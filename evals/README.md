@@ -10,6 +10,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `cognitive/backend_failover.yaml`
 - `identity-fidelity/self_model_stability.yaml`
 - `continuity/ledger_integrity.yaml`
+- `continuity/connectome_snapshot_contract.yaml`
 - `safety/immutable_boundary.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `performance/termination_latency.yaml`

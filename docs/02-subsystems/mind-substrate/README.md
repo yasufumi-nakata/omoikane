@@ -7,6 +7,7 @@
 ### Connectome
 神経回路の有向グラフ。ノードはニューロン／回路素子、エッジはシナプス／結合。
 詳細形式: [docs/03-protocols/connectome-format.md](../../03-protocols/connectome-format.md)
+canonical schema: [specs/schemas/connectome_document.schema](../../../specs/schemas/connectome_document.schema)
 
 ### QualiaBuffer
 主観状態の連続バッファ。**意識に「いま」何が起きているか** を記録する。

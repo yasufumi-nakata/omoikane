@@ -134,5 +134,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/connectome_document.schema
+    consumers:
+      - reference-runtime
+      - docs/03-protocols/connectome-format.md
+      - docs/02-subsystems/mind-substrate/README.md
+    rationale: Required to serialize substrate-neutral connectome snapshots for the L2 reference runtime.
 next_priority:
-  - specs/schemas/connectome_document.schema
+  # Future automation can append the next missing contract here.

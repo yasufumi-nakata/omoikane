@@ -1,0 +1,18 @@
+eval_id: connectome_snapshot_contract
+target: mind.connectome
+level: L2
+description: >
+  ConnectomeDocument が substrate-neutral shape を保ち、全 edge/hierarchy 参照が
+  既知ノードへ閉じること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
+expected:
+  validation_ok: true
+  node_count_min: 3
+  edge_count_min: 2
+  hierarchy_count_min: 1
+  invariant_count_min: 1
+metric: boolean
+threshold: 1.0
+ethics_check: true

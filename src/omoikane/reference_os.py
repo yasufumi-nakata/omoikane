@@ -15,6 +15,7 @@ from .cognitive import (
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
+from .mind.connectome import ConnectomeModel
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction.gaps import GapScanner
@@ -30,6 +31,7 @@ class OmoikaneReferenceOS:
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
         self.qualia = QualiaBuffer()
+        self.connectome = ConnectomeModel()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
@@ -220,6 +222,34 @@ class OmoikaneReferenceOS:
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
+
+    def run_connectome_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://connectome-demo/v1",
+            metadata={"display_name": "Connectome Sandbox"},
+        )
+        connectome = self.connectome.build_reference_snapshot(identity.identity_id)
+        validation = self.connectome.validate(connectome)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.connectome.snapshotted",
+            payload={
+                "snapshot_id": connectome["snapshot_id"],
+                "node_count": validation["node_count"],
+                "edge_count": validation["edge_count"],
+            },
+            actor="ConnectomeModel",
+            signatures=["integrity-guardian"],
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "connectome": connectome,
+            "validation": validation,
+            "ledger_verification": self.ledger.verify(),
+        }
 
     def run_cognitive_failover_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(

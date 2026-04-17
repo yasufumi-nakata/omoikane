@@ -17,6 +17,12 @@ def _build_parser() -> argparse.ArgumentParser:
     demo_parser = subparsers.add_parser("demo", help="Run a safe reference scenario")
     demo_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    connectome_parser = subparsers.add_parser(
+        "connectome-demo",
+        help="Emit a reference L2 connectome snapshot and validation summary",
+    )
+    connectome_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     cognitive_parser = subparsers.add_parser(
         "cognitive-demo",
         help="Run the L3 reasoning backend failover scenario",
@@ -50,6 +56,10 @@ def main() -> None:
 
     if args.command == "demo":
         _print_result(runtime.run_reference_scenario(), args.json)
+        return
+
+    if args.command == "connectome-demo":
+        _print_result(runtime.run_connectome_demo(), args.json)
         return
 
     if args.command == "cognitive-demo":

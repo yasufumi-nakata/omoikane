@@ -7,6 +7,7 @@
 ```yaml
 ConnectomeDocument:
   schema_version: '1.0'
+  snapshot_id: <uuid>
   identity_id: <id>
   snapshot_time: <attested>
   nodes:
@@ -21,21 +22,27 @@ ConnectomeDocument:
       source: <node_id>
       target: <node_id>
       weight: <float>
-      delay: <ms>
-      plasticity: { rule, params }
+      delay_ms: <float>
+      plasticity: { rule, params, enabled }
   hierarchies:
     - id: <uuid>
       kind: cortical_column|basal_ganglia|...
       members: [<node_id>...]
+      description: <optional>
   invariants:
-    - <invariant_id>: <expression>
+    - invariant_id: <name>
+      expression: <rule>
+      scope: document|subgraph|hierarchy-name
 ```
+
+canonical schema: [specs/schemas/connectome_document.schema](../../specs/schemas/connectome_document.schema)
 
 ## Substrate 中立化
 
 - 物理座標は `frame: anatomical` で生体由来、`frame: abstract` で計算空間
 - 重み・遅延は **物理単位ではなく機能単位** で正規化
 - 各 substrate adapter が「自分の物理表現への翻訳器」を持つ
+- reference runtime では `connectome-demo` がこの canonical schema に沿う最小 snapshot を出力する
 
 ## 同等性検証
 

@@ -1,0 +1,186 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/connectome_document.schema"
+title: ConnectomeDocument
+description: >
+  Substrate-neutral connectome snapshot for the OmoikaneOS reference runtime.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - snapshot_id
+  - identity_id
+  - snapshot_time
+  - nodes
+  - edges
+  - hierarchies
+  - invariants
+properties:
+  schema_version:
+    const: "1.0"
+  snapshot_id:
+    type: string
+    format: uuid
+  identity_id:
+    type: string
+    minLength: 1
+  snapshot_time:
+    type: string
+    format: date-time
+  nodes:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/node"
+  edges:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/edge"
+  hierarchies:
+    type: array
+    items:
+      $ref: "#/$defs/hierarchy"
+  invariants:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/invariant"
+$defs:
+  position:
+    type: object
+    additionalProperties: false
+    required:
+      - x
+      - y
+      - z
+      - frame
+    properties:
+      x:
+        type: number
+      y:
+        type: number
+      z:
+        type: number
+      frame:
+        type: string
+        enum:
+          - anatomical
+          - abstract
+  node:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - kind
+      - type
+      - position
+      - properties
+    properties:
+      id:
+        type: string
+        format: uuid
+      kind:
+        type: string
+        enum:
+          - neuron
+          - circuit
+          - module
+      type:
+        type: string
+        enum:
+          - excitatory
+          - inhibitory
+          - modulatory
+      position:
+        $ref: "#/$defs/position"
+      properties:
+        type: object
+        minProperties: 1
+      substrate_hint:
+        type: string
+        minLength: 1
+  plasticity:
+    type: object
+    additionalProperties: false
+    required:
+      - rule
+      - params
+      - enabled
+    properties:
+      rule:
+        type: string
+        minLength: 1
+      params:
+        type: object
+        minProperties: 1
+      enabled:
+        type: boolean
+  edge:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - source
+      - target
+      - weight
+      - delay_ms
+      - plasticity
+    properties:
+      id:
+        type: string
+        format: uuid
+      source:
+        type: string
+        format: uuid
+      target:
+        type: string
+        format: uuid
+      weight:
+        type: number
+        minimum: 0
+      delay_ms:
+        type: number
+        minimum: 0
+      plasticity:
+        $ref: "#/$defs/plasticity"
+  hierarchy:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - kind
+      - members
+    properties:
+      id:
+        type: string
+        format: uuid
+      kind:
+        type: string
+        minLength: 1
+      members:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          format: uuid
+      description:
+        type: string
+        minLength: 1
+  invariant:
+    type: object
+    additionalProperties: false
+    required:
+      - invariant_id
+      - expression
+      - scope
+    properties:
+      invariant_id:
+        type: string
+        minLength: 1
+      expression:
+        type: string
+        minLength: 1
+      scope:
+        type: string
+        minLength: 1

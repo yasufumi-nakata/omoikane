@@ -7,6 +7,7 @@
 - `identity_record.schema`
 - `qualia_tick.schema`
 - `self_model.schema`
+- `connectome_document.schema`
 - `council_input.yaml`
 - `council_output.yaml`
 - `council_argument.yaml`
@@ -20,7 +21,7 @@
 
 ## 次段階
 
-connectome / memory crystal / episodic event / interface handshake は
+memory crystal / episodic event / interface handshake は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式
