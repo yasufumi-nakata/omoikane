@@ -22,6 +22,7 @@ class GapScanner:
         open_questions = self._unchecked_items(repo_root / "meta" / "open-questions.md")
         missing_specs = self._missing_expected_files(repo_root / "specs")
         empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
+        catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
 
         prioritized_tasks: List[Dict[str, str]] = []
@@ -39,6 +40,14 @@ class GapScanner:
                     "priority": "high",
                     "kind": "empty-eval-surface",
                     "summary": f"評価 surface が空です: {surface}",
+                }
+            )
+        for filename in catalog_pending:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "catalog-next-priority",
+                    "summary": f"catalog の次優先ファイルが未実装です: {filename}",
                 }
             )
         for item in open_questions[:10]:
@@ -67,9 +76,34 @@ class GapScanner:
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
             "empty_eval_surfaces": empty_eval_surfaces,
+            "catalog_pending_count": len(catalog_pending),
+            "catalog_pending_files": catalog_pending,
             "placeholder_hits": placeholder_hits,
             "prioritized_tasks": prioritized_tasks,
         }
+
+    @staticmethod
+    def _catalog_pending_files(catalog_path: Path, repo_root: Path) -> List[str]:
+        if not catalog_path.exists():
+            return []
+
+        pending: List[str] = []
+        in_next_priority = False
+        for line in catalog_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped == "next_priority:":
+                in_next_priority = True
+                continue
+            if not in_next_priority:
+                continue
+            if stripped.startswith("- "):
+                candidate = stripped[2:].strip().strip("'\"")
+                if candidate and not (repo_root / candidate).exists():
+                    pending.append(candidate)
+                continue
+            if stripped and not stripped.startswith("#"):
+                break
+        return pending
 
     @staticmethod
     def _unchecked_items(path: Path) -> List[str]:

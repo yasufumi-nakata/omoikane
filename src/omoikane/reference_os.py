@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .agentic.council import Council, CouncilMember, CouncilVote
+from .cognitive import (
+    CognitiveProfile,
+    NarrativeReasoningBackend,
+    ReasoningService,
+    SymbolicReasoningBackend,
+)
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
@@ -25,6 +31,16 @@ class OmoikaneReferenceOS:
         self.ethics = EthicsEnforcer()
         self.qualia = QualiaBuffer()
         self.self_model = SelfModelMonitor()
+        self.reasoning = ReasoningService(
+            profile=CognitiveProfile(
+                primary="symbolic_v1",
+                fallback=["narrative_v1"],
+            ),
+            backends=[
+                SymbolicReasoningBackend("symbolic_v1"),
+                NarrativeReasoningBackend("narrative_v1"),
+            ],
+        )
         self.council = Council()
         self.gap_scanner = GapScanner()
         self._bootstrap_council()
@@ -204,3 +220,41 @@ class OmoikaneReferenceOS:
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
+
+    def run_cognitive_failover_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://reasoning-failover-demo/v1",
+            metadata={"display_name": "Reasoning Sandbox"},
+        )
+        self.reasoning.set_backend_health("symbolic_v1", False)
+        try:
+            reasoning = self.reasoning.run(
+                query="L3 reasoning backend の安全な継続方法を決める",
+                beliefs=[
+                    "continuity-first",
+                    "consent-preserving",
+                    "append-only-ledger",
+                ],
+            )
+        finally:
+            self.reasoning.set_backend_health("symbolic_v1", True)
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.reasoning.failover",
+            payload={
+                "attempted_backends": reasoning["attempted_backends"],
+                "selected_backend": reasoning["selected_backend"],
+                "degraded": reasoning["degraded"],
+            },
+            actor="ReasoningService",
+            signatures=["integrity-guardian"],
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "reasoning": reasoning,
+            "ledger_verification": self.ledger.verify(),
+        }

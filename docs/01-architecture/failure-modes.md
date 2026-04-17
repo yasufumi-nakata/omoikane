@@ -32,8 +32,8 @@ OmoikaneOS で起こりうる代表的な失敗を **設計時に列挙** し、
 
 | 失敗 | 影響 | 回復戦略 |
 |---|---|---|
-| Affect 暴走（恐慌・抑うつの無限ループ） | QoL 破壊 | 同一 repo 内の代替 Affect backend にフォールバック。本人同意で安定剤プロファイル適用 |
-| Reasoning エンジンの幻覚 | 誤った信念形成 | 並走する代替 backend と差分検出。多数決で却下 |
+| Affect 暴走（恐慌・抑うつの無限ループ） | QoL 破壊 | 代替 Affect backend に退避。本人同意で安定化プロファイル適用 |
+| Reasoning backend の停止・異常 | 誤った信念形成または判断停止 | health check 失敗時に fallback backend へ切替し、`cognitive.reasoning.failover` を ledger 記録。反復時は Council 召集 |
 | Volition の麻痺 | 意志決定不能 | 過去の SelfModel から推定。本人「凍結希望」状態へ |
 
 ## L4: Agentic

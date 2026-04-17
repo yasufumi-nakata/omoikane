@@ -17,6 +17,12 @@ def _build_parser() -> argparse.ArgumentParser:
     demo_parser = subparsers.add_parser("demo", help="Run a safe reference scenario")
     demo_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    cognitive_parser = subparsers.add_parser(
+        "cognitive-demo",
+        help="Run the L3 reasoning backend failover scenario",
+    )
+    cognitive_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -44,6 +50,10 @@ def main() -> None:
 
     if args.command == "demo":
         _print_result(runtime.run_reference_scenario(), args.json)
+        return
+
+    if args.command == "cognitive-demo":
+        _print_result(runtime.run_cognitive_failover_demo(), args.json)
         return
 
     if args.command == "gap-report":

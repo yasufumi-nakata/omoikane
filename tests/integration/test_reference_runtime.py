@@ -28,6 +28,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["missing_expected_file_count"])
         self.assertEqual(0, report["empty_eval_surface_count"])
 
+    def test_cognitive_failover_demo_records_fallback(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_cognitive_failover_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["reasoning"]["degraded"])
+        self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
+
 
 if __name__ == "__main__":
     unittest.main()

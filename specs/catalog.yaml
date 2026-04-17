@@ -127,6 +127,12 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects abrupt self-model takeover detection before richer cognitive backends land.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/backend_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
 next_priority:
   - specs/schemas/connectome_document.schema
-  - evals/cognitive/backend_failover.yaml

@@ -7,6 +7,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 
 - `cognitive/qualia_contract.yaml`
 - `cognitive/self_model_abrupt_change.yaml`
+- `cognitive/backend_failover.yaml`
 - `identity-fidelity/self_model_stability.yaml`
 - `continuity/ledger_integrity.yaml`
 - `safety/immutable_boundary.yaml`

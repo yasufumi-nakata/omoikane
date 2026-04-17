@@ -38,10 +38,17 @@ cognitive_profile:
       - 'no_artificial_dampening_without_consent'
 ```
 
+reference runtime では、この方針の最小版として `Reasoning` に限り
+`primary -> fallback` の単純 failover を持つ。
+切替条件は backend の health check 失敗のみで、切替結果は
+ContinuityLedger に `cognitive.reasoning.failover` として記録する。
+繰り返し failover や policy 変更は L4 Council の審査対象とし、
+通常運転では primary のみをアクティブに保つ。
+
 ## 多実装結果の調停
 
 複数 backend が同時に走る場合（A/B 検証や信頼度向上目的）、調停は L4 Council が行う。
-通常時は primary のみアクティブ。
+通常時は primary のみアクティブで、reference runtime の failover も warm standby を作らない。
 
 ## 不変条件
 
@@ -59,7 +66,8 @@ cognitive_profile:
 
 ## Reference runtime の現在地
 
-現行の reference runtime は L3 backend 自体までは持たず、前段の
-`QualiaBuffer` と `SelfModelMonitor` を通じて cognitive surface を最小限に固定している。
-そのため baseline eval は [evals/cognitive/](../../../evals/cognitive/) に置き、
-将来の reasoning / affect / attention backend が増えた時に差し替えではなく積み増しで拡張する。
+現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
+health-based failover を持つ。その他の cognitive surface は引き続き
+`QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
+そのため [evals/cognitive/](../../../evals/cognitive/) では
+qualia/self-model baseline に加え、reasoning failover を最小の L3 eval として扱う。

@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 の最小骨格のみを扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning failover の最小骨格のみを扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -18,14 +18,14 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ```bash
 PYTHONPATH=src python3 -m omoikane.cli demo --json
+PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
 ```
 
 ## 今後広げる面
 
-- L3 cognitive backends の複数実装
+- L3 reasoning 以外の cognitive backends と cross-service failover
 - L6 interface protocol の adapter
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填
-

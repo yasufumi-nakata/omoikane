@@ -46,6 +46,8 @@
 - `Language` ── 内的言語と外的言語の橋渡し
 
 各サービスは **複数の実装** を持ち得る（古典 / LLM / 量子 / 生体）。本人が選択できる。
+reference runtime では `Reasoning` に対してのみ backend supervisor を置き、
+health check に基づく `primary -> fallback` の単純切替を行う。
 
 ## L4: Agentic Orchestration ── 八百万
 

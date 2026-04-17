@@ -17,6 +17,8 @@
 
 L1 scheduler/broker/termination、L2 connectome/memory、L3 cognitive、L6 interface は
 docs 側で設計を深めてから昇格させる。
+reference runtime にある reasoning failover も、現時点では内部実装に留め、
+IDL 化は service 境界が安定してから行う。
 
 ## 形式
 

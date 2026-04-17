@@ -38,3 +38,5 @@ status: decided | superseded
 ## 既存ログ
 
 - [2026-04-18_initial-architecture.md](2026-04-18_initial-architecture.md)
+- [2026-04-18_cognitive-eval-baseline.md](2026-04-18_cognitive-eval-baseline.md)
+- [2026-04-18_reasoning-failover-baseline.md](2026-04-18_reasoning-failover-baseline.md)

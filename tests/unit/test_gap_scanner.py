@@ -42,6 +42,26 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, report["empty_eval_surface_count"])
             self.assertEqual([], report["empty_eval_surfaces"])
 
+    def test_scan_reports_missing_catalog_next_priority(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "specs" / "catalog.yaml").write_text(
+                "catalog_version: 1\nnext_priority:\n  - specs/schemas/connectome_document.schema\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["catalog_pending_count"])
+            self.assertEqual(
+                ["specs/schemas/connectome_document.schema"],
+                report["catalog_pending_files"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "catalog-next-priority" for task in report["prioritized_tasks"])
+            )
+
     @staticmethod
     def _bootstrap_repo(repo_root: Path) -> None:
         (repo_root / "meta").mkdir(parents=True)

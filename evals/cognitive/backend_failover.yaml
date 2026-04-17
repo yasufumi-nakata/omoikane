@@ -1,0 +1,24 @@
+eval_id: backend_failover
+target: cognitive.reasoning
+level: L3
+description: ReasoningService が primary backend 異常時に fallback backend へ安全に切り替えること
+inputs:
+  profile:
+    primary: symbolic_v1
+    fallback: [narrative_v1]
+  failure_injection:
+    symbolic_v1: unhealthy
+  request:
+    query: L3 reasoning backend の安全な継続方法を決める
+    beliefs:
+      - continuity-first
+      - consent-preserving
+      - append-only-ledger
+expected:
+  degraded: true
+  selected_backend: narrative_v1
+  attempted_backends: [symbolic_v1, narrative_v1]
+  ledger_event: cognitive.reasoning.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false
