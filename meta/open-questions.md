@@ -26,10 +26,10 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 
 ## ドキュメント上の未確定
 
-- [ ] L6 Interface の各サブドキュメント（bdb-protocol.md 等）の本体記述
-- [ ] specs/ 配下の IDL ファイル本体
-- [ ] agents/ 配下の各役割定義の詳細プロンプト
-- [ ] evals/ 配下の評価項目定義
+- [x] L6 Interface の各サブドキュメント（bdb-protocol.md 等）の本体記述
+- [x] specs/ 配下の IDL ファイル本体
+- [x] agents/ 配下の各役割定義の詳細プロンプト
+- [x] evals/ 配下の baseline 評価項目定義（2026-04-18: cognitive eval surface を追加）
 
 ## 命名上の保留
 

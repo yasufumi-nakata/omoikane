@@ -21,6 +21,7 @@ class GapScanner:
         repo_root = repo_root.resolve()
         open_questions = self._unchecked_items(repo_root / "meta" / "open-questions.md")
         missing_specs = self._missing_expected_files(repo_root / "specs")
+        empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
         placeholder_hits = self._placeholder_hits(repo_root)
 
         prioritized_tasks: List[Dict[str, str]] = []
@@ -30,6 +31,14 @@ class GapScanner:
                     "priority": "high",
                     "kind": "missing-spec",
                     "summary": f"期待される spec/eval ファイルが未作成です: {filename}",
+                }
+            )
+        for surface in empty_eval_surfaces:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "empty-eval-surface",
+                    "summary": f"評価 surface が空です: {surface}",
                 }
             )
         for item in open_questions[:10]:
@@ -53,9 +62,11 @@ class GapScanner:
             "repo_root": str(repo_root),
             "open_question_count": len(open_questions),
             "missing_expected_file_count": len(missing_specs),
+            "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
+            "empty_eval_surfaces": empty_eval_surfaces,
             "placeholder_hits": placeholder_hits,
             "prioritized_tasks": prioritized_tasks,
         }
@@ -107,6 +118,21 @@ class GapScanner:
                 expected.append(base_dir / candidate)
         return expected
 
+    @staticmethod
+    def _empty_eval_surfaces(evals_root: Path) -> List[str]:
+        if not evals_root.exists():
+            return []
+
+        surfaces: List[str] = []
+        for child in sorted(path for path in evals_root.iterdir() if path.is_dir()):
+            has_eval_files = any(
+                candidate.is_file() and candidate.suffix.lower() in {".yaml", ".yml"}
+                for candidate in child.rglob("*")
+            )
+            if not has_eval_files:
+                surfaces.append(str(child.relative_to(evals_root.parent)))
+        return surfaces
+
     def _placeholder_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
         for path in repo_root.rglob("*"):
@@ -121,6 +147,8 @@ class GapScanner:
                 continue
             for line in text.splitlines():
                 stripped = line.strip()
+                if stripped.startswith("- [x] "):
+                    continue
                 if any(marker in stripped for marker in PLACEHOLDER_MARKERS):
                     hits.append({"path": str(relative_path), "line": stripped})
         return hits

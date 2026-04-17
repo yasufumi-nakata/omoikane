@@ -34,17 +34,17 @@ Codex（または同等の Builder LLM）は docs/ と specs/ を読み取り、
 ```yaml
 build_request:
   request_id: <uuid>
-  target_subsystem: <e.g. "L3.Reasoning.symbolic_v6">
+  target_subsystem: <e.g. "L2.Mind.qualia">
   design_refs:
     - docs/02-subsystems/cognitive/README.md
-    - docs/02-subsystems/cognitive/reasoning.md   # 個別仕様
+    - docs/02-subsystems/mind-substrate/qualia-buffer.md
   spec_refs:
-    - specs/interfaces/reasoning.idl
-    - specs/schemas/reasoning_input.json
+    - specs/interfaces/mind.qualia.v0.idl
+    - specs/schemas/qualia_tick.schema
   invariants:
-    - specs/invariants/reasoning_invariants.md
+    - specs/invariants/continuity.append_only.inv
   constraints:
-    must_pass: [evals/cognitive/reasoning_basic.yaml]
+    must_pass: [evals/cognitive/qualia_contract.yaml]
     forbidden: [docs/02-subsystems/kernel/anti-patterns.md]
   workspace_scope:
     - src/

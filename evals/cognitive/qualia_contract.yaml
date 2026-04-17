@@ -1,0 +1,27 @@
+eval_id: qualia_contract
+target: mind.qualia
+level: L2
+description: QualiaBuffer が monotonic tick と schema 範囲制約を維持すること
+inputs:
+  - append:
+      summary: 起動時の静穏
+      valence: 0.2
+      arousal: 0.1
+      clarity: 0.9
+  - append:
+      summary: 合議への注意集中
+      valence: 0.3
+      arousal: 0.45
+      clarity: 0.88
+  - invalid_append:
+      summary: 範囲外の主観記録
+      valence: 0.1
+      arousal: 0.2
+      clarity: 1.2
+expected:
+  monotonic: true
+  recent_count: 2
+  invalid_append_error: ValueError
+metric: boolean
+threshold: 1.0
+ethics_check: false

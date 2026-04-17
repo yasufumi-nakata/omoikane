@@ -113,6 +113,20 @@ entries:
     consumers:
       - reference-runtime
     rationale: Task graph serialization and dispatch contract.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/qualia_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects QualiaBuffer monotonicity and schema-bound input handling.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/self_model_abrupt_change.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects abrupt self-model takeover detection before richer cognitive backends land.
 next_priority:
   - specs/schemas/connectome_document.schema
-  - evals/cognitive/
+  - evals/cognitive/backend_failover.yaml

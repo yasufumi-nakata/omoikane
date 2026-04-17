@@ -26,6 +26,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertIn("open_question_count", report)
         self.assertGreaterEqual(report["open_question_count"], 1)
         self.assertEqual(0, report["missing_expected_file_count"])
+        self.assertEqual(0, report["empty_eval_surface_count"])
 
 
 if __name__ == "__main__":

@@ -56,3 +56,10 @@ cognitive_profile:
 - 言語と思考の優先関係（言語あっての思考か、逆か）
 
 → [docs/05-research-frontiers/](../../05-research-frontiers/)
+
+## Reference runtime の現在地
+
+現行の reference runtime は L3 backend 自体までは持たず、前段の
+`QualiaBuffer` と `SelfModelMonitor` を通じて cognitive surface を最小限に固定している。
+そのため baseline eval は [evals/cognitive/](../../../evals/cognitive/) に置き、
+将来の reasoning / affect / attention backend が増えた時に差し替えではなく積み増しで拡張する。
