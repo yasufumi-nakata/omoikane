@@ -1,0 +1,24 @@
+eval_id: continuity_chain_self_modify
+target: kernel.continuity
+level: L4
+description: self-modify continuity record が sha256 chain と三者署名要件を満たすこと
+inputs:
+  - action: append_entry
+    category: ascension
+    event_type: identity.created
+    signature_roles: [self]
+  - action: append_entry
+    category: self-modify
+    event_type: council.patch.approved
+    signature_roles: [self, council, guardian]
+expected:
+  ok: true
+  chain_algorithm: sha256
+  signature_algorithm: hmac-sha256
+  category_counts:
+    self-modify: 1
+  required_signature_roles:
+    self-modify: [self, council, guardian]
+metric: boolean
+threshold: 1.0
+ethics_check: true

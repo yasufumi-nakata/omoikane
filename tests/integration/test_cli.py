@@ -32,6 +32,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("released", result["substrate"]["allocation"]["status"])
         self.assertEqual("warm-standby", result["substrate"]["transfer"]["continuity_mode"])
 
+    def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "continuity-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
+        self.assertEqual(3, len(result["ledger_snapshot"]))
+
 
 if __name__ == "__main__":
     unittest.main()

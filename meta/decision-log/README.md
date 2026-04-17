@@ -41,3 +41,4 @@ status: decided | superseded
 - [2026-04-18_cognitive-eval-baseline.md](2026-04-18_cognitive-eval-baseline.md)
 - [2026-04-18_reasoning-failover-baseline.md](2026-04-18_reasoning-failover-baseline.md)
 - [2026-04-18_connectome-document-baseline.md](2026-04-18_connectome-document-baseline.md)
+- [2026-04-18_continuity-ledger-profile.md](2026-04-18_continuity-ledger-profile.md)

@@ -7,7 +7,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 ## 設計上の未確定
 
 - [x] L0 SubstrateAdapter の API を IDL として確定（2026-04-18: `substrate.adapter.v0.idl` を schema 参照付きで確定し、`substrate-demo` と continuity eval を追加）
-- [ ] ContinuityLedger のチェーン形式（hash 種・署名アルゴリズム）の暫定選定
+- [x] ContinuityLedger のチェーン形式（hash 種・署名アルゴリズム）の暫定選定（2026-04-18: reference runtime を `sha256` chain + `hmac-sha256` signature profile に固定し、schema/IDL/CLI/eval を整合）
 - [ ] QualiaTick の高次元埋め込みの次元数と時間粒度
 - [ ] MemoryCrystal の compaction 戦略
 - [ ] Council session の最大時間と timeout 戦略

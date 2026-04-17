@@ -75,14 +75,20 @@ class OmoikaneReferenceOS:
             event_type="identity.created",
             payload={"display_name": "Amaterasu Endpoint", "lineage_id": identity.lineage_id},
             actor="IdentityRegistry",
-            signatures=["self-consent"],
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
         )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="substrate.attested",
             payload={"attestation_id": attestation.attestation_id, "substrate": attestation.substrate},
             actor="SubstrateBroker",
-            signatures=["integrity-guardian"],
+            category="attestation",
+            layer="L0",
+            signature_roles=["guardian"],
+            substrate=attestation.substrate,
         )
 
         qualia_ticks = [
@@ -137,7 +143,10 @@ class OmoikaneReferenceOS:
             event_type="identity.forked",
             payload={"parent_id": identity.identity_id, "mode": "sandbox"},
             actor="IdentityRegistry",
-            signatures=["self", "third-party", "legal"],
+            category="fork",
+            layer="L1",
+            signature_roles=["self", "council", "guardian", "third_party"],
+            substrate="classical-silicon",
         )
 
         return {
@@ -166,6 +175,8 @@ class OmoikaneReferenceOS:
                 "parent_id": approved_fork.parent_id,
                 "lineage_id": approved_fork.lineage_id,
             },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
         }
 
@@ -215,7 +226,10 @@ class OmoikaneReferenceOS:
             event_type="council.decision",
             payload=decision.to_dict(),
             actor="Council",
-            signatures=["design-architect", "ethics-committee", "integrity-guardian"],
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
         )
         return {
             "proposal_id": proposal.proposal_id,
@@ -258,7 +272,10 @@ class OmoikaneReferenceOS:
                 "status": attestation.status,
             },
             actor="SubstrateBroker",
-            signatures=["integrity-guardian"],
+            category="attestation",
+            layer="L0",
+            signature_roles=["guardian"],
+            substrate=attestation.substrate,
         )
         transfer = self.substrate.transfer(
             allocation_id=allocation.allocation_id,
@@ -280,7 +297,10 @@ class OmoikaneReferenceOS:
                 "continuity_mode": transfer.continuity_mode,
             },
             actor="SubstrateBroker",
-            signatures=["self", "council", "integrity-guardian"],
+            category="substrate-migrate",
+            layer="L0",
+            signature_roles=["self", "council", "guardian"],
+            substrate=transfer.destination_substrate,
         )
         release = self.substrate.release(
             allocation_id=allocation.allocation_id,
@@ -291,7 +311,10 @@ class OmoikaneReferenceOS:
             event_type="substrate.released",
             payload=release,
             actor="SubstrateBroker",
-            signatures=["integrity-guardian"],
+            category="substrate-release",
+            layer="L0",
+            signature_roles=["guardian"],
+            substrate="classical_silicon.redundant",
         )
         return {
             "identity": {
@@ -306,6 +329,8 @@ class OmoikaneReferenceOS:
                 "release": release,
                 "snapshot": self.substrate.snapshot(),
             },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
         }
 
@@ -325,7 +350,10 @@ class OmoikaneReferenceOS:
                 "edge_count": validation["edge_count"],
             },
             actor="ConnectomeModel",
-            signatures=["integrity-guardian"],
+            category="connectome-snapshot",
+            layer="L2",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
         )
         return {
             "identity": {
@@ -334,6 +362,8 @@ class OmoikaneReferenceOS:
             },
             "connectome": connectome,
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
         }
 
@@ -364,7 +394,10 @@ class OmoikaneReferenceOS:
                 "degraded": reasoning["degraded"],
             },
             actor="ReasoningService",
-            signatures=["integrity-guardian"],
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
         )
         return {
             "identity": {
@@ -372,5 +405,61 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "reasoning": reasoning,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_continuity_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://continuity-demo/v1",
+            metadata={"display_name": "Continuity Sandbox"},
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.created",
+            payload={"display_name": "Continuity Sandbox", "lineage_id": identity.lineage_id},
+            actor="IdentityRegistry",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.qualia.checkpointed",
+            payload={
+                "slice_id": "qualia-slice-0001",
+                "valence": 0.22,
+                "arousal": 0.31,
+                "coherence": 0.91,
+            },
+            actor="QualiaBuffer",
+            category="qualia-checkpoint",
+            layer="L2",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.patch.approved",
+            payload={
+                "proposal_id": "proposal-continuity-0001",
+                "target_component": "ContinuityLedger",
+                "change_scope": "signature policy hardening",
+            },
+            actor="Council",
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
         }

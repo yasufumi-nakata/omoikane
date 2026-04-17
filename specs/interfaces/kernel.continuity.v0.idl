@@ -6,6 +6,33 @@ summary: Append-only continuity evidence logging and verification.
 imports:
   continuity_log_entry: ../schemas/continuity_log_entry.schema
 operations:
+  read_profile:
+    summary: Return the active chain and signature profile for this continuity ledger.
+    output:
+      inline_schema:
+        type: object
+        required:
+          - genesis_hash
+          - chain_algorithm
+          - signature_algorithm
+          - required_signature_roles
+        properties:
+          genesis_hash:
+            type: string
+          chain_algorithm:
+            type: string
+            enum:
+              - sha256
+          signature_algorithm:
+            type: string
+            enum:
+              - hmac-sha256
+          required_signature_roles:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
   append_entry:
     summary: Append one continuity event into the ledger.
     input:
@@ -16,10 +43,13 @@ operations:
         required:
           - accepted
           - entry_id
+          - entry_hash
         properties:
           accepted:
             type: boolean
           entry_id:
+            type: string
+          entry_hash:
             type: string
   verify_chain:
     summary: Verify hash continuity and required signatures for a sequence.
@@ -39,6 +69,8 @@ operations:
         required:
           - status
           - verified_count
+          - chain_algorithm
+          - signature_algorithm
         properties:
           status:
             type: string
@@ -48,6 +80,14 @@ operations:
               - uncertain
           verified_count:
             type: integer
+          chain_algorithm:
+            type: string
+            enum:
+              - sha256
+          signature_algorithm:
+            type: string
+            enum:
+              - hmac-sha256
           first_error:
             type: string
   mark_uncertain_interval:

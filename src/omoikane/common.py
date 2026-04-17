@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -28,3 +29,7 @@ def sha256_text(text: str) -> str:
     """Return a SHA-256 hex digest."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+
+def hmac_sha256_text(key: str, text: str) -> str:
+    """Return an HMAC-SHA256 hex digest."""
+    return hmac.new(key.encode("utf-8"), text.encode("utf-8"), hashlib.sha256).hexdigest()

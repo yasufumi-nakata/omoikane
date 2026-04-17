@@ -6,6 +6,7 @@ type: object
 additionalProperties: false
 required:
   - entry_id
+  - entry_hash
   - prev_hash
   - identity_id
   - logical_time
@@ -13,10 +14,16 @@ required:
   - substrate
   - layer
   - category
+  - event_type
   - payload_ref
+  - chain_algorithm
+  - signature_algorithm
   - signatures
 properties:
   entry_id:
+    type: string
+    minLength: 16
+  entry_hash:
     type: string
     minLength: 16
   prev_hash:
@@ -51,17 +58,36 @@ properties:
     type: string
     enum:
       - ascension
+      - attestation
       - fork
       - terminate
       - crystal-commit
+      - connectome-snapshot
       - qualia-checkpoint
       - substrate-migrate
+      - substrate-release
       - self-modify
       - ethics-veto
       - ethics-escalate
+      - cognitive-failover
+  event_type:
+    type: string
+    minLength: 1
   payload_ref:
     type: string
     minLength: 1
+  payload_inline:
+    description: Inline payload mirror used by the reference runtime before external CAS storage exists.
+    type: object
+    minProperties: 1
+  chain_algorithm:
+    type: string
+    enum:
+      - sha256
+  signature_algorithm:
+    type: string
+    enum:
+      - hmac-sha256
   signatures:
     type: object
     additionalProperties: false
@@ -127,14 +153,18 @@ allOf:
             - third_party
 examples:
   - entry_id: log-0002
-    prev_hash: log-0001
+    entry_hash: 6a3f8f2797052ceeb0e4f4d4781abacd5892c04f65de3a07802340f9b7c625d3
+    prev_hash: 2fdbe46de6c34074ea9c8eacf4fca08f32b3b1824a2dfd4fe6106f1d0fbdbd9d
     identity_id: self-001
     logical_time: 42
     wall_time: "2026-04-18T09:30:00Z"
     substrate: classical-silicon
     layer: L5
     category: self-modify
-    payload_ref: cas://build-artifact-0001
+    event_type: council.patch.approved
+    payload_ref: cas://sha256/6e1ce8b55a7d8b7c9a1f9a85ad31413d426a5cf00e75cb00502dbda38b0a0111
+    chain_algorithm: sha256
+    signature_algorithm: hmac-sha256
     signatures:
       self: sig:self-001
       council: sig:council

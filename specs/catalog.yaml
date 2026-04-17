@@ -178,6 +178,13 @@ entries:
     rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
   - priority: P1
     kind: eval
+    file: evals/continuity/continuity_chain_self_modify.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the bootstrap self-modify chain profile and required tri-signature policy.
+  - priority: P1
+    kind: eval
     file: evals/continuity/substrate_migration_continuity.yaml
     consumers:
       - reference-runtime

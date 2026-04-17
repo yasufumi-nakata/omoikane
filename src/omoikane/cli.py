@@ -35,6 +35,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     substrate_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    continuity_parser = subparsers.add_parser(
+        "continuity-demo",
+        help="Run the L1 continuity ledger profile and signature policy scenario",
+    )
+    continuity_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -74,6 +80,10 @@ def main() -> None:
 
     if args.command == "substrate-demo":
         _print_result(runtime.run_substrate_demo(), args.json)
+        return
+
+    if args.command == "continuity-demo":
+        _print_result(runtime.run_continuity_demo(), args.json)
         return
 
     if args.command == "gap-report":

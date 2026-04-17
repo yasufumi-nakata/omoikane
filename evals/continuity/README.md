@@ -7,6 +7,9 @@
 ### Continuity Ledger Integrity
 ハッシュチェーンの連続性、署名の正当性。
 
+### Continuity Self-Modify Chain
+`self-modify` 記録が `sha256` チェーンと `self/council/guardian` 三者署名を満たすか。
+
 ### Connectome Snapshot Contract
 connectome snapshot の参照整合性、閉路構造、invariant 記述の存在。
 
