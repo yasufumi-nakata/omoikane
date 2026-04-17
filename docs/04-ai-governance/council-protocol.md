@@ -21,6 +21,9 @@ Council（評議体）の運用詳細。
 - トリガ: 改修提案 / 倫理懸念 / 本人意思 / 障害イベント
 - 召集者: Speaker
 - 出席: 案件種別ごとに [council-composition.md](../02-subsystems/agentic/council-composition.md) の規約
+- convene 時に `session_policy` を確定する
+  - standard: soft timeout 45s / hard timeout 90s / 最大 4 ラウンド
+  - expedited: soft timeout 250ms / hard timeout 1s / 最大 1 ラウンド
 
 ## Speak in turn
 
@@ -38,6 +41,10 @@ Council（評議体）の運用詳細。
 - **合意** が原則
 - 不一致時は trust 重み付き多数決（[trust-management.md](../02-subsystems/agentic/trust-management.md)）
 - veto: Guardian と Self Liaison のみ持つ
+- soft timeout 到達時は quorum が揃っていれば **weighted-majority fallback**
+- hard timeout 到達時は
+  - standard: 人間 governance へ escalation
+  - expedited: 即 defer し、通常議事で追認
 
 ## Gate
 
@@ -62,7 +69,7 @@ Council（評議体）の運用詳細。
 - トリガ: substrate 障害・倫理違反検知・本人危機
 - 召集時間: 常に < 1s
 - 出席: Guardian + Speaker + 関連専門家のみ
-- 事後に通常議事で追認
+- 1s を超えたら即 defer し、事後に通常議事で追認
 
 ## 永続不一致
 

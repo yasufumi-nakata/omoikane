@@ -19,6 +19,9 @@ operations:
       - participants.self_liaison must be present
       - decision_policy.veto_holders must include guardian or self
     guarantees:
+      - session_policy must fit the declared session_mode budget profile
+      - standard sessions must never exceed 90000ms or 4 rounds without escalation
+      - expedited sessions must never exceed 1000ms or 1 round without defer-to-standard-review
       - approved decisions must pass guardian_gate.status == pass
       - approved_action emit_build_request must emit a build_request artifact ref
   submit_argument:
@@ -64,3 +67,5 @@ compatibility:
   stability: bootstrap
   notes:
     - Transcript storage remains external to this repo.
+    - Timeout fallback is fixed in the reference runtime to weighted-majority after soft timeout.
+    - Hard timeout escalates in standard mode and defers to follow-up standard review in expedited mode.

@@ -73,6 +73,14 @@ entries:
     rationale: Required for ConsensusBus message exchange.
   - priority: P1
     kind: schema
+    file: specs/schemas/council_session_policy.schema
+    consumers:
+      - specs/interfaces/agentic.council.v0.idl
+      - specs/schemas/council_input.yaml
+      - reference-runtime
+    rationale: Required to bound session duration and make timeout fallback deterministic.
+  - priority: P1
+    kind: schema
     file: specs/schemas/task_node.schema
     consumers:
       - specs/interfaces/agentic.task_graph.v0.idl
@@ -190,6 +198,20 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects attestation, migration, and release continuity at the L0 boundary.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/council_timeout_fallback.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects weighted-majority fallback after a standard Council soft timeout.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/council_expedited_timeout_defer.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects defer-to-standard-review behavior after an expedited hard timeout.
   - priority: P1
     kind: schema
     file: specs/schemas/connectome_document.schema

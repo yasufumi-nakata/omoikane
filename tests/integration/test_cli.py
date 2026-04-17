@@ -43,6 +43,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
         self.assertEqual(3, len(result["ledger_snapshot"]))
 
+    def test_council_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "council-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(1_000, result["policies"]["expedited"]["hard_timeout_ms"])
+        self.assertEqual("soft-timeout", result["sessions"]["standard_soft_timeout"]["timeout_status"]["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

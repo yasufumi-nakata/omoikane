@@ -75,6 +75,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, len(result["ledger_snapshot"]))
         self.assertEqual("self-modify", result["ledger_snapshot"][-1]["category"])
 
+    def test_council_demo_reports_timeout_policy(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_council_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(45_000, result["policies"]["standard"]["soft_timeout_ms"])
+        self.assertEqual(
+            "timeout-fallback",
+            result["sessions"]["standard_soft_timeout"]["decision_mode"],
+        )
+        self.assertEqual(
+            "deferred",
+            result["sessions"]["expedited_hard_timeout"]["outcome"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

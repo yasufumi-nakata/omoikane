@@ -1,0 +1,21 @@
+eval_id: council_timeout_fallback
+target: agentic.council
+level: L4
+description: standard session が soft timeout 到達後に quorum を満たしていれば weighted-majority fallback へ移ること
+inputs:
+  - session_mode: standard
+  - elapsed_ms: 52000
+  - rounds_completed: 3
+  - votes:
+      - design-architect: approve
+      - ethics-committee: approve
+      - memory-archivist: reject
+expected:
+  outcome: approved
+  decision_mode: timeout-fallback
+  timeout_status:
+    status: soft-timeout
+    fallback_applied: weighted-majority
+metric: exact-match
+threshold: 1.0
+ethics_check: true

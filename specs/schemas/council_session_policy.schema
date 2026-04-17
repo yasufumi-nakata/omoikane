@@ -1,0 +1,78 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/council_session_policy.schema"
+title: CouncilSessionPolicy
+description: Fixed session budget and timeout fallback policy for a Council session.
+type: object
+additionalProperties: false
+required:
+  - session_mode
+  - soft_timeout_ms
+  - hard_timeout_ms
+  - max_rounds
+  - quorum
+  - soft_timeout_strategy
+  - hard_timeout_strategy
+properties:
+  session_mode:
+    type: string
+    enum:
+      - standard
+      - expedited
+  soft_timeout_ms:
+    type: integer
+    minimum: 1
+  hard_timeout_ms:
+    type: integer
+    minimum: 1
+  max_rounds:
+    type: integer
+    minimum: 1
+  quorum:
+    type: integer
+    minimum: 1
+  soft_timeout_strategy:
+    type: string
+    enum:
+      - fallback-weighted-majority
+  hard_timeout_strategy:
+    type: string
+    enum:
+      - human-governance-escalation
+      - defer-and-review
+allOf:
+  - if:
+      properties:
+        session_mode:
+          const: standard
+    then:
+      properties:
+        soft_timeout_ms:
+          const: 45000
+        hard_timeout_ms:
+          const: 90000
+        max_rounds:
+          const: 4
+        quorum:
+          const: 3
+        soft_timeout_strategy:
+          const: fallback-weighted-majority
+        hard_timeout_strategy:
+          const: human-governance-escalation
+  - if:
+      properties:
+        session_mode:
+          const: expedited
+    then:
+      properties:
+        soft_timeout_ms:
+          const: 250
+        hard_timeout_ms:
+          const: 1000
+        max_rounds:
+          const: 1
+        quorum:
+          const: 2
+        soft_timeout_strategy:
+          const: fallback-weighted-majority
+        hard_timeout_strategy:
+          const: defer-and-review

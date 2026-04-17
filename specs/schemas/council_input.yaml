@@ -10,6 +10,7 @@ required:
   - session_id
   - case_type
   - session_mode
+  - session_policy
   - trigger
   - subject
   - proposal
@@ -42,6 +43,8 @@ properties:
     enum:
       - standard
       - expedited
+  session_policy:
+    $ref: "./council_session_policy.schema"
   trigger:
     type: object
     additionalProperties: false
@@ -321,6 +324,14 @@ examples:
     session_id: sess-self-mod-001
     case_type: self-modify
     session_mode: standard
+    session_policy:
+      session_mode: standard
+      soft_timeout_ms: 45000
+      hard_timeout_ms: 90000
+      max_rounds: 4
+      quorum: 3
+      soft_timeout_strategy: fallback-weighted-majority
+      hard_timeout_strategy: human-governance-escalation
     trigger:
       kind: proposal
       initiated_by: design-architect

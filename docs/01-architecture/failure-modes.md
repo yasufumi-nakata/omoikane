@@ -41,6 +41,7 @@ OmoikaneOS で起こりうる代表的な失敗を **設計時に列挙** し、
 | 失敗 | 影響 | 回復戦略 |
 |---|---|---|
 | Council 内紛（合意不能） | タスク停滞 | エスカレーション：人間 yasufumi 等の上位 governance |
+| Council session timeout | 議事途中で判断不能 | soft timeout は weighted-majority fallback、hard timeout は standard で human escalation / expedited で defer |
 | Yaoyorozu の暴走（指示無視） | 不正実行 | Guardian が即時 kill。Builder agent は同一 repo 内の sandbox runtime で reset |
 | Codex 出力が悪意ある | システム改竄 | 静的・動的検査で検出。Council 承認なしには本体反映されない |
 

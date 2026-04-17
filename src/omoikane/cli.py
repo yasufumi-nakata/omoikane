@@ -41,6 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     continuity_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    council_parser = subparsers.add_parser(
+        "council-demo",
+        help="Run the L4 Council session budget and timeout strategy scenario",
+    )
+    council_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -84,6 +90,10 @@ def main() -> None:
 
     if args.command == "continuity-demo":
         _print_result(runtime.run_continuity_demo(), args.json)
+        return
+
+    if args.command == "council-demo":
+        _print_result(runtime.run_council_demo(), args.json)
         return
 
     if args.command == "gap-report":

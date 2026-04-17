@@ -11,6 +11,7 @@ required:
   - status
   - decision_mode
   - resolution_summary
+  - timeout_status
   - guardian_gate
   - vote_summary
   - emitted_artifacts
@@ -38,6 +39,8 @@ properties:
       - consensus
       - weighted-majority
       - expedited
+      - timeout-fallback
+      - timeout-escalation
   approved_action:
     type: string
     enum:
@@ -73,6 +76,47 @@ properties:
         minimum: 0
       weighted_score:
         type: number
+  timeout_status:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+      - elapsed_ms
+      - soft_timeout_ms
+      - hard_timeout_ms
+      - fallback_applied
+      - follow_up_action
+    properties:
+      status:
+        type: string
+        enum:
+          - within-budget
+          - soft-timeout
+          - hard-timeout
+      elapsed_ms:
+        type: integer
+        minimum: 0
+      soft_timeout_ms:
+        type: integer
+        minimum: 1
+      hard_timeout_ms:
+        type: integer
+        minimum: 1
+      fallback_applied:
+        type: string
+        enum:
+          - none
+          - guardian-veto
+          - weighted-majority
+          - human-governance-escalation
+          - defer-and-review
+      follow_up_action:
+        type: string
+        enum:
+          - none
+          - record-resolution
+          - escalate-to-human-governance
+          - schedule-standard-session
   guardian_gate:
     type: object
     additionalProperties: false
@@ -194,6 +238,13 @@ examples:
     decision_mode: consensus
     approved_action: emit_build_request
     resolution_summary: Approved after guardian pass and rollback safeguards.
+    timeout_status:
+      status: within-budget
+      elapsed_ms: 18000
+      soft_timeout_ms: 45000
+      hard_timeout_ms: 90000
+      fallback_applied: none
+      follow_up_action: record-resolution
     vote_summary:
       participant_count: 4
       approvals: 4

@@ -240,6 +240,85 @@ class OmoikaneReferenceOS:
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
 
+    def run_council_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://council-timeout-demo/v1",
+            metadata={"display_name": "Council Timeout Sandbox"},
+        )
+        standard_proposal = self.council.propose(
+            title="Timeout-aware self modification review",
+            requested_action="approve-build",
+            rationale="Standard session should fall back to weighted majority after soft timeout.",
+            risk_level="medium",
+            session_mode="standard",
+        )
+        standard_decision = self.council.deliberate(
+            standard_proposal,
+            [
+                CouncilVote("design-architect", "approve", "設計整合は保たれる"),
+                CouncilVote("ethics-committee", "approve", "倫理境界に触れない"),
+                CouncilVote("memory-archivist", "reject", "議事録追記が不足している"),
+            ],
+            elapsed_ms=52_000,
+            rounds_completed=3,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.session.timeout_fallback",
+            payload=standard_decision.to_dict(),
+            actor="Council",
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        expedited_proposal = self.council.propose(
+            title="Emergency substrate review",
+            requested_action="escalate",
+            rationale="Expedited session must stop quickly and defer to a standard review if unresolved.",
+            risk_level="high",
+            session_mode="expedited",
+        )
+        expedited_decision = self.council.deliberate(
+            expedited_proposal,
+            [
+                CouncilVote("design-architect", "approve", "暫定的な保全措置は妥当"),
+                CouncilVote("integrity-guardian", "approve", "隔離を優先して追認へ回す"),
+            ],
+            elapsed_ms=1_500,
+            rounds_completed=2,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.session.timeout_deferred",
+            payload=expedited_decision.to_dict(),
+            actor="Council",
+            category="ethics-escalate",
+            layer="L4",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policies": {
+                "standard": asdict(self.council.session_policy("standard")),
+                "expedited": asdict(self.council.session_policy("expedited")),
+            },
+            "sessions": {
+                "standard_soft_timeout": standard_decision.to_dict(),
+                "expedited_hard_timeout": expedited_decision.to_dict(),
+            },
+            "history": self.council.history(),
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_substrate_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://substrate-demo/v1",

@@ -19,6 +19,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 ```bash
 PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
+PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
@@ -29,6 +30,12 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+
+`council-demo` は L4 Council の session budget を可視化し、
+standard 議事では 45s soft / 90s hard timeout、
+expedited 議事では 250ms soft / 1s hard timeout を持ち、
+soft timeout 時は weighted-majority fallback、
+hard timeout 時は defer または human governance escalation に分岐する。
 
 ## 今後広げる面
 

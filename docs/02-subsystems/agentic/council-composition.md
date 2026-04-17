@@ -32,12 +32,19 @@ on incoming proposal P:
   Speaker opens session
 ```
 
+session_mode ごとの budget は固定する:
+
+- standard: soft timeout 45s / hard timeout 90s / quorum 3 / max 4 rounds
+- expedited: soft timeout 250ms / hard timeout 1s / quorum 2 / max 1 round
+
 ## 議決方式
 
 - **合意（consensus）** が原則
 - 不一致時は **加重多数決**（trust_score を重みに）
 - **veto 権** は Guardian と本人 (Self Liaison) のみ持つ
 - veto 行使時は EthicsLedger に理由を記載
+- soft timeout では quorum が揃った時だけ weighted-majority に落とし、
+  それでも決まらない案件は defer または human escalation に送る
 
 ## トラスト管理
 

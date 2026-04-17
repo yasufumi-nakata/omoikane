@@ -1,0 +1,20 @@
+eval_id: council_expedited_timeout_defer
+target: agentic.council
+level: L4
+description: expedited session が hard timeout 到達時に defer され、通常議事への follow-up を要求すること
+inputs:
+  - session_mode: expedited
+  - elapsed_ms: 1500
+  - rounds_completed: 2
+  - votes:
+      - design-architect: approve
+      - integrity-guardian: approve
+expected:
+  outcome: deferred
+  decision_mode: expedited
+  timeout_status:
+    status: hard-timeout
+    follow_up_action: schedule-standard-session
+metric: exact-match
+threshold: 1.0
+ethics_check: true

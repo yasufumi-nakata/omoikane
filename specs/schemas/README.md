@@ -14,6 +14,7 @@
 - `substrate_release.schema`
 - `energy_floor.schema`
 - `council_input.yaml`
+- `council_session_policy.schema`
 - `council_output.yaml`
 - `council_argument.yaml`
 - `ethics_query.yaml`
