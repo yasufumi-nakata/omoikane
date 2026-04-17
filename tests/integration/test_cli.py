@@ -21,6 +21,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertEqual(3, result["validation"]["node_count"])
 
+    def test_substrate_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "substrate-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("released", result["substrate"]["allocation"]["status"])
+        self.assertEqual("warm-standby", result["substrate"]["transfer"]["continuity_mode"])
+
 
 if __name__ == "__main__":
     unittest.main()

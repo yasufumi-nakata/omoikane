@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -58,8 +59,16 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://amaterasu-endpoint/v1",
             metadata={"display_name": "Amaterasu Endpoint"},
         )
-        allocation = self.substrate.allocate(units=128, purpose="reference-self-sandbox")
-        attestation = self.substrate.attest({"allocation_id": allocation.allocation_id, "status": "healthy"})
+        allocation = self.substrate.allocate(
+            units=128,
+            purpose="reference-self-sandbox",
+            identity_id=identity.identity_id,
+        )
+        attestation = self.substrate.attest(
+            allocation_id=allocation.allocation_id,
+            integrity={"allocation_id": allocation.allocation_id, "status": "healthy"},
+        )
+        energy_floor = self.substrate.energy_floor(identity.identity_id, workload_class="sandbox")
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -137,15 +146,9 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "substrate": {
-                "allocation": {
-                    "allocation_id": allocation.allocation_id,
-                    "units": allocation.units,
-                    "purpose": allocation.purpose,
-                },
-                "attestation": {
-                    "attestation_id": attestation.attestation_id,
-                    "status": attestation.status,
-                },
+                "allocation": asdict(allocation),
+                "attestation": asdict(attestation),
+                "energy_floor": asdict(energy_floor),
             },
             "qualia": {
                 "monotonic": self.qualia.verify_monotonic(),
@@ -222,6 +225,89 @@ class OmoikaneReferenceOS:
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
+
+    def run_substrate_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://substrate-demo/v1",
+            metadata={"display_name": "Substrate Migration Sandbox"},
+        )
+        allocation = self.substrate.allocate(
+            units=96,
+            purpose="substrate-migration-eval",
+            identity_id=identity.identity_id,
+        )
+        energy_floor = self.substrate.energy_floor(
+            identity.identity_id,
+            workload_class="migration",
+        )
+        attestation = self.substrate.attest(
+            allocation_id=allocation.allocation_id,
+            integrity={
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-attestor-v1",
+                "status": "healthy",
+            },
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.attested",
+            payload={
+                "allocation_id": allocation.allocation_id,
+                "attestation_id": attestation.attestation_id,
+                "substrate": attestation.substrate,
+                "status": attestation.status,
+            },
+            actor="SubstrateBroker",
+            signatures=["integrity-guardian"],
+        )
+        transfer = self.substrate.transfer(
+            allocation_id=allocation.allocation_id,
+            state={
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "checkpoint": "reference-connectome-v1",
+            },
+            destination_substrate="classical_silicon.redundant",
+            continuity_mode="warm-standby",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.migrated",
+            payload={
+                "allocation_id": allocation.allocation_id,
+                "transfer_id": transfer.transfer_id,
+                "destination_substrate": transfer.destination_substrate,
+                "continuity_mode": transfer.continuity_mode,
+            },
+            actor="SubstrateBroker",
+            signatures=["self", "council", "integrity-guardian"],
+        )
+        release = self.substrate.release(
+            allocation_id=allocation.allocation_id,
+            reason="migration-complete",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.released",
+            payload=release,
+            actor="SubstrateBroker",
+            signatures=["integrity-guardian"],
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "substrate": {
+                "allocation": asdict(allocation),
+                "energy_floor": asdict(energy_floor),
+                "attestation": asdict(attestation),
+                "transfer": asdict(transfer),
+                "release": release,
+                "snapshot": self.substrate.snapshot(),
+            },
+            "ledger_verification": self.ledger.verify(),
+        }
 
     def run_connectome_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(

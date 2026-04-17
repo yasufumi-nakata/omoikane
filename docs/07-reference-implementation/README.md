@@ -18,6 +18,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ```bash
 PYTHONPATH=src python3 -m omoikane.cli demo --json
+PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json

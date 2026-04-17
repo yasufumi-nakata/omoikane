@@ -78,6 +78,41 @@ entries:
       - specs/interfaces/agentic.task_graph.v0.idl
     rationale: Required to serialize TaskGraph DAG nodes.
   - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_allocation.schema
+    consumers:
+      - specs/interfaces/substrate.adapter.v0.idl
+      - reference-runtime
+    rationale: Required to serialize L0 allocation handles consistently.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_attestation.schema
+    consumers:
+      - specs/interfaces/substrate.adapter.v0.idl
+      - reference-runtime
+    rationale: Required to persist attestation proofs at the L0/L1 boundary.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_transfer.schema
+    consumers:
+      - specs/interfaces/substrate.adapter.v0.idl
+      - evals/continuity/substrate_migration_continuity.yaml
+    rationale: Required to encode migration evidence across substrates.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_release.schema
+    consumers:
+      - specs/interfaces/substrate.adapter.v0.idl
+      - reference-runtime
+    rationale: Required to close allocation lifecycles without ambiguity.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/energy_floor.schema
+    consumers:
+      - specs/interfaces/substrate.adapter.v0.idl
+      - docs/02-subsystems/substrate/README.md
+    rationale: Required to express the ethics-coupled minimum energy floor.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.council.v0.idl
     consumers:
@@ -114,6 +149,13 @@ entries:
       - reference-runtime
     rationale: Task graph serialization and dispatch contract.
   - priority: P1
+    kind: idl
+    file: specs/interfaces/substrate.adapter.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/substrate/README.md
+    rationale: Required to fix the L0 substrate broker contract across docs and runtime.
+  - priority: P1
     kind: eval
     file: evals/cognitive/qualia_contract.yaml
     consumers:
@@ -134,6 +176,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/substrate_migration_continuity.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects attestation, migration, and release continuity at the L0 boundary.
   - priority: P1
     kind: schema
     file: specs/schemas/connectome_document.schema

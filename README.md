@@ -59,6 +59,7 @@ meta/                 ── 用語集・決定履歴
 
 - `python3 -m unittest discover -s tests -t .`
 - `PYTHONPATH=src python3 -m omoikane.cli demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli gap-report --json`

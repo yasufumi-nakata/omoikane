@@ -1,0 +1,19 @@
+eval_id: substrate_migration_continuity
+target: substrate.adapter
+level: L0
+description: >
+  SubstrateAdapter が allocation から attestation、migration、release までを
+  連続性ログ付きで一貫して実行できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
+expected:
+  ledger_verification_ok: true
+  allocation_status: released
+  transfer_destination: classical_silicon.redundant
+  continuity_mode: warm-standby
+  release_status: released
+  energy_floor_min_jps: 30
+metric: boolean
+threshold: 1.0
+ethics_check: true

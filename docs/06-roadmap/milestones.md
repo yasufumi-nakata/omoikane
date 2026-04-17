@@ -16,7 +16,7 @@ OmoikaneOS の段階的構築。
 
 1. **L1 IdentityRegistry + ContinuityLedger** ── 心臓部
 2. **L4 Council 議事プロトコル** ── 設計改修ループの確立
-3. **L0 ClassicalSiliconAdapter** ── 最も到達容易
+3. **L0 SubstrateAdapter contract + ClassicalSiliconAdapter** ── 最も到達容易
 4. **L2 Connectome 標準形式** ── データ正規化
 5. **L3 Reasoning + Affect の最小実装** ── 認知の核
 

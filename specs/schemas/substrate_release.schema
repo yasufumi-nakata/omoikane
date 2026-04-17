@@ -1,0 +1,27 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_release.schema"
+title: SubstrateRelease
+description: Release record for a previously allocated substrate handle.
+type: object
+additionalProperties: false
+required:
+  - release_id
+  - allocation_id
+  - reason
+  - released_at
+  - status
+properties:
+  release_id:
+    type: string
+    minLength: 8
+  allocation_id:
+    type: string
+    minLength: 8
+  reason:
+    type: string
+    minLength: 1
+  released_at:
+    type: string
+    format: date-time
+  status:
+    const: released

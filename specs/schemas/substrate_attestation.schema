@@ -1,0 +1,35 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_attestation.schema"
+title: SubstrateAttestation
+description: Integrity attestation emitted for one active substrate allocation.
+type: object
+additionalProperties: false
+required:
+  - attestation_id
+  - allocation_id
+  - substrate
+  - integrity
+  - measured_at
+  - status
+properties:
+  attestation_id:
+    type: string
+    minLength: 8
+  allocation_id:
+    type: string
+    minLength: 8
+  substrate:
+    type: string
+    minLength: 1
+  integrity:
+    type: object
+    minProperties: 1
+  measured_at:
+    type: string
+    format: date-time
+  status:
+    type: string
+    enum:
+      - healthy
+      - degraded
+      - failed

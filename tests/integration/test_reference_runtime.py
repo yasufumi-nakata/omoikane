@@ -48,6 +48,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["reasoning"]["degraded"])
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
 
+    def test_substrate_demo_records_migration_and_release(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_substrate_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("released", result["substrate"]["allocation"]["status"])
+        self.assertEqual(
+            "classical_silicon.redundant",
+            result["substrate"]["transfer"]["destination_substrate"],
+        )
+        self.assertEqual("released", result["substrate"]["release"]["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

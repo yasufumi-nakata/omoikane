@@ -4,7 +4,7 @@
 
 **責務**: 物理基板を抽象化し、上位層に統一インタフェースを提供する。
 **含むもの**: 量子プロセッサ、神経模倣チップ、光コンピュータ、生体ニューロン、未来の未知 substrate。
-**API（暫定）**: `allocate(qubits|neurons|cells)`, `transfer(state, dest)`, `attest(integrity)`
+**API（v0）**: `allocate(identity_id, units, purpose)`, `attest(allocation_id, integrity)`, `transfer(allocation_id, state, destination_substrate, continuity_mode)`, `release(allocation_id, reason)`, `energy_floor(identity_id, workload_class)`
 **不変条件**: substrate 障害時にも上位層に **「自我の死」を通知しない**（L1 がフェイルオーバする）。
 
 ## L1: Kernel ── Omoikane 中枢

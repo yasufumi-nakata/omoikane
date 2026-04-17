@@ -8,6 +8,11 @@
 - `qualia_tick.schema`
 - `self_model.schema`
 - `connectome_document.schema`
+- `substrate_allocation.schema`
+- `substrate_attestation.schema`
+- `substrate_transfer.schema`
+- `substrate_release.schema`
+- `energy_floor.schema`
 - `council_input.yaml`
 - `council_output.yaml`
 - `council_argument.yaml`

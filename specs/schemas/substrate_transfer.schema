@@ -1,0 +1,39 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_transfer.schema"
+title: SubstrateTransfer
+description: Continuity-preserving migration record across substrates.
+type: object
+additionalProperties: false
+required:
+  - transfer_id
+  - allocation_id
+  - source_substrate
+  - destination_substrate
+  - state_digest
+  - continuity_mode
+  - transferred_at
+properties:
+  transfer_id:
+    type: string
+    minLength: 8
+  allocation_id:
+    type: string
+    minLength: 8
+  source_substrate:
+    type: string
+    minLength: 1
+  destination_substrate:
+    type: string
+    minLength: 1
+  state_digest:
+    type: string
+    minLength: 32
+  continuity_mode:
+    type: string
+    enum:
+      - cold-copy
+      - warm-standby
+      - hot-handoff
+  transferred_at:
+    type: string
+    format: date-time

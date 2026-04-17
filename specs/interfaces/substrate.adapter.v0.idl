@@ -2,67 +2,125 @@ idl_version: 1
 kind: service
 namespace: substrate.adapter.v0
 service: SubstrateAdapterService
-summary: Minimal contract for the reference substrate broker.
+summary: Canonical L0 contract for the reference substrate broker.
+imports:
+  substrate_allocation: ../schemas/substrate_allocation.schema
+  substrate_attestation: ../schemas/substrate_attestation.schema
+  substrate_transfer: ../schemas/substrate_transfer.schema
+  substrate_release: ../schemas/substrate_release.schema
+  energy_floor: ../schemas/energy_floor.schema
 operations:
   allocate:
-    summary: Reserve substrate resources for a sandbox or runtime component.
+    summary: Reserve substrate resources for one identity or runtime component.
     input:
       inline_schema:
         type: object
         required:
+          - identity_id
           - units
           - purpose
         properties:
+          identity_id:
+            type: string
+            minLength: 1
           units:
             type: integer
             minimum: 1
           purpose:
             type: string
+            minLength: 1
     output:
-      inline_schema:
-        type: object
-        required:
-          - allocation_id
-          - units
-          - purpose
-          - created_at
-        properties:
-          allocation_id:
-            type: string
-          units:
-            type: integer
-          purpose:
-            type: string
-          created_at:
-            type: string
-            format: date-time
+      schema_ref: substrate_allocation
   attest:
-    summary: Emit a substrate integrity attestation.
+    summary: Emit a substrate integrity attestation for one active allocation.
     input:
       inline_schema:
         type: object
         required:
+          - allocation_id
           - integrity
         properties:
+          allocation_id:
+            type: string
+            minLength: 8
           integrity:
             type: object
+            minProperties: 1
     output:
+      schema_ref: substrate_attestation
+  transfer:
+    summary: Create continuity evidence for migration into another substrate.
+    input:
       inline_schema:
         type: object
         required:
-          - attestation_id
-          - substrate
-          - measured_at
-          - status
+          - allocation_id
+          - state
+          - destination_substrate
         properties:
-          attestation_id:
+          allocation_id:
             type: string
-          substrate:
+            minLength: 8
+          state:
+            type: object
+            minProperties: 1
+          destination_substrate:
             type: string
-          measured_at:
+            minLength: 1
+          continuity_mode:
             type: string
-            format: date-time
-          status:
+            enum:
+              - cold-copy
+              - warm-standby
+              - hot-handoff
+    output:
+      schema_ref: substrate_transfer
+  release:
+    summary: Release a previously allocated substrate handle.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - allocation_id
+          - reason
+        properties:
+          allocation_id:
             type: string
-            enum: [healthy, degraded, failed]
-
+            minLength: 8
+          reason:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: substrate_release
+  energy_floor:
+    summary: Query the minimum energy budget that L1 must preserve.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          workload_class:
+            type: string
+            enum:
+              - baseline
+              - sandbox
+              - council
+              - migration
+    output:
+      schema_ref: energy_floor
+events:
+  substrate.attested:
+    payload:
+      schema_ref: substrate_attestation
+  substrate.migrated:
+    payload:
+      schema_ref: substrate_transfer
+compatibility:
+  stability: bootstrap
+  notes:
+    - UnknownAdapter はこの contract を満たしてから専用実装へ昇格させる
+    - energy_floor は L1 EthicsEnforcer が維持すべき hard floor を意味する

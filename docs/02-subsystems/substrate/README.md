@@ -15,15 +15,19 @@
 - `EnergyBudget` ── 自我ごとのエネルギー配分（倫理規約により本人意思に反した削減を禁止）
 - `RedundancyPlanner` ── 冗長基板の自動配置
 
-## 共通 API（暫定 IDL）
+## 共通 API（v0 IDL）
 
-```
-allocate(resource_type, capacity) → SubstrateHandle
-attest(handle) → AttestationProof
-transfer(handle_src, dst_substrate) → MigrationToken
-release(handle) → ()
-energy_floor(identity_id) → JoulesPerSec   # 倫理床値
-```
+正本は [specs/interfaces/substrate.adapter.v0.idl](../../../specs/interfaces/substrate.adapter.v0.idl)。
+reference runtime では次の 5 operation を確定した。
+
+- `allocate(identity_id, units, purpose) -> SubstrateAllocation`
+- `attest(allocation_id, integrity) -> SubstrateAttestation`
+- `transfer(allocation_id, state, destination_substrate, continuity_mode) -> SubstrateTransfer`
+- `release(allocation_id, reason) -> SubstrateRelease`
+- `energy_floor(identity_id, workload_class) -> EnergyFloor`
+
+`continuity_mode` は `cold-copy` / `warm-standby` / `hot-handoff` を取り、
+`energy_floor` は L1 EthicsEnforcer が下回ってはならない最低エネルギー床値を返す。
 
 ## 不変条件
 

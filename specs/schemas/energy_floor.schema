@@ -1,0 +1,28 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/energy_floor.schema"
+title: EnergyFloor
+description: Minimum energy budget that L1 must preserve for one identity.
+type: object
+additionalProperties: false
+required:
+  - identity_id
+  - minimum_joules_per_second
+  - workload_class
+  - evaluated_at
+properties:
+  identity_id:
+    type: string
+    minLength: 1
+  minimum_joules_per_second:
+    type: integer
+    minimum: 1
+  workload_class:
+    type: string
+    enum:
+      - baseline
+      - sandbox
+      - council
+      - migration
+  evaluated_at:
+    type: string
+    format: date-time
