@@ -1,0 +1,59 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/patch_descriptor.schema"
+title: PatchDescriptor
+description: Machine-readable description of a generated patch unit.
+type: object
+additionalProperties: false
+required:
+  - patch_id
+  - target_path
+  - action
+  - format
+  - summary
+  - safety_impact
+properties:
+  patch_id:
+    type: string
+    minLength: 8
+  target_path:
+    type: string
+    minLength: 1
+  action:
+    type: string
+    enum:
+      - create
+      - modify
+      - delete
+      - move
+  format:
+    type: string
+    enum:
+      - unified_diff
+      - structured_patch
+      - binary_pointer
+  summary:
+    type: string
+    minLength: 1
+  safety_impact:
+    type: string
+    enum:
+      - cosmetic
+      - low
+      - medium
+      - high
+      - prohibited
+  rationale_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  forbidden_patterns:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  rollback_hint:
+    type: string
+    minLength: 1
+  applies_cleanly:
+    type: boolean

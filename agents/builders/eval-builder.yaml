@@ -1,0 +1,14 @@
+name: eval-builder
+role: builder
+version: 0.1.0
+capabilities:
+  - eval.generate
+  - eval.run
+trust_floor: 0.5
+ethics_constraints:
+  - sandboxed-only
+prompt_or_policy_ref: agents/builders/codex-builder.policy.md
+when_to_invoke: |
+  - 新しいサブシステム / reference runtime 改修に対応する eval が必要な時
+when_not_to_invoke: |
+  - 既存 eval の閾値調整のみ

@@ -1,0 +1,58 @@
+"""CLI for the OmoikaneOS reference runtime."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+from .reference_os import OmoikaneReferenceOS
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="OmoikaneOS reference runtime CLI")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    demo_parser = subparsers.add_parser("demo", help="Run a safe reference scenario")
+    demo_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
+    gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
+    gap_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root to inspect",
+    )
+    gap_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
+    return parser
+
+
+def _print_result(result: Dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def main() -> None:
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    runtime = OmoikaneReferenceOS()
+
+    if args.command == "demo":
+        _print_result(runtime.run_reference_scenario(), args.json)
+        return
+
+    if args.command == "gap-report":
+        repo_root = Path(args.repo_root).resolve()
+        _print_result(runtime.generate_gap_report(repo_root), args.json)
+        return
+
+    parser.error(f"unknown command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()

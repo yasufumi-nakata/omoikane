@@ -1,0 +1,14 @@
+name: integrity-guardian
+role: guardian
+version: 0.1.0
+capabilities:
+  - integrity.check
+  - rollback.trigger
+trust_floor: 0.99
+ethics_constraints: ['ALL']
+prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
+when_to_invoke: |
+  - データ整合性の周期検査
+  - ContinuityLedger の検証
+when_not_to_invoke: |
+  - 設計議論

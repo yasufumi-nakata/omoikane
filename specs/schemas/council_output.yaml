@@ -1,0 +1,219 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/council_output.yaml"
+title: CouncilOutput
+description: Canonical output payload for a Council resolution.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - session_id
+  - status
+  - decision_mode
+  - resolution_summary
+  - guardian_gate
+  - vote_summary
+  - emitted_artifacts
+  - recorded_at
+properties:
+  kind:
+    const: council_output
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  session_id:
+    type: string
+    minLength: 8
+  status:
+    type: string
+    enum:
+      - approved
+      - rejected
+      - escalated
+      - deferred
+      - vetoed
+  decision_mode:
+    type: string
+    enum:
+      - consensus
+      - weighted-majority
+      - expedited
+  approved_action:
+    type: string
+    enum:
+      - none
+      - request_revision
+      - emit_build_request
+      - emit_ethics_review
+      - rollback
+      - human_governance_escalation
+  resolution_summary:
+    type: string
+    minLength: 1
+  vote_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - participant_count
+      - approvals
+      - rejections
+      - abstentions
+    properties:
+      participant_count:
+        type: integer
+        minimum: 1
+      approvals:
+        type: integer
+        minimum: 0
+      rejections:
+        type: integer
+        minimum: 0
+      abstentions:
+        type: integer
+        minimum: 0
+      weighted_score:
+        type: number
+  guardian_gate:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+      - reason
+    properties:
+      status:
+        type: string
+        enum:
+          - pass
+          - veto
+          - escalate
+      reason:
+        type: string
+        minLength: 1
+      checked_rules:
+        type: array
+        items:
+          type: string
+          minLength: 1
+  emitted_artifacts:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_kind
+        - ref
+      properties:
+        artifact_kind:
+          type: string
+          enum:
+            - build_request
+            - ethics_decision
+            - continuity_log_entry
+            - decision_log
+            - consensus_message
+        ref:
+          type: string
+          minLength: 1
+        summary:
+          type: string
+          minLength: 1
+  must_pass_evals:
+    type: array
+    items:
+      type: string
+      pattern: "^evals/"
+  continuity_record:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+          - category
+          - ref
+        properties:
+          category:
+            type: string
+            enum:
+              - self-modify
+              - fork
+              - terminate
+              - ethics-veto
+              - ethics-escalate
+          ref:
+            type: string
+            minLength: 1
+      - $ref: "./continuity_log_entry.schema"
+  amendments:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+allOf:
+  - if:
+      properties:
+        status:
+          const: approved
+    then:
+      required:
+        - approved_action
+        - must_pass_evals
+      properties:
+        guardian_gate:
+          properties:
+            status:
+              const: pass
+  - if:
+      properties:
+        approved_action:
+          const: emit_build_request
+    then:
+      properties:
+        emitted_artifacts:
+          contains:
+            type: object
+            properties:
+              artifact_kind:
+                const: build_request
+  - if:
+      properties:
+        status:
+          const: vetoed
+    then:
+      properties:
+        guardian_gate:
+          properties:
+            status:
+              const: veto
+examples:
+  - kind: council_output
+    schema_version: 1.0.0
+    session_id: sess-self-mod-001
+    status: approved
+    decision_mode: consensus
+    approved_action: emit_build_request
+    resolution_summary: Approved after guardian pass and rollback safeguards.
+    vote_summary:
+      participant_count: 4
+      approvals: 4
+      rejections: 0
+      abstentions: 0
+      weighted_score: 3.1
+    guardian_gate:
+      status: pass
+      reason: No ethics or continuity violations detected.
+      checked_rules:
+        - A1-continuity
+        - A2-uniqueness
+    emitted_artifacts:
+      - artifact_kind: build_request
+        ref: build://req-0001
+      - artifact_kind: continuity_log_entry
+        ref: ledger://log-0002
+    must_pass_evals:
+      - evals/continuity/council_output_build_request_pipeline.yaml
+    continuity_record:
+      category: self-modify
+      ref: ledger://log-0002
+    recorded_at: "2026-04-18T09:40:00Z"

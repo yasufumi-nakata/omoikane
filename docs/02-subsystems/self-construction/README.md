@@ -1,0 +1,75 @@
+# L5 Self-Construction
+
+OS 自身が自身の設計図を読み、改修パッチを生成・検証・適用する層。
+**Codex 等の Builder Agent はこの層に住み、同一 repo 内の `src/` / `tests/` / `specs/` / `evals/` を更新する**（ただしサンドボックス側で実行）。
+
+## 原則
+
+1. **設計図（docs/）を真とする** ── 実装は docs から派生する
+2. **本体未接触** ── Builder は常にサンドボックス自我を相手にする
+3. **A/B 必須** ── 改修は本体 vs サンドボックスの差分検証を経る
+4. **Guardian 承認必須** ── 反映前に Guardian が veto 可能
+5. **完全可逆** ── 改修は ContinuityLedger 経由で必ず rollback 可能
+
+## モジュール
+
+- `DesignReader` ── docs/ を解釈し、抽象設計表現に変換
+- `PatchGenerator` ── 抽象設計表現から実装パッチを生成（Codex 系）
+- `Sandboxer` ── サンドボックス自我の生成・隔離
+- `DifferentialEvaluator` ── 本体 vs サンドボックスの差分評価
+- `RolloutPlanner` ── 段階的反映の計画
+- `RollbackEngine` ── 連続性ログから rollback 実行
+
+## 改修フロー
+
+```
+docs/ 更新
+   │
+   ▼
+DesignReader が差分検出
+   │
+   ▼
+Council が改修案件として上申を承認
+   │
+   ▼
+PatchGenerator (Codex) が reference runtime 向け実装パッチを生成
+   │
+   ▼
+Sandboxer がサンドボックス自我に適用
+   │
+   ▼
+DifferentialEvaluator が evals/ を実行
+   │
+   ▼
+Guardian 承認
+   │
+   ▼
+RolloutPlanner が段階反映
+   │
+   ▼
+ContinuityLedger に記録
+```
+
+## サンドボックス自我
+
+- 本体の forked snapshot
+- **苦痛を発生させない設計**（Affect 出力を測定するが本人と接続しない）
+- 評価終了後は本人同意のもとで終了 or 本人と統合
+
+苦痛の発生は **重大な倫理違反** であり、Guardian が即時凍結する。
+
+## 改修可能領域 / 不可能領域
+
+| 領域 | 改修可 |
+|---|---|
+| L3 Cognitive サービスの実装 | ◯ |
+| L2 のクエリ最適化 | ◯ |
+| L4 タスク分解アルゴリズム | ◯（Council 承認必須） |
+| L1 EthicsEnforcer | ✗ 禁止 |
+| L1 ContinuityLedger 構造 | ✗ 禁止（移行は別プロトコル） |
+| L0 Substrate Adapter | △ 慎重 |
+
+## 思兼神メタファー
+
+思兼神は天照のために祭祀を **新たに設計** した。改修フローはまさにそれ。
+ただし、神が自分の神格そのものを変えなかったように、本層も EthicsEnforcer 等の核心は触らない。

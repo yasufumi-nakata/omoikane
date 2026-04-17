@@ -1,0 +1,50 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/consensus_message.schema"
+title: ConsensusMessage
+description: Message envelope emitted on the ConsensusBus.
+type: object
+additionalProperties: false
+required:
+  - message_id
+  - session_id
+  - sender_role
+  - phase
+  - payload
+  - emitted_at
+properties:
+  message_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  sender_role:
+    type: string
+    minLength: 1
+  phase:
+    type: string
+    enum:
+      - brief
+      - opening
+      - rebuttal
+      - amendment
+      - decision
+      - gate
+      - resolve
+  payload:
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: object
+        minProperties: 1
+  related_claim_ids:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  emitted_at:
+    type: string
+    format: date-time
+  signature_ref:
+    type: string
+    minLength: 1

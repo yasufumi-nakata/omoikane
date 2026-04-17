@@ -1,0 +1,14 @@
+name: neuroscience-scout
+role: researcher
+version: 0.1.0
+capabilities:
+  - literature.survey
+  - news.scan
+trust_floor: 0.4
+ethics_constraints: []
+prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+when_to_invoke: |
+  - 神経科学の最新トピック追跡
+  - connectome / scanning 関連の進捗確認
+when_not_to_invoke: |
+  - 設計判断

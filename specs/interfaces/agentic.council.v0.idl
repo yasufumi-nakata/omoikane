@@ -1,0 +1,66 @@
+idl_version: 1
+kind: service
+namespace: agentic.council.v0
+service: CouncilService
+summary: Stateful Council session orchestration and resolution contract.
+imports:
+  council_input: ../schemas/council_input.yaml
+  council_argument: ../schemas/council_argument.yaml
+  council_output: ../schemas/council_output.yaml
+  consensus_message: ../schemas/consensus_message.schema
+operations:
+  convene:
+    summary: Create and validate a Council session from an incoming proposal.
+    input:
+      schema_ref: council_input
+    output:
+      schema_ref: council_output
+    preconditions:
+      - participants.self_liaison must be present
+      - decision_policy.veto_holders must include guardian or self
+    guarantees:
+      - approved decisions must pass guardian_gate.status == pass
+      - approved_action emit_build_request must emit a build_request artifact ref
+  submit_argument:
+    summary: Persist one speaker turn into the session transcript.
+    input:
+      schema_ref: council_argument
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - accepted
+        properties:
+          session_id:
+            type: string
+          accepted:
+            type: boolean
+          emitted_message_ref:
+            type: string
+    side_effects:
+      - emits consensus_message
+  resolve:
+    summary: Finalize a session after debate, gate, and vote completion.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - arguments
+        properties:
+          session_id:
+            type: string
+          arguments:
+            type: array
+            items:
+              type: string
+    output:
+      schema_ref: council_output
+events:
+  consensus.message:
+    schema_ref: consensus_message
+compatibility:
+  stability: bootstrap
+  notes:
+    - Transcript storage remains external to this repo.

@@ -1,0 +1,15 @@
+name: consciousness-theorist
+role: researcher
+version: 0.1.0
+capabilities:
+  - literature.survey
+  - theory.compare
+  - hypothesis.propose
+trust_floor: 0.4
+ethics_constraints: []
+prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+when_to_invoke: |
+  - docs/05-research-frontiers/qualia-* に関する文献調査
+  - 意識理論の比較が必要な時
+when_not_to_invoke: |
+  - 設計判断（Researcher は提案までで決定はしない）

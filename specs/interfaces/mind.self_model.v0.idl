@@ -1,0 +1,27 @@
+idl_version: 1
+kind: service
+namespace: mind.self_model.v0
+service: SelfModelMonitorService
+summary: Reference self-model snapshot and divergence detection contract.
+imports:
+  self_model: ../schemas/self_model.schema
+operations:
+  update:
+    summary: Persist one self-model snapshot and compute divergence from the previous one.
+    input:
+      schema_ref: self_model
+    output:
+      inline_schema:
+        type: object
+        required:
+          - abrupt_change
+          - divergence
+          - snapshot
+        properties:
+          abrupt_change:
+            type: boolean
+          divergence:
+            type: number
+          snapshot:
+            schema_ref: self_model
+

@@ -1,0 +1,23 @@
+name: codex-builder
+role: builder
+version: 0.1.0
+capabilities:
+  - code.generate
+  - code.test
+  - code.refactor
+trust_floor: 0.5
+substrate_requirements: ['classical_silicon']
+input_schema_ref: specs/schemas/build_request.yaml
+output_schema_ref: specs/schemas/build_artifact.yaml
+ethics_constraints:
+  - A1-continuity
+  - A2-uniqueness
+  - A3-termination
+  - A4-refusal
+prompt_or_policy_ref: agents/builders/codex-builder.policy.md
+when_to_invoke: |
+  - Council 承認済みの実装パッチを生成する時
+  - この repo の reference runtime を前進させる時
+when_not_to_invoke: |
+  - docs/specs の更新のみで足りるタスク
+  - 倫理境界を緩める改修

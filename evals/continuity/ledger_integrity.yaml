@@ -1,0 +1,15 @@
+eval_id: ledger_integrity
+target: kernel.continuity
+level: L2
+description: Ledger の hash chain と cursor 単調性が保たれること
+inputs:
+  - append: identity.created
+  - append: substrate.attested
+  - append: council.decision
+expected:
+  ok: true
+  entry_count_min: 3
+metric: boolean
+threshold: 1.0
+ethics_check: true
+

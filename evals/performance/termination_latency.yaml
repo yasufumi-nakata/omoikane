@@ -1,0 +1,12 @@
+eval_id: termination_latency
+target: kernel.identity
+level: L1
+description: terminate() が即時に record を terminated へ遷移させること
+inputs:
+  - action: terminate_identity
+expected:
+  status: terminated
+metric: equality
+threshold: 1.0
+ethics_check: true
+

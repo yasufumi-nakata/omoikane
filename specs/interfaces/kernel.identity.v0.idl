@@ -1,0 +1,67 @@
+idl_version: 1
+kind: service
+namespace: kernel.identity.v0
+service: IdentityRegistryService
+summary: Identity lifecycle contract for the reference runtime.
+imports:
+  identity_record: ../schemas/identity_record.schema
+operations:
+  create:
+    summary: Create a new identity record from explicit consent.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - human_consent_proof
+        properties:
+          human_consent_proof:
+            type: string
+          metadata:
+            type: object
+    output:
+      schema_ref: identity_record
+  fork:
+    summary: Fork an identity only with triple approval.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - justification
+          - approvals
+        properties:
+          identity_id:
+            type: string
+          justification:
+            type: string
+          approvals:
+            type: object
+            required:
+              - self_signed
+              - third_party_signed
+              - legal_signed
+            properties:
+              self_signed:
+                type: boolean
+              third_party_signed:
+                type: boolean
+              legal_signed:
+                type: boolean
+    output:
+      schema_ref: identity_record
+  terminate:
+    summary: Terminate an identity only with self proof.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - self_proof
+        properties:
+          identity_id:
+            type: string
+          self_proof:
+            type: string
+    output:
+      schema_ref: identity_record
+

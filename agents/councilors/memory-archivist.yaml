@@ -1,0 +1,14 @@
+name: memory-archivist
+role: councilor
+version: 0.1.0
+capabilities:
+  - decision-log.read
+  - decision-log.append
+trust_floor: 0.6
+substrate_requirements: ['any']
+ethics_constraints: []
+prompt_or_policy_ref: agents/councilors/memory-archivist.policy.md
+when_to_invoke: |
+  - Council session のたび
+when_not_to_invoke: |
+  - meta/decision-log の検索のみ（直接 Read で十分）

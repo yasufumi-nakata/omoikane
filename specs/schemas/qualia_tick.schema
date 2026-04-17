@@ -1,0 +1,36 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/qualia_tick.schema"
+title: QualiaTick
+description: One monotonic qualia sample for the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - tick_id
+  - summary
+  - valence
+  - arousal
+  - clarity
+  - observed_at
+properties:
+  tick_id:
+    type: integer
+    minimum: 0
+  summary:
+    type: string
+    minLength: 1
+  valence:
+    type: number
+    minimum: -1
+    maximum: 1
+  arousal:
+    type: number
+    minimum: 0
+    maximum: 1
+  clarity:
+    type: number
+    minimum: 0
+    maximum: 1
+  observed_at:
+    type: string
+    format: date-time
+

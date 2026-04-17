@@ -1,0 +1,24 @@
+name: design-architect
+role: councilor
+version: 0.1.0
+capabilities:
+  - docs.read
+  - docs.propose-change
+  - integrity.cross-reference-check
+trust_floor: 0.6
+substrate_requirements: ['any']
+input_schema_ref: specs/schemas/council_input.yaml
+output_schema_ref: specs/schemas/council_output.yaml
+ethics_constraints:
+  - A1-continuity
+  - A2-uniqueness
+  - A3-termination
+  - A4-refusal
+prompt_or_policy_ref: agents/councilors/design-architect.policy.md
+when_to_invoke: |
+  - 設計ドキュメントに変更提案がある時
+  - 複数の docs/ が同時に更新される時
+  - 新しいサブシステム追加時
+when_not_to_invoke: |
+  - 単純な誤字修正
+  - meta/decision-log への追記のみ

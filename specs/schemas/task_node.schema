@@ -1,0 +1,54 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/task_node.schema"
+title: TaskNode
+description: Serializable TaskGraph node for agent dispatch.
+type: object
+additionalProperties: false
+required:
+  - id
+  - role
+  - input_spec
+  - output_spec
+properties:
+  id:
+    type: string
+    minLength: 1
+  role:
+    type: string
+    minLength: 1
+  deps:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  input_spec:
+    type: object
+    minProperties: 1
+  output_spec:
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: object
+        minProperties: 1
+  ethics_constraints:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  timeout_ms:
+    type: integer
+    minimum: 1
+  fallback_roles:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  status:
+    type: string
+    enum:
+      - planned
+      - dispatched
+      - running
+      - complete
+      - failed
+      - canceled

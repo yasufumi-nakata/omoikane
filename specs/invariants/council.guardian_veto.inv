@@ -1,0 +1,6 @@
+INVARIANT GuardianVetoPrecedence
+IF guardian_vote == "veto":
+  council_outcome == "vetoed"
+ELSE:
+  council_outcome IN {"approved", "rejected", "escalated"}
+

@@ -1,0 +1,32 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model.schema"
+title: SelfModelSnapshot
+description: Snapshot of current values, goals, and traits.
+type: object
+additionalProperties: false
+required:
+  - identity_id
+  - values
+  - goals
+  - traits
+  - recorded_at
+properties:
+  identity_id:
+    type: string
+    minLength: 1
+  values:
+    type: array
+    items:
+      type: string
+  goals:
+    type: array
+    items:
+      type: string
+  traits:
+    type: object
+    additionalProperties:
+      type: number
+  recorded_at:
+    type: string
+    format: date-time
+

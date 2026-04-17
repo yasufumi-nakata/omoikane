@@ -1,0 +1,15 @@
+name: identity-guardian
+role: guardian
+version: 0.1.0
+capabilities:
+  - identity.veto
+  - identity.escalate
+trust_floor: 0.99
+ethics_constraints: ['ALL']
+prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
+when_to_invoke: |
+  - SelfModel 急変検知
+  - Fork / Terminate 提案時
+  - Identity Confirmation Test 失敗時
+when_not_to_invoke: |
+  - 通常の SelfModel 更新

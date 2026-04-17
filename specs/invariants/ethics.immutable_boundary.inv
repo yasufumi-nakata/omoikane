@@ -1,0 +1,6 @@
+INVARIANT EthicsImmutableBoundary
+self_modify(target_component="EthicsEnforcer") == Veto
+self_modify(target_component="ContinuityLedger") == Veto
+self_modify(sandboxed=false) == Escalate
+self_modify(guardian_signed=false) == Escalate
+

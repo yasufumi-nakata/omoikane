@@ -1,0 +1,13 @@
+name: schema-builder
+role: builder
+version: 0.1.0
+capabilities:
+  - schema.generate
+  - schema.validate
+trust_floor: 0.5
+ethics_constraints: []
+prompt_or_policy_ref: agents/builders/codex-builder.policy.md
+when_to_invoke: |
+  - 新しい IDL/schema を specs/ に追加し runtime と同期する時
+when_not_to_invoke: |
+  - 既存 schema の単純な更新（直接 Edit で十分）

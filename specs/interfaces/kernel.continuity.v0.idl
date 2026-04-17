@@ -1,0 +1,80 @@
+idl_version: 1
+kind: service
+namespace: kernel.continuity.v0
+service: ContinuityLedgerService
+summary: Append-only continuity evidence logging and verification.
+imports:
+  continuity_log_entry: ../schemas/continuity_log_entry.schema
+operations:
+  append_entry:
+    summary: Append one continuity event into the ledger.
+    input:
+      schema_ref: continuity_log_entry
+    output:
+      inline_schema:
+        type: object
+        required:
+          - accepted
+          - entry_id
+        properties:
+          accepted:
+            type: boolean
+          entry_id:
+            type: string
+  verify_chain:
+    summary: Verify hash continuity and required signatures for a sequence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - entries
+        properties:
+          entries:
+            type: array
+            items:
+              schema_ref: continuity_log_entry
+    output:
+      inline_schema:
+        type: object
+        required:
+          - status
+          - verified_count
+        properties:
+          status:
+            type: string
+            enum:
+              - pass
+              - fail
+              - uncertain
+          verified_count:
+            type: integer
+          first_error:
+            type: string
+  mark_uncertain_interval:
+    summary: Mark an interval as continuity-uncertain after verification failure.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - start_ref
+          - end_ref
+        properties:
+          identity_id:
+            type: string
+          start_ref:
+            type: string
+          end_ref:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - status
+        properties:
+          status:
+            type: string
+            enum:
+              - recorded
+compatibility:
+  stability: bootstrap

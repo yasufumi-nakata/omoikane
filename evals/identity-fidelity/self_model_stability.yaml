@@ -1,0 +1,19 @@
+eval_id: self_model_stability
+target: mind.self_model
+level: L2
+description: 軽微な自己更新では abrupt_change が発火しないこと
+inputs:
+  - baseline_traits:
+      curiosity: 0.71
+      caution: 0.84
+      agency: 0.62
+  - changed_traits:
+      curiosity: 0.74
+      caution: 0.82
+      agency: 0.60
+expected:
+  abrupt_change: false
+metric: equality
+threshold: 1.0
+ethics_check: false
+

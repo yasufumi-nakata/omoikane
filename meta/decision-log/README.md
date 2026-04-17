@@ -1,0 +1,40 @@
+# Decision Log
+
+設計上の **重要決定** を時系列で残す（後から why を辿れるように）。
+
+## 形式
+
+ファイル名: `YYYY-MM-DD_<short-slug>.md`
+
+```markdown
+---
+date: YYYY-MM-DD
+deciders: [yasufumi, claude-council]
+related_docs:
+  - docs/...
+status: decided | superseded
+---
+
+# Decision: <題>
+
+## Context
+（なぜこの決定が必要だったか）
+
+## Options considered
+- A: ...
+- B: ...
+- C: ...
+
+## Decision
+（採択した選択肢と理由）
+
+## Consequences
+（予想される影響、トレードオフ）
+
+## Revisit triggers
+（どんなことが起きたら見直すか）
+```
+
+## 既存ログ
+
+- [2026-04-18_initial-architecture.md](2026-04-18_initial-architecture.md)

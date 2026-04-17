@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ethics_decision.yaml"
+title: EthicsDecision
+description: Ethics gate output for approval, veto, or escalation.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - decision_id
+  - query_id
+  - outcome
+  - summary
+  - applied_rules
+  - required_actions
+  - ledger_event
+properties:
+  kind:
+    const: ethics_decision
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  decision_id:
+    type: string
+    minLength: 8
+  query_id:
+    type: string
+    minLength: 8
+  outcome:
+    type: string
+    enum:
+      - approval
+      - veto
+      - escalate
+  summary:
+    type: string
+    minLength: 1
+  applied_rules:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - rule_id
+        - disposition
+        - rationale
+      properties:
+        rule_id:
+          type: string
+          minLength: 1
+        disposition:
+          type: string
+          enum:
+            - satisfied
+            - violated
+            - ambiguous
+        rationale:
+          type: string
+          minLength: 1
+        evidence_refs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+  required_actions:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - action
+        - assignee_role
+      properties:
+        action:
+          type: string
+          minLength: 1
+        assignee_role:
+          type: string
+          minLength: 1
+        blocking:
+          type: boolean
+  ledger_event:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+          - event_ref
+        properties:
+          event_ref:
+            type: string
+            minLength: 1
+      - $ref: "./ethics_event.schema"
+  signatures:
+    type: object
+    additionalProperties: false
+    properties:
+      enforcer_ref:
+        type: string
+        minLength: 1
+      guardian_ref:
+        type: string
+        minLength: 1
+      council_ref:
+        type: string
+        minLength: 1
+allOf:
+  - if:
+      properties:
+        outcome:
+          const: veto
+    then:
+      properties:
+        required_actions:
+          minItems: 1
+        applied_rules:
+          contains:
+            type: object
+            properties:
+              disposition:
+                const: violated
+  - if:
+      properties:
+        outcome:
+          const: escalate
+    then:
+      properties:
+        applied_rules:
+          contains:
+            type: object
+            properties:
+              disposition:
+                const: ambiguous
+examples:
+  - kind: ethics_decision
+    schema_version: 1.0.0
+    decision_id: ethd-0001
+    query_id: ethq-0001
+    outcome: veto
+    summary: Parallel activation would violate the uniqueness axiom.
+    applied_rules:
+      - rule_id: A2-uniqueness
+        disposition: violated
+        rationale: There is already one active copy.
+    required_actions:
+      - action: halt_activation
+        assignee_role: Guardian Liaison
+        blocking: true
+    ledger_event:
+      event_ref: ethics://evt-0001

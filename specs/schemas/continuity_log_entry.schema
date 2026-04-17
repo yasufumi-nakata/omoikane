@@ -1,0 +1,141 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/continuity_log_entry.schema"
+title: ContinuityLogEntry
+description: Append-only continuity ledger entry.
+type: object
+additionalProperties: false
+required:
+  - entry_id
+  - prev_hash
+  - identity_id
+  - logical_time
+  - wall_time
+  - substrate
+  - layer
+  - category
+  - payload_ref
+  - signatures
+properties:
+  entry_id:
+    type: string
+    minLength: 16
+  prev_hash:
+    type: string
+    minLength: 16
+  identity_id:
+    type: string
+    minLength: 1
+  logical_time:
+    oneOf:
+      - type: integer
+        minimum: 0
+      - type: string
+        minLength: 1
+  wall_time:
+    type: string
+    format: date-time
+  substrate:
+    type: string
+    minLength: 1
+  layer:
+    type: string
+    enum:
+      - L0
+      - L1
+      - L2
+      - L3
+      - L4
+      - L5
+      - L6
+  category:
+    type: string
+    enum:
+      - ascension
+      - fork
+      - terminate
+      - crystal-commit
+      - qualia-checkpoint
+      - substrate-migrate
+      - self-modify
+      - ethics-veto
+      - ethics-escalate
+  payload_ref:
+    type: string
+    minLength: 1
+  signatures:
+    type: object
+    additionalProperties: false
+    properties:
+      self:
+        type: string
+        minLength: 1
+      council:
+        type: string
+        minLength: 1
+      guardian:
+        type: string
+        minLength: 1
+      third_party:
+        type: string
+        minLength: 1
+allOf:
+  - if:
+      properties:
+        category:
+          const: self-modify
+    then:
+      properties:
+        signatures:
+          required:
+            - self
+            - council
+            - guardian
+  - if:
+      properties:
+        category:
+          const: substrate-migrate
+    then:
+      properties:
+        signatures:
+          required:
+            - self
+            - council
+            - guardian
+  - if:
+      properties:
+        category:
+          const: fork
+    then:
+      properties:
+        signatures:
+          required:
+            - self
+            - council
+            - guardian
+            - third_party
+  - if:
+      properties:
+        category:
+          const: terminate
+    then:
+      properties:
+        signatures:
+          required:
+            - self
+            - council
+            - guardian
+            - third_party
+examples:
+  - entry_id: log-0002
+    prev_hash: log-0001
+    identity_id: self-001
+    logical_time: 42
+    wall_time: "2026-04-18T09:30:00Z"
+    substrate: classical-silicon
+    layer: L5
+    category: self-modify
+    payload_ref: cas://build-artifact-0001
+    signatures:
+      self: sig:self-001
+      council: sig:council
+      guardian: sig:guardian

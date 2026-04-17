@@ -1,0 +1,46 @@
+idl_version: 1
+kind: service
+namespace: mind.qualia.v0
+service: QualiaBufferService
+summary: Minimal monotonic qualia buffer contract.
+imports:
+  qualia_tick: ../schemas/qualia_tick.schema
+operations:
+  append:
+    summary: Record one subjective-state sample.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - summary
+          - valence
+          - arousal
+          - clarity
+        properties:
+          summary:
+            type: string
+          valence:
+            type: number
+          arousal:
+            type: number
+          clarity:
+            type: number
+    output:
+      schema_ref: qualia_tick
+  recent:
+    summary: Return recent qualia ticks.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - count
+        properties:
+          count:
+            type: integer
+            minimum: 1
+    output:
+      inline_schema:
+        type: array
+        items:
+          schema_ref: qualia_tick
+

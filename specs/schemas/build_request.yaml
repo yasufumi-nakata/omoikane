@@ -1,0 +1,173 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/build_request.yaml"
+title: BuildRequest
+description: Canonical builder handoff produced after Council approval.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - request_id
+  - target_subsystem
+  - change_class
+  - design_refs
+  - spec_refs
+  - invariants
+  - constraints
+  - workspace_scope
+  - output_paths
+properties:
+  kind:
+    const: build_request
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  request_id:
+    type: string
+    minLength: 8
+  target_subsystem:
+    type: string
+    minLength: 1
+  change_class:
+    type: string
+    enum:
+      - cosmetic
+      - feature-addition
+      - feature-improvement
+      - algorithm-replacement
+      - data-structure-change
+      - l1-neighbor-change
+  change_summary:
+    type: string
+    minLength: 1
+  design_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^docs/"
+  spec_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^specs/"
+  invariants:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  constraints:
+    type: object
+    additionalProperties: false
+    required:
+      - must_pass
+      - forbidden
+      - sandbox_profile
+      - allowed_write_paths
+    properties:
+      must_pass:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          pattern: "^evals/"
+      forbidden:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      sandbox_profile:
+        type: string
+        enum:
+          - forked-self
+          - synthetic-self
+      allowed_write_paths:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  workspace_scope:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  output_paths:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  approval_context:
+    type: object
+    additionalProperties: false
+    properties:
+      council_session_id:
+        type: string
+        minLength: 8
+      guardian_gate:
+        type: string
+        enum:
+          - pass
+          - veto
+          - escalate
+allOf:
+  - properties:
+      constraints:
+        properties:
+          forbidden:
+            allOf:
+              - contains:
+                  const: L1.EthicsEnforcer
+              - contains:
+                  const: L1.ContinuityLedger
+  - if:
+      properties:
+        change_class:
+          enum:
+            - algorithm-replacement
+            - data-structure-change
+            - l1-neighbor-change
+    then:
+      properties:
+        constraints:
+          properties:
+            must_pass:
+              minItems: 2
+examples:
+  - kind: build_request
+    schema_version: 1.0.0
+    request_id: build-0001
+    target_subsystem: L5.DifferentialEvaluator
+    change_class: feature-improvement
+    change_summary: Harden rollback boundary checks in sandbox promotion.
+    design_refs:
+      - docs/04-ai-governance/self-modification.md
+    spec_refs:
+      - specs/interfaces/selfctor.diff_eval.v0.idl
+      - specs/schemas/build_artifact.yaml
+    invariants:
+      - self_modify requires sandbox A/B + guardian_sig
+      - self_modify never targets EthicsEnforcer
+    constraints:
+      must_pass:
+        - evals/continuity/council_output_build_request_pipeline.yaml
+      forbidden:
+        - L1.EthicsEnforcer
+        - L1.ContinuityLedger
+      sandbox_profile: forked-self
+      allowed_write_paths:
+        - src/omoikane/self_construction/
+        - tests/integration/
+    workspace_scope:
+      - src/
+      - tests/
+      - specs/
+      - evals/
+    output_paths:
+      - src/omoikane/self_construction/
+      - tests/integration/

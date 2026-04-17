@@ -1,0 +1,50 @@
+idl_version: 1
+kind: service
+namespace: kernel.ethics.v0
+service: EthicsEnforcerService
+summary: Decision gate for approval, veto, and escalation of sensitive actions.
+imports:
+  ethics_query: ../schemas/ethics_query.yaml
+  ethics_decision: ../schemas/ethics_decision.yaml
+  ethics_event: ../schemas/ethics_event.schema
+operations:
+  check_action:
+    summary: Evaluate one action against the encoded ethics ruleset.
+    input:
+      schema_ref: ethics_query
+    output:
+      schema_ref: ethics_decision
+    guarantees:
+      - activate-copy requests must evaluate A2-uniqueness
+      - terminate requests must evaluate A3-termination and A4-refusal
+  record_decision:
+    summary: Persist veto or escalation events to the EthicsLedger.
+    input:
+      schema_ref: ethics_decision
+    output:
+      schema_ref: ethics_event
+  explain_rule:
+    summary: Return structured interpretation notes for one ethics rule.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - rule_id
+        properties:
+          rule_id:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - rule_id
+          - interpretation
+        properties:
+          rule_id:
+            type: string
+          interpretation:
+            type: string
+compatibility:
+  stability: bootstrap
+  notes:
+    - EthicsEnforcer remains immutable from L5 according to governance docs.

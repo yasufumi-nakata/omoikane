@@ -1,0 +1,52 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ethics_event.schema"
+title: EthicsEvent
+description: Ledger entry for veto and escalation events.
+type: object
+additionalProperties: false
+required:
+  - ethics_event_id
+  - query_id
+  - action_snapshot
+  - rule_id
+  - decision
+  - signatures
+  - recorded_at
+properties:
+  ethics_event_id:
+    type: string
+    minLength: 8
+  query_id:
+    type: string
+    minLength: 8
+  action_snapshot:
+    type: object
+    minProperties: 1
+  rule_id:
+    type: string
+    minLength: 1
+  decision:
+    type: string
+    enum:
+      - approval
+      - veto
+      - escalate
+  signatures:
+    type: object
+    additionalProperties: false
+    required:
+      - enforcer
+      - guardian
+    properties:
+      enforcer:
+        type: string
+        minLength: 1
+      guardian:
+        type: string
+        minLength: 1
+      council:
+        type: string
+        minLength: 1
+  recorded_at:
+    type: string
+    format: date-time

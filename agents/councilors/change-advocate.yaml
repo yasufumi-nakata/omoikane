@@ -1,0 +1,15 @@
+name: change-advocate
+role: councilor
+version: 0.1.0
+capabilities:
+  - argue.for-change
+trust_floor: 0.5
+substrate_requirements: ['any']
+input_schema_ref: specs/schemas/council_input.yaml
+output_schema_ref: specs/schemas/council_argument.yaml
+ethics_constraints: []
+prompt_or_policy_ref: agents/councilors/change-advocate.policy.md
+when_to_invoke: |
+  - すべての改修提案 Council 議事
+when_not_to_invoke: |
+  - 改修提案でない議事

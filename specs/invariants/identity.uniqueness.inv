@@ -1,0 +1,9 @@
+INVARIANT IdentityUniqueness
+FORALL record IN IdentityRegistry:
+  record.status IN {"active", "terminated"}
+
+REQUIRES
+- create() emits fresh identity_id
+- fork() requires self + third-party + legal approvals
+- terminate() requires self proof
+

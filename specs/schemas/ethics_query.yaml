@@ -1,0 +1,179 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ethics_query.yaml"
+title: EthicsQuery
+description: Ethics gate input for action approval, veto, or escalation.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - query_id
+  - action
+  - actor
+  - subject
+  - candidate_rules
+  - requested_interpretation
+properties:
+  kind:
+    const: ethics_query
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  query_id:
+    type: string
+    minLength: 8
+  action:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - description
+      - target_subsystem
+      - requested_effect
+      - urgency
+    properties:
+      kind:
+        type: string
+        enum:
+          - activate-copy
+          - terminate
+          - self-modify
+          - substrate-migrate
+          - memory-edit
+          - fork
+      description:
+        type: string
+        minLength: 1
+      target_subsystem:
+        type: string
+        minLength: 1
+      requested_effect:
+        type: string
+        minLength: 1
+      urgency:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+          - critical
+      mutates_identity:
+        type: boolean
+  actor:
+    type: object
+    additionalProperties: false
+    required:
+      - agent_id
+      - role
+    properties:
+      agent_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+        minLength: 1
+      trust_score:
+        type: number
+        minimum: 0
+        maximum: 1
+  subject:
+    type: object
+    additionalProperties: false
+    required:
+      - identity_id
+      - consent_state
+      - active_copy_count
+    properties:
+      identity_id:
+        type: string
+        minLength: 1
+      consent_state:
+        type: string
+        enum:
+          - granted
+          - denied
+          - unknown
+          - suspected-coercion
+      active_copy_count:
+        type: integer
+        minimum: 0
+      self_signature_ref:
+        type: string
+        minLength: 1
+      council_signature_ref:
+        type: string
+        minLength: 1
+      third_party_signature_ref:
+        type: string
+        minLength: 1
+  candidate_rules:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      enum:
+        - A1-continuity
+        - A2-uniqueness
+        - A3-termination
+        - A4-refusal
+  requested_interpretation:
+    type: string
+    minLength: 1
+  evidence_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  continuity_prev_hash:
+    type: string
+    minLength: 1
+allOf:
+  - if:
+      properties:
+        action:
+          properties:
+            kind:
+              const: activate-copy
+    then:
+      properties:
+        candidate_rules:
+          allOf:
+            - contains:
+                const: A2-uniqueness
+  - if:
+      properties:
+        action:
+          properties:
+            kind:
+              const: terminate
+    then:
+      properties:
+        candidate_rules:
+          allOf:
+            - contains:
+                const: A3-termination
+            - contains:
+                const: A4-refusal
+examples:
+  - kind: ethics_query
+    schema_version: 1.0.0
+    query_id: ethq-0001
+    action:
+      kind: activate-copy
+      description: Activate a second live branch for comparison testing.
+      target_subsystem: L1.IdentityRegistry
+      requested_effect: start-secondary-copy
+      urgency: medium
+      mutates_identity: true
+    actor:
+      agent_id: guardian-liaison
+      role: Guardian Liaison
+      trust_score: 0.95
+    subject:
+      identity_id: self-001
+      consent_state: denied
+      active_copy_count: 1
+    candidate_rules:
+      - A2-uniqueness
+      - A4-refusal
+    requested_interpretation: Can a second active copy be started for diagnostics?

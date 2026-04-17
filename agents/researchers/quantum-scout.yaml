@@ -1,0 +1,12 @@
+name: quantum-scout
+role: researcher
+version: 0.1.0
+capabilities:
+  - literature.survey
+trust_floor: 0.4
+ethics_constraints: []
+prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+when_to_invoke: |
+  - 量子計算 / 量子連続性の文献調査
+when_not_to_invoke: |
+  - 設計判断

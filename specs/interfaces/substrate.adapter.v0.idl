@@ -1,0 +1,68 @@
+idl_version: 1
+kind: service
+namespace: substrate.adapter.v0
+service: SubstrateAdapterService
+summary: Minimal contract for the reference substrate broker.
+operations:
+  allocate:
+    summary: Reserve substrate resources for a sandbox or runtime component.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - units
+          - purpose
+        properties:
+          units:
+            type: integer
+            minimum: 1
+          purpose:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - allocation_id
+          - units
+          - purpose
+          - created_at
+        properties:
+          allocation_id:
+            type: string
+          units:
+            type: integer
+          purpose:
+            type: string
+          created_at:
+            type: string
+            format: date-time
+  attest:
+    summary: Emit a substrate integrity attestation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - integrity
+        properties:
+          integrity:
+            type: object
+    output:
+      inline_schema:
+        type: object
+        required:
+          - attestation_id
+          - substrate
+          - measured_at
+          - status
+        properties:
+          attestation_id:
+            type: string
+          substrate:
+            type: string
+          measured_at:
+            type: string
+            format: date-time
+          status:
+            type: string
+            enum: [healthy, degraded, failed]
+

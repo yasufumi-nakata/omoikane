@@ -1,0 +1,47 @@
+idl_version: 1
+kind: service
+namespace: selfctor.patch_generator.v0
+service: PatchGeneratorService
+summary: Generate sandbox-only implementation artifacts from approved build requests.
+imports:
+  build_request: ../schemas/build_request.yaml
+  build_artifact: ../schemas/build_artifact.yaml
+  patch_descriptor: ../schemas/patch_descriptor.schema
+operations:
+  generate_patch_set:
+    summary: Produce patch descriptors, logs, and tests for an approved request.
+    input:
+      schema_ref: build_request
+    output:
+      schema_ref: build_artifact
+    preconditions:
+      - workspace_scope must stay within this repository
+      - constraints.allowed_write_paths must be subset of workspace_scope
+      - constraints.forbidden must include L1.EthicsEnforcer and L1.ContinuityLedger
+    guarantees:
+      - ready artifacts include at least one patch descriptor
+      - blocked artifacts enumerate blocking_rules
+  validate_scope:
+    summary: Reject requests that target immutable safety boundaries.
+    input:
+      schema_ref: build_request
+    output:
+      inline_schema:
+        type: object
+        required:
+          - allowed
+        properties:
+          allowed:
+            type: boolean
+          blocking_rules:
+            type: array
+            items:
+              type: string
+  describe_patch:
+    summary: Materialize one patch descriptor for downstream inspection.
+    input:
+      schema_ref: patch_descriptor
+    output:
+      schema_ref: patch_descriptor
+compatibility:
+  stability: bootstrap

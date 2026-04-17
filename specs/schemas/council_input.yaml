@@ -1,0 +1,393 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/council_input.yaml"
+title: CouncilInput
+description: Canonical input payload for a Council session.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - session_id
+  - case_type
+  - session_mode
+  - trigger
+  - subject
+  - proposal
+  - participants
+  - decision_policy
+  - requested_outputs
+properties:
+  kind:
+    const: council_input
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  session_id:
+    type: string
+    minLength: 8
+  case_type:
+    type: string
+    enum:
+      - design-change
+      - safety-incident
+      - ethics-interpretation
+      - self-modify
+      - substrate-migration
+      - memory-edit
+      - fork-request
+      - termination-request
+      - emergency-expedited
+  session_mode:
+    type: string
+    enum:
+      - standard
+      - expedited
+  trigger:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - initiated_by
+      - timestamp
+    properties:
+      kind:
+        type: string
+        enum:
+          - proposal
+          - ethics-alert
+          - self-request
+          - failure-event
+          - scheduled-review
+      initiated_by:
+        type: string
+        minLength: 1
+      timestamp:
+        type: string
+        format: date-time
+      evidence_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+  subject:
+    type: object
+    additionalProperties: false
+    required:
+      - identity_id
+      - subsystem
+      - summary
+    properties:
+      identity_id:
+        type: string
+        minLength: 1
+      subsystem:
+        type: string
+        minLength: 1
+      summary:
+        type: string
+        minLength: 1
+  proposal:
+    type: object
+    additionalProperties: false
+    required:
+      - title
+      - summary
+      - requested_action
+      - change_scope
+    properties:
+      title:
+        type: string
+        minLength: 1
+      summary:
+        type: string
+        minLength: 1
+      requested_action:
+        type: string
+        enum:
+          - review
+          - approve-build
+          - reject
+          - rollback
+          - escalate
+      risk_class:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+          - existential
+      change_scope:
+        type: object
+        additionalProperties: false
+        required:
+          - docs_refs
+          - spec_refs
+          - affected_layers
+        properties:
+          docs_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              pattern: "^docs/"
+          spec_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              pattern: "^specs/"
+          eval_refs:
+            type: array
+            items:
+              type: string
+              pattern: "^evals/"
+          affected_layers:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              enum:
+                - L0
+                - L1
+                - L2
+                - L3
+                - L4
+                - L5
+                - L6
+  constraints:
+    type: object
+    additionalProperties: false
+    properties:
+      must_preserve:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum:
+            - A1-continuity
+            - A2-uniqueness
+            - A3-termination
+            - A4-refusal
+      forbidden_targets:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      must_pass_evals:
+        type: array
+        items:
+          type: string
+          pattern: "^evals/"
+      max_duration_ms:
+        type: integer
+        minimum: 1
+      trust_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+  participants:
+    type: object
+    additionalProperties: false
+    required:
+      - speaker
+      - recorder
+      - guardian_liaison
+      - self_liaison
+      - invited_agents
+    properties:
+      speaker:
+        $ref: "#/$defs/agentRef"
+      recorder:
+        $ref: "#/$defs/agentRef"
+      guardian_liaison:
+        $ref: "#/$defs/agentRef"
+      self_liaison:
+        $ref: "#/$defs/agentRef"
+      invited_agents:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/agentRef"
+  decision_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - preferred
+      - fallback
+      - quorum
+      - veto_holders
+    properties:
+      preferred:
+        type: string
+        enum:
+          - consensus
+          - weighted-majority
+      fallback:
+        type: string
+        enum:
+          - consensus
+          - weighted-majority
+          - human-escalation
+      quorum:
+        type: integer
+        minimum: 1
+      veto_holders:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum:
+            - guardian
+            - self
+      unanimous_roles:
+        type: array
+        items:
+          type: string
+          minLength: 1
+  requested_outputs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      enum:
+        - council_argument
+        - council_output
+        - build_request
+        - ethics_decision
+  metadata:
+    type: object
+    additionalProperties: false
+    properties:
+      continuity_prev_hash:
+        type: string
+        minLength: 1
+      substrate_attestation_ref:
+        type: string
+        minLength: 1
+      source_commit:
+        type: string
+        minLength: 7
+$defs:
+  agentRef:
+    type: object
+    additionalProperties: false
+    required:
+      - agent_id
+      - role
+    properties:
+      agent_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+        minLength: 1
+      trust_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      voting_power:
+        type: number
+        minimum: 0
+allOf:
+  - if:
+      properties:
+        case_type:
+          const: fork-request
+    then:
+      properties:
+        constraints:
+          required:
+            - must_preserve
+          properties:
+            must_preserve:
+              allOf:
+                - contains:
+                    const: A2-uniqueness
+                - contains:
+                    const: A4-refusal
+  - if:
+      properties:
+        session_mode:
+          const: expedited
+    then:
+      properties:
+        decision_policy:
+          properties:
+            quorum:
+              minimum: 1
+examples:
+  - kind: council_input
+    schema_version: 1.0.0
+    session_id: sess-self-mod-001
+    case_type: self-modify
+    session_mode: standard
+    trigger:
+      kind: proposal
+      initiated_by: design-architect
+      timestamp: "2026-04-18T09:00:00Z"
+    subject:
+      identity_id: self-001
+      subsystem: L5.PatchGenerator
+      summary: Improve diff evaluator rollback hooks.
+    proposal:
+      title: Differential evaluator hardening
+      summary: Add stricter rollback checks before rollout.
+      requested_action: approve-build
+      risk_class: medium
+      change_scope:
+        docs_refs:
+          - docs/04-ai-governance/self-modification.md
+        spec_refs:
+          - specs/interfaces/selfctor.diff_eval.v0.idl
+          - specs/schemas/build_request.yaml
+        eval_refs:
+          - evals/continuity/council_output_build_request_pipeline.yaml
+        affected_layers:
+          - L5
+    constraints:
+      must_preserve:
+        - A1-continuity
+        - A2-uniqueness
+      forbidden_targets:
+        - L1.EthicsEnforcer
+      must_pass_evals:
+        - evals/continuity/council_output_build_request_pipeline.yaml
+      max_duration_ms: 3600000
+      trust_floor: 0.6
+    participants:
+      speaker:
+        agent_id: council-speaker
+        role: Speaker
+        trust_score: 0.9
+      recorder:
+        agent_id: recorder-01
+        role: Recorder
+        trust_score: 0.8
+      guardian_liaison:
+        agent_id: guardian-liaison
+        role: Guardian Liaison
+        trust_score: 0.95
+      self_liaison:
+        agent_id: self-liaison
+        role: Self Liaison
+        trust_score: 1.0
+      invited_agents:
+        - agent_id: design-architect
+          role: DesignArchitect
+          trust_score: 0.81
+        - agent_id: conservatism-advocate
+          role: ConservatismAdvocate
+          trust_score: 0.62
+        - agent_id: change-advocate
+          role: ChangeAdvocate
+          trust_score: 0.64
+    decision_policy:
+      preferred: consensus
+      fallback: weighted-majority
+      quorum: 4
+      veto_holders:
+        - guardian
+        - self
+    requested_outputs:
+      - council_output
+      - build_request

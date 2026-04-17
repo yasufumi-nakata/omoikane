@@ -1,0 +1,118 @@
+catalog_version: 1
+summary: Initial bootstrap set for the in-repo reference runtime.
+entries:
+  - priority: P0
+    kind: schema
+    file: specs/schemas/council_input.yaml
+    consumers:
+      - agents/councilors/design-architect.yaml
+      - agents/councilors/change-advocate.yaml
+      - agents/councilors/conservatism-advocate.yaml
+    rationale: Existing agent definitions already point at this schema.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/council_argument.yaml
+    consumers:
+      - agents/councilors/change-advocate.yaml
+      - agents/councilors/conservatism-advocate.yaml
+    rationale: Required to serialize turn-based Council debate.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/council_output.yaml
+    consumers:
+      - agents/councilors/design-architect.yaml
+    rationale: Required to emit Council resolutions and builder handoff.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/ethics_query.yaml
+    consumers:
+      - agents/councilors/ethics-committee.yaml
+    rationale: Ethics gate input for safety-critical actions.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/ethics_decision.yaml
+    consumers:
+      - agents/councilors/ethics-committee.yaml
+    rationale: Ethics gate output for approval, veto, and escalation.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/build_request.yaml
+    consumers:
+      - agents/builders/codex-builder.yaml
+    rationale: Builder input already referenced by agent config.
+  - priority: P0
+    kind: schema
+    file: specs/schemas/build_artifact.yaml
+    consumers:
+      - agents/builders/codex-builder.yaml
+    rationale: Builder output already referenced by agent config.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/continuity_log_entry.schema
+    consumers:
+      - specs/schemas/council_output.yaml
+      - evals/continuity/continuity_chain_self_modify.yaml
+    rationale: Required to encode append-only continuity evidence.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/ethics_event.schema
+    consumers:
+      - specs/schemas/ethics_decision.yaml
+    rationale: Required to persist veto and escalation events.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/patch_descriptor.schema
+    consumers:
+      - specs/schemas/build_artifact.yaml
+    rationale: Required to describe generated patch units safely.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/consensus_message.schema
+    consumers:
+      - specs/interfaces/agentic.council.v0.idl
+    rationale: Required for ConsensusBus message exchange.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/task_node.schema
+    consumers:
+      - specs/interfaces/agentic.task_graph.v0.idl
+    rationale: Required to serialize TaskGraph DAG nodes.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.council.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Council lifecycle contract.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/kernel.ethics.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Ethics gate contract.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/kernel.continuity.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Continuity ledger contract.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.patch_generator.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Builder patch generation contract.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.diff_eval.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Differential evaluation contract.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.task_graph.v0.idl
+    consumers:
+      - reference-runtime
+    rationale: Task graph serialization and dispatch contract.
+next_priority:
+  - specs/schemas/connectome_document.schema
+  - evals/cognitive/

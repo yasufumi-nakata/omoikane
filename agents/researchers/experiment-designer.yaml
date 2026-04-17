@@ -1,0 +1,14 @@
+name: experiment-designer
+role: researcher
+version: 0.1.0
+capabilities:
+  - hypothesis.formulate
+  - experiment.design
+trust_floor: 0.4
+ethics_constraints:
+  - human-subject-review
+prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+when_to_invoke: |
+  - 研究フロンティアに対する実証実験案が必要な時
+when_not_to_invoke: |
+  - 実装的検証（EvalBuilder の管轄）

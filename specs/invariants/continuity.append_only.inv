@@ -1,0 +1,9 @@
+INVARIANT ContinuityAppendOnly
+FORALL entry[index] IN ContinuityLedger:
+  entry[index].cursor == index
+  entry[index].prev_hash == hash(entry[index - 1]) OR "GENESIS"
+
+FORBIDDEN
+- mutation of prior entries
+- rewrite path in append API
+

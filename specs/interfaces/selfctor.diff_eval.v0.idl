@@ -1,0 +1,99 @@
+idl_version: 1
+kind: service
+namespace: selfctor.diff_eval.v0
+service: DifferentialEvaluatorService
+summary: Select and execute eval suites against sandbox and baseline variants.
+operations:
+  select_suite:
+    summary: Resolve an eval list from a build request and affected subsystem.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - target_subsystem
+          - requested_evals
+        properties:
+          target_subsystem:
+            type: string
+          requested_evals:
+            type: array
+            items:
+              type: string
+              pattern: "^evals/"
+    output:
+      inline_schema:
+        type: object
+        required:
+          - selected_evals
+        properties:
+          selected_evals:
+            type: array
+            items:
+              type: string
+              pattern: "^evals/"
+  run_ab_eval:
+    summary: Execute one eval suite against baseline and sandbox variants.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - eval_ref
+          - baseline_ref
+          - sandbox_ref
+        properties:
+          eval_ref:
+            type: string
+            pattern: "^evals/"
+          baseline_ref:
+            type: string
+          sandbox_ref:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - eval_ref
+          - outcome
+        properties:
+          eval_ref:
+            type: string
+          outcome:
+            type: string
+            enum:
+              - pass
+              - fail
+              - regression
+          report_ref:
+            type: string
+  classify_rollout:
+    summary: Classify whether rollout may proceed after all evals complete.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - outcomes
+        properties:
+          outcomes:
+            type: array
+            items:
+              type: string
+              enum:
+                - pass
+                - fail
+                - regression
+    output:
+      inline_schema:
+        type: object
+        required:
+          - decision
+        properties:
+          decision:
+            type: string
+            enum:
+              - promote
+              - hold
+              - rollback
+compatibility:
+  stability: bootstrap
+  notes:
+    - Any regression outcome forces rollback per self-modification governance.

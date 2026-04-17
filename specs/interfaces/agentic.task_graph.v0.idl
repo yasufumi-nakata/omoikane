@@ -1,0 +1,90 @@
+idl_version: 1
+kind: service
+namespace: agentic.task_graph.v0
+service: TaskGraphService
+summary: Contract for DAG construction, dispatch, and synthesis.
+imports:
+  task_node: ../schemas/task_node.schema
+operations:
+  build_graph:
+    summary: Convert an approved intent spec into a DAG of executable nodes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - intent
+          - required_roles
+        properties:
+          intent:
+            type: string
+          required_roles:
+            type: array
+            items:
+              type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - graph_id
+          - nodes
+        properties:
+          graph_id:
+            type: string
+          nodes:
+            type: array
+            items:
+              schema_ref: task_node
+  dispatch_graph:
+    summary: Dispatch all ready nodes to candidate agents.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - graph_id
+          - nodes
+        properties:
+          graph_id:
+            type: string
+          nodes:
+            type: array
+            items:
+              schema_ref: task_node
+    output:
+      inline_schema:
+        type: object
+        required:
+          - graph_id
+          - dispatched_count
+        properties:
+          graph_id:
+            type: string
+          dispatched_count:
+            type: integer
+  synthesize_results:
+    summary: Merge finished node outputs into a Council-consumable aggregate.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - graph_id
+          - result_refs
+        properties:
+          graph_id:
+            type: string
+          result_refs:
+            type: array
+            items:
+              type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - graph_id
+          - synthesis_ref
+        properties:
+          graph_id:
+            type: string
+          synthesis_ref:
+            type: string
+compatibility:
+  stability: bootstrap
