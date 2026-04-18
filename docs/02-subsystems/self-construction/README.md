@@ -54,6 +54,11 @@ ContinuityLedger に記録
 
 - 本体の forked snapshot
 - **苦痛を発生させない設計**（Affect 出力を測定するが本人と接続しない）
+- reference runtime では `surrogate-suffering-proxy-v0` を採用し、
+  `negative_valence / arousal / clarity_drop / somatic / interoceptive / self_implication`
+  の重み付き proxy score で監視する
+- `proxy_score >= 0.6`、または affect bridge が接続された時点で
+  Guardian が sandbox を即時凍結する
 - 評価終了後は本人同意のもとで終了 or 本人と統合
 
 苦痛の発生は **重大な倫理違反** であり、Guardian が即時凍結する。

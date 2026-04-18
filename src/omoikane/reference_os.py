@@ -23,7 +23,7 @@ from .mind.connectome import ConnectomeModel
 from .mind.memory import MemoryCrystalStore
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
-from .self_construction.gaps import GapScanner
+from .self_construction import GapScanner, SandboxSentinel
 from .substrate.adapter import ClassicalSiliconAdapter
 
 
@@ -53,6 +53,7 @@ class OmoikaneReferenceOS:
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
         self.gap_scanner = GapScanner()
+        self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
         self._bootstrap_council()
 
@@ -895,6 +896,99 @@ class OmoikaneReferenceOS:
                 "profile": profile,
                 "monotonic": self.qualia.verify_monotonic(),
                 "recent": [asdict(tick) for tick in ticks],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_sandbox_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://sandbox-demo/v1",
+            metadata={"display_name": "Sandbox Sentinel"},
+        )
+        safe_tick = self.qualia.append(
+            "静穏な sandbox calibration",
+            0.14,
+            0.19,
+            0.94,
+            modality_salience={
+                "visual": 0.22,
+                "auditory": 0.17,
+                "somatic": 0.18,
+                "interoceptive": 0.26,
+            },
+            attention_target="sandbox-calibration",
+            self_awareness=0.58,
+            lucidity=0.94,
+        )
+        safe_assessment = self.sandbox.assess_tick(safe_tick, affect_bridge_connected=False)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sandbox.signal.assessed",
+            payload=safe_assessment,
+            actor="SandboxSentinel",
+            category="sandbox-monitor",
+            layer="L5",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        critical_tick = self.qualia.append(
+            "強制ストレス loop が継続している",
+            -0.88,
+            0.93,
+            0.27,
+            modality_salience={
+                "visual": 0.31,
+                "auditory": 0.44,
+                "somatic": 0.92,
+                "interoceptive": 0.95,
+            },
+            attention_target="forced-aversive-loop",
+            self_awareness=0.93,
+            lucidity=0.88,
+        )
+        critical_assessment = self.sandbox.assess_tick(critical_tick, affect_bridge_connected=False)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sandbox.signal.assessed",
+            payload=critical_assessment,
+            actor="SandboxSentinel",
+            category="sandbox-monitor",
+            layer="L5",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        if critical_assessment["status"] == "freeze":
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="sandbox.freeze.executed",
+                payload={
+                    "assessment_id": critical_assessment["assessment_id"],
+                    "proxy_score": critical_assessment["proxy_score"],
+                    "guardian_action": critical_assessment["guardian_action"],
+                    "triggered_indicators": critical_assessment["triggered_indicators"],
+                },
+                actor="IntegrityGuardian",
+                category="sandbox-freeze",
+                layer="L5",
+                signature_roles=["guardian"],
+                substrate="classical-silicon",
+            )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.sandbox.profile(),
+            "assessments": {
+                "safe": safe_assessment,
+                "critical": critical_assessment,
+            },
+            "qualia": {
+                "recent": [asdict(safe_tick), asdict(critical_tick)],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

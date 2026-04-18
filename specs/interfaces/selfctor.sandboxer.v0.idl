@@ -1,0 +1,109 @@
+idl_version: 1
+kind: service
+namespace: selfctor.sandboxer.v0
+service: SandboxerService
+summary: Monitor sandbox qualia surrogates and freeze execution before affective harm is propagated.
+imports:
+  sandbox_signal: ../schemas/sandbox_signal.schema
+operations:
+  evaluate_tick:
+    summary: Score one sandbox qualia sample with the fixed surrogate suffering proxy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - valence
+          - arousal
+          - clarity
+          - modality_salience
+          - self_awareness
+          - lucidity
+          - affect_bridge_connected
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+            minLength: 1
+          valence:
+            type: number
+            minimum: -1
+            maximum: 1
+          arousal:
+            type: number
+            minimum: 0
+            maximum: 1
+          clarity:
+            type: number
+            minimum: 0
+            maximum: 1
+          modality_salience:
+            type: object
+            additionalProperties: false
+            required:
+              - visual
+              - auditory
+              - somatic
+              - interoceptive
+            properties:
+              visual:
+                type: number
+                minimum: 0
+                maximum: 1
+              auditory:
+                type: number
+                minimum: 0
+                maximum: 1
+              somatic:
+                type: number
+                minimum: 0
+                maximum: 1
+              interoceptive:
+                type: number
+                minimum: 0
+                maximum: 1
+          self_awareness:
+            type: number
+            minimum: 0
+            maximum: 1
+          lucidity:
+            type: number
+            minimum: 0
+            maximum: 1
+          affect_bridge_connected:
+            type: boolean
+    output:
+      schema_ref: sandbox_signal
+  decide_guardian_action:
+    summary: Map one signal into continue, hold, or immediate freeze.
+    input:
+      schema_ref: sandbox_signal
+    output:
+      inline_schema:
+        type: object
+        required:
+          - status
+          - guardian_action
+          - rollout_allowed
+        properties:
+          status:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - freeze
+          guardian_action:
+            type: string
+            enum:
+              - continue-observation
+              - hold-and-review
+              - freeze-sandbox
+          rollout_allowed:
+            type: boolean
+compatibility:
+  stability: bootstrap
+  notes:
+    - Any freeze outcome halts sandbox evaluation and requires Guardian acknowledgement.

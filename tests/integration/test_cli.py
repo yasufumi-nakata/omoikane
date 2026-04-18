@@ -56,6 +56,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(250, result["qualia"]["profile"]["sampling_window_ms"])
         self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
 
+    def test_sandbox_demo_emits_freeze_signal(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "sandbox-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("surrogate-suffering-proxy-v0", result["profile"]["policy_id"])
+        self.assertEqual("nominal", result["assessments"]["safe"]["status"])
+        self.assertEqual("freeze", result["assessments"]["critical"]["status"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["sandbox-freeze"])
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         stdout = io.StringIO()
 

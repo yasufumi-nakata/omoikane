@@ -41,6 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     qualia_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    sandbox_parser = subparsers.add_parser(
+        "sandbox-demo",
+        help="Run the L5 sandbox suffering proxy and freeze scenario",
+    )
+    sandbox_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     substrate_parser = subparsers.add_parser(
         "substrate-demo",
         help="Run the L0 substrate allocation/attestation/migration scenario",
@@ -120,6 +126,10 @@ def main() -> None:
 
     if args.command == "qualia-demo":
         _print_result(runtime.run_qualia_demo(), args.json)
+        return
+
+    if args.command == "sandbox-demo":
+        _print_result(runtime.run_sandbox_demo(), args.json)
         return
 
     if args.command == "substrate-demo":

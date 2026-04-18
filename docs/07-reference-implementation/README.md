@@ -27,6 +27,7 @@ PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
+PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
@@ -62,6 +63,13 @@ fork approval の 3 例を JSON で可視化し、
 (`visual/auditory/somatic/interoceptive` の 4 modality、
 各 32 次元、250ms sampling window) を JSON で可視化し、
 checkpoint ledger event まで含めて確認する。
+
+`sandbox-demo` は L5 Sandboxer の surrogate suffering proxy
+(`surrogate-suffering-proxy-v0`) を JSON で可視化し、
+negative valence / arousal / clarity drop / somatic/interoceptive load /
+self implication を重み付きで集計して
+`freeze_threshold=0.6` 以上、または affect bridge 接続時に
+Guardian が sandbox を即時凍結することを確認する。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

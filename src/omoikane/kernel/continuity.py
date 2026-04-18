@@ -34,6 +34,8 @@ REQUIRED_SIGNATURE_ROLES = {
     "ethics-veto": ["guardian"],
     "ethics-escalate": ["guardian"],
     "cognitive-failover": ["guardian"],
+    "sandbox-monitor": ["guardian"],
+    "sandbox-freeze": ["guardian"],
 }
 
 

@@ -26,6 +26,7 @@
 - `consensus_message.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
+- `sandbox_signal.schema`
 - `build_request.yaml`
 - `build_artifact.yaml`
 - `patch_descriptor.schema`

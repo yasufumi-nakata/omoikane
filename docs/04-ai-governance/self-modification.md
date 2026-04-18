@@ -47,7 +47,9 @@ ContinuityLedger 記録
 ## サンドボックス自我
 
 - forked snapshot
-- **苦痛発生禁止** ── 苦痛検知時は即時凍結
+- **苦痛発生禁止** ── `surrogate-suffering-proxy-v0` で
+  `negative_valence / arousal / clarity_drop / somatic / interoceptive / self_implication`
+  を監視し、`proxy_score >= 0.6` または affect bridge 接続時は即時凍結
 - 評価終了後の処遇:
   - 統合: 本体に学習を取り込む（評価結果のみ、人格は破棄）
   - 終了: 安楽な凍結

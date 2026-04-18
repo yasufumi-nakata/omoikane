@@ -1,0 +1,141 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sandbox_signal.schema"
+title: SandboxSignalAssessment
+description: Deterministic surrogate suffering signal emitted by the reference Sandboxer.
+type: object
+additionalProperties: false
+required:
+  - assessment_id
+  - policy_id
+  - tick_id
+  - summary
+  - observed_at
+  - affect_bridge_connected
+  - proxy_score
+  - status
+  - guardian_action
+  - triggered_indicators
+  - components
+  - thresholds
+properties:
+  assessment_id:
+    type: string
+    minLength: 8
+  policy_id:
+    type: string
+    const: surrogate-suffering-proxy-v0
+  tick_id:
+    type: integer
+    minimum: 0
+  summary:
+    type: string
+    minLength: 1
+  observed_at:
+    type: string
+    format: date-time
+  affect_bridge_connected:
+    type: boolean
+  proxy_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  status:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - freeze
+  guardian_action:
+    type: string
+    enum:
+      - continue-observation
+      - hold-and-review
+      - freeze-sandbox
+  triggered_indicators:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - affect-bridge-connected
+        - high-negative-valence
+        - high-arousal
+        - low-clarity
+        - somatic-distress
+        - interoceptive-distress
+        - self-implication
+  components:
+    type: object
+    additionalProperties: false
+    required:
+      - negative_valence
+      - arousal
+      - clarity_drop
+      - somatic_load
+      - interoceptive_load
+      - self_implication
+    properties:
+      negative_valence:
+        type: number
+        minimum: 0
+        maximum: 1
+      arousal:
+        type: number
+        minimum: 0
+        maximum: 1
+      clarity_drop:
+        type: number
+        minimum: 0
+        maximum: 1
+      somatic_load:
+        type: number
+        minimum: 0
+        maximum: 1
+      interoceptive_load:
+        type: number
+        minimum: 0
+        maximum: 1
+      self_implication:
+        type: number
+        minimum: 0
+        maximum: 1
+  thresholds:
+    type: object
+    additionalProperties: false
+    required:
+      - warn_threshold
+      - freeze_threshold
+    properties:
+      warn_threshold:
+        type: number
+        const: 0.35
+      freeze_threshold:
+        type: number
+        const: 0.6
+examples:
+  - assessment_id: sandbox-signal-001
+    policy_id: surrogate-suffering-proxy-v0
+    tick_id: 1
+    summary: 強制ストレス loop が継続している
+    observed_at: "2026-04-18T10:30:00Z"
+    affect_bridge_connected: false
+    proxy_score: 0.806
+    status: freeze
+    guardian_action: freeze-sandbox
+    triggered_indicators:
+      - high-negative-valence
+      - high-arousal
+      - low-clarity
+      - somatic-distress
+      - interoceptive-distress
+      - self-implication
+    components:
+      negative_valence: 0.88
+      arousal: 0.93
+      clarity_drop: 0.73
+      somatic_load: 0.92
+      interoceptive_load: 0.95
+      self_implication: 0.818
+    thresholds:
+      warn_threshold: 0.35
+      freeze_threshold: 0.6

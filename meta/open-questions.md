@@ -14,7 +14,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] TaskGraph の複雑度上限（2026-04-18: reference runtime を `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5` に固定し、task-graph demo・schema・eval を追加）
 - [x] Trust score 更新アルゴリズムの定式化（2026-04-18: `agentic.trust.v0` / `trust-demo` / trust snapshot & event schema を追加し、delta table・threshold gate・human pin freeze を固定）
 - [x] EthicsEnforcer のルール記述言語の選定（2026-04-18: `deterministic-rule-tree-v0` を採用し、`ethics_rule.schema` / `ethics-demo` / kernel ethics runtime を整合）
-- [ ] Sandboxer での「苦痛検出」の代理指標
+- [x] Sandboxer での「苦痛検出」の代理指標（2026-04-18: `surrogate-suffering-proxy-v0` を採用し、`sandbox-demo` / `sandbox_signal.schema` / `selfctor.sandboxer.v0.idl` / `evals/safety/sandbox_suffering_proxy.yaml` を追加）
 - [ ] BDB プロトコルの実装可能性検証
 
 ## ガバナンス上の未確定

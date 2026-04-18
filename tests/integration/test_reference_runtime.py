@@ -77,6 +77,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["qualia-checkpoint"])
 
+    def test_sandbox_demo_freezes_on_surrogate_signal(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_sandbox_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("surrogate-suffering-proxy-v0", result["profile"]["policy_id"])
+        self.assertEqual("nominal", result["assessments"]["safe"]["status"])
+        self.assertEqual("freeze", result["assessments"]["critical"]["status"])
+        self.assertGreaterEqual(
+            result["assessments"]["critical"]["proxy_score"],
+            result["assessments"]["critical"]["thresholds"]["freeze_threshold"],
+        )
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["sandbox-monitor"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["sandbox-freeze"])
+
     def test_substrate_demo_records_migration_and_release(self) -> None:
         runtime = OmoikaneReferenceOS()
 

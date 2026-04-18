@@ -10,5 +10,6 @@ ethics_constraints:
 prompt_or_policy_ref: agents/builders/codex-builder.policy.md
 when_to_invoke: |
   - 新しいサブシステム / reference runtime 改修に対応する eval が必要な時
+  - Sandboxer の surrogate safety signal を追加・更新した時
 when_not_to_invoke: |
   - 既存 eval の閾値調整のみ

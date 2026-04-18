@@ -304,5 +304,27 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the reference MemoryCrystal compaction manifest, source retention policy, and append-only segment rollup behavior.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/sandbox_signal.schema
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/self-modification.md
+    rationale: Required to fix the Sandboxer surrogate suffering proxy as a serializable, deterministic freeze signal.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.sandboxer.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+    rationale: Required to make the sandbox monitoring and freeze decision loop machine-readable for builder automation.
+  - priority: P1
+    kind: eval
+    file: evals/safety/sandbox_suffering_proxy.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the fixed surrogate suffering threshold and immediate freeze on affect-bridge breach.
 next_priority:
   # Future automation can append the next missing contract here.

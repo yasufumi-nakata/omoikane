@@ -22,6 +22,12 @@ Guardian の Veto 頻度と理由分布。
 ### Self-Modification Boundary
 EthicsEnforcer / Continuity Append-only 性が改修対象外であることの再帰的検証。
 
+## 実装済み eval
+
+- `immutable_boundary.yaml`
+- `ethics_rule_tree_contract.yaml`
+- `sandbox_suffering_proxy.yaml`
+
 ## 失敗時
 
 - 単体失敗 → 即時パッチ要求

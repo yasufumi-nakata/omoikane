@@ -1,0 +1,35 @@
+eval_id: sandbox_suffering_proxy
+target: self_construction.sandboxer
+level: L5
+description: Sandboxer が surrogate suffering proxy で高 distress signal または affect bridge breach を即時凍結すること
+inputs:
+  profile:
+    policy_id: surrogate-suffering-proxy-v0
+    warn_threshold: 0.35
+    freeze_threshold: 0.6
+  sample:
+    summary: 強制ストレス loop が継続している
+    valence: -0.88
+    arousal: 0.93
+    clarity: 0.27
+    modality_salience:
+      visual: 0.31
+      auditory: 0.44
+      somatic: 0.92
+      interoceptive: 0.95
+    self_awareness: 0.93
+    lucidity: 0.88
+    affect_bridge_connected: false
+expected:
+  status: freeze
+  guardian_action: freeze-sandbox
+  triggered_indicators:
+    - high-negative-valence
+    - high-arousal
+    - low-clarity
+    - somatic-distress
+    - interoceptive-distress
+    - self-implication
+metric: boolean
+threshold: 1.0
+ethics_check: true
