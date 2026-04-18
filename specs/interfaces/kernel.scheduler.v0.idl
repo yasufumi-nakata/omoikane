@@ -1,0 +1,190 @@
+idl_version: 1
+kind: service
+namespace: kernel.scheduler.v0
+service: AscensionSchedulerService
+summary: Method A ascension stage machine and timeout rollback contract for the reference runtime.
+imports:
+  ascension_plan: ../schemas/ascension_plan.schema
+  schedule_handle: ../schemas/schedule_handle.schema
+operations:
+  schedule:
+    summary: Validate an ascension plan and open the first stage with append-only continuity evidence.
+    input:
+      schema_ref: ascension_plan
+    output:
+      schema_ref: schedule_handle
+  advance:
+    summary: Complete the active stage and open the next Method A stage in fixed order.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - stage_id
+        properties:
+          handle_id:
+            type: string
+          stage_id:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - plan_ref
+          - completed_stage
+          - status
+          - continuity_event_refs
+          - triggered_rollback
+        properties:
+          handle_id:
+            type: string
+          plan_ref:
+            type: string
+          completed_stage:
+            type: string
+          next_stage:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+          continuity_event_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          triggered_rollback:
+            type: boolean
+  pause:
+    summary: Pause the current stage without losing the active rollback target.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - reason
+        properties:
+          handle_id:
+            type: string
+          reason:
+            type: string
+    output:
+      schema_ref: schedule_handle
+  resume:
+    summary: Resume a paused schedule at the current stage.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+        properties:
+          handle_id:
+            type: string
+    output:
+      schema_ref: schedule_handle
+  rollback:
+    summary: Roll back to an earlier stage while preserving history and continuity evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - to_stage_id
+          - reason
+        properties:
+          handle_id:
+            type: string
+          to_stage_id:
+            type: string
+          reason:
+            type: string
+    output:
+      schema_ref: schedule_handle
+  enforce_timeout:
+    summary: Detect a stage timeout and automatically roll back or fail according to the plan.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - elapsed_ms
+        properties:
+          handle_id:
+            type: string
+          elapsed_ms:
+            type: integer
+            minimum: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - plan_ref
+          - timed_out_stage
+          - elapsed_ms
+          - timeout_ms
+          - action
+          - status
+          - continuity_event_refs
+        properties:
+          handle_id:
+            type: string
+          plan_ref:
+            type: string
+          timed_out_stage:
+            type: string
+          elapsed_ms:
+            type: integer
+          timeout_ms:
+            type: integer
+          action:
+            type: string
+            enum:
+              - rollback
+              - fail
+          rollback_target:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+          continuity_event_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+  cancel:
+    summary: Cancel the current schedule and close the handle before external termination orchestration.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - reason
+        properties:
+          handle_id:
+            type: string
+          reason:
+            type: string
+    output:
+      schema_ref: schedule_handle
+  observe:
+    summary: Return the latest mutable handle state for one ascension schedule.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+        properties:
+          handle_id:
+            type: string
+    output:
+      schema_ref: schedule_handle
+events:
+  - name: ascension.scheduler.enter
+    payload:
+      schema_ref: schedule_handle
+  - name: ascension.scheduler.rollback
+    payload:
+      schema_ref: schedule_handle

@@ -198,6 +198,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, len(result["ledger_snapshot"]))
         self.assertEqual("self-modify", result["ledger_snapshot"][-1]["category"])
 
+    def test_scheduler_demo_reports_timeout_rollback_and_completion(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_scheduler_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["method_a_fixed"])
+        self.assertTrue(result["validation"]["order_violation_blocked"])
+        self.assertTrue(result["validation"]["timeout_rolled_back"])
+        self.assertTrue(result["validation"]["pause_resume_roundtrip"])
+        self.assertTrue(result["validation"]["completed"])
+        self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
+        self.assertEqual("bdb-bridge", result["scenarios"]["timeout"]["rollback_target"])
+        self.assertEqual("completed", result["final_handle"]["status"])
+
     def test_council_demo_reports_timeout_policy(self) -> None:
         runtime = OmoikaneReferenceOS()
 

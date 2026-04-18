@@ -1,0 +1,118 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/schedule_handle.schema"
+title: ScheduleHandle
+description: Mutable handle that tracks AscensionPlan progress and rollback history.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - handle_id
+  - plan_ref
+  - identity_id
+  - current_stage
+  - status
+  - history
+  - opened_at
+properties:
+  kind:
+    const: schedule_handle
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  handle_id:
+    type: string
+    minLength: 8
+  plan_ref:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  current_stage:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - scheduled
+      - advancing
+      - paused
+      - rolled-back
+      - completed
+      - cancelled
+      - failed
+  history:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - stage_id
+        - transition
+        - recorded_at
+        - continuity_event_ref
+      properties:
+        sequence:
+          type: integer
+          minimum: 0
+        stage_id:
+          type: string
+          minLength: 1
+        transition:
+          type: string
+          enum:
+            - enter
+            - complete
+            - rollback
+            - pause
+            - resume
+            - cancel
+            - fail
+        recorded_at:
+          type: string
+          format: date-time
+        continuity_event_ref:
+          type: string
+          minLength: 1
+        reason:
+          type: string
+  opened_at:
+    type: string
+    format: date-time
+  closed_at:
+    type: string
+    format: date-time
+examples:
+  - kind: schedule_handle
+    schema_version: 1.0.0
+    handle_id: schedule-handle-001
+    plan_ref: plan-method-a-001
+    identity_id: identity://amaterasu-endpoint
+    current_stage: bdb-bridge
+    status: paused
+    history:
+      - sequence: 0
+        stage_id: scan-baseline
+        transition: enter
+        recorded_at: "2026-04-18T18:00:00Z"
+        continuity_event_ref: continuity-event-stage-001
+      - sequence: 1
+        stage_id: scan-baseline
+        transition: complete
+        recorded_at: "2026-04-18T18:30:00Z"
+        continuity_event_ref: continuity-event-stage-002
+      - sequence: 2
+        stage_id: bdb-bridge
+        transition: enter
+        recorded_at: "2026-04-18T18:30:01Z"
+        continuity_event_ref: continuity-event-stage-003
+      - sequence: 3
+        stage_id: bdb-bridge
+        transition: pause
+        recorded_at: "2026-04-18T18:31:00Z"
+        continuity_event_ref: continuity-event-stage-004
+        reason: self requested cool-off
+    opened_at: "2026-04-18T18:00:00Z"

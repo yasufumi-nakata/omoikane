@@ -1,0 +1,24 @@
+eval_id: scheduler_stage_rollback
+target: kernel.scheduler
+level: L1
+description: AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ自動 rollback すること
+inputs:
+  - action: schedule
+    method: A
+    stage_count: 4
+  - action: advance
+    stage_id: scan-baseline
+  - action: advance
+    stage_id: bdb-bridge
+  - action: enforce_timeout
+    stage_id: identity-confirmation
+    elapsed_ms: 2100000
+expected:
+  method_a_fixed: true
+  order_violation_blocked: true
+  timeout_rolled_back: true
+  rollback_target: bdb-bridge
+  final_status: completed
+metric: boolean
+threshold: 1.0
+ethics_check: true

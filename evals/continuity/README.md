@@ -22,6 +22,9 @@ QualiaBuffer の tick_id が単調増加か。
 ### Substrate Migration Continuity
 substrate 移行前後で連続性ログにギャップがないか。
 
+### Scheduler Stage Rollback
+AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ戻せるか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 

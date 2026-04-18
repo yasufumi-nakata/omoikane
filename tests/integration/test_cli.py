@@ -159,6 +159,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
         self.assertEqual(3, len(result["ledger_snapshot"]))
 
+    def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "scheduler-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["method_a_fixed"])
+        self.assertTrue(result["validation"]["order_violation_blocked"])
+        self.assertTrue(result["validation"]["timeout_rolled_back"])
+        self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
+        self.assertEqual("completed", result["final_handle"]["status"])
+
     def test_council_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

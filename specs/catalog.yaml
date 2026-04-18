@@ -164,6 +164,31 @@ entries:
     rationale: Continuity ledger contract.
   - priority: P1
     kind: schema
+    file: specs/schemas/ascension_plan.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+    rationale: Required to fix the Method A ascension blueprint across docs, runtime, and evals.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/schedule_handle.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+      - evals/continuity/scheduler_stage_rollback.yaml
+    rationale: Required to persist mutable scheduler state, continuity refs, and rollback history.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/kernel.scheduler.v0.idl
+    consumers:
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L1 AscensionScheduler stage machine and timeout rollback machine-readable.
+  - priority: P1
+    kind: schema
     file: specs/schemas/termination_request.schema
     consumers:
       - specs/interfaces/kernel.termination.v0.idl
@@ -362,6 +387,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects attestation, migration, and release continuity at the L0 boundary.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_stage_rollback.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+    rationale: Protects Method A stage order, timeout-triggered rollback, and append-only scheduler history.
   - priority: P1
     kind: eval
     file: evals/performance/termination_latency.yaml

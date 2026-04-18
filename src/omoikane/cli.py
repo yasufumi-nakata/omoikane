@@ -101,6 +101,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     continuity_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    scheduler_parser = subparsers.add_parser(
+        "scheduler-demo",
+        help="Run the L1 ascension scheduler stage machine and timeout rollback scenario",
+    )
+    scheduler_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     council_parser = subparsers.add_parser(
         "council-demo",
         help="Run the L4 Council session budget and timeout strategy scenario",
@@ -226,6 +232,10 @@ def main() -> None:
 
     if args.command == "continuity-demo":
         _print_result(runtime.run_continuity_demo(), args.json)
+        return
+
+    if args.command == "scheduler-demo":
+        _print_result(runtime.run_scheduler_demo(), args.json)
         return
 
     if args.command == "council-demo":

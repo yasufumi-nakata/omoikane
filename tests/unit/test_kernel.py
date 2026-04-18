@@ -5,6 +5,7 @@ import unittest
 from omoikane.kernel.continuity import ContinuityLedger
 from omoikane.kernel.ethics import ActionRequest, EthicsEnforcer
 from omoikane.kernel.identity import ForkApprovals, IdentityRegistry
+from omoikane.kernel.scheduler import AscensionScheduler
 from omoikane.kernel.termination import TerminationGate
 from omoikane.substrate.adapter import ClassicalSiliconAdapter
 
@@ -238,6 +239,61 @@ class KernelTests(unittest.TestCase):
         observed = gate.observe(identity.identity_id)
         self.assertEqual("cool-off-pending", observed["status"])
         self.assertEqual(30, observed["policy"]["cool_off_days"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_enforces_method_a_stage_order(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-order")
+        handle = scheduler.schedule(plan)
+
+        with self.assertRaises(ValueError):
+            scheduler.advance(handle["handle_id"], "identity-confirmation")
+
+        result = scheduler.advance(handle["handle_id"], "scan-baseline")
+
+        self.assertEqual("scan-baseline", result["completed_stage"])
+        self.assertEqual("bdb-bridge", result["next_stage"])
+        self.assertEqual("advancing", scheduler.observe(handle["handle_id"])["status"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_timeout_rolls_back_to_prior_stage(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-timeout")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+
+        timeout = scheduler.enforce_timeout(handle["handle_id"], elapsed_ms=2_100_000)
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("rollback", timeout["action"])
+        self.assertEqual("bdb-bridge", timeout["rollback_target"])
+        self.assertEqual("rolled-back", observed["status"])
+        self.assertEqual("bdb-bridge", observed["current_stage"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_pause_resume_and_complete(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-complete")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+
+        paused = scheduler.pause(handle["handle_id"], "bounded pause for continuity witness")
+        resumed = scheduler.resume(handle["handle_id"])
+        scheduler.advance(handle["handle_id"], "identity-confirmation")
+        result = scheduler.advance(handle["handle_id"], "active-handoff")
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("paused", paused["status"])
+        self.assertEqual("advancing", resumed["status"])
+        self.assertEqual("completed", result["status"])
+        self.assertEqual("completed", observed["status"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
 
 

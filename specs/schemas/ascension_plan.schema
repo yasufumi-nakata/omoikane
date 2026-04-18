@@ -1,0 +1,97 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ascension_plan.schema"
+title: AscensionPlan
+description: Multi-stage plan to migrate an identity into Active state.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - plan_id
+  - identity_id
+  - method
+  - stages
+  - ethics_attestation_required
+  - council_attestation_required
+properties:
+  kind:
+    const: ascension_plan
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  plan_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  method:
+    type: string
+    enum:
+      - A
+      - B
+      - C
+  stages:
+    type: array
+    minItems: 1
+    maxItems: 12
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - stage_id
+        - precondition
+        - timeout_ms
+      properties:
+        stage_id:
+          type: string
+          minLength: 1
+        precondition:
+          type: string
+          minLength: 1
+        timeout_ms:
+          type: integer
+          minimum: 1
+        rollback_to:
+          type:
+            - string
+            - "null"
+  ethics_attestation_required:
+    type: boolean
+  council_attestation_required:
+    type: boolean
+allOf:
+  - if:
+      properties:
+        method:
+          const: A
+    then:
+      properties:
+        stages:
+          minItems: 4
+          maxItems: 4
+examples:
+  - kind: ascension_plan
+    schema_version: 1.0.0
+    plan_id: plan-method-a-001
+    identity_id: identity://amaterasu-endpoint
+    method: A
+    stages:
+      - stage_id: scan-baseline
+        precondition: pre-upload-consent
+        timeout_ms: 7776000000
+        rollback_to: null
+      - stage_id: bdb-bridge
+        precondition: scan-baseline:done
+        timeout_ms: 600000
+        rollback_to: scan-baseline
+      - stage_id: identity-confirmation
+        precondition: bdb-bridge:done
+        timeout_ms: 1800000
+        rollback_to: bdb-bridge
+      - stage_id: active-handoff
+        precondition: identity-confirmation:passed
+        timeout_ms: 300000
+        rollback_to: bdb-bridge
+    ethics_attestation_required: true
+    council_attestation_required: true

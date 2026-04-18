@@ -30,6 +30,7 @@ from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
+from .kernel.scheduler import AscensionScheduler
 from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
 from .mind.memory import MemoryCrystalStore
@@ -47,6 +48,7 @@ class OmoikaneReferenceOS:
         self.identity = IdentityRegistry()
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
+        self.scheduler = AscensionScheduler(self.ledger)
         self.termination = TerminationGate(self.identity, self.ledger, self.substrate)
         self.qualia = QualiaBuffer()
         self.connectome = ConnectomeModel()
@@ -1059,6 +1061,120 @@ class OmoikaneReferenceOS:
                 },
             },
             "ethics_events": [immutable_event, escalation_event],
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_scheduler_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo/v1",
+            metadata={"display_name": "Ascension Scheduler Sandbox"},
+        )
+        allocation = self.substrate.allocate(
+            units=48,
+            purpose="ascension-method-a-demo",
+            identity_id=identity.identity_id,
+        )
+        attestation = self.substrate.attest(
+            allocation_id=allocation.allocation_id,
+            integrity={
+                "allocation_id": allocation.allocation_id,
+                "status": "healthy",
+                "tee": "reference-attestor-v1",
+            },
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.attested",
+            payload={
+                "allocation_id": allocation.allocation_id,
+                "attestation_id": attestation.attestation_id,
+                "substrate": attestation.substrate,
+                "status": attestation.status,
+            },
+            actor="SubstrateBroker",
+            category="attestation",
+            layer="L0",
+            signature_roles=["guardian"],
+            substrate=attestation.substrate,
+        )
+
+        plan = self.scheduler.build_method_a_plan(identity.identity_id)
+        scheduled = self.scheduler.schedule(plan)
+        order_violation_message = ""
+        try:
+            self.scheduler.advance(scheduled["handle_id"], "identity-confirmation")
+        except ValueError as exc:
+            order_violation_message = str(exc)
+
+        scan_result = self.scheduler.advance(scheduled["handle_id"], "scan-baseline")
+        bdb_result = self.scheduler.advance(scheduled["handle_id"], "bdb-bridge")
+        paused = self.scheduler.pause(
+            scheduled["handle_id"],
+            reason="substrate lease jitter requires bounded pause before confirmation",
+        )
+        resumed = self.scheduler.resume(scheduled["handle_id"])
+        timeout = self.scheduler.enforce_timeout(
+            scheduled["handle_id"],
+            elapsed_ms=2_100_000,
+        )
+        after_timeout = self.scheduler.observe(scheduled["handle_id"])
+        retry_bdb = self.scheduler.advance(scheduled["handle_id"], "bdb-bridge")
+        confirmation_result = self.scheduler.advance(
+            scheduled["handle_id"],
+            "identity-confirmation",
+        )
+        handoff_result = self.scheduler.advance(scheduled["handle_id"], "active-handoff")
+        final_handle = self.scheduler.observe(scheduled["handle_id"])
+        validation = self.scheduler.validate_handle(final_handle)
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.scheduler.reference_profile(),
+            "plan": plan,
+            "substrate": {
+                "allocation": asdict(allocation),
+                "attestation": asdict(attestation),
+            },
+            "scenarios": {
+                "scheduled": scheduled,
+                "order_violation": {
+                    "blocked": bool(order_violation_message),
+                    "message": order_violation_message,
+                },
+                "scan_baseline": scan_result,
+                "bdb_bridge": bdb_result,
+                "pause": paused,
+                "resume": resumed,
+                "timeout": timeout,
+                "after_timeout": after_timeout,
+                "retry_bdb_bridge": retry_bdb,
+                "identity_confirmation": confirmation_result,
+                "active_handoff": handoff_result,
+            },
+            "final_handle": final_handle,
+            "validation": {
+                **validation,
+                "method_a_fixed": [stage["stage_id"] for stage in plan["stages"]]
+                == [
+                    "scan-baseline",
+                    "bdb-bridge",
+                    "identity-confirmation",
+                    "active-handoff",
+                ],
+                "order_violation_blocked": "stage order violation" in order_violation_message,
+                "timeout_rolled_back": timeout["action"] == "rollback"
+                and timeout["rollback_target"] == "bdb-bridge"
+                and after_timeout["current_stage"] == "bdb-bridge",
+                "pause_resume_roundtrip": paused["status"] == "paused"
+                and resumed["status"] == "advancing",
+                "completed": final_handle["status"] == "completed"
+                and handoff_result["status"] == "completed",
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

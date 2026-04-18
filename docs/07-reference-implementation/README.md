@@ -39,6 +39,7 @@ PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
+PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
 ```
@@ -46,6 +47,12 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+
+`scheduler-demo` は L1 AscensionScheduler の reference contract
+(`kernel.scheduler.v0`) を JSON で可視化し、
+Method A の 4 stage blueprint、順序違反の reject、
+`identity-confirmation` timeout 超過時の `bdb-bridge` への自動 rollback、
+pause / resume 後の `active-handoff` 完了を 1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -148,6 +155,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- AscensionScheduler の Method A stage machine と rollback 実行面
+- AscensionScheduler の Method B/C 実行面と SubstrateBroker-triggered pause/failover hook
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

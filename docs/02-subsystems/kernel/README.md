@@ -36,6 +36,8 @@ ethics.check(action: Action) → Approval | Veto
 
 - [continuity-ledger.md](continuity-ledger.md) ── 連続性ログの詳細仕様
 - [identity-lifecycle.md](identity-lifecycle.md) ── 自我のライフサイクル
+- [ascension-scheduler.md](ascension-scheduler.md) ── アップロード段階遷移と rollback 実行
 - [ethics-enforcement.md](ethics-enforcement.md) ── 倫理規約の機械的強制
 - [termination-gate.md](termination-gate.md) ── 本人終了権の即時実行口
+- [substrate-broker.md](substrate-broker.md) ── substrate 選定・冗長化・移行
 - [anti-patterns.md](anti-patterns.md) ── 設計禁止事項
