@@ -1,0 +1,255 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/procedural_writeback_receipt.schema"
+title: ProceduralWritebackReceipt
+description: >
+  Deterministic, human-approved procedural writeback receipt emitted after
+  applying bounded connectome weight deltas from a validated procedural preview.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - identity_id
+  - applied_at
+  - writeback_policy
+  - source_preview_digest
+  - source_preview_recommendation_ids
+  - input_connectome_snapshot_id
+  - input_connectome_digest
+  - output_connectome_snapshot_id
+  - output_connectome_digest
+  - applied_recommendation_count
+  - applied_recommendations
+  - approval_bundle
+  - continuity_diff
+  - status
+  - rollback_token
+  - unchanged_edge_ids
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  identity_id:
+    type: string
+    minLength: 1
+  applied_at:
+    type: string
+    format: date-time
+  writeback_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - source_preview_policy
+      - target_connectome_schema
+      - update_mode
+      - max_weight_delta
+      - approval_required
+      - required_human_reviewers
+      - continuity_diff_required
+      - rollback_ready
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: human-approved-procedural-writeback-v1
+      source_preview_policy:
+        type: string
+        const: connectome-coupled-procedural-preview-v1
+      target_connectome_schema:
+        type: string
+        const: "1.0"
+      update_mode:
+        type: string
+        const: bounded-weight-application
+      max_weight_delta:
+        type: number
+        const: 0.08
+      approval_required:
+        type: array
+        minItems: 4
+        maxItems: 4
+        prefixItems:
+          - type: string
+            const: self
+          - type: string
+            const: council
+          - type: string
+            const: guardian
+          - type: string
+            const: human
+      required_human_reviewers:
+        type: integer
+        const: 2
+      continuity_diff_required:
+        type: boolean
+        const: true
+      rollback_ready:
+        type: boolean
+        const: true
+  source_preview_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_preview_recommendation_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  input_connectome_snapshot_id:
+    type: string
+    format: uuid
+  input_connectome_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  output_connectome_snapshot_id:
+    type: string
+    format: uuid
+  output_connectome_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  applied_recommendation_count:
+    type: integer
+    minimum: 1
+  applied_recommendations:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/applied_recommendation"
+  approval_bundle:
+    type: object
+    additionalProperties: false
+    required:
+      - self_attestation_id
+      - council_attestation_id
+      - guardian_attestation_id
+      - human_reviewers
+      - approval_reason
+    properties:
+      self_attestation_id:
+        type: string
+        minLength: 1
+      council_attestation_id:
+        type: string
+        minLength: 1
+      guardian_attestation_id:
+        type: string
+        minLength: 1
+      human_reviewers:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      approval_reason:
+        type: string
+        minLength: 1
+  continuity_diff:
+    type: object
+    additionalProperties: false
+    required:
+      - diff_id
+      - event_type
+      - mutated_edge_ids
+      - recorded_by
+      - target_paths
+    properties:
+      diff_id:
+        type: string
+        minLength: 1
+      event_type:
+        type: string
+        const: mind.memory.procedural_applied
+      mutated_edge_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          format: uuid
+      recorded_by:
+        type: string
+        const: ProceduralMemoryWritebackGate
+      target_paths:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  status:
+    type: string
+    const: approved
+  rollback_token:
+    type: string
+    minLength: 1
+  unchanged_edge_ids:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      format: uuid
+$defs:
+  applied_recommendation:
+    type: object
+    additionalProperties: false
+    required:
+      - recommendation_id
+      - target_edge_id
+      - target_path
+      - source_segment_ids
+      - source_event_ids
+      - source_recommendation_digest
+      - previous_weight
+      - applied_weight_delta
+      - resulting_weight
+      - continuity_diff_ref
+      - digest
+    properties:
+      recommendation_id:
+        type: string
+        minLength: 1
+      target_edge_id:
+        type: string
+        format: uuid
+      target_path:
+        type: string
+        minLength: 1
+      source_segment_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_event_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_recommendation_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      previous_weight:
+        type: number
+        minimum: 0
+        maximum: 1
+      applied_weight_delta:
+        type: number
+        minimum: 0
+        maximum: 0.08
+      resulting_weight:
+        type: number
+        minimum: 0
+        maximum: 1
+      continuity_diff_ref:
+        type: string
+        minLength: 1
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"

@@ -83,6 +83,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     procedural_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    procedural_writeback_parser = subparsers.add_parser(
+        "procedural-writeback-demo",
+        help="Apply a human-approved bounded procedural writeback to a copied Connectome snapshot",
+    )
+    procedural_writeback_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     episodic_parser = subparsers.add_parser(
         "episodic-demo",
         help="Run the L2 episodic stream canonical shape and MemoryCrystal handoff scenario",
@@ -238,6 +244,10 @@ def main() -> None:
 
     if args.command == "procedural-demo":
         _print_result(runtime.run_procedural_demo(), args.json)
+        return
+
+    if args.command == "procedural-writeback-demo":
+        _print_result(runtime.run_procedural_writeback_demo(), args.json)
         return
 
     if args.command == "episodic-demo":

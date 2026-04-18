@@ -549,7 +549,7 @@ entries:
       - docs/02-subsystems/mind-substrate/procedural-memory.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 procedural preview contract machine-readable before human-approved writeback lands.
+    rationale: Required to make the L2 procedural preview contract machine-readable and supply a stable source surface for bounded writeback.
   - priority: P1
     kind: eval
     file: evals/continuity/procedural_preview_contract.yaml
@@ -557,6 +557,29 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the read-only connectome preview policy, bounded weight delta, and deferred apply boundary.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/procedural_writeback_receipt.schema
+    consumers:
+      - specs/interfaces/mind.procedural_writeback.v0.idl
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize human-approved procedural writeback evidence, continuity diff metadata, and rollback readiness.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.procedural_writeback.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 bounded procedural writeback contract machine-readable across runtime, docs, and evals.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/procedural_writeback_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects human reviewer quorum, bounded connectome delta, continuity diff metadata, and rollback token emission.
   - priority: P1
     kind: schema
     file: specs/schemas/trust_event.schema

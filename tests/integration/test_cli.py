@@ -156,6 +156,22 @@ class CliIntegrationTests(unittest.TestCase):
             result["procedural"]["snapshot"]["deferred_surfaces"],
         )
 
+    def test_procedural_writeback_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "procedural-writeback-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["writeback"]["ok"])
+        self.assertEqual(2, result["validation"]["writeback"]["applied_recommendation_count"])
+        self.assertEqual(
+            ["human://reviewers/alice", "human://reviewers/bob"],
+            result["validation"]["writeback"]["human_reviewers"],
+        )
+        self.assertEqual("approved", result["procedural"]["writeback_receipt"]["status"])
+
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()
 

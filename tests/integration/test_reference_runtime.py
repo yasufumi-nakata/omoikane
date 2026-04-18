@@ -163,6 +163,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-preview"])
 
+    def test_procedural_writeback_demo_returns_valid_receipt(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_writeback_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["writeback"]["ok"])
+        self.assertEqual(2, result["validation"]["writeback"]["applied_recommendation_count"])
+        self.assertEqual(
+            ["human://reviewers/alice", "human://reviewers/bob"],
+            result["validation"]["writeback"]["human_reviewers"],
+        )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-writeback"])
+
     def test_cognitive_failover_demo_records_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 

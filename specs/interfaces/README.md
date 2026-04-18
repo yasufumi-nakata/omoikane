@@ -11,6 +11,7 @@
 - `mind.memory.v0.idl`
 - `mind.semantic.v0.idl`
 - `mind.procedural.v0.idl`
+- `mind.procedural_writeback.v0.idl`
 - `mind.qualia.v0.idl`
 - `mind.self_model.v0.idl`
 - `agentic.council.v0.idl`
@@ -28,7 +29,7 @@
 
 ## 次段階
 
-L2 procedural memory apply path、L3 cognitive、
+L2 procedural skill execution enactment、L3 cognitive、
 L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、

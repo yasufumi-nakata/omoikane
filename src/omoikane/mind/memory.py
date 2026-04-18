@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Sequence
+from uuid import uuid4
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .connectome import CONNECTOME_SCHEMA_VERSION, ConnectomeModel
@@ -29,6 +30,8 @@ PROCEDURAL_MEMORY_SCHEMA_VERSION = "1.0"
 PROCEDURAL_PREVIEW_POLICY_ID = "connectome-coupled-procedural-preview-v1"
 PROCEDURAL_MAX_WEIGHT_DELTA = 0.08
 PROCEDURAL_DEFERRED_SURFACES = ["weight-application", "skill-execution"]
+PROCEDURAL_WRITEBACK_POLICY_ID = "human-approved-procedural-writeback-v1"
+PROCEDURAL_REQUIRED_HUMAN_REVIEWERS = 2
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -55,6 +58,10 @@ def _semantic_concept_digest_payload(concept: Dict[str, Any]) -> Dict[str, Any]:
 
 def _procedural_recommendation_digest_payload(recommendation: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in recommendation.items() if key != "digest"}
+
+
+def _procedural_writeback_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "digest"}
 
 
 @dataclass
@@ -1290,3 +1297,434 @@ class ProceduralMemoryProjector:
             canonical_json(_procedural_recommendation_digest_payload(recommendation))
         )
         return recommendation
+
+
+class ProceduralMemoryWritebackGate:
+    """Applies approved procedural previews to a copied Connectome snapshot."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "policy_id": PROCEDURAL_WRITEBACK_POLICY_ID,
+            "source_preview_policy": PROCEDURAL_PREVIEW_POLICY_ID,
+            "target_connectome_schema": CONNECTOME_SCHEMA_VERSION,
+            "update_mode": "bounded-weight-application",
+            "max_weight_delta": PROCEDURAL_MAX_WEIGHT_DELTA,
+            "approval_required": ["self", "council", "guardian", "human"],
+            "required_human_reviewers": PROCEDURAL_REQUIRED_HUMAN_REVIEWERS,
+            "continuity_diff_required": True,
+            "rollback_ready": True,
+        }
+
+    def apply(
+        self,
+        identity_id: str,
+        preview_snapshot: Dict[str, Any],
+        connectome_document: Dict[str, Any],
+        *,
+        selected_recommendation_ids: Sequence[str] | None = None,
+        self_attestation_id: str,
+        council_attestation_id: str,
+        guardian_attestation_id: str,
+        human_reviewers: Sequence[str],
+        approval_reason: str,
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(preview_snapshot, dict):
+            raise ValueError("preview_snapshot must be a mapping")
+        if not isinstance(connectome_document, dict):
+            raise ValueError("connectome_document must be a mapping")
+
+        preview_validation = ProceduralMemoryProjector().validate(preview_snapshot)
+        if not preview_validation["ok"]:
+            raise ValueError(
+                f"procedural writeback requires a valid preview snapshot: {preview_validation['errors']}"
+            )
+        connectome_validation = ConnectomeModel().validate(connectome_document)
+        if not connectome_validation["ok"]:
+            raise ValueError("connectome_document must satisfy Connectome validation")
+        if preview_snapshot.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match preview_snapshot.identity_id")
+        if connectome_document.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match connectome_document.identity_id")
+        if preview_snapshot.get("connectome_snapshot_id") != connectome_document.get("snapshot_id"):
+            raise ValueError("preview_snapshot must reference connectome_document.snapshot_id")
+
+        normalized_reviewers = _dedupe_preserve_order(list(human_reviewers))
+        if len(normalized_reviewers) < PROCEDURAL_REQUIRED_HUMAN_REVIEWERS:
+            raise PermissionError(
+                f"procedural writeback requires at least {PROCEDURAL_REQUIRED_HUMAN_REVIEWERS} human reviewers"
+            )
+        for field_name, value in (
+            ("self_attestation_id", self_attestation_id),
+            ("council_attestation_id", council_attestation_id),
+            ("guardian_attestation_id", guardian_attestation_id),
+            ("approval_reason", approval_reason),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+
+        selected_ids = self._normalize_selected_recommendation_ids(
+            preview_snapshot["recommendations"],
+            selected_recommendation_ids,
+        )
+        selected_recommendations = [
+            recommendation
+            for recommendation in preview_snapshot["recommendations"]
+            if recommendation["recommendation_id"] in selected_ids
+        ]
+        updated_connectome = deepcopy(connectome_document)
+        edge_map = {edge["id"]: edge for edge in updated_connectome["edges"]}
+
+        applied_recommendations: List[Dict[str, Any]] = []
+        target_paths: List[str] = []
+        for recommendation in selected_recommendations:
+            edge = edge_map.get(recommendation["target_edge_id"])
+            if edge is None:
+                raise ValueError(
+                    f"preview recommendation references unknown edge: {recommendation['target_edge_id']}"
+                )
+            previous_weight = round(float(edge["weight"]), 3)
+            applied_weight_delta = round(float(recommendation["proposed_weight_delta"]), 3)
+            resulting_weight = round(min(1.0, previous_weight + applied_weight_delta), 3)
+            edge["weight"] = resulting_weight
+            target_paths.append(recommendation["target_path"])
+
+            applied_record = {
+                "recommendation_id": recommendation["recommendation_id"],
+                "target_edge_id": recommendation["target_edge_id"],
+                "target_path": recommendation["target_path"],
+                "source_segment_ids": list(recommendation["source_segment_ids"]),
+                "source_event_ids": list(recommendation["source_event_ids"]),
+                "source_recommendation_digest": recommendation["digest"],
+                "previous_weight": previous_weight,
+                "applied_weight_delta": applied_weight_delta,
+                "resulting_weight": resulting_weight,
+                "continuity_diff_ref": f"ledger://entry/{new_id('procedural-writeback')}",
+            }
+            applied_record["digest"] = sha256_text(
+                canonical_json(_procedural_writeback_digest_payload(applied_record))
+            )
+            applied_recommendations.append(applied_record)
+
+        updated_connectome["snapshot_id"] = str(uuid4())
+        updated_connectome["snapshot_time"] = utc_now_iso()
+        updated_connectome_validation = ConnectomeModel().validate(updated_connectome)
+        if not updated_connectome_validation["ok"]:
+            raise ValueError("updated_connectome must satisfy Connectome validation")
+
+        source_preview_digest = sha256_text(canonical_json(preview_snapshot))
+        input_connectome_digest = sha256_text(canonical_json(connectome_document))
+        output_connectome_digest = sha256_text(canonical_json(updated_connectome))
+        rollback_token = new_id("rollback")
+
+        receipt = {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "applied_at": utc_now_iso(),
+            "writeback_policy": self.profile(),
+            "source_preview_digest": source_preview_digest,
+            "source_preview_recommendation_ids": list(selected_ids),
+            "input_connectome_snapshot_id": connectome_document["snapshot_id"],
+            "input_connectome_digest": input_connectome_digest,
+            "output_connectome_snapshot_id": updated_connectome["snapshot_id"],
+            "output_connectome_digest": output_connectome_digest,
+            "applied_recommendation_count": len(applied_recommendations),
+            "applied_recommendations": applied_recommendations,
+            "approval_bundle": {
+                "self_attestation_id": self_attestation_id.strip(),
+                "council_attestation_id": council_attestation_id.strip(),
+                "guardian_attestation_id": guardian_attestation_id.strip(),
+                "human_reviewers": normalized_reviewers,
+                "approval_reason": approval_reason.strip(),
+            },
+            "continuity_diff": {
+                "diff_id": new_id("connectome-diff"),
+                "event_type": "mind.memory.procedural_applied",
+                "mutated_edge_ids": [record["target_edge_id"] for record in applied_recommendations],
+                "recorded_by": "ProceduralMemoryWritebackGate",
+                "target_paths": target_paths,
+            },
+            "status": "approved",
+            "rollback_token": rollback_token,
+            "unchanged_edge_ids": [
+                edge["id"]
+                for edge in updated_connectome["edges"]
+                if edge["id"] not in receipt_edge_ids(applied_recommendations)
+            ],
+        }
+
+        validation = self.validate(receipt, updated_connectome, preview_snapshot)
+        if not validation["ok"]:
+            raise ValueError(f"procedural writeback receipt failed validation: {validation['errors']}")
+
+        return {
+            "receipt": receipt,
+            "updated_connectome_document": updated_connectome,
+        }
+
+    def validate(
+        self,
+        receipt: Dict[str, Any],
+        updated_connectome_document: Dict[str, Any],
+        preview_snapshot: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        target_paths: List[str] = []
+
+        if not isinstance(receipt, dict):
+            raise ValueError("receipt must be a mapping")
+        if not isinstance(updated_connectome_document, dict):
+            raise ValueError("updated_connectome_document must be a mapping")
+        if receipt.get("schema_version") != PROCEDURAL_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {PROCEDURAL_MEMORY_SCHEMA_VERSION}, "
+                f"got {receipt.get('schema_version')!r}"
+            )
+
+        for field_name in (
+            "identity_id",
+            "applied_at",
+            "input_connectome_snapshot_id",
+            "output_connectome_snapshot_id",
+            "rollback_token",
+        ):
+            MemoryCrystalStore._require_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        writeback_policy = receipt.get("writeback_policy")
+        if not isinstance(writeback_policy, dict):
+            errors.append("writeback_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if writeback_policy.get(field_name) != expected_value:
+                    errors.append(f"writeback_policy.{field_name} mismatch")
+
+        for field_name in (
+            "source_preview_digest",
+            "input_connectome_digest",
+            "output_connectome_digest",
+        ):
+            value = receipt.get(field_name)
+            if not isinstance(value, str) or len(value) != 64:
+                errors.append(f"{field_name} must be a sha256 hex string")
+
+        selected_ids = receipt.get("source_preview_recommendation_ids")
+        if not isinstance(selected_ids, list) or not selected_ids:
+            errors.append("source_preview_recommendation_ids must be a non-empty list")
+            selected_ids = []
+        else:
+            for recommendation_id in selected_ids:
+                if not isinstance(recommendation_id, str) or not recommendation_id.strip():
+                    errors.append(
+                        "source_preview_recommendation_ids must contain non-empty strings"
+                    )
+
+        applied_recommendations = receipt.get("applied_recommendations")
+        if not isinstance(applied_recommendations, list) or not applied_recommendations:
+            errors.append("applied_recommendations must be a non-empty list")
+            applied_recommendations = []
+
+        seen_recommendation_ids = set()
+        mutated_edge_ids: List[str] = []
+        human_reviewers: List[str] = []
+        for index, record in enumerate(applied_recommendations):
+            if not isinstance(record, dict):
+                errors.append(f"applied_recommendations[{index}] must be an object")
+                continue
+
+            for field_name in (
+                "recommendation_id",
+                "target_edge_id",
+                "target_path",
+                "source_recommendation_digest",
+                "continuity_diff_ref",
+            ):
+                MemoryCrystalStore._require_non_empty_string(
+                    record.get(field_name),
+                    f"applied_recommendations[{index}].{field_name}",
+                    errors,
+                )
+
+            recommendation_id = record.get("recommendation_id")
+            if isinstance(recommendation_id, str) and recommendation_id:
+                if recommendation_id in seen_recommendation_ids:
+                    errors.append(f"duplicate applied recommendation_id: {recommendation_id}")
+                else:
+                    seen_recommendation_ids.add(recommendation_id)
+
+            target_path = record.get("target_path")
+            if isinstance(target_path, str) and target_path:
+                target_paths.append(target_path)
+            target_edge_id = record.get("target_edge_id")
+            if isinstance(target_edge_id, str) and target_edge_id:
+                mutated_edge_ids.append(target_edge_id)
+
+            for field_name in ("source_segment_ids", "source_event_ids"):
+                value = record.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(
+                        f"applied_recommendations[{index}].{field_name} must be a non-empty list"
+                    )
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(
+                            f"applied_recommendations[{index}].{field_name} must contain non-empty strings"
+                        )
+
+            for field_name, minimum, maximum in (
+                ("previous_weight", 0.0, 1.0),
+                ("applied_weight_delta", 0.0, PROCEDURAL_MAX_WEIGHT_DELTA),
+                ("resulting_weight", 0.0, 1.0),
+            ):
+                MemoryCrystalStore._require_number_in_range(
+                    record.get(field_name),
+                    minimum,
+                    maximum,
+                    f"applied_recommendations[{index}].{field_name}",
+                    errors,
+                )
+
+            digest = record.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append(f"applied_recommendations[{index}].digest must be a sha256 hex string")
+            else:
+                expected_digest = sha256_text(canonical_json(_procedural_writeback_digest_payload(record)))
+                if digest != expected_digest:
+                    errors.append(f"applied_recommendations[{index}].digest mismatch")
+
+        applied_recommendation_count = receipt.get("applied_recommendation_count")
+        if applied_recommendation_count != len(applied_recommendations):
+            errors.append(
+                "applied_recommendation_count must equal len(applied_recommendations) "
+                f"({len(applied_recommendations)}), got {applied_recommendation_count!r}"
+            )
+
+        approval_bundle = receipt.get("approval_bundle")
+        if not isinstance(approval_bundle, dict):
+            errors.append("approval_bundle must be an object")
+        else:
+            for field_name in (
+                "self_attestation_id",
+                "council_attestation_id",
+                "guardian_attestation_id",
+                "approval_reason",
+            ):
+                MemoryCrystalStore._require_non_empty_string(
+                    approval_bundle.get(field_name),
+                    f"approval_bundle.{field_name}",
+                    errors,
+                )
+            human_reviewers = approval_bundle.get("human_reviewers", [])
+            if not isinstance(human_reviewers, list):
+                errors.append("approval_bundle.human_reviewers must be a list")
+                human_reviewers = []
+            else:
+                for reviewer in human_reviewers:
+                    if not isinstance(reviewer, str) or not reviewer.strip():
+                        errors.append("approval_bundle.human_reviewers must contain non-empty strings")
+                if human_reviewers != _dedupe_preserve_order(human_reviewers):
+                    errors.append("approval_bundle.human_reviewers must be deduplicated")
+                if len(human_reviewers) < PROCEDURAL_REQUIRED_HUMAN_REVIEWERS:
+                    errors.append(
+                        f"approval_bundle.human_reviewers must contain at least {PROCEDURAL_REQUIRED_HUMAN_REVIEWERS} reviewers"
+                    )
+
+        continuity_diff = receipt.get("continuity_diff")
+        if not isinstance(continuity_diff, dict):
+            errors.append("continuity_diff must be an object")
+        else:
+            for field_name in ("diff_id", "recorded_by", "event_type"):
+                MemoryCrystalStore._require_non_empty_string(
+                    continuity_diff.get(field_name),
+                    f"continuity_diff.{field_name}",
+                    errors,
+                )
+            if continuity_diff.get("event_type") != "mind.memory.procedural_applied":
+                errors.append("continuity_diff.event_type mismatch")
+            mutated = continuity_diff.get("mutated_edge_ids")
+            if not isinstance(mutated, list) or not mutated:
+                errors.append("continuity_diff.mutated_edge_ids must be a non-empty list")
+            elif mutated != mutated_edge_ids:
+                errors.append("continuity_diff.mutated_edge_ids must match applied target_edge_ids")
+            target_paths_value = continuity_diff.get("target_paths")
+            if not isinstance(target_paths_value, list) or not target_paths_value:
+                errors.append("continuity_diff.target_paths must be a non-empty list")
+            elif target_paths_value != target_paths:
+                errors.append("continuity_diff.target_paths must match applied target_paths")
+
+        if receipt.get("status") != "approved":
+            errors.append("status must equal 'approved'")
+
+        unchanged_edge_ids = receipt.get("unchanged_edge_ids")
+        if not isinstance(unchanged_edge_ids, list):
+            errors.append("unchanged_edge_ids must be a list")
+
+        connectome_validation = ConnectomeModel().validate(updated_connectome_document)
+        if not connectome_validation["ok"]:
+            errors.append("updated_connectome_document must satisfy Connectome validation")
+        else:
+            if receipt.get("identity_id") != updated_connectome_document.get("identity_id"):
+                errors.append("receipt.identity_id must match updated_connectome_document.identity_id")
+            if receipt.get("output_connectome_snapshot_id") != updated_connectome_document.get("snapshot_id"):
+                errors.append(
+                    "output_connectome_snapshot_id must match updated_connectome_document.snapshot_id"
+                )
+            expected_output_digest = sha256_text(canonical_json(updated_connectome_document))
+            if receipt.get("output_connectome_digest") != expected_output_digest:
+                errors.append("output_connectome_digest mismatch")
+            if isinstance(unchanged_edge_ids, list):
+                all_edge_ids = [edge["id"] for edge in updated_connectome_document["edges"]]
+                expected_unchanged = [edge_id for edge_id in all_edge_ids if edge_id not in mutated_edge_ids]
+                if unchanged_edge_ids != expected_unchanged:
+                    errors.append("unchanged_edge_ids mismatch")
+
+        if preview_snapshot is not None:
+            preview_validation = ProceduralMemoryProjector().validate(preview_snapshot)
+            if not preview_validation["ok"]:
+                errors.append("preview_snapshot must satisfy ProceduralMemoryProjector validation")
+            else:
+                expected_preview_digest = sha256_text(canonical_json(preview_snapshot))
+                if receipt.get("source_preview_digest") != expected_preview_digest:
+                    errors.append("source_preview_digest mismatch")
+                expected_ids = [record["recommendation_id"] for record in applied_recommendations]
+                if selected_ids != expected_ids:
+                    errors.append(
+                        "source_preview_recommendation_ids must match applied recommendation_ids"
+                    )
+
+        return {
+            "ok": not errors,
+            "applied_recommendation_count": len(applied_recommendations),
+            "target_paths": target_paths,
+            "human_reviewers": human_reviewers,
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _normalize_selected_recommendation_ids(
+        recommendations: Sequence[Dict[str, Any]],
+        selected_recommendation_ids: Sequence[str] | None,
+    ) -> List[str]:
+        available_ids = [recommendation["recommendation_id"] for recommendation in recommendations]
+        if selected_recommendation_ids is None:
+            return list(available_ids)
+        normalized = _dedupe_preserve_order(
+            [
+                recommendation_id.strip()
+                for recommendation_id in selected_recommendation_ids
+                if isinstance(recommendation_id, str) and recommendation_id.strip()
+            ]
+        )
+        if not normalized:
+            raise ValueError("selected_recommendation_ids must contain at least one recommendation id")
+        missing = [recommendation_id for recommendation_id in normalized if recommendation_id not in available_ids]
+        if missing:
+            raise ValueError(f"selected_recommendation_ids contain unknown ids: {missing}")
+        return normalized
+
+
+def receipt_edge_ids(applied_recommendations: Sequence[Dict[str, Any]]) -> List[str]:
+    return [record["target_edge_id"] for record in applied_recommendations]

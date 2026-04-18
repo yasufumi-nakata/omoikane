@@ -1,0 +1,16 @@
+eval_id: procedural_writeback_contract
+target: mind.procedural_writeback
+summary: >
+  Human-approved procedural writeback が bounded connectome delta、
+  continuity diff、rollback token、human reviewer quorum を守ること
+checks:
+  - name: procedural writeback demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
+expect:
+  writeback_ok: true
+  applied_recommendation_count: 2
+  target_paths:
+    - sensory_ingress->continuity_integrator
+    - continuity_integrator->ethics_gate
+  human_reviewer_count: 2
+  procedural_writeback_ledger_count: 1

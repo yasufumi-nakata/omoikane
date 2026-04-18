@@ -5,6 +5,7 @@ from .memory import (
     EpisodicStream,
     MemoryCrystalStore,
     ProceduralMemoryProjector,
+    ProceduralMemoryWritebackGate,
     SemanticMemoryProjector,
 )
 
@@ -14,4 +15,5 @@ __all__ = [
     "MemoryCrystalStore",
     "SemanticMemoryProjector",
     "ProceduralMemoryProjector",
+    "ProceduralMemoryWritebackGate",
 ]

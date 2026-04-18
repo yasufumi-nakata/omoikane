@@ -1,0 +1,129 @@
+idl_version: 1
+kind: service
+namespace: mind.procedural_writeback.v0
+service: ProceduralMemoryWritebackGate
+summary: >
+  Deterministic human-approved procedural writeback that applies bounded
+  connectome weight deltas from a validated procedural preview to a copied
+  Connectome snapshot.
+imports:
+  procedural_memory_preview: ../schemas/procedural_memory_preview.schema
+  connectome_document: ../schemas/connectome_document.schema
+  procedural_writeback_receipt: ../schemas/procedural_writeback_receipt.schema
+operations:
+  apply_preview:
+    summary: Apply one or more validated procedural preview recommendations after self, council, guardian, and human approval.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - preview_snapshot
+          - connectome_document
+          - selected_recommendation_ids
+          - self_attestation_id
+          - council_attestation_id
+          - guardian_attestation_id
+          - human_reviewers
+          - approval_reason
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          preview_snapshot:
+            schema_ref: procedural_memory_preview
+          connectome_document:
+            schema_ref: connectome_document
+          selected_recommendation_ids:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          self_attestation_id:
+            type: string
+            minLength: 1
+          council_attestation_id:
+            type: string
+            minLength: 1
+          guardian_attestation_id:
+            type: string
+            minLength: 1
+          human_reviewers:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          approval_reason:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+          - updated_connectome_document
+        properties:
+          receipt:
+            schema_ref: procedural_writeback_receipt
+          updated_connectome_document:
+            schema_ref: connectome_document
+    guarantees:
+      - source preview must validate before any writeback is applied
+      - input connectome snapshot must remain unchanged and output must receive a fresh snapshot_id
+      - each applied delta must remain within the fixed max_weight_delta
+      - every approved writeback must emit continuity diff metadata and a rollback token
+  validate_receipt:
+    summary: Validate one procedural writeback receipt and the resulting Connectome snapshot against the fixed writeback policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+          - updated_connectome_document
+        properties:
+          receipt:
+            schema_ref: procedural_writeback_receipt
+          updated_connectome_document:
+            schema_ref: connectome_document
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - applied_recommendation_count
+          - target_paths
+          - human_reviewers
+          - errors
+        properties:
+          ok:
+            type: boolean
+          applied_recommendation_count:
+            type: integer
+            minimum: 0
+          target_paths:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          human_reviewers:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.procedural_applied:
+    payload:
+      schema_ref: procedural_writeback_receipt
