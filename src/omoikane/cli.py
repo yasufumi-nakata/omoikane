@@ -71,6 +71,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     memory_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    episodic_parser = subparsers.add_parser(
+        "episodic-demo",
+        help="Run the L2 episodic stream canonical shape and MemoryCrystal handoff scenario",
+    )
+    episodic_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     cognitive_parser = subparsers.add_parser(
         "cognitive-demo",
         help="Run the L3 reasoning backend failover scenario",
@@ -212,6 +218,10 @@ def main() -> None:
 
     if args.command == "memory-demo":
         _print_result(runtime.run_memory_demo(), args.json)
+        return
+
+    if args.command == "episodic-demo":
+        _print_result(runtime.run_episodic_demo(), args.json)
         return
 
     if args.command == "cognitive-demo":

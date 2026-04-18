@@ -1,0 +1,115 @@
+idl_version: 1
+kind: service
+namespace: mind.memory.v0
+service: EpisodicStreamService
+summary: Canonical episodic stream contract and MemoryCrystal handoff window.
+imports:
+  episodic_event: ../schemas/episodic_event.schema
+  episodic_stream_snapshot: ../schemas/episodic_stream_snapshot.schema
+  memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
+operations:
+  append:
+    summary: Record one episodic event into the append-only stream.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - summary
+          - tags
+          - salience
+          - valence
+          - arousal
+          - source_refs
+          - attention_target
+          - narrative_role
+          - self_coherence
+          - continuity_ref
+        properties:
+          summary:
+            type: string
+            minLength: 1
+          tags:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          salience:
+            type: number
+            minimum: 0
+            maximum: 1
+          valence:
+            type: number
+            minimum: -1
+            maximum: 1
+          arousal:
+            type: number
+            minimum: -1
+            maximum: 1
+          source_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          attention_target:
+            type: string
+            minLength: 1
+          narrative_role:
+            type: string
+            enum:
+              - observation
+              - deliberation
+              - resolution
+              - verification
+              - handoff
+          self_coherence:
+            type: number
+            minimum: 0
+            maximum: 1
+          continuity_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: episodic_event
+  snapshot:
+    summary: Return the current append-only episodic stream snapshot and compaction window.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: episodic_stream_snapshot
+  prepare_compaction:
+    summary: Preview the current handoff window that will flow into MemoryCrystal compaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          max_events:
+            type: integer
+            minimum: 3
+            maximum: 5
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - snapshot
+          - manifest_schema_ref
+        properties:
+          snapshot:
+            schema_ref: episodic_stream_snapshot
+          manifest_schema_ref:
+            type: string
+            const: memory_crystal_manifest

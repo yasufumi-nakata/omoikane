@@ -35,6 +35,7 @@ PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
 PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
+PYTHONPATH=src python3 -m omoikane.cli episodic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
@@ -116,6 +117,14 @@ Guardian が sandbox を即時凍結することを確認する。
 (`append-only-segment-rollup-v1`) を JSON で可視化し、
 source event を保持したまま最大 3 件ずつ segment 化する manifest と
 `crystal-commit` ledger event を確認する。
+入力 source event は `EpisodicStream` の handoff window から取り込み、
+`compaction_candidate_ids` をそのまま payload に残す。
+
+`episodic-demo` は L2 EpisodicStream の canonical shape
+(`canonical-episodic-stream-v1`) を JSON で可視化し、
+append-only snapshot、最新 5 event の handoff window、
+`MemoryCrystal` への manifest 生成プレビュー、
+`episodic-window` ledger event を確認する。
 
 `bdb-demo` は L6 Biological-Digital Bridge の reference contract
 (`interface.bdb.v0`) を JSON で可視化し、
@@ -152,7 +161,7 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- L2 episodic stream の canonical shape と MemoryCrystal への流入拡張
+- L2 semantic / procedural memory projection の machine-readable contract
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担

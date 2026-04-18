@@ -1,0 +1,85 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/episodic_stream_snapshot.schema"
+title: EpisodicStreamSnapshot
+description: Append-only episodic stream snapshot and MemoryCrystal handoff window.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - identity_id
+  - captured_at
+  - policy
+  - event_count
+  - ready_for_compaction
+  - compaction_candidate_ids
+  - events
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  identity_id:
+    type: string
+    minLength: 1
+  captured_at:
+    type: string
+    format: date-time
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - append_only
+      - min_events_for_compaction
+      - max_pending_events_for_compaction
+      - target_compaction_strategy
+      - narrative_roles
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: canonical-episodic-stream-v1
+      append_only:
+        type: boolean
+        const: true
+      min_events_for_compaction:
+        type: integer
+        const: 3
+      max_pending_events_for_compaction:
+        type: integer
+        const: 5
+      target_compaction_strategy:
+        type: string
+        const: append-only-segment-rollup-v1
+      narrative_roles:
+        type: array
+        minItems: 5
+        maxItems: 5
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - deliberation
+            - handoff
+            - observation
+            - resolution
+            - verification
+  event_count:
+    type: integer
+    minimum: 1
+  ready_for_compaction:
+    type: boolean
+  compaction_candidate_ids:
+    type: array
+    minItems: 1
+    maxItems: 5
+    items:
+      type: string
+      minLength: 1
+  events:
+    type: array
+    minItems: 1
+    items:
+      $ref: "episodic_event.schema"

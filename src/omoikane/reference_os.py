@@ -33,7 +33,7 @@ from .kernel.identity import ForkApprovals, IdentityRegistry
 from .kernel.scheduler import AscensionScheduler
 from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
-from .mind.memory import MemoryCrystalStore
+from .mind.memory import EpisodicStream, MemoryCrystalStore
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction import GapScanner, SandboxSentinel
@@ -52,6 +52,7 @@ class OmoikaneReferenceOS:
         self.termination = TerminationGate(self.identity, self.ledger, self.substrate)
         self.qualia = QualiaBuffer()
         self.connectome = ConnectomeModel()
+        self.episodic = EpisodicStream()
         self.memory = MemoryCrystalStore()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
@@ -1955,7 +1956,8 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://memory-demo/v1",
             metadata={"display_name": "MemoryCrystal Sandbox"},
         )
-        source_events = self.memory.reference_events()
+        episodic_snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
         manifest = self.memory.compact(identity.identity_id, source_events)
         validation = self.memory.validate(manifest)
         self.ledger.append(
@@ -1966,6 +1968,7 @@ class OmoikaneReferenceOS:
                 "source_event_count": manifest["source_event_count"],
                 "segment_count": manifest["segment_count"],
                 "themes": validation["themes"],
+                "source_event_ids": episodic_snapshot["compaction_candidate_ids"],
                 "manifest_digest": sha256_text(canonical_json(manifest)),
             },
             actor="MemoryCrystalStore",
@@ -1981,10 +1984,75 @@ class OmoikaneReferenceOS:
             },
             "memory": {
                 "compaction_strategy": self.memory.strategy(),
+                "episodic_stream": episodic_snapshot,
                 "source_events": source_events,
                 "manifest": manifest,
             },
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_episodic_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://episodic-demo/v1",
+            metadata={"display_name": "EpisodicStream Sandbox"},
+        )
+        snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        snapshot_validation = self.episodic.validate_snapshot(snapshot)
+        handoff_events = self.episodic.compaction_candidates()
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.episodic_window_prepared",
+            payload={
+                "policy_id": snapshot["policy"]["policy_id"],
+                "event_count": snapshot["event_count"],
+                "candidate_event_ids": snapshot["compaction_candidate_ids"],
+                "ready_for_compaction": snapshot["ready_for_compaction"],
+            },
+            actor="EpisodicStream",
+            category="episodic-window",
+            layer="L2",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        manifest = self.memory.compact(identity.identity_id, handoff_events)
+        manifest_validation = self.memory.validate(manifest)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "themes": manifest_validation["themes"],
+                "source_event_ids": snapshot["compaction_candidate_ids"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.episodic.profile(),
+            "stream": snapshot,
+            "handoff": {
+                "candidate_event_ids": snapshot["compaction_candidate_ids"],
+                "candidate_event_count": len(handoff_events),
+                "manifest": manifest,
+            },
+            "validation": {
+                "snapshot": snapshot_validation,
+                "manifest": manifest_validation,
+                "ok": snapshot_validation["ok"] and manifest_validation["ok"],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

@@ -24,6 +24,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "ascension": ["self"],
     "attestation": ["guardian"],
     "qualia-checkpoint": ["self"],
+    "episodic-window": ["self"],
     "crystal-commit": ["self", "council"],
     "connectome-snapshot": ["self", "guardian"],
     "substrate-migrate": ["self", "council", "guardian"],

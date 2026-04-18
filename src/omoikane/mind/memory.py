@@ -1,12 +1,24 @@
-"""MemoryCrystal compaction reference model."""
+"""Episodic stream and MemoryCrystal reference models."""
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
+EPISODIC_STREAM_SCHEMA_VERSION = "1.0"
+EPISODIC_STREAM_POLICY_ID = "canonical-episodic-stream-v1"
+EPISODIC_MAX_PENDING_EVENTS = 5
+EPISODIC_MIN_EVENTS_FOR_COMPACTION = 3
+EPISODIC_ALLOWED_NARRATIVE_ROLES = {
+    "observation",
+    "deliberation",
+    "resolution",
+    "verification",
+    "handoff",
+}
 MEMORY_CRYSTAL_SCHEMA_VERSION = "1.0"
 COMPACTION_STRATEGY_ID = "append-only-segment-rollup-v1"
 MAX_SOURCE_EVENTS_PER_SEGMENT = 3
@@ -42,6 +54,315 @@ class EpisodicEvent:
     valence: float
     arousal: float
     source_refs: List[str]
+    attention_target: str
+    narrative_role: str
+    self_coherence: float
+    continuity_ref: str
+
+
+def _reference_episodic_seed_events() -> List[Dict[str, Any]]:
+    return [
+        asdict(
+            EpisodicEvent(
+                event_id="episode-0001",
+                occurred_at="2026-04-18T00:00:00+00:00",
+                summary="Council review で traceability 強化案の争点を抽出した",
+                tags=["council-review", "traceability", "safety"],
+                salience=0.91,
+                valence=0.24,
+                arousal=0.43,
+                source_refs=[
+                    "ledger://proposal/traceability-0001",
+                    "qualia://tick/council-focus-0001",
+                ],
+                attention_target="proposal.traceability",
+                narrative_role="deliberation",
+                self_coherence=0.88,
+                continuity_ref="ledger://entry/episodic-0001",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="episode-0002",
+                occurred_at="2026-04-18T00:02:00+00:00",
+                summary="Guardian veto 条件を再確認し、危険な patch 経路を除外した",
+                tags=["council-review", "guardian", "safety"],
+                salience=0.88,
+                valence=0.11,
+                arousal=0.57,
+                source_refs=[
+                    "ledger://proposal/traceability-0001",
+                    "ledger://ethics/veto-boundary-0001",
+                ],
+                attention_target="guardian.veto-boundary",
+                narrative_role="resolution",
+                self_coherence=0.91,
+                continuity_ref="ledger://entry/episodic-0002",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="episode-0003",
+                occurred_at="2026-04-18T00:04:00+00:00",
+                summary="決議と根拠を continuity evidence として整形した",
+                tags=["council-review", "continuity", "traceability"],
+                salience=0.83,
+                valence=0.19,
+                arousal=0.34,
+                source_refs=[
+                    "ledger://entry/council-decision-0001",
+                    "cas://sha256/continuity-evidence-0001",
+                ],
+                attention_target="continuity.evidence",
+                narrative_role="verification",
+                self_coherence=0.93,
+                continuity_ref="ledger://entry/episodic-0003",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="episode-0004",
+                occurred_at="2026-04-18T00:08:00+00:00",
+                summary="Substrate migration 後の warm standby 状態を確認した",
+                tags=["migration-check", "substrate", "continuity"],
+                salience=0.79,
+                valence=0.08,
+                arousal=0.48,
+                source_refs=[
+                    "substrate://transfer/warm-standby-0001",
+                    "connectome://snapshot/reference-v1",
+                ],
+                attention_target="substrate.warm-standby",
+                narrative_role="observation",
+                self_coherence=0.86,
+                continuity_ref="ledger://entry/episodic-0004",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="episode-0005",
+                occurred_at="2026-04-18T00:11:00+00:00",
+                summary="Mirror 側の hash 照合が primary と一致し handoff 可能と判断した",
+                tags=["migration-check", "replication", "continuity"],
+                salience=0.76,
+                valence=0.05,
+                arousal=0.29,
+                source_refs=[
+                    "mirror://hash/primary-0001",
+                    "mirror://hash/mirror-0001",
+                ],
+                attention_target="replication.hash-check",
+                narrative_role="handoff",
+                self_coherence=0.95,
+                continuity_ref="ledger://entry/episodic-0005",
+            )
+        ),
+    ]
+
+
+class EpisodicStream:
+    """Append-only episodic stream that prepares MemoryCrystal handoff windows."""
+
+    def __init__(self) -> None:
+        self._events: List[Dict[str, Any]] = []
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": EPISODIC_STREAM_SCHEMA_VERSION,
+            "policy_id": EPISODIC_STREAM_POLICY_ID,
+            "append_only": True,
+            "min_events_for_compaction": EPISODIC_MIN_EVENTS_FOR_COMPACTION,
+            "max_pending_events_for_compaction": EPISODIC_MAX_PENDING_EVENTS,
+            "target_compaction_strategy": COMPACTION_STRATEGY_ID,
+            "narrative_roles": sorted(EPISODIC_ALLOWED_NARRATIVE_ROLES),
+        }
+
+    def append(
+        self,
+        *,
+        summary: str,
+        tags: Sequence[str],
+        salience: float,
+        valence: float,
+        arousal: float,
+        source_refs: Sequence[str],
+        attention_target: str,
+        narrative_role: str,
+        self_coherence: float,
+        continuity_ref: str,
+        occurred_at: str | None = None,
+    ) -> Dict[str, Any]:
+        event = {
+            "event_id": new_id("episode"),
+            "occurred_at": occurred_at or utc_now_iso(),
+            "summary": summary,
+            "tags": list(tags),
+            "salience": salience,
+            "valence": valence,
+            "arousal": arousal,
+            "source_refs": list(source_refs),
+            "attention_target": attention_target,
+            "narrative_role": narrative_role,
+            "self_coherence": self_coherence,
+            "continuity_ref": continuity_ref,
+        }
+        normalized = self._normalize_event(event, len(self._events))
+        self._events.append(normalized)
+        return deepcopy(normalized)
+
+    def reference_events(self) -> List[Dict[str, Any]]:
+        return deepcopy(_reference_episodic_seed_events())
+
+    def load_reference_events(self) -> List[Dict[str, Any]]:
+        self._events = self.reference_events()
+        return self.recent(len(self._events))
+
+    def recent(self, count: int = EPISODIC_MAX_PENDING_EVENTS) -> List[Dict[str, Any]]:
+        if count < 1:
+            raise ValueError("count must be >= 1")
+        return deepcopy(self._events[-count:])
+
+    def compaction_candidates(self, max_events: int = EPISODIC_MAX_PENDING_EVENTS) -> List[Dict[str, Any]]:
+        if max_events < EPISODIC_MIN_EVENTS_FOR_COMPACTION:
+            raise ValueError(
+                f"max_events must be >= {EPISODIC_MIN_EVENTS_FOR_COMPACTION} for compaction readiness"
+            )
+        return self.recent(max_events)
+
+    def snapshot(self, identity_id: str) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not self._events:
+            raise ValueError("episodic stream is empty")
+
+        candidate_ids = [
+            event["event_id"] for event in self._events[-EPISODIC_MAX_PENDING_EVENTS:]
+        ]
+        return {
+            "schema_version": EPISODIC_STREAM_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "captured_at": utc_now_iso(),
+            "policy": self.profile(),
+            "event_count": len(self._events),
+            "ready_for_compaction": len(self._events) >= EPISODIC_MIN_EVENTS_FOR_COMPACTION,
+            "compaction_candidate_ids": candidate_ids,
+            "events": deepcopy(self._events),
+        }
+
+    def build_reference_snapshot(self, identity_id: str) -> Dict[str, Any]:
+        self.load_reference_events()
+        return self.snapshot(identity_id)
+
+    def validate_snapshot(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(snapshot, dict):
+            raise ValueError("snapshot must be a mapping")
+
+        if snapshot.get("schema_version") != EPISODIC_STREAM_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {EPISODIC_STREAM_SCHEMA_VERSION}, "
+                f"got {snapshot.get('schema_version')!r}"
+            )
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("identity_id"), "identity_id", errors)
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("captured_at"), "captured_at", errors)
+
+        policy = snapshot.get("policy")
+        if not isinstance(policy, dict):
+            errors.append("policy must be an object")
+        else:
+            if policy.get("policy_id") != EPISODIC_STREAM_POLICY_ID:
+                errors.append(f"unsupported policy_id: {policy.get('policy_id')!r}")
+            if policy.get("append_only") is not True:
+                errors.append("policy.append_only must be true")
+            if policy.get("min_events_for_compaction") != EPISODIC_MIN_EVENTS_FOR_COMPACTION:
+                errors.append("policy.min_events_for_compaction mismatch")
+            if policy.get("max_pending_events_for_compaction") != EPISODIC_MAX_PENDING_EVENTS:
+                errors.append("policy.max_pending_events_for_compaction mismatch")
+            if policy.get("target_compaction_strategy") != COMPACTION_STRATEGY_ID:
+                errors.append("policy.target_compaction_strategy mismatch")
+
+        events = snapshot.get("events")
+        if not isinstance(events, list) or not events:
+            errors.append("events must be a non-empty list")
+            events = []
+
+        normalized_events: List[Dict[str, Any]] = []
+        for index, event in enumerate(events):
+            try:
+                normalized_events.append(self._normalize_event(event, index))
+            except ValueError as exc:
+                errors.append(str(exc))
+
+        ordered_ids = [event["event_id"] for event in normalized_events]
+        sorted_ids = [
+            event["event_id"]
+            for event in sorted(normalized_events, key=lambda item: (item["occurred_at"], item["event_id"]))
+        ]
+        if ordered_ids != sorted_ids:
+            errors.append("events must be sorted by occurred_at/event_id")
+
+        event_count = snapshot.get("event_count")
+        if event_count != len(events):
+            errors.append(f"event_count must equal len(events) ({len(events)}), got {event_count!r}")
+
+        candidate_ids = snapshot.get("compaction_candidate_ids")
+        if not isinstance(candidate_ids, list) or not candidate_ids:
+            errors.append("compaction_candidate_ids must be a non-empty list")
+            candidate_ids = []
+        else:
+            expected_candidate_ids = ordered_ids[-EPISODIC_MAX_PENDING_EVENTS:]
+            if candidate_ids != expected_candidate_ids:
+                errors.append(
+                    "compaction_candidate_ids must track the most recent compaction window"
+                )
+
+        ready_for_compaction = snapshot.get("ready_for_compaction")
+        expected_ready = len(events) >= EPISODIC_MIN_EVENTS_FOR_COMPACTION
+        if ready_for_compaction is not expected_ready:
+            errors.append(
+                f"ready_for_compaction must be {expected_ready} for event_count {len(events)}"
+            )
+
+        return {
+            "ok": not errors,
+            "event_count": len(events),
+            "compaction_candidate_count": len(candidate_ids),
+            "ready_for_compaction": expected_ready,
+            "ordered": ordered_ids == sorted_ids,
+            "attention_targets": [event["attention_target"] for event in normalized_events],
+            "narrative_roles": [event["narrative_role"] for event in normalized_events],
+            "errors": errors,
+        }
+
+    def _normalize_event(self, event: Dict[str, Any], index: int) -> Dict[str, Any]:
+        base_event = MemoryCrystalStore._normalize_event(self, event, index)
+
+        attention_target = event.get("attention_target")
+        if not isinstance(attention_target, str) or not attention_target.strip():
+            raise ValueError(f"events[{index}].attention_target must be a non-empty string")
+
+        narrative_role = event.get("narrative_role")
+        if narrative_role not in EPISODIC_ALLOWED_NARRATIVE_ROLES:
+            raise ValueError(
+                f"events[{index}].narrative_role must be one of: "
+                + ", ".join(sorted(EPISODIC_ALLOWED_NARRATIVE_ROLES))
+            )
+
+        self_coherence = event.get("self_coherence")
+        if not isinstance(self_coherence, (int, float)) or self_coherence < 0.0 or self_coherence > 1.0:
+            raise ValueError(f"events[{index}].self_coherence must be between 0.0 and 1.0")
+
+        continuity_ref = event.get("continuity_ref")
+        if not isinstance(continuity_ref, str) or not continuity_ref.strip():
+            raise ValueError(f"events[{index}].continuity_ref must be a non-empty string")
+
+        return {
+            **base_event,
+            "attention_target": attention_target.strip(),
+            "narrative_role": narrative_role,
+            "self_coherence": round(float(self_coherence), 3),
+            "continuity_ref": continuity_ref.strip(),
+        }
 
 
 class MemoryCrystalStore:
@@ -58,83 +379,7 @@ class MemoryCrystalStore:
         }
 
     def reference_events(self) -> List[Dict[str, Any]]:
-        return [
-            asdict(
-                EpisodicEvent(
-                    event_id="episode-0001",
-                    occurred_at="2026-04-18T00:00:00+00:00",
-                    summary="Council review で traceability 強化案を採択した",
-                    tags=["council-review", "traceability", "safety"],
-                    salience=0.91,
-                    valence=0.24,
-                    arousal=0.43,
-                    source_refs=[
-                        "ledger://proposal/traceability-0001",
-                        "qualia://slice/council-focus-0001",
-                    ],
-                )
-            ),
-            asdict(
-                EpisodicEvent(
-                    event_id="episode-0002",
-                    occurred_at="2026-04-18T00:02:00+00:00",
-                    summary="Guardian veto 条件を再確認し、危険な patch 経路を除外した",
-                    tags=["council-review", "guardian", "safety"],
-                    salience=0.88,
-                    valence=0.11,
-                    arousal=0.57,
-                    source_refs=[
-                        "ledger://proposal/traceability-0001",
-                        "ledger://ethics/veto-boundary-0001",
-                    ],
-                )
-            ),
-            asdict(
-                EpisodicEvent(
-                    event_id="episode-0003",
-                    occurred_at="2026-04-18T00:04:00+00:00",
-                    summary="決議と根拠を continuity evidence として整形した",
-                    tags=["council-review", "continuity", "traceability"],
-                    salience=0.83,
-                    valence=0.19,
-                    arousal=0.34,
-                    source_refs=[
-                        "ledger://entry/council-decision-0001",
-                        "cas://sha256/continuity-evidence-0001",
-                    ],
-                )
-            ),
-            asdict(
-                EpisodicEvent(
-                    event_id="episode-0004",
-                    occurred_at="2026-04-18T00:08:00+00:00",
-                    summary="Substrate migration 後の warm standby 状態を確認した",
-                    tags=["migration-check", "substrate", "continuity"],
-                    salience=0.79,
-                    valence=0.08,
-                    arousal=0.48,
-                    source_refs=[
-                        "substrate://transfer/warm-standby-0001",
-                        "connectome://snapshot/reference-v1",
-                    ],
-                )
-            ),
-            asdict(
-                EpisodicEvent(
-                    event_id="episode-0005",
-                    occurred_at="2026-04-18T00:11:00+00:00",
-                    summary="Mirror 側の hash 照合が primary と一致することを確認した",
-                    tags=["migration-check", "replication", "continuity"],
-                    salience=0.76,
-                    valence=0.05,
-                    arousal=0.29,
-                    source_refs=[
-                        "mirror://hash/primary-0001",
-                        "mirror://hash/mirror-0001",
-                    ],
-                )
-            ),
-        ]
+        return deepcopy(_reference_episodic_seed_events())
 
     def build_reference_manifest(self, identity_id: str) -> Dict[str, Any]:
         return self.compact(identity_id=identity_id, events=self.reference_events())

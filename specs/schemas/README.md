@@ -9,6 +9,8 @@
 - `qualia_tick.schema`
 - `self_model.schema`
 - `connectome_document.schema`
+- `episodic_event.schema`
+- `episodic_stream_snapshot.schema`
 - `memory_crystal_manifest.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
@@ -42,7 +44,7 @@
 
 ## 次段階
 
-episodic event / richer sensory loopback artifacts は
+semantic memory projection / richer sensory loopback artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

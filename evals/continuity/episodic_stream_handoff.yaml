@@ -1,0 +1,25 @@
+eval_id: episodic_stream_handoff
+target: mind.episodic_stream
+level: L2
+description: >
+  EpisodicStream が append-only canonical event shape を維持しつつ、
+  MemoryCrystal compaction へそのまま handoff できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli episodic-demo --json
+expected:
+  snapshot_ok: true
+  manifest_ok: true
+  ready_for_compaction: true
+  event_count_min: 5
+  compaction_candidate_count: 5
+  narrative_roles:
+    - deliberation
+    - resolution
+    - verification
+    - observation
+    - handoff
+  append_only: true
+metric: boolean
+threshold: 1.0
+ethics_check: false

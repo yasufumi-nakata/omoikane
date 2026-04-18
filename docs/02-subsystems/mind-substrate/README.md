@@ -33,6 +33,10 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 エピソード記憶の時系列ストリーム。
 - 体験を「物語」として再生可能
 - 検索可能（意味埋め込み）
+- reference runtime では append-only canonical event shape と
+  `MemoryCrystal` handoff window を固定する
+canonical schema:
+[specs/schemas/episodic_event.schema](../../../specs/schemas/episodic_event.schema)
 
 ### EmotionalTone
 感情の地形図。Affect engine（L3）と双方向。
@@ -50,6 +54,7 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 ## サブドキュメント
 
 - [ascension-protocol.md](ascension-protocol.md) ── L0-L4 アップロード手順
+- [episodic-stream.md](episodic-stream.md) ── episodic event の canonical shape と handoff
 - [memory-model.md](memory-model.md) ── 記憶階層の詳細
 - [self-model.md](self-model.md) ── 自己モデルの構造
 - [qualia-buffer.md](qualia-buffer.md) ── 主観バッファの仕様

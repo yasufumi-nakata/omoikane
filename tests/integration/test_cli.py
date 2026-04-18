@@ -112,6 +112,24 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["append_only"])
         self.assertEqual(5, result["validation"]["source_event_count"])
         self.assertEqual(2, result["validation"]["segment_count"])
+        self.assertTrue(result["memory"]["episodic_stream"]["ready_for_compaction"])
+        self.assertEqual(
+            5,
+            len(result["memory"]["episodic_stream"]["compaction_candidate_ids"]),
+        )
+
+    def test_episodic_demo_emits_valid_handoff_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "episodic-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["snapshot"]["ready_for_compaction"])
+        self.assertTrue(result["validation"]["manifest"]["append_only"])
+        self.assertEqual("canonical-episodic-stream-v1", result["profile"]["policy_id"])
+        self.assertEqual(5, result["handoff"]["candidate_event_count"])
 
     def test_substrate_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

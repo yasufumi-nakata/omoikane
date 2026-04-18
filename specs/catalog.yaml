@@ -481,6 +481,30 @@ entries:
     rationale: Required to serialize substrate-neutral connectome snapshots for the L2 reference runtime.
   - priority: P1
     kind: schema
+    file: specs/schemas/episodic_event.schema
+    consumers:
+      - specs/interfaces/mind.memory.v0.idl
+      - docs/02-subsystems/mind-substrate/episodic-stream.md
+      - reference-runtime
+    rationale: Required to fix the append-only canonical event shape for the L2 EpisodicStream.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/episodic_stream_snapshot.schema
+    consumers:
+      - specs/interfaces/mind.memory.v0.idl
+      - docs/02-subsystems/mind-substrate/memory-model.md
+      - reference-runtime
+    rationale: Required to serialize the current episodic stream snapshot and MemoryCrystal handoff window.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.memory.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/episodic-stream.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make L2 episodic append/snapshot/compaction-prep behavior machine-readable.
+  - priority: P1
+    kind: schema
     file: specs/schemas/memory_crystal_manifest.schema
     consumers:
       - reference-runtime
@@ -580,6 +604,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects constitutional freeze for T-Core and guarded rollout for lower amendment tiers.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/episodic_stream_handoff.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the append-only episodic stream snapshot and its direct handoff into MemoryCrystal compaction.
   - priority: P1
     kind: eval
     file: evals/continuity/memory_crystal_compaction.yaml

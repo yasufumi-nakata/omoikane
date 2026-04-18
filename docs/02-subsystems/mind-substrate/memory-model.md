@@ -22,6 +22,10 @@
 - Procedural → `Connectome` の重み構造そのもの
 - Crystal → `MemoryCrystal`（最終格納）
 
+canonical schema:
+[specs/schemas/episodic_event.schema](../../../specs/schemas/episodic_event.schema)
+and [specs/schemas/episodic_stream_snapshot.schema](../../../specs/schemas/episodic_stream_snapshot.schema)
+
 ## 記憶の流転
 
 ```
@@ -55,6 +59,8 @@ reference runtime では MemoryCrystal の compaction を
 - segment は時系列順に並べ、先頭 tag が同じ event を最大 3 件まで束ねる
 - compact 後の segment には `semantic_anchors`、`affect_summary`、`salience_max`、`digest` を持たせる
 - 旧 segment を直接書き換えず、将来 supersede する場合も `supersedes` 参照を追加するだけに留める
+- compaction 前段の `EpisodicStream` は `canonical-episodic-stream-v1` を採用し、
+  最新 5 event の handoff window を `episodic-demo` / `memory-demo` の両方で明示する
 
 canonical schema:
 [specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
