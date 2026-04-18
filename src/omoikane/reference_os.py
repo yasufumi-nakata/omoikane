@@ -16,6 +16,7 @@ from .cognitive import (
     ReasoningService,
     SymbolicReasoningBackend,
 )
+from .governance import AmendmentService, AmendmentSignatures
 from .interface.bdb import BiologicalDigitalBridge
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -54,6 +55,7 @@ class OmoikaneReferenceOS:
         self.council = Council()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
+        self.amendment = AmendmentService()
         self.gap_scanner = GapScanner()
         self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
@@ -328,6 +330,125 @@ class OmoikaneReferenceOS:
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
+
+    def run_amendment_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://amendment-demo/v1",
+            metadata={"display_name": "Governance Amendment Sandbox"},
+        )
+
+        core_proposal = self.amendment.propose(
+            tier="T-Core",
+            target_clauses=["ethics.A1", "ethics.A3"],
+            draft_text_ref="meta/decision-log/2026-04-18_amendment-protocol-freeze.md",
+            rationale="core constitutional clauses must stay outside the runtime's direct apply surface",
+            drafted_by="design-architect",
+            signatures=AmendmentSignatures(
+                council="unanimous",
+                self_consent=True,
+                guardian_attested=True,
+                human_reviewers=0,
+                design_architect_attested=True,
+            ),
+        )
+        core_event = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="governance.amendment.core.freeze",
+            payload=core_proposal.to_dict(),
+            actor="GovernanceAmendmentService",
+            category="governance.amendment",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        core_proposal, core_decision = self.amendment.decide(
+            core_proposal,
+            continuity_event_ref=core_event.entry_id,
+        )
+
+        kernel_proposal = self.amendment.propose(
+            tier="T-Kernel",
+            target_clauses=["continuity.profile", "identity.lifecycle"],
+            draft_text_ref="meta/decision-log/2026-04-18_amendment-protocol-freeze.md",
+            rationale="kernel-level contract changes need unanimous consent and external review",
+            drafted_by="design-architect",
+            signatures=AmendmentSignatures(
+                council="unanimous",
+                self_consent=True,
+                guardian_attested=True,
+                human_reviewers=2,
+                design_architect_attested=True,
+            ),
+        )
+        kernel_event = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="governance.amendment.kernel.apply",
+            payload=kernel_proposal.to_dict(),
+            actor="GovernanceAmendmentService",
+            category="governance.amendment",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        kernel_proposal, kernel_decision = self.amendment.decide(
+            kernel_proposal,
+            continuity_event_ref=kernel_event.entry_id,
+        )
+
+        operational_proposal = self.amendment.propose(
+            tier="T-Operational",
+            target_clauses=["council.timeout", "task-graph.complexity"],
+            draft_text_ref="meta/decision-log/2026-04-18_amendment-protocol-freeze.md",
+            rationale="operational guardrails may ship under majority plus guardian attestation",
+            drafted_by="design-architect",
+            signatures=AmendmentSignatures(
+                council="majority",
+                guardian_attested=True,
+                design_architect_attested=True,
+            ),
+        )
+        operational_event = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="governance.amendment.operational.apply",
+            payload=operational_proposal.to_dict(),
+            actor="GovernanceAmendmentService",
+            category="governance.amendment",
+            layer="L4",
+            signature_roles=["council", "guardian"],
+            substrate="classical-silicon",
+        )
+        operational_proposal, operational_decision = self.amendment.decide(
+            operational_proposal,
+            continuity_event_ref=operational_event.entry_id,
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": self.amendment.policy(),
+            "proposals": {
+                "core": core_proposal.to_dict(),
+                "kernel": kernel_proposal.to_dict(),
+                "operational": operational_proposal.to_dict(),
+            },
+            "decisions": {
+                "core": core_decision,
+                "kernel": kernel_decision,
+                "operational": operational_decision,
+            },
+            "validation": {
+                "core_frozen": core_proposal.status == "frozen" and not core_decision["allow_apply"],
+                "kernel_guarded_rollout": kernel_proposal.status == "applied"
+                and kernel_decision["applied_stage"] == "dark-launch",
+                "operational_guarded_rollout": operational_proposal.status == "applied"
+                and operational_decision["applied_stage"] == "5pct",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
 
     def run_council_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(

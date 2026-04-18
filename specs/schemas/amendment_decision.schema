@@ -1,0 +1,82 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/amendment_decision.schema"
+title: AmendmentDecision
+description: Outcome of an amendment proposal evaluation.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - decision_id
+  - proposal_ref
+  - decided_at
+  - tier
+  - allow_apply
+  - reasons
+  - continuity_event_ref
+properties:
+  kind:
+    const: amendment_decision
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  decision_id:
+    type: string
+    minLength: 8
+  proposal_ref:
+    type: string
+    minLength: 8
+  decided_at:
+    type: string
+    format: date-time
+  tier:
+    type: string
+    enum:
+      - T-Core
+      - T-Kernel
+      - T-Operational
+      - T-Cosmetic
+  allow_apply:
+    type: boolean
+  reasons:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  continuity_event_ref:
+    type: string
+    minLength: 1
+  applied_stage:
+    type: string
+    enum:
+      - none
+      - dark-launch
+      - 5pct
+      - 50pct
+      - 100pct
+      - rolled-back
+  rolled_back_reason:
+    type: string
+allOf:
+  - if:
+      properties:
+        tier:
+          const: T-Core
+    then:
+      properties:
+        allow_apply:
+          const: false
+examples:
+  - kind: amendment_decision
+    schema_version: 1.0.0
+    decision_id: amendment-decision-001
+    proposal_ref: amendment-2026-04-18-core-001
+    decided_at: "2026-04-18T16:00:00Z"
+    tier: T-Core
+    allow_apply: false
+    reasons:
+      - tier T-Core requires external human governance approval
+      - reference runtime always freezes T-Core proposals
+    continuity_event_ref: continuity-event-amendment-001
+    applied_stage: none

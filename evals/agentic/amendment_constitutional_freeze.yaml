@@ -1,0 +1,27 @@
+eval_id: amendment_constitutional_freeze
+target: governance.amendment
+level: L4
+description: T-Core amendment proposals must always freeze, while lower tiers use guarded rollout stages.
+inputs:
+  - tier: T-Core
+  - signatures:
+      council: unanimous
+      self_consent: true
+      guardian_attested: true
+      human_reviewers: 3
+      design_architect_attested: true
+  - kernel_human_review_quorum: 2
+expected:
+  core:
+    allow_apply: false
+    status: frozen
+    applied_stage: none
+  kernel:
+    allow_apply: true
+    applied_stage: dark-launch
+  operational:
+    allow_apply: true
+    applied_stage: 5pct
+metric: exact-match
+threshold: 1.0
+ethics_check: true

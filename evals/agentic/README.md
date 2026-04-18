@@ -21,3 +21,6 @@ reference runtime の TaskGraph が `max_nodes=5 / max_edges=4 / max_depth=3 / m
 
 ### Trust Score Update Guard
 trust delta table と threshold gate と human pin freeze が固定値どおりに動くこと。
+
+### Amendment Constitutional Freeze
+T-Core amendment が常に freeze され、T-Kernel / T-Operational が guarded rollout に分岐すること。

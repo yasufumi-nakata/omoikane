@@ -1,0 +1,52 @@
+idl_version: 1
+kind: service
+namespace: governance.amendment.v0
+service: GovernanceAmendmentService
+summary: Deterministic proposal, attestation, freeze, and guarded apply flow for governance amendments.
+imports:
+  amendment_proposal: ../schemas/amendment_proposal.schema
+  amendment_decision: ../schemas/amendment_decision.schema
+operations:
+  propose:
+    summary: Draft one amendment proposal against a governance tier.
+    input:
+      schema_ref: amendment_proposal
+    output:
+      schema_ref: amendment_proposal
+    guarantees:
+      - tier must be one of T-Core, T-Kernel, T-Operational, T-Cosmetic
+      - target_clauses must not be empty
+      - initial status must be derived deterministically from attestation inputs
+  attest:
+    summary: Re-evaluate proposal status after council, guardian, self, or human attestations change.
+    input:
+      schema_ref: amendment_proposal
+    output:
+      schema_ref: amendment_proposal
+    guarantees:
+      - T-Core must never become applied
+      - T-Kernel requires unanimous council, self consent, guardian attest, and two human reviewers before apply
+      - T-Operational requires majority-or-better council plus guardian attest before apply
+  apply:
+    summary: Produce the canonical amendment decision and guarded rollout stage.
+    input:
+      schema_ref: amendment_proposal
+    output:
+      schema_ref: amendment_decision
+    guarantees:
+      - T-Core decisions must always return allow_apply=false and applied_stage=none
+      - allowed T-Kernel decisions must start at dark-launch
+      - allowed T-Operational decisions must start at 5pct
+  freeze:
+    summary: Emit the explicit frozen decision path for constitutional proposals.
+    input:
+      schema_ref: amendment_proposal
+    output:
+      schema_ref: amendment_decision
+    guarantees:
+      - output.allow_apply must remain false
+compatibility:
+  stability: bootstrap
+  notes:
+    - Human reviewer identity and authenticity remain external to this repo.
+    - Reference runtime stores only quorum counts and reviewer ids, not legal proofs.

@@ -7,6 +7,21 @@ from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class ReferenceRuntimeTests(unittest.TestCase):
+    def test_amendment_demo_reports_constitutional_freeze(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_amendment_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["core_frozen"])
+        self.assertTrue(result["validation"]["kernel_guarded_rollout"])
+        self.assertTrue(result["validation"]["operational_guarded_rollout"])
+        self.assertEqual(2, result["policy"]["kernel_human_review_quorum"])
+        self.assertEqual("frozen", result["proposals"]["core"]["status"])
+        self.assertFalse(result["decisions"]["core"]["allow_apply"])
+        self.assertEqual("dark-launch", result["decisions"]["kernel"]["applied_stage"])
+        self.assertEqual("5pct", result["decisions"]["operational"]["applied_stage"])
+
     def test_bdb_demo_reports_viable_bridge_contract(self) -> None:
         runtime = OmoikaneReferenceOS()
 

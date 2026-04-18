@@ -10,6 +10,20 @@ from omoikane.cli import main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_amendment_demo_emits_freeze_and_guarded_rollouts(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "amendment-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["core_frozen"])
+        self.assertTrue(result["validation"]["kernel_guarded_rollout"])
+        self.assertTrue(result["validation"]["operational_guarded_rollout"])
+        self.assertEqual("frozen", result["proposals"]["core"]["status"])
+        self.assertEqual("dark-launch", result["decisions"]["kernel"]["applied_stage"])
+        self.assertEqual("5pct", result["decisions"]["operational"]["applied_stage"])
+
     def test_bdb_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

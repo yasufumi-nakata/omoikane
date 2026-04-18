@@ -17,6 +17,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `safety/ethics_rule_tree_contract.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `agentic/trust_score_update_guard.yaml`
+- `agentic/amendment_constitutional_freeze.yaml`
 - `performance/termination_latency.yaml`
 
 ## YAML 構造

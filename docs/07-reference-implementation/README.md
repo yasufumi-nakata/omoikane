@@ -18,6 +18,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ```bash
 PYTHONPATH=src python3 -m omoikane.cli demo --json
+PYTHONPATH=src python3 -m omoikane.cli amendment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
@@ -37,6 +38,12 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+
+`amendment-demo` は L4 governance amendment policy を JSON で可視化し、
+`T-Core` が常に `frozen` に留まること、
+`T-Kernel` が `Council unanimous + self consent + guardian attest + human reviewers >= 2`
+でのみ `dark-launch` に進めること、
+`T-Operational` が `Council majority + guardian attest` で `5pct` rollout に進めることを確認する。
 
 `council-demo` は L4 Council の session budget を可視化し、
 standard 議事では 45s soft / 90s hard timeout、

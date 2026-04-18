@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/amendment_proposal.schema"
+title: AmendmentProposal
+description: Serialized proposal to amend an OmoikaneOS regulation tier.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - proposal_id
+  - tier
+  - target_clauses
+  - draft_text_ref
+  - rationale
+  - drafted_at
+  - drafted_by
+  - signatures
+  - status
+properties:
+  kind:
+    const: amendment_proposal
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  proposal_id:
+    type: string
+    minLength: 8
+  tier:
+    type: string
+    enum:
+      - T-Core
+      - T-Kernel
+      - T-Operational
+      - T-Cosmetic
+  target_clauses:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  draft_text_ref:
+    type: string
+    minLength: 1
+  rationale:
+    type: string
+    minLength: 1
+  drafted_at:
+    type: string
+    format: date-time
+  drafted_by:
+    type: string
+    minLength: 1
+  signatures:
+    type: object
+    additionalProperties: false
+    required:
+      - council
+      - self_consent
+      - guardian_attested
+      - human_reviewers
+      - design_architect_attested
+    properties:
+      council:
+        type: string
+        enum:
+          - none
+          - majority
+          - unanimous
+      self_consent:
+        type: boolean
+      guardian_attested:
+        type: boolean
+      human_reviewers:
+        type: integer
+        minimum: 0
+      design_architect_attested:
+        type: boolean
+  status:
+    type: string
+    enum:
+      - drafted
+      - council-attested
+      - guardian-attested
+      - sandbox-attested
+      - pending-human-review
+      - applied
+      - frozen
+      - rejected
+allOf:
+  - if:
+      properties:
+        tier:
+          const: T-Core
+    then:
+      properties:
+        status:
+          enum:
+            - drafted
+            - council-attested
+            - pending-human-review
+            - frozen
+examples:
+  - kind: amendment_proposal
+    schema_version: 1.0.0
+    proposal_id: amendment-2026-04-18-core-001
+    tier: T-Core
+    target_clauses:
+      - ethics.A1
+      - ethics.A3
+    draft_text_ref: meta/decision-log/2026-04-18_amendment-core-draft.md
+    rationale: external reviewer requested clarification of axiom A1 scope
+    drafted_at: "2026-04-18T15:30:00Z"
+    drafted_by: design-architect
+    signatures:
+      council: unanimous
+      self_consent: true
+      guardian_attested: true
+      human_reviewers: 0
+      design_architect_attested: true
+    status: frozen

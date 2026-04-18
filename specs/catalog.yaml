@@ -329,6 +329,37 @@ entries:
       - agents/builders/eval-builder.yaml
     rationale: Protects the fixed trust delta table, threshold gates, and human pin behavior.
   - priority: P1
+    kind: schema
+    file: specs/schemas/amendment_proposal.schema
+    consumers:
+      - specs/interfaces/governance.amendment.v0.idl
+      - docs/04-ai-governance/amendment-protocol.md
+      - reference-runtime
+    rationale: Required to serialize tiered amendment drafts and attestation state.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/amendment_decision.schema
+    consumers:
+      - specs/interfaces/governance.amendment.v0.idl
+      - docs/04-ai-governance/amendment-protocol.md
+      - reference-runtime
+    rationale: Required to encode constitutional freeze versus guarded rollout decisions.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/governance.amendment.v0.idl
+    consumers:
+      - docs/04-ai-governance/amendment-protocol.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make amendment propose/attest/apply/freeze behavior machine-readable.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/amendment_constitutional_freeze.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects constitutional freeze for T-Core and guarded rollout for lower amendment tiers.
+  - priority: P1
     kind: eval
     file: evals/continuity/memory_crystal_compaction.yaml
     consumers:
