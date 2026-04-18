@@ -21,6 +21,7 @@ PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli amendment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
+PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
@@ -50,6 +51,13 @@ standard 議事では 45s soft / 90s hard timeout、
 expedited 議事では 250ms soft / 1s hard timeout を持ち、
 soft timeout 時は weighted-majority fallback、
 hard timeout 時は defer または human governance escalation に分岐する。
+
+`multi-council-demo` は L4 multi-council trigger の reference routing を JSON で可視化し、
+単一 identity 議題が Local Council に留まり、
+複数 identity をまたぐ議題が Federation Council 要求へ、
+`ethics_axiom` / `identity_axiom` / `governance` を引用する議題が
+Heritage Council 要求へ外部化されること、
+両条件が衝突する曖昧案件は local binding decision を停止することを確認する。
 
 `task-graph-demo` は L4 TaskGraph の暫定 complexity policy
 (`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)
@@ -94,6 +102,7 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 
 - L2 episodic stream の canonical shape と MemoryCrystal への流入拡張
 - L3 reasoning 以外の cognitive backends と cross-service failover
+- Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - 残る L6 interface protocol（IMC/WMS/EWA）の adapter
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

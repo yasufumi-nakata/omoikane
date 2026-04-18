@@ -28,6 +28,8 @@ class CouncilProposal:
     rationale: str
     risk_level: str
     session_mode: str = "standard"
+    target_identity_ids: List[str] = field(default_factory=list)
+    referenced_clauses: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
 
 
@@ -119,8 +121,61 @@ class CouncilDecision:
         return asdict(self)
 
 
+@dataclass
+class CouncilExternalRequest:
+    """Convening request sent to an external council tier."""
+
+    convened: bool
+    participants: Optional[List[str]] = None
+    clauses: Optional[List[str]] = None
+    status: str = "none"
+
+    def to_dict(self) -> Dict[str, Any]:
+        if self.participants is not None:
+            return {
+                "convened": self.convened,
+                "participants": self.participants,
+                "status": self.status,
+            }
+        return {
+            "convened": self.convened,
+            "clauses": self.clauses or [],
+            "status": self.status,
+        }
+
+
+@dataclass
+class CouncilTopology:
+    """Serialized routing state for multi-council escalation."""
+
+    topology_id: str
+    proposal_ref: str
+    scope: str
+    local_session_ref: str
+    federation_request: CouncilExternalRequest
+    heritage_request: CouncilExternalRequest
+    resolved_at: str
+    conflict_resolution: str = "none"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "council_topology",
+            "schema_version": "1.0.0",
+            "topology_id": self.topology_id,
+            "proposal_ref": self.proposal_ref,
+            "scope": self.scope,
+            "local_session_ref": self.local_session_ref,
+            "federation_request": self.federation_request.to_dict(),
+            "heritage_request": self.heritage_request.to_dict(),
+            "resolved_at": self.resolved_at,
+            "conflict_resolution": self.conflict_resolution,
+        }
+
+
 class Council:
     """Weighted-majority council with guardian veto."""
+
+    INTERPRETIVE_PREFIXES = ("ethics_axiom", "identity_axiom", "governance")
 
     def __init__(self) -> None:
         self._members: Dict[str, CouncilMember] = {}
@@ -136,6 +191,9 @@ class Council:
         rationale: str,
         risk_level: str = "medium",
         session_mode: str = "standard",
+        *,
+        target_identity_ids: Optional[List[str]] = None,
+        referenced_clauses: Optional[List[str]] = None,
     ) -> CouncilProposal:
         return CouncilProposal(
             proposal_id=new_id("proposal"),
@@ -144,6 +202,8 @@ class Council:
             rationale=rationale,
             risk_level=risk_level,
             session_mode=session_mode,
+            target_identity_ids=list(target_identity_ids or []),
+            referenced_clauses=list(referenced_clauses or []),
         )
 
     @staticmethod
@@ -333,3 +393,54 @@ class Council:
 
     def history(self) -> List[Dict[str, Any]]:
         return [decision.to_dict() for decision in self._history]
+
+    @classmethod
+    def classify_scope(cls, proposal: CouncilProposal) -> str:
+        unique_targets = sorted(set(proposal.target_identity_ids))
+        interpretive = any(
+            clause.startswith(prefix)
+            for clause in proposal.referenced_clauses
+            for prefix in cls.INTERPRETIVE_PREFIXES
+        )
+        cross_self = len(unique_targets) >= 2
+        local = len(unique_targets) == 1 and not interpretive
+
+        if cross_self and interpretive:
+            return "ambiguous"
+        if cross_self:
+            return "cross-self"
+        if interpretive:
+            return "interpretive"
+        if local:
+            return "local"
+        return "ambiguous"
+
+    def route_topology(self, proposal: CouncilProposal, *, local_session_ref: str) -> CouncilTopology:
+        scope = self.classify_scope(proposal)
+        participants = sorted(set(proposal.target_identity_ids))
+        clauses = [
+            clause
+            for clause in proposal.referenced_clauses
+            if any(clause.startswith(prefix) for prefix in self.INTERPRETIVE_PREFIXES)
+        ]
+
+        federation_request = CouncilExternalRequest(
+            convened=scope == "cross-self",
+            participants=participants if scope == "cross-self" else [],
+            status="external-pending" if scope == "cross-self" else "none",
+        )
+        heritage_request = CouncilExternalRequest(
+            convened=scope == "interpretive",
+            clauses=clauses if scope == "interpretive" else [],
+            status="external-pending" if scope == "interpretive" else "none",
+        )
+
+        return CouncilTopology(
+            topology_id=new_id("topology"),
+            proposal_ref=proposal.proposal_id,
+            scope=scope,
+            local_session_ref=local_session_ref,
+            federation_request=federation_request,
+            heritage_request=heritage_request,
+            resolved_at=utc_now_iso(),
+        )

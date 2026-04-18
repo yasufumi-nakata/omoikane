@@ -8,6 +8,7 @@ imports:
   council_argument: ../schemas/council_argument.yaml
   council_output: ../schemas/council_output.yaml
   consensus_message: ../schemas/consensus_message.schema
+  council_topology: ../schemas/council_topology.schema
 operations:
   convene:
     summary: Create and validate a Council session from an incoming proposal.
@@ -60,12 +61,66 @@ operations:
               type: string
     output:
       schema_ref: council_output
+  request_federation_convene:
+    summary: Externalize a cross-self proposal into Federation Council review.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - proposal_ref
+          - participant_identity_ids
+          - local_session_ref
+        properties:
+          proposal_ref:
+            type: string
+          participant_identity_ids:
+            type: array
+            minItems: 2
+            items:
+              type: string
+          local_session_ref:
+            type: string
+    output:
+      schema_ref: council_topology
+    guarantees:
+      - scope must equal cross-self
+      - federation_request.status must equal external-pending
+      - local council remains advisory until federation_result returns
+  request_heritage_convene:
+    summary: Externalize an interpretive proposal into Heritage Council review.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - proposal_ref
+          - referenced_clauses
+          - local_session_ref
+        properties:
+          proposal_ref:
+            type: string
+          referenced_clauses:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          local_session_ref:
+            type: string
+    output:
+      schema_ref: council_topology
+    guarantees:
+      - scope must equal interpretive
+      - heritage_request.status must equal external-pending
+      - local council must block binding resolution until heritage_result returns
 events:
   consensus.message:
     schema_ref: consensus_message
+  topology.routed:
+    schema_ref: council_topology
 compatibility:
   stability: bootstrap
   notes:
     - Transcript storage remains external to this repo.
     - Timeout fallback is fixed in the reference runtime to weighted-majority after soft timeout.
     - Hard timeout escalates in standard mode and defers to follow-up standard review in expedited mode.
+    - Cross-self proposals externalize into Federation Council review instead of binding local-only resolution.
+    - Interpretive proposals that cite ethics_axiom, identity_axiom, or governance clauses externalize into Heritage Council review.

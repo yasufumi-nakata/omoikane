@@ -529,6 +529,133 @@ class OmoikaneReferenceOS:
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_multi_council_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://multi-council-demo/v1",
+            metadata={"display_name": "Multi-Council Routing Sandbox"},
+        )
+
+        local_proposal = self.council.propose(
+            title="Single identity maintenance plan",
+            requested_action="schedule-maintenance-window",
+            rationale="単一 identity の運用調整は Local Council のみで扱う。",
+            risk_level="low",
+            target_identity_ids=[identity.identity_id],
+        )
+        local_topology = self.council.route_topology(
+            local_proposal,
+            local_session_ref="local-session-single-identity",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.topology.local",
+            payload=local_topology.to_dict(),
+            actor="Council",
+            category="council-topology",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        cross_self_proposal = self.council.propose(
+            title="Shared reality merge rehearsal",
+            requested_action="request-federation-review",
+            rationale="複数 identity をまたぐ議題は Federation Council を要求する。",
+            risk_level="high",
+            target_identity_ids=[identity.identity_id, "identity://shared-peer"],
+        )
+        cross_self_topology = self.council.route_topology(
+            cross_self_proposal,
+            local_session_ref="local-session-cross-self",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.topology.federation_requested",
+            payload=cross_self_topology.to_dict(),
+            actor="Council",
+            category="council-topology",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        interpretive_proposal = self.council.propose(
+            title="Identity axiom interpretation request",
+            requested_action="request-heritage-ruling",
+            rationale="identity_axiom 参照は Heritage Council の裁定を必要とする。",
+            risk_level="medium",
+            target_identity_ids=[identity.identity_id],
+            referenced_clauses=["identity_axiom.A2", "governance.review-window"],
+        )
+        interpretive_topology = self.council.route_topology(
+            interpretive_proposal,
+            local_session_ref="local-session-interpretive",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.topology.heritage_requested",
+            payload=interpretive_topology.to_dict(),
+            actor="Council",
+            category="council-topology",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        ambiguous_proposal = self.council.propose(
+            title="Cross-self ethics axiom reinterpretation",
+            requested_action="block-until-reclassification",
+            rationale="cross-self と interpretive が同時成立する案件は local binding decision を止める。",
+            risk_level="high",
+            target_identity_ids=[identity.identity_id, "identity://shared-peer"],
+            referenced_clauses=["ethics_axiom.A2"],
+        )
+        ambiguous_topology = self.council.route_topology(
+            ambiguous_proposal,
+            local_session_ref="local-session-ambiguous",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.topology.ambiguous_blocked",
+            payload=ambiguous_topology.to_dict(),
+            actor="Council",
+            category="council-topology",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "classification_rules": {
+                "local": "target_identity_ids が単一で、interpretive clause を含まない",
+                "cross_self": "target_identity_ids が 2 件以上で、interpretive clause を含まない",
+                "interpretive": "ethics_axiom / identity_axiom / governance clause を参照し、target_identity_ids は単一",
+                "ambiguous": "上記が複数同時成立、またはどれにも当てはまらない",
+            },
+            "topologies": {
+                "local": local_topology.to_dict(),
+                "cross_self": cross_self_topology.to_dict(),
+                "interpretive": interpretive_topology.to_dict(),
+                "ambiguous": ambiguous_topology.to_dict(),
+            },
+            "validation": {
+                "cross_self_requests_federation": cross_self_topology.scope == "cross-self"
+                and cross_self_topology.federation_request.status == "external-pending",
+                "interpretive_requests_heritage": interpretive_topology.scope == "interpretive"
+                and interpretive_topology.heritage_request.status == "external-pending",
+                "ambiguous_blocks_local_binding": ambiguous_topology.scope == "ambiguous"
+                and ambiguous_topology.federation_request.status == "none"
+                and ambiguous_topology.heritage_request.status == "none",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_task_graph_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://task-graph-demo/v1",

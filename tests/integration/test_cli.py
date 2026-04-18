@@ -117,6 +117,26 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(1_000, result["policies"]["expedited"]["hard_timeout_ms"])
         self.assertEqual("soft-timeout", result["sessions"]["standard_soft_timeout"]["timeout_status"]["status"])
 
+    def test_multi_council_demo_emits_externalized_topologies(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "multi-council-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("cross-self", result["topologies"]["cross_self"]["scope"])
+        self.assertEqual(
+            "external-pending",
+            result["topologies"]["cross_self"]["federation_request"]["status"],
+        )
+        self.assertEqual("interpretive", result["topologies"]["interpretive"]["scope"])
+        self.assertEqual(
+            "external-pending",
+            result["topologies"]["interpretive"]["heritage_request"]["status"],
+        )
+        self.assertEqual("ambiguous", result["topologies"]["ambiguous"]["scope"])
+
     def test_task_graph_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

@@ -89,6 +89,14 @@ entries:
     rationale: Required to bound session duration and make timeout fallback deterministic.
   - priority: P1
     kind: schema
+    file: specs/schemas/council_topology.schema
+    consumers:
+      - specs/interfaces/agentic.council.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/multi-council-trigger.md
+    rationale: Required to serialize deterministic routing between Local, Federation, and Heritage Councils.
+  - priority: P1
+    kind: schema
     file: specs/schemas/task_node.schema
     consumers:
       - specs/interfaces/agentic.task_graph.v0.idl
@@ -141,7 +149,7 @@ entries:
     file: specs/interfaces/agentic.council.v0.idl
     consumers:
       - reference-runtime
-    rationale: Council lifecycle contract.
+    rationale: Council lifecycle contract, including timeout policy and multi-council externalization.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.ethics.v0.idl
@@ -243,6 +251,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects defer-to-standard-review behavior after an expedited hard timeout.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/multi_council_externalization.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects deterministic externalization into Federation or Heritage Council and blocks ambiguous local-only binding.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

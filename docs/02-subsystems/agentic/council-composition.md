@@ -59,14 +59,20 @@ reference runtime では `agentic.trust.v0` を参照し、
 `global_score >= 0.6` を weighted-majority の重み付与条件に固定する。
 `guardian_role` は `0.99 + pinned_by_human` が揃わない限り成立しない。
 
-## 多 Council 化（将来）
+## 多 Council 化
 
 substrate や文化圏により規約解釈が異なる場合、Council を **多重化** する。
 - Local Council: 当該自我の専属
 - Federation Council: 自我間取引・共有現実の調整
 - Heritage Council: 文化・歴史的規約の維持
 
-これは未解決領域 → [docs/05-research-frontiers/governance.md](../../05-research-frontiers/governance.md)
+reference runtime は単一 Local Council を実装しつつ、
+trigger 判定だけは deterministic に固定する。
+- `cross-self` 議題: Federation Council を要求し、Local は advisory に降格
+- `interpretive` 議題: Heritage Council を要求し、Local は binding decision を停止
+- `ambiguous` 議題: design-architect へ再分類を要求
+
+詳細は [multi-council-trigger.md](multi-council-trigger.md)。
 
 ## 思兼神メタファーとの整合
 

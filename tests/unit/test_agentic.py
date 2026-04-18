@@ -71,6 +71,57 @@ class CouncilTests(unittest.TestCase):
         self.assertEqual("hard-timeout", decision.timeout_status.status)
         self.assertEqual("schedule-standard-session", decision.timeout_status.follow_up_action)
 
+    def test_cross_self_scope_requests_federation(self) -> None:
+        council = Council()
+
+        proposal = council.propose(
+            "Shared reality merge",
+            "federation review",
+            "複数 identity をまたぐため federation に送る",
+            target_identity_ids=["identity://a", "identity://b"],
+        )
+        topology = council.route_topology(proposal, local_session_ref="local-session-cross-self")
+
+        self.assertEqual("cross-self", topology.scope)
+        self.assertTrue(topology.federation_request.convened)
+        self.assertEqual("external-pending", topology.federation_request.status)
+        self.assertEqual([], topology.heritage_request.clauses)
+
+    def test_interpretive_scope_requests_heritage(self) -> None:
+        council = Council()
+
+        proposal = council.propose(
+            "Interpret ethics axiom",
+            "heritage ruling",
+            "規約解釈を heritage に送る",
+            target_identity_ids=["identity://a"],
+            referenced_clauses=["ethics_axiom.A2"],
+        )
+        topology = council.route_topology(proposal, local_session_ref="local-session-interpretive")
+
+        self.assertEqual("interpretive", topology.scope)
+        self.assertTrue(topology.heritage_request.convened)
+        self.assertEqual("external-pending", topology.heritage_request.status)
+        self.assertEqual([], topology.federation_request.participants)
+
+    def test_ambiguous_scope_blocks_external_requests_until_reclassified(self) -> None:
+        council = Council()
+
+        proposal = council.propose(
+            "Cross-self ethics rewrite",
+            "block pending reclassification",
+            "cross-self と interpretive が競合する",
+            target_identity_ids=["identity://a", "identity://b"],
+            referenced_clauses=["governance.freeze"],
+        )
+        topology = council.route_topology(proposal, local_session_ref="local-session-ambiguous")
+
+        self.assertEqual("ambiguous", topology.scope)
+        self.assertFalse(topology.federation_request.convened)
+        self.assertFalse(topology.heritage_request.convened)
+        self.assertEqual("none", topology.federation_request.status)
+        self.assertEqual("none", topology.heritage_request.status)
+
 
 class TaskGraphServiceTests(unittest.TestCase):
     def test_build_graph_returns_bounded_reference_shape(self) -> None:

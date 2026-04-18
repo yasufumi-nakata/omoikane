@@ -1,0 +1,111 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/council_topology.schema"
+title: CouncilTopology
+description: Snapshot of which Council tiers are convened for a proposal.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - topology_id
+  - proposal_ref
+  - scope
+  - local_session_ref
+  - federation_request
+  - heritage_request
+  - resolved_at
+properties:
+  kind:
+    const: council_topology
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  topology_id:
+    type: string
+    minLength: 8
+  proposal_ref:
+    type: string
+    minLength: 1
+  scope:
+    type: string
+    enum:
+      - local
+      - cross-self
+      - interpretive
+      - ambiguous
+  local_session_ref:
+    type: string
+    minLength: 1
+  federation_request:
+    type: object
+    additionalProperties: false
+    required:
+      - convened
+      - participants
+      - status
+    properties:
+      convened:
+        type: boolean
+      participants:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      status:
+        type: string
+        enum:
+          - none
+          - requested
+          - external-pending
+          - returned
+  heritage_request:
+    type: object
+    additionalProperties: false
+    required:
+      - convened
+      - clauses
+      - status
+    properties:
+      convened:
+        type: boolean
+      clauses:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      status:
+        type: string
+        enum:
+          - none
+          - requested
+          - external-pending
+          - returned
+  resolved_at:
+    type: string
+    format: date-time
+  conflict_resolution:
+    type: string
+    enum:
+      - none
+      - federation-overrides-local
+      - heritage-overrides-local
+      - escalated-to-human-governance
+examples:
+  - kind: council_topology
+    schema_version: 1.0.0
+    topology_id: topology-001
+    proposal_ref: proposal-cross-self-merge-001
+    scope: cross-self
+    local_session_ref: council-session-001
+    federation_request:
+      convened: true
+      participants:
+        - identity://amaterasu-endpoint
+        - identity://second-self
+      status: external-pending
+    heritage_request:
+      convened: false
+      clauses: []
+      status: none
+    resolved_at: "2026-04-18T17:30:00Z"
+    conflict_resolution: none

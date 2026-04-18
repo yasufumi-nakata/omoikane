@@ -20,7 +20,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 ## ガバナンス上の未確定
 
 - [x] 規約改正フローの実体（2026-04-18: `governance.amendment.v0` / `amendment-demo` / `amendment_constitutional_freeze` を追加し、T-Core freeze と下位 tier の guarded rollout 条件を固定）
-- [ ] 多 Council 化のトリガ条件
+- [x] 多 Council 化のトリガ条件（2026-04-18: `agentic.council.v0` に Federation/Heritage convene contract を追加し、`council_topology.schema`・`multi-council-demo`・agentic eval へ反映）
 - [ ] Guardian の人間による監督方式
 - [ ] OS バージョン管理の semver か独自か
 

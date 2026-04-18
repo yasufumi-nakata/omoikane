@@ -77,6 +77,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     council_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    multi_council_parser = subparsers.add_parser(
+        "multi-council-demo",
+        help="Run the L4 multi-council trigger and external routing scenario",
+    )
+    multi_council_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     task_graph_parser = subparsers.add_parser(
         "task-graph-demo",
         help="Run the L4 TaskGraph complexity policy and dispatch scenario",
@@ -162,6 +168,10 @@ def main() -> None:
 
     if args.command == "council-demo":
         _print_result(runtime.run_council_demo(), args.json)
+        return
+
+    if args.command == "multi-council-demo":
+        _print_result(runtime.run_multi_council_demo(), args.json)
         return
 
     if args.command == "task-graph-demo":

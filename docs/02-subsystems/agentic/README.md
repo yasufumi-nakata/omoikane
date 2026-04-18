@@ -9,6 +9,7 @@
 - 評議体。重要決定をすべて経由する。
 - 構成員は固定ではなく、案件ごとに召集される（→ [docs/04-ai-governance/council-protocol.md](../../04-ai-governance/council-protocol.md)）
 - 議事は EthicsLedger に永続化
+- reference runtime では `multi-council-demo` が Local / Federation / Heritage への deterministic routing を可視化する
 
 ### YaoyorozuRegistry
 - 利用可能 Agent の登録簿

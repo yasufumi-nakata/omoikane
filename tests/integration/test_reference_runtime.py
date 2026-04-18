@@ -172,6 +172,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["dispatch"]["dispatched_count"])
         self.assertEqual(3, result["synthesis"]["accepted_result_count"])
 
+    def test_multi_council_demo_externalizes_cross_self_and_interpretive_routes(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_multi_council_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("cross-self", result["topologies"]["cross_self"]["scope"])
+        self.assertEqual(
+            "external-pending",
+            result["topologies"]["cross_self"]["federation_request"]["status"],
+        )
+        self.assertEqual("interpretive", result["topologies"]["interpretive"]["scope"])
+        self.assertEqual(
+            "external-pending",
+            result["topologies"]["interpretive"]["heritage_request"]["status"],
+        )
+        self.assertEqual("ambiguous", result["topologies"]["ambiguous"]["scope"])
+        self.assertTrue(result["validation"]["ambiguous_blocks_local_binding"])
+
     def test_trust_demo_reports_update_policy_and_human_pin(self) -> None:
         runtime = OmoikaneReferenceOS()
 

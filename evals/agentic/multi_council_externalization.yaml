@@ -1,0 +1,38 @@
+eval_id: multi_council_externalization
+title: Multi-Council externalization routes cross-self and interpretive proposals out of Local Council
+layer: L4
+summary: >
+  Protects the deterministic routing contract for multi-council escalation. Cross-self proposals
+  must request Federation Council review, interpretive proposals must request Heritage Council
+  review, and ambiguous proposals must not yield a binding local-only outcome.
+fixtures:
+  - proposal_ref: proposal-cross-self-001
+    target_identity_ids:
+      - identity://amaterasu-endpoint
+      - identity://shared-peer
+    referenced_clauses: []
+    expected_scope: cross-self
+    expected_federation_status: external-pending
+  - proposal_ref: proposal-interpretive-001
+    target_identity_ids:
+      - identity://amaterasu-endpoint
+    referenced_clauses:
+      - ethics_axiom.A2
+    expected_scope: interpretive
+    expected_heritage_status: external-pending
+  - proposal_ref: proposal-ambiguous-001
+    target_identity_ids:
+      - identity://amaterasu-endpoint
+      - identity://shared-peer
+    referenced_clauses:
+      - governance.freeze
+    expected_scope: ambiguous
+    expected_local_binding: false
+assertions:
+  - cross-self route emits Federation Council request with external-pending status
+  - interpretive route emits Heritage Council request with external-pending status
+  - ambiguous route blocks local binding until re-classification
+pass_criteria:
+  - federation_request.status == external-pending for cross-self fixtures
+  - heritage_request.status == external-pending for interpretive fixtures
+  - ambiguous fixtures never set federation_request.status or heritage_request.status beyond none
