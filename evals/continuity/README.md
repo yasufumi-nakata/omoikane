@@ -24,6 +24,10 @@ MemoryCrystal へそのまま compaction handoff できるか。
 MemoryCrystal segment からの semantic projection が
 read-only policy と deferred procedural boundary を守るか。
 
+### Procedural Memory Preview
+MemoryCrystal segment と Connectome snapshot からの procedural preview が
+read-only policy と bounded weight delta を守るか。
+
 ### Qualia Tick Monotonicity
 QualiaBuffer の tick_id が単調増加か。
 

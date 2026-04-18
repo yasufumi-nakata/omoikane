@@ -137,6 +137,25 @@ class CliIntegrationTests(unittest.TestCase):
             result["semantic"]["snapshot"]["deferred_surfaces"],
         )
 
+    def test_procedural_demo_emits_valid_preview_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "procedural-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["procedural"]["ok"])
+        self.assertEqual(2, result["validation"]["procedural"]["recommendation_count"])
+        self.assertEqual(
+            ["continuity_integrator->ethics_gate", "sensory_ingress->continuity_integrator"],
+            sorted(result["validation"]["procedural"]["target_paths"]),
+        )
+        self.assertEqual(
+            ["weight-application", "skill-execution"],
+            result["procedural"]["snapshot"]["deferred_surfaces"],
+        )
+
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()
 

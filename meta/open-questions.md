@@ -12,6 +12,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] QualiaTick の高次元埋め込みの次元数と時間粒度（2026-04-18: reference runtime を 4 modality × 32 次元 / 250ms window に固定し、schema/IDL/CLI/eval に反映）
 - [x] MemoryCrystal の compaction 戦略（2026-04-18: reference runtime を `append-only-segment-rollup-v1` に固定し、`memory-demo` / schema / continuity eval を追加）
 - [x] EpisodicStream の canonical shape と MemoryCrystal handoff contract（2026-04-19: `mind.memory.v0` / `episodic-demo` / `episodic_event.schema` / `episodic_stream_snapshot.schema` / `evals/continuity/episodic_stream_handoff.yaml` を追加し、最新 5 event の append-only handoff window を固定）
+- [x] Procedural memory projection と Connectome-coupled preview contract（2026-04-19: `mind.procedural.v0` / `procedural-demo` / `procedural_memory_preview.schema` / `evals/continuity/procedural_preview_contract.yaml` を追加し、read-only connectome preview と bounded weight delta を固定）
 - [x] TaskGraph の複雑度上限（2026-04-18: reference runtime を `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5` に固定し、task-graph demo・schema・eval を追加）
 - [x] Trust score 更新アルゴリズムの定式化（2026-04-18: `agentic.trust.v0` / `trust-demo` / trust snapshot & event schema を追加し、delta table・threshold gate・human pin freeze を固定）
 - [x] EthicsEnforcer のルール記述言語の選定（2026-04-18: `deterministic-rule-tree-v0` を採用し、`ethics_rule.schema` / `ethics-demo` / kernel ethics runtime を整合）

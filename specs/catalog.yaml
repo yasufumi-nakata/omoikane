@@ -526,7 +526,7 @@ entries:
       - docs/02-subsystems/mind-substrate/semantic-memory.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 semantic projection contract machine-readable before procedural projection lands.
+    rationale: Required to make the L2 semantic projection contract machine-readable without mutating MemoryCrystal source segments.
   - priority: P1
     kind: eval
     file: evals/continuity/semantic_projection_contract.yaml
@@ -534,6 +534,29 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the read-only semantic projection policy, concept count, and deferred procedural boundary.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/procedural_memory_preview.schema
+    consumers:
+      - specs/interfaces/mind.procedural.v0.idl
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize the connectome-coupled procedural preview derived from MemoryCrystal segments.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.procedural.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 procedural preview contract machine-readable before human-approved writeback lands.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/procedural_preview_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the read-only connectome preview policy, bounded weight delta, and deferred apply boundary.
   - priority: P1
     kind: schema
     file: specs/schemas/trust_event.schema

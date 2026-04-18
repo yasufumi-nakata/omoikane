@@ -27,6 +27,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "episodic-window": ["self"],
     "crystal-commit": ["self", "council"],
     "semantic-projection": ["self", "council"],
+    "procedural-preview": ["self", "council"],
     "connectome-snapshot": ["self", "guardian"],
     "substrate-migrate": ["self", "council", "guardian"],
     "substrate-release": ["guardian"],

@@ -78,6 +78,21 @@ reference runtime では MemoryCrystal manifest の各 segment を
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
 
+## Reference runtime の procedural preview
+
+reference runtime では procedural memory を直接 apply せず、
+`Connectome` snapshot に対する `connectome-coupled-procedural-preview-v1`
+として bounded な update candidate だけを生成する。
+
+- `MemoryCrystal` segment ごとに target edge を 1 つ選び、
+  `proposed_weight_delta <= 0.08` の preview を返す
+- preview は read-only であり、`Connectome` 本体の重みは変更しない
+- 実際の apply は `weight-application` / `skill-execution` として deferred に残し、
+  self / council / guardian 承認と continuity diff 記録を前提にする
+
+canonical schema:
+[specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
+
 ## トラウマ記憶の扱い
 
 倫理的に最もデリケート。
@@ -89,5 +104,5 @@ canonical schema:
 ## 未解決
 
 - 記憶を **substrate 中立な正規形** で表現できるか
-- 暗黙記憶（procedural）の連続性をどう保証するか
+- 暗黙記憶（procedural）の apply 後連続性をどう保証するか
 - 記憶の真正性を本人自身が判定する手段

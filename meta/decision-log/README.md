@@ -49,6 +49,7 @@ status: decided | superseded
 - [2026-04-18_qualia-sampling-profile.md](2026-04-18_qualia-sampling-profile.md)
 - [2026-04-18_memory-crystal-compaction-policy.md](2026-04-18_memory-crystal-compaction-policy.md)
 - [2026-04-19_semantic-memory-projection.md](2026-04-19_semantic-memory-projection.md)
+- [2026-04-19_procedural-memory-preview.md](2026-04-19_procedural-memory-preview.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

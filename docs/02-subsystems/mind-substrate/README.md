@@ -48,6 +48,15 @@ canonical schema:
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
 
+### Procedural Memory
+`MemoryCrystal` segment と `Connectome` snapshot を照合し、
+暗黙技能の writeback 前段となる read-only procedural preview を生成する層。
+- reference runtime では `connectome-coupled-procedural-preview-v1` を採用
+- `target_edge_id` / `target_path` / `proposed_weight_delta` を機械可読で固定
+- actual apply は行わず、`weight-application` と `skill-execution` を deferred に残す
+canonical schema:
+[specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
+
 ### EmotionalTone
 感情の地形図。Affect engine（L3）と双方向。
 
@@ -67,6 +76,7 @@ canonical schema:
 - [episodic-stream.md](episodic-stream.md) ── episodic event の canonical shape と handoff
 - [memory-model.md](memory-model.md) ── 記憶階層の詳細
 - [semantic-memory.md](semantic-memory.md) ── MemoryCrystal からの semantic projection
+- [procedural-memory.md](procedural-memory.md) ── Connectome-coupled procedural preview
 - [self-model.md](self-model.md) ── 自己モデルの構造
 - [qualia-buffer.md](qualia-buffer.md) ── 主観バッファの仕様
 

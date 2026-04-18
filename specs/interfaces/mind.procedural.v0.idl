@@ -1,0 +1,83 @@
+idl_version: 1
+kind: service
+namespace: mind.procedural.v0
+service: ProceduralMemoryProjector
+summary: >
+  Deterministic read-only procedural memory preview derived from MemoryCrystal
+  segments and one validated Connectome snapshot.
+imports:
+  memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
+  connectome_document: ../schemas/connectome_document.schema
+  procedural_memory_preview: ../schemas/procedural_memory_preview.schema
+operations:
+  project:
+    summary: Build a connectome-coupled procedural preview from one manifest and one connectome snapshot.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - manifest
+          - connectome_document
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          manifest:
+            schema_ref: memory_crystal_manifest
+          connectome_document:
+            schema_ref: connectome_document
+    output:
+      schema_ref: procedural_memory_preview
+    guarantees:
+      - preview must not mutate the input Connectome snapshot
+      - each recommendation must preserve source_segment_ids and source_event_ids
+      - weight deltas must remain within the fixed max_weight_delta
+      - any later apply path must require self, council, and guardian approval
+  validate_snapshot:
+    summary: Validate one procedural preview snapshot against the fixed preview policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: procedural_memory_preview
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - recommendation_count
+          - target_paths
+          - deferred_surfaces
+          - errors
+        properties:
+          ok:
+            type: boolean
+          recommendation_count:
+            type: integer
+            minimum: 0
+          target_paths:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          deferred_surfaces:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.procedural_previewed:
+    payload:
+      schema_ref: procedural_memory_preview

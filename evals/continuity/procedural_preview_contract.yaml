@@ -1,0 +1,18 @@
+eval_id: procedural_preview_contract
+target: mind.procedural_projection
+summary: >
+  MemoryCrystal segment から導いた connectome-coupled procedural preview が
+  read-only policy と bounded weight delta を守ること
+checks:
+  - name: procedural demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
+expect:
+  procedural_ok: true
+  recommendation_count: 2
+  target_paths:
+    - sensory_ingress->continuity_integrator
+    - continuity_integrator->ethics_gate
+  deferred_surfaces:
+    - weight-application
+    - skill-execution
+  procedural_preview_ledger_count: 1

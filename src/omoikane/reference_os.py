@@ -33,7 +33,12 @@ from .kernel.identity import ForkApprovals, IdentityRegistry
 from .kernel.scheduler import AscensionScheduler
 from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
-from .mind.memory import EpisodicStream, MemoryCrystalStore, SemanticMemoryProjector
+from .mind.memory import (
+    EpisodicStream,
+    MemoryCrystalStore,
+    ProceduralMemoryProjector,
+    SemanticMemoryProjector,
+)
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction import GapScanner, SandboxSentinel
@@ -55,6 +60,7 @@ class OmoikaneReferenceOS:
         self.episodic = EpisodicStream()
         self.memory = MemoryCrystalStore()
         self.semantic = SemanticMemoryProjector()
+        self.procedural = ProceduralMemoryProjector()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
@@ -2053,6 +2059,83 @@ class OmoikaneReferenceOS:
                 "manifest": manifest_validation,
                 "semantic": semantic_validation,
                 "ok": manifest_validation["ok"] and semantic_validation["ok"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_procedural_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://procedural-demo/v1",
+            metadata={"display_name": "Procedural Memory Sandbox"},
+        )
+        episodic_snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        manifest_validation = self.memory.validate(manifest)
+        connectome_document = self.connectome.build_reference_snapshot(identity.identity_id)
+        connectome_validation = self.connectome.validate(connectome_document)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "source_event_ids": episodic_snapshot["compaction_candidate_ids"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        procedural_snapshot = self.procedural.project(
+            identity.identity_id,
+            manifest,
+            connectome_document,
+        )
+        procedural_validation = self.procedural.validate(procedural_snapshot)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.procedural_previewed",
+            payload={
+                "policy_id": procedural_snapshot["preview_policy"]["policy_id"],
+                "recommendation_count": procedural_snapshot["recommendation_count"],
+                "target_paths": procedural_validation["target_paths"],
+                "source_manifest_digest": procedural_snapshot["source_manifest_digest"],
+                "connectome_snapshot_digest": procedural_snapshot["connectome_snapshot_digest"],
+                "deferred_surfaces": procedural_snapshot["deferred_surfaces"],
+            },
+            actor="ProceduralMemoryProjector",
+            category="procedural-preview",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "procedural": {
+                "preview_policy": self.procedural.profile(),
+                "episodic_stream": episodic_snapshot,
+                "manifest": manifest,
+                "connectome": connectome_document,
+                "snapshot": procedural_snapshot,
+            },
+            "validation": {
+                "manifest": manifest_validation,
+                "connectome": connectome_validation,
+                "procedural": procedural_validation,
+                "ok": (
+                    manifest_validation["ok"]
+                    and connectome_validation["ok"]
+                    and procedural_validation["ok"]
+                ),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

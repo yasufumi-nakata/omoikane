@@ -77,6 +77,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     semantic_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    procedural_parser = subparsers.add_parser(
+        "procedural-demo",
+        help="Emit a connectome-coupled procedural memory preview derived from MemoryCrystal",
+    )
+    procedural_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     episodic_parser = subparsers.add_parser(
         "episodic-demo",
         help="Run the L2 episodic stream canonical shape and MemoryCrystal handoff scenario",
@@ -228,6 +234,10 @@ def main() -> None:
 
     if args.command == "semantic-demo":
         _print_result(runtime.run_semantic_demo(), args.json)
+        return
+
+    if args.command == "procedural-demo":
+        _print_result(runtime.run_procedural_demo(), args.json)
         return
 
     if args.command == "episodic-demo":

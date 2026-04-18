@@ -148,6 +148,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["semantic-projection"])
 
+    def test_procedural_demo_returns_valid_preview(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["connectome"]["ok"])
+        self.assertTrue(result["validation"]["procedural"]["ok"])
+        self.assertEqual(2, result["validation"]["procedural"]["recommendation_count"])
+        self.assertEqual(
+            ["continuity_integrator->ethics_gate", "sensory_ingress->continuity_integrator"],
+            sorted(result["validation"]["procedural"]["target_paths"]),
+        )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-preview"])
+
     def test_cognitive_failover_demo_records_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 

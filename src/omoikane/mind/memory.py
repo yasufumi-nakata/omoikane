@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
+from .connectome import CONNECTOME_SCHEMA_VERSION, ConnectomeModel
 
 EPISODIC_STREAM_SCHEMA_VERSION = "1.0"
 EPISODIC_STREAM_POLICY_ID = "canonical-episodic-stream-v1"
@@ -24,6 +25,10 @@ COMPACTION_STRATEGY_ID = "append-only-segment-rollup-v1"
 MAX_SOURCE_EVENTS_PER_SEGMENT = 3
 SEMANTIC_MEMORY_SCHEMA_VERSION = "1.0"
 SEMANTIC_PROJECTION_POLICY_ID = "semantic-segment-rollup-v1"
+PROCEDURAL_MEMORY_SCHEMA_VERSION = "1.0"
+PROCEDURAL_PREVIEW_POLICY_ID = "connectome-coupled-procedural-preview-v1"
+PROCEDURAL_MAX_WEIGHT_DELTA = 0.08
+PROCEDURAL_DEFERRED_SURFACES = ["weight-application", "skill-execution"]
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -46,6 +51,10 @@ def _segment_digest_payload(segment: Dict[str, Any]) -> Dict[str, Any]:
 
 def _semantic_concept_digest_payload(concept: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in concept.items() if key != "digest"}
+
+
+def _procedural_recommendation_digest_payload(recommendation: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in recommendation.items() if key != "digest"}
 
 
 @dataclass
@@ -947,3 +956,337 @@ class SemanticMemoryProjector:
         }
         concept["digest"] = sha256_text(canonical_json(_semantic_concept_digest_payload(concept)))
         return concept
+
+
+class ProceduralMemoryProjector:
+    """Projects MemoryCrystal segments into read-only connectome update previews."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "policy_id": PROCEDURAL_PREVIEW_POLICY_ID,
+            "read_only_preview": True,
+            "source_compaction_strategy": COMPACTION_STRATEGY_ID,
+            "target_connectome_schema": CONNECTOME_SCHEMA_VERSION,
+            "update_mode": "weight-delta-preview",
+            "max_weight_delta": PROCEDURAL_MAX_WEIGHT_DELTA,
+            "approval_required": ["self", "council", "guardian"],
+            "deferred_surfaces": list(PROCEDURAL_DEFERRED_SURFACES),
+        }
+
+    def build_reference_snapshot(self, identity_id: str) -> Dict[str, Any]:
+        manifest = MemoryCrystalStore().build_reference_manifest(identity_id)
+        connectome_document = ConnectomeModel().build_reference_snapshot(identity_id)
+        return self.project(identity_id, manifest, connectome_document)
+
+    def project(
+        self,
+        identity_id: str,
+        manifest: Dict[str, Any],
+        connectome_document: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(manifest, dict):
+            raise ValueError("manifest must be a mapping")
+        if not isinstance(connectome_document, dict):
+            raise ValueError("connectome_document must be a mapping")
+
+        manifest_validation = MemoryCrystalStore().validate(manifest)
+        if not manifest_validation["ok"]:
+            raise ValueError(
+                "procedural projection requires a valid MemoryCrystal manifest: "
+                f"{manifest_validation['errors']}"
+            )
+        connectome_validation = ConnectomeModel().validate(connectome_document)
+        if not connectome_validation["ok"]:
+            raise ValueError("connectome_document must satisfy Connectome validation")
+        if manifest.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match manifest.identity_id")
+        if connectome_document.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match connectome_document.identity_id")
+
+        edge_contexts = self._edge_contexts(connectome_document)
+        recommendations = [
+            self._build_recommendation(segment, self._select_edge(segment, edge_contexts))
+            for segment in manifest["segments"]
+        ]
+        snapshot = {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "projected_at": utc_now_iso(),
+            "preview_policy": self.profile(),
+            "source_manifest_digest": sha256_text(canonical_json(manifest)),
+            "source_segment_ids": [segment["segment_id"] for segment in manifest["segments"]],
+            "connectome_snapshot_id": connectome_document["snapshot_id"],
+            "connectome_snapshot_digest": sha256_text(canonical_json(connectome_document)),
+            "recommendation_count": len(recommendations),
+            "recommendations": recommendations,
+            "preview_only": True,
+            "deferred_surfaces": list(PROCEDURAL_DEFERRED_SURFACES),
+        }
+        validation = self.validate(snapshot)
+        if not validation["ok"]:
+            raise ValueError(f"procedural preview failed validation: {validation['errors']}")
+        return snapshot
+
+    def validate(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        target_paths: List[str] = []
+
+        if not isinstance(snapshot, dict):
+            raise ValueError("snapshot must be a mapping")
+        if snapshot.get("schema_version") != PROCEDURAL_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {PROCEDURAL_MEMORY_SCHEMA_VERSION}, "
+                f"got {snapshot.get('schema_version')!r}"
+            )
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("identity_id"), "identity_id", errors)
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("projected_at"), "projected_at", errors)
+        MemoryCrystalStore._require_non_empty_string(
+            snapshot.get("connectome_snapshot_id"),
+            "connectome_snapshot_id",
+            errors,
+        )
+
+        preview_policy = snapshot.get("preview_policy")
+        if not isinstance(preview_policy, dict):
+            errors.append("preview_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if preview_policy.get(field_name) != expected_value:
+                    errors.append(f"preview_policy.{field_name} mismatch")
+
+        for field_name in ("source_manifest_digest", "connectome_snapshot_digest"):
+            value = snapshot.get(field_name)
+            if not isinstance(value, str) or len(value) != 64:
+                errors.append(f"{field_name} must be a sha256 hex string")
+
+        source_segment_ids = snapshot.get("source_segment_ids")
+        if not isinstance(source_segment_ids, list) or not source_segment_ids:
+            errors.append("source_segment_ids must be a non-empty list")
+            source_segment_ids = []
+        else:
+            for segment_id in source_segment_ids:
+                if not isinstance(segment_id, str) or not segment_id.strip():
+                    errors.append("source_segment_ids must contain non-empty strings")
+
+        recommendations = snapshot.get("recommendations")
+        if not isinstance(recommendations, list) or not recommendations:
+            errors.append("recommendations must be a non-empty list")
+            recommendations = []
+
+        seen_recommendation_ids = set()
+        seen_segment_ids = set()
+        for index, recommendation in enumerate(recommendations):
+            if not isinstance(recommendation, dict):
+                errors.append(f"recommendations[{index}] must be an object")
+                continue
+
+            recommendation_id = recommendation.get("recommendation_id")
+            MemoryCrystalStore._require_non_empty_string(
+                recommendation_id,
+                f"recommendations[{index}].recommendation_id",
+                errors,
+            )
+            if isinstance(recommendation_id, str) and recommendation_id:
+                if recommendation_id in seen_recommendation_ids:
+                    errors.append(f"duplicate recommendation_id: {recommendation_id}")
+                else:
+                    seen_recommendation_ids.add(recommendation_id)
+
+            for field_name in ("source_segment_ids", "source_event_ids", "source_refs", "guardrails"):
+                value = recommendation.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(f"recommendations[{index}].{field_name} must be a non-empty list")
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(
+                            f"recommendations[{index}].{field_name} must contain non-empty strings"
+                        )
+                if field_name == "source_segment_ids":
+                    seen_segment_ids.update(value)
+
+            for field_name in ("target_edge_id", "target_path", "plasticity_rule", "justification"):
+                MemoryCrystalStore._require_non_empty_string(
+                    recommendation.get(field_name),
+                    f"recommendations[{index}].{field_name}",
+                    errors,
+                )
+
+            target_path = recommendation.get("target_path")
+            if isinstance(target_path, str) and target_path:
+                target_paths.append(target_path)
+
+            MemoryCrystalStore._require_number_in_range(
+                recommendation.get("proposed_weight_delta"),
+                0.0,
+                PROCEDURAL_MAX_WEIGHT_DELTA,
+                f"recommendations[{index}].proposed_weight_delta",
+                errors,
+            )
+            MemoryCrystalStore._require_number_in_range(
+                recommendation.get("target_weight_after_preview"),
+                0.0,
+                1.0,
+                f"recommendations[{index}].target_weight_after_preview",
+                errors,
+            )
+            MemoryCrystalStore._require_number_in_range(
+                recommendation.get("confidence"),
+                0.0,
+                1.0,
+                f"recommendations[{index}].confidence",
+                errors,
+            )
+            MemoryCrystalStore._require_number_in_range(
+                recommendation.get("rehearsal_priority"),
+                0.0,
+                1.0,
+                f"recommendations[{index}].rehearsal_priority",
+                errors,
+            )
+
+            source_segment_digest = recommendation.get("source_segment_digest")
+            if not isinstance(source_segment_digest, str) or len(source_segment_digest) != 64:
+                errors.append(
+                    f"recommendations[{index}].source_segment_digest must be a sha256 hex string"
+                )
+            digest = recommendation.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append(f"recommendations[{index}].digest must be a sha256 hex string")
+            else:
+                expected_digest = sha256_text(
+                    canonical_json(_procedural_recommendation_digest_payload(recommendation))
+                )
+                if digest != expected_digest:
+                    errors.append(f"recommendations[{index}].digest mismatch")
+
+        recommendation_count = snapshot.get("recommendation_count")
+        if recommendation_count != len(recommendations):
+            errors.append(
+                "recommendation_count must equal len(recommendations) "
+                f"({len(recommendations)}), got {recommendation_count!r}"
+            )
+
+        if snapshot.get("preview_only") is not True:
+            errors.append("preview_only must equal true")
+
+        deferred_surfaces = snapshot.get("deferred_surfaces")
+        if deferred_surfaces != PROCEDURAL_DEFERRED_SURFACES:
+            errors.append(f"deferred_surfaces must equal {PROCEDURAL_DEFERRED_SURFACES!r}")
+
+        if isinstance(source_segment_ids, list) and source_segment_ids and seen_segment_ids:
+            if sorted(source_segment_ids) != sorted(seen_segment_ids):
+                errors.append("source_segment_ids must equal the union of recommendation source_segment_ids")
+
+        return {
+            "ok": not errors,
+            "recommendation_count": len(recommendations),
+            "target_paths": target_paths,
+            "deferred_surfaces": list(PROCEDURAL_DEFERRED_SURFACES),
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _edge_contexts(connectome_document: Dict[str, Any]) -> List[Dict[str, Any]]:
+        node_labels = {
+            node["id"]: node.get("properties", {}).get("label", node["id"])
+            for node in connectome_document["nodes"]
+        }
+        return [
+            {
+                "edge_id": edge["id"],
+                "source_label": node_labels[edge["source"]],
+                "target_label": node_labels[edge["target"]],
+                "plasticity_rule": edge["plasticity"]["rule"],
+                "current_weight": edge["weight"],
+            }
+            for edge in connectome_document["edges"]
+        ]
+
+    def _select_edge(
+        self,
+        segment: Dict[str, Any],
+        edge_contexts: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        anchors = set(segment["semantic_anchors"])
+        theme = segment["theme"]
+        best_edge = edge_contexts[0]
+        best_score = -1
+
+        for edge_context in edge_contexts:
+            score = 0
+            source_label = edge_context["source_label"]
+            target_label = edge_context["target_label"]
+            plasticity_rule = edge_context["plasticity_rule"]
+
+            if theme == "council-review" or anchors & {"guardian", "safety", "traceability"}:
+                if target_label == "ethics_gate":
+                    score += 3
+                if plasticity_rule == "homeostatic-clamp":
+                    score += 2
+            if theme == "migration-check" or anchors & {"migration-check", "replication", "substrate"}:
+                if source_label == "sensory_ingress":
+                    score += 3
+                if plasticity_rule == "hebbian-windowed":
+                    score += 2
+            if "continuity" in anchors and (
+                source_label == "continuity_integrator" or target_label == "continuity_integrator"
+            ):
+                score += 1
+
+            if score > best_score:
+                best_edge = edge_context
+                best_score = score
+
+        return best_edge
+
+    def _build_recommendation(
+        self,
+        segment: Dict[str, Any],
+        edge_context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        reinforcement_count = len(segment["source_event_ids"])
+        salience = segment["salience_max"]
+        arousal = abs(segment["affect_summary"]["mean_arousal"])
+        delta = 0.015 + (salience * 0.04) + ((reinforcement_count - 1) * 0.005)
+        if edge_context["target_label"] == "ethics_gate":
+            delta += 0.005
+        proposed_weight_delta = round(min(PROCEDURAL_MAX_WEIGHT_DELTA, delta), 3)
+        target_weight_after_preview = round(
+            min(1.0, edge_context["current_weight"] + proposed_weight_delta),
+            3,
+        )
+        confidence = round(min(0.97, 0.56 + (salience * 0.25) + (reinforcement_count * 0.04)), 3)
+        rehearsal_priority = round(min(0.98, 0.45 + (salience * 0.30) + (arousal * 0.15)), 3)
+
+        recommendation = {
+            "recommendation_id": f"procedural-{segment['segment_id']}",
+            "source_segment_ids": [segment["segment_id"]],
+            "source_event_ids": list(segment["source_event_ids"]),
+            "target_edge_id": edge_context["edge_id"],
+            "target_path": f"{edge_context['source_label']}->{edge_context['target_label']}",
+            "plasticity_rule": edge_context["plasticity_rule"],
+            "proposed_weight_delta": proposed_weight_delta,
+            "target_weight_after_preview": target_weight_after_preview,
+            "confidence": confidence,
+            "rehearsal_priority": rehearsal_priority,
+            "justification": (
+                f"{segment['theme']} segment を {edge_context['source_label']} -> "
+                f"{edge_context['target_label']} の結合へ rehearsal preview として反映する"
+            ),
+            "source_refs": list(segment["source_refs"]),
+            "guardrails": [
+                "preview-only",
+                "apply requires self/council/guardian approval",
+                "connectome mutation must emit continuity diff",
+            ],
+            "source_segment_digest": segment["digest"],
+        }
+        recommendation["digest"] = sha256_text(
+            canonical_json(_procedural_recommendation_digest_payload(recommendation))
+        )
+        return recommendation

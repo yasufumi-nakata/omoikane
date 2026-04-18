@@ -38,6 +38,7 @@ PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli episodic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
+PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
@@ -134,6 +135,14 @@ read-only concept view に投影しつつ、
 `procedural-memory` が deferred surface として残ること、
 `semantic-projection` ledger event が source manifest digest と concept label を記録することを確認する。
 
+`procedural-demo` は L2 procedural preview の reference contract
+(`mind.procedural.v0`) を JSON で可視化し、
+`MemoryCrystal` segment と `Connectome` snapshot を
+`connectome-coupled-procedural-preview-v1` で突き合わせ、
+bounded な `weight-delta-preview` recommendation と
+`procedural-preview` ledger event が source manifest / connectome digest と
+target path を記録することを確認する。
+
 `bdb-demo` は L6 Biological-Digital Bridge の reference contract
 (`interface.bdb.v0`) を JSON で可視化し、
 `latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
@@ -169,7 +178,7 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- L2 procedural memory projection と connectome-coupled preview contract
+- L2 procedural memory apply path と human-approved writeback contract
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
