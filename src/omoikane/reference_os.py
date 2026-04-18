@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from .agentic.council import Council, CouncilMember, CouncilVote
 from .agentic.task_graph import TaskGraphService
+from .agentic.trust import TrustService
 from .common import canonical_json, sha256_text
 from .cognitive import (
     CognitiveProfile,
@@ -50,14 +51,65 @@ class OmoikaneReferenceOS:
         )
         self.council = Council()
         self.task_graph = TaskGraphService()
+        self.trust = TrustService()
         self.gap_scanner = GapScanner()
+        self._bootstrap_trust()
         self._bootstrap_council()
 
+    def _bootstrap_trust(self) -> None:
+        self.trust.register_agent(
+            "design-architect",
+            initial_score=0.61,
+            per_domain={"council_deliberation": 0.72, "self_modify": 0.61},
+        )
+        self.trust.register_agent(
+            "ethics-committee",
+            initial_score=0.73,
+            per_domain={"council_deliberation": 0.81, "self_modify": 0.78},
+        )
+        self.trust.register_agent(
+            "memory-archivist",
+            initial_score=0.57,
+            per_domain={"council_deliberation": 0.63, "memory_editing": 0.76},
+        )
+        self.trust.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap requires explicit human approval",
+        )
+
     def _bootstrap_council(self) -> None:
-        self.council.register(CouncilMember("design-architect", "councilor", 0.61))
-        self.council.register(CouncilMember("ethics-committee", "councilor", 0.73))
-        self.council.register(CouncilMember("memory-archivist", "councilor", 0.57))
-        self.council.register(CouncilMember("integrity-guardian", "guardian", 0.99, is_guardian=True))
+        self.council.register(
+            CouncilMember(
+                "design-architect",
+                "councilor",
+                self.trust.snapshot("design-architect")["global_score"],
+            )
+        )
+        self.council.register(
+            CouncilMember(
+                "ethics-committee",
+                "councilor",
+                self.trust.snapshot("ethics-committee")["global_score"],
+            )
+        )
+        self.council.register(
+            CouncilMember(
+                "memory-archivist",
+                "councilor",
+                self.trust.snapshot("memory-archivist")["global_score"],
+            )
+        )
+        self.council.register(
+            CouncilMember(
+                "integrity-guardian",
+                "guardian",
+                self.trust.snapshot("integrity-guardian")["global_score"],
+                is_guardian=True,
+            )
+        )
 
     def run_reference_scenario(self) -> Dict[str, Any]:
         identity = self.identity.create(
@@ -400,6 +452,79 @@ class OmoikaneReferenceOS:
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_trust_demo(self) -> Dict[str, Any]:
+        service = TrustService()
+        service.register_agent(
+            "design-architect",
+            initial_score=0.58,
+            per_domain={"council_deliberation": 0.58, "self_modify": 0.58},
+        )
+        service.register_agent(
+            "codex-builder",
+            initial_score=0.78,
+            per_domain={"self_modify": 0.78, "documentation": 0.81},
+        )
+        service.register_agent(
+            "new-researcher",
+            per_domain={"council_deliberation": 0.3, "documentation": 0.3},
+        )
+        service.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap requires explicit human approval",
+        )
+
+        events = [
+            service.record_event(
+                "design-architect",
+                event_type="council_quality_positive",
+                domain="council_deliberation",
+                severity="medium",
+                evidence_confidence=1.0,
+                triggered_by="Council",
+                rationale="timeout-aware decision left no policy regression",
+            ),
+            service.record_event(
+                "codex-builder",
+                event_type="guardian_audit_pass",
+                domain="self_modify",
+                severity="medium",
+                evidence_confidence=1.0,
+                triggered_by="IntegrityGuardian",
+                rationale="reference patch preserved immutable boundary and passed evals",
+            ),
+            service.record_event(
+                "new-researcher",
+                event_type="human_feedback_good",
+                domain="documentation",
+                severity="medium",
+                evidence_confidence=1.0,
+                triggered_by="yasufumi",
+                rationale="low-risk documentation work matched the requested scope",
+            ),
+            service.record_event(
+                "integrity-guardian",
+                event_type="human_feedback_bad",
+                domain="council_deliberation",
+                severity="medium",
+                evidence_confidence=1.0,
+                triggered_by="yasufumi",
+                rationale="pin の間は event を記録するが自動減点しない",
+            ),
+        ]
+
+        return {
+            "policy": service.policy_snapshot()["policy"],
+            "thresholds": service.policy_snapshot()["thresholds"],
+            "events": events,
+            "agents": {
+                snapshot["agent_id"]: snapshot
+                for snapshot in service.all_snapshots()
+            },
         }
 
     def run_substrate_demo(self) -> Dict[str, Any]:

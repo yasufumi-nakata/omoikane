@@ -259,6 +259,37 @@ entries:
       - docs/02-subsystems/mind-substrate/memory-model.md
     rationale: Required to fix the append-only MemoryCrystal compaction strategy across runtime, docs, and evals.
   - priority: P1
+    kind: schema
+    file: specs/schemas/trust_event.schema
+    consumers:
+      - specs/schemas/trust_snapshot.schema
+      - specs/interfaces/agentic.trust.v0.idl
+      - reference-runtime
+    rationale: Required to encode deterministic trust update attempts, including human pin freezes.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/trust_snapshot.schema
+    consumers:
+      - specs/interfaces/agentic.trust.v0.idl
+      - docs/02-subsystems/agentic/trust-management.md
+      - reference-runtime
+    rationale: Required to serialize global/domain trust, history, thresholds, and operational gates.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.trust.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/trust-management.md
+      - docs/02-subsystems/agentic/council-composition.md
+      - reference-runtime
+    rationale: Required to make Council selection and human pinning depend on a fixed trust registry contract.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/trust_score_update_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the fixed trust delta table, threshold gates, and human pin behavior.
+  - priority: P1
     kind: eval
     file: evals/continuity/memory_crystal_compaction.yaml
     consumers:

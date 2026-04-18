@@ -91,6 +91,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(3, result["dispatch"]["dispatched_count"])
         self.assertEqual(3, result["synthesis"]["accepted_result_count"])
 
+    def test_trust_demo_emits_threshold_and_pin_state(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "trust-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("reference-v0", result["policy"]["policy_id"])
+        self.assertEqual(0.99, result["agents"]["integrity-guardian"]["global_score"])
+        self.assertFalse(result["events"][-1]["applied"])
+        self.assertTrue(result["agents"]["design-architect"]["eligibility"]["count_for_weighted_vote"])
+
 
 if __name__ == "__main__":
     unittest.main()

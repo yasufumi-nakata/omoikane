@@ -46,3 +46,4 @@ status: decided | superseded
 - [2026-04-18_task-graph-complexity-policy.md](2026-04-18_task-graph-complexity-policy.md)
 - [2026-04-18_qualia-sampling-profile.md](2026-04-18_qualia-sampling-profile.md)
 - [2026-04-18_memory-crystal-compaction-policy.md](2026-04-18_memory-crystal-compaction-policy.md)
+- [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)

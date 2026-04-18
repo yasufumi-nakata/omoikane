@@ -23,6 +23,8 @@
 - `task_node.schema`
 - `task_graph_policy.schema`
 - `consensus_message.schema`
+- `trust_event.schema`
+- `trust_snapshot.schema`
 - `build_request.yaml`
 - `build_artifact.yaml`
 - `patch_descriptor.schema`

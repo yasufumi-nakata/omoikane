@@ -4,6 +4,7 @@ import unittest
 
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote
 from omoikane.agentic.task_graph import TaskGraphService
+from omoikane.agentic.trust import TrustService
 
 
 class CouncilTests(unittest.TestCase):
@@ -140,6 +141,59 @@ class TaskGraphServiceTests(unittest.TestCase):
                 ],
                 complexity_policy=policy,
             )
+
+
+class TrustServiceTests(unittest.TestCase):
+    def test_positive_event_updates_score_and_thresholds(self) -> None:
+        service = TrustService()
+        service.register_agent(
+            "design-architect",
+            initial_score=0.58,
+            per_domain={"council_deliberation": 0.58},
+        )
+
+        event = service.record_event(
+            "design-architect",
+            event_type="council_quality_positive",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="Council",
+            rationale="consistent review quality",
+        )
+        snapshot = service.snapshot("design-architect")
+
+        self.assertEqual(0.04, event["applied_delta"])
+        self.assertEqual(0.62, snapshot["global_score"])
+        self.assertEqual(0.62, snapshot["per_domain"]["council_deliberation"])
+        self.assertTrue(snapshot["eligibility"]["count_for_weighted_vote"])
+
+    def test_human_pin_freezes_automatic_delta(self) -> None:
+        service = TrustService()
+        service.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+
+        event = service.record_event(
+            "integrity-guardian",
+            event_type="human_feedback_bad",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="yasufumi",
+            rationale="manual review pending",
+        )
+        snapshot = service.snapshot("integrity-guardian")
+
+        self.assertFalse(event["applied"])
+        self.assertEqual(0.0, event["applied_delta"])
+        self.assertEqual(0.99, snapshot["global_score"])
+        self.assertTrue(snapshot["eligibility"]["guardian_role"])
+        self.assertEqual("guardian bootstrap", snapshot["pinned_reason"])
 
 
 if __name__ == "__main__":

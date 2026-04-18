@@ -10,6 +10,7 @@
 - `mind.self_model.v0.idl`
 - `agentic.council.v0.idl`
 - `agentic.task_graph.v0.idl`
+- `agentic.trust.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`
 

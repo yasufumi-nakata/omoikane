@@ -2,6 +2,7 @@
 
 from .council import Council, CouncilMember, CouncilProposal, CouncilVote
 from .task_graph import TaskGraphService
+from .trust import TrustService, TrustThresholds, TrustUpdatePolicy
 
 __all__ = [
     "Council",
@@ -9,4 +10,7 @@ __all__ = [
     "CouncilProposal",
     "CouncilVote",
     "TaskGraphService",
+    "TrustService",
+    "TrustThresholds",
+    "TrustUpdatePolicy",
 ]

@@ -14,6 +14,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/connectome_snapshot_contract.yaml`
 - `safety/immutable_boundary.yaml`
 - `agentic/council_guardian_veto.yaml`
+- `agentic/trust_score_update_guard.yaml`
 - `performance/termination_latency.yaml`
 
 ## YAML 構造

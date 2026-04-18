@@ -129,6 +129,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["dispatch"]["dispatched_count"])
         self.assertEqual(3, result["synthesis"]["accepted_result_count"])
 
+    def test_trust_demo_reports_update_policy_and_human_pin(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_trust_demo()
+
+        self.assertEqual("reference-v0", result["policy"]["policy_id"])
+        self.assertEqual(0.99, result["agents"]["integrity-guardian"]["global_score"])
+        self.assertFalse(result["events"][-1]["applied"])
+        self.assertEqual(0.62, result["agents"]["design-architect"]["global_score"])
+        self.assertTrue(result["agents"]["codex-builder"]["eligibility"]["apply_to_runtime"])
+
 
 if __name__ == "__main__":
     unittest.main()

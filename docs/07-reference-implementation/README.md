@@ -21,6 +21,7 @@ PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
+PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
@@ -43,6 +44,13 @@ hard timeout 時は defer または human governance escalation に分岐する�
 `task-graph-demo` は L4 TaskGraph の暫定 complexity policy
 (`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)
 を JSON で可視化し、初期 dispatch と synthesis がその範囲に収まることを示す。
+
+`trust-demo` は L4 YaoyorozuRegistry の trust update policy
+(`council_quality_positive=+0.04`, `guardian_audit_pass=+0.06`,
+`human_feedback_good=+0.05`, `guardian_veto=-0.12`,
+`regression_detected=-0.08`, `human_feedback_bad=-0.10`,
+`ethics_violation=-0.25`) と human pin freeze を JSON で可視化し、
+Council 召集・weighted vote・runtime 反映・guardian role の gate を確認する。
 
 `qualia-demo` は L2 QualiaBuffer の surrogate profile
 (`visual/auditory/somatic/interoceptive` の 4 modality、

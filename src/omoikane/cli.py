@@ -65,6 +65,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     task_graph_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    trust_parser = subparsers.add_parser(
+        "trust-demo",
+        help="Run the L4 trust update policy and human pin scenario",
+    )
+    trust_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -124,6 +130,10 @@ def main() -> None:
 
     if args.command == "task-graph-demo":
         _print_result(runtime.run_task_graph_demo(), args.json)
+        return
+
+    if args.command == "trust-demo":
+        _print_result(runtime.run_trust_demo(), args.json)
         return
 
     if args.command == "gap-report":

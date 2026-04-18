@@ -54,6 +54,10 @@ session_mode ごとの budget は固定する:
 - 本人のフィードバック
 
 trust score が閾値以下の Agent は召集されない。
+reference runtime では `agentic.trust.v0` を参照し、
+`global_score >= 0.5` を召集条件、
+`global_score >= 0.6` を weighted-majority の重み付与条件に固定する。
+`guardian_role` は `0.99 + pinned_by_human` が揃わない限り成立しない。
 
 ## 多 Council 化（将来）
 

@@ -1,0 +1,111 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_event.schema"
+title: TrustEvent
+description: Audited trust update event for one agent and one domain.
+type: object
+additionalProperties: false
+required:
+  - event_id
+  - agent_id
+  - domain
+  - event_type
+  - severity
+  - evidence_confidence
+  - raw_delta
+  - applied_delta
+  - applied
+  - triggered_by
+  - rationale
+  - global_before
+  - global_after
+  - domain_before
+  - domain_after
+  - policy_id
+  - recorded_at
+properties:
+  event_id:
+    type: string
+    minLength: 8
+  agent_id:
+    type: string
+    minLength: 1
+  domain:
+    type: string
+    minLength: 1
+  event_type:
+    type: string
+    enum:
+      - council_quality_positive
+      - guardian_audit_pass
+      - human_feedback_good
+      - guardian_veto
+      - regression_detected
+      - human_feedback_bad
+      - ethics_violation
+  severity:
+    type: string
+    enum:
+      - low
+      - medium
+      - high
+      - critical
+  evidence_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+  raw_delta:
+    type: number
+    minimum: -1
+    maximum: 1
+  applied_delta:
+    type: number
+    minimum: -1
+    maximum: 1
+  applied:
+    type: boolean
+  triggered_by:
+    type: string
+    minLength: 1
+  rationale:
+    type: string
+    minLength: 1
+  global_before:
+    type: number
+    minimum: 0
+    maximum: 1
+  global_after:
+    type: number
+    minimum: 0
+    maximum: 1
+  domain_before:
+    type: number
+    minimum: 0
+    maximum: 1
+  domain_after:
+    type: number
+    minimum: 0
+    maximum: 1
+  policy_id:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+examples:
+  - event_id: trust-event-001
+    agent_id: design-architect
+    domain: council_deliberation
+    event_type: council_quality_positive
+    severity: medium
+    evidence_confidence: 1.0
+    raw_delta: 0.04
+    applied_delta: 0.04
+    applied: true
+    triggered_by: Council
+    rationale: timeout-aware decision left no policy regression
+    global_before: 0.58
+    global_after: 0.62
+    domain_before: 0.58
+    domain_after: 0.62
+    policy_id: reference-v0
+    recorded_at: "2026-04-18T10:00:00Z"

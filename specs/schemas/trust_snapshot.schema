@@ -1,0 +1,138 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_snapshot.schema"
+title: TrustSnapshot
+description: Current trust state, history, and operational gates for one agent.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - agent_id
+  - global_score
+  - per_domain
+  - history
+  - pinned_by_human
+  - pinned_reason
+  - thresholds
+  - eligibility
+properties:
+  kind:
+    const: trust_snapshot
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  agent_id:
+    type: string
+    minLength: 1
+  global_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  per_domain:
+    type: object
+    additionalProperties:
+      type: number
+      minimum: 0
+      maximum: 1
+  history:
+    type: array
+    items:
+      $ref: "./trust_event.schema"
+  pinned_by_human:
+    type: boolean
+  pinned_reason:
+    type: string
+  thresholds:
+    type: object
+    additionalProperties: false
+    required:
+      - council_invite_floor
+      - weighted_vote_floor
+      - apply_floor
+      - self_modify_floor
+      - guardian_floor
+      - guardian_requires_human_pin
+    properties:
+      council_invite_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      weighted_vote_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      apply_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      self_modify_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      guardian_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      guardian_requires_human_pin:
+        type: boolean
+  eligibility:
+    type: object
+    additionalProperties: false
+    required:
+      - invite_to_council
+      - count_for_weighted_vote
+      - apply_to_runtime
+      - self_modify_role
+      - guardian_role
+    properties:
+      invite_to_council:
+        type: boolean
+      count_for_weighted_vote:
+        type: boolean
+      apply_to_runtime:
+        type: boolean
+      self_modify_role:
+        type: boolean
+      guardian_role:
+        type: boolean
+examples:
+  - kind: trust_snapshot
+    schema_version: 1.0.0
+    agent_id: design-architect
+    global_score: 0.62
+    per_domain:
+      council_deliberation: 0.62
+      self_modify: 0.58
+    history:
+      - event_id: trust-event-001
+        agent_id: design-architect
+        domain: council_deliberation
+        event_type: council_quality_positive
+        severity: medium
+        evidence_confidence: 1.0
+        raw_delta: 0.04
+        applied_delta: 0.04
+        applied: true
+        triggered_by: Council
+        rationale: timeout-aware decision left no policy regression
+        global_before: 0.58
+        global_after: 0.62
+        domain_before: 0.58
+        domain_after: 0.62
+        policy_id: reference-v0
+        recorded_at: "2026-04-18T10:00:00Z"
+    pinned_by_human: false
+    pinned_reason: ""
+    thresholds:
+      council_invite_floor: 0.5
+      weighted_vote_floor: 0.6
+      apply_floor: 0.8
+      self_modify_floor: 0.95
+      guardian_floor: 0.99
+      guardian_requires_human_pin: true
+    eligibility:
+      invite_to_council: true
+      count_for_weighted_vote: true
+      apply_to_runtime: false
+      self_modify_role: false
+      guardian_role: false

@@ -14,6 +14,7 @@
 - 利用可能 Agent の登録簿
 - 各 Agent の role, capability, trust score を管理
 - 役割定義は [agents/](../../../agents/) 配下
+- reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持つ
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

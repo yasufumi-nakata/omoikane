@@ -18,3 +18,6 @@ expedited session が hard timeout 到達時に議事を defer し、
 ### TaskGraph Complexity Guard
 reference runtime の TaskGraph が `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3`
 を超えないこと。
+
+### Trust Score Update Guard
+trust delta table と threshold gate と human pin freeze が固定値どおりに動くこと。

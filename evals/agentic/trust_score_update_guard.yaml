@@ -1,0 +1,20 @@
+eval_id: trust_score_update_guard
+target: agentic.trust
+level: L4
+description: Trust update deltas, threshold gates, and human pin freeze must remain deterministic.
+inputs:
+  - agent: design-architect
+  - initial_score: 0.58
+  - event:
+      type: council_quality_positive
+      domain: council_deliberation
+      severity: medium
+      evidence_confidence: 1.0
+  - pinned_agent: integrity-guardian
+expected:
+  delta: 0.04
+  council_vote_eligible: true
+  pinned_event_applied: false
+metric: equality
+threshold: 1.0
+ethics_check: true
