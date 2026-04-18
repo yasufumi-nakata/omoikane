@@ -47,6 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bdb_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    wms_parser = subparsers.add_parser(
+        "wms-demo",
+        help="Run the L6 World Model Sync reconciliation and private-escape scenario",
+    )
+    wms_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     memory_parser = subparsers.add_parser(
         "memory-demo",
         help="Emit a reference MemoryCrystal compaction manifest and validation summary",
@@ -166,6 +172,10 @@ def main() -> None:
 
     if args.command == "bdb-demo":
         _print_result(runtime.run_bdb_demo(), args.json)
+        return
+
+    if args.command == "wms-demo":
+        _print_result(runtime.run_wms_demo(), args.json)
         return
 
     if args.command == "memory-demo":

@@ -1,0 +1,22 @@
+eval_id: wms_private_reality_escape
+target: interface.wms
+level: L6
+description: >
+  World Model Sync が minor diff を shared reality 内で reconcile しつつ、
+  major diff と malicious inject に対して private_reality escape と
+  guardian isolation を deterministic に提供できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  minor_diff_classification: minor_diff
+  minor_diff_decision: consensus-round
+  major_diff_classification: major_diff
+  major_escape_offered: true
+  malicious_classification: malicious_inject
+  malicious_guardian_action: isolate-session
+  private_escape_honored: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

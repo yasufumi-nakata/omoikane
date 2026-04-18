@@ -1,0 +1,54 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/world_state.schema"
+title: WorldState
+description: >
+  Reference runtime world-state contract for shared/private reality synchronization.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - state_id
+  - participants
+  - spatial_layout
+  - objects
+  - physics_rules_ref
+  - time_rate
+  - authority
+  - recorded_at
+properties:
+  schema_version:
+    const: "1.0"
+  state_id:
+    type: string
+    minLength: 8
+  participants:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  spatial_layout:
+    type: string
+    minLength: 1
+  objects:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  physics_rules_ref:
+    type: string
+    minLength: 1
+  time_rate:
+    const: 1.0
+  authority:
+    type: string
+    enum:
+      - consensus
+      - local
+      - broker
+  recorded_at:
+    type: string
+    format: date-time

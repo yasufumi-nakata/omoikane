@@ -12,6 +12,8 @@
 - `memory_crystal_manifest.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
+- `world_state.schema`
+- `wms_reconcile.schema`
 - `substrate_allocation.schema`
 - `substrate_attestation.schema`
 - `substrate_transfer.schema`
@@ -38,7 +40,7 @@
 
 ## 次段階
 
-episodic event / IMC/WMS/EWA handshake は reference runtime の対象が
+episodic event / IMC/EWA handshake は reference runtime の対象が
 広がる段階で追加する。
 
 ## 形式

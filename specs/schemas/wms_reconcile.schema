@@ -1,0 +1,81 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_reconcile.schema"
+title: WMSReconcileOutcome
+description: >
+  Deterministic outcome of one World Model Sync diff proposal.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - reconcile_id
+  - session_id
+  - recorded_at
+  - classification
+  - decision
+  - consensus_required
+  - guardian_action
+  - council_notification
+  - escape_offered
+  - resulting_mode
+  - resulting_state_id
+  - affected_object_ratio
+  - requested_time_rate
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  reconcile_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  classification:
+    type: string
+    enum:
+      - minor_diff
+      - major_diff
+      - malicious_inject
+  decision:
+    type: string
+    enum:
+      - consensus-round
+      - offer-private-reality
+      - guardian-veto
+  consensus_required:
+    type: boolean
+  guardian_action:
+    type: string
+    enum:
+      - continue-shared-sync
+      - await-human-choice
+      - isolate-session
+  council_notification:
+    type: string
+    enum:
+      - not-required
+      - required
+      - async-audit-only
+  escape_offered:
+    type: boolean
+  resulting_mode:
+    type: string
+    enum:
+      - shared_reality
+      - private_reality
+      - mixed
+  resulting_state_id:
+    type: string
+    minLength: 8
+  affected_object_ratio:
+    type: number
+    minimum: 0
+    maximum: 1
+  requested_time_rate:
+    const: 1.0
+  audit_event_ref:
+    type: string
+    minLength: 1

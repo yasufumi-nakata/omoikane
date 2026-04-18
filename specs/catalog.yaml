@@ -203,6 +203,29 @@ entries:
       - docs/02-subsystems/substrate/README.md
     rationale: Required to fix the L0 substrate broker contract across docs and runtime.
   - priority: P1
+    kind: schema
+    file: specs/schemas/world_state.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - docs/02-subsystems/interface/wms-spec.md
+      - reference-runtime
+    rationale: Required to serialize shared/private world-state snapshots with fixed authority and time_rate fields.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_reconcile.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_private_reality_escape.yaml
+      - reference-runtime
+    rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes and private escape offers.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.wms.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/interface/wms-spec.md
+    rationale: Required to fix the L6 World Model Sync adapter contract across docs, CLI, and runtime.
+  - priority: P1
     kind: eval
     file: evals/cognitive/qualia_contract.yaml
     consumers:
@@ -223,6 +246,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_private_reality_escape.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects shared reality reconciliation, private reality escape, and guardian isolation for malicious world-state diffs.
   - priority: P1
     kind: eval
     file: evals/continuity/continuity_chain_self_modify.yaml

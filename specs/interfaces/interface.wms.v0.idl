@@ -1,0 +1,222 @@
+idl_version: 1
+kind: service
+namespace: interface.wms.v0
+service: WorldModelSyncService
+summary: Canonical L6 contract for deterministic shared/private world-state reconciliation.
+imports:
+  world_state: ../schemas/world_state.schema
+  wms_reconcile: ../schemas/wms_reconcile.schema
+operations:
+  snapshot:
+    summary: Read the current world state for one WMS session.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: world_state
+  propose_diff:
+    summary: Classify one proposed shared-world diff and either reconcile, escalate, or isolate it.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - proposer_id
+          - candidate_objects
+          - affected_object_ratio
+          - attested
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          proposer_id:
+            type: string
+            minLength: 1
+          candidate_objects:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          affected_object_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+          attested:
+            type: boolean
+          requested_time_rate:
+            type: number
+            minimum: 0.001
+            default: 1.0
+    output:
+      schema_ref: wms_reconcile
+    guarantees:
+      - affected_object_ratio < 0.05 must reconcile via consensus_round when proposer is attested
+      - unauthorized or unattested diffs must isolate the session via guardian veto
+      - time_rate deviation or affected_object_ratio >= 0.05 must offer private_reality escape
+  switch_mode:
+    summary: Change a session between shared, private, and mixed world-model modes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - mode
+          - requested_by
+          - reason
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          mode:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+          requested_by:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - recorded_at
+          - old_mode
+          - new_mode
+          - requested_by
+          - reason
+          - authority
+          - private_escape_honored
+          - resulting_state_id
+          - audit_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          old_mode:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+          new_mode:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+          requested_by:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+          authority:
+            type: string
+            enum:
+              - consensus
+              - local
+              - broker
+          private_escape_honored:
+            type: boolean
+          resulting_state_id:
+            type: string
+            minLength: 8
+          audit_event_ref:
+            type: string
+            minLength: 1
+  observe_violation:
+    summary: Read the most recent WMS violation or malicious injection report.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - observed_at
+          - violation_detected
+          - classification
+          - guardian_action
+          - requires_council_review
+          - audit_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          observed_at:
+            type: string
+            format: date-time
+          violation_detected:
+            type: boolean
+          classification:
+            type: string
+            enum:
+              - none
+              - minor_diff
+              - major_diff
+              - malicious_inject
+          guardian_action:
+            type: string
+            minLength: 1
+          requires_council_review:
+            type: boolean
+          audit_event_ref:
+            type: string
+events:
+  wms.reconciled:
+    payload:
+      schema_ref: wms_reconcile
+  wms.violation_detected:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - observed_at
+          - violation_detected
+          - classification
+          - guardian_action
+          - requires_council_review
+          - audit_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          observed_at:
+            type: string
+            format: date-time
+          violation_detected:
+            const: true
+          classification:
+            type: string
+            const: malicious_inject
+          guardian_action:
+            type: string
+            const: isolate-session
+          requires_council_review:
+            const: false
+          audit_event_ref:
+            type: string
+            minLength: 1

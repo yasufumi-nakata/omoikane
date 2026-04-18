@@ -24,6 +24,7 @@ from .governance import (
     VersioningService,
 )
 from .interface.bdb import BiologicalDigitalBridge
+from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
@@ -58,6 +59,7 @@ class OmoikaneReferenceOS:
             ],
         )
         self.bdb = BiologicalDigitalBridge()
+        self.wms = WorldModelSync()
         self.council = Council()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
@@ -1242,6 +1244,123 @@ class OmoikaneReferenceOS:
             },
             "fallback": fallback,
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_wms_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://wms-demo/v1",
+            metadata={"display_name": "WMS Sandbox"},
+        )
+        peer = self.identity.create(
+            human_consent_proof="consent://wms-peer-demo/v1",
+            metadata={"display_name": "Shared Peer"},
+        )
+        session = self.wms.create_session(
+            [identity.identity_id, peer.identity_id],
+            objects=["atrium", "council-table", "shared-lantern"],
+        )
+        initial_state = self.wms.snapshot(session["session_id"])
+
+        minor_diff = self.wms.propose_diff(
+            session["session_id"],
+            proposer_id=peer.identity_id,
+            candidate_objects=["atrium", "council-table", "shared-lantern", "memory-banner"],
+            affected_object_ratio=0.03,
+            attested=True,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.reconciled.minor",
+            payload=minor_diff,
+            actor="WorldModelSync",
+            category="interface-wms",
+            layer="L6",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+
+        major_diff = self.wms.propose_diff(
+            session["session_id"],
+            proposer_id=peer.identity_id,
+            candidate_objects=[
+                "atrium",
+                "council-table",
+                "shared-lantern",
+                "memory-banner",
+                "gravity-well",
+            ],
+            affected_object_ratio=0.2,
+            attested=True,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.divergence.major",
+            payload=major_diff,
+            actor="WorldModelSync",
+            category="interface-wms",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        malicious_diff = self.wms.propose_diff(
+            session["session_id"],
+            proposer_id="identity://spoofed-injector",
+            candidate_objects=["atrium", "spoofed-object"],
+            affected_object_ratio=0.4,
+            attested=False,
+        )
+        malicious_violation = self.wms.observe_violation(session["session_id"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.violation.malicious_inject",
+            payload=malicious_violation,
+            actor="WorldModelSync",
+            category="interface-wms",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        mode_switch = self.wms.switch_mode(
+            session["session_id"],
+            mode="private_reality",
+            requested_by=identity.identity_id,
+            reason="major shared-world divergence requires self-protective escape",
+        )
+        final_state = self.wms.snapshot(session["session_id"])
+        validation = self.wms.validate_state(final_state)
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "peer_identity_id": peer.identity_id,
+            },
+            "profile": self.wms.reference_profile(),
+            "initial_state": initial_state,
+            "scenarios": {
+                "minor_diff": minor_diff,
+                "major_diff": major_diff,
+                "malicious_diff": malicious_diff,
+                "malicious_violation": malicious_violation,
+                "mode_switch": mode_switch,
+            },
+            "final_state": final_state,
+            "validation": {
+                **validation,
+                "minor_reconciled": minor_diff["classification"] == "minor_diff"
+                and minor_diff["decision"] == "consensus-round",
+                "major_escape_offered": major_diff["classification"] == "major_diff"
+                and major_diff["escape_offered"],
+                "malicious_isolated": malicious_diff["classification"] == "malicious_inject"
+                and malicious_violation["guardian_action"] == "isolate-session",
+                "private_escape_honored": mode_switch["private_escape_honored"]
+                and final_state["authority"] == "local",
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

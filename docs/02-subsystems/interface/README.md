@@ -23,6 +23,8 @@
 - **共有現実 (shared reality)** ── 多自我が同じ外界モデルを共有
 - **個別現実 (private reality)** ── 自分専用の外界モデル
 - 不整合時の自動退避
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli wms-demo --json`
+  で minor reconcile、major divergence、malicious inject、private reality escape を検証する
 
 ### Sensory Loopback (SL)
 - 感覚出力（音／映像／触覚）のフィードバック
