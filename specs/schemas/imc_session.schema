@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCSession
+type: object
+required:
+  - schema_version
+  - session_id
+  - opened_at
+  - updated_at
+  - participants
+  - mode
+  - status
+  - handshake
+  - message_summaries
+  - disconnect_policy
+  - key_state
+properties:
+  schema_version:
+    const: "1.0"
+  session_id:
+    type: string
+    minLength: 8
+  opened_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  participants:
+    type: array
+    minItems: 2
+    maxItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  mode:
+    type: string
+    enum:
+      - text
+      - voice
+      - presence
+      - affect_share
+      - memory_glimpse
+      - co_imagination
+      - merge_thought
+  status:
+    type: string
+    enum:
+      - open
+      - closed
+  handshake:
+    $ref: ./imc_handshake.schema
+  message_summaries:
+    type: array
+    items:
+      type: object
+      required:
+        - message_id
+        - sender_id
+        - recorded_at
+        - summary
+        - payload_digest
+        - redacted_fields
+      properties:
+        message_id:
+          type: string
+          minLength: 8
+        sender_id:
+          type: string
+          minLength: 1
+        recorded_at:
+          type: string
+          format: date-time
+        summary:
+          type: string
+          minLength: 1
+        payload_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        redacted_fields:
+          type: array
+          items:
+            type: string
+            minLength: 1
+  disconnect_policy:
+    type: object
+    required:
+      - emergency_self_authorized
+      - close_before_notice
+      - council_notify_async
+    properties:
+      emergency_self_authorized:
+        type: boolean
+      close_before_notice:
+        type: boolean
+      council_notify_async:
+        type: boolean
+  key_state:
+    type: string
+    enum:
+      - established
+      - revoked
+  closed_at:
+    type:
+      - string
+      - "null"
+    format: date-time
+  disconnect_reason:
+    type: string
+  last_disconnect:
+    type:
+      - object
+      - "null"
+    required:
+      - session_id
+      - recorded_at
+      - requested_by
+      - reason
+      - status
+      - key_state
+      - close_committed_before_notice
+      - council_notified_async
+      - audit_event_ref
+    properties:
+      session_id:
+        type: string
+        minLength: 8
+      recorded_at:
+        type: string
+        format: date-time
+      requested_by:
+        type: string
+        minLength: 1
+      reason:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        const: closed
+      key_state:
+        type: string
+        const: revoked
+      close_committed_before_notice:
+        type: boolean
+        const: true
+      council_notified_async:
+        type: boolean
+      audit_event_ref:
+        type: string
+        minLength: 1

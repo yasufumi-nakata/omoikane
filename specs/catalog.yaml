@@ -254,6 +254,45 @@ entries:
       - agents/builders/eval-builder.yaml
     rationale: Protects shared reality reconciliation, private reality escape, and guardian isolation for malicious world-state diffs.
   - priority: P1
+    kind: schema
+    file: specs/schemas/imc_handshake.schema
+    consumers:
+      - specs/schemas/imc_session.schema
+      - specs/interfaces/interface.imc.v0.idl
+      - reference-runtime
+    rationale: Required to serialize one fail-closed IMC handshake with disclosure floor and witness metadata.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/imc_message.schema
+    consumers:
+      - specs/schemas/imc_session.schema
+      - specs/interfaces/interface.imc.v0.idl
+      - reference-runtime
+    rationale: Required to serialize redacted IMC deliveries as summary plus digest without leaking raw content.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/imc_session.schema
+    consumers:
+      - specs/interfaces/interface.imc.v0.idl
+      - docs/03-protocols/inter-mind-comm.md
+      - reference-runtime
+    rationale: Required to fix the IMC v0 session state across runtime, docs, and tests.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.imc.v0.idl
+    consumers:
+      - docs/03-protocols/inter-mind-comm.md
+      - docs/02-subsystems/interface/README.md
+      - reference-runtime
+    rationale: Required to make the L6 Inter-Mind Channel boundary machine-readable before collective or merge-thought work lands.
+  - priority: P1
+    kind: eval
+    file: evals/interface/imc_disclosure_floor.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the disclosure floor, sealed-field redaction, and unilateral emergency disconnect at the IMC boundary.
+  - priority: P1
     kind: eval
     file: evals/continuity/continuity_chain_self_modify.yaml
     consumers:

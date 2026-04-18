@@ -17,6 +17,9 @@
 - 他のアップロード自我との通信
 - 公開／親密／秘匿の段階的開示
 - 通信内容は両者の SelfModel に従いフィルタ
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli imc-demo --json`
+  で fail-closed handshake、narrow disclosure floor、summary+digest-only audit、
+  emergency disconnect をまとめて検証する
 
 ### World Model Sync (WMS)
 - 外界状態の同期

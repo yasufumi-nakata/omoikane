@@ -1,0 +1,188 @@
+idl_version: 1
+kind: service
+namespace: interface.imc.v0
+service: InterMindChannelService
+summary: Canonical L6 contract for bounded inter-mind communication with disclosure floors and emergency disconnect.
+imports:
+  imc_session: ../schemas/imc_session.schema
+  imc_handshake: ../schemas/imc_handshake.schema
+  imc_message: ../schemas/imc_message.schema
+operations:
+  open_session:
+    summary: Open one fail-closed IMC session after identity attestation, disclosure-floor derivation, and forward-secrecy key exchange.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - initiator_id
+          - peer_id
+          - mode
+          - initiator_template
+          - peer_template
+          - peer_attested
+          - forward_secrecy
+        properties:
+          initiator_id:
+            type: string
+            minLength: 1
+          peer_id:
+            type: string
+            minLength: 1
+          mode:
+            type: string
+            enum:
+              - text
+              - voice
+              - presence
+              - affect_share
+              - memory_glimpse
+              - co_imagination
+              - merge_thought
+          initiator_template:
+            type: object
+          peer_template:
+            type: object
+          peer_attested:
+            type: boolean
+            const: true
+          forward_secrecy:
+            type: boolean
+            const: true
+          council_witnessed:
+            type: boolean
+            default: false
+    output:
+      schema_ref: imc_session
+    guarantees:
+      - peer_attested and forward_secrecy must both be true or the session must fail closed
+      - memory_glimpse, co_imagination, and merge_thought must require council witness
+      - derived disclosure_profile must adopt the narrower side and never leak sealed_fields
+  send:
+    summary: Deliver one IMC message through the disclosure gate and persist only summary plus payload digest.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - sender_id
+          - summary
+          - payload
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          sender_id:
+            type: string
+            minLength: 1
+          summary:
+            type: string
+            minLength: 1
+          payload:
+            type: object
+    output:
+      schema_ref: imc_message
+    guarantees:
+      - delivered_fields must remain within mode_allowed_fields
+      - redacted_fields must include every sealed or out-of-floor field
+      - continuity artifacts must store summary plus payload digest, not raw content
+  emergency_disconnect:
+    summary: Let either participant close the session unilaterally before any downstream notice is attempted.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - requested_by
+          - reason
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          requested_by:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - recorded_at
+          - requested_by
+          - reason
+          - status
+          - key_state
+          - close_committed_before_notice
+          - council_notified_async
+          - audit_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          requested_by:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+          status:
+            type: string
+            const: closed
+          key_state:
+            type: string
+            const: revoked
+          close_committed_before_notice:
+            type: boolean
+            const: true
+          council_notified_async:
+            type: boolean
+          audit_event_ref:
+            type: string
+            minLength: 1
+  snapshot:
+    summary: Read the current IMC session state including handshake metadata and digest-only message summaries.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: imc_session
+events:
+  imc.session_opened:
+    payload:
+      schema_ref: imc_handshake
+  imc.message_sent:
+    payload:
+      schema_ref: imc_message
+  imc.session_closed:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - status
+          - key_state
+          - close_committed_before_notice
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          status:
+            type: string
+            const: closed
+          key_state:
+            type: string
+            const: revoked
+          close_committed_before_notice:
+            type: boolean
+            const: true

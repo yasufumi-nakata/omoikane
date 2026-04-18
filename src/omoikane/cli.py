@@ -47,6 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bdb_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    imc_parser = subparsers.add_parser(
+        "imc-demo",
+        help="Run the L6 Inter-Mind Channel handshake, disclosure, and disconnect scenario",
+    )
+    imc_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     wms_parser = subparsers.add_parser(
         "wms-demo",
         help="Run the L6 World Model Sync reconciliation and private-escape scenario",
@@ -172,6 +178,10 @@ def main() -> None:
 
     if args.command == "bdb-demo":
         _print_result(runtime.run_bdb_demo(), args.json)
+        return
+
+    if args.command == "imc-demo":
+        _print_result(runtime.run_imc_demo(), args.json)
         return
 
     if args.command == "wms-demo":

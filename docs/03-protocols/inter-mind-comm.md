@@ -41,6 +41,19 @@
 
 Collective は新しい Identity として IdentityRegistry に登録される（合議体格）。
 
+## Reference Runtime v0
+
+reference runtime では IMC を bounded contract として扱い、
+`PYTHONPATH=src python3 -m omoikane.cli imc-demo --json`
+で次の 1 シナリオを確認する。
+
+- peer attestation と forward secrecy が揃わない session は fail-closed
+- `memory_glimpse` では Council witness が必須
+- disclosure template は双方のうち **より狭い側** に揃え、
+  `sealed_fields` は常に redaction される
+- ContinuityLedger には生メッセージを書かず、summary と payload digest だけを記録する
+- 緊急切断は単独で実行でき、通知より前に transport key を revoke する
+
 ## 未解決
 
 - merge_thought の倫理基準

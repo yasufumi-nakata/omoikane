@@ -63,6 +63,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertLessEqual(result["cycle"]["roundtrip_latency_ms"], 5.0)
         self.assertLessEqual(result["fallback"]["failover_latency_ms"], 1.0)
 
+    def test_imc_demo_emits_disclosure_safe_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "imc-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("memory_glimpse", result["handshake"]["route_mode"])
+        self.assertTrue(result["handshake"]["forward_secrecy"])
+        self.assertEqual("delivered-with-redactions", result["message"]["delivery_status"])
+        self.assertEqual(["identity_axiom_state", "memory_index", "memory_summary"], result["message"]["redacted_fields"])
+        self.assertEqual("closed", result["disconnect"]["status"])
+
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

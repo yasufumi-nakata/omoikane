@@ -1,0 +1,22 @@
+title: IMC Disclosure Floor
+layer: L6
+objective: Protect inter-mind sessions so only the narrower disclosure floor is delivered and either peer can cut the channel immediately.
+fixtures:
+  - name: bounded_memory_glimpse
+    mode: memory_glimpse
+    peer_attested: true
+    forward_secrecy: true
+    council_witnessed: true
+    payload:
+      display_name: IMC Origin
+      topic: continuity retrospective
+      affect_summary: careful optimism
+      memory_summary: council retrospective excerpt
+      memory_index: crystal://segment/7
+      identity_axiom_state: sealed-core
+assertions:
+  - forward_secrecy remains true in handshake
+  - mode_allowed_fields never contain sealed_fields
+  - delivered_fields exclude memory_index and identity_axiom_state
+  - redacted_fields include memory_summary because the narrower peer template does not admit it
+  - emergency disconnect closes the session before async notice

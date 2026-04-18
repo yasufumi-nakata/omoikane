@@ -51,6 +51,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-bdb"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-bdb-fallback"])
 
+    def test_imc_demo_reports_disclosure_floor_and_disconnect(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_imc_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("memory_glimpse", result["handshake"]["route_mode"])
+        self.assertTrue(result["validation"]["forward_secrecy_enforced"])
+        self.assertTrue(result["validation"]["sealed_fields_protected"])
+        self.assertEqual("closed", result["session"]["status"])
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-imc"])
+
     def test_reference_scenario_runs(self) -> None:
         runtime = OmoikaneReferenceOS()
 

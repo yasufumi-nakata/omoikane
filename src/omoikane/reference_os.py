@@ -24,6 +24,7 @@ from .governance import (
     VersioningService,
 )
 from .interface.bdb import BiologicalDigitalBridge
+from .interface.imc import InterMindChannel
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -59,6 +60,7 @@ class OmoikaneReferenceOS:
             ],
         )
         self.bdb = BiologicalDigitalBridge()
+        self.imc = InterMindChannel()
         self.wms = WorldModelSync()
         self.council = Council()
         self.task_graph = TaskGraphService()
@@ -1243,6 +1245,122 @@ class OmoikaneReferenceOS:
                 "decrease": decrease,
             },
             "fallback": fallback,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_imc_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://imc-demo/v1",
+            metadata={"display_name": "IMC Origin"},
+        )
+        peer = self.identity.create(
+            human_consent_proof="consent://imc-peer-demo/v1",
+            metadata={"display_name": "Shared Peer"},
+        )
+        session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer.identity_id,
+            mode="memory_glimpse",
+            initiator_template={
+                "public_fields": ["display_name", "presence_state", "topic"],
+                "intimate_fields": ["affect_summary", "memory_summary"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "topic"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state", "memory_index"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        message = self.imc.send(
+            session["session_id"],
+            sender_id=identity.identity_id,
+            summary="限定的な感情サマリだけを共有し、深い自己公理と記憶索引は遮断する",
+            payload={
+                "display_name": "IMC Origin",
+                "topic": "continuity retrospective",
+                "affect_summary": "careful optimism",
+                "memory_summary": "council retrospective excerpt",
+                "memory_index": "crystal://segment/7",
+                "identity_axiom_state": "sealed-core",
+            },
+        )
+        disconnect = self.imc.emergency_disconnect(
+            session["session_id"],
+            requested_by=identity.identity_id,
+            reason="self-initiated withdrawal after bounded glimpse exchange",
+        )
+        final_session = self.imc.snapshot(session["session_id"])
+        validation = self.imc.validate_session(final_session)
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="imc.session.opened",
+            payload={
+                "session_id": session["session_id"],
+                "mode": session["mode"],
+                "handshake_id": session["handshake"]["handshake_id"],
+                "forward_secrecy": session["handshake"]["forward_secrecy"],
+                "council_witnessed": session["handshake"]["council_witnessed"],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="imc.message.sent",
+            payload={
+                "message_id": message["message_id"],
+                "session_id": message["session_id"],
+                "summary": message["summary"],
+                "payload_digest": message["payload_digest"],
+                "redacted_fields": message["redacted_fields"],
+                "delivery_status": message["delivery_status"],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="imc.emergency.disconnect",
+            payload={
+                "session_id": disconnect["session_id"],
+                "requested_by": disconnect["requested_by"],
+                "reason": disconnect["reason"],
+                "status": disconnect["status"],
+                "key_state": disconnect["key_state"],
+                "close_committed_before_notice": disconnect["close_committed_before_notice"],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "peer_identity_id": peer.identity_id,
+            },
+            "profile": self.imc.reference_profile(),
+            "handshake": final_session["handshake"],
+            "message": message,
+            "disconnect": disconnect,
+            "session": final_session,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

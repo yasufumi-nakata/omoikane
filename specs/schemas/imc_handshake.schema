@@ -1,0 +1,92 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCHandshake
+type: object
+required:
+  - schema_version
+  - handshake_id
+  - session_id
+  - verified_peer_id
+  - recorded_at
+  - attestation_status
+  - forward_secrecy
+  - route_mode
+  - council_witness_required
+  - council_witnessed
+  - disclosure_profile
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  handshake_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  verified_peer_id:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  attestation_status:
+    type: string
+    const: verified
+  forward_secrecy:
+    type: boolean
+    const: true
+  route_mode:
+    type: string
+    enum:
+      - text
+      - voice
+      - presence
+      - affect_share
+      - memory_glimpse
+      - co_imagination
+      - merge_thought
+  council_witness_required:
+    type: boolean
+  council_witnessed:
+    type: boolean
+  disclosure_profile:
+    type: object
+    required:
+      - public_fields
+      - intimate_fields
+      - sealed_fields
+      - mode_allowed_fields
+      - share_topology
+      - council_witness_required
+      - council_witnessed
+    properties:
+      public_fields:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      intimate_fields:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      sealed_fields:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      mode_allowed_fields:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      share_topology:
+        type: string
+        minLength: 1
+      council_witness_required:
+        type: boolean
+      council_witnessed:
+        type: boolean
+  audit_event_ref:
+    type: string
+    minLength: 1

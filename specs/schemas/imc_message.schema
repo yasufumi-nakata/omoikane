@@ -1,0 +1,63 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCMessage
+type: object
+required:
+  - schema_version
+  - message_id
+  - session_id
+  - sender_id
+  - recorded_at
+  - mode
+  - summary
+  - delivered_fields
+  - redacted_fields
+  - payload_digest
+  - delivery_status
+  - continuity_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  message_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  sender_id:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  mode:
+    type: string
+    enum:
+      - text
+      - voice
+      - presence
+      - affect_share
+      - memory_glimpse
+      - co_imagination
+      - merge_thought
+  summary:
+    type: string
+    minLength: 1
+  delivered_fields:
+    type: object
+    additionalProperties: true
+  redacted_fields:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  payload_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  delivery_status:
+    type: string
+    enum:
+      - delivered
+      - delivered-with-redactions
+  continuity_event_ref:
+    type: string
+    minLength: 1
