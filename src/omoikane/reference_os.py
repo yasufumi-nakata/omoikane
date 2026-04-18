@@ -16,7 +16,7 @@ from .cognitive import (
     ReasoningService,
     SymbolicReasoningBackend,
 )
-from .governance import AmendmentService, AmendmentSignatures, OversightService
+from .governance import AmendmentService, AmendmentSignatures, OversightService, VersioningService
 from .interface.bdb import BiologicalDigitalBridge
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -57,6 +57,7 @@ class OmoikaneReferenceOS:
         self.trust = TrustService()
         self.amendment = AmendmentService()
         self.oversight = OversightService(trust_service=self.trust)
+        self.versioning = VersioningService()
         self.gap_scanner = GapScanner()
         self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
@@ -331,6 +332,17 @@ class OmoikaneReferenceOS:
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
         return self.gap_scanner.scan(repo_root)
+
+    def run_version_demo(self) -> Dict[str, Any]:
+        repo_root = Path(__file__).resolve().parents[2]
+        manifest = self.versioning.build_release_manifest(repo_root)
+        validation = self.versioning.validate_release_manifest(repo_root, manifest)
+        return {
+            "policy": self.versioning.policy_snapshot(repo_root),
+            "manifest": manifest,
+            "validation": validation,
+            "release_digest": self.versioning.release_digest(manifest),
+        }
 
     def run_amendment_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(

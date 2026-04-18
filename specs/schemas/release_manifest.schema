@@ -1,0 +1,125 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/release_manifest.schema"
+title: ReleaseManifest
+description: Aggregated runtime, IDL, and regulation versions for one OmoikaneOS release snapshot.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - manifest_id
+  - generated_at
+  - runtime_version
+  - runtime_stability
+  - regulation_calver
+  - idl_versions
+  - schema_versions
+  - catalog_snapshot
+  - notes
+properties:
+  kind:
+    const: release_manifest
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  manifest_id:
+    type: string
+    minLength: 8
+  generated_at:
+    type: string
+    format: date-time
+  runtime_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  runtime_stability:
+    type: string
+    enum:
+      - bootstrap
+      - stable
+      - frozen
+  regulation_calver:
+    type: string
+    pattern: "^[0-9]{4}\\.[0-9]{2}(\\+rev[0-9]+)?$"
+  idl_versions:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - semver
+        - stability
+      properties:
+        semver:
+          type: string
+          pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        stability:
+          type: string
+          enum:
+            - bootstrap
+            - stable
+            - frozen
+  schema_versions:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - semver
+        - stability
+      properties:
+        semver:
+          type: string
+          pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        stability:
+          type: string
+          enum:
+            - bootstrap
+            - stable
+            - frozen
+  catalog_snapshot:
+    type: object
+    additionalProperties: false
+    required:
+      - calver
+      - sha256
+    properties:
+      calver:
+        type: string
+        pattern: "^[0-9]{4}\\.[0-9]{2}(\\+rev[0-9]+)?$"
+      sha256:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  notes:
+    type: array
+    items:
+      type: string
+      minLength: 1
+examples:
+  - kind: release_manifest
+    schema_version: 1.0.0
+    manifest_id: release-2026-04-18
+    generated_at: "2026-04-18T17:00:00Z"
+    runtime_version: 0.3.0
+    runtime_stability: bootstrap
+    regulation_calver: "2026.04"
+    idl_versions:
+      agentic.council.v0:
+        semver: 0.1.0
+        stability: bootstrap
+      interface.bdb.v0:
+        semver: 0.1.0
+        stability: bootstrap
+    schema_versions:
+      specs/schemas/release_manifest.schema:
+        semver: 1.0.0
+        stability: bootstrap
+      specs/schemas/trust_snapshot.schema:
+        semver: 1.0.0
+        stability: bootstrap
+    catalog_snapshot:
+      calver: "2026.04"
+      sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    notes:
+      - bootstrap release; all contracts subject to MAJOR change

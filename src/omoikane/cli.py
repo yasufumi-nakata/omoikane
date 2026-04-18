@@ -23,6 +23,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     amendment_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    version_parser = subparsers.add_parser(
+        "version-demo",
+        help="Emit the hybrid semver/calver release manifest for the reference runtime",
+    )
+    version_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     connectome_parser = subparsers.add_parser(
         "connectome-demo",
         help="Emit a reference L2 connectome snapshot and validation summary",
@@ -138,6 +144,10 @@ def main() -> None:
 
     if args.command == "amendment-demo":
         _print_result(runtime.run_amendment_demo(), args.json)
+        return
+
+    if args.command == "version-demo":
+        _print_result(runtime.run_version_demo(), args.json)
         return
 
     if args.command == "connectome-demo":

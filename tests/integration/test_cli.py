@@ -10,6 +10,20 @@ from omoikane.cli import main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_version_demo_emits_release_manifest(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "version-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("0.1.0", result["manifest"]["runtime_version"])
+        self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
+        self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
+        self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])
+        self.assertIn("specs/schemas/release_manifest.schema", result["manifest"]["schema_versions"])
+
     def test_amendment_demo_emits_freeze_and_guarded_rollouts(self) -> None:
         stdout = io.StringIO()
 

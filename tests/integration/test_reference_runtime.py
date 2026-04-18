@@ -7,6 +7,23 @@ from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class ReferenceRuntimeTests(unittest.TestCase):
+    def test_version_demo_emits_release_manifest(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_version_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("0.1.0", result["manifest"]["runtime_version"])
+        self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
+        self.assertEqual("2026.04", result["manifest"]["catalog_snapshot"]["calver"])
+        self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])
+        self.assertIn(
+            "specs/schemas/release_manifest.schema",
+            result["manifest"]["schema_versions"],
+        )
+        self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
+        self.assertEqual(64, len(result["release_digest"]))
+
     def test_amendment_demo_reports_constitutional_freeze(self) -> None:
         runtime = OmoikaneReferenceOS()
 

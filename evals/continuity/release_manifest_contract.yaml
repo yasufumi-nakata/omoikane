@@ -1,0 +1,19 @@
+eval_id: release_manifest_contract
+target: governance.versioning
+level: L4
+description: >
+  release manifest が runtime semver、IDL/schema stability、catalog snapshot hash を
+  一貫して保持し、reference runtime の hybrid versioning policy を壊さないこと
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli version-demo --json
+expected:
+  validation_ok: true
+  runtime_version_semver: true
+  runtime_stability: bootstrap
+  regulation_calver: "2026.04"
+  catalog_hash_matches: true
+  idl_major_alignment: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

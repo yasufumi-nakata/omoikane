@@ -22,7 +22,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] 規約改正フローの実体（2026-04-18: `governance.amendment.v0` / `amendment-demo` / `amendment_constitutional_freeze` を追加し、T-Core freeze と下位 tier の guarded rollout 条件を固定）
 - [x] 多 Council 化のトリガ条件（2026-04-18: `agentic.council.v0` に Federation/Heritage convene contract を追加し、`council_topology.schema`・`multi-council-demo`・agentic eval へ反映）
 - [x] Guardian の人間による監督方式（2026-04-18: `governance.oversight.v0` / `oversight-demo` / `guardian_pin_breach_propagation` を追加し、breach 時に human pin を剥がす reference runtime を固定）
-- [ ] OS バージョン管理の semver か独自か
+- [x] OS バージョン管理の semver か独自か（2026-04-18: hybrid policy として runtime=semver / governance=calver / catalog=calver+sha256 を固定し、`release_manifest.schema`・`VersioningService`・`version-demo`・`evals/continuity/release_manifest_contract.yaml` を追加）
 
 ## ドキュメント上の未確定
 

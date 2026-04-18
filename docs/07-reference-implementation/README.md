@@ -19,6 +19,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 ```bash
 PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli amendment-demo --json
+PYTHONPATH=src python3 -m omoikane.cli version-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
@@ -103,6 +104,10 @@ source event を保持したまま最大 3 件ずつ segment 化する manifest 
 `latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
 coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 をまとめて確認する。
+
+`version-demo` は hybrid versioning policy を JSON で可視化し、
+runtime semver、IDL/schema の `bootstrap` stability、governance calver、
+`specs/catalog.yaml` の sha256 snapshot を 1 つの manifest に集約して確認する。
 
 ## 今後広げる面
 
