@@ -208,6 +208,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(250, result["qualia"]["profile"]["sampling_window_ms"])
         self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
 
+    def test_affect_demo_emits_smoothed_failover_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "affect-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("stability_guard_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["smoothed"])
+        self.assertTrue(result["validation"]["consent_preserved"])
+        self.assertEqual("observe", result["validation"]["recommended_guard"])
+
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
 

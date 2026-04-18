@@ -187,6 +187,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
+    def test_affect_demo_records_smoothed_failover(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_affect_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("stability_guard_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["continuity_guard_preserved"])
+        self.assertTrue(result["validation"]["smoothed"])
+        self.assertTrue(result["validation"]["consent_preserved"])
+        self.assertEqual("observe", result["validation"]["recommended_guard"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
     def test_qualia_demo_reports_reference_sampling_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
 

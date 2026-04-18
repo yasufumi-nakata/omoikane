@@ -276,6 +276,30 @@ entries:
       - docs/02-subsystems/interface/wms-spec.md
     rationale: Required to fix the L6 World Model Sync adapter contract across docs, CLI, and runtime.
   - priority: P1
+    kind: schema
+    file: specs/schemas/affect_state.schema
+    consumers:
+      - specs/interfaces/cognitive.affect.v0.idl
+      - docs/02-subsystems/cognitive/affect.md
+      - reference-runtime
+    rationale: Required to serialize bounded affect states with fixed smoothing deltas and consent guardrails.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/affect_transition.schema
+    consumers:
+      - specs/interfaces/cognitive.affect.v0.idl
+      - evals/cognitive/affect_failover.yaml
+      - reference-runtime
+    rationale: Required to emit ledger-safe affect failover summaries without raw affective payload leakage.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.affect.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/affect.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to fix the L3 affect failover and continuity smoothing contract across docs, CLI, and runtime.
+  - priority: P1
     kind: eval
     file: evals/cognitive/qualia_contract.yaml
     consumers:
@@ -296,6 +320,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects safe reasoning fallback and ledger evidence when the primary backend becomes unavailable.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/affect_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects single-switch affect fallback, continuity smoothing, and no-dampening-without-consent.
   - priority: P1
     kind: eval
     file: evals/interface/wms_private_reality_escape.yaml

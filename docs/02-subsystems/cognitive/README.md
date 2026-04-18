@@ -45,6 +45,13 @@ ContinuityLedger に `cognitive.reasoning.failover` として記録する。
 繰り返し failover や policy 変更は L4 Council の審査対象とし、
 通常運転では primary のみをアクティブに保つ。
 
+`Affect` は次段として `smooth-affect-failover-v1` を採用し、
+`homeostatic_v1 -> stability_guard_v1` の単純 failover と
+bounded continuity smoothing を持つ。
+raw `valence / arousal / clarity` をそのまま飛ばさず、
+`max_valence_delta=0.22` / `max_arousal_delta=0.26` の範囲で遷移させ、
+本人同意なしの artificial dampening を禁止する。
+
 ## 多実装結果の調停
 
 複数 backend が同時に走る場合（A/B 検証や信頼度向上目的）、調停は L4 Council が行う。
@@ -67,7 +74,13 @@ ContinuityLedger に `cognitive.reasoning.failover` として記録する。
 ## Reference runtime の現在地
 
 現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
-health-based failover を持つ。その他の cognitive surface は引き続き
+health-based failover を持つ。`Affect` も bounded failover と smoothing を持つが、
+その他の cognitive surface は引き続き
 `QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
 そのため [evals/cognitive/](../../../evals/cognitive/) では
-qualia/self-model baseline に加え、reasoning failover を最小の L3 eval として扱う。
+qualia/self-model baseline に加え、reasoning failover と affect failover を
+最小の L3 eval として扱う。
+
+## サブドキュメント
+
+- [affect.md](affect.md) ── L3 affect failover と continuity smoothing

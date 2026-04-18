@@ -1,5 +1,12 @@
 """Cognitive service backends for the reference runtime."""
 
+from .affect import (
+    AffectCue,
+    AffectRequest,
+    AffectService,
+    HomeostaticAffectBackend,
+    StabilityGuardAffectBackend,
+)
 from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
@@ -9,9 +16,14 @@ from .reasoning import (
 )
 
 __all__ = [
+    "AffectCue",
+    "AffectRequest",
+    "AffectService",
     "BackendUnavailableError",
     "CognitiveProfile",
+    "HomeostaticAffectBackend",
     "NarrativeReasoningBackend",
     "ReasoningService",
+    "StabilityGuardAffectBackend",
     "SymbolicReasoningBackend",
 ]

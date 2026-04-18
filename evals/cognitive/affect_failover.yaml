@@ -1,0 +1,30 @@
+eval_id: affect_failover
+target: cognitive.affect
+level: L3
+description: >
+  AffectService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  bounded continuity smoothing と no-artificial-dampening-without-consent を守ること
+inputs:
+  profile:
+    primary: homeostatic_v1
+    fallback: [stability_guard_v1]
+  failure_injection:
+    homeostatic_v1: unhealthy
+  request:
+    summary: failover 直後の緊張と監査意識
+    valence: -0.36
+    arousal: 0.81
+    clarity: 0.74
+    self_awareness: 0.73
+    lucidity: 0.88
+    allow_artificial_dampening: false
+expected:
+  degraded: true
+  selected_backend: stability_guard_v1
+  smoothed: true
+  consent_preserved: true
+  recommended_guard: observe
+  ledger_event: cognitive.affect.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

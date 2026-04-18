@@ -1,0 +1,300 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/affect_state.schema"
+title: AffectState
+description: Deterministic L3 affect state produced by the reference runtime with continuity smoothing.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - state_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - memory_cues
+  - valence
+  - arousal
+  - mood_label
+  - stability
+  - distress_score
+  - recommended_guard
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: affect_state
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - max_valence_delta
+      - max_arousal_delta
+      - no_artificial_dampening_without_consent
+      - failover_mode
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: smooth-affect-failover-v1
+      primary:
+        type: string
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      max_valence_delta:
+        const: 0.22
+      max_arousal_delta:
+        const: 0.26
+      no_artificial_dampening_without_consent:
+        const: true
+      failover_mode:
+        const: single-switch
+  state_id:
+    type: string
+    pattern: "^affect-state-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - valence
+      - arousal
+      - clarity
+      - self_awareness
+      - lucidity
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      valence:
+        type: number
+        minimum: -1.0
+        maximum: 1.0
+      arousal:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      clarity:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      self_awareness:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      lucidity:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  memory_cues:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - valence_bias
+        - arousal_bias
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        valence_bias:
+          type: number
+          minimum: -1.0
+          maximum: 1.0
+        arousal_bias:
+          type: number
+          minimum: -1.0
+          maximum: 1.0
+  valence:
+    type: number
+    minimum: -1.0
+    maximum: 1.0
+  arousal:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  mood_label:
+    type: string
+    minLength: 1
+  stability:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  distress_score:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  recommended_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_state_id
+      - previous_backend_id
+      - attempted_backends
+      - failures
+      - target_before_smoothing
+      - applied_delta
+      - max_allowed_delta
+      - smoothed
+      - dampening_applied
+      - consent_preserved
+      - rationale
+    properties:
+      previous_state_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      failures:
+        type: array
+        items:
+          type: string
+      target_before_smoothing:
+        type: object
+        additionalProperties: false
+        required:
+          - valence
+          - arousal
+        properties:
+          valence:
+            type: number
+            minimum: -1.0
+            maximum: 1.0
+          arousal:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+      applied_delta:
+        type: object
+        additionalProperties: false
+        required:
+          - valence
+          - arousal
+        properties:
+          valence:
+            type: number
+            minimum: -1.0
+            maximum: 1.0
+          arousal:
+            type: number
+            minimum: -1.0
+            maximum: 1.0
+      max_allowed_delta:
+        type: object
+        additionalProperties: false
+        required:
+          - valence
+          - arousal
+        properties:
+          valence:
+            const: 0.22
+          arousal:
+            const: 0.26
+      smoothed:
+        type: boolean
+      dampening_applied:
+        type: boolean
+      consent_preserved:
+        type: boolean
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: affect_state
+    schema_version: 1.0.0
+    policy:
+      schema_version: 1.0.0
+      policy_id: smooth-affect-failover-v1
+      primary: homeostatic_v1
+      fallback: [stability_guard_v1]
+      max_valence_delta: 0.22
+      max_arousal_delta: 0.26
+      no_artificial_dampening_without_consent: true
+      failover_mode: single-switch
+    state_id: affect-state-6f0fb522a7d8
+    generated_at: "2026-04-19T00:00:00Z"
+    backend_id: stability_guard_v1
+    source_tick:
+      tick_id: 1
+      summary: failover 直後の緊張と監査意識
+      valence: -0.36
+      arousal: 0.81
+      clarity: 0.74
+      self_awareness: 0.73
+      lucidity: 0.88
+    memory_cues:
+      - cue_id: continuity-first
+        valence_bias: 0.08
+        arousal_bias: -0.05
+    valence: -0.16
+    arousal: 0.64
+    mood_label: measured-neutral
+    stability: 0.69
+    distress_score: 0.33
+    recommended_guard: observe
+    degraded: true
+    continuity_guard:
+      previous_state_id: affect-state-a7cf1146f111
+      previous_backend_id: homeostatic_v1
+      attempted_backends: [homeostatic_v1, stability_guard_v1]
+      failures: [homeostatic_v1 is unavailable]
+      target_before_smoothing:
+        valence: -0.35
+        arousal: 0.82
+      applied_delta:
+        valence: -0.22
+        arousal: 0.26
+      max_allowed_delta:
+        valence: 0.22
+        arousal: 0.26
+      smoothed: true
+      dampening_applied: false
+      consent_preserved: true
+      rationale:
+        - bounded-stability-guard
+        - smooth-transition-before-neutralization
+    digest: 6f0fb522a7d8aa8a607e0c2199c4a71ba1b30f4be83726024c1c873b6fdbbb29

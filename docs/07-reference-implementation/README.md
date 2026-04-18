@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning failover、L6 BDB の bounded viability contract を扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning/affect failover、L6 BDB の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -41,6 +41,7 @@ PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
+PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
@@ -151,6 +152,14 @@ validated preview を `human-approved-procedural-writeback-v1` で copied
 2 名の human reviewer quorum、continuity diff metadata、
 rollback token、`procedural-writeback` ledger event を確認する。
 
+`affect-demo` は L3 affect failover の reference contract
+(`cognitive.affect.v0`) を JSON で可視化し、
+`homeostatic_v1` baseline から `stability_guard_v1` fallback への
+single-switch failover、`max_valence_delta=0.22` /
+`max_arousal_delta=0.26` の continuity smoothing、
+本人同意なしの artificial dampening 不可、
+`cognitive.affect.failover` ledger event を確認する。
+
 `bdb-demo` は L6 Biological-Digital Bridge の reference contract
 (`interface.bdb.v0`) を JSON で可視化し、
 `latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
@@ -186,7 +195,7 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- L3 reasoning 以外の cognitive backends と cross-service failover
+- L3 attention / volition / imagination の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
 - AscensionScheduler の臨床・法務向け attest / witness / consent artifact 接続

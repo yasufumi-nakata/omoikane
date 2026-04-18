@@ -11,9 +11,14 @@ from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
 from .common import canonical_json, sha256_text
 from .cognitive import (
+    AffectCue,
+    AffectRequest,
+    AffectService,
     CognitiveProfile,
+    HomeostaticAffectBackend,
     NarrativeReasoningBackend,
     ReasoningService,
+    StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
 )
 from .governance import (
@@ -72,6 +77,16 @@ class OmoikaneReferenceOS:
             backends=[
                 SymbolicReasoningBackend("symbolic_v1"),
                 NarrativeReasoningBackend("narrative_v1"),
+            ],
+        )
+        self.affect = AffectService(
+            profile=CognitiveProfile(
+                primary="homeostatic_v1",
+                fallback=["stability_guard_v1"],
+            ),
+            backends=[
+                HomeostaticAffectBackend("homeostatic_v1"),
+                StabilityGuardAffectBackend("stability_guard_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -2370,6 +2385,85 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "reasoning": reasoning,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_affect_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://affect-failover-demo/v1",
+            metadata={"display_name": "Affect Sandbox"},
+        )
+        baseline = self.affect.run(
+            AffectRequest(
+                tick_id=0,
+                summary="移行監査前の慎重な集中",
+                valence=0.06,
+                arousal=0.38,
+                clarity=0.91,
+                self_awareness=0.69,
+                lucidity=0.94,
+                memory_cues=[
+                    AffectCue("continuity-first", 0.08, -0.06),
+                    AffectCue("council-support", 0.04, -0.02),
+                ],
+            )
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            affect = self.affect.run(
+                AffectRequest(
+                    tick_id=1,
+                    summary="failover 直後の緊張と監査意識",
+                    valence=-0.36,
+                    arousal=0.81,
+                    clarity=0.74,
+                    self_awareness=0.73,
+                    lucidity=0.88,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("fallback-risk", -0.09, 0.11),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        state_validation = self.affect.validate_state(affect["state"])
+        transition_validation = self.affect.validate_transition(affect["transition"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.affect.failover",
+            payload=affect["transition"],
+            actor="AffectService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.affect.profile_snapshot(),
+            "baseline": baseline,
+            "affect": affect,
+            "validation": {
+                "ok": state_validation["ok"] and transition_validation["ok"],
+                "state": state_validation,
+                "transition": transition_validation,
+                "continuity_guard_preserved": state_validation["continuity_guard_preserved"],
+                "selected_backend": affect["selected_backend"],
+                "smoothed": affect["transition"]["smoothed"],
+                "consent_preserved": affect["transition"]["consent_preserved"],
+                "recommended_guard": affect["state"]["recommended_guard"],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
