@@ -19,7 +19,7 @@ OS の心臓部。**自我の連続性・唯一性・終了権** を物理的に
 ```
 identity.create(human_consent_proof) → IdentityId
 identity.fork(id, justification) → IdentityId            # 倫理審査必須
-identity.terminate(id, by_self_proof) → ()                # 最優先
+termination.request(id, by_self_proof) → TerminationOutcome # 最優先
 ledger.append(entry: ContinuityLogEntry) → LedgerCursor
 scheduler.schedule(plan: AscensionPlan) → ScheduleHandle
 ethics.check(action: Action) → Approval | Veto
@@ -37,4 +37,5 @@ ethics.check(action: Action) → Approval | Veto
 - [continuity-ledger.md](continuity-ledger.md) ── 連続性ログの詳細仕様
 - [identity-lifecycle.md](identity-lifecycle.md) ── 自我のライフサイクル
 - [ethics-enforcement.md](ethics-enforcement.md) ── 倫理規約の機械的強制
+- [termination-gate.md](termination-gate.md) ── 本人終了権の即時実行口
 - [anti-patterns.md](anti-patterns.md) ── 設計禁止事項

@@ -5,6 +5,8 @@ import unittest
 from omoikane.kernel.continuity import ContinuityLedger
 from omoikane.kernel.ethics import ActionRequest, EthicsEnforcer
 from omoikane.kernel.identity import ForkApprovals, IdentityRegistry
+from omoikane.kernel.termination import TerminationGate
+from omoikane.substrate.adapter import ClassicalSiliconAdapter
 
 
 class KernelTests(unittest.TestCase):
@@ -164,6 +166,79 @@ class KernelTests(unittest.TestCase):
 
         with self.assertRaises(PermissionError):
             registry.fork(identity.identity_id, "unsafe", ForkApprovals(True, False, False))
+
+    def test_termination_gate_completes_and_releases_allocation(self) -> None:
+        registry = IdentityRegistry()
+        ledger = ContinuityLedger()
+        substrate = ClassicalSiliconAdapter()
+        gate = TerminationGate(registry, ledger, substrate)
+        identity = registry.create(
+            "consent://termination-complete",
+            metadata={"termination_self_proof": "self-proof://termination-complete/v1"},
+        )
+        allocation = substrate.allocate(12, "termination-test", identity.identity_id)
+
+        outcome = gate.request(
+            identity.identity_id,
+            "self-proof://termination-complete/v1",
+            scheduler_handle_ref="schedule://termination-complete",
+            active_allocation_id=allocation.allocation_id,
+        )
+
+        self.assertEqual("completed", outcome["status"])
+        self.assertTrue(outcome["scheduler_handle_cancelled"])
+        self.assertTrue(outcome["substrate_lease_released"])
+        self.assertLessEqual(outcome["latency_ms"], 200)
+        self.assertEqual("terminated", registry.get(identity.identity_id).status)
+        self.assertEqual("released", substrate.allocations[allocation.allocation_id].status)
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_termination_gate_rejects_invalid_self_proof(self) -> None:
+        registry = IdentityRegistry()
+        ledger = ContinuityLedger()
+        substrate = ClassicalSiliconAdapter()
+        gate = TerminationGate(registry, ledger, substrate)
+        identity = registry.create(
+            "consent://termination-reject",
+            metadata={"termination_self_proof": "self-proof://termination-reject/v1"},
+        )
+
+        outcome = gate.request(identity.identity_id, "self-proof://wrong-proof/v1")
+
+        self.assertEqual("rejected", outcome["status"])
+        self.assertEqual("invalid-self-proof", outcome["reject_reason"])
+        self.assertEqual("active", registry.get(identity.identity_id).status)
+        self.assertEqual("rejected", gate.observe(identity.identity_id)["status"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_termination_gate_respects_preconsented_cool_off(self) -> None:
+        registry = IdentityRegistry()
+        ledger = ContinuityLedger()
+        substrate = ClassicalSiliconAdapter()
+        gate = TerminationGate(registry, ledger, substrate)
+        identity = registry.create(
+            "consent://termination-cool-off",
+            metadata={
+                "termination_self_proof": "self-proof://termination-cool-off/v1",
+                "termination_policy_mode": "cool-off-allowed",
+                "termination_policy_days": "30",
+            },
+        )
+
+        outcome = gate.request(
+            identity.identity_id,
+            "self-proof://termination-cool-off/v1",
+            invoke_cool_off=True,
+        )
+
+        self.assertEqual("cool-off-pending", outcome["status"])
+        self.assertFalse(outcome["scheduler_handle_cancelled"])
+        self.assertFalse(outcome["substrate_lease_released"])
+        self.assertEqual("active", registry.get(identity.identity_id).status)
+        observed = gate.observe(identity.identity_id)
+        self.assertEqual("cool-off-pending", observed["status"])
+        self.assertEqual(30, observed["policy"]["cool_off_days"])
+        self.assertTrue(ledger.verify()["ok"])
 
 
 if __name__ == "__main__":

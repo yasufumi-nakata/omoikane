@@ -163,6 +163,31 @@ entries:
       - reference-runtime
     rationale: Continuity ledger contract.
   - priority: P1
+    kind: schema
+    file: specs/schemas/termination_request.schema
+    consumers:
+      - specs/interfaces/kernel.termination.v0.idl
+      - docs/02-subsystems/kernel/termination-gate.md
+      - reference-runtime
+    rationale: Required to serialize self-issued termination requests, including preconsented cool-off invocation.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/termination_outcome.schema
+    consumers:
+      - specs/interfaces/kernel.termination.v0.idl
+      - docs/02-subsystems/kernel/termination-gate.md
+      - reference-runtime
+      - evals/performance/termination_latency.yaml
+    rationale: Required to persist completed, rejected, and cool-off-pending termination outcomes with bounded latency evidence.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/kernel.termination.v0.idl
+    consumers:
+      - docs/02-subsystems/kernel/termination-gate.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L1 termination gate machine-readable before scheduler cancellation and richer lifecycle orchestration land.
+  - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.patch_generator.v0.idl
     consumers:
@@ -337,6 +362,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects attestation, migration, and release continuity at the L0 boundary.
+  - priority: P1
+    kind: eval
+    file: evals/performance/termination_latency.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/termination-gate.md
+    rationale: Protects the TerminationGate latency budget, self-proof verification, and immediate release path.
   - priority: P1
     kind: eval
     file: evals/agentic/council_timeout_fallback.yaml

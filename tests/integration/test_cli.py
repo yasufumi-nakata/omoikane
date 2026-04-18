@@ -241,6 +241,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("veto", result["rule_explanation"]["outcome"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_termination_demo_emits_immediate_and_cool_off_paths(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "termination-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["completed_within_budget"])
+        self.assertTrue(result["validation"]["cool_off_pending"])
+        self.assertTrue(result["validation"]["invalid_self_proof_rejected"])
+        self.assertEqual("completed", result["outcomes"]["completed"]["status"])
+        self.assertEqual("cool-off-pending", result["outcomes"]["cool_off"]["status"])
+        self.assertEqual("invalid-self-proof", result["outcomes"]["rejected"]["reject_reason"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

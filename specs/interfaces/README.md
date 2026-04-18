@@ -4,6 +4,7 @@
 
 - `substrate.adapter.v0.idl`
 - `kernel.identity.v0.idl`
+- `kernel.termination.v0.idl`
 - `kernel.continuity.v0.idl`
 - `kernel.ethics.v0.idl`
 - `mind.qualia.v0.idl`
@@ -23,7 +24,7 @@
 
 ## 次段階
 
-L1 scheduler/broker/termination、L2 connectome/memory、L3 cognitive、
+L1 scheduler/broker、L2 connectome/memory、L3 cognitive、
 L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、

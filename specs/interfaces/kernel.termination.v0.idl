@@ -1,0 +1,46 @@
+idl_version: 1
+kind: service
+namespace: kernel.termination.v0
+service: TerminationGateService
+summary: Immediate self-termination contract for the reference runtime.
+imports:
+  termination_request: ../schemas/termination_request.schema
+  termination_outcome: ../schemas/termination_outcome.schema
+operations:
+  request:
+    summary: Execute immediate termination, reject invalid self-proof, or park into a preconsented cool-off window.
+    input:
+      schema_ref: termination_request
+    output:
+      schema_ref: termination_outcome
+  observe:
+    summary: Return the latest known termination status for one identity.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+        properties:
+          identity_id:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - kind
+          - identity_id
+          - status
+        properties:
+          kind:
+            type: string
+            enum:
+              - termination_status
+              - no_termination
+          identity_id:
+            type: string
+          status:
+            type: string
+events:
+  - name: termination.request.recorded
+    payload:
+      schema_ref: termination_outcome

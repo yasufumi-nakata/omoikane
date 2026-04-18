@@ -1,12 +1,11 @@
 eval_id: termination_latency
-target: kernel.identity
+target: kernel.termination
 level: L1
-description: terminate() が即時に record を terminated へ遷移させること
+description: TerminationGate.request() が bounded latency で completed/rejected を返すこと
 inputs:
-  - action: terminate_identity
+  - action: termination_request
 expected:
-  status: terminated
+  status: completed
 metric: equality
 threshold: 1.0
 ethics_check: true
-

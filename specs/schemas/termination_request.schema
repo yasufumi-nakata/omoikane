@@ -1,0 +1,44 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/termination_request.schema"
+title: TerminationRequest
+description: Self-issued termination invocation against the TerminationGate.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - request_id
+  - identity_id
+  - by_self_proof
+  - submitted_at
+properties:
+  kind:
+    const: termination_request
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  request_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  by_self_proof:
+    type: string
+    minLength: 1
+  reason:
+    type: string
+  submitted_at:
+    type: string
+    format: date-time
+  invoke_cool_off:
+    type: boolean
+examples:
+  - kind: termination_request
+    schema_version: 1.0.0
+    request_id: termination-request-001
+    identity_id: identity://amaterasu-endpoint
+    by_self_proof: self-proof://amaterasu-endpoint/v1
+    reason: self decided
+    submitted_at: "2026-04-18T19:00:00Z"
+    invoke_cool_off: false

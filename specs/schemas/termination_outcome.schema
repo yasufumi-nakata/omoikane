@@ -1,0 +1,107 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/termination_outcome.schema"
+title: TerminationOutcome
+description: Final outcome and side-effect manifest for a TerminationRequest.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - outcome_id
+  - request_ref
+  - identity_id
+  - recorded_at
+  - status
+  - reject_reason
+  - ledger_event_ref
+  - scheduler_handle_cancelled
+  - substrate_lease_released
+  - notifications
+  - latency_ms
+properties:
+  kind:
+    const: termination_outcome
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  outcome_id:
+    type: string
+    minLength: 8
+  request_ref:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  status:
+    type: string
+    enum:
+      - completed
+      - rejected
+      - cool-off-pending
+  reject_reason:
+    type: string
+  ledger_event_ref:
+    type: string
+    minLength: 1
+  scheduler_handle_cancelled:
+    type: boolean
+  substrate_lease_released:
+    type: boolean
+  notifications:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - audience
+        - sent
+      properties:
+        audience:
+          type: string
+          enum:
+            - ethics
+            - guardians
+            - council
+        sent:
+          type: boolean
+  latency_ms:
+    type: number
+    minimum: 0
+allOf:
+  - if:
+      properties:
+        status:
+          const: completed
+    then:
+      properties:
+        scheduler_handle_cancelled:
+          const: true
+        substrate_lease_released:
+          const: true
+        latency_ms:
+          maximum: 200
+examples:
+  - kind: termination_outcome
+    schema_version: 1.0.0
+    outcome_id: termination-outcome-001
+    request_ref: termination-request-001
+    identity_id: identity://amaterasu-endpoint
+    recorded_at: "2026-04-18T19:00:00.180Z"
+    status: completed
+    reject_reason: ""
+    ledger_event_ref: continuity-event-termination-001
+    scheduler_handle_cancelled: true
+    substrate_lease_released: true
+    notifications:
+      - audience: ethics
+        sent: true
+      - audience: guardians
+        sent: true
+      - audience: council
+        sent: true
+    latency_ms: 180

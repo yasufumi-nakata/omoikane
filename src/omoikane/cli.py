@@ -137,6 +137,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ethics_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    termination_parser = subparsers.add_parser(
+        "termination-demo",
+        help="Run the L1 termination gate immediate, cool-off, and reject scenarios",
+    )
+    termination_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -244,6 +250,10 @@ def main() -> None:
 
     if args.command == "ethics-demo":
         _print_result(runtime.run_ethics_demo(), args.json)
+        return
+
+    if args.command == "termination-demo":
+        _print_result(runtime.run_termination_demo(), args.json)
         return
 
     if args.command == "gap-report":

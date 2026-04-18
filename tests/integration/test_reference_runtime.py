@@ -281,6 +281,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-veto"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-escalate"])
 
+    def test_termination_demo_reports_immediate_pending_and_reject_paths(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_termination_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["completed_within_budget"])
+        self.assertTrue(result["validation"]["cool_off_pending"])
+        self.assertTrue(result["validation"]["invalid_self_proof_rejected"])
+        self.assertEqual("completed", result["outcomes"]["completed"]["status"])
+        self.assertEqual("cool-off-pending", result["observations"]["cool_off"]["status"])
+        self.assertEqual("released", result["substrate_snapshot"]["allocations"][0]["status"])
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["terminate"])
+
 
 if __name__ == "__main__":
     unittest.main()

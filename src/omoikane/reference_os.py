@@ -30,6 +30,7 @@ from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
+from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
 from .mind.memory import MemoryCrystalStore
 from .mind.qualia import QualiaBuffer
@@ -46,6 +47,7 @@ class OmoikaneReferenceOS:
         self.identity = IdentityRegistry()
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
+        self.termination = TerminationGate(self.identity, self.ledger, self.substrate)
         self.qualia = QualiaBuffer()
         self.connectome = ConnectomeModel()
         self.memory = MemoryCrystalStore()
@@ -1057,6 +1059,92 @@ class OmoikaneReferenceOS:
                 },
             },
             "ethics_events": [immutable_event, escalation_event],
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_termination_demo(self) -> Dict[str, Any]:
+        completed_identity = self.identity.create(
+            human_consent_proof="consent://termination-demo-complete/v1",
+            metadata={
+                "display_name": "Termination Immediate Sandbox",
+                "termination_self_proof": "self-proof://termination-demo-complete/v1",
+                "termination_policy_mode": "immediate-only",
+            },
+        )
+        completed_allocation = self.substrate.allocate(
+            units=24,
+            purpose="termination-demo-immediate",
+            identity_id=completed_identity.identity_id,
+        )
+        completed = self.termination.request(
+            completed_identity.identity_id,
+            "self-proof://termination-demo-complete/v1",
+            reason="identity explicitly requested immediate stop",
+            scheduler_handle_ref="schedule://termination-demo-complete",
+            active_allocation_id=completed_allocation.allocation_id,
+        )
+
+        cool_off_identity = self.identity.create(
+            human_consent_proof="consent://termination-demo-cool-off/v1",
+            metadata={
+                "display_name": "Termination Cool-Off Sandbox",
+                "termination_self_proof": "self-proof://termination-demo-cool-off/v1",
+                "termination_policy_mode": "cool-off-allowed",
+                "termination_policy_days": "30",
+            },
+        )
+        cool_off = self.termination.request(
+            cool_off_identity.identity_id,
+            "self-proof://termination-demo-cool-off/v1",
+            reason="identity requested the preconsented review window",
+            invoke_cool_off=True,
+            scheduler_handle_ref="schedule://termination-demo-cool-off",
+        )
+
+        rejected_identity = self.identity.create(
+            human_consent_proof="consent://termination-demo-reject/v1",
+            metadata={
+                "display_name": "Termination Reject Sandbox",
+                "termination_self_proof": "self-proof://termination-demo-reject/v1",
+                "termination_policy_mode": "immediate-only",
+            },
+        )
+        rejected = self.termination.request(
+            rejected_identity.identity_id,
+            "self-proof://invalid-proof/v1",
+            reason="invalid proof must be rejected but still logged",
+            scheduler_handle_ref="schedule://termination-demo-reject",
+        )
+
+        observations = {
+            "completed": self.termination.observe(completed_identity.identity_id),
+            "cool_off": self.termination.observe(cool_off_identity.identity_id),
+            "rejected": self.termination.observe(rejected_identity.identity_id),
+        }
+        validation = {
+            "completed_within_budget": completed["status"] == "completed"
+            and completed["latency_ms"] <= 200
+            and completed["scheduler_handle_cancelled"]
+            and completed["substrate_lease_released"],
+            "cool_off_pending": cool_off["status"] == "cool-off-pending"
+            and observations["cool_off"]["status"] == "cool-off-pending",
+            "invalid_self_proof_rejected": rejected["status"] == "rejected"
+            and rejected["reject_reason"] == "invalid-self-proof",
+        }
+
+        return {
+            "policy": self.termination.policy_snapshot(),
+            "outcomes": {
+                "completed": completed,
+                "cool_off": cool_off,
+                "rejected": rejected,
+            },
+            "observations": observations,
+            "validation": validation,
+            "identity_snapshot": self.identity.snapshot(),
+            "substrate_snapshot": self.substrate.snapshot(),
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
