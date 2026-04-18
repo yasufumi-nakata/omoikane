@@ -29,6 +29,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     cognitive_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    qualia_parser = subparsers.add_parser(
+        "qualia-demo",
+        help="Run the L2 qualia surrogate profile and checkpoint scenario",
+    )
+    qualia_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     substrate_parser = subparsers.add_parser(
         "substrate-demo",
         help="Run the L0 substrate allocation/attestation/migration scenario",
@@ -88,6 +94,10 @@ def main() -> None:
 
     if args.command == "cognitive-demo":
         _print_result(runtime.run_cognitive_failover_demo(), args.json)
+        return
+
+    if args.command == "qualia-demo":
+        _print_result(runtime.run_qualia_demo(), args.json)
         return
 
     if args.command == "substrate-demo":

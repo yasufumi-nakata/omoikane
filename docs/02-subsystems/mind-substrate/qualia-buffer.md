@@ -40,6 +40,20 @@ QualiaTick:
 
 これは **「本人の主観そのもの」ではない** 点に注意。あくまで再生・連続性証明のための代理。
 
+## Reference runtime の固定 profile
+
+reference runtime では open question を 1 つ潰すため、
+`QualiaTick` の surrogate profile を次で固定する。
+
+- modality は `visual / auditory / somatic / interoceptive` の 4 系統
+- 各 modality embedding は **32 次元**
+- 1 tick は **250ms** の観測窓を代表する
+- tick には `attention_target`, `self_awareness`, `lucidity` を含める
+- embedding は外部モデルに依存せず、summary と salience から決定的に再現される surrogate vector とする
+
+これにより「正規表現」自体は未解決のままでも、
+L2 runtime / schema / eval / CLI の間では同一 profile を共有できる。
+
 ## 容量管理
 
 - 通常は環状バッファ（直近 N 分のみ揮発保持）

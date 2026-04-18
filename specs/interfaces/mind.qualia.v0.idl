@@ -19,12 +19,50 @@ operations:
         properties:
           summary:
             type: string
+            minLength: 1
           valence:
             type: number
+            minimum: -1
+            maximum: 1
           arousal:
             type: number
+            minimum: 0
+            maximum: 1
           clarity:
             type: number
+            minimum: 0
+            maximum: 1
+          modality_salience:
+            type: object
+            additionalProperties: false
+            properties:
+              visual:
+                type: number
+                minimum: 0
+                maximum: 1
+              auditory:
+                type: number
+                minimum: 0
+                maximum: 1
+              somatic:
+                type: number
+                minimum: 0
+                maximum: 1
+              interoceptive:
+                type: number
+                minimum: 0
+                maximum: 1
+          attention_target:
+            type: string
+            minLength: 1
+          self_awareness:
+            type: number
+            minimum: 0
+            maximum: 1
+          lucidity:
+            type: number
+            minimum: 0
+            maximum: 1
     output:
       schema_ref: qualia_tick
   recent:
@@ -43,4 +81,3 @@ operations:
         type: array
         items:
           schema_ref: qualia_tick
-

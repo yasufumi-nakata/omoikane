@@ -13,7 +13,7 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 主観状態の連続バッファ。**意識に「いま」何が起きているか** を記録する。
 - 解釈は L3（Cognitive）が行う
 - 通常は揮発、特定区間のみ ContinuityLedger に永続化
-- 容量と粒度は本人が選択（→ プライバシ／連続性のトレードオフ）
+- reference runtime では 4 modality × 32 次元 / 250ms 窓で固定し、将来は本人設定へ拡張する
 
 ### SelfModel
 「自分はこういう人間だ」という自己認識のネットワーク。
@@ -54,6 +54,7 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 ## 未解決
 
 - Qualia の **正規表現（canonical encoding）** ── そもそも表現可能か
+- MemoryCrystal の substrate 中立 compaction
 - 記憶を **substrate 中立に** 表現する正規形
 - SelfModel の急変検知の閾値
 

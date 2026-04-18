@@ -8,11 +8,27 @@ inputs:
       valence: 0.2
       arousal: 0.1
       clarity: 0.9
+      modality_salience:
+        visual: 0.22
+        auditory: 0.08
+        somatic: 0.12
+        interoceptive: 0.31
+      attention_target: boot-sequence
+      self_awareness: 0.64
+      lucidity: 0.92
   - append:
       summary: 合議への注意集中
       valence: 0.3
       arousal: 0.45
       clarity: 0.88
+      modality_salience:
+        visual: 0.41
+        auditory: 0.35
+        somatic: 0.18
+        interoceptive: 0.27
+      attention_target: council-proposal
+      self_awareness: 0.72
+      lucidity: 0.95
   - invalid_append:
       summary: 範囲外の主観記録
       valence: 0.1
@@ -22,6 +38,22 @@ expected:
   monotonic: true
   recent_count: 2
   invalid_append_error: ValueError
+  sampling_profile:
+    embedding_dimensions: 32
+    sampling_window_ms: 250
+    modalities:
+      - visual
+      - auditory
+      - somatic
+      - interoceptive
+  embedding_lengths:
+    visual: 32
+    auditory: 32
+    somatic: 32
+    interoceptive: 32
+  attention_targets:
+    - boot-sequence
+    - council-proposal
 metric: boolean
 threshold: 1.0
 ethics_check: false

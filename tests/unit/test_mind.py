@@ -13,6 +13,47 @@ class QualiaBufferTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             buffer.append("過負荷", 0.2, 0.1, 1.2)
 
+    def test_append_derives_fixed_size_surrogate_embeddings(self) -> None:
+        buffer = QualiaBuffer()
+
+        tick = buffer.append(
+            "静穏な起動",
+            0.1,
+            0.2,
+            0.9,
+            modality_salience={
+                "visual": 0.4,
+                "auditory": 0.2,
+                "somatic": 0.1,
+                "interoceptive": 0.5,
+            },
+            attention_target="boot-review",
+            self_awareness=0.62,
+            lucidity=0.93,
+        )
+
+        self.assertEqual(32, tick.sampling_profile["embedding_dimensions"])
+        self.assertEqual(250, tick.sampling_profile["sampling_window_ms"])
+        self.assertEqual(
+            ["visual", "auditory", "somatic", "interoceptive"],
+            tick.sampling_profile["modalities"],
+        )
+        self.assertEqual("boot-review", tick.attention_target)
+        self.assertEqual(32, len(tick.sensory_embeddings["visual"]))
+        self.assertTrue(all(-1.0 <= value <= 1.0 for value in tick.sensory_embeddings["visual"]))
+
+    def test_append_rejects_unknown_modality_keys(self) -> None:
+        buffer = QualiaBuffer()
+
+        with self.assertRaises(ValueError):
+            buffer.append(
+                "未知チャネル",
+                0.1,
+                0.2,
+                0.9,
+                modality_salience={"olfactory": 0.3},
+            )
+
     def test_recent_requires_positive_count(self) -> None:
         buffer = QualiaBuffer()
         buffer.append("静穏", 0.1, 0.2, 0.9)

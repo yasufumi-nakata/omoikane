@@ -15,6 +15,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
         self.assertTrue(result["qualia"]["monotonic"])
+        self.assertEqual(32, result["qualia"]["profile"]["embedding_dimensions"])
         self.assertEqual("Approval", result["safe_patch"]["ethics"]["status"])
         self.assertEqual("Veto", result["blocked_patch"]["ethics"]["status"])
         self.assertGreaterEqual(len(result["ledger_snapshot"]), 4)
@@ -50,6 +51,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["reasoning"]["degraded"])
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
+    def test_qualia_demo_reports_reference_sampling_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_qualia_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(250, result["qualia"]["profile"]["sampling_window_ms"])
+        self.assertEqual(
+            ["visual", "auditory", "somatic", "interoceptive"],
+            result["qualia"]["profile"]["modalities"],
+        )
+        self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["qualia-checkpoint"])
 
     def test_substrate_demo_records_migration_and_release(self) -> None:
         runtime = OmoikaneReferenceOS()

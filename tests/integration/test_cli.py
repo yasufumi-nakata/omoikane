@@ -32,6 +32,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("released", result["substrate"]["allocation"]["status"])
         self.assertEqual("warm-standby", result["substrate"]["transfer"]["continuity_mode"])
 
+    def test_qualia_demo_emits_reference_profile(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "qualia-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(32, result["qualia"]["profile"]["embedding_dimensions"])
+        self.assertEqual(250, result["qualia"]["profile"]["sampling_window_ms"])
+        self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         stdout = io.StringIO()
 

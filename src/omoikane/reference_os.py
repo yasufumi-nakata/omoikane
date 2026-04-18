@@ -94,8 +94,36 @@ class OmoikaneReferenceOS:
         )
 
         qualia_ticks = [
-            self.qualia.append("起動時の静穏", 0.2, 0.1, 0.9),
-            self.qualia.append("Council 合議への注意集中", 0.3, 0.45, 0.88),
+            self.qualia.append(
+                "起動時の静穏",
+                0.2,
+                0.1,
+                0.9,
+                modality_salience={
+                    "visual": 0.22,
+                    "auditory": 0.08,
+                    "somatic": 0.12,
+                    "interoceptive": 0.31,
+                },
+                attention_target="boot-sequence",
+                self_awareness=0.64,
+                lucidity=0.92,
+            ),
+            self.qualia.append(
+                "Council 合議への注意集中",
+                0.3,
+                0.45,
+                0.88,
+                modality_salience={
+                    "visual": 0.41,
+                    "auditory": 0.35,
+                    "somatic": 0.18,
+                    "interoceptive": 0.27,
+                },
+                attention_target="council-proposal",
+                self_awareness=0.72,
+                lucidity=0.95,
+            ),
         ]
 
         self_model_result = self.self_model.update(
@@ -162,8 +190,9 @@ class OmoikaneReferenceOS:
                 "energy_floor": asdict(energy_floor),
             },
             "qualia": {
+                "profile": self.qualia.profile(),
                 "monotonic": self.qualia.verify_monotonic(),
-                "recent": [tick.__dict__ for tick in qualia_ticks],
+                "recent": [asdict(tick) for tick in qualia_ticks],
             },
             "self_model": self_model_result,
             "safe_patch": safe_patch,
@@ -535,6 +564,74 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "reasoning": reasoning,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_qualia_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://qualia-demo/v1",
+            metadata={"display_name": "Qualia Sandbox"},
+        )
+        ticks = [
+            self.qualia.append(
+                "起動直後の環境同定",
+                0.18,
+                0.22,
+                0.91,
+                modality_salience={
+                    "visual": 0.48,
+                    "auditory": 0.12,
+                    "somatic": 0.16,
+                    "interoceptive": 0.29,
+                },
+                attention_target="sensor-calibration",
+                self_awareness=0.63,
+                lucidity=0.93,
+            ),
+            self.qualia.append(
+                "安全境界レビューへの集中",
+                0.26,
+                0.39,
+                0.87,
+                modality_salience={
+                    "visual": 0.34,
+                    "auditory": 0.31,
+                    "somatic": 0.14,
+                    "interoceptive": 0.37,
+                },
+                attention_target="ethics-boundary-review",
+                self_awareness=0.71,
+                lucidity=0.96,
+            ),
+        ]
+        profile = self.qualia.profile()
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.qualia.checkpointed",
+            payload={
+                "slice_id": "qualia-slice-reference-profile-0001",
+                "tick_ids": [tick.tick_id for tick in ticks],
+                "embedding_dimensions": profile["embedding_dimensions"],
+                "sampling_window_ms": profile["sampling_window_ms"],
+            },
+            actor="QualiaBuffer",
+            category="qualia-checkpoint",
+            layer="L2",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "qualia": {
+                "profile": profile,
+                "monotonic": self.qualia.verify_monotonic(),
+                "recent": [asdict(tick) for tick in ticks],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

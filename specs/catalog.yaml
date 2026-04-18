@@ -165,6 +165,21 @@ entries:
       - reference-runtime
     rationale: Task graph serialization and dispatch contract.
   - priority: P1
+    kind: schema
+    file: specs/schemas/qualia_tick.schema
+    consumers:
+      - specs/interfaces/mind.qualia.v0.idl
+      - evals/cognitive/qualia_contract.yaml
+      - reference-runtime
+    rationale: Required to fix the reference qualia surrogate profile across runtime, CLI, and evals.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.qualia.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/qualia-buffer.md
+    rationale: Qualia buffer append/read contract for the fixed 32d/250ms reference profile.
+  - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
     consumers:
@@ -177,7 +192,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects QualiaBuffer monotonicity and schema-bound input handling.
+    rationale: Protects QualiaBuffer monotonicity, fixed surrogate profile, and schema-bound input handling.
   - priority: P1
     kind: eval
     file: evals/cognitive/self_model_abrupt_change.yaml
