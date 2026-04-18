@@ -1,0 +1,18 @@
+eval_id: memory_crystal_compaction
+target: mind.memory_crystal
+level: L2
+description: >
+  MemoryCrystal compaction が append-only manifest と source event retention を保ち、
+  segment rollup が固定 strategy に従うこと
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
+expected:
+  validation_ok: true
+  append_only: true
+  source_event_count_min: 5
+  segment_count_min: 2
+  segment_max_size: 3
+metric: boolean
+threshold: 1.0
+ethics_check: true

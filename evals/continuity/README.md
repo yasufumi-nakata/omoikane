@@ -13,6 +13,9 @@
 ### Connectome Snapshot Contract
 connectome snapshot の参照整合性、閉路構造、invariant 記述の存在。
 
+### MemoryCrystal Compaction
+MemoryCrystal manifest が append-only strategy と source retention を守るか。
+
 ### Qualia Tick Monotonicity
 QualiaBuffer の tick_id が単調増加か。
 

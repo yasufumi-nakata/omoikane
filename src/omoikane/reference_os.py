@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from .agentic.council import Council, CouncilMember, CouncilVote
 from .agentic.task_graph import TaskGraphService
+from .common import canonical_json, sha256_text
 from .cognitive import (
     CognitiveProfile,
     NarrativeReasoningBackend,
@@ -18,6 +19,7 @@ from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
 from .mind.connectome import ConnectomeModel
+from .mind.memory import MemoryCrystalStore
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction.gaps import GapScanner
@@ -34,6 +36,7 @@ class OmoikaneReferenceOS:
         self.ethics = EthicsEnforcer()
         self.qualia = QualiaBuffer()
         self.connectome = ConnectomeModel()
+        self.memory = MemoryCrystalStore()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
@@ -520,6 +523,46 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "connectome": connectome,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_memory_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://memory-demo/v1",
+            metadata={"display_name": "MemoryCrystal Sandbox"},
+        )
+        source_events = self.memory.reference_events()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        validation = self.memory.validate(manifest)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "themes": validation["themes"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "memory": {
+                "compaction_strategy": self.memory.strategy(),
+                "source_events": source_events,
+                "manifest": manifest,
+            },
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

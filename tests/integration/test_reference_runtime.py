@@ -42,6 +42,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["edge_count"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_memory_demo_returns_valid_manifest(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_memory_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["append_only"])
+        self.assertEqual(5, result["validation"]["source_event_count"])
+        self.assertEqual(2, result["validation"]["segment_count"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["crystal-commit"])
+
     def test_cognitive_failover_demo_records_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 

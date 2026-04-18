@@ -23,6 +23,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     connectome_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    memory_parser = subparsers.add_parser(
+        "memory-demo",
+        help="Emit a reference MemoryCrystal compaction manifest and validation summary",
+    )
+    memory_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     cognitive_parser = subparsers.add_parser(
         "cognitive-demo",
         help="Run the L3 reasoning backend failover scenario",
@@ -90,6 +96,10 @@ def main() -> None:
 
     if args.command == "connectome-demo":
         _print_result(runtime.run_connectome_demo(), args.json)
+        return
+
+    if args.command == "memory-demo":
+        _print_result(runtime.run_memory_demo(), args.json)
         return
 
     if args.command == "cognitive-demo":

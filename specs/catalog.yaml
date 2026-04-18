@@ -250,5 +250,20 @@ entries:
       - docs/03-protocols/connectome-format.md
       - docs/02-subsystems/mind-substrate/README.md
     rationale: Required to serialize substrate-neutral connectome snapshots for the L2 reference runtime.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/memory_crystal_manifest.schema
+    consumers:
+      - reference-runtime
+      - docs/03-protocols/memory-replication.md
+      - docs/02-subsystems/mind-substrate/memory-model.md
+    rationale: Required to fix the append-only MemoryCrystal compaction strategy across runtime, docs, and evals.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/memory_crystal_compaction.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the reference MemoryCrystal compaction manifest, source retention policy, and append-only segment rollup behavior.
 next_priority:
   # Future automation can append the next missing contract here.

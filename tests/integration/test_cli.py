@@ -21,6 +21,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertEqual(3, result["validation"]["node_count"])
 
+    def test_memory_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "memory-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["append_only"])
+        self.assertEqual(5, result["validation"]["source_event_count"])
+        self.assertEqual(2, result["validation"]["segment_count"])
+
     def test_substrate_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

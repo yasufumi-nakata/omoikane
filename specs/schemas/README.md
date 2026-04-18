@@ -8,6 +8,7 @@
 - `qualia_tick.schema`
 - `self_model.schema`
 - `connectome_document.schema`
+- `memory_crystal_manifest.schema`
 - `substrate_allocation.schema`
 - `substrate_attestation.schema`
 - `substrate_transfer.schema`
@@ -28,8 +29,8 @@
 
 ## 次段階
 
-memory crystal / episodic event / interface handshake は
-reference runtime の対象が広がる段階で追加する。
+episodic event / interface handshake は reference runtime の対象が
+広がる段階で追加する。
 
 ## 形式
 

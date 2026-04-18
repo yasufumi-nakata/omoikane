@@ -25,6 +25,9 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 - append-only
 - 内容は本人鍵で暗号化
 - 削除は本人の明示同意のみ
+- reference runtime では `chronological-primary-tag` による
+  `append-only-segment-rollup-v1` compaction を採用し、
+  元イベントは保持したまま最大 3 件の source event を 1 segment へ要約する
 
 ### EpisodicStream
 エピソード記憶の時系列ストリーム。
@@ -54,7 +57,6 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 ## 未解決
 
 - Qualia の **正規表現（canonical encoding）** ── そもそも表現可能か
-- MemoryCrystal の substrate 中立 compaction
 - 記憶を **substrate 中立に** 表現する正規形
 - SelfModel の急変検知の閾値
 

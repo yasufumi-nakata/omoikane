@@ -30,6 +30,8 @@
 容量を抑えるため、commit 間 diff のみ転送。
 - 内容 diff: encrypted blob
 - 構造 diff: 平文 metadata
+- reference runtime では compaction 後の `MemoryCrystalManifest` を metadata として運び、
+  `source_event_ids` / `source_refs` を残して元イベントへの追跡性を失わない
 
 ## バックグラウンド整合性検査
 

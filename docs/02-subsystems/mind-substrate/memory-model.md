@@ -46,6 +46,19 @@ Sensory ──→ Working ──→ Short-term ──→ Episodic ──→ Crys
 - 過去 Crystal の編集：**原則禁止**。例外は本人の明示同意＋ Guardian 承認
 - 編集前状態は必ず凍結保存（[docs/00-philosophy/ethics.md](../../00-philosophy/ethics.md) 参照）
 
+## Reference runtime の compaction
+
+reference runtime では MemoryCrystal の compaction を
+`append-only-segment-rollup-v1` として固定する。
+
+- 元の episodic event は削除せず、manifest から `source_event_ids` / `source_refs` で辿れるように残す
+- segment は時系列順に並べ、先頭 tag が同じ event を最大 3 件まで束ねる
+- compact 後の segment には `semantic_anchors`、`affect_summary`、`salience_max`、`digest` を持たせる
+- 旧 segment を直接書き換えず、将来 supersede する場合も `supersedes` 参照を追加するだけに留める
+
+canonical schema:
+[specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
+
 ## トラウマ記憶の扱い
 
 倫理的に最もデリケート。
