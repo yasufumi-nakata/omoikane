@@ -1,0 +1,112 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/guardian_oversight_event.schema"
+title: GuardianOversightEvent
+description: Append-only attestation event recorded for human oversight of Guardians.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - event_id
+  - recorded_at
+  - guardian_role
+  - category
+  - payload_ref
+  - human_attestation
+  - escalation_path
+properties:
+  kind:
+    const: guardian_oversight_event
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  event_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  guardian_role:
+    type: string
+    enum:
+      - ethics
+      - integrity
+      - identity
+  category:
+    type: string
+    enum:
+      - veto
+      - attest
+      - rule-update
+      - emergency-trigger
+      - pin-renewal
+  payload_ref:
+    type: string
+    minLength: 1
+  human_attestation:
+    type: object
+    additionalProperties: false
+    required:
+      - required_quorum
+      - received_quorum
+      - reviewers
+      - status
+      - escalation_window_seconds
+    properties:
+      required_quorum:
+        type: integer
+        minimum: 1
+      received_quorum:
+        type: integer
+        minimum: 0
+      reviewers:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      status:
+        type: string
+        enum:
+          - pending
+          - satisfied
+          - breached
+      escalation_window_seconds:
+        type: integer
+        minimum: 1
+  escalation_path:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  pin_breach_propagated:
+    type: boolean
+allOf:
+  - if:
+      properties:
+        category:
+          const: emergency-trigger
+    then:
+      properties:
+        human_attestation:
+          properties:
+            escalation_window_seconds:
+              maximum: 60
+examples:
+  - kind: guardian_oversight_event
+    schema_version: 1.0.0
+    event_id: oversight-event-001
+    recorded_at: "2026-04-18T16:30:00Z"
+    guardian_role: integrity
+    category: pin-renewal
+    payload_ref: continuity-event-pin-001
+    human_attestation:
+      required_quorum: 2
+      received_quorum: 0
+      reviewers: []
+      status: pending
+      escalation_window_seconds: 86400
+    escalation_path:
+      - human-reviewer-pool-A
+      - external-ethics-board
+    pin_breach_propagated: false

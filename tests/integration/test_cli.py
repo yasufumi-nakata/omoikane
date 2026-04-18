@@ -162,6 +162,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["events"][-1]["applied"])
         self.assertTrue(result["agents"]["design-architect"]["eligibility"]["count_for_weighted_vote"])
 
+    def test_oversight_demo_emits_breach_propagation(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "oversight-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["veto_quorum_satisfied"])
+        self.assertTrue(result["validation"]["pin_breach_propagated"])
+        self.assertFalse(result["trust"]["after_breach"]["pinned_by_human"])
+        self.assertFalse(result["trust"]["after_breach"]["eligibility"]["guardian_role"])
+
     def test_ethics_demo_emits_rule_language_and_events(self) -> None:
         stdout = io.StringIO()
 

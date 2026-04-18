@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from omoikane.governance import AmendmentService, AmendmentSignatures
+from omoikane.governance import AmendmentService, AmendmentSignatures, OversightService
+from omoikane.agentic.trust import TrustService
 
 
 class AmendmentServiceTests(unittest.TestCase):
@@ -72,6 +73,48 @@ class AmendmentServiceTests(unittest.TestCase):
         self.assertEqual("applied", updated.status)
         self.assertTrue(decision["allow_apply"])
         self.assertEqual("5pct", decision["applied_stage"])
+
+
+class OversightServiceTests(unittest.TestCase):
+    def test_veto_event_satisfies_quorum_after_one_attestation(self) -> None:
+        service = OversightService()
+
+        event = service.record(
+            guardian_role="integrity",
+            category="veto",
+            payload_ref="entry-1",
+            escalation_path=["human-reviewer-pool-A"],
+        )
+        updated = service.attest(event["event_id"], reviewer_id="reviewer-1")
+
+        self.assertEqual(1, updated["human_attestation"]["required_quorum"])
+        self.assertEqual(1, updated["human_attestation"]["received_quorum"])
+        self.assertEqual("satisfied", updated["human_attestation"]["status"])
+
+    def test_pin_breach_unpins_guardian_role(self) -> None:
+        trust = TrustService()
+        trust.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        service = OversightService(trust_service=trust)
+
+        event = service.record(
+            guardian_role="integrity",
+            category="pin-renewal",
+            payload_ref="entry-2",
+            escalation_path=["human-reviewer-pool-A", "external-ethics-board"],
+        )
+        breached = service.breach(event["event_id"])
+        snapshot = trust.snapshot("integrity-guardian")
+
+        self.assertEqual("breached", breached["human_attestation"]["status"])
+        self.assertTrue(breached["pin_breach_propagated"])
+        self.assertFalse(snapshot["pinned_by_human"])
+        self.assertFalse(snapshot["eligibility"]["guardian_role"])
 
 
 if __name__ == "__main__":

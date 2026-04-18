@@ -24,6 +24,7 @@ PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
+PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
@@ -70,6 +71,11 @@ Heritage Council 要求へ外部化されること、
 `ethics_violation=-0.25`) と human pin freeze を JSON で可視化し、
 Council 召集・weighted vote・runtime 反映・guardian role の gate を確認する。
 
+`oversight-demo` は L4 Guardian human oversight channel を JSON で可視化し、
+`veto` category が reviewer 1 名で `satisfied` になること、
+`pin-renewal` が reviewer 不足で `breached` になった時に
+`integrity-guardian` の human pin と guardian eligibility が外れることを確認する。
+
 `ethics-demo` は L1 EthicsEnforcer の rule language profile
 (`deterministic-rule-tree-v0`) と immutable boundary / sandbox escalation /
 fork approval の 3 例を JSON で可視化し、
@@ -103,6 +109,7 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 - L2 episodic stream の canonical shape と MemoryCrystal への流入拡張
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
+- Guardian oversight reviewer の実体証明と法的責任分担
 - 残る L6 interface protocol（IMC/WMS/EWA）の adapter
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

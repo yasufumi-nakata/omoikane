@@ -202,6 +202,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0.62, result["agents"]["design-architect"]["global_score"])
         self.assertTrue(result["agents"]["codex-builder"]["eligibility"]["apply_to_runtime"])
 
+    def test_oversight_demo_propagates_pin_breach(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_guardian_oversight_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["veto_quorum_satisfied"])
+        self.assertTrue(result["validation"]["pin_breach_propagated"])
+        self.assertTrue(result["validation"]["human_pin_cleared"])
+        self.assertTrue(result["validation"]["guardian_role_removed"])
+        self.assertEqual("breached", result["events"]["pin_renewal"]["human_attestation"]["status"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["guardian-oversight"])
+
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
         runtime = OmoikaneReferenceOS()
 

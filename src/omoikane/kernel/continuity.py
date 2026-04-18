@@ -36,6 +36,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "cognitive-failover": ["guardian"],
     "sandbox-monitor": ["guardian"],
     "sandbox-freeze": ["guardian"],
+    "guardian-oversight": ["third_party"],
 }
 
 

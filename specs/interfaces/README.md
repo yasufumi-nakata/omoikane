@@ -12,6 +12,7 @@
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
 - `governance.amendment.v0.idl`
+- `governance.oversight.v0.idl`
 - `interface.bdb.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`

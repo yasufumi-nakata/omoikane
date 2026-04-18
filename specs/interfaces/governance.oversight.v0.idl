@@ -1,0 +1,49 @@
+idl_version: 1
+kind: service
+namespace: governance.oversight.v0
+service: GuardianOversightService
+summary: Deterministic human oversight quorum, attestation, breach propagation, and snapshot flow for Guardian actions.
+imports:
+  guardian_oversight_event: ../schemas/guardian_oversight_event.schema
+operations:
+  record:
+    summary: Record one append-only oversight event for a Guardian veto, attestation, rule update, emergency trigger, or pin renewal.
+    input:
+      schema_ref: guardian_oversight_event
+    output:
+      schema_ref: guardian_oversight_event
+    guarantees:
+      - category must be one of veto, attest, rule-update, emergency-trigger, pin-renewal
+      - escalation_path must not be empty
+      - required_quorum and escalation_window_seconds must be derived deterministically from category
+  attest:
+    summary: Add one human reviewer attestation to an existing oversight event.
+    input:
+      schema_ref: guardian_oversight_event
+    output:
+      schema_ref: guardian_oversight_event
+    guarantees:
+      - reviewer ids must deduplicate without reordering existing reviewers
+      - status becomes satisfied once received_quorum >= required_quorum
+      - breached events must reject further attestation
+  breach:
+    summary: Mark one unsatisfied oversight event as breached after its escalation window elapses.
+    input:
+      schema_ref: guardian_oversight_event
+    output:
+      schema_ref: guardian_oversight_event
+    guarantees:
+      - unsatisfied pin breaches must clear human pin on the mapped Guardian agent
+      - breach propagation must make guardian_role ineligible in trust snapshots
+      - satisfied events must remain unchanged
+  snapshot:
+    summary: Return the current oversight policy and append-only event set.
+    output:
+      schema_ref: guardian_oversight_event
+    guarantees:
+      - returned events must preserve append-only ordering by event_id
+compatibility:
+  stability: bootstrap
+  notes:
+    - Human reviewer identity and authenticity remain external to this repo.
+    - Reference runtime counts quorum and reviewer ids only, and does not store legal evidence artifacts.

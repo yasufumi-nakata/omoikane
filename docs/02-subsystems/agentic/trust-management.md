@@ -67,6 +67,8 @@ score' = clamp(score + raw_delta, 0.0, 1.0)
 `per_domain.self_modify >= 0.95` を必須とする。
 `Guardian 役` は `global_score >= 0.99` に加え、
 `pinned_by_human = true` の explicit approval を必須とする。
+この `pinned_by_human` は [../../04-ai-governance/guardian-oversight.md](../../04-ai-governance/guardian-oversight.md)
+の oversight channel で維持され、`pin-renewal` breach 時は自動で剥奪される。
 
 ## Cold Start
 
@@ -104,6 +106,7 @@ eligibility:
 ## Reference runtime surface
 
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-demo --json`
+- Oversight: `PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json`
 - Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`

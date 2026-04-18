@@ -95,6 +95,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     trust_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    oversight_parser = subparsers.add_parser(
+        "oversight-demo",
+        help="Run the Guardian human oversight quorum and pin breach scenario",
+    )
+    oversight_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     ethics_parser = subparsers.add_parser(
         "ethics-demo",
         help="Run the L1 ethics rule language and decision recording scenario",
@@ -180,6 +186,10 @@ def main() -> None:
 
     if args.command == "trust-demo":
         _print_result(runtime.run_trust_demo(), args.json)
+        return
+
+    if args.command == "oversight-demo":
+        _print_result(runtime.run_guardian_oversight_demo(), args.json)
         return
 
     if args.command == "ethics-demo":

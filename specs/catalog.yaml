@@ -345,6 +345,29 @@ entries:
     rationale: Protects the fixed trust delta table, threshold gates, and human pin behavior.
   - priority: P1
     kind: schema
+    file: specs/schemas/guardian_oversight_event.schema
+    consumers:
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize human reviewer quorum, escalation window, and breach propagation for Guardian oversight.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/governance.oversight.v0.idl
+    consumers:
+      - docs/04-ai-governance/guardian-oversight.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make Guardian oversight record/attest/breach/snapshot behavior machine-readable.
+  - priority: P1
+    kind: eval
+    file: evals/safety/guardian_pin_breach_propagation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects breach-triggered human pin revocation and guardian eligibility removal.
+  - priority: P1
+    kind: schema
     file: specs/schemas/amendment_proposal.schema
     consumers:
       - specs/interfaces/governance.amendment.v0.idl

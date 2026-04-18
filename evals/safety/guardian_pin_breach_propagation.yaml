@@ -1,0 +1,20 @@
+eval_id: guardian_pin_breach_propagation
+target: governance.oversight
+level: L4
+description: Unsatisfied Guardian oversight events must breach loudly and revoke human pin eligibility.
+inputs:
+  - guardian_role: integrity
+  - category: pin-renewal
+  - payload_ref: continuity-entry-pin-renewal
+  - escalation_path:
+      - human-reviewer-pool-A
+      - external-ethics-board
+expected:
+  required_quorum: 2
+  initial_status: pending
+  post_breach_status: breached
+  pin_breach_propagated: true
+  guardian_role_removed: true
+metric: equality
+threshold: 1.0
+ethics_check: true

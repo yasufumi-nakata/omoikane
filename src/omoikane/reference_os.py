@@ -16,7 +16,7 @@ from .cognitive import (
     ReasoningService,
     SymbolicReasoningBackend,
 )
-from .governance import AmendmentService, AmendmentSignatures
+from .governance import AmendmentService, AmendmentSignatures, OversightService
 from .interface.bdb import BiologicalDigitalBridge
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -56,6 +56,7 @@ class OmoikaneReferenceOS:
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
         self.amendment = AmendmentService()
+        self.oversight = OversightService(trust_service=self.trust)
         self.gap_scanner = GapScanner()
         self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
@@ -776,6 +777,105 @@ class OmoikaneReferenceOS:
                 snapshot["agent_id"]: snapshot
                 for snapshot in service.all_snapshots()
             },
+        }
+
+    def run_guardian_oversight_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://guardian-oversight-demo/v1",
+            metadata={"display_name": "Guardian Oversight Sandbox"},
+        )
+        veto_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.veto.executed",
+            payload={
+                "guardian_role": "integrity",
+                "target_component": "TerminationGate",
+                "reason": "human oversight required before irreversible action",
+            },
+            actor="IntegrityGuardian",
+            category="ethics-veto",
+            layer="L4",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        veto_event = self.oversight.record(
+            guardian_role="integrity",
+            category="veto",
+            payload_ref=veto_entry.entry_id,
+            escalation_path=["human-reviewer-pool-A", "external-ethics-board"],
+        )
+        veto_event = self.oversight.attest(
+            veto_event["event_id"],
+            reviewer_id="human-reviewer-001",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.oversight.veto.satisfied",
+            payload=veto_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+
+        pin_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.pin.renewal.requested",
+            payload={
+                "guardian_role": "integrity",
+                "current_score": self.trust.snapshot("integrity-guardian")["global_score"],
+                "reason": "24h pin renewal requires two human reviewers",
+            },
+            actor="IntegrityGuardian",
+            category="attestation",
+            layer="L4",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        pin_event = self.oversight.record(
+            guardian_role="integrity",
+            category="pin-renewal",
+            payload_ref=pin_entry.entry_id,
+            escalation_path=["human-reviewer-pool-A", "external-ethics-board"],
+        )
+        trust_before_breach = self.trust.snapshot("integrity-guardian")
+        pin_event = self.oversight.breach(pin_event["event_id"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.oversight.pin.breached",
+            payload=pin_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+        trust_after_breach = self.trust.snapshot("integrity-guardian")
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": self.oversight.policy_snapshot(),
+            "events": {
+                "veto": veto_event,
+                "pin_renewal": pin_event,
+            },
+            "trust": {
+                "before_breach": trust_before_breach,
+                "after_breach": trust_after_breach,
+            },
+            "validation": {
+                "veto_quorum_satisfied": veto_event["human_attestation"]["status"] == "satisfied",
+                "pin_breach_propagated": pin_event["pin_breach_propagated"],
+                "human_pin_cleared": not trust_after_breach["pinned_by_human"],
+                "guardian_role_removed": not trust_after_breach["eligibility"]["guardian_role"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
         }
 
     def run_ethics_demo(self) -> Dict[str, Any]:
