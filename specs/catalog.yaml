@@ -87,6 +87,14 @@ entries:
     rationale: Required to serialize TaskGraph DAG nodes.
   - priority: P1
     kind: schema
+    file: specs/schemas/task_graph_policy.schema
+    consumers:
+      - specs/interfaces/agentic.task_graph.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/task-decomposition.md
+    rationale: Required to fix the reference TaskGraph complexity ceiling across specs, docs, and runtime.
+  - priority: P1
+    kind: schema
     file: specs/schemas/substrate_allocation.schema
     consumers:
       - specs/interfaces/substrate.adapter.v0.idl
@@ -212,6 +220,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects defer-to-standard-review behavior after an expedited hard timeout.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/task_graph_complexity_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the reference TaskGraph complexity cap before richer DAG orchestration lands.
   - priority: P1
     kind: schema
     file: specs/schemas/connectome_document.schema

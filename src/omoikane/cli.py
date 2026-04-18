@@ -47,6 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     council_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    task_graph_parser = subparsers.add_parser(
+        "task-graph-demo",
+        help="Run the L4 TaskGraph complexity policy and dispatch scenario",
+    )
+    task_graph_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     gap_parser = subparsers.add_parser("gap-report", help="Scan design gaps in this repo")
     gap_parser.add_argument(
         "--repo-root",
@@ -94,6 +100,10 @@ def main() -> None:
 
     if args.command == "council-demo":
         _print_result(runtime.run_council_demo(), args.json)
+        return
+
+    if args.command == "task-graph-demo":
+        _print_result(runtime.run_task_graph_demo(), args.json)
         return
 
     if args.command == "gap-report":

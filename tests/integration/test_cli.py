@@ -54,6 +54,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(1_000, result["policies"]["expedited"]["hard_timeout_ms"])
         self.assertEqual("soft-timeout", result["sessions"]["standard_soft_timeout"]["timeout_status"]["status"])
 
+    def test_task_graph_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "task-graph-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(5, result["validation"]["node_count"])
+        self.assertEqual(3, result["dispatch"]["dispatched_count"])
+        self.assertEqual(3, result["synthesis"]["accepted_result_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

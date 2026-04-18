@@ -20,6 +20,7 @@
 - `ethics_query.yaml`
 - `ethics_decision.yaml`
 - `task_node.schema`
+- `task_graph_policy.schema`
 - `consensus_message.schema`
 - `build_request.yaml`
 - `build_artifact.yaml`

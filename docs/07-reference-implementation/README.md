@@ -20,6 +20,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
+PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
@@ -36,6 +37,10 @@ standard 議事では 45s soft / 90s hard timeout、
 expedited 議事では 250ms soft / 1s hard timeout を持ち、
 soft timeout 時は weighted-majority fallback、
 hard timeout 時は defer または human governance escalation に分岐する。
+
+`task-graph-demo` は L4 TaskGraph の暫定 complexity policy
+(`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)
+を JSON で可視化し、初期 dispatch と synthesis がその範囲に収まることを示す。
 
 ## 今後広げる面
 

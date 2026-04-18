@@ -11,7 +11,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] Council session の最大時間と timeout 戦略（2026-04-18: reference runtime を standard 45s/90s・expedited 250ms/1s に固定し、timeout fallback/defer を schema・CLI・eval に反映）
 - [ ] QualiaTick の高次元埋め込みの次元数と時間粒度
 - [ ] MemoryCrystal の compaction 戦略
-- [ ] TaskGraph の複雑度上限
+- [x] TaskGraph の複雑度上限（2026-04-18: reference runtime を `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5` に固定し、task-graph demo・schema・eval を追加）
 - [ ] Trust score 更新アルゴリズムの定式化
 - [ ] EthicsEnforcer のルール記述言語の選定
 - [ ] Sandboxer での「苦痛検出」の代理指標

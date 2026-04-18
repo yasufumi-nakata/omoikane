@@ -91,6 +91,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["sessions"]["expedited_hard_timeout"]["outcome"],
         )
 
+    def test_task_graph_demo_reports_bounded_complexity(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_task_graph_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("reference-v0", result["graph"]["complexity_policy"]["policy_id"])
+        self.assertEqual(5, result["validation"]["node_count"])
+        self.assertEqual(4, result["validation"]["edge_count"])
+        self.assertEqual(3, result["dispatch"]["dispatched_count"])
+        self.assertEqual(3, result["synthesis"]["accepted_result_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

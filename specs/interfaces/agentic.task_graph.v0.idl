@@ -5,6 +5,7 @@ service: TaskGraphService
 summary: Contract for DAG construction, dispatch, and synthesis.
 imports:
   task_node: ../schemas/task_node.schema
+  task_graph_policy: ../schemas/task_graph_policy.schema
 operations:
   build_graph:
     summary: Convert an approved intent spec into a DAG of executable nodes.
@@ -26,14 +27,29 @@ operations:
         type: object
         required:
           - graph_id
+          - intent
+          - required_roles
           - nodes
+          - complexity_policy
+          - created_at
         properties:
           graph_id:
             type: string
+          intent:
+            type: string
+          required_roles:
+            type: array
+            items:
+              type: string
           nodes:
             type: array
             items:
               schema_ref: task_node
+          complexity_policy:
+            schema_ref: task_graph_policy
+          created_at:
+            type: string
+            format: date-time
   dispatch_graph:
     summary: Dispatch all ready nodes to candidate agents.
     input:
@@ -42,6 +58,7 @@ operations:
         required:
           - graph_id
           - nodes
+          - complexity_policy
         properties:
           graph_id:
             type: string
@@ -49,17 +66,24 @@ operations:
             type: array
             items:
               schema_ref: task_node
+          complexity_policy:
+            schema_ref: task_graph_policy
     output:
       inline_schema:
         type: object
         required:
           - graph_id
           - dispatched_count
+          - ready_node_ids
         properties:
           graph_id:
             type: string
           dispatched_count:
             type: integer
+          ready_node_ids:
+            type: array
+            items:
+              type: string
   synthesize_results:
     summary: Merge finished node outputs into a Council-consumable aggregate.
     input:
@@ -68,6 +92,7 @@ operations:
         required:
           - graph_id
           - result_refs
+          - complexity_policy
         properties:
           graph_id:
             type: string
@@ -75,16 +100,21 @@ operations:
             type: array
             items:
               type: string
+          complexity_policy:
+            schema_ref: task_graph_policy
     output:
       inline_schema:
         type: object
         required:
           - graph_id
           - synthesis_ref
+          - accepted_result_count
         properties:
           graph_id:
             type: string
           synthesis_ref:
             type: string
+          accepted_result_count:
+            type: integer
 compatibility:
   stability: bootstrap

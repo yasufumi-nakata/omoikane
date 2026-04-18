@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .agentic.council import Council, CouncilMember, CouncilVote
+from .agentic.task_graph import TaskGraphService
 from .cognitive import (
     CognitiveProfile,
     NarrativeReasoningBackend,
@@ -45,6 +46,7 @@ class OmoikaneReferenceOS:
             ],
         )
         self.council = Council()
+        self.task_graph = TaskGraphService()
         self.gap_scanner = GapScanner()
         self._bootstrap_council()
 
@@ -314,6 +316,55 @@ class OmoikaneReferenceOS:
                 "expedited_hard_timeout": expedited_decision.to_dict(),
             },
             "history": self.council.history(),
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_task_graph_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://task-graph-demo/v1",
+            metadata={"display_name": "TaskGraph Sandbox"},
+        )
+        graph = self.task_graph.build_graph(
+            intent="runtime・spec・eval を同期した変更束を Council review へ渡す",
+            required_roles=["schema-builder", "eval-builder", "doc-sync-builder"],
+        )
+        validation = self.task_graph.validate_graph(graph)
+        dispatch = self.task_graph.dispatch_graph(
+            graph_id=graph["graph_id"],
+            nodes=graph["nodes"],
+            complexity_policy=graph["complexity_policy"],
+        )
+        synthesis = self.task_graph.synthesize_results(
+            graph_id=graph["graph_id"],
+            result_refs=[f"artifact://{node_id}" for node_id in dispatch["ready_node_ids"]],
+            complexity_policy=graph["complexity_policy"],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="task_graph.reference_built",
+            payload={
+                "graph_id": graph["graph_id"],
+                "validation": validation,
+                "dispatch": dispatch,
+                "synthesis": synthesis,
+            },
+            actor="Council",
+            category="task-graph",
+            layer="L4",
+            signature_roles=["council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "graph": graph,
+            "validation": validation,
+            "dispatch": dispatch,
+            "synthesis": synthesis,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

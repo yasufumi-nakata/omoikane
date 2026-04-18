@@ -32,6 +32,9 @@ UserIntent:
 - DAG を構築
 - 各ノード: { agent_role, input_spec, output_spec, ethics_constraints }
 - 並列可能箇所と直列必須箇所を識別
+- reference runtime v0 では complexity cap を
+  `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`
+  に固定し、これを超える案件は本人確認または分割へ回す
 
 ### Stage 4: Council Review
 - Council が DAG を見て：
@@ -85,6 +88,26 @@ nodes:
 - ノード失敗 → 代替 Agent への再発注
 - 連鎖失敗 → Council 召集、戦略再考
 - どうしても解けない → 本人にエスカレ「これは現状解けません」（隠さない）
+
+## Reference Runtime の暫定上限
+
+reference runtime は安全側に倒して、次の上限を固定する。
+
+```yaml
+TaskGraphComplexityPolicy:
+  policy_id: reference-v0
+  max_nodes: 5
+  max_edges: 4
+  max_depth: 3
+  max_parallelism: 3
+  max_result_refs: 5
+  max_dependencies_per_node: 3
+```
+
+この上限では、最大 3 つの executable node を並列に走らせ、
+その後に `council-review` と `result-synthesis` を 1 段ずつ置く。
+複雑度超過の要求は build 前に reject し、TaskGraph を二段階へ分割するか、
+ユーザ確認つきの再構成へ送る。
 
 ## 思兼神メタファー
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote
+from omoikane.agentic.task_graph import TaskGraphService
 
 
 class CouncilTests(unittest.TestCase):
@@ -68,6 +69,77 @@ class CouncilTests(unittest.TestCase):
         self.assertEqual("expedited", decision.decision_mode)
         self.assertEqual("hard-timeout", decision.timeout_status.status)
         self.assertEqual("schedule-standard-session", decision.timeout_status.follow_up_action)
+
+
+class TaskGraphServiceTests(unittest.TestCase):
+    def test_build_graph_returns_bounded_reference_shape(self) -> None:
+        service = TaskGraphService()
+
+        graph = service.build_graph(
+            intent="runtime と spec を同期する",
+            required_roles=["schema-builder", "eval-builder", "doc-sync-builder"],
+        )
+        validation = service.validate_graph(graph)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(5, validation["node_count"])
+        self.assertEqual(4, validation["edge_count"])
+        self.assertEqual(3, validation["max_depth"])
+        self.assertEqual(3, validation["root_count"])
+
+    def test_build_graph_rejects_parallelism_over_policy(self) -> None:
+        service = TaskGraphService()
+
+        with self.assertRaises(ValueError):
+            service.build_graph(
+                intent="4 roles を同時に走らせる",
+                required_roles=["schema-builder", "eval-builder", "doc-sync-builder", "codex-builder"],
+            )
+
+    def test_dispatch_graph_marks_root_nodes_dispatched(self) -> None:
+        service = TaskGraphService()
+        graph = service.build_graph(
+            intent="runtime と docs を同期する",
+            required_roles=["schema-builder", "eval-builder", "doc-sync-builder"],
+        )
+
+        dispatch = service.dispatch_graph(
+            graph_id=graph["graph_id"],
+            nodes=graph["nodes"],
+            complexity_policy=graph["complexity_policy"],
+        )
+
+        self.assertEqual(3, dispatch["dispatched_count"])
+        self.assertEqual(["node-1", "node-2", "node-3"], dispatch["ready_node_ids"])
+        self.assertEqual(
+            ["dispatched", "dispatched", "dispatched"],
+            [graph["nodes"][index]["status"] for index in range(3)],
+        )
+
+    def test_synthesize_results_respects_result_ref_limit(self) -> None:
+        service = TaskGraphService()
+        policy = service.policy()
+
+        synthesis = service.synthesize_results(
+            graph_id="graph-demo",
+            result_refs=["artifact://schema", "artifact://eval", "artifact://docs"],
+            complexity_policy=policy,
+        )
+
+        self.assertEqual(3, synthesis["accepted_result_count"])
+        with self.assertRaises(ValueError):
+            service.synthesize_results(
+                graph_id="graph-demo",
+                result_refs=[
+                    "artifact://1",
+                    "artifact://2",
+                    "artifact://3",
+                    "artifact://4",
+                    "artifact://5",
+                    "artifact://6",
+                ],
+                complexity_policy=policy,
+            )
 
 
 if __name__ == "__main__":

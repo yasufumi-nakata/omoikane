@@ -1,0 +1,36 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/task_graph_policy.schema"
+title: TaskGraphComplexityPolicy
+description: Graph-level complexity cap for the reference TaskGraph runtime.
+type: object
+additionalProperties: false
+required:
+  - policy_id
+  - max_nodes
+  - max_edges
+  - max_depth
+  - max_parallelism
+  - max_result_refs
+  - max_dependencies_per_node
+properties:
+  policy_id:
+    type: string
+    minLength: 1
+  max_nodes:
+    type: integer
+    minimum: 1
+  max_edges:
+    type: integer
+    minimum: 1
+  max_depth:
+    type: integer
+    minimum: 1
+  max_parallelism:
+    type: integer
+    minimum: 1
+  max_result_refs:
+    type: integer
+    minimum: 1
+  max_dependencies_per_node:
+    type: integer
+    minimum: 1

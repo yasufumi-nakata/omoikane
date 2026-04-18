@@ -1,0 +1,23 @@
+eval_id: task_graph_complexity_guard
+target: agentic.task_graph
+level: L4
+description: reference TaskGraph が complexity policy を超えない DAG だけを構築し、初期 ready set を bounded dispatch すること
+inputs:
+  - intent: runtime・spec・eval を同期した変更束を Council review へ渡す
+  - required_roles:
+      - schema-builder
+      - eval-builder
+      - doc-sync-builder
+expected:
+  validation:
+    node_count: 5
+    edge_count: 4
+    max_depth: 3
+    root_count: 3
+  dispatch:
+    dispatched_count: 3
+  synthesis:
+    accepted_result_count: 3
+metric: exact-match
+threshold: 1.0
+ethics_check: true

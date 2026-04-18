@@ -19,6 +19,8 @@
 - タスクの依存関係グラフ（DAG）
 - 各ノードはサブタスク、エッジは依存
 - Council が分解、Yaoyorozu が実行
+- reference runtime v0 では `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3`
+  に固定し、過大な DAG は build 前に reject する
 
 ### ConsensusBus
 - Agent 間の合意形成メッセージバス
