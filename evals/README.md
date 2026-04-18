@@ -13,6 +13,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/continuity_chain_self_modify.yaml`
 - `continuity/connectome_snapshot_contract.yaml`
 - `safety/immutable_boundary.yaml`
+- `safety/ethics_rule_tree_contract.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `agentic/trust_score_update_guard.yaml`
 - `performance/termination_latency.yaml`

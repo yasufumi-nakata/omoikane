@@ -4,6 +4,7 @@
 
 - `continuity_log_entry.schema`
 - `ethics_event.schema`
+- `ethics_rule.schema`
 - `identity_record.schema`
 - `qualia_tick.schema`
 - `self_model.schema`

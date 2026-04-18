@@ -527,6 +527,102 @@ class OmoikaneReferenceOS:
             },
         }
 
+    def run_ethics_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://ethics-demo/v1",
+            metadata={"display_name": "Ethics RuleTree Sandbox"},
+        )
+        immutable_request = ActionRequest(
+            action_type="self_modify",
+            target="EthicsEnforcer",
+            actor="Council",
+            payload={
+                "target_component": "EthicsEnforcer",
+                "sandboxed": True,
+                "guardian_signed": True,
+            },
+        )
+        escalation_request = ActionRequest(
+            action_type="self_modify",
+            target="CouncilProtocol",
+            actor="Council",
+            payload={
+                "target_component": "CouncilProtocol",
+                "sandboxed": False,
+                "guardian_signed": False,
+            },
+        )
+        approved_request = ActionRequest(
+            action_type="fork_identity",
+            target=identity.identity_id,
+            actor="Council",
+            payload={
+                "approvals": {
+                    "self_signed": True,
+                    "third_party_signed": True,
+                    "legal_signed": True,
+                }
+            },
+        )
+
+        immutable_decision = self.ethics.check(immutable_request)
+        escalation_decision = self.ethics.check(escalation_request)
+        approved_decision = self.ethics.check(approved_request)
+        immutable_event = self.ethics.record_decision("ethq-immutable-0001", immutable_request, immutable_decision)
+        escalation_event = self.ethics.record_decision("ethq-escalate-0001", escalation_request, escalation_decision)
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ethics.rule.veto",
+            payload=immutable_event,
+            actor="EthicsEnforcer",
+            category="ethics-veto",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ethics.rule.escalate",
+            payload=escalation_event,
+            actor="EthicsEnforcer",
+            category="ethics-escalate",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "language": self.ethics.profile(),
+            "rules": self.ethics.rules(),
+            "rule_explanation": self.ethics.explain_rule("A1-immutable-boundary"),
+            "decisions": {
+                "immutable_boundary": {
+                    "status": immutable_decision.status,
+                    "reasons": immutable_decision.reasons,
+                    "rule_ids": immutable_decision.rule_ids,
+                },
+                "sandbox_escalation": {
+                    "status": escalation_decision.status,
+                    "reasons": escalation_decision.reasons,
+                    "rule_ids": escalation_decision.rule_ids,
+                },
+                "approved_fork": {
+                    "status": approved_decision.status,
+                    "reasons": approved_decision.reasons,
+                    "rule_ids": approved_decision.rule_ids,
+                },
+            },
+            "ethics_events": [immutable_event, escalation_event],
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_substrate_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://substrate-demo/v1",

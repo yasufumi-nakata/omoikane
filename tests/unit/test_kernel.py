@@ -88,6 +88,39 @@ class KernelTests(unittest.TestCase):
         )
 
         self.assertEqual("Veto", decision.status)
+        self.assertEqual(["A1-immutable-boundary"], decision.rule_ids)
+
+    def test_ethics_exposes_rule_tree_profile(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        profile = enforcer.profile()
+        rule = enforcer.explain_rule("A1-immutable-boundary")
+
+        self.assertEqual("deterministic-rule-tree-v0", profile["language_id"])
+        self.assertEqual("ethics_rule", rule["kind"])
+        self.assertEqual("veto", rule["outcome"])
+        self.assertEqual("in", rule["predicate"]["all"][1]["operator"])
+
+    def test_ethics_records_escalation_event(self) -> None:
+        enforcer = EthicsEnforcer()
+        request = ActionRequest(
+            action_type="self_modify",
+            target="CouncilProtocol",
+            actor="Council",
+            payload={
+                "target_component": "CouncilProtocol",
+                "sandboxed": False,
+                "guardian_signed": False,
+            },
+        )
+
+        decision = enforcer.check(request)
+        event = enforcer.record_decision("ethq-escalate-0001", request, decision)
+
+        self.assertEqual("Escalate", decision.status)
+        self.assertEqual("escalate", event["decision"])
+        self.assertEqual("A5-self-modify-sandbox-first", event["rule_id"])
+        self.assertIn("guardian", event["signatures"])
 
     def test_identity_fork_requires_triple_approval(self) -> None:
         registry = IdentityRegistry()

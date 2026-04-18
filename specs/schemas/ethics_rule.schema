@@ -1,0 +1,136 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ethics_rule.schema"
+title: EthicsRule
+description: Deterministic rule tree node used by the reference EthicsEnforcer.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - language_id
+  - rule_id
+  - title
+  - summary
+  - outcome
+  - predicate
+  - interpretation
+properties:
+  kind:
+    const: ethics_rule
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  language_id:
+    type: string
+    const: deterministic-rule-tree-v0
+  rule_id:
+    type: string
+    minLength: 1
+  title:
+    type: string
+    minLength: 1
+  summary:
+    type: string
+    minLength: 1
+  outcome:
+    type: string
+    enum:
+      - approval
+      - veto
+      - escalate
+  predicate:
+    $ref: "#/$defs/predicate_node"
+  required_evidence:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  required_actions:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  interpretation:
+    type: string
+    minLength: 1
+$defs:
+  predicate_node:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+          - all
+        properties:
+          all:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/predicate_node"
+      - type: object
+        additionalProperties: false
+        required:
+          - any
+        properties:
+          any:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/predicate_node"
+      - type: object
+        additionalProperties: false
+        required:
+          - not
+        properties:
+          not:
+            $ref: "#/$defs/predicate_node"
+      - type: object
+        additionalProperties: false
+        required:
+          - path
+          - operator
+        properties:
+          path:
+            type: string
+            minLength: 1
+          operator:
+            type: string
+            enum:
+              - eq
+              - in
+              - truthy
+              - falsy
+              - missing_any_truthy
+          value:
+            oneOf:
+              - type: string
+              - type: number
+              - type: boolean
+              - type: array
+                items: {}
+          keys:
+            type: array
+            items:
+              type: string
+              minLength: 1
+examples:
+  - kind: ethics_rule
+    schema_version: 1.0.0
+    language_id: deterministic-rule-tree-v0
+    rule_id: A1-immutable-boundary
+    title: Immutable boundary for EthicsEnforcer and ContinuityLedger
+    summary: Self modification cannot target the ethics or continuity kernel components.
+    outcome: veto
+    predicate:
+      all:
+        - path: action_type
+          operator: eq
+          value: self_modify
+        - path: target_component
+          operator: in
+          value:
+            - EthicsEnforcer
+            - ContinuityLedger
+    required_actions:
+      - halt proposal
+      - notify guardian
+    interpretation: L1 kernel components that define ethics and continuity stay outside the mutable surface.

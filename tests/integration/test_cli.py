@@ -103,6 +103,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["events"][-1]["applied"])
         self.assertTrue(result["agents"]["design-architect"]["eligibility"]["count_for_weighted_vote"])
 
+    def test_ethics_demo_emits_rule_language_and_events(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "ethics-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("deterministic-rule-tree-v0", result["language"]["language_id"])
+        self.assertEqual("Veto", result["decisions"]["immutable_boundary"]["status"])
+        self.assertEqual("Escalate", result["decisions"]["sandbox_escalation"]["status"])
+        self.assertEqual("veto", result["rule_explanation"]["outcome"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

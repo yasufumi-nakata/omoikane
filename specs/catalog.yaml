@@ -61,6 +61,14 @@ entries:
     rationale: Required to persist veto and escalation events.
   - priority: P1
     kind: schema
+    file: specs/schemas/ethics_rule.schema
+    consumers:
+      - specs/interfaces/kernel.ethics.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/kernel/ethics-enforcement.md
+    rationale: Required to fix the reference ethics rule language as serializable deterministic rule trees.
+  - priority: P1
+    kind: schema
     file: specs/schemas/patch_descriptor.schema
     consumers:
       - specs/schemas/build_artifact.yaml

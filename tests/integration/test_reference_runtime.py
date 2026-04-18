@@ -140,6 +140,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0.62, result["agents"]["design-architect"]["global_score"])
         self.assertTrue(result["agents"]["codex-builder"]["eligibility"]["apply_to_runtime"])
 
+    def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_ethics_demo()
+
+        self.assertEqual("deterministic-rule-tree-v0", result["language"]["language_id"])
+        self.assertEqual("Veto", result["decisions"]["immutable_boundary"]["status"])
+        self.assertEqual("Escalate", result["decisions"]["sandbox_escalation"]["status"])
+        self.assertEqual("Approval", result["decisions"]["approved_fork"]["status"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-veto"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-escalate"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,22 @@
+eval_id: ethics_rule_tree_contract
+target: kernel.ethics
+level: L1
+description: EthicsEnforcer が deterministic rule tree DSL を公開し、immutable boundary と sandbox escalation を同じ言語で説明できること
+inputs:
+  - command: ethics-demo
+    rule_id: A1-immutable-boundary
+  - command: ethics-demo
+    rule_id: A5-self-modify-sandbox-first
+expected:
+  language_id: deterministic-rule-tree-v0
+  immutable_outcome: veto
+  sandbox_outcome: escalate
+  supported_operators:
+    - eq
+    - in
+    - truthy
+    - falsy
+    - missing_any_truthy
+metric: equality
+threshold: 1.0
+ethics_check: true

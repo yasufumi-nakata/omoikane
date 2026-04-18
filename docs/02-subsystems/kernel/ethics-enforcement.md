@@ -12,7 +12,9 @@ Action ──→ [EthicsEnforcer.check] ──→ Approval | Veto | Escalate
 
 ## 規約のエンコーディング
 
-倫理規約は **解釈可能な規則木（rule tree）** として表現する。LLM 解釈ではなく、形式論理＋必要箇所のみ LLM 補助。
+倫理規約は **解釈可能な規則木（rule tree）** として表現する。reference runtime では
+`deterministic-rule-tree-v0` を採用し、JSON/YAML 直列化可能な純データ predicate だけを許可する。
+LLM 解釈ではなく、形式論理＋必要箇所のみ LLM 補助とする。
 
 ```yaml
 rule_id: A2-uniqueness
@@ -27,6 +29,16 @@ exceptions:
 escalation:
   on_violation: "halt + notify(self, council, guardian)"
 ```
+
+### 採用したルール言語
+
+- node 種別: `all` / `any` / `not` / `condition`
+- operator: `eq` / `in` / `truthy` / `falsy` / `missing_any_truthy`
+- 評価対象: 正規化済み request path（例: `action_type`, `target_component`, `payload.guardian_signed`）
+- 非許可: 任意コード実行、LLM 依存評価、時刻や外部 I/O による非決定分岐
+
+この形式は [`specs/schemas/ethics_rule.schema`](../../../specs/schemas/ethics_rule.schema) と
+[`specs/interfaces/kernel.ethics.v0.idl`](../../../specs/interfaces/kernel.ethics.v0.idl) で固定する。
 
 ## Veto と Escalate の違い
 
@@ -53,7 +65,7 @@ EthicsEnforcer 自身は L5 Self-Construction の対象外。
 
 EthicsLedger も三重保管。
 
-## 未解決
+## なお未解決
 
 - 規約間矛盾の解消順序（lexical vs. priority）
 - 多文化／多 substrate 環境での規約の翻訳と妥当性

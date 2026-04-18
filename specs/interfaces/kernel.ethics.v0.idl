@@ -7,6 +7,7 @@ imports:
   ethics_query: ../schemas/ethics_query.yaml
   ethics_decision: ../schemas/ethics_decision.yaml
   ethics_event: ../schemas/ethics_event.schema
+  ethics_rule: ../schemas/ethics_rule.schema
 operations:
   check_action:
     summary: Evaluate one action against the encoded ethics ruleset.
@@ -34,17 +35,9 @@ operations:
           rule_id:
             type: string
     output:
-      inline_schema:
-        type: object
-        required:
-          - rule_id
-          - interpretation
-        properties:
-          rule_id:
-            type: string
-          interpretation:
-            type: string
+      schema_ref: ethics_rule
 compatibility:
   stability: bootstrap
   notes:
     - EthicsEnforcer remains immutable from L5 according to governance docs.
+    - rule language is fixed to deterministic-rule-tree-v0 in the reference runtime.

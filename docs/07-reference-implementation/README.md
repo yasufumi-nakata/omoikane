@@ -22,6 +22,7 @@ PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
+PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
@@ -51,6 +52,11 @@ hard timeout 時は defer または human governance escalation に分岐する�
 `regression_detected=-0.08`, `human_feedback_bad=-0.10`,
 `ethics_violation=-0.25`) と human pin freeze を JSON で可視化し、
 Council 召集・weighted vote・runtime 反映・guardian role の gate を確認する。
+
+`ethics-demo` は L1 EthicsEnforcer の rule language profile
+(`deterministic-rule-tree-v0`) と immutable boundary / sandbox escalation /
+fork approval の 3 例を JSON で可視化し、
+`explain_rule` が schema-bound な rule tree を返すことを確認する。
 
 `qualia-demo` は L2 QualiaBuffer の surrogate profile
 (`visual/auditory/somatic/interoceptive` の 4 modality、
