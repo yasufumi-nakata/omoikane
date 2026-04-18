@@ -134,6 +134,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["segment_count"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["crystal-commit"])
 
+    def test_semantic_demo_returns_valid_projection(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_semantic_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["semantic"]["ok"])
+        self.assertEqual(2, result["validation"]["semantic"]["concept_count"])
+        self.assertEqual(
+            ["council-review", "migration-check"],
+            result["validation"]["semantic"]["labels"],
+        )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["semantic-projection"])
+
     def test_cognitive_failover_demo_records_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 

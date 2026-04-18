@@ -28,6 +28,8 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 - reference runtime では `chronological-primary-tag` による
   `append-only-segment-rollup-v1` compaction を採用し、
   元イベントは保持したまま最大 3 件の source event を 1 segment へ要約する
+canonical schema:
+[specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
 
 ### EpisodicStream
 エピソード記憶の時系列ストリーム。
@@ -37,6 +39,14 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
   `MemoryCrystal` handoff window を固定する
 canonical schema:
 [specs/schemas/episodic_event.schema](../../../specs/schemas/episodic_event.schema)
+
+### Semantic Memory
+`MemoryCrystal` の segment を read-only な semantic concept view に投影する層。
+- reference runtime では `semantic-segment-rollup-v1` を採用
+- `segment.theme` を canonical label とし、`semantic_anchors` を retrieval cue として保持
+- procedural memory はまだ `Connectome` 側の preview に留め、ここでは明示的に deferred とする
+canonical schema:
+[specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
 
 ### EmotionalTone
 感情の地形図。Affect engine（L3）と双方向。
@@ -56,6 +66,7 @@ canonical schema:
 - [ascension-protocol.md](ascension-protocol.md) ── L0-L4 アップロード手順
 - [episodic-stream.md](episodic-stream.md) ── episodic event の canonical shape と handoff
 - [memory-model.md](memory-model.md) ── 記憶階層の詳細
+- [semantic-memory.md](semantic-memory.md) ── MemoryCrystal からの semantic projection
 - [self-model.md](self-model.md) ── 自己モデルの構造
 - [qualia-buffer.md](qualia-buffer.md) ── 主観バッファの仕様
 

@@ -1,0 +1,76 @@
+idl_version: 1
+kind: service
+namespace: mind.semantic.v0
+service: SemanticMemoryProjector
+summary: Deterministic read-only semantic projection derived from MemoryCrystal segments.
+imports:
+  memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
+  semantic_memory_snapshot: ../schemas/semantic_memory_snapshot.schema
+operations:
+  project:
+    summary: Build a semantic concept view from one validated MemoryCrystal manifest.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - manifest
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          manifest:
+            schema_ref: memory_crystal_manifest
+    output:
+      schema_ref: semantic_memory_snapshot
+    guarantees:
+      - projection must not mutate or supersede MemoryCrystal source segments
+      - each concept must preserve supporting_segment_ids and supporting_event_ids
+      - procedural-memory must remain a deferred surface in v0
+  validate_snapshot:
+    summary: Validate one semantic memory snapshot against the fixed projection policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: semantic_memory_snapshot
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - concept_count
+          - labels
+          - deferred_surfaces
+          - errors
+        properties:
+          ok:
+            type: boolean
+          concept_count:
+            type: integer
+            minimum: 0
+          labels:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          deferred_surfaces:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.semantic_projected:
+    payload:
+      schema_ref: semantic_memory_snapshot

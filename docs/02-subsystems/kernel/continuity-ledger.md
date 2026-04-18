@@ -14,7 +14,7 @@
   wall_time: <壁時計 (RFC3339, attested)>
   substrate: <現在の substrate id>
   layer: L0|L1|L2|L3|L4|L5|L6
-  category: ascension|attestation|fork|terminate|crystal-commit|connectome-snapshot|qualia-checkpoint|substrate-migrate|substrate-release|self-modify|ethics-veto|ethics-escalate|cognitive-failover|guardian-oversight
+  category: ascension|attestation|fork|terminate|crystal-commit|semantic-projection|connectome-snapshot|qualia-checkpoint|substrate-migrate|substrate-release|self-modify|ethics-veto|ethics-escalate|cognitive-failover|guardian-oversight
   event_type: <詳細イベント名。例: council.patch.approved>
   payload_ref: <CAS hash>            # 大きいデータは別 store
   chain_algorithm: sha256
@@ -52,6 +52,7 @@ CI/automation で profile を壊さず回せるためである。これは **ref
 |---|---|---|---|---|
 | qualia-checkpoint | ◯ | - | - | - |
 | crystal-commit | ◯ | ◯ | - | - |
+| semantic-projection | ◯ | ◯ | - | - |
 | connectome-snapshot | ◯ | - | ◯ | - |
 | substrate-migrate | ◯ | ◯ | ◯ | - |
 | substrate-release | - | - | ◯ | - |

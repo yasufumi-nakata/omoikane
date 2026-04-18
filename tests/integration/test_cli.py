@@ -118,6 +118,25 @@ class CliIntegrationTests(unittest.TestCase):
             len(result["memory"]["episodic_stream"]["compaction_candidate_ids"]),
         )
 
+    def test_semantic_demo_emits_valid_projection_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "semantic-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["semantic"]["ok"])
+        self.assertEqual(2, result["validation"]["semantic"]["concept_count"])
+        self.assertEqual(
+            ["council-review", "migration-check"],
+            result["validation"]["semantic"]["labels"],
+        )
+        self.assertEqual(
+            ["procedural-memory"],
+            result["semantic"]["snapshot"]["deferred_surfaces"],
+        )
+
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()
 

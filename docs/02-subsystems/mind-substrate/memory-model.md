@@ -65,6 +65,19 @@ reference runtime では MemoryCrystal の compaction を
 canonical schema:
 [specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
 
+## Reference runtime の semantic projection
+
+reference runtime では MemoryCrystal manifest の各 segment を
+`semantic-segment-rollup-v1` で read-only な semantic concept view に投影する。
+
+- `segment.theme` を `canonical_label` に昇格する
+- `semantic_anchors` を retrieval cue / alias 候補として保持する
+- `source_event_ids` / `source_refs` / `time_span` / `affect_summary` を失わず保持する
+- procedural memory は `Connectome` 側の preview 前段として deferred と明示する
+
+canonical schema:
+[specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
+
 ## トラウマ記憶の扱い
 
 倫理的に最もデリケート。

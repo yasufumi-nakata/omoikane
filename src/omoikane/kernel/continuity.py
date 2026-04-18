@@ -26,6 +26,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "qualia-checkpoint": ["self"],
     "episodic-window": ["self"],
     "crystal-commit": ["self", "council"],
+    "semantic-projection": ["self", "council"],
     "connectome-snapshot": ["self", "guardian"],
     "substrate-migrate": ["self", "council", "guardian"],
     "substrate-release": ["guardian"],

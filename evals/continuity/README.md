@@ -20,6 +20,10 @@ MemoryCrystal manifest が append-only strategy と source retention を守る�
 EpisodicStream が canonical event shape を保ち、
 MemoryCrystal へそのまま compaction handoff できるか。
 
+### Semantic Memory Projection
+MemoryCrystal segment からの semantic projection が
+read-only policy と deferred procedural boundary を守るか。
+
 ### Qualia Tick Monotonicity
 QualiaBuffer の tick_id が単調増加か。
 

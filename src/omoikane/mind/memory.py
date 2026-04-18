@@ -22,6 +22,8 @@ EPISODIC_ALLOWED_NARRATIVE_ROLES = {
 MEMORY_CRYSTAL_SCHEMA_VERSION = "1.0"
 COMPACTION_STRATEGY_ID = "append-only-segment-rollup-v1"
 MAX_SOURCE_EVENTS_PER_SEGMENT = 3
+SEMANTIC_MEMORY_SCHEMA_VERSION = "1.0"
+SEMANTIC_PROJECTION_POLICY_ID = "semantic-segment-rollup-v1"
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -40,6 +42,10 @@ def _segment_digest_payload(segment: Dict[str, Any]) -> Dict[str, Any]:
         for key, value in segment.items()
         if key not in {"segment_id", "digest"}
     }
+
+
+def _semantic_concept_digest_payload(concept: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in concept.items() if key != "digest"}
 
 
 @dataclass
@@ -694,3 +700,250 @@ class MemoryCrystalStore:
         }
         segment["digest"] = sha256_text(canonical_json(_segment_digest_payload(segment)))
         return segment
+
+
+class SemanticMemoryProjector:
+    """Projects MemoryCrystal segments into a deterministic semantic view."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": SEMANTIC_MEMORY_SCHEMA_VERSION,
+            "policy_id": SEMANTIC_PROJECTION_POLICY_ID,
+            "read_only_view": True,
+            "source_compaction_strategy": COMPACTION_STRATEGY_ID,
+            "grouping_key": "memory-crystal-segment-theme",
+            "projection_mode": "derived-semantic-view",
+            "confidence_floor": 0.55,
+            "deferred_surfaces": ["procedural-memory"],
+        }
+
+    def build_reference_snapshot(self, identity_id: str) -> Dict[str, Any]:
+        manifest = MemoryCrystalStore().build_reference_manifest(identity_id)
+        return self.project(identity_id, manifest)
+
+    def project(self, identity_id: str, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(manifest, dict):
+            raise ValueError("manifest must be a mapping")
+
+        manifest_validation = MemoryCrystalStore().validate(manifest)
+        if not manifest_validation["ok"]:
+            raise ValueError(
+                f"semantic projection requires a valid MemoryCrystal manifest: {manifest_validation['errors']}"
+            )
+        if manifest.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match manifest.identity_id")
+
+        concepts = [
+            self._build_concept(segment)
+            for segment in manifest["segments"]
+        ]
+        snapshot = {
+            "schema_version": SEMANTIC_MEMORY_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "projected_at": utc_now_iso(),
+            "projection_policy": self.profile(),
+            "source_manifest_digest": sha256_text(canonical_json(manifest)),
+            "source_segment_ids": [segment["segment_id"] for segment in manifest["segments"]],
+            "concept_count": len(concepts),
+            "concepts": concepts,
+            "deferred_surfaces": ["procedural-memory"],
+        }
+        validation = self.validate(snapshot)
+        if not validation["ok"]:
+            raise ValueError(f"semantic snapshot failed validation: {validation['errors']}")
+        return snapshot
+
+    def validate(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        labels: List[str] = []
+
+        if not isinstance(snapshot, dict):
+            raise ValueError("snapshot must be a mapping")
+        if snapshot.get("schema_version") != SEMANTIC_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {SEMANTIC_MEMORY_SCHEMA_VERSION}, "
+                f"got {snapshot.get('schema_version')!r}"
+            )
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("identity_id"), "identity_id", errors)
+        MemoryCrystalStore._require_non_empty_string(snapshot.get("projected_at"), "projected_at", errors)
+
+        projection_policy = snapshot.get("projection_policy")
+        if not isinstance(projection_policy, dict):
+            errors.append("projection_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if projection_policy.get(field_name) != expected_value:
+                    errors.append(f"projection_policy.{field_name} mismatch")
+
+        source_manifest_digest = snapshot.get("source_manifest_digest")
+        if not isinstance(source_manifest_digest, str) or len(source_manifest_digest) != 64:
+            errors.append("source_manifest_digest must be a sha256 hex string")
+
+        source_segment_ids = snapshot.get("source_segment_ids")
+        if not isinstance(source_segment_ids, list) or not source_segment_ids:
+            errors.append("source_segment_ids must be a non-empty list")
+            source_segment_ids = []
+        else:
+            for segment_id in source_segment_ids:
+                if not isinstance(segment_id, str) or not segment_id.strip():
+                    errors.append("source_segment_ids must contain non-empty strings")
+
+        concepts = snapshot.get("concepts")
+        if not isinstance(concepts, list) or not concepts:
+            errors.append("concepts must be a non-empty list")
+            concepts = []
+
+        seen_concept_ids = set()
+        seen_segment_ids = set()
+        for index, concept in enumerate(concepts):
+            if not isinstance(concept, dict):
+                errors.append(f"concepts[{index}] must be an object")
+                continue
+
+            concept_id = concept.get("concept_id")
+            MemoryCrystalStore._require_non_empty_string(concept_id, f"concepts[{index}].concept_id", errors)
+            if isinstance(concept_id, str) and concept_id:
+                if concept_id in seen_concept_ids:
+                    errors.append(f"duplicate concept_id: {concept_id}")
+                else:
+                    seen_concept_ids.add(concept_id)
+
+            canonical_label = concept.get("canonical_label")
+            MemoryCrystalStore._require_non_empty_string(
+                canonical_label,
+                f"concepts[{index}].canonical_label",
+                errors,
+            )
+            if isinstance(canonical_label, str) and canonical_label:
+                labels.append(canonical_label)
+
+            for field_name in ("aliases", "supporting_segment_ids", "supporting_event_ids", "source_refs", "retrieval_cues"):
+                value = concept.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(f"concepts[{index}].{field_name} must be a non-empty list")
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(f"concepts[{index}].{field_name} must contain non-empty strings")
+                if field_name == "supporting_segment_ids":
+                    seen_segment_ids.update(value)
+
+            MemoryCrystalStore._require_non_empty_string(
+                concept.get("proposition"),
+                f"concepts[{index}].proposition",
+                errors,
+            )
+            reinforcement_count = concept.get("reinforcement_count")
+            if not isinstance(reinforcement_count, int) or reinforcement_count < 1:
+                errors.append(f"concepts[{index}].reinforcement_count must be >= 1")
+
+            MemoryCrystalStore._require_number_in_range(
+                concept.get("confidence"),
+                0.0,
+                1.0,
+                f"concepts[{index}].confidence",
+                errors,
+            )
+            MemoryCrystalStore._require_number_in_range(
+                concept.get("salience_max"),
+                0.0,
+                1.0,
+                f"concepts[{index}].salience_max",
+                errors,
+            )
+
+            affect_envelope = concept.get("affect_envelope")
+            if not isinstance(affect_envelope, dict):
+                errors.append(f"concepts[{index}].affect_envelope must be an object")
+            else:
+                MemoryCrystalStore._require_number_in_range(
+                    affect_envelope.get("mean_valence"),
+                    -1.0,
+                    1.0,
+                    f"concepts[{index}].affect_envelope.mean_valence",
+                    errors,
+                )
+                MemoryCrystalStore._require_number_in_range(
+                    affect_envelope.get("mean_arousal"),
+                    -1.0,
+                    1.0,
+                    f"concepts[{index}].affect_envelope.mean_arousal",
+                    errors,
+                )
+
+            time_span = concept.get("time_span")
+            if not isinstance(time_span, dict):
+                errors.append(f"concepts[{index}].time_span must be an object")
+            else:
+                start = time_span.get("start")
+                end = time_span.get("end")
+                MemoryCrystalStore._require_non_empty_string(
+                    start,
+                    f"concepts[{index}].time_span.start",
+                    errors,
+                )
+                MemoryCrystalStore._require_non_empty_string(
+                    end,
+                    f"concepts[{index}].time_span.end",
+                    errors,
+                )
+                if isinstance(start, str) and isinstance(end, str) and start > end:
+                    errors.append(f"concepts[{index}].time_span start/end order is invalid")
+
+            for field_name in ("source_segment_digest", "digest"):
+                value = concept.get(field_name)
+                if not isinstance(value, str) or len(value) != 64:
+                    errors.append(f"concepts[{index}].{field_name} must be a sha256 hex string")
+
+            digest = concept.get("digest")
+            if isinstance(digest, str) and len(digest) == 64:
+                expected_digest = sha256_text(canonical_json(_semantic_concept_digest_payload(concept)))
+                if digest != expected_digest:
+                    errors.append(f"concepts[{index}].digest mismatch")
+
+        concept_count = snapshot.get("concept_count")
+        if concept_count != len(concepts):
+            errors.append(f"concept_count must equal len(concepts) ({len(concepts)}), got {concept_count!r}")
+
+        if isinstance(source_segment_ids, list) and source_segment_ids and seen_segment_ids:
+            if sorted(source_segment_ids) != sorted(seen_segment_ids):
+                errors.append("source_segment_ids must equal the union of supporting_segment_ids")
+
+        deferred_surfaces = snapshot.get("deferred_surfaces")
+        if deferred_surfaces != ["procedural-memory"]:
+            errors.append("deferred_surfaces must equal ['procedural-memory']")
+
+        return {
+            "ok": not errors,
+            "concept_count": len(concepts),
+            "labels": labels,
+            "deferred_surfaces": ["procedural-memory"],
+            "errors": errors,
+        }
+
+    def _build_concept(self, segment: Dict[str, Any]) -> Dict[str, Any]:
+        aliases = [anchor for anchor in segment["semantic_anchors"] if anchor != segment["theme"]]
+        confidence = 0.55 + (segment["salience_max"] * 0.30) + (
+            0.03 * (len(segment["source_event_ids"]) - 1)
+        )
+        concept = {
+            "concept_id": f"concept-{segment['segment_id']}",
+            "canonical_label": segment["theme"],
+            "aliases": aliases or [segment["theme"]],
+            "proposition": segment["synopsis"],
+            "supporting_segment_ids": [segment["segment_id"]],
+            "supporting_event_ids": list(segment["source_event_ids"]),
+            "source_refs": list(segment["source_refs"]),
+            "retrieval_cues": list(segment["semantic_anchors"]),
+            "reinforcement_count": len(segment["source_event_ids"]),
+            "confidence": round(min(0.98, confidence), 3),
+            "salience_max": segment["salience_max"],
+            "affect_envelope": deepcopy(segment["affect_summary"]),
+            "time_span": deepcopy(segment["time_span"]),
+            "source_segment_digest": segment["digest"],
+        }
+        concept["digest"] = sha256_text(canonical_json(_semantic_concept_digest_payload(concept)))
+        return concept

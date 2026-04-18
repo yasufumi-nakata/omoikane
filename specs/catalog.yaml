@@ -513,6 +513,29 @@ entries:
     rationale: Required to fix the append-only MemoryCrystal compaction strategy across runtime, docs, and evals.
   - priority: P1
     kind: schema
+    file: specs/schemas/semantic_memory_snapshot.schema
+    consumers:
+      - specs/interfaces/mind.semantic.v0.idl
+      - docs/02-subsystems/mind-substrate/semantic-memory.md
+      - reference-runtime
+    rationale: Required to serialize the deterministic semantic projection derived from MemoryCrystal segments.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.semantic.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/semantic-memory.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 semantic projection contract machine-readable before procedural projection lands.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/semantic_projection_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the read-only semantic projection policy, concept count, and deferred procedural boundary.
+  - priority: P1
+    kind: schema
     file: specs/schemas/trust_event.schema
     consumers:
       - specs/schemas/trust_snapshot.schema

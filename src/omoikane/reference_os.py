@@ -33,7 +33,7 @@ from .kernel.identity import ForkApprovals, IdentityRegistry
 from .kernel.scheduler import AscensionScheduler
 from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
-from .mind.memory import EpisodicStream, MemoryCrystalStore
+from .mind.memory import EpisodicStream, MemoryCrystalStore, SemanticMemoryProjector
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction import GapScanner, SandboxSentinel
@@ -54,6 +54,7 @@ class OmoikaneReferenceOS:
         self.connectome = ConnectomeModel()
         self.episodic = EpisodicStream()
         self.memory = MemoryCrystalStore()
+        self.semantic = SemanticMemoryProjector()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
@@ -1989,6 +1990,70 @@ class OmoikaneReferenceOS:
                 "manifest": manifest,
             },
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_semantic_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://semantic-demo/v1",
+            metadata={"display_name": "Semantic Memory Sandbox"},
+        )
+        episodic_snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        manifest_validation = self.memory.validate(manifest)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "source_event_ids": episodic_snapshot["compaction_candidate_ids"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        semantic_snapshot = self.semantic.project(identity.identity_id, manifest)
+        semantic_validation = self.semantic.validate(semantic_snapshot)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.semantic_projected",
+            payload={
+                "policy_id": semantic_snapshot["projection_policy"]["policy_id"],
+                "concept_count": semantic_snapshot["concept_count"],
+                "labels": semantic_validation["labels"],
+                "source_manifest_digest": semantic_snapshot["source_manifest_digest"],
+                "deferred_surfaces": semantic_snapshot["deferred_surfaces"],
+            },
+            actor="SemanticMemoryProjector",
+            category="semantic-projection",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "semantic": {
+                "projection_policy": self.semantic.profile(),
+                "episodic_stream": episodic_snapshot,
+                "manifest": manifest,
+                "snapshot": semantic_snapshot,
+            },
+            "validation": {
+                "manifest": manifest_validation,
+                "semantic": semantic_validation,
+                "ok": manifest_validation["ok"] and semantic_validation["ok"],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

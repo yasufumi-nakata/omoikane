@@ -1,0 +1,22 @@
+eval_id: semantic_projection_contract
+target: mind.semantic_projection
+level: L2
+description: >
+  MemoryCrystal segment からの semantic projection が read-only derived view を維持し、
+  procedural memory を deferred surface として明示すること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
+expected:
+  manifest_ok: true
+  semantic_ok: true
+  concept_count: 2
+  labels:
+    - council-review
+    - migration-check
+  deferred_surfaces:
+    - procedural-memory
+  semantic_projection_ledger_count: 1
+metric: boolean
+threshold: 1.0
+ethics_check: false

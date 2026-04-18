@@ -1,0 +1,207 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/semantic_memory_snapshot.schema"
+title: SemanticMemorySnapshot
+description: >
+  Deterministic read-only semantic projection derived from MemoryCrystal segments.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - identity_id
+  - projected_at
+  - projection_policy
+  - source_manifest_digest
+  - source_segment_ids
+  - concept_count
+  - concepts
+  - deferred_surfaces
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  identity_id:
+    type: string
+    minLength: 1
+  projected_at:
+    type: string
+    format: date-time
+  projection_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - read_only_view
+      - source_compaction_strategy
+      - grouping_key
+      - projection_mode
+      - confidence_floor
+      - deferred_surfaces
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: semantic-segment-rollup-v1
+      read_only_view:
+        type: boolean
+        const: true
+      source_compaction_strategy:
+        type: string
+        const: append-only-segment-rollup-v1
+      grouping_key:
+        type: string
+        const: memory-crystal-segment-theme
+      projection_mode:
+        type: string
+        const: derived-semantic-view
+      confidence_floor:
+        type: number
+        const: 0.55
+      deferred_surfaces:
+        type: array
+        minItems: 1
+        maxItems: 1
+        items:
+          type: string
+          const: procedural-memory
+  source_manifest_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_segment_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  concept_count:
+    type: integer
+    minimum: 1
+  concepts:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/concept"
+  deferred_surfaces:
+    type: array
+    minItems: 1
+    maxItems: 1
+    items:
+      type: string
+      const: procedural-memory
+$defs:
+  affect_envelope:
+    type: object
+    additionalProperties: false
+    required:
+      - mean_valence
+      - mean_arousal
+    properties:
+      mean_valence:
+        type: number
+        minimum: -1
+        maximum: 1
+      mean_arousal:
+        type: number
+        minimum: -1
+        maximum: 1
+  time_span:
+    type: object
+    additionalProperties: false
+    required:
+      - start
+      - end
+    properties:
+      start:
+        type: string
+        format: date-time
+      end:
+        type: string
+        format: date-time
+  concept:
+    type: object
+    additionalProperties: false
+    required:
+      - concept_id
+      - canonical_label
+      - aliases
+      - proposition
+      - supporting_segment_ids
+      - supporting_event_ids
+      - source_refs
+      - retrieval_cues
+      - reinforcement_count
+      - confidence
+      - salience_max
+      - affect_envelope
+      - time_span
+      - source_segment_digest
+      - digest
+    properties:
+      concept_id:
+        type: string
+        minLength: 1
+      canonical_label:
+        type: string
+        minLength: 1
+      aliases:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      proposition:
+        type: string
+        minLength: 1
+      supporting_segment_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      supporting_event_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      retrieval_cues:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      reinforcement_count:
+        type: integer
+        minimum: 1
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+      salience_max:
+        type: number
+        minimum: 0
+        maximum: 1
+      affect_envelope:
+        $ref: "#/$defs/affect_envelope"
+      time_span:
+        $ref: "#/$defs/time_span"
+      source_segment_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"

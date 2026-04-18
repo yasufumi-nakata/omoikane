@@ -9,6 +9,7 @@
 - `kernel.continuity.v0.idl`
 - `kernel.ethics.v0.idl`
 - `mind.memory.v0.idl`
+- `mind.semantic.v0.idl`
 - `mind.qualia.v0.idl`
 - `mind.self_model.v0.idl`
 - `agentic.council.v0.idl`
@@ -26,7 +27,7 @@
 
 ## 次段階
 
-L1 broker、L2 connectome、L3 cognitive、
+L2 procedural memory、L3 cognitive、
 L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、

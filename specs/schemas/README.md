@@ -12,6 +12,7 @@
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`
 - `memory_crystal_manifest.schema`
+- `semantic_memory_snapshot.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
 - `ewa_command.schema`
@@ -44,7 +45,7 @@
 
 ## 次段階
 
-semantic memory projection / richer sensory loopback artifacts は
+procedural memory projection / richer sensory loopback artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式
