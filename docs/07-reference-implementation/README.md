@@ -31,6 +31,7 @@ PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
+PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
 PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
@@ -114,6 +115,12 @@ peer attestation、forward secrecy、narrow disclosure floor、
 sealed field redaction、summary+digest-only audit、
 unilateral emergency disconnect をまとめて確認する。
 
+`ewa-demo` は L6 External World Agents の reference contract
+(`interface.ewa.v0`) を JSON で可視化し、
+reversible command に Guardian observe を要求しつつ、
+blocked token を含む irreversible command を
+fail-closed で veto し、digest-only audit と forced release を確認する。
+
 `wms-demo` は L6 World Model Sync の reference contract
 (`interface.wms.v0`) を JSON で可視化し、
 minor diff を `consensus-round` で reconcile しつつ、
@@ -135,6 +142,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- 残る L6 interface protocol（EWA）の adapter
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

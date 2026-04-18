@@ -53,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     imc_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    ewa_parser = subparsers.add_parser(
+        "ewa-demo",
+        help="Run the L6 External World Agent safety and veto scenario",
+    )
+    ewa_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     wms_parser = subparsers.add_parser(
         "wms-demo",
         help="Run the L6 World Model Sync reconciliation and private-escape scenario",
@@ -182,6 +188,10 @@ def main() -> None:
 
     if args.command == "imc-demo":
         _print_result(runtime.run_imc_demo(), args.json)
+        return
+
+    if args.command == "ewa-demo":
+        _print_result(runtime.run_ewa_demo(), args.json)
         return
 
     if args.command == "wms-demo":

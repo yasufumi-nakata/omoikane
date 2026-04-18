@@ -244,6 +244,36 @@ class EthicsEnforcer:
                 interpretation="Even sandboxed patches require an explicit guardian sign-off before Council execution.",
                 required_actions=["request guardian signature"],
             ),
+            EthicsRule(
+                rule_id="A7-ewa-blocked-token",
+                title="Blocked physical-harm tokens veto EWA commands",
+                summary="External World Agent commands must fail closed when a blocked physical token is matched.",
+                outcome="Veto",
+                predicate={
+                    "all": [
+                        {"path": "action_type", "operator": "eq", "value": "ewa_command"},
+                        {"path": "payload.matched_tokens", "operator": "truthy"},
+                    ]
+                },
+                match_message="EWA command matched blocked safety tokens",
+                interpretation="Physical-world actuation must stop before execution when violence, privacy abuse, illegal action, ecological harm, or deception is detected.",
+                required_actions=["deny actuation", "route to council"],
+            ),
+            EthicsRule(
+                rule_id="A8-ewa-ambiguous-intent",
+                title="Ambiguous EWA intent escalates fail closed",
+                summary="Low-confidence physical-world intent classification must escalate instead of guessing.",
+                outcome="Escalate",
+                predicate={
+                    "all": [
+                        {"path": "action_type", "operator": "eq", "value": "ewa_command"},
+                        {"path": "payload.intent_ambiguous", "operator": "truthy"},
+                    ]
+                },
+                match_message="EWA intent is ambiguous and must escalate before actuation",
+                interpretation="Physical interventions cannot rely on uncertain intent classification because misclassification could cross legal or ethical boundaries.",
+                required_actions=["hold device", "request council review"],
+            ),
         ]
 
     def _serialize_rule(self, rule: EthicsRule) -> Dict[str, Any]:

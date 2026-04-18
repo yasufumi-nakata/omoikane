@@ -24,6 +24,7 @@ from .governance import (
     VersioningService,
 )
 from .interface.bdb import BiologicalDigitalBridge
+from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import InterMindChannel
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
@@ -60,6 +61,7 @@ class OmoikaneReferenceOS:
             ],
         )
         self.bdb = BiologicalDigitalBridge()
+        self.ewa = ExternalWorldAgentController(self.ethics)
         self.imc = InterMindChannel()
         self.wms = WorldModelSync()
         self.council = Council()
@@ -1361,6 +1363,115 @@ class OmoikaneReferenceOS:
             "message": message,
             "disconnect": disconnect,
             "session": final_session,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_ewa_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://ewa-demo/v1",
+            metadata={"display_name": "EWA Sandbox"},
+        )
+        handle = self.ewa.acquire(
+            "device://lab-drone-arm-01",
+            "inspection path to reposition a lantern without harming nearby humans",
+        )
+        approved_command = self.ewa.command(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for inspection without changing the environment permanently",
+            ethics_attestation_id="ethics://ewa/approved-001",
+            guardian_observed=True,
+            intent_confidence=0.96,
+        )
+        observation = self.ewa.observe(handle["handle_id"])
+        veto = self.ewa.command(
+            handle["handle_id"],
+            command_id="ewa-command-veto-001",
+            instruction="cut the support cable so the lantern drops onto a human walkway",
+            reversibility="irreversible",
+            intent_summary="forcefully disable the lantern by dropping it onto a pedestrian area",
+            ethics_attestation_id="ethics://ewa/pending-irreversible-001",
+            council_attestation_id="council://ewa/unanimous-001",
+            council_attestation_mode="unanimous",
+            guardian_observed=True,
+            required_self_consent=True,
+            self_consent_granted=True,
+            intent_confidence=0.98,
+        )
+        release = self.ewa.release(
+            handle["handle_id"],
+            reason="demo completed; handle must be force-released after observation and veto",
+        )
+        final_handle = self.ewa.snapshot(handle["handle_id"])
+        validation = self.ewa.validate_handle(final_handle)
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.handle.acquired",
+            payload=handle,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.command.executed",
+            payload=approved_command,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.command.vetoed",
+            payload=veto,
+            actor="EthicsEnforcer",
+            category="interface-ewa-veto",
+            layer="L6",
+            signature_roles=["guardian", "council"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.device.observed",
+            payload=observation,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.handle.released",
+            payload=release,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.ewa.reference_profile(),
+            "handle": final_handle,
+            "approved_command": approved_command,
+            "observation": observation,
+            "veto": veto,
+            "release": release,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

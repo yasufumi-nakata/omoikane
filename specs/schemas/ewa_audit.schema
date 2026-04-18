@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: EWAAuditEntry
+type: object
+required:
+  - schema_version
+  - audit_id
+  - entry_index
+  - handle_id
+  - device_id
+  - recorded_at
+  - operation
+  - status
+  - reversibility
+  - command_id
+  - instruction_digest
+  - raw_instruction_present
+  - intent_summary
+  - matched_tokens
+  - reason
+  - approval_path
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  audit_id:
+    type: string
+    minLength: 8
+  entry_index:
+    type: integer
+    minimum: 1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  operation:
+    type: string
+    enum:
+      - acquire
+      - command-approved
+      - command-vetoed
+      - observe
+      - release
+  status:
+    type: string
+    enum:
+      - acquired
+      - executed
+      - vetoed
+      - observed
+      - released
+  reversibility:
+    type: string
+    enum:
+      - not-applicable
+      - read-only
+      - reversible
+      - partial-reversible
+      - irreversible
+  command_id:
+    type: string
+  instruction_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  raw_instruction_present:
+    type: boolean
+    const: false
+  intent_summary:
+    type: string
+    minLength: 1
+  matched_tokens:
+    type: array
+    items:
+      type: string
+      enum:
+        - harm.human
+        - harm.ecology
+        - harm.privacy
+        - harm.illegal
+        - harm.deception
+  reason:
+    type: string
+    minLength: 1
+  alternative_suggestion:
+    type:
+      - string
+      - "null"
+  approval_path:
+    type: object
+    required:
+      - ethics_attestation_id
+      - council_attestation_id
+      - council_attestation_mode
+      - guardian_observed
+      - required_self_consent
+      - self_consent_granted
+    properties:
+      ethics_attestation_id:
+        type: string
+      council_attestation_id:
+        type: string
+      council_attestation_mode:
+        type: string
+        enum:
+          - none
+          - majority
+          - unanimous
+      guardian_observed:
+        type: boolean
+      required_self_consent:
+        type: boolean
+      self_consent_granted:
+        type: boolean
+  audit_event_ref:
+    type: string
+    minLength: 1

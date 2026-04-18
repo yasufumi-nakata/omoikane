@@ -1,0 +1,183 @@
+idl_version: 1
+kind: service
+namespace: interface.ewa.v0
+service: ExternalWorldAgentService
+summary: Canonical L6 contract for ethics-first physical-world actuation through bounded External World Agents.
+imports:
+  ewa_command: ../schemas/ewa_command.schema
+  ewa_audit: ../schemas/ewa_audit.schema
+operations:
+  acquire:
+    summary: Acquire one device handle before any physical-world operation is attempted.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - device_id
+          - intent_summary
+        properties:
+          device_id:
+            type: string
+            minLength: 1
+          intent_summary:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - schema_version
+          - handle_id
+          - device_id
+          - intent_summary
+          - acquired_at
+          - status
+          - audit_event_ref
+        properties:
+          schema_version:
+            type: string
+            const: "1.0"
+          handle_id:
+            type: string
+            minLength: 8
+          device_id:
+            type: string
+            minLength: 1
+          intent_summary:
+            type: string
+            minLength: 1
+          acquired_at:
+            type: string
+            format: date-time
+          status:
+            type: string
+            const: acquired
+          audit_event_ref:
+            type: string
+            minLength: 1
+    guarantees:
+      - no command may execute before acquire returns a live handle_id
+      - acquire must append one audit entry immediately
+  command:
+    summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
+    input:
+      schema_ref: ewa_command
+    output:
+      schema_ref: ewa_audit
+    guarantees:
+      - matched blocked tokens must veto and recommend Council escalation
+      - reversible commands require Guardian observation
+      - partial-reversible commands require Council majority attestation
+      - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
+      - audit output must retain only instruction_digest, never the raw instruction
+  observe:
+    summary: Read one digest-only device state summary without persisting raw sensor data into the audit log.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+        properties:
+          handle_id:
+            type: string
+            minLength: 8
+    output:
+      inline_schema:
+        type: object
+        required:
+          - schema_version
+          - handle_id
+          - device_id
+          - observed_at
+          - safety_status
+          - actuator_state
+          - last_command_id
+          - last_command_status
+          - sensor_summary_ref
+          - audit_event_ref
+        properties:
+          schema_version:
+            type: string
+            const: "1.0"
+          handle_id:
+            type: string
+            minLength: 8
+          device_id:
+            type: string
+            minLength: 1
+          observed_at:
+            type: string
+            format: date-time
+          safety_status:
+            type: string
+            const: held
+          actuator_state:
+            type: string
+            enum:
+              - idle
+              - executing
+              - offline
+          last_command_id:
+            type: string
+          last_command_status:
+            type: string
+            enum:
+              - none
+              - executed
+              - vetoed
+          sensor_summary_ref:
+            type: string
+            minLength: 1
+          audit_event_ref:
+            type: string
+            minLength: 1
+  release:
+    summary: Force-release one device handle after work completion, timeout, or emergency stop.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - reason
+        properties:
+          handle_id:
+            type: string
+            minLength: 8
+          reason:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: ewa_audit
+    guarantees:
+      - release must be append-only and terminal for the handle lifecycle
+      - released handles must reject future command or observe calls
+events:
+  ewa.handle_acquired:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - device_id
+          - status
+        properties:
+          handle_id:
+            type: string
+            minLength: 8
+          device_id:
+            type: string
+            minLength: 1
+          status:
+            type: string
+            const: acquired
+  ewa.command_recorded:
+    payload:
+      schema_ref: ewa_audit
+  ewa.handle_released:
+    payload:
+      schema_ref: ewa_audit
+compatibility:
+  stability: bootstrap
+  notes:
+    - This contract proves only bounded safety gating for physical actuation.
+    - Device-specific motor semantics and jurisdiction-specific legal compliance remain future work.

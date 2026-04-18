@@ -12,6 +12,8 @@
 - `memory_crystal_manifest.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
+- `ewa_command.schema`
+- `ewa_audit.schema`
 - `world_state.schema`
 - `wms_reconcile.schema`
 - `substrate_allocation.schema`
@@ -40,8 +42,8 @@
 
 ## 次段階
 
-episodic event / IMC/EWA handshake は reference runtime の対象が
-広がる段階で追加する。
+episodic event / richer sensory loopback artifacts は
+reference runtime の対象が広がる段階で追加する。
 
 ## 形式
 

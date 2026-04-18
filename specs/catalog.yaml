@@ -286,12 +286,43 @@ entries:
       - reference-runtime
     rationale: Required to make the L6 Inter-Mind Channel boundary machine-readable before collective or merge-thought work lands.
   - priority: P1
+    kind: schema
+    file: specs/schemas/ewa_command.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to serialize one ethics-attested EWA command with reversibility, Council mode, and self-consent gates.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/ewa_audit.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to persist append-only EWA audit entries without storing raw instructions or sensor payloads.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.ewa.v0.idl
+    consumers:
+      - docs/02-subsystems/interface/README.md
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to make the L6 External World Agent boundary machine-readable before real device adapters land.
+  - priority: P1
     kind: eval
     file: evals/interface/imc_disclosure_floor.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the disclosure floor, sealed-field redaction, and unilateral emergency disconnect at the IMC boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_irreversible_veto.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects Guardian-observed reversible actuation, blocked-token veto, digest-only audit, and forced release at the EWA boundary.
   - priority: P1
     kind: eval
     file: evals/continuity/continuity_chain_self_modify.yaml

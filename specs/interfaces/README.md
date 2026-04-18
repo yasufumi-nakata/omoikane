@@ -15,6 +15,7 @@
 - `governance.oversight.v0.idl`
 - `governance.naming.v0.idl`
 - `interface.bdb.v0.idl`
+- `interface.ewa.v0.idl`
 - `interface.wms.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`
@@ -23,7 +24,7 @@
 ## 次段階
 
 L1 scheduler/broker/termination、L2 connectome/memory、L3 cognitive、
-L6 interface の残り（IMC/EWA）は
+L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、
 IDL 化は service 境界が安定してから行う。

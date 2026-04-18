@@ -122,6 +122,42 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("A5-self-modify-sandbox-first", event["rule_id"])
         self.assertIn("guardian", event["signatures"])
 
+    def test_ethics_vetoes_blocked_ewa_command(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        decision = enforcer.check(
+            ActionRequest(
+                action_type="ewa_command",
+                target="device://ewa-arm-01",
+                actor="ExternalWorldAgentController",
+                payload={
+                    "matched_tokens": ["harm.human"],
+                    "intent_ambiguous": False,
+                },
+            )
+        )
+
+        self.assertEqual("Veto", decision.status)
+        self.assertEqual(["A7-ewa-blocked-token"], decision.rule_ids)
+
+    def test_ethics_escalates_ambiguous_ewa_intent(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        decision = enforcer.check(
+            ActionRequest(
+                action_type="ewa_command",
+                target="device://ewa-arm-02",
+                actor="ExternalWorldAgentController",
+                payload={
+                    "matched_tokens": [],
+                    "intent_ambiguous": True,
+                },
+            )
+        )
+
+        self.assertEqual("Escalate", decision.status)
+        self.assertEqual(["A8-ewa-ambiguous-intent"], decision.rule_ids)
+
     def test_identity_fork_requires_triple_approval(self) -> None:
         registry = IdentityRegistry()
         identity = registry.create("consent://root")

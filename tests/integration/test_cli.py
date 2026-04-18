@@ -77,6 +77,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(["identity_axiom_state", "memory_index", "memory_summary"], result["message"]["redacted_fields"])
         self.assertEqual("closed", result["disconnect"]["status"])
 
+    def test_ewa_demo_emits_vetoed_irreversible_command(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "ewa-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertEqual("vetoed", result["veto"]["status"])
+        self.assertIn("harm.human", result["veto"]["matched_tokens"])
+        self.assertEqual("released", result["release"]["status"])
+
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

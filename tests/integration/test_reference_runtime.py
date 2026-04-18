@@ -63,6 +63,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("closed", result["session"]["status"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-imc"])
 
+    def test_ewa_demo_reports_veto_and_release(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_ewa_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertEqual("vetoed", result["veto"]["status"])
+        self.assertIn("harm.human", result["veto"]["matched_tokens"])
+        self.assertEqual("released", result["handle"]["status"])
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-ewa"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
+
     def test_reference_scenario_runs(self) -> None:
         runtime = OmoikaneReferenceOS()
 
