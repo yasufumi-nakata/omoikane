@@ -1127,7 +1127,68 @@ class OmoikaneReferenceOS:
         )
         handoff_result = self.scheduler.advance(scheduled["handle_id"], "active-handoff")
         final_handle = self.scheduler.observe(scheduled["handle_id"])
-        validation = self.scheduler.validate_handle(final_handle)
+        method_a_validation = self.scheduler.validate_handle(final_handle)
+
+        method_b_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-b/v1",
+            metadata={"display_name": "Parallel Run Sandbox"},
+        )
+        method_b_plan = self.scheduler.build_method_b_plan(method_b_identity.identity_id)
+        method_b_scheduled = self.scheduler.schedule(method_b_plan)
+        method_b_shadow = self.scheduler.advance(method_b_scheduled["handle_id"], "shadow-sync")
+        method_b_signal_pause = self.scheduler.handle_substrate_signal(
+            method_b_scheduled["handle_id"],
+            severity="degraded",
+            source_substrate="classical_silicon.shadow",
+            reason="replication jitter exceeded bounded sync budget",
+        )
+        method_b_resume = self.scheduler.resume(method_b_scheduled["handle_id"])
+        method_b_review = self.scheduler.advance(
+            method_b_scheduled["handle_id"],
+            "dual-channel-review",
+        )
+        method_b_signal_rollback = self.scheduler.handle_substrate_signal(
+            method_b_scheduled["handle_id"],
+            severity="critical",
+            source_substrate="classical_silicon.shadow",
+            reason="authority sync diverged beyond reversible threshold",
+        )
+        method_b_after_signal = self.scheduler.observe(method_b_scheduled["handle_id"])
+        method_b_review_retry = self.scheduler.advance(
+            method_b_scheduled["handle_id"],
+            "dual-channel-review",
+        )
+        method_b_handoff = self.scheduler.advance(
+            method_b_scheduled["handle_id"],
+            "authority-handoff",
+        )
+        method_b_retirement = self.scheduler.advance(
+            method_b_scheduled["handle_id"],
+            "bio-retirement",
+        )
+        method_b_final = self.scheduler.observe(method_b_scheduled["handle_id"])
+        method_b_validation = self.scheduler.validate_handle(method_b_final)
+
+        method_c_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-c/v1",
+            metadata={"display_name": "Destructive Scan Sandbox"},
+        )
+        method_c_plan = self.scheduler.build_method_c_plan(method_c_identity.identity_id)
+        method_c_scheduled = self.scheduler.schedule(method_c_plan)
+        method_c_consent = self.scheduler.advance(method_c_scheduled["handle_id"], "consent-lock")
+        method_c_signal_fail = self.scheduler.handle_substrate_signal(
+            method_c_scheduled["handle_id"],
+            severity="critical",
+            source_substrate="classical_silicon.scan-array",
+            reason="scan commit lost redundancy and must fail closed",
+        )
+        method_c_final = self.scheduler.observe(method_c_scheduled["handle_id"])
+        method_c_validation = self.scheduler.validate_handle(method_c_final)
+        all_validations = {
+            "method_a": method_a_validation,
+            "method_b": method_b_validation,
+            "method_c": method_c_validation,
+        }
 
         return {
             "identity": {
@@ -1136,6 +1197,11 @@ class OmoikaneReferenceOS:
             },
             "profile": self.scheduler.reference_profile(),
             "plan": plan,
+            "plans": {
+                "method_a": plan,
+                "method_b": method_b_plan,
+                "method_c": method_c_plan,
+            },
             "substrate": {
                 "allocation": asdict(allocation),
                 "attestation": asdict(attestation),
@@ -1155,16 +1221,57 @@ class OmoikaneReferenceOS:
                 "retry_bdb_bridge": retry_bdb,
                 "identity_confirmation": confirmation_result,
                 "active_handoff": handoff_result,
+                "method_b": {
+                    "scheduled": method_b_scheduled,
+                    "shadow_sync": method_b_shadow,
+                    "signal_pause": method_b_signal_pause,
+                    "resume": method_b_resume,
+                    "dual_channel_review": method_b_review,
+                    "signal_rollback": method_b_signal_rollback,
+                    "after_signal": method_b_after_signal,
+                    "dual_channel_review_retry": method_b_review_retry,
+                    "authority_handoff": method_b_handoff,
+                    "bio_retirement": method_b_retirement,
+                },
+                "method_c": {
+                    "scheduled": method_c_scheduled,
+                    "consent_lock": method_c_consent,
+                    "signal_fail": method_c_signal_fail,
+                },
             },
             "final_handle": final_handle,
+            "method_b_final_handle": method_b_final,
+            "method_c_final_handle": method_c_final,
+            "handle_validations": all_validations,
             "validation": {
-                **validation,
+                "ok": all(item["ok"] for item in all_validations.values()),
+                "errors": (
+                    method_a_validation["errors"]
+                    + method_b_validation["errors"]
+                    + method_c_validation["errors"]
+                ),
+                "history_length": method_a_validation["history_length"],
+                "rollback_count": method_a_validation["rollback_count"],
+                "status": method_a_validation["status"],
                 "method_a_fixed": [stage["stage_id"] for stage in plan["stages"]]
                 == [
                     "scan-baseline",
                     "bdb-bridge",
                     "identity-confirmation",
                     "active-handoff",
+                ],
+                "method_b_fixed": [stage["stage_id"] for stage in method_b_plan["stages"]]
+                == [
+                    "shadow-sync",
+                    "dual-channel-review",
+                    "authority-handoff",
+                    "bio-retirement",
+                ],
+                "method_c_fixed": [stage["stage_id"] for stage in method_c_plan["stages"]]
+                == [
+                    "consent-lock",
+                    "scan-commit",
+                    "activation-review",
                 ],
                 "order_violation_blocked": "stage order violation" in order_violation_message,
                 "timeout_rolled_back": timeout["action"] == "rollback"
@@ -1174,6 +1281,17 @@ class OmoikaneReferenceOS:
                 and resumed["status"] == "advancing",
                 "completed": final_handle["status"] == "completed"
                 and handoff_result["status"] == "completed",
+                "method_b_signal_paused": method_b_signal_pause["action"] == "pause"
+                and method_b_signal_pause["status"] == "paused"
+                and method_b_resume["status"] == "advancing",
+                "method_b_signal_rolled_back": method_b_signal_rollback["action"] == "rollback"
+                and method_b_signal_rollback["rollback_target"] == "dual-channel-review"
+                and method_b_after_signal["current_stage"] == "dual-channel-review",
+                "method_b_completed": method_b_retirement["status"] == "completed"
+                and method_b_final["status"] == "completed",
+                "method_c_fail_closed": method_c_signal_fail["action"] == "fail"
+                and method_c_signal_fail["stage_id"] == "scan-commit"
+                and method_c_final["status"] == "failed",
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/ascension_plan.schema"
 title: AscensionPlan
-description: Multi-stage plan to migrate an identity into Active state.
+description: Multi-stage plan to migrate an identity into Active state using one fixed reference blueprint per method.
 type: object
 additionalProperties: false
 required:
@@ -70,6 +70,24 @@ allOf:
         stages:
           minItems: 4
           maxItems: 4
+  - if:
+      properties:
+        method:
+          const: B
+    then:
+      properties:
+        stages:
+          minItems: 4
+          maxItems: 4
+  - if:
+      properties:
+        method:
+          const: C
+    then:
+      properties:
+        stages:
+          minItems: 3
+          maxItems: 3
 examples:
   - kind: ascension_plan
     schema_version: 1.0.0
@@ -93,5 +111,49 @@ examples:
         precondition: identity-confirmation:passed
         timeout_ms: 300000
         rollback_to: bdb-bridge
+    ethics_attestation_required: true
+    council_attestation_required: true
+  - kind: ascension_plan
+    schema_version: 1.0.0
+    plan_id: plan-method-b-001
+    identity_id: identity://parallel-sandbox
+    method: B
+    stages:
+      - stage_id: shadow-sync
+        precondition: pre-upload-consent
+        timeout_ms: 2592000000
+        rollback_to: null
+      - stage_id: dual-channel-review
+        precondition: shadow-sync:stable
+        timeout_ms: 86400000
+        rollback_to: shadow-sync
+      - stage_id: authority-handoff
+        precondition: dual-channel-review:attested
+        timeout_ms: 600000
+        rollback_to: dual-channel-review
+      - stage_id: bio-retirement
+        precondition: authority-handoff:confirmed
+        timeout_ms: 604800000
+        rollback_to: null
+    ethics_attestation_required: true
+    council_attestation_required: true
+  - kind: ascension_plan
+    schema_version: 1.0.0
+    plan_id: plan-method-c-001
+    identity_id: identity://destructive-scan-sandbox
+    method: C
+    stages:
+      - stage_id: consent-lock
+        precondition: pre-upload-consent+human-review
+        timeout_ms: 604800000
+        rollback_to: null
+      - stage_id: scan-commit
+        precondition: consent-lock:confirmed
+        timeout_ms: 300000
+        rollback_to: null
+      - stage_id: activation-review
+        precondition: scan-commit:completed
+        timeout_ms: 1800000
+        rollback_to: null
     ethics_attestation_required: true
     council_attestation_required: true

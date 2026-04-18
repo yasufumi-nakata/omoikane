@@ -296,6 +296,61 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
 
+    def test_ascension_scheduler_method_b_substrate_signal_pauses_and_rolls_back(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_b_plan("identity://scheduler-method-b")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "shadow-sync")
+
+        paused = scheduler.handle_substrate_signal(
+            handle["handle_id"],
+            severity="degraded",
+            source_substrate="classical_silicon.shadow",
+            reason="replication jitter exceeded threshold",
+        )
+        resumed = scheduler.resume(handle["handle_id"])
+        scheduler.advance(handle["handle_id"], "dual-channel-review")
+        rollback = scheduler.handle_substrate_signal(
+            handle["handle_id"],
+            severity="critical",
+            source_substrate="classical_silicon.shadow",
+            reason="authority sync diverged",
+        )
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("pause", paused["action"])
+        self.assertEqual("paused", paused["status"])
+        self.assertEqual("advancing", resumed["status"])
+        self.assertEqual("rollback", rollback["action"])
+        self.assertEqual("dual-channel-review", rollback["rollback_target"])
+        self.assertEqual("rolled-back", observed["status"])
+        self.assertEqual("dual-channel-review", observed["current_stage"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_method_c_fails_closed_on_critical_signal(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_c_plan("identity://scheduler-method-c")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "consent-lock")
+
+        signal = scheduler.handle_substrate_signal(
+            handle["handle_id"],
+            severity="critical",
+            source_substrate="classical_silicon.scan-array",
+            reason="scan commit lost redundancy",
+        )
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("fail", signal["action"])
+        self.assertEqual("scan-commit", signal["stage_id"])
+        self.assertEqual("failed", observed["status"])
+        self.assertEqual("scan-commit", observed["current_stage"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+        self.assertTrue(ledger.verify()["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

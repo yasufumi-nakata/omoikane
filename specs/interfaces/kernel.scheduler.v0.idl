@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: kernel.scheduler.v0
 service: AscensionSchedulerService
-summary: Method A ascension stage machine and timeout rollback contract for the reference runtime.
+summary: Method A/B/C ascension stage machine and substrate failover contract for the reference runtime.
 imports:
   ascension_plan: ../schemas/ascension_plan.schema
   schedule_handle: ../schemas/schedule_handle.schema
@@ -14,7 +14,7 @@ operations:
     output:
       schema_ref: schedule_handle
   advance:
-    summary: Complete the active stage and open the next Method A stage in fixed order.
+    summary: Complete the active stage and open the next stage in the fixed Method A/B/C reference blueprint.
     input:
       inline_schema:
         type: object
@@ -102,7 +102,7 @@ operations:
     output:
       schema_ref: schedule_handle
   enforce_timeout:
-    summary: Detect a stage timeout and automatically roll back or fail according to the plan.
+    summary: Detect a stage timeout and automatically roll back or fail according to the active stage policy.
     input:
       inline_schema:
         type: object
@@ -141,6 +141,69 @@ operations:
           action:
             type: string
             enum:
+              - rollback
+              - fail
+          rollback_target:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+          continuity_event_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+  handle_substrate_signal:
+    summary: Pause, roll back, or fail-closed one schedule in response to a SubstrateBroker signal.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - severity
+          - source_substrate
+          - reason
+        properties:
+          handle_id:
+            type: string
+          severity:
+            type: string
+            enum:
+              - watch
+              - degraded
+              - critical
+          source_substrate:
+            type: string
+          reason:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - plan_ref
+          - stage_id
+          - severity
+          - source_substrate
+          - action
+          - status
+          - continuity_event_refs
+        properties:
+          handle_id:
+            type: string
+          plan_ref:
+            type: string
+          stage_id:
+            type: string
+          severity:
+            type: string
+          source_substrate:
+            type: string
+          action:
+            type: string
+            enum:
+              - pause
               - rollback
               - fail
           rollback_target:

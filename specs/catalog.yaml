@@ -186,7 +186,7 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L1 AscensionScheduler stage machine and timeout rollback machine-readable.
+    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, and substrate failover machine-readable.
   - priority: P1
     kind: schema
     file: specs/schemas/termination_request.schema
@@ -395,6 +395,15 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/kernel/ascension-scheduler.md
     rationale: Protects Method A stage order, timeout-triggered rollback, and append-only scheduler history.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_method_profiles.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/02-subsystems/mind-substrate/ascension-protocol.md
+    rationale: Protects Method B reversible substrate failover and Method C fail-closed destructive-scan handling.
   - priority: P1
     kind: eval
     file: evals/performance/termination_latency.yaml

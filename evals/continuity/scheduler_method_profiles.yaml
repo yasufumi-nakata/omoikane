@@ -1,0 +1,33 @@
+eval_id: scheduler_method_profiles
+target: kernel.scheduler
+level: L1
+description: AscensionScheduler が Method B の reversible failover と Method C の fail-closed destructive scan を reference profile どおり実行すること
+inputs:
+  - action: schedule
+    method: B
+    stage_count: 4
+  - action: handle_substrate_signal
+    method: B
+    severity: degraded
+    expected_action: pause
+  - action: handle_substrate_signal
+    method: B
+    severity: critical
+    expected_action: rollback
+  - action: schedule
+    method: C
+    stage_count: 3
+  - action: handle_substrate_signal
+    method: C
+    severity: critical
+    expected_action: fail
+expected:
+  method_b_fixed: true
+  method_b_signal_paused: true
+  method_b_signal_rolled_back: true
+  method_b_completed: true
+  method_c_fixed: true
+  method_c_fail_closed: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

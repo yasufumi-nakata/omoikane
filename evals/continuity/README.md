@@ -25,6 +25,10 @@ substrate 移行前後で連続性ログにギャップがないか。
 ### Scheduler Stage Rollback
 AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ戻せるか。
 
+### Scheduler Method Profiles
+AscensionScheduler が Method B では substrate signal で pause / rollback し、
+Method C では destructive scan 開始後に fail-closed するか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 

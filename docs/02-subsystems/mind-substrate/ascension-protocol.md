@@ -36,6 +36,10 @@ ContinuityLedger 互換 event ref、置換比率の増減を proxy 実装する
 - 移譲後の生体は安楽な「廃用」状態へ
 
 **前提**: 高精度連続スキャン、二重身の主観統合プロトコル
+**reference runtime で検証済みの最小 contract**:
+`kernel.scheduler.v0` は `shadow-sync → dual-channel-review → authority-handoff → bio-retirement`
+の固定 profile を持ち、degraded substrate signal を pause、
+critical signal を `dual-channel-review` への rollback として扱う
 **未解決**: 「二つの自分」の主観統合は本当に可能か → 連続性ガード [docs/05-research-frontiers/twin-integration.md](../../05-research-frontiers/twin-integration.md)
 
 ### Method C: Destructive Scan（破壊スキャン）
@@ -50,6 +54,10 @@ ContinuityLedger 互換 event ref、置換比率の増減を proxy 実装する
 
 **前提**: スキャン精度の十分性、同時性保証
 **強制条件**: 本人の事前明確同意、複数回の確認、撤回可能期間、第三者立会
+**reference runtime で検証済みの最小 contract**:
+`kernel.scheduler.v0` は `consent-lock → scan-commit → activation-review`
+の固定 profile を持ち、`scan-commit` 開始後は rollback target を持たず、
+critical substrate signal で fail-closed する
 **未解決**: スキャン精度の必要十分性 → [docs/05-research-frontiers/scan-fidelity.md](../../05-research-frontiers/scan-fidelity.md)
 
 ## 共通プロトコル

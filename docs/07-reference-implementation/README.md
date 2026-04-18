@@ -52,7 +52,8 @@ python3 -m unittest discover -s tests -t .
 (`kernel.scheduler.v0`) を JSON で可視化し、
 Method A の 4 stage blueprint、順序違反の reject、
 `identity-confirmation` timeout 超過時の `bdb-bridge` への自動 rollback、
-pause / resume 後の `active-handoff` 完了を 1 シナリオで確認する。
+Method B の degraded / critical substrate signal に対する pause / rollback、
+Method C の `scan-commit` fail-closed を 1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -155,6 +156,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - L3 reasoning 以外の cognitive backends と cross-service failover
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- AscensionScheduler の Method B/C 実行面と SubstrateBroker-triggered pause/failover hook
+- AscensionScheduler の臨床・法務向け attest / witness / consent artifact 接続
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

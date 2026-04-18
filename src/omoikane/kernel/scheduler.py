@@ -10,7 +10,7 @@ from .continuity import ContinuityLedger
 
 SCHEDULER_SCHEMA_VERSION = "1.0.0"
 SCHEDULER_ALLOWED_METHODS = {"A", "B", "C"}
-SCHEDULER_EXECUTABLE_METHODS = {"A"}
+SCHEDULER_EXECUTABLE_METHODS = {"A", "B", "C"}
 SCHEDULER_ALLOWED_STATUS = {
     "scheduled",
     "advancing",
@@ -29,6 +29,7 @@ SCHEDULER_ALLOWED_TRANSITIONS = {
     "cancel",
     "fail",
 }
+SCHEDULER_SIGNAL_SEVERITIES = {"watch", "degraded", "critical"}
 METHOD_A_STAGE_BLUEPRINT = (
     {
         "stage_id": "scan-baseline",
@@ -55,10 +56,61 @@ METHOD_A_STAGE_BLUEPRINT = (
         "rollback_to": "bdb-bridge",
     },
 )
+METHOD_B_STAGE_BLUEPRINT = (
+    {
+        "stage_id": "shadow-sync",
+        "precondition": "pre-upload-consent",
+        "timeout_ms": 2_592_000_000,
+        "rollback_to": None,
+    },
+    {
+        "stage_id": "dual-channel-review",
+        "precondition": "shadow-sync:stable",
+        "timeout_ms": 86_400_000,
+        "rollback_to": "shadow-sync",
+    },
+    {
+        "stage_id": "authority-handoff",
+        "precondition": "dual-channel-review:attested",
+        "timeout_ms": 600_000,
+        "rollback_to": "dual-channel-review",
+    },
+    {
+        "stage_id": "bio-retirement",
+        "precondition": "authority-handoff:confirmed",
+        "timeout_ms": 604_800_000,
+        "rollback_to": None,
+    },
+)
+METHOD_C_STAGE_BLUEPRINT = (
+    {
+        "stage_id": "consent-lock",
+        "precondition": "pre-upload-consent+human-review",
+        "timeout_ms": 604_800_000,
+        "rollback_to": None,
+    },
+    {
+        "stage_id": "scan-commit",
+        "precondition": "consent-lock:confirmed",
+        "timeout_ms": 300_000,
+        "rollback_to": None,
+    },
+    {
+        "stage_id": "activation-review",
+        "precondition": "scan-commit:completed",
+        "timeout_ms": 1_800_000,
+        "rollback_to": None,
+    },
+)
+METHOD_STAGE_BLUEPRINTS = {
+    "A": METHOD_A_STAGE_BLUEPRINT,
+    "B": METHOD_B_STAGE_BLUEPRINT,
+    "C": METHOD_C_STAGE_BLUEPRINT,
+}
 
 
 class AscensionScheduler:
-    """Deterministic Method A scheduler and rollback engine."""
+    """Deterministic Method A/B/C scheduler and substrate failover engine."""
 
     def __init__(self, ledger: ContinuityLedger) -> None:
         self.ledger = ledger
@@ -70,13 +122,32 @@ class AscensionScheduler:
             "schema_version": SCHEDULER_SCHEMA_VERSION,
             "accepted_plan_methods": sorted(SCHEDULER_ALLOWED_METHODS),
             "executable_methods": sorted(SCHEDULER_EXECUTABLE_METHODS),
-            "method_a_blueprint": self._method_a_stages(),
+            "method_profiles": {
+                "A": {
+                    "stages": self._method_stages("A"),
+                    "reversibility": "reversible through active-handoff rollback target",
+                },
+                "B": {
+                    "stages": self._method_stages("B"),
+                    "reversibility": "reversible until authority handoff completes",
+                },
+                "C": {
+                    "stages": self._method_stages("C"),
+                    "reversibility": "fail-closed once destructive scan begins",
+                },
+            },
             "status_values": sorted(SCHEDULER_ALLOWED_STATUS),
             "history_transitions": sorted(SCHEDULER_ALLOWED_TRANSITIONS),
             "timeout_policy": {
                 "auto_rollback": True,
                 "fail_when_no_rollback_target": True,
                 "continuity_append_required_before_commit": True,
+            },
+            "substrate_signal_policy": {
+                "watch": "pause",
+                "degraded": "pause",
+                "critical_with_rollback_target": "rollback",
+                "critical_without_rollback_target": "fail-closed",
             },
         }
 
@@ -88,17 +159,45 @@ class AscensionScheduler:
         ethics_attestation_required: bool = True,
         council_attestation_required: bool = True,
     ) -> Dict[str, Any]:
-        normalized_identity_id = self._normalize_non_empty_string(identity_id, "identity_id")
-        return {
-            "kind": "ascension_plan",
-            "schema_version": SCHEDULER_SCHEMA_VERSION,
-            "plan_id": plan_id or new_id("ascension-plan"),
-            "identity_id": normalized_identity_id,
-            "method": "A",
-            "stages": self._method_a_stages(),
-            "ethics_attestation_required": ethics_attestation_required,
-            "council_attestation_required": council_attestation_required,
-        }
+        return self._build_plan(
+            identity_id,
+            method="A",
+            plan_id=plan_id,
+            ethics_attestation_required=ethics_attestation_required,
+            council_attestation_required=council_attestation_required,
+        )
+
+    def build_method_b_plan(
+        self,
+        identity_id: str,
+        *,
+        plan_id: Optional[str] = None,
+        ethics_attestation_required: bool = True,
+        council_attestation_required: bool = True,
+    ) -> Dict[str, Any]:
+        return self._build_plan(
+            identity_id,
+            method="B",
+            plan_id=plan_id,
+            ethics_attestation_required=ethics_attestation_required,
+            council_attestation_required=council_attestation_required,
+        )
+
+    def build_method_c_plan(
+        self,
+        identity_id: str,
+        *,
+        plan_id: Optional[str] = None,
+        ethics_attestation_required: bool = True,
+        council_attestation_required: bool = True,
+    ) -> Dict[str, Any]:
+        return self._build_plan(
+            identity_id,
+            method="C",
+            plan_id=plan_id,
+            ethics_attestation_required=ethics_attestation_required,
+            council_attestation_required=council_attestation_required,
+        )
 
     def schedule(self, plan: Mapping[str, Any]) -> Dict[str, Any]:
         normalized_plan = self.validate_plan(plan)
@@ -218,10 +317,14 @@ class AscensionScheduler:
         handle = self._require_handle(handle_id)
         plan = self._require_plan(handle["plan_ref"])
         target_stage = self._normalize_non_empty_string(to_stage_id, "to_stage_id")
-        current_index = self._stage_index(plan, handle["current_stage"])
-        rollback_index = self._stage_index(plan, target_stage)
-        if rollback_index > current_index:
-            raise ValueError("rollback target must not be ahead of the current stage")
+        current_stage = self._stage_definition(plan, handle["current_stage"])
+        rollback_target = current_stage["rollback_to"]
+        if rollback_target is None:
+            raise ValueError(f"stage {current_stage['stage_id']} does not allow rollback")
+        if target_stage != rollback_target:
+            raise ValueError(
+                f"rollback target for {current_stage['stage_id']} must be {rollback_target}"
+            )
         handle["current_stage"] = target_stage
         handle["status"] = "rolled-back"
         self._append_history(
@@ -292,6 +395,82 @@ class AscensionScheduler:
             "handle": rolled_back,
         }
 
+    def handle_substrate_signal(
+        self,
+        handle_id: str,
+        *,
+        severity: str,
+        source_substrate: str,
+        reason: str,
+    ) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        if handle["status"] in {"completed", "cancelled", "failed"}:
+            raise ValueError(f"cannot process substrate signal in status {handle['status']}")
+
+        plan = self._require_plan(handle["plan_ref"])
+        stage = self._stage_definition(plan, handle["current_stage"])
+        normalized_severity = self._normalize_signal_severity(severity)
+        normalized_source = self._normalize_non_empty_string(
+            source_substrate,
+            "source_substrate",
+        )
+        normalized_reason = self._normalize_non_empty_string(reason, "reason")
+        signal_reason = (
+            f"substrate signal {normalized_severity} from {normalized_source}: {normalized_reason}"
+        )
+
+        if normalized_severity in {"watch", "degraded"}:
+            paused = self.pause(handle_id, signal_reason)
+            return {
+                "handle_id": handle["handle_id"],
+                "plan_ref": handle["plan_ref"],
+                "stage_id": stage["stage_id"],
+                "severity": normalized_severity,
+                "source_substrate": normalized_source,
+                "action": "pause",
+                "rollback_target": None,
+                "status": paused["status"],
+                "continuity_event_refs": [paused["history"][-1]["continuity_event_ref"]],
+                "handle": paused,
+            }
+
+        fail_ref = self._append_history(
+            handle,
+            stage_id=stage["stage_id"],
+            transition="fail",
+            reason=signal_reason,
+        )
+        rollback_target = stage["rollback_to"]
+        if rollback_target is None:
+            handle["status"] = "failed"
+            handle["closed_at"] = utc_now_iso()
+            return {
+                "handle_id": handle["handle_id"],
+                "plan_ref": handle["plan_ref"],
+                "stage_id": stage["stage_id"],
+                "severity": normalized_severity,
+                "source_substrate": normalized_source,
+                "action": "fail",
+                "rollback_target": None,
+                "status": handle["status"],
+                "continuity_event_refs": [fail_ref],
+                "handle": deepcopy(handle),
+            }
+
+        rolled_back = self.rollback(handle_id, rollback_target, reason=signal_reason)
+        return {
+            "handle_id": handle["handle_id"],
+            "plan_ref": handle["plan_ref"],
+            "stage_id": stage["stage_id"],
+            "severity": normalized_severity,
+            "source_substrate": normalized_source,
+            "action": "rollback",
+            "rollback_target": rollback_target,
+            "status": rolled_back["status"],
+            "continuity_event_refs": [fail_ref, rolled_back["history"][-1]["continuity_event_ref"]],
+            "handle": rolled_back,
+        }
+
     def cancel(self, handle_id: str, reason: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
         if handle["status"] in {"completed", "cancelled", "failed"}:
@@ -326,10 +505,11 @@ class AscensionScheduler:
                 "council_attestation_required",
             ),
         }
-        if normalized["method"] == "A":
-            expected = self._method_a_stages()
-            if normalized["stages"] != expected:
-                raise ValueError("method A must use the fixed four-stage reference blueprint")
+        expected = self._method_stages(normalized["method"])
+        if normalized["stages"] != expected:
+            raise ValueError(
+                f"method {normalized['method']} must use the fixed reference blueprint"
+            )
         return normalized
 
     def validate_handle(self, handle: Mapping[str, Any]) -> Dict[str, Any]:
@@ -497,6 +677,14 @@ class AscensionScheduler:
             raise ValueError(f"method must be one of {sorted(SCHEDULER_ALLOWED_METHODS)}")
         return method
 
+    def _normalize_signal_severity(self, value: Any) -> str:
+        severity = self._normalize_non_empty_string(value, "severity")
+        if severity not in SCHEDULER_SIGNAL_SEVERITIES:
+            raise ValueError(
+                f"severity must be one of {sorted(SCHEDULER_SIGNAL_SEVERITIES)}"
+            )
+        return severity
+
     def _normalize_positive_int(self, value: Any, field_name: str) -> int:
         if not isinstance(value, int) or value < 1:
             raise ValueError(f"{field_name} must be a positive integer")
@@ -519,4 +707,29 @@ class AscensionScheduler:
             errors.append(f"{field_name} must be a non-empty string")
 
     def _method_a_stages(self) -> List[Dict[str, Any]]:
-        return [dict(stage) for stage in METHOD_A_STAGE_BLUEPRINT]
+        return self._method_stages("A")
+
+    def _method_stages(self, method: str) -> List[Dict[str, Any]]:
+        return [deepcopy(stage) for stage in METHOD_STAGE_BLUEPRINTS[method]]
+
+    def _build_plan(
+        self,
+        identity_id: str,
+        *,
+        method: str,
+        plan_id: Optional[str],
+        ethics_attestation_required: bool,
+        council_attestation_required: bool,
+    ) -> Dict[str, Any]:
+        normalized_identity_id = self._normalize_non_empty_string(identity_id, "identity_id")
+        normalized_method = self._normalize_method(method)
+        return {
+            "kind": "ascension_plan",
+            "schema_version": SCHEDULER_SCHEMA_VERSION,
+            "plan_id": plan_id or new_id("ascension-plan"),
+            "identity_id": normalized_identity_id,
+            "method": normalized_method,
+            "stages": self._method_stages(normalized_method),
+            "ethics_attestation_required": ethics_attestation_required,
+            "council_attestation_required": council_attestation_required,
+        }

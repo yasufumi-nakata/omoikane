@@ -168,10 +168,21 @@ class CliIntegrationTests(unittest.TestCase):
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["method_a_fixed"])
+        self.assertTrue(result["validation"]["method_b_fixed"])
+        self.assertTrue(result["validation"]["method_c_fixed"])
         self.assertTrue(result["validation"]["order_violation_blocked"])
         self.assertTrue(result["validation"]["timeout_rolled_back"])
+        self.assertTrue(result["validation"]["method_b_signal_paused"])
+        self.assertTrue(result["validation"]["method_b_signal_rolled_back"])
+        self.assertTrue(result["validation"]["method_b_completed"])
+        self.assertTrue(result["validation"]["method_c_fail_closed"])
         self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
         self.assertEqual("completed", result["final_handle"]["status"])
+        self.assertEqual(
+            "dual-channel-review",
+            result["scenarios"]["method_b"]["signal_rollback"]["rollback_target"],
+        )
+        self.assertEqual("fail", result["scenarios"]["method_c"]["signal_fail"]["action"])
 
     def test_council_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
