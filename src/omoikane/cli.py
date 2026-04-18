@@ -29,6 +29,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     version_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    naming_parser = subparsers.add_parser(
+        "naming-demo",
+        help="Emit the fixed naming policy for project romanization and sandbox self labels",
+    )
+    naming_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     connectome_parser = subparsers.add_parser(
         "connectome-demo",
         help="Emit a reference L2 connectome snapshot and validation summary",
@@ -148,6 +154,10 @@ def main() -> None:
 
     if args.command == "version-demo":
         _print_result(runtime.run_version_demo(), args.json)
+        return
+
+    if args.command == "naming-demo":
+        _print_result(runtime.run_naming_demo(), args.json)
         return
 
     if args.command == "connectome-demo":

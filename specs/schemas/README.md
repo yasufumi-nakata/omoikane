@@ -29,6 +29,8 @@
 - `trust_event.schema`
 - `trust_snapshot.schema`
 - `sandbox_signal.schema`
+- `naming_policy.schema`
+- `naming_validation.schema`
 - `release_manifest.schema`
 - `build_request.yaml`
 - `build_artifact.yaml`

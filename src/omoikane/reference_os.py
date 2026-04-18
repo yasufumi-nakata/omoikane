@@ -16,7 +16,13 @@ from .cognitive import (
     ReasoningService,
     SymbolicReasoningBackend,
 )
-from .governance import AmendmentService, AmendmentSignatures, OversightService, VersioningService
+from .governance import (
+    AmendmentService,
+    AmendmentSignatures,
+    NamingService,
+    OversightService,
+    VersioningService,
+)
 from .interface.bdb import BiologicalDigitalBridge
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -57,6 +63,7 @@ class OmoikaneReferenceOS:
         self.trust = TrustService()
         self.amendment = AmendmentService()
         self.oversight = OversightService(trust_service=self.trust)
+        self.naming = NamingService()
         self.versioning = VersioningService()
         self.gap_scanner = GapScanner()
         self.sandbox = SandboxSentinel()
@@ -342,6 +349,69 @@ class OmoikaneReferenceOS:
             "manifest": manifest,
             "validation": validation,
             "release_digest": self.versioning.release_digest(manifest),
+        }
+
+    def run_naming_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://naming-demo/v1",
+            metadata={"display_name": "Naming Policy Sandbox"},
+        )
+        reviews = {
+            "canonical_brand": self.naming.review_term(
+                "project_romanization",
+                "OmoikaneOS",
+                context="external_brand",
+            ),
+            "hyphenated_brand": self.naming.review_term(
+                "project_romanization",
+                "Omoi-KaneOS",
+                context="external_brand",
+            ),
+            "canonical_sandbox_name": self.naming.review_term(
+                "sandbox_self_name",
+                "Mirage Self",
+                context="user_facing_doc",
+            ),
+            "rejected_sandbox_name": self.naming.review_term(
+                "sandbox_self_name",
+                "Yumi Self",
+                context="user_facing_doc",
+            ),
+            "legacy_runtime_alias": self.naming.review_term(
+                "sandbox_self_name",
+                "SandboxSentinel",
+                context="code_identifier",
+            ),
+        }
+        validation = self.naming.validation_summary(reviews)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="governance.naming.validated",
+            payload={
+                "canonical_project_name": reviews["canonical_brand"]["suggestion"],
+                "canonical_sandbox_name": reviews["canonical_sandbox_name"]["suggestion"],
+                "rewrite_required_terms": [
+                    key for key, review in reviews.items() if review["status"] == "rewrite-required"
+                ],
+                "validation": validation,
+            },
+            actor="NamingService",
+            category="governance-naming",
+            layer="L4",
+            signature_roles=["council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": self.naming.policy_snapshot(),
+            "reviews": reviews,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
         }
 
     def run_amendment_demo(self) -> Dict[str, Any]:

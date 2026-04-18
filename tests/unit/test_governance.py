@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from omoikane.governance import AmendmentService, AmendmentSignatures, OversightService
+from omoikane.governance import AmendmentService, AmendmentSignatures, NamingService, OversightService
 from omoikane.agentic.trust import TrustService
 
 
@@ -115,6 +115,44 @@ class OversightServiceTests(unittest.TestCase):
         self.assertTrue(breached["pin_breach_propagated"])
         self.assertFalse(snapshot["pinned_by_human"])
         self.assertFalse(snapshot["eligibility"]["guardian_role"])
+
+
+class NamingServiceTests(unittest.TestCase):
+    def test_policy_snapshot_emits_fixed_canonical_names(self) -> None:
+        service = NamingService()
+
+        policy = service.policy_snapshot()
+
+        self.assertEqual("naming_policy", policy["kind"])
+        self.assertEqual("Omoikane", policy["rules"]["project_romanization"]["canonical"])
+        self.assertEqual("Mirage Self", policy["rules"]["sandbox_self_name"]["canonical"])
+        self.assertFalse(policy["enforcement"]["abbreviations_allowed"])
+
+    def test_review_term_rejects_hyphenated_brand(self) -> None:
+        service = NamingService()
+
+        result = service.review_term(
+            "project_romanization",
+            "Omoi-KaneOS",
+            context="external_brand",
+        )
+
+        self.assertEqual("rewrite-required", result["status"])
+        self.assertEqual("OmoikaneOS", result["suggestion"])
+        self.assertFalse(result["allowed_in_context"])
+
+    def test_review_term_allows_runtime_alias_only_in_code_context(self) -> None:
+        service = NamingService()
+
+        result = service.review_term(
+            "sandbox_self_name",
+            "SandboxSentinel",
+            context="code_identifier",
+        )
+
+        self.assertEqual("allowed-alias", result["status"])
+        self.assertTrue(result["allowed_in_context"])
+        self.assertEqual("Mirage Self", result["suggestion"])
 
 
 if __name__ == "__main__":

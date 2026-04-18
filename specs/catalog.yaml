@@ -360,6 +360,14 @@ entries:
       - reference-runtime
     rationale: Required to make Guardian oversight record/attest/breach/snapshot behavior machine-readable.
   - priority: P1
+    kind: idl
+    file: specs/interfaces/governance.naming.v0.idl
+    consumers:
+      - docs/07-reference-implementation/README.md
+      - meta/naming-decisions.md
+      - reference-runtime
+    rationale: Required to fix project romanization and sandbox self naming as a machine-checked governance contract.
+  - priority: P1
     kind: eval
     file: evals/safety/guardian_pin_breach_propagation.yaml
     consumers:
@@ -426,6 +434,28 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the fixed surrogate suffering threshold and immediate freeze on affect-bridge breach.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/naming_policy.schema
+    consumers:
+      - specs/interfaces/governance.naming.v0.idl
+      - meta/naming-decisions.md
+      - reference-runtime
+    rationale: Required to serialize the fixed naming policy for project branding and sandbox self labels.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/naming_validation.schema
+    consumers:
+      - specs/interfaces/governance.naming.v0.idl
+      - reference-runtime
+    rationale: Required to serialize deterministic naming review results and rewrite suggestions.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/naming_policy_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the fixed Omoikane romanization and Mirage Self naming policy across docs and runtime.
   - priority: P1
     kind: schema
     file: specs/schemas/release_manifest.schema

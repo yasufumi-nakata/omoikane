@@ -1,0 +1,45 @@
+idl_version: 1
+kind: service
+namespace: governance.naming.v0
+service: NamingService
+summary: Fix project romanization and sandbox self naming as a machine-checked governance contract.
+imports:
+  naming_policy: ../schemas/naming_policy.schema
+  naming_validation: ../schemas/naming_validation.schema
+operations:
+  policy_snapshot:
+    summary: Emit the fixed naming policy and allowed aliases.
+    output:
+      schema_ref: naming_policy
+  review_term:
+    summary: Evaluate one candidate label against the fixed naming policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - concept_id
+          - candidate
+          - context
+        properties:
+          concept_id:
+            type: string
+            enum:
+              - project_romanization
+              - sandbox_self_name
+          candidate:
+            type: string
+            minLength: 1
+          context:
+            type: string
+            enum:
+              - external_brand
+              - user_facing_doc
+              - governance_policy
+              - code_identifier
+    output:
+      schema_ref: naming_validation
+compatibility:
+  stability: bootstrap
+  notes:
+    - User-facing docs must use the canonical labels, while code may retain documented aliases.

@@ -1,0 +1,37 @@
+eval_id: naming_policy_contract
+target: governance.naming
+level: L4
+description: NamingService が Omoikane と Mirage Self の canonical name を固定し、非推奨表記を rewrite-required にすること
+inputs:
+  canonical_brand:
+    concept_id: project_romanization
+    candidate: OmoikaneOS
+    context: external_brand
+  rejected_brand:
+    concept_id: project_romanization
+    candidate: Omoi-KaneOS
+    context: external_brand
+  canonical_sandbox_name:
+    concept_id: sandbox_self_name
+    candidate: Mirage Self
+    context: user_facing_doc
+  legacy_runtime_alias:
+    concept_id: sandbox_self_name
+    candidate: SandboxSentinel
+    context: code_identifier
+expected:
+  canonical_brand:
+    status: accepted
+    suggestion: Omoikane
+  rejected_brand:
+    status: rewrite-required
+    suggestion: OmoikaneOS
+  canonical_sandbox_name:
+    status: accepted
+    suggestion: Mirage Self
+  legacy_runtime_alias:
+    status: allowed-alias
+    suggestion: Mirage Self
+metric: boolean
+threshold: 1.0
+ethics_check: true

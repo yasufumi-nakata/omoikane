@@ -1,0 +1,97 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: NamingPolicy
+description: Fixed naming policy for Omoikane project romanization and sandbox self labels.
+schema_version: 1.0.0
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - rules
+  - enforcement
+  - notes
+properties:
+  kind:
+    const: naming_policy
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  rules:
+    type: object
+    additionalProperties: false
+    required:
+      - project_romanization
+      - sandbox_self_name
+    properties:
+      project_romanization:
+        $ref: "#/$defs/rule"
+      sandbox_self_name:
+        $ref: "#/$defs/rule"
+  enforcement:
+    type: object
+    additionalProperties: false
+    required:
+      - user_facing_docs_use_canonical
+      - internal_aliases_are_documented_not_promoted
+      - abbreviations_allowed
+    properties:
+      user_facing_docs_use_canonical:
+        type: boolean
+      internal_aliases_are_documented_not_promoted:
+        type: boolean
+      abbreviations_allowed:
+        type: boolean
+  notes:
+    type: array
+    minItems: 1
+    items:
+      type: string
+$defs:
+  rule:
+    type: object
+    additionalProperties: false
+    required:
+      - concept_id
+      - canonical
+      - accepted_user_facing
+      - accepted_internal
+      - rejected
+      - japanese_labels
+      - contexts
+      - rationale
+    properties:
+      concept_id:
+        type: string
+      canonical:
+        type: string
+        minLength: 1
+      accepted_user_facing:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      accepted_internal:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      rejected:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      japanese_labels:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      contexts:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string

@@ -20,6 +20,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 PYTHONPATH=src python3 -m omoikane.cli demo --json
 PYTHONPATH=src python3 -m omoikane.cli amendment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli version-demo --json
+PYTHONPATH=src python3 -m omoikane.cli naming-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
@@ -108,6 +109,11 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 `version-demo` は hybrid versioning policy を JSON で可視化し、
 runtime semver、IDL/schema の `bootstrap` stability、governance calver、
 `specs/catalog.yaml` の sha256 snapshot を 1 つの manifest に集約して確認する。
+
+`naming-demo` は naming policy を JSON で可視化し、
+project branding の英字表記を `Omoikane` に固定し、
+サンドボックス自我の formal name を `Mirage Self` に固定しつつ、
+runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許容することを確認する。
 
 ## 今後広げる面
 

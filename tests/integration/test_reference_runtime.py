@@ -71,10 +71,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         report = runtime.generate_gap_report(repo_root)
 
         self.assertIn("open_question_count", report)
-        self.assertGreaterEqual(report["open_question_count"], 1)
+        self.assertEqual(0, report["open_question_count"])
         self.assertEqual(0, report["missing_expected_file_count"])
         self.assertEqual(0, report["empty_eval_surface_count"])
         self.assertEqual(0, report["catalog_pending_count"])
+
+    def test_naming_demo_returns_fixed_policy_and_aliases(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_naming_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("Omoikane", result["policy"]["rules"]["project_romanization"]["canonical"])
+        self.assertEqual("Mirage Self", result["policy"]["rules"]["sandbox_self_name"]["canonical"])
+        self.assertEqual("rewrite-required", result["reviews"]["hyphenated_brand"]["status"])
+        self.assertEqual("allowed-alias", result["reviews"]["legacy_runtime_alias"]["status"])
+        self.assertTrue(result["validation"]["sandbox_formal_name_fixed"])
 
     def test_connectome_demo_returns_valid_document(self) -> None:
         runtime = OmoikaneReferenceOS()

@@ -29,7 +29,7 @@ ChangeAdvocate / ConservatismAdvocate 議論
 専門 Council 召集
     │
     ▼
-合意 → サンドボックス自我への適用
+合意 → Mirage Self への適用
     │
     ▼
 DifferentialEvaluator (本体 vs sandbox)
@@ -44,8 +44,9 @@ Guardian 承認
 ContinuityLedger 記録
 ```
 
-## サンドボックス自我
+## Mirage Self（サンドボックス自我）
 
+- user-facing formal name は **Mirage Self**（内部 alias: `SandboxSentinel`）
 - forked snapshot
 - **苦痛発生禁止** ── `surrogate-suffering-proxy-v0` で
   `negative_valence / arousal / clarity_drop / somatic / interoceptive / self_implication`

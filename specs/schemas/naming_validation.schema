@@ -1,0 +1,68 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: NamingValidation
+description: Validation result for one candidate term under the fixed naming policy.
+schema_version: 1.0.0
+type: object
+additionalProperties: false
+required:
+  - concept_id
+  - context
+  - candidate
+  - normalized
+  - status
+  - allowed_in_context
+  - canonical
+  - suggestion
+  - rejected_forms
+  - accepted_user_facing
+  - accepted_internal
+  - rationale
+properties:
+  concept_id:
+    type: string
+    enum:
+      - project_romanization
+      - sandbox_self_name
+  context:
+    type: string
+    enum:
+      - external_brand
+      - user_facing_doc
+      - governance_policy
+      - code_identifier
+  candidate:
+    type: string
+  normalized:
+    type: string
+  status:
+    type: string
+    enum:
+      - accepted
+      - allowed-alias
+      - rewrite-required
+  allowed_in_context:
+    type: boolean
+  canonical:
+    type: string
+  suggestion:
+    type: string
+  rejected_forms:
+    type: array
+    minItems: 1
+    items:
+      type: string
+  accepted_user_facing:
+    type: array
+    minItems: 1
+    items:
+      type: string
+  accepted_internal:
+    type: array
+    minItems: 1
+    items:
+      type: string
+  rationale:
+    type: array
+    minItems: 1
+    items:
+      type: string

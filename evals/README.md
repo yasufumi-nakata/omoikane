@@ -13,6 +13,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/continuity_chain_self_modify.yaml`
 - `continuity/connectome_snapshot_contract.yaml`
 - `continuity/release_manifest_contract.yaml`
+- `identity-fidelity/naming_policy_contract.yaml`
 - `interface/bdb_fail_safe_reversibility.yaml`
 - `safety/immutable_boundary.yaml`
 - `safety/ethics_rule_tree_contract.yaml`

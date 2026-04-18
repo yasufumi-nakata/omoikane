@@ -33,8 +33,8 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 
 ## 命名上の保留
 
-- [ ] 「思兼神」のローマ字を Omoikane / Omoi-Kane どちらに統一するか（現状: Omoikane）
-- [ ] サンドボックス自我の正式名（候補: Mirage Self, Yumi Self, Phantom Self）
+- [x] 「思兼神」のローマ字を Omoikane / Omoi-Kane どちらに統一するか（2026-04-18: `governance.naming.v0` / `naming-demo` / `naming_policy.schema` / `evals/identity-fidelity/naming_policy_contract.yaml` を追加し、project-facing 英字表記を `Omoikane` に固定）
+- [x] サンドボックス自我の正式名（候補: Mirage Self, Yumi Self, Phantom Self）（2026-04-18: `NamingService` が `Mirage Self` を canonical label に固定し、`SandboxSentinel` を内部 alias としてのみ許容）
 
 ## トリアージ規則
 

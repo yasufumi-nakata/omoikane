@@ -30,6 +30,8 @@
 | **TaskGraph** | タスク依存 DAG |
 | **ConsensusBus** | Agent 間メッセージバス |
 | **Sandboxer** | サンドボックス自我生成 |
+| **Mirage Self** / 幻影自我 | user-facing なサンドボックス自我の正式名 |
+| **NamingService** | Omoikane / Mirage Self 表記を固定する naming policy validator |
 
 ## アップロード関連
 

@@ -19,6 +19,10 @@
 ### Subjective Identity Confirmation
 本人による「同じ私である」感覚の自己報告。
 
+### Naming Policy Consistency
+本人・Council・Builder が同じ identity label を参照し続けられるよう、
+project romanization と sandbox fork 名の canonical 表記を固定する。
+
 ## メトリクス
 
 主観要素を含むため、**単一スコアでなく多次元プロファイル** で評価。

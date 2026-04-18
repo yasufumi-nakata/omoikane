@@ -38,6 +38,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("dark-launch", result["decisions"]["kernel"]["applied_stage"])
         self.assertEqual("5pct", result["decisions"]["operational"]["applied_stage"])
 
+    def test_naming_demo_emits_fixed_policy(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "naming-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("Omoikane", result["policy"]["rules"]["project_romanization"]["canonical"])
+        self.assertEqual("Mirage Self", result["policy"]["rules"]["sandbox_self_name"]["canonical"])
+        self.assertEqual("rewrite-required", result["reviews"]["hyphenated_brand"]["status"])
+        self.assertEqual("allowed-alias", result["reviews"]["legacy_runtime_alias"]["status"])
+
     def test_bdb_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 
