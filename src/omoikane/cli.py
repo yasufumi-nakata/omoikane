@@ -23,6 +23,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     connectome_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    bdb_parser = subparsers.add_parser(
+        "bdb-demo",
+        help="Run the L6 Biological-Digital Bridge viability scenario",
+    )
+    bdb_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     memory_parser = subparsers.add_parser(
         "memory-demo",
         help="Emit a reference MemoryCrystal compaction manifest and validation summary",
@@ -114,6 +120,10 @@ def main() -> None:
 
     if args.command == "connectome-demo":
         _print_result(runtime.run_connectome_demo(), args.json)
+        return
+
+    if args.command == "bdb-demo":
+        _print_result(runtime.run_bdb_demo(), args.json)
         return
 
     if args.command == "memory-demo":

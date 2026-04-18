@@ -18,6 +18,7 @@
 
 - [qualia-encoding.md](qualia-encoding.md) ── 主観経験を表現できるか
 - [gradual-replacement.md](gradual-replacement.md) ── 漸進置換の最小単位と可逆性
+  （BDB v0 の bounded viability smoke は reference runtime に追加済み）
 - [scan-fidelity.md](scan-fidelity.md) ── スキャン精度の必要十分性
 - [consciousness-substrate.md](consciousness-substrate.md) ── 意識を生む基板条件
 

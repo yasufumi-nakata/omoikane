@@ -7,6 +7,18 @@ from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class ReferenceRuntimeTests(unittest.TestCase):
+    def test_bdb_demo_reports_viable_bridge_contract(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_bdb_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("bio-autonomous-fallback", result["session"]["bridge_state"])
+        self.assertEqual(0.0, result["session"]["effective_replacement_ratio"])
+        self.assertTrue(result["validation"]["reversibility_verified"])
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-bdb"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-bdb-fallback"])
+
     def test_reference_scenario_runs(self) -> None:
         runtime = OmoikaneReferenceOS()
 

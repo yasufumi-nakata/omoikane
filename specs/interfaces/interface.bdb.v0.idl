@@ -1,0 +1,246 @@
+idl_version: 1
+kind: service
+namespace: interface.bdb.v0
+service: BiologicalDigitalBridgeService
+summary: Canonical L6 contract for the bounded Biological-Digital Bridge reference runtime.
+imports:
+  bdb_session: ../schemas/bdb_session.schema
+  bdb_cycle: ../schemas/bdb_cycle.schema
+operations:
+  open_session:
+    summary: Open one bounded BDB session for a single identity.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - replacement_ratio
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          replacement_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+            multipleOf: 0.05
+          bio_signal_channels:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          neuromodulator_channels:
+            type: array
+            minItems: 1
+            items:
+              type: string
+    output:
+      schema_ref: bdb_session
+  transduce_cycle:
+    summary: Execute one closed-loop bio-digital cycle and record latency evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - spike_channels
+          - neuromodulators
+          - stimulus_targets
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          spike_channels:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          neuromodulators:
+            type: object
+            minProperties: 1
+            additionalProperties:
+              type: number
+              minimum: 0
+              maximum: 1
+          stimulus_targets:
+            type: array
+            minItems: 1
+            items:
+              type: string
+    output:
+      schema_ref: bdb_cycle
+    guarantees:
+      - roundtrip_latency_ms must remain <= latency_budget_ms for the reference viability scenario
+      - continuity_event_ref must be emitted for every completed cycle
+  adjust_replacement_ratio:
+    summary: Raise or lower the requested replacement ratio in reversible 0.05 increments.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - new_ratio
+          - rationale
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          new_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+            multipleOf: 0.05
+          rationale:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - recorded_at
+          - old_ratio
+          - new_ratio
+          - direction
+          - rationale
+          - continuity_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          old_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+            multipleOf: 0.05
+          new_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+            multipleOf: 0.05
+          direction:
+            type: string
+            enum:
+              - increase
+              - decrease
+          rationale:
+            type: string
+            minLength: 1
+          continuity_event_ref:
+            type: string
+            minLength: 1
+  fail_safe_fallback:
+    summary: Disable the digital bridge and return to biological autonomy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - reason
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          reason:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - recorded_at
+          - status
+          - reason
+          - failover_latency_ms
+          - bio_autonomy_retained
+          - stim_output_enabled
+          - continuity_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          status:
+            type: string
+            const: bio-autonomous-fallback
+          reason:
+            type: string
+            minLength: 1
+          failover_latency_ms:
+            type: number
+            minimum: 0
+          bio_autonomy_retained:
+            type: boolean
+          stim_output_enabled:
+            const: false
+          continuity_event_ref:
+            type: string
+            minLength: 1
+    guarantees:
+      - effective_replacement_ratio must become 0.0
+      - stim_output_enabled must become false
+      - failover must complete within failover_budget_ms for the reference viability scenario
+  snapshot:
+    summary: Read the current BDB session state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: bdb_session
+events:
+  bdb.cycle_recorded:
+    payload:
+      schema_ref: bdb_cycle
+  bdb.fallback_engaged:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - recorded_at
+          - status
+          - reason
+          - failover_latency_ms
+          - bio_autonomy_retained
+          - stim_output_enabled
+          - continuity_event_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          status:
+            type: string
+            const: bio-autonomous-fallback
+          reason:
+            type: string
+            minLength: 1
+          failover_latency_ms:
+            type: number
+            minimum: 0
+          bio_autonomy_retained:
+            type: boolean
+          stim_output_enabled:
+            const: false
+          continuity_event_ref:
+            type: string
+            minLength: 1
+compatibility:
+  stability: bootstrap
+  notes:
+    - This contract proves boundary viability only; it does not claim neuron-level equivalence or subjective continuity.
+    - Neuromodulator transport is limited to a coarse proxy channel set in the reference runtime.

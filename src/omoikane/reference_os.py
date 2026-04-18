@@ -16,6 +16,7 @@ from .cognitive import (
     ReasoningService,
     SymbolicReasoningBackend,
 )
+from .interface.bdb import BiologicalDigitalBridge
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
@@ -49,6 +50,7 @@ class OmoikaneReferenceOS:
                 NarrativeReasoningBackend("narrative_v1"),
             ],
         )
+        self.bdb = BiologicalDigitalBridge()
         self.council = Council()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
@@ -713,6 +715,103 @@ class OmoikaneReferenceOS:
                 "release": release,
                 "snapshot": self.substrate.snapshot(),
             },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_bdb_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://bdb-demo/v1",
+            metadata={"display_name": "BDB Viability Sandbox"},
+        )
+        session = self.bdb.open_session(identity.identity_id, replacement_ratio=0.35)
+        cycle = self.bdb.transduce_cycle(
+            session["session_id"],
+            spike_channels=["motor_cortex", "somatic_feedback", "autonomic_state"],
+            neuromodulators={
+                "acetylcholine": 0.44,
+                "dopamine": 0.38,
+                "serotonin": 0.29,
+            },
+            stimulus_targets=["motor_cortex", "somatic_feedback"],
+        )
+        increase = self.bdb.adjust_replacement_ratio(
+            session["session_id"],
+            new_ratio=0.50,
+            rationale="置換比率を増やしても latency budget を維持できるか確認する",
+        )
+        decrease = self.bdb.adjust_replacement_ratio(
+            session["session_id"],
+            new_ratio=0.20,
+            rationale="可逆性の確認として置換比率を生体側へ戻す",
+        )
+        fallback = self.bdb.fail_safe_fallback(
+            session["session_id"],
+            reason="codec link integrity probe failed; revert to biological autonomy",
+        )
+        final_session = self.bdb.snapshot(session["session_id"])
+        validation = self.bdb.validate_session(final_session)
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="bdb.session.opened",
+            payload={
+                "session_id": session["session_id"],
+                "requested_replacement_ratio": session["requested_replacement_ratio"],
+                "latency_budget_ms": session["latency_budget_ms"],
+            },
+            actor="BiologicalDigitalBridge",
+            category="interface-bdb",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="bdb.cycle.recorded",
+            payload=cycle,
+            actor="BiologicalDigitalBridge",
+            category="interface-bdb",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="bdb.ratio.adjusted",
+            payload={"increase": increase, "decrease": decrease},
+            actor="BiologicalDigitalBridge",
+            category="interface-bdb",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="bdb.fallback.engaged",
+            payload=fallback,
+            actor="BiologicalDigitalBridge",
+            category="interface-bdb-fallback",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="hybrid-bio-digital",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.bdb.reference_profile(),
+            "session": final_session,
+            "cycle": cycle,
+            "ratio_adjustments": {
+                "increase": increase,
+                "decrease": decrease,
+            },
+            "fallback": fallback,
+            "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

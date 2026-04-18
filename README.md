@@ -53,6 +53,7 @@ meta/                 ── 用語集・決定履歴
 
 - これは **夢物語の設計図** であり、同時にその設計を壊さず試す **参考実装の実験場** である。
 - 今日の技術で実装できない部分は多いが、L1/L4/L5 の統率や append-only ledger のような骨格は今から prototype 化できる。
+- L6 では BDB（Biological-Digital Bridge）の bounded viability を proxy 実装し、ms 級 latency budget・fail-safe fallback・可逆な置換比率調整までは reference runtime で検証できる。
 - このリポジトリは「設計が成熟するほど、必要な研究が明確になり、reference runtime も厚くなる」ことを目指す。
 
 ## すぐ動かせるもの
@@ -60,6 +61,7 @@ meta/                 ── 用語集・決定履歴
 - `python3 -m unittest discover -s tests -t .`
 - `PYTHONPATH=src python3 -m omoikane.cli demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json`

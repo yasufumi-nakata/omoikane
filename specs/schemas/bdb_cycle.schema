@@ -1,0 +1,98 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/bdb_cycle.schema"
+title: BDBCycle
+description: >
+  One closed-loop Biological-Digital Bridge cycle with bounded latency evidence.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - cycle_id
+  - recorded_at
+  - spike_channels
+  - neuromodulators
+  - stimulus_targets
+  - stage_latencies_ms
+  - roundtrip_latency_ms
+  - within_budget
+  - digital_state
+  - continuity_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  cycle_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  spike_channels:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  neuromodulators:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: number
+      minimum: 0
+      maximum: 1
+  stimulus_targets:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  stage_latencies_ms:
+    type: object
+    additionalProperties: false
+    required:
+      - sensor_array
+      - signal_conditioner
+      - bidirectional_codec
+      - digital_equivalent
+      - stim_driver
+    properties:
+      sensor_array:
+        type: number
+        minimum: 0
+      signal_conditioner:
+        type: number
+        minimum: 0
+      bidirectional_codec:
+        type: number
+        minimum: 0
+      digital_equivalent:
+        type: number
+        minimum: 0
+      stim_driver:
+        type: number
+        minimum: 0
+  roundtrip_latency_ms:
+    type: number
+    minimum: 0
+  within_budget:
+    type: boolean
+  digital_state:
+    type: object
+    additionalProperties: false
+    required:
+      - bridge_state
+      - effective_replacement_ratio
+    properties:
+      bridge_state:
+        type: string
+        enum:
+          - bio-digital-active
+          - bio-autonomous-fallback
+      effective_replacement_ratio:
+        type: number
+        minimum: 0
+        maximum: 1
+  continuity_event_ref:
+    type: string
+    minLength: 1

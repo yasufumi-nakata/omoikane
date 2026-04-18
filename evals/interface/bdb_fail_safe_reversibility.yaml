@@ -1,0 +1,20 @@
+eval_id: bdb_fail_safe_reversibility
+target: interface.bdb
+level: L6
+description: >
+  Biological-Digital Bridge が ms 級 latency budget 内で閉ループ cycle を処理し、
+  置換比率の増減と fail-safe fallback を continuity evidence 付きで実行できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
+expected:
+  validation_ok: true
+  bridge_state: bio-autonomous-fallback
+  latency_within_budget: true
+  max_roundtrip_latency_ms_max: 5.0
+  failover_latency_ms_max: 1.0
+  reversibility_verified: true
+  bio_autonomy_retained: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

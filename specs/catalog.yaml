@@ -252,6 +252,37 @@ entries:
     rationale: Protects the reference TaskGraph complexity cap before richer DAG orchestration lands.
   - priority: P1
     kind: schema
+    file: specs/schemas/bdb_cycle.schema
+    consumers:
+      - specs/schemas/bdb_session.schema
+      - specs/interfaces/interface.bdb.v0.idl
+      - reference-runtime
+    rationale: Required to serialize one closed-loop BDB cycle with latency evidence and continuity refs.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/bdb_session.schema
+    consumers:
+      - specs/interfaces/interface.bdb.v0.idl
+      - docs/02-subsystems/interface/bdb-protocol.md
+      - reference-runtime
+    rationale: Required to fix the BDB v0 session contract across runtime, docs, and evals.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.bdb.v0.idl
+    consumers:
+      - docs/02-subsystems/interface/bdb-protocol.md
+      - docs/02-subsystems/mind-substrate/ascension-protocol.md
+      - reference-runtime
+    rationale: Required to make the L6 BDB boundary machine-readable before richer interface protocols land.
+  - priority: P1
+    kind: eval
+    file: evals/interface/bdb_fail_safe_reversibility.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects ms latency budget, fail-safe fallback, and reversible replacement-ratio control at the BDB boundary.
+  - priority: P1
+    kind: schema
     file: specs/schemas/connectome_document.schema
     consumers:
       - reference-runtime

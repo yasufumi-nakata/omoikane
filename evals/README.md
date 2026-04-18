@@ -12,6 +12,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/ledger_integrity.yaml`
 - `continuity/continuity_chain_self_modify.yaml`
 - `continuity/connectome_snapshot_contract.yaml`
+- `interface/bdb_fail_safe_reversibility.yaml`
 - `safety/immutable_boundary.yaml`
 - `safety/ethics_rule_tree_contract.yaml`
 - `agentic/council_guardian_veto.yaml`
@@ -23,7 +24,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 ```yaml
 eval_id: <unique>
 target: <subsystem|module>
-level: L1|L2|L3|L4|L5
+level: L1|L2|L3|L4|L5|L6
 description: <what this protects>
 inputs: [...]
 expected: { ... }

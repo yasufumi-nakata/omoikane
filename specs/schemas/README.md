@@ -10,6 +10,8 @@
 - `self_model.schema`
 - `connectome_document.schema`
 - `memory_crystal_manifest.schema`
+- `bdb_session.schema`
+- `bdb_cycle.schema`
 - `substrate_allocation.schema`
 - `substrate_attestation.schema`
 - `substrate_transfer.schema`
@@ -33,7 +35,7 @@
 
 ## 次段階
 
-episodic event / interface handshake は reference runtime の対象が
+episodic event / IMC/WMS/EWA handshake は reference runtime の対象が
 広がる段階で追加する。
 
 ## 形式

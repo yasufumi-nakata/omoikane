@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial-solution
 priority: T0
 last_revisit: 2026-04-18
 researcher: yasufumi
@@ -23,6 +23,9 @@ OmoikaneOS は Method A（漸進置換）をデフォルトに据えるが、上
 - 神経科学的には人工内耳・脳ペースメーカー等で部分置換は実用化
 - BCI 研究の進展（Neuralink 等）
 - 培養脳-シリコン接続実験
+- OmoikaneOS reference runtime では `interface.bdb.v0` を追加し、
+  `5ms` latency budget、`1ms` fail-safe fallback、置換比率の増減、
+  ContinuityLedger 互換 event ref を proxy 実装した
 
 ## ブロッキング要因
 
@@ -37,6 +40,8 @@ OmoikaneOS は Method A（漸進置換）をデフォルトに据えるが、上
 - 各置換ステップで連続性証拠ログを取得
 - 本人の主観報告で各ステップを承認
 - 中断時は **逆置換** が可能な技術前提で設計（実装は別研究）
+- reference runtime では BDB 境界の viability だけを固定し、
+  ニューロン単位の完全置換を主張しない
 
 ## 解決時のシステムへの影響
 

@@ -11,13 +11,15 @@
 - `agentic.council.v0.idl`
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
+- `interface.bdb.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`
 - `selfctor.sandboxer.v0.idl`
 
 ## 次段階
 
-L1 scheduler/broker/termination、L2 connectome/memory、L3 cognitive、L6 interface は
+L1 scheduler/broker/termination、L2 connectome/memory、L3 cognitive、
+L6 interface の残り（IMC/WMS/EWA）は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、
 IDL 化は service 境界が安定してから行う。

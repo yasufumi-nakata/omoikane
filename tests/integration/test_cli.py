@@ -10,6 +10,19 @@ from omoikane.cli import main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_bdb_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "bdb-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("bio-autonomous-fallback", result["validation"]["bridge_state"])
+        self.assertTrue(result["validation"]["latency_within_budget"])
+        self.assertLessEqual(result["cycle"]["roundtrip_latency_ms"], 5.0)
+        self.assertLessEqual(result["fallback"]["failover_latency_ms"], 1.0)
+
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

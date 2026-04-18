@@ -15,7 +15,11 @@
 - 中断時は逆向きの再置換が（理論上）可能
 
 **前提**: 神経素子レベルの精密 BCI と、生体・デジタル境界での信号変換器
-**未解決**: 最小ステップ単位、中断時の可逆性 → [docs/05-research-frontiers/gradual-replacement.md](../../05-research-frontiers/gradual-replacement.md)
+**reference runtime で検証済みの最小 contract**:
+`interface.bdb.v0` は ms 級 latency budget、fail-safe fallback、
+ContinuityLedger 互換 event ref、置換比率の増減を proxy 実装する
+**未解決**: 最小ステップ単位、中断時の可逆性、主観連続性の保証
+→ [docs/05-research-frontiers/gradual-replacement.md](../../05-research-frontiers/gradual-replacement.md)
 
 ### Method B: Parallel Run（並走）
 

@@ -76,6 +76,10 @@ health check に基づく `primary -> fallback` の単純切替を行う。
 - **World Model Sync** ── 外界状態の同期（共有現実 / 個別現実の選択）
 - **Sensory Loopback** ── 感覚出力のフィードバック
 
+reference runtime では L6 全体を実装せず、まず BDB のみを
+`latency budget / fail-safe fallback / continuity evidence / reversibility`
+の 4 点に限定した v0 contract として固定する。
+
 ## 層間呼び出し規則
 
 - 上位 → 下位: 直接 API 呼び出し可

@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning failover の最小骨格のみを扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning failover、L6 BDB の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -24,6 +24,7 @@ PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
+PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
@@ -76,10 +77,16 @@ Guardian が sandbox を即時凍結することを確認する。
 source event を保持したまま最大 3 件ずつ segment 化する manifest と
 `crystal-commit` ledger event を確認する。
 
+`bdb-demo` は L6 Biological-Digital Bridge の reference contract
+(`interface.bdb.v0`) を JSON で可視化し、
+`latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
+coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
+をまとめて確認する。
+
 ## 今後広げる面
 
 - L2 episodic stream の canonical shape と MemoryCrystal への流入拡張
 - L3 reasoning 以外の cognitive backends と cross-service failover
-- L6 interface protocol の adapter
+- 残る L6 interface protocol（IMC/WMS/EWA）の adapter
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填
