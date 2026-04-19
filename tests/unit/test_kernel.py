@@ -19,7 +19,68 @@ class KernelTests(unittest.TestCase):
         checked_at: str,
         sync_token: str,
         status_overrides: dict[str, str] | None = None,
+        verifier_rotation_state: str = "stable",
     ) -> dict[str, object]:
+        def verifier_roster_report() -> dict[str, object]:
+            roster_ref = governance_artifacts["artifact_bundle_ref"].replace(
+                "artifact://",
+                "verifier://",
+                1,
+            ).replace("/bundle", "/root-roster")
+
+            def root_record(root_label: str, status: str) -> dict[str, str]:
+                root_id = f"root://tests/{sync_token}/{root_label}"
+                return {
+                    "root_id": root_id,
+                    "fingerprint": sha256_text(
+                        canonical_json(
+                            {
+                                "root_id": root_id,
+                                "checked_at": checked_at,
+                                "status": status,
+                            }
+                        )
+                    ),
+                    "status": status,
+                }
+
+            active_root = root_record("active", "active")
+            accepted_roots: list[dict[str, str]] = [active_root]
+            next_root_id = None
+            dual_attestation_required = False
+            dual_attested = False
+            if verifier_rotation_state == "overlap-required":
+                candidate_root = root_record("candidate", "candidate")
+                accepted_roots.append(candidate_root)
+                next_root_id = candidate_root["root_id"]
+                dual_attestation_required = True
+            elif verifier_rotation_state == "rotated":
+                active_root = root_record("cutover", "active")
+                retired_root = root_record("previous", "retired")
+                accepted_roots = [active_root, retired_root]
+                dual_attested = True
+            return {
+                "roster_ref": roster_ref,
+                "active_root_id": active_root["root_id"],
+                "next_root_id": next_root_id,
+                "rotation_state": verifier_rotation_state,
+                "accepted_roots": accepted_roots,
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "roster_ref": roster_ref,
+                            "checked_at": checked_at,
+                            "rotation_state": verifier_rotation_state,
+                            "sync_token": sync_token,
+                            "accepted_roots": accepted_roots,
+                        }
+                    )
+                ),
+                "external_sync_ref": f"sync://tests/{sync_token}/verifier-roster",
+                "dual_attestation_required": dual_attestation_required,
+                "dual_attested": dual_attested,
+            }
+
         overrides = status_overrides or {}
         artifacts = []
         for artifact_key in (
@@ -49,7 +110,11 @@ class KernelTests(unittest.TestCase):
                     "external_sync_ref": f"sync://tests/{sync_token}/{artifact_key}",
                 }
             )
-        return {"checked_at": checked_at, "artifacts": artifacts}
+        return {
+            "checked_at": checked_at,
+            "artifacts": artifacts,
+            "verifier_roster": verifier_roster_report(),
+        }
 
     def test_continuity_ledger_detects_tamper(self) -> None:
         ledger = ContinuityLedger()
@@ -503,6 +568,66 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("revoked", result["bundle_status"])
         self.assertEqual("failed", observed["status"])
         self.assertEqual("revoked", observed["artifact_sync"]["bundle_status"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+
+    def test_ascension_scheduler_verifier_rotation_overlap_pauses_until_cutover(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-rotation")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+
+        overlap = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:06:00Z",
+                sync_token="method-a-overlap",
+                verifier_rotation_state="overlap-required",
+            ),
+        )
+        after_overlap = scheduler.observe(handle["handle_id"])
+        cutover = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:07:00Z",
+                sync_token="method-a-cutover",
+                verifier_rotation_state="rotated",
+            ),
+        )
+        resumed = scheduler.resume(handle["handle_id"])
+
+        self.assertEqual("pause", overlap["action"])
+        self.assertEqual("overlap-required", overlap["verifier_rotation_state"])
+        self.assertEqual("paused", after_overlap["status"])
+        self.assertEqual("accept", cutover["action"])
+        self.assertEqual("rotated", cutover["verifier_rotation_state"])
+        self.assertEqual("advancing", resumed["status"])
+        self.assertTrue(scheduler.validate_handle(scheduler.observe(handle["handle_id"]))["ok"])
+
+    def test_ascension_scheduler_verifier_revocation_fails_closed(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_c_plan("identity://scheduler-verifier-revoked")
+        handle = scheduler.schedule(plan)
+
+        result = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:08:00Z",
+                sync_token="method-c-verifier-revoked",
+                verifier_rotation_state="revoked",
+            ),
+        )
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("fail", result["action"])
+        self.assertEqual("revoked", result["verifier_rotation_state"])
+        self.assertEqual("failed", observed["status"])
+        self.assertEqual("revoked", observed["verifier_roster"]["rotation_state"])
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
 
 

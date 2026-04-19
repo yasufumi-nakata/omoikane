@@ -181,7 +181,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     scheduler_parser = subparsers.add_parser(
         "scheduler-demo",
-        help="Run the L1 ascension scheduler Method A/B/C profiles and substrate failover scenario",
+        help="Run the L1 ascension scheduler Method A/B/C, artifact sync, and verifier rotation scenario",
     )
     scheduler_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

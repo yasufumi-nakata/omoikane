@@ -22,6 +22,7 @@
 - `bdb_cycle.schema`
 - `ewa_command.schema`
 - `ewa_audit.schema`
+- `governance_verifier_roster.schema`
 - `world_state.schema`
 - `wms_reconcile.schema`
 - `substrate_allocation.schema`

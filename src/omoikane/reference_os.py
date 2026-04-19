@@ -1332,12 +1332,79 @@ class OmoikaneReferenceOS:
         }
 
     def run_scheduler_demo(self) -> Dict[str, Any]:
-        def artifact_sync_report(
+        def verifier_roster_report(
+            governance_artifacts: Dict[str, Any],
+            *,
+            checked_at: str,
+            sync_token: str,
+            rotation_state: str = "stable",
+        ) -> Dict[str, Any]:
+            roster_ref = governance_artifacts["artifact_bundle_ref"].replace(
+                "artifact://",
+                "verifier://",
+                1,
+            ).replace("/bundle", "/root-roster")
+
+            def root_record(root_label: str, status: str) -> Dict[str, str]:
+                root_id = f"root://scheduler-demo/{sync_token}/{root_label}"
+                return {
+                    "root_id": root_id,
+                    "fingerprint": sha256_text(
+                        canonical_json(
+                            {
+                                "root_id": root_id,
+                                "checked_at": checked_at,
+                                "status": status,
+                            }
+                        )
+                    ),
+                    "status": status,
+                }
+
+            active_root = root_record("active", "active")
+            accepted_roots = [active_root]
+            next_root_id = None
+            dual_attestation_required = False
+            dual_attested = False
+            if rotation_state == "overlap-required":
+                candidate_root = root_record("candidate", "candidate")
+                accepted_roots.append(candidate_root)
+                next_root_id = candidate_root["root_id"]
+                dual_attestation_required = True
+            elif rotation_state == "rotated":
+                active_root = root_record("cutover", "active")
+                retired_root = root_record("previous", "retired")
+                accepted_roots = [active_root, retired_root]
+                dual_attested = True
+            return {
+                "roster_ref": roster_ref,
+                "active_root_id": active_root["root_id"],
+                "next_root_id": next_root_id,
+                "rotation_state": rotation_state,
+                "accepted_roots": accepted_roots,
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "roster_ref": roster_ref,
+                            "checked_at": checked_at,
+                            "rotation_state": rotation_state,
+                            "sync_token": sync_token,
+                            "accepted_roots": accepted_roots,
+                        }
+                    )
+                ),
+                "external_sync_ref": f"sync://scheduler-demo/{sync_token}/verifier-roster",
+                "dual_attestation_required": dual_attestation_required,
+                "dual_attested": dual_attested,
+            }
+
+        def sync_report(
             governance_artifacts: Dict[str, Any],
             *,
             checked_at: str,
             sync_token: str,
             status_overrides: Dict[str, str] | None = None,
+            verifier_rotation_state: str = "stable",
         ) -> Dict[str, Any]:
             overrides = status_overrides or {}
             artifacts: List[Dict[str, Any]] = []
@@ -1368,7 +1435,16 @@ class OmoikaneReferenceOS:
                         "external_sync_ref": f"sync://scheduler-demo/{sync_token}/{artifact_key}",
                     }
                 )
-            return {"checked_at": checked_at, "artifacts": artifacts}
+            return {
+                "checked_at": checked_at,
+                "artifacts": artifacts,
+                "verifier_roster": verifier_roster_report(
+                    governance_artifacts,
+                    checked_at=checked_at,
+                    sync_token=sync_token,
+                    rotation_state=verifier_rotation_state,
+                ),
+            }
 
         identity = self.identity.create(
             human_consent_proof="consent://scheduler-demo/v1",
@@ -1431,7 +1507,7 @@ class OmoikaneReferenceOS:
             artifact_gate_message = str(exc)
         method_a_artifact_sync = self.scheduler.sync_governance_artifacts(
             scheduled["handle_id"],
-            artifact_sync_report(
+            sync_report(
                 plan["governance_artifacts"],
                 checked_at="2026-04-19T06:00:00Z",
                 sync_token="method-a-current",
@@ -1444,6 +1520,43 @@ class OmoikaneReferenceOS:
         handoff_result = self.scheduler.advance(scheduled["handle_id"], "active-handoff")
         final_handle = self.scheduler.observe(scheduled["handle_id"])
         method_a_validation = self.scheduler.validate_handle(final_handle)
+
+        method_a_rotation_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-a-rotation/v1",
+            metadata={"display_name": "Verifier Rotation Sandbox"},
+        )
+        method_a_rotation_plan = self.scheduler.build_method_a_plan(
+            method_a_rotation_identity.identity_id
+        )
+        method_a_rotation_scheduled = self.scheduler.schedule(method_a_rotation_plan)
+        self.scheduler.advance(method_a_rotation_scheduled["handle_id"], "scan-baseline")
+        self.scheduler.advance(method_a_rotation_scheduled["handle_id"], "bdb-bridge")
+        method_a_rotation_overlap = self.scheduler.sync_governance_artifacts(
+            method_a_rotation_scheduled["handle_id"],
+            sync_report(
+                method_a_rotation_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:02:00Z",
+                sync_token="method-a-rotation-overlap",
+                verifier_rotation_state="overlap-required",
+            ),
+        )
+        method_a_rotation_after_overlap = self.scheduler.observe(
+            method_a_rotation_scheduled["handle_id"]
+        )
+        method_a_rotation_cutover = self.scheduler.sync_governance_artifacts(
+            method_a_rotation_scheduled["handle_id"],
+            sync_report(
+                method_a_rotation_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:03:00Z",
+                sync_token="method-a-rotation-cutover",
+                verifier_rotation_state="rotated",
+            ),
+        )
+        method_a_rotation_resume = self.scheduler.resume(method_a_rotation_scheduled["handle_id"])
+        self.scheduler.advance(method_a_rotation_scheduled["handle_id"], "identity-confirmation")
+        self.scheduler.advance(method_a_rotation_scheduled["handle_id"], "active-handoff")
+        method_a_rotation_final = self.scheduler.observe(method_a_rotation_scheduled["handle_id"])
+        method_a_rotation_validation = self.scheduler.validate_handle(method_a_rotation_final)
 
         method_b_identity = self.identity.create(
             human_consent_proof="consent://scheduler-demo-method-b/v1",
@@ -1461,7 +1574,7 @@ class OmoikaneReferenceOS:
         method_b_resume = self.scheduler.resume(method_b_scheduled["handle_id"])
         method_b_artifact_refresh_required = self.scheduler.sync_governance_artifacts(
             method_b_scheduled["handle_id"],
-            artifact_sync_report(
+            sync_report(
                 method_b_plan["governance_artifacts"],
                 checked_at="2026-04-19T06:05:00Z",
                 sync_token="method-b-stale",
@@ -1471,7 +1584,7 @@ class OmoikaneReferenceOS:
         method_b_after_refresh_required = self.scheduler.observe(method_b_scheduled["handle_id"])
         method_b_artifact_refresh_current = self.scheduler.sync_governance_artifacts(
             method_b_scheduled["handle_id"],
-            artifact_sync_report(
+            sync_report(
                 method_b_plan["governance_artifacts"],
                 checked_at="2026-04-19T06:07:00Z",
                 sync_token="method-b-current",
@@ -1512,7 +1625,7 @@ class OmoikaneReferenceOS:
         method_c_scheduled = self.scheduler.schedule(method_c_plan)
         method_c_artifact_sync = self.scheduler.sync_governance_artifacts(
             method_c_scheduled["handle_id"],
-            artifact_sync_report(
+            sync_report(
                 method_c_plan["governance_artifacts"],
                 checked_at="2026-04-19T06:10:00Z",
                 sync_token="method-c-current",
@@ -1535,7 +1648,7 @@ class OmoikaneReferenceOS:
         method_c_revoked_scheduled = self.scheduler.schedule(method_c_revoked_plan)
         method_c_revoked_sync = self.scheduler.sync_governance_artifacts(
             method_c_revoked_scheduled["handle_id"],
-            artifact_sync_report(
+            sync_report(
                 method_c_revoked_plan["governance_artifacts"],
                 checked_at="2026-04-19T06:12:00Z",
                 sync_token="method-c-revoked",
@@ -1544,11 +1657,36 @@ class OmoikaneReferenceOS:
         )
         method_c_revoked_final = self.scheduler.observe(method_c_revoked_scheduled["handle_id"])
         method_c_revoked_validation = self.scheduler.validate_handle(method_c_revoked_final)
+        method_c_verifier_revoked_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-c-verifier-revoked/v1",
+            metadata={"display_name": "Verifier Revoked Sandbox"},
+        )
+        method_c_verifier_revoked_plan = self.scheduler.build_method_c_plan(
+            method_c_verifier_revoked_identity.identity_id
+        )
+        method_c_verifier_revoked_scheduled = self.scheduler.schedule(method_c_verifier_revoked_plan)
+        method_c_verifier_revoked_sync = self.scheduler.sync_governance_artifacts(
+            method_c_verifier_revoked_scheduled["handle_id"],
+            sync_report(
+                method_c_verifier_revoked_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:13:00Z",
+                sync_token="method-c-verifier-revoked",
+                verifier_rotation_state="revoked",
+            ),
+        )
+        method_c_verifier_revoked_final = self.scheduler.observe(
+            method_c_verifier_revoked_scheduled["handle_id"]
+        )
+        method_c_verifier_revoked_validation = self.scheduler.validate_handle(
+            method_c_verifier_revoked_final
+        )
         all_validations = {
             "method_a": method_a_validation,
+            "method_a_rotation": method_a_rotation_validation,
             "method_b": method_b_validation,
             "method_c": method_c_validation,
             "method_c_revoked": method_c_revoked_validation,
+            "method_c_verifier_revoked": method_c_verifier_revoked_validation,
         }
 
         return {
@@ -1560,9 +1698,11 @@ class OmoikaneReferenceOS:
             "plan": plan,
             "plans": {
                 "method_a": plan,
+                "method_a_rotation": method_a_rotation_plan,
                 "method_b": method_b_plan,
                 "method_c": method_c_plan,
                 "method_c_revoked": method_c_revoked_plan,
+                "method_c_verifier_revoked": method_c_verifier_revoked_plan,
             },
             "substrate": {
                 "allocation": asdict(allocation),
@@ -1586,6 +1726,14 @@ class OmoikaneReferenceOS:
                     "message": artifact_gate_message,
                 },
                 "artifact_sync": method_a_artifact_sync,
+                "method_a_rotation": {
+                    "scheduled": method_a_rotation_scheduled,
+                    "verifier_overlap": method_a_rotation_overlap,
+                    "after_overlap": method_a_rotation_after_overlap,
+                    "verifier_cutover": method_a_rotation_cutover,
+                    "resume_after_cutover": method_a_rotation_resume,
+                    "final_handle": method_a_rotation_final,
+                },
                 "identity_confirmation": confirmation_result,
                 "active_handoff": handoff_result,
                 "method_b": {
@@ -1616,19 +1764,28 @@ class OmoikaneReferenceOS:
                     "artifact_sync": method_c_revoked_sync,
                     "final_handle": method_c_revoked_final,
                 },
+                "method_c_verifier_revoked": {
+                    "scheduled": method_c_verifier_revoked_scheduled,
+                    "artifact_sync": method_c_verifier_revoked_sync,
+                    "final_handle": method_c_verifier_revoked_final,
+                },
             },
             "final_handle": final_handle,
+            "method_a_rotation_final_handle": method_a_rotation_final,
             "method_b_final_handle": method_b_final,
             "method_c_final_handle": method_c_final,
             "method_c_revoked_final_handle": method_c_revoked_final,
+            "method_c_verifier_revoked_final_handle": method_c_verifier_revoked_final,
             "handle_validations": all_validations,
             "validation": {
                 "ok": all(item["ok"] for item in all_validations.values()),
                 "errors": (
                     method_a_validation["errors"]
+                    + method_a_rotation_validation["errors"]
                     + method_b_validation["errors"]
                     + method_c_validation["errors"]
                     + method_c_revoked_validation["errors"]
+                    + method_c_verifier_revoked_validation["errors"]
                 ),
                 "history_length": method_a_validation["history_length"],
                 "rollback_count": method_a_validation["rollback_count"],
@@ -1660,19 +1817,30 @@ class OmoikaneReferenceOS:
                     == final_item["governance_artifacts"]["artifact_bundle_ref"]
                     for plan_item, final_item in (
                         (plan, final_handle),
+                        (method_a_rotation_plan, method_a_rotation_final),
                         (method_b_plan, method_b_final),
                         (method_c_plan, method_c_final),
                     )
                 ),
                 "witness_quorum_bound": all(
                     len(plan_item["governance_artifacts"]["witness_refs"]) >= 2
-                    for plan_item in (plan, method_b_plan, method_c_plan)
+                    for plan_item in (
+                        plan,
+                        method_a_rotation_plan,
+                        method_b_plan,
+                        method_c_plan,
+                    )
                 ),
                 "legal_attestation_bound": all(
                     plan_item["governance_artifacts"]["legal_attestation_ref"].startswith(
                         "legal://"
                     )
-                    for plan_item in (plan, method_b_plan, method_c_plan)
+                    for plan_item in (
+                        plan,
+                        method_a_rotation_plan,
+                        method_b_plan,
+                        method_c_plan,
+                    )
                 ),
                 "artifact_sync_gate_blocked": (
                     "governance artifacts must be synced as current before entering active-handoff"
@@ -1698,6 +1866,28 @@ class OmoikaneReferenceOS:
                     method_c_revoked_sync["action"] == "fail"
                     and method_c_revoked_sync["bundle_status"] == "revoked"
                     and method_c_revoked_final["status"] == "failed"
+                ),
+                "verifier_rotation_overlap_paused": (
+                    method_a_rotation_overlap["action"] == "pause"
+                    and method_a_rotation_overlap["verifier_rotation_state"]
+                    == "overlap-required"
+                    and method_a_rotation_after_overlap["status"] == "paused"
+                ),
+                "verifier_rotation_cutover_recovered": (
+                    method_a_rotation_cutover["action"] == "accept"
+                    and method_a_rotation_cutover["verifier_rotation_state"] == "rotated"
+                    and method_a_rotation_resume["status"] == "advancing"
+                    and method_a_rotation_final["verifier_roster"]["rotation_state"]
+                    == "rotated"
+                ),
+                "verifier_rotation_dual_attested": (
+                    method_a_rotation_final["verifier_roster"]["dual_attested"]
+                    and len(method_a_rotation_final["verifier_roster"]["accepted_roots"]) == 2
+                ),
+                "verifier_revocation_fail_closed": (
+                    method_c_verifier_revoked_sync["action"] == "fail"
+                    and method_c_verifier_revoked_sync["verifier_rotation_state"] == "revoked"
+                    and method_c_verifier_revoked_final["status"] == "failed"
                 ),
                 "order_violation_blocked": "stage order violation" in order_violation_message,
                 "timeout_rolled_back": timeout["action"] == "rollback"

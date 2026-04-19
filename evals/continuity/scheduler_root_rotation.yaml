@@ -1,0 +1,18 @@
+eval_id: scheduler_root_rotation
+target: kernel.scheduler
+level: L1
+description: >
+  AscensionScheduler が external verifier の root-of-trust overlap を pause し、
+  cutover 後のみ protected handoff を再開し、
+  verifier revocation を fail-closed で止めること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
+expected:
+  verifier_rotation_overlap_paused: true
+  verifier_rotation_cutover_recovered: true
+  verifier_rotation_dual_attested: true
+  verifier_revocation_fail_closed: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

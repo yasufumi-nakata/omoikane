@@ -36,6 +36,16 @@ SCHEDULER_ARTIFACT_SYNC_POLICY_ID = "attestation-freshness-v1"
 SCHEDULER_ARTIFACT_REFRESH_WINDOW_HOURS = 24
 SCHEDULER_ARTIFACT_BUNDLE_STATUS = {"unsynced", "current", "refresh-required", "revoked"}
 SCHEDULER_ARTIFACT_STATUS = {"unsynced", "current", "stale", "revoked"}
+SCHEDULER_VERIFIER_ROSTER_POLICY_ID = "verifier-root-rotation-v1"
+SCHEDULER_VERIFIER_ROTATION_STATES = {
+    "unverified",
+    "stable",
+    "overlap-required",
+    "rotated",
+    "revoked",
+}
+SCHEDULER_VERIFIER_ROOT_STATUSES = {"active", "candidate", "retired"}
+SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS = 2
 SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD = {
     "A": "active-handoff",
     "B": "authority-handoff",
@@ -160,6 +170,13 @@ class AscensionScheduler:
                 "revoked_action": "fail-closed",
                 "sync_required_before_stage": dict(SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD),
             },
+            "verifier_rotation_policy": {
+                "policy_id": SCHEDULER_VERIFIER_ROSTER_POLICY_ID,
+                "accepted_states_before_handoff": ["stable", "rotated"],
+                "overlap_action": "pause-until-cutover",
+                "revoked_action": "fail-closed",
+                "max_tracked_roots": SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS,
+            },
             "method_profiles": {
                 "A": {
                     "stages": self._method_stages("A"),
@@ -251,6 +268,9 @@ class AscensionScheduler:
             "governance_artifacts": deepcopy(normalized_plan["governance_artifacts"]),
             "governance_artifact_digest": normalized_plan["governance_artifact_digest"],
             "artifact_sync": self._initial_artifact_sync(normalized_plan["governance_artifacts"]),
+            "verifier_roster": self._initial_verifier_roster(
+                normalized_plan["governance_artifacts"]
+            ),
             "current_stage": first_stage,
             "status": "scheduled",
             "history": [],
@@ -522,42 +542,63 @@ class AscensionScheduler:
         if handle["status"] in {"completed", "cancelled", "failed"}:
             raise ValueError(f"cannot sync governance artifacts in status {handle['status']}")
 
+        checked_at = self._normalize_non_empty_string(sync_report.get("checked_at"), "checked_at")
         normalized_sync = self._normalize_artifact_sync_report(
             sync_report,
             handle["governance_artifacts"],
+            checked_at=checked_at,
+        )
+        normalized_verifier_roster = self._normalize_verifier_roster_report(
+            sync_report.get("verifier_roster"),
+            handle["governance_artifacts"],
+            checked_at=checked_at,
         )
         handle["artifact_sync"] = normalized_sync
+        handle["verifier_roster"] = normalized_verifier_roster
         sync_ref = self._append_history(
             handle,
             stage_id=handle["current_stage"],
             transition="sync",
             reason=(
                 "governance artifact sync recorded with "
-                f"bundle_status={normalized_sync['bundle_status']}"
+                f"bundle_status={normalized_sync['bundle_status']} "
+                f"and verifier_rotation_state={normalized_verifier_roster['rotation_state']}"
             ),
         )
 
         bundle_status = normalized_sync["bundle_status"]
-        if bundle_status == "revoked":
+        rotation_state = normalized_verifier_roster["rotation_state"]
+        if bundle_status == "revoked" or rotation_state == "revoked":
             handle["status"] = "failed"
             handle["closed_at"] = utc_now_iso()
+            fail_reason = (
+                "governance verifier root revoked; fail-closed before protected handoff"
+                if rotation_state == "revoked"
+                else "governance artifact revoked; fail-closed before protected handoff"
+            )
             fail_ref = self._append_history(
                 handle,
                 stage_id=handle["current_stage"],
                 transition="fail",
-                reason="governance artifact revoked; fail-closed before protected handoff",
+                reason=fail_reason,
             )
             return {
                 "handle_id": handle["handle_id"],
                 "plan_ref": handle["plan_ref"],
                 "bundle_status": bundle_status,
+                "verifier_rotation_state": rotation_state,
                 "action": "fail",
                 "status": handle["status"],
                 "continuity_event_refs": [sync_ref, fail_ref],
                 "handle": deepcopy(handle),
             }
 
+        pause_reason = None
         if bundle_status == "refresh-required":
+            pause_reason = "governance artifact refresh required before protected handoff"
+        elif rotation_state == "overlap-required":
+            pause_reason = "verifier root overlap must finish before protected handoff"
+        if pause_reason is not None:
             continuity_event_refs = [sync_ref]
             if handle["status"] != "paused":
                 handle["status"] = "paused"
@@ -565,13 +606,14 @@ class AscensionScheduler:
                     handle,
                     stage_id=handle["current_stage"],
                     transition="pause",
-                    reason="governance artifact refresh required before protected handoff",
+                    reason=pause_reason,
                 )
                 continuity_event_refs.append(pause_ref)
             return {
                 "handle_id": handle["handle_id"],
                 "plan_ref": handle["plan_ref"],
                 "bundle_status": bundle_status,
+                "verifier_rotation_state": rotation_state,
                 "action": "pause",
                 "status": handle["status"],
                 "continuity_event_refs": continuity_event_refs,
@@ -582,6 +624,7 @@ class AscensionScheduler:
             "handle_id": handle["handle_id"],
             "plan_ref": handle["plan_ref"],
             "bundle_status": bundle_status,
+            "verifier_rotation_state": rotation_state,
             "action": "accept",
             "status": handle["status"],
             "continuity_event_refs": [sync_ref],
@@ -673,6 +716,11 @@ class AscensionScheduler:
             errors.append("artifact_sync must be a mapping")
         else:
             errors.extend(self._check_artifact_sync(artifact_sync, governance_artifacts))
+        verifier_roster = handle.get("verifier_roster")
+        if not isinstance(verifier_roster, Mapping):
+            errors.append("verifier_roster must be a mapping")
+        else:
+            errors.extend(self._check_verifier_roster(verifier_roster, governance_artifacts))
         self._check_non_empty_string(handle.get("current_stage"), "current_stage", errors)
 
         status = handle.get("status")
@@ -743,6 +791,10 @@ class AscensionScheduler:
         if isinstance(artifact_sync, Mapping):
             payload["artifact_bundle_status"] = artifact_sync.get("bundle_status", "unsynced")
             payload["artifact_sync_checked_at"] = artifact_sync.get("last_checked_at")
+        verifier_roster = handle.get("verifier_roster")
+        if isinstance(verifier_roster, Mapping):
+            payload["verifier_rotation_state"] = verifier_roster.get("rotation_state", "unverified")
+            payload["verifier_root_id"] = verifier_roster.get("active_root_id")
         entry = self.ledger.append(
             identity_id=handle["identity_id"],
             event_type=f"ascension.scheduler.{transition}",
@@ -865,14 +917,30 @@ class AscensionScheduler:
             ],
         }
 
+    def _initial_verifier_roster(self, governance_artifacts: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            "policy_id": SCHEDULER_VERIFIER_ROSTER_POLICY_ID,
+            "roster_ref": self._expected_verifier_roster_ref(governance_artifacts),
+            "checked_at": None,
+            "active_root_id": None,
+            "next_root_id": None,
+            "rotation_state": "unverified",
+            "accepted_roots": [],
+            "proof_digest": None,
+            "external_sync_ref": None,
+            "dual_attestation_required": False,
+            "dual_attested": False,
+        }
+
     def _normalize_artifact_sync_report(
         self,
         value: Any,
         governance_artifacts: Mapping[str, Any],
+        *,
+        checked_at: str,
     ) -> Dict[str, Any]:
         if not isinstance(value, Mapping):
             raise ValueError("sync_report must be a mapping")
-        checked_at = self._normalize_non_empty_string(value.get("checked_at"), "checked_at")
         raw_artifacts = value.get("artifacts")
         if not isinstance(raw_artifacts, Sequence) or isinstance(raw_artifacts, (str, bytes)):
             raise ValueError("artifacts must be a sequence")
@@ -925,6 +993,95 @@ class AscensionScheduler:
             "last_checked_at": checked_at,
             "artifacts": normalized_artifacts,
         }
+
+    def _normalize_verifier_roster_report(
+        self,
+        value: Any,
+        governance_artifacts: Mapping[str, Any],
+        *,
+        checked_at: str,
+    ) -> Dict[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError("verifier_roster must be a mapping")
+        raw_roots = value.get("accepted_roots")
+        if not isinstance(raw_roots, Sequence) or isinstance(raw_roots, (str, bytes)):
+            raise ValueError("verifier_roster.accepted_roots must be a sequence")
+
+        normalized_roots: List[Dict[str, Any]] = []
+        for index, raw_root in enumerate(raw_roots):
+            if not isinstance(raw_root, Mapping):
+                raise ValueError("verifier_roster.accepted_roots items must be mappings")
+            root_id = self._normalize_non_empty_string(
+                raw_root.get("root_id"),
+                f"verifier_roster.accepted_roots[{index}].root_id",
+            )
+            fingerprint = self._normalize_non_empty_string(
+                raw_root.get("fingerprint"),
+                f"verifier_roster.accepted_roots[{index}].fingerprint",
+            )
+            if len(fingerprint) != 64:
+                raise ValueError(
+                    f"verifier_roster.accepted_roots[{index}].fingerprint must be 64 chars"
+                )
+            status = self._normalize_non_empty_string(
+                raw_root.get("status"),
+                f"verifier_roster.accepted_roots[{index}].status",
+            )
+            if status not in SCHEDULER_VERIFIER_ROOT_STATUSES:
+                raise ValueError(
+                    "verifier_roster.accepted_roots status must be one of "
+                    f"{sorted(SCHEDULER_VERIFIER_ROOT_STATUSES)}"
+                )
+            normalized_roots.append(
+                {
+                    "root_id": root_id,
+                    "fingerprint": fingerprint,
+                    "status": status,
+                }
+            )
+
+        normalized = {
+            "policy_id": SCHEDULER_VERIFIER_ROSTER_POLICY_ID,
+            "roster_ref": self._normalize_artifact_ref(
+                value.get("roster_ref"),
+                "verifier_roster.roster_ref",
+                "verifier://",
+            ),
+            "checked_at": checked_at,
+            "active_root_id": self._normalize_optional_non_empty_string(
+                value.get("active_root_id"),
+                "verifier_roster.active_root_id",
+            ),
+            "next_root_id": self._normalize_optional_non_empty_string(
+                value.get("next_root_id"),
+                "verifier_roster.next_root_id",
+            ),
+            "rotation_state": self._normalize_verifier_rotation_state(
+                value.get("rotation_state")
+            ),
+            "accepted_roots": normalized_roots,
+            "proof_digest": self._normalize_optional_digest(
+                value.get("proof_digest"),
+                "verifier_roster.proof_digest",
+                allow_none=False,
+            ),
+            "external_sync_ref": self._normalize_optional_sync_ref(
+                value.get("external_sync_ref"),
+                allow_none=False,
+            ),
+            "dual_attestation_required": self._normalize_bool(
+                value.get("dual_attestation_required"),
+                "verifier_roster.dual_attestation_required",
+            ),
+            "dual_attested": self._normalize_bool(
+                value.get("dual_attested"),
+                "verifier_roster.dual_attested",
+            ),
+        }
+        errors = self._check_verifier_roster(normalized, governance_artifacts)
+        if errors:
+            raise ValueError(errors[0])
+        return normalized
 
     def _check_governance_artifacts(self, value: Mapping[str, Any]) -> List[str]:
         errors: List[str] = []
@@ -1048,6 +1205,167 @@ class AscensionScheduler:
             errors.append("artifact_sync.bundle_status does not match artifact statuses")
         return errors
 
+    def _check_verifier_roster(
+        self,
+        value: Mapping[str, Any],
+        governance_artifacts: Any,
+    ) -> List[str]:
+        errors: List[str] = []
+        if value.get("policy_id") != SCHEDULER_VERIFIER_ROSTER_POLICY_ID:
+            errors.append(
+                f"verifier_roster.policy_id must be {SCHEDULER_VERIFIER_ROSTER_POLICY_ID}"
+            )
+        expected_roster_ref = (
+            self._expected_verifier_roster_ref(governance_artifacts)
+            if isinstance(governance_artifacts, Mapping)
+            else None
+        )
+        if value.get("roster_ref") != expected_roster_ref:
+            errors.append("verifier_roster.roster_ref must match governance_artifacts")
+        checked_at = value.get("checked_at")
+        if checked_at is not None and (not isinstance(checked_at, str) or not checked_at.strip()):
+            errors.append("verifier_roster.checked_at must be a string or null")
+        rotation_state = value.get("rotation_state")
+        if rotation_state not in SCHEDULER_VERIFIER_ROTATION_STATES:
+            errors.append(
+                "verifier_roster.rotation_state must be one of "
+                f"{sorted(SCHEDULER_VERIFIER_ROTATION_STATES)}"
+            )
+        active_root_id = value.get("active_root_id")
+        if active_root_id is not None and (not isinstance(active_root_id, str) or not active_root_id.strip()):
+            errors.append("verifier_roster.active_root_id must be a string or null")
+        next_root_id = value.get("next_root_id")
+        if next_root_id is not None and (not isinstance(next_root_id, str) or not next_root_id.strip()):
+            errors.append("verifier_roster.next_root_id must be a string or null")
+        proof_digest = value.get("proof_digest")
+        if proof_digest is not None and (
+            not isinstance(proof_digest, str) or len(proof_digest) != 64
+        ):
+            errors.append("verifier_roster.proof_digest must be 64 hex chars or null")
+        external_sync_ref = value.get("external_sync_ref")
+        if external_sync_ref is not None and (
+            not isinstance(external_sync_ref, str)
+            or not external_sync_ref.startswith("sync://")
+        ):
+            errors.append("verifier_roster.external_sync_ref must start with sync:// or be null")
+
+        dual_attestation_required = value.get("dual_attestation_required")
+        if not isinstance(dual_attestation_required, bool):
+            errors.append("verifier_roster.dual_attestation_required must be a boolean")
+        dual_attested = value.get("dual_attested")
+        if not isinstance(dual_attested, bool):
+            errors.append("verifier_roster.dual_attested must be a boolean")
+
+        accepted_roots = value.get("accepted_roots")
+        if not isinstance(accepted_roots, list):
+            errors.append("verifier_roster.accepted_roots must be a list")
+            return errors
+        if len(accepted_roots) > SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS:
+            errors.append(
+                "verifier_roster.accepted_roots must not exceed "
+                f"{SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS} items"
+            )
+
+        seen_root_ids: List[str] = []
+        status_by_root_id: Dict[str, str] = {}
+        for item in accepted_roots:
+            if not isinstance(item, Mapping):
+                errors.append("verifier_roster.accepted_roots items must be mappings")
+                continue
+            root_id = item.get("root_id")
+            if not isinstance(root_id, str) or not root_id.strip():
+                errors.append("verifier_roster.accepted_roots.root_id must be a non-empty string")
+                continue
+            if root_id in seen_root_ids:
+                errors.append(f"verifier_roster.accepted_roots.root_id duplicated: {root_id}")
+            else:
+                seen_root_ids.append(root_id)
+            fingerprint = item.get("fingerprint")
+            if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+                errors.append(
+                    f"verifier_roster.accepted_roots[{root_id}].fingerprint must be 64 chars"
+                )
+            status = item.get("status")
+            if status not in SCHEDULER_VERIFIER_ROOT_STATUSES:
+                errors.append(
+                    "verifier_roster.accepted_roots.status must be one of "
+                    f"{sorted(SCHEDULER_VERIFIER_ROOT_STATUSES)}"
+                )
+                continue
+            status_by_root_id[root_id] = status
+
+        if errors:
+            return errors
+
+        active_roots = [root_id for root_id, status in status_by_root_id.items() if status == "active"]
+        candidate_roots = [
+            root_id for root_id, status in status_by_root_id.items() if status == "candidate"
+        ]
+        retired_roots = [root_id for root_id, status in status_by_root_id.items() if status == "retired"]
+        if rotation_state == "unverified":
+            if accepted_roots:
+                errors.append("verifier_roster.accepted_roots must be empty while unverified")
+            if active_root_id is not None:
+                errors.append("verifier_roster.active_root_id must be null while unverified")
+            if next_root_id is not None:
+                errors.append("verifier_roster.next_root_id must be null while unverified")
+            if proof_digest is not None:
+                errors.append("verifier_roster.proof_digest must be null while unverified")
+            if external_sync_ref is not None:
+                errors.append("verifier_roster.external_sync_ref must be null while unverified")
+            if dual_attestation_required or dual_attested:
+                errors.append("verifier_roster dual attestation flags must be false while unverified")
+            return errors
+
+        if active_root_id not in status_by_root_id:
+            errors.append("verifier_roster.active_root_id must reference one accepted root")
+        elif status_by_root_id[active_root_id] != "active":
+            errors.append("verifier_roster.active_root_id must reference an active root")
+        if len(active_roots) != 1:
+            errors.append("verifier_roster.accepted_roots must contain exactly one active root")
+        if checked_at is None:
+            errors.append("verifier_roster.checked_at must be set once verified")
+        if proof_digest is None:
+            errors.append("verifier_roster.proof_digest must be set once verified")
+        if external_sync_ref is None:
+            errors.append("verifier_roster.external_sync_ref must be set once verified")
+
+        if rotation_state == "stable":
+            if len(accepted_roots) != 1 or candidate_roots or retired_roots:
+                errors.append("stable verifier roster must contain exactly one active root")
+            if next_root_id is not None:
+                errors.append("verifier_roster.next_root_id must be null when stable")
+            if dual_attestation_required or dual_attested:
+                errors.append("stable verifier roster must not require dual attestation")
+        elif rotation_state == "overlap-required":
+            if len(accepted_roots) != 2 or len(candidate_roots) != 1:
+                errors.append(
+                    "overlap-required verifier roster must contain active and candidate roots"
+                )
+            if next_root_id not in candidate_roots:
+                errors.append(
+                    "verifier_roster.next_root_id must reference the candidate root during overlap"
+                )
+            if dual_attestation_required is not True or dual_attested is not False:
+                errors.append(
+                    "overlap-required verifier roster must require but not yet satisfy dual attestation"
+                )
+        elif rotation_state == "rotated":
+            if len(accepted_roots) != 2 or len(retired_roots) != 1:
+                errors.append("rotated verifier roster must contain active and retired roots")
+            if next_root_id is not None:
+                errors.append("verifier_roster.next_root_id must be null after cutover")
+            if dual_attestation_required or dual_attested is not True:
+                errors.append(
+                    "rotated verifier roster must record completed dual attestation"
+                )
+        elif rotation_state == "revoked":
+            if next_root_id is not None:
+                errors.append("verifier_roster.next_root_id must be null when revoked")
+            if dual_attestation_required:
+                errors.append("revoked verifier roster must not require dual attestation")
+        return errors
+
     def _normalize_artifact_ref(self, value: Any, field_name: str, prefix: str) -> str:
         normalized = self._normalize_non_empty_string(value, field_name)
         if not normalized.startswith(prefix):
@@ -1099,6 +1417,13 @@ class AscensionScheduler:
     def _governance_artifact_digest(self, governance_artifacts: Mapping[str, Any]) -> str:
         return sha256_text(canonical_json(dict(governance_artifacts)))
 
+    def _expected_verifier_roster_ref(self, governance_artifacts: Mapping[str, Any]) -> str:
+        artifact_bundle_ref = governance_artifacts["artifact_bundle_ref"]
+        return artifact_bundle_ref.replace("artifact://", "verifier://", 1).replace(
+            "/bundle",
+            "/root-roster",
+        )
+
     def _ensure_artifact_sync_for_stage(
         self,
         handle: Mapping[str, Any],
@@ -1112,16 +1437,38 @@ class AscensionScheduler:
             raise ValueError(
                 f"governance artifacts must be synced as current before entering {next_stage}"
             )
+        verifier_roster = handle.get("verifier_roster")
+        if (
+            not isinstance(verifier_roster, Mapping)
+            or verifier_roster.get("rotation_state") not in {"stable", "rotated"}
+        ):
+            raise ValueError(
+                f"verifier root rotation must be stable before entering {next_stage}"
+            )
 
     def _normalize_non_empty_string(self, value: Any, field_name: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field_name} must be a non-empty string")
         return value.strip()
 
+    def _normalize_optional_non_empty_string(self, value: Any, field_name: str) -> Optional[str]:
+        if value is None:
+            return None
+        return self._normalize_non_empty_string(value, field_name)
+
     def _normalize_bool(self, value: Any, field_name: str) -> bool:
         if not isinstance(value, bool):
             raise ValueError(f"{field_name} must be a boolean")
         return value
+
+    def _normalize_verifier_rotation_state(self, value: Any) -> str:
+        state = self._normalize_non_empty_string(value, "verifier_roster.rotation_state")
+        if state not in SCHEDULER_VERIFIER_ROTATION_STATES:
+            raise ValueError(
+                "verifier_roster.rotation_state must be one of "
+                f"{sorted(SCHEDULER_VERIFIER_ROTATION_STATES)}"
+            )
+        return state
 
     def _normalize_method(self, value: Any) -> str:
         method = self._normalize_non_empty_string(value, "method")

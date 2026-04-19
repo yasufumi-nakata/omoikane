@@ -63,6 +63,10 @@ reference runtime は Method ごとに固定 profile を持つ。
 - `artifact_sync` は core artifact bundle の external proof snapshot を保持し、
   `active-handoff` / `authority-handoff` / `scan-commit` の前に `current` bundle を要求する。
   `stale` は pause + refresh-required、`revoked` は fail-closed で扱う。
+- `verifier_roster` は external verifier の root-of-trust snapshot を保持し、
+  `overlap-required` では dual-attested cutover 完了まで pause、
+  `rotated` でのみ protected handoff を再開し、
+  `revoked` は fail-closed で扱う。
 
 ## 不変条件
 
@@ -75,6 +79,7 @@ reference runtime は Method ごとに固定 profile を持つ。
 6. clinical/legal consent artifact の真正性確認は repo 外だが、
    scheduler surface には stable artifact ref・witness quorum・最新 sync snapshot を必ず残す
 7. `artifact_sync.bundle_status != current` のまま protected handoff stage を開いてはならない
+8. `verifier_roster.rotation_state` は `stable` または `rotated` でなければ protected handoff stage を開いてはならない
 
 ## API
 
@@ -90,20 +95,29 @@ scheduler.sync_governance_artifacts(handle, checked_at, artifacts) → ArtifactS
 scheduler.cancel(handle, reason) → ScheduleHandle
 ```
 
+`sync_governance_artifacts` の入力は `artifacts` に加えて
+`verifier_roster` snapshot
+(`roster_ref` / `active_root_id` / `next_root_id` / `rotation_state` /
+`accepted_roots` / `dual_attestation_required` / `dual_attested`) を必須とする。
+
 ## reference runtime の扱い
 
 - `kernel.scheduler.v0.idl` で機械可読に
-- `ascension_plan.schema` / `schedule_handle.schema` を導入
+- `ascension_plan.schema` / `schedule_handle.schema` /
+  `governance_verifier_roster.schema` を導入
 - `scheduler-demo` を CLI に追加し、Method A の順序遷移＋ forced rollback、
   Method B の reversible substrate failover、
   Method C の fail-closed destructive scan に加えて、
   governance artifact bundle の current / stale / revoked sync snapshot を
-  ContinuityLedger に記録
+  ContinuityLedger に記録し、
+  verifier root rotation の overlap pause / rotated cutover / revoked fail-closed を
+  1 シナリオで確認する
 - `evals/continuity/scheduler_stage_rollback.yaml` と
   `evals/continuity/scheduler_method_profiles.yaml`、
   `evals/continuity/scheduler_governance_artifacts.yaml`、
-  `evals/continuity/scheduler_artifact_sync.yaml` で Method A/B/C の contract と
-  artifact binding / freshness gate を守る
+  `evals/continuity/scheduler_artifact_sync.yaml`、
+  `evals/continuity/scheduler_root_rotation.yaml` で Method A/B/C の contract と
+  artifact binding / freshness gate / verifier cutover gate を守る
 
 ## 思兼神メタファー
 

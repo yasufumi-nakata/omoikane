@@ -70,7 +70,10 @@ Method C の `scan-commit` fail-closed に加えて、
 `self_consent` / `ethics` / `council` / `legal` / `witness` artifact bundle と
 `governance_artifact_digest` が plan と handle に束縛されること、
 さらに `artifact_sync` が `current / stale / revoked` external proof snapshot を持ち、
-protected handoff 前に `current` bundle を要求することを 1 シナリオで確認する。
+protected handoff 前に `current` bundle を要求すること、
+`verifier_roster` が `overlap-required` で pause、
+`rotated` で cutover 後に再開、
+`revoked` で fail-closed になることを 1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -277,6 +280,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 - Federation / Heritage participant attestation と transport authenticity を実在 remote execution に接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- AscensionScheduler artifact の root-of-trust rotation と外部 verifier 接続
+- AscensionScheduler external verifier の真正性証明と live 接続
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

@@ -386,12 +386,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["artifact_refresh_paused"])
         self.assertTrue(result["validation"]["artifact_refresh_recovered"])
         self.assertTrue(result["validation"]["artifact_revocation_fail_closed"])
+        self.assertTrue(result["validation"]["verifier_rotation_overlap_paused"])
+        self.assertTrue(result["validation"]["verifier_rotation_cutover_recovered"])
+        self.assertTrue(result["validation"]["verifier_rotation_dual_attested"])
+        self.assertTrue(result["validation"]["verifier_revocation_fail_closed"])
         self.assertTrue(result["validation"]["witness_quorum_bound"])
         self.assertTrue(result["validation"]["legal_attestation_bound"])
         self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
         self.assertEqual("bdb-bridge", result["scenarios"]["timeout"]["rollback_target"])
         self.assertEqual("completed", result["final_handle"]["status"])
         self.assertEqual("current", result["final_handle"]["artifact_sync"]["bundle_status"])
+        self.assertEqual("stable", result["final_handle"]["verifier_roster"]["rotation_state"])
+        self.assertEqual(
+            "rotated",
+            result["method_a_rotation_final_handle"]["verifier_roster"]["rotation_state"],
+        )
         self.assertEqual(
             "dual-channel-review",
             result["scenarios"]["method_b"]["signal_rollback"]["rollback_target"],
@@ -400,6 +409,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("fail", result["scenarios"]["method_c"]["signal_fail"]["action"])
         self.assertEqual("failed", result["method_c_final_handle"]["status"])
         self.assertEqual("failed", result["method_c_revoked_final_handle"]["status"])
+        self.assertEqual("failed", result["method_c_verifier_revoked_final_handle"]["status"])
 
     def test_council_demo_reports_timeout_policy(self) -> None:
         runtime = OmoikaneReferenceOS()

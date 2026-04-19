@@ -187,7 +187,8 @@ entries:
       - reference-runtime
       - evals/continuity/scheduler_stage_rollback.yaml
       - evals/continuity/scheduler_artifact_sync.yaml
-    rationale: Required to persist mutable scheduler state, continuity refs, rollback history, and artifact sync snapshots.
+      - evals/continuity/scheduler_root_rotation.yaml
+    rationale: Required to persist mutable scheduler state, continuity refs, rollback history, artifact sync snapshots, and verifier root rotation state.
   - priority: P1
     kind: schema
     file: specs/schemas/governance_artifact_sync.schema
@@ -198,13 +199,23 @@ entries:
       - evals/continuity/scheduler_artifact_sync.yaml
     rationale: Required to serialize current/stale/revoked external proof snapshots for the protected scheduler artifact bundle.
   - priority: P1
+    kind: schema
+    file: specs/schemas/governance_verifier_roster.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - specs/schemas/schedule_handle.schema
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+      - evals/continuity/scheduler_root_rotation.yaml
+    rationale: Required to serialize overlap, cutover, and revocation state for the scheduler external verifier root-of-trust roster.
+  - priority: P1
     kind: idl
     file: specs/interfaces/kernel.scheduler.v0.idl
     consumers:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, and artifact sync gate machine-readable.
+    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, artifact sync gate, and verifier root rotation machine-readable.
   - priority: P1
     kind: schema
     file: specs/schemas/termination_request.schema
@@ -675,6 +686,15 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
     rationale: Protects current-sync gating, stale pause, and revoked fail-closed behavior for scheduler governance artifacts.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_root_rotation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects verifier overlap pause, rotated cutover recovery, dual-attested root history, and verifier revocation fail-closed behavior.
   - priority: P1
     kind: eval
     file: evals/performance/termination_latency.yaml

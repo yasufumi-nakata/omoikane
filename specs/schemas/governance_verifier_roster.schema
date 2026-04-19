@@ -1,0 +1,102 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/governance_verifier_roster.schema"
+title: GovernanceVerifierRoster
+description: External verifier root-of-trust snapshot bound to one ascension governance artifact bundle.
+type: object
+additionalProperties: false
+required:
+  - policy_id
+  - roster_ref
+  - checked_at
+  - active_root_id
+  - next_root_id
+  - rotation_state
+  - accepted_roots
+  - proof_digest
+  - external_sync_ref
+  - dual_attestation_required
+  - dual_attested
+properties:
+  policy_id:
+    const: verifier-root-rotation-v1
+  roster_ref:
+    type: string
+    pattern: "^verifier://"
+  checked_at:
+    type:
+      - string
+      - "null"
+    format: date-time
+  active_root_id:
+    type:
+      - string
+      - "null"
+    minLength: 1
+  next_root_id:
+    type:
+      - string
+      - "null"
+    minLength: 1
+  rotation_state:
+    type: string
+    enum:
+      - unverified
+      - stable
+      - overlap-required
+      - rotated
+      - revoked
+  accepted_roots:
+    type: array
+    maxItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - root_id
+        - fingerprint
+        - status
+      properties:
+        root_id:
+          type: string
+          minLength: 1
+        fingerprint:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        status:
+          type: string
+          enum:
+            - active
+            - candidate
+            - retired
+  proof_digest:
+    type:
+      - string
+      - "null"
+    pattern: "^[a-f0-9]{64}$"
+  external_sync_ref:
+    type:
+      - string
+      - "null"
+    pattern: "^sync://"
+  dual_attestation_required:
+    type: boolean
+  dual_attested:
+    type: boolean
+examples:
+  - policy_id: verifier-root-rotation-v1
+    roster_ref: verifier://ascension/a/3dfb1f84a223/root-roster
+    checked_at: "2026-04-19T06:03:00Z"
+    active_root_id: root://scheduler-demo/method-a-rotation-cutover/cutover
+    next_root_id: null
+    rotation_state: rotated
+    accepted_roots:
+      - root_id: root://scheduler-demo/method-a-rotation-cutover/cutover
+        fingerprint: 43f7c0d2851fb777f44f080b86cc352870b0540f097651ee6bb40d4f0fbf4f65
+        status: active
+      - root_id: root://scheduler-demo/method-a-rotation-cutover/previous
+        fingerprint: 653b66831fb73ce71f73db2e31702cb426e1176ca7dbf95678ce1d154049f4fe
+        status: retired
+    proof_digest: 61e17111c819d1cbbe42f478d8485d89d8eb0b715051cd14cb1932b55cbf5a1c
+    external_sync_ref: sync://scheduler-demo/method-a-rotation-cutover/verifier-roster
+    dual_attestation_required: false
+    dual_attested: true

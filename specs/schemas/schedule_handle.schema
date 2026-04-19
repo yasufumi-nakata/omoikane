@@ -13,6 +13,7 @@ required:
   - governance_artifacts
   - governance_artifact_digest
   - artifact_sync
+  - verifier_roster
   - current_stage
   - status
   - history
@@ -141,6 +142,8 @@ properties:
               pattern: "^sync://"
             refresh_required:
               type: boolean
+  verifier_roster:
+    $ref: ./governance_verifier_roster.schema
   current_stage:
     type: string
     minLength: 1
@@ -254,6 +257,21 @@ examples:
           proof_digest: 5b653bcd16fc850d9e4d7f3857549ed510d9af1f8d9cb0fd78a76eb4332ea3d4
           external_sync_ref: sync://scheduler-demo/method-a-current/artifact_bundle_ref
           refresh_required: false
+    verifier_roster:
+      policy_id: verifier-root-rotation-v1
+      roster_ref: verifier://ascension/a/3dfb1f84a223/root-roster
+      checked_at: "2026-04-19T06:00:00Z"
+      active_root_id: root://scheduler-demo/method-a-current/active
+      next_root_id: null
+      rotation_state: stable
+      accepted_roots:
+        - root_id: root://scheduler-demo/method-a-current/active
+          fingerprint: 1a0e7d7d2f8ee29120bce2fe3d95ce96625a0dd75b7cb2798c5b5bc3e90e6495
+          status: active
+      proof_digest: 90d771225219a74cfeb8439fe7e0af1c1da7b0f0c5a461f165b04ad68d39d9c0
+      external_sync_ref: sync://scheduler-demo/method-a-current/verifier-roster
+      dual_attestation_required: false
+      dual_attested: false
     current_stage: bdb-bridge
     status: paused
     history:

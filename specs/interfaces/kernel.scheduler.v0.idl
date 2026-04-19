@@ -7,6 +7,7 @@ imports:
   ascension_plan: ../schemas/ascension_plan.schema
   schedule_handle: ../schemas/schedule_handle.schema
   governance_artifact_sync: ../schemas/governance_artifact_sync.schema
+  governance_verifier_roster: ../schemas/governance_verifier_roster.schema
 operations:
   schedule:
     summary: Validate an ascension plan, bind its governance artifact bundle, and open the first stage with append-only continuity evidence.
@@ -249,7 +250,7 @@ operations:
     output:
       schema_ref: schedule_handle
   sync_governance_artifacts:
-    summary: Record one external proof sync snapshot and pause or fail-closed when artifacts are stale or revoked.
+    summary: Record one external proof sync snapshot and pause or fail-closed when artifacts are stale, verifier roots overlap, or verifier trust is revoked.
     input:
       inline_schema:
         type: object
@@ -257,6 +258,7 @@ operations:
           - handle_id
           - checked_at
           - artifacts
+          - verifier_roster
         properties:
           handle_id:
             type: string
@@ -294,6 +296,8 @@ operations:
                 external_sync_ref:
                   type: string
                   pattern: "^sync://"
+          verifier_roster:
+            schema_ref: governance_verifier_roster
     output:
       inline_schema:
         type: object
@@ -301,6 +305,7 @@ operations:
           - handle_id
           - plan_ref
           - bundle_status
+          - verifier_rotation_state
           - action
           - status
           - continuity_event_refs
@@ -315,6 +320,13 @@ operations:
             enum:
               - current
               - refresh-required
+              - revoked
+          verifier_rotation_state:
+            type: string
+            enum:
+              - stable
+              - overlap-required
+              - rotated
               - revoked
           action:
             type: string
@@ -338,7 +350,7 @@ compatibility:
     - Timeout and substrate-signal handling always append continuity evidence before exposing completed state.
     - Clinical/legal attestation authenticity stays external to this repo, but every plan and handle must carry stable artifact refs and a bundle digest.
     - Protected handoff stages require one current governance artifact sync snapshot before they can open.
-    - Stale snapshots pause the active schedule, and revoked snapshots fail-closed before destructive or authority-bearing handoff.
+    - Stale snapshots pause the active schedule, verifier overlap snapshots pause until cutover, and revoked snapshots fail-closed before destructive or authority-bearing handoff.
 events:
   - name: ascension.scheduler.enter
     payload:

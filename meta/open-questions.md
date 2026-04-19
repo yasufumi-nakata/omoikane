@@ -31,6 +31,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] Guardian の人間による監督方式（2026-04-18: `governance.oversight.v0` / `oversight-demo` / `guardian_pin_breach_propagation` を追加し、breach 時に human pin を剥がす reference runtime を固定）
 - [x] OS バージョン管理の semver か独自か（2026-04-18: hybrid policy として runtime=semver / governance=calver / catalog=calver+sha256 を固定し、`release_manifest.schema`・`VersioningService`・`version-demo`・`evals/continuity/release_manifest_contract.yaml` を追加）
 - [x] AscensionScheduler artifact の freshness / revocation / external sync gate（2026-04-19: `governance_artifact_sync.schema` / `artifact_sync` / `scheduler_artifact_sync` / `scheduler-demo` を追加し、`active-handoff` / `authority-handoff` / `scan-commit` 前の current bundle requirement と stale pause / revoked fail-closed を固定）
+- [x] AscensionScheduler external verifier の root-of-trust rotation overlap / cutover contract（2026-04-19: `governance_verifier_roster.schema` / `kernel.scheduler.v0` / `scheduler_root_rotation` / `scheduler-demo` を追加し、`overlap-required` pause・`rotated` cutover recovery・`revoked` fail-closed を固定）
 
 ## ドキュメント上の未確定
 

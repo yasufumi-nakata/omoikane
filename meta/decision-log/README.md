@@ -57,6 +57,7 @@ status: decided | superseded
 - [2026-04-19_metacognition-self-monitor-loop.md](2026-04-19_metacognition-self-monitor-loop.md)
 - [2026-04-19_self-model-threshold-profile.md](2026-04-19_self-model-threshold-profile.md)
 - [2026-04-19_scheduler-artifact-sync-gate.md](2026-04-19_scheduler-artifact-sync-gate.md)
+- [2026-04-19_scheduler-verifier-root-rotation.md](2026-04-19_scheduler-verifier-root-rotation.md)
 - [2026-04-19_distributed-council-resolution.md](2026-04-19_distributed-council-resolution.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
