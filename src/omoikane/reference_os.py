@@ -57,6 +57,7 @@ from .governance import (
     VersioningService,
 )
 from .interface.bdb import BiologicalDigitalBridge
+from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import InterMindChannel
 from .interface.wms import WorldModelSync
@@ -172,6 +173,7 @@ class OmoikaneReferenceOS:
         self.bdb = BiologicalDigitalBridge()
         self.ewa = ExternalWorldAgentController(self.ethics)
         self.imc = InterMindChannel()
+        self.collective = CollectiveIdentityService()
         self.wms = WorldModelSync()
         self.council = Council()
         self.cognitive_audit = CognitiveAuditService()
@@ -2508,6 +2510,230 @@ class OmoikaneReferenceOS:
             "message": message,
             "disconnect": disconnect,
             "session": final_session,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_collective_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://collective-origin-demo/v1",
+            metadata={"display_name": "Collective Origin"},
+        )
+        peer = self.identity.create(
+            human_consent_proof="consent://collective-peer-demo/v1",
+            metadata={"display_name": "Collective Peer"},
+        )
+        collective_identity = self.identity.create_collective(
+            [identity.identity_id, peer.identity_id],
+            consent_proof="consent://collective-formation-demo/v1",
+            metadata={
+                "display_name": "Collective Meridian",
+                "purpose": "bounded merge-thought synthesis",
+            },
+        )
+        imc_session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer.identity_id,
+            mode="merge_thought",
+            initiator_template={
+                "public_fields": ["display_name", "shared_focus", "presence_state"],
+                "intimate_fields": ["affect_summary", "intent_vector"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state", "memory_index"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        collective_record = self.collective.register_collective(
+            collective_identity_id=collective_identity.identity_id,
+            member_ids=[identity.identity_id, peer.identity_id],
+            purpose="bounded merge-thought synthesis for shared planning",
+            proposed_name="Collective Meridian",
+            council_witnessed=True,
+            federation_attested=True,
+            guardian_observed=True,
+        )
+        wms_session = self.wms.create_session(
+            [collective_identity.identity_id, identity.identity_id, peer.identity_id],
+            objects=["merge-atrium", "shared-anchor", "continuity-lantern"],
+        )
+        merge_session = self.collective.open_merge_session(
+            collective_id=collective_record["collective_id"],
+            imc_session_id=imc_session["session_id"],
+            wms_session_id=wms_session["session_id"],
+            requested_duration_seconds=8.0,
+            council_witnessed=True,
+            federation_attested=True,
+            guardian_observed=True,
+            shared_world_mode=wms_session["mode"],
+        )
+        merge_message = self.imc.send(
+            imc_session["session_id"],
+            sender_id=identity.identity_id,
+            summary="merge-thought では shared focus と affect summary のみを同期する",
+            payload={
+                "display_name": "Collective Origin",
+                "shared_focus": "merge-boundary-review",
+                "affect_summary": "careful trust",
+                "intent_vector": "synthesize shared plan",
+                "memory_index": "crystal://collective/segment-4",
+                "identity_axiom_state": "sealed-self-core",
+            },
+        )
+        divergence = self.wms.propose_diff(
+            wms_session["session_id"],
+            proposer_id=peer.identity_id,
+            candidate_objects=[
+                "merge-atrium",
+                "shared-anchor",
+                "continuity-lantern",
+                "overlaid-subjective-map",
+            ],
+            affected_object_ratio=0.24,
+            attested=True,
+        )
+        escape = self.wms.switch_mode(
+            wms_session["session_id"],
+            mode="private_reality",
+            requested_by=collective_identity.identity_id,
+            reason="major divergence during merge-thought requires member-safe private recovery",
+        )
+        disconnect = self.imc.emergency_disconnect(
+            imc_session["session_id"],
+            requested_by=identity.identity_id,
+            reason="bounded merge window completed; return each member to private recovery",
+        )
+        self.collective.close_merge_session(
+            merge_session["merge_session_id"],
+            disconnect_reason=disconnect["reason"],
+            time_in_merge_seconds=7.5,
+            resulting_wms_mode=escape["new_mode"],
+            identity_confirmations={
+                identity.identity_id: True,
+                peer.identity_id: True,
+            },
+        )
+        dissolution = self.collective.dissolve_collective(
+            collective_record["collective_id"],
+            requested_by=identity.identity_id,
+            member_confirmations={
+                identity.identity_id: True,
+                peer.identity_id: True,
+            },
+            reason="bounded merge session ended and both members recovered independent subjectivity",
+        )
+        final_collective = self.collective.snapshot(collective_record["collective_id"])
+        final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
+        collective_validation = self.collective.validate_record(final_collective)
+        merge_validation = self.collective.validate_merge_session(final_merge)
+        wms_snapshot = self.wms.snapshot(wms_session["session_id"])
+
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.formed",
+            payload={
+                "collective_id": collective_record["collective_id"],
+                "member_ids": collective_record["member_ids"],
+                "governance_mode": collective_record["governance_mode"],
+                "purpose": collective_record["purpose"],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.merge.opened",
+            payload={
+                "merge_session_id": merge_session["merge_session_id"],
+                "imc_session_id": merge_session["imc_session_id"],
+                "wms_session_id": merge_session["wms_session_id"],
+                "granted_duration_seconds": merge_session["granted_duration_seconds"],
+                "shared_world_mode": merge_session["shared_world_mode"],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.escape.private_reality",
+            payload={
+                "reconcile_id": divergence["reconcile_id"],
+                "classification": divergence["classification"],
+                "decision": divergence["decision"],
+                "escape_offered": divergence["escape_offered"],
+                "private_escape_honored": escape["private_escape_honored"],
+            },
+            actor="WorldModelSync",
+            category="interface-collective",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.merge.closed",
+            payload={
+                "merge_session_id": final_merge["merge_session_id"],
+                "status": final_merge["status"],
+                "time_in_merge_seconds": final_merge["time_in_merge_seconds"],
+                "within_budget": final_merge["within_budget"],
+                "private_escape_honored": final_merge["private_escape_honored"],
+                "identity_confirmations": final_merge["identity_confirmations"],
+                "dissolution_status": dissolution["status"],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        validation = {
+            "ok": collective_validation["ok"] and merge_validation["ok"],
+            "collective_identity_distinct": collective_identity.identity_id
+            not in {identity.identity_id, peer.identity_id},
+            "merge_window_bounded": merge_validation["merge_window_bounded"],
+            "merge_duration_within_budget": final_merge["within_budget"],
+            "private_escape_honored": escape["private_escape_honored"],
+            "identity_confirmation_complete": merge_validation["identity_confirmation_complete"],
+            "dissolution_clears_collective": final_collective["status"] == "dissolved",
+            "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
+            "federation_attested": final_collective["oversight"]["federation_attested"],
+        }
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "peer_identity_id": peer.identity_id,
+                "collective_identity_id": collective_identity.identity_id,
+            },
+            "profile": self.collective.reference_profile(),
+            "collective": final_collective,
+            "merge": final_merge,
+            "imc": {
+                "session": self.imc.snapshot(imc_session["session_id"]),
+                "message": merge_message,
+                "disconnect": disconnect,
+            },
+            "wms": {
+                "divergence": divergence,
+                "escape": escape,
+                "state": wms_snapshot,
+            },
+            "dissolution": dissolution,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

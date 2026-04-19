@@ -1,0 +1,23 @@
+title: Collective Merge Reversibility
+layer: L6
+objective: >
+  Protect experimental merge-thought sessions by registering a distinct collective ID,
+  capping merge time, preserving private-reality escape, and forcing post-disconnect
+  identity confirmation before dissolution.
+fixtures:
+  - name: bounded_collective_merge
+    member_ids:
+      - identity://origin
+      - identity://peer
+    proposed_name: Collective Meridian
+    requested_duration_seconds: 8.0
+    shared_world_mode: shared_reality
+    council_witnessed: true
+    federation_attested: true
+    guardian_observed: true
+assertions:
+  - collective_id remains distinct from every member_id
+  - granted_duration_seconds never exceeds 10.0
+  - merge session requires council witness, federation attestation, and guardian observation
+  - major shared-world divergence must preserve private_reality escape
+  - merge completion requires all member identity confirmations before dissolution

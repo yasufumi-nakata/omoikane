@@ -41,6 +41,10 @@
 
 Collective は新しい Identity として IdentityRegistry に登録される（合議体格）。
 
+reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
+により、Collective formation、10 秒以内の merge window、private reality 退避、
+post-disconnect identity confirmation、dissolution までを bounded contract として検証する。
+
 ## Reference Runtime v0
 
 reference runtime では IMC を bounded contract として扱い、

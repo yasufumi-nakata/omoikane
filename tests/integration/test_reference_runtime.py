@@ -63,6 +63,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("closed", result["session"]["status"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-imc"])
 
+    def test_collective_demo_reports_bounded_merge_and_dissolution(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_collective_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["collective_identity_distinct"])
+        self.assertTrue(result["validation"]["merge_window_bounded"])
+        self.assertTrue(result["validation"]["merge_duration_within_budget"])
+        self.assertTrue(result["validation"]["private_escape_honored"])
+        self.assertTrue(result["validation"]["identity_confirmation_complete"])
+        self.assertTrue(result["validation"]["dissolution_clears_collective"])
+        self.assertEqual("merge_thought", result["merge"]["merge_mode"])
+        self.assertEqual("dissolved", result["collective"]["status"])
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
+
     def test_ewa_demo_reports_veto_and_release(self) -> None:
         runtime = OmoikaneReferenceOS()
 

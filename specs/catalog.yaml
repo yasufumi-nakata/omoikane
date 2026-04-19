@@ -347,6 +347,15 @@ entries:
     rationale: Required to serialize shared/private world-state snapshots with fixed authority and time_rate fields.
   - priority: P1
     kind: schema
+    file: specs/schemas/collective_record.schema
+    consumers:
+      - specs/interfaces/interface.collective.v0.idl
+      - docs/02-subsystems/interface/collective-identity.md
+      - docs/03-protocols/inter-mind-comm.md
+      - reference-runtime
+    rationale: Required to serialize one temporary collective identity distinct from its member identities.
+  - priority: P1
+    kind: schema
     file: specs/schemas/reasoning_trace.schema
     consumers:
       - specs/interfaces/cognitive.reasoning.v0.idl
@@ -384,6 +393,29 @@ entries:
       - reference-runtime
       - docs/02-subsystems/interface/wms-spec.md
     rationale: Required to fix the L6 World Model Sync adapter contract across docs, CLI, and runtime.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/collective_merge_session.schema
+    consumers:
+      - specs/interfaces/interface.collective.v0.idl
+      - docs/02-subsystems/interface/collective-identity.md
+      - reference-runtime
+    rationale: Required to serialize one bounded merge-thought session with time cap, private escape, and member recovery evidence.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.collective.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/interface/collective-identity.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to fix the L6 collective formation, merge closure, and dissolution contract across docs, CLI, and runtime.
+  - priority: P1
+    kind: eval
+    file: evals/interface/collective_merge_reversibility.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects bounded merge windows, private-reality escape, and post-disconnect member recovery before dissolution.
   - priority: P1
     kind: schema
     file: specs/schemas/affect_state.schema

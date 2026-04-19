@@ -87,6 +87,42 @@ class IdentityRegistry:
         self._records[child_id] = record
         return record
 
+    def create_collective(
+        self,
+        member_ids: List[str],
+        consent_proof: str,
+        metadata: Optional[Dict[str, str]] = None,
+    ) -> IdentityRecord:
+        if len(member_ids) < 2:
+            raise ValueError("collective identity requires at least two member identities")
+
+        normalized_members: List[str] = []
+        for member_id in member_ids:
+            member = self.get(member_id)
+            if member.status != "active":
+                raise ValueError("cannot form a collective from a non-active identity")
+            if member.identity_id not in normalized_members:
+                normalized_members.append(member.identity_id)
+
+        if len(normalized_members) < 2:
+            raise ValueError("collective identity requires two unique active member identities")
+
+        collective_id = new_id("collective")
+        collective_metadata = {
+            "identity_kind": "collective",
+            "member_ids": ",".join(normalized_members),
+            **(metadata or {}),
+        }
+        record = IdentityRecord(
+            identity_id=collective_id,
+            lineage_id=collective_id,
+            consent_proof=consent_proof,
+            created_at=utc_now_iso(),
+            metadata=collective_metadata,
+        )
+        self._records[collective_id] = record
+        return record
+
     def terminate(self, identity_id: str, self_proof: str) -> IdentityRecord:
         if not self_proof:
             raise PermissionError("self proof is required for termination")
@@ -111,4 +147,3 @@ class IdentityRegistry:
             }
             for record in self._records.values()
         ]
-

@@ -1,0 +1,126 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_merge_session.schema"
+title: CollectiveMergeSession
+description: >
+  One bounded merge-thought session attached to a temporary collective identity.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - merge_session_id
+  - collective_id
+  - opened_at
+  - status
+  - merge_mode
+  - imc_session_id
+  - wms_session_id
+  - requested_duration_seconds
+  - granted_duration_seconds
+  - duration_capped
+  - shared_world_mode
+  - oversight
+  - identity_confirmation_required
+  - disconnect_reason
+  - identity_confirmations
+  - within_budget
+  - private_escape_honored
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  merge_session_id:
+    type: string
+    minLength: 8
+  collective_id:
+    type: string
+    minLength: 8
+  opened_at:
+    type: string
+    format: date-time
+  closed_at:
+    type:
+      - string
+      - "null"
+    format: date-time
+  status:
+    type: string
+    enum:
+      - open
+      - completed
+      - recovery-required
+  merge_mode:
+    type: string
+    const: merge_thought
+  imc_session_id:
+    type: string
+    minLength: 8
+  wms_session_id:
+    type: string
+    minLength: 8
+  requested_duration_seconds:
+    type: number
+    exclusiveMinimum: 0
+  granted_duration_seconds:
+    type: number
+    exclusiveMinimum: 0
+    maximum: 10.0
+  duration_capped:
+    type: boolean
+  shared_world_mode:
+    type: string
+    enum:
+      - shared_reality
+      - private_reality
+      - mixed
+  oversight:
+    type: object
+    additionalProperties: false
+    required:
+      - council_witnessed
+      - federation_attested
+      - guardian_observed
+    properties:
+      council_witnessed:
+        type: boolean
+        const: true
+      federation_attested:
+        type: boolean
+        const: true
+      guardian_observed:
+        type: boolean
+        const: true
+  identity_confirmation_required:
+    type: array
+    minItems: 2
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  disconnect_reason:
+    type: string
+  identity_confirmations:
+    type: object
+    additionalProperties:
+      type: boolean
+  time_in_merge_seconds:
+    type:
+      - number
+      - "null"
+  within_budget:
+    type:
+      - boolean
+      - "null"
+  resulting_wms_mode:
+    type:
+      - string
+      - "null"
+    enum:
+      - shared_reality
+      - private_reality
+      - mixed
+      - null
+  private_escape_honored:
+    type: boolean
+  audit_event_ref:
+    type: string

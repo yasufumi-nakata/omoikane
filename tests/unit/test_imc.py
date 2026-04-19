@@ -91,6 +91,56 @@ class InterMindChannelTests(unittest.TestCase):
                 council_witnessed=False,
             )
 
+    def test_merge_thought_requires_council_witness_and_redacts_intimate_floor_overreach(self) -> None:
+        imc = InterMindChannel()
+        session = imc.open_session(
+            initiator_id="identity://origin",
+            peer_id="identity://peer",
+            mode="merge_thought",
+            initiator_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary", "intent_vector"],
+                "sealed_fields": ["identity_axiom_state", "memory_index"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state", "memory_index"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+
+        message = imc.send(
+            session["session_id"],
+            sender_id="identity://origin",
+            summary="bounded merge exchange",
+            payload={
+                "display_name": "Origin",
+                "shared_focus": "collective-planning",
+                "affect_summary": "careful trust",
+                "intent_vector": "synthesize shared plan",
+                "memory_index": "crystal://segment/3",
+                "identity_axiom_state": "sealed-core",
+            },
+        )
+
+        self.assertEqual("merge_thought", session["mode"])
+        self.assertEqual("delivered-with-redactions", message["delivery_status"])
+        self.assertEqual(
+            ["identity_axiom_state", "intent_vector", "memory_index"],
+            message["redacted_fields"],
+        )
+        self.assertEqual(
+            {
+                "display_name": "Origin",
+                "shared_focus": "collective-planning",
+                "affect_summary": "careful trust",
+            },
+            message["delivered_fields"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

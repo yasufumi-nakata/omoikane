@@ -21,6 +21,14 @@
   で fail-closed handshake、narrow disclosure floor、summary+digest-only audit、
   emergency disconnect をまとめて検証する
 
+### Collective Identity
+- 複数自我の bounded `merge_thought` を支える実験的 collective ID
+- IdentityRegistry 上の distinct ID と meta-council governance
+- merge 後の `private_reality` 退避と member recovery
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
+  で collective formation、merge window cap、WMS private escape、
+  identity confirmation、dissolution をまとめて検証する
+
 ### World Model Sync (WMS)
 - 外界状態の同期
 - **共有現実 (shared reality)** ── 多自我が同じ外界モデルを共有
@@ -71,6 +79,7 @@ if shared_reality.state_hash != local_belief.state_hash:
 ## サブドキュメント
 
 - [bdb-protocol.md](bdb-protocol.md)
+- [collective-identity.md](collective-identity.md)
 - [imc-protocol.md](imc-protocol.md)
 - [wms-spec.md](wms-spec.md)
 - [ewa-safety.md](ewa-safety.md)

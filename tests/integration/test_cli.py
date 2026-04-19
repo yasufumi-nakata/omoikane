@@ -77,6 +77,22 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(["identity_axiom_state", "memory_index", "memory_summary"], result["message"]["redacted_fields"])
         self.assertEqual("closed", result["disconnect"]["status"])
 
+    def test_collective_demo_emits_bounded_merge_and_recovery_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "collective-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["collective_identity_distinct"])
+        self.assertTrue(result["validation"]["merge_window_bounded"])
+        self.assertTrue(result["validation"]["private_escape_honored"])
+        self.assertTrue(result["validation"]["identity_confirmation_complete"])
+        self.assertEqual("dissolved", result["collective"]["status"])
+        self.assertEqual("merge_thought", result["merge"]["merge_mode"])
+        self.assertEqual("private_reality", result["wms"]["escape"]["new_mode"])
+
     def test_ewa_demo_emits_vetoed_irreversible_command(self) -> None:
         stdout = io.StringIO()
 

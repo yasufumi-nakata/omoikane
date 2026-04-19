@@ -1,0 +1,159 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_record.schema"
+title: CollectiveRecord
+description: >
+  Bounded collective identity record registered for one experimental merge-thought cohort.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - collective_id
+  - created_at
+  - display_name
+  - status
+  - member_ids
+  - governance_mode
+  - formation_mode
+  - purpose
+  - merge_policy
+  - oversight
+  - active_merge_session_ids
+  - last_merge_status
+properties:
+  schema_version:
+    const: "1.0"
+  collective_id:
+    type: string
+    minLength: 8
+  created_at:
+    type: string
+    format: date-time
+  display_name:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - active
+      - recovery
+      - dissolved
+  member_ids:
+    type: array
+    minItems: 2
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  governance_mode:
+    type: string
+    const: meta-council
+  formation_mode:
+    type: string
+    const: bounded-collective-merge-v0
+  purpose:
+    type: string
+    minLength: 1
+  merge_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - merge_mode
+      - max_duration_seconds
+      - post_disconnect_identity_confirmation
+      - escape_route
+      - single_active_merge_per_collective
+    properties:
+      merge_mode:
+        type: string
+        const: merge_thought
+      max_duration_seconds:
+        type: number
+        const: 10.0
+      post_disconnect_identity_confirmation:
+        type: string
+        const: all-members
+      escape_route:
+        type: string
+        const: private_reality
+      single_active_merge_per_collective:
+        type: boolean
+        const: true
+  oversight:
+    type: object
+    additionalProperties: false
+    required:
+      - council_witnessed
+      - federation_attested
+      - guardian_observed
+    properties:
+      council_witnessed:
+        type: boolean
+        const: true
+      federation_attested:
+        type: boolean
+        const: true
+      guardian_observed:
+        type: boolean
+        const: true
+  active_merge_session_ids:
+    type: array
+    maxItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 8
+  last_merge_status:
+    type: string
+    enum:
+      - none
+      - open
+      - completed
+      - recovery-required
+  dissolved_at:
+    type:
+      - string
+      - "null"
+    format: date-time
+  last_dissolution:
+    type:
+      - object
+      - "null"
+    additionalProperties: false
+    required:
+      - collective_id
+      - recorded_at
+      - requested_by
+      - status
+      - member_confirmations
+      - reason
+      - member_recovery_required
+      - audit_event_ref
+    properties:
+      collective_id:
+        type: string
+        minLength: 8
+      recorded_at:
+        type: string
+        format: date-time
+      requested_by:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        const: dissolved
+      member_confirmations:
+        type: object
+        minProperties: 2
+        additionalProperties:
+          type: boolean
+          const: true
+      reason:
+        type: string
+        minLength: 1
+      member_recovery_required:
+        type: boolean
+        const: true
+      audit_event_ref:
+        type: string
+        minLength: 1

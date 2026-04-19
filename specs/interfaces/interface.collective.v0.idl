@@ -1,0 +1,232 @@
+idl_version: 1
+kind: service
+namespace: interface.collective.v0
+service: CollectiveIdentityService
+summary: Canonical L6 contract for bounded collective identity formation and reversible merge-thought sessions.
+imports:
+  collective_record: ../schemas/collective_record.schema
+  collective_merge_session: ../schemas/collective_merge_session.schema
+operations:
+  register_collective:
+    summary: Register one temporary collective identity distinct from its members after unanimous bounded-merge consent.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - collective_identity_id
+          - member_ids
+          - purpose
+          - proposed_name
+          - council_witnessed
+          - federation_attested
+          - guardian_observed
+        properties:
+          collective_identity_id:
+            type: string
+            minLength: 8
+          member_ids:
+            type: array
+            minItems: 2
+            maxItems: 4
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          purpose:
+            type: string
+            minLength: 1
+          proposed_name:
+            type: string
+            minLength: 1
+          council_witnessed:
+            type: boolean
+            const: true
+          federation_attested:
+            type: boolean
+            const: true
+          guardian_observed:
+            type: boolean
+            const: true
+    output:
+      schema_ref: collective_record
+    guarantees:
+      - collective_identity_id must differ from every member identity
+      - the reference runtime must cap collective membership at four members
+      - governance_mode must remain meta-council while the collective exists
+  open_merge_session:
+    summary: Open one experimental merge-thought session backed by an IMC merge channel and one WMS world-state handle.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - collective_id
+          - imc_session_id
+          - wms_session_id
+          - requested_duration_seconds
+          - council_witnessed
+          - federation_attested
+          - guardian_observed
+          - shared_world_mode
+        properties:
+          collective_id:
+            type: string
+            minLength: 8
+          imc_session_id:
+            type: string
+            minLength: 8
+          wms_session_id:
+            type: string
+            minLength: 8
+          requested_duration_seconds:
+            type: number
+            exclusiveMinimum: 0
+          council_witnessed:
+            type: boolean
+            const: true
+          federation_attested:
+            type: boolean
+            const: true
+          guardian_observed:
+            type: boolean
+            const: true
+          shared_world_mode:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+    output:
+      schema_ref: collective_merge_session
+    guarantees:
+      - granted_duration_seconds must never exceed 10.0
+      - merge_mode must remain merge_thought for the entire session
+      - one collective may own at most one active merge session at a time
+  close_merge_session:
+    summary: Close one bounded merge-thought session and require post-disconnect identity confirmation from every member.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - merge_session_id
+          - disconnect_reason
+          - time_in_merge_seconds
+          - resulting_wms_mode
+          - identity_confirmations
+        properties:
+          merge_session_id:
+            type: string
+            minLength: 8
+          disconnect_reason:
+            type: string
+            minLength: 1
+          time_in_merge_seconds:
+            type: number
+            exclusiveMinimum: 0
+          resulting_wms_mode:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+          identity_confirmations:
+            type: object
+            minProperties: 2
+            additionalProperties:
+              type: boolean
+    output:
+      schema_ref: collective_merge_session
+    guarantees:
+      - completed status requires all required members to pass identity confirmation
+      - time_in_merge_seconds beyond granted_duration_seconds must force recovery-required
+      - private_reality escape must remain available after major shared-world divergence
+  dissolve_collective:
+    summary: Dissolve one collective identity after the merge session is closed and every member reclaims independent subjectivity.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - collective_id
+          - requested_by
+          - member_confirmations
+          - reason
+        properties:
+          collective_id:
+            type: string
+            minLength: 8
+          requested_by:
+            type: string
+            minLength: 1
+          member_confirmations:
+            type: object
+            minProperties: 2
+            additionalProperties:
+              type: boolean
+              const: true
+          reason:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - collective_id
+          - recorded_at
+          - requested_by
+          - status
+          - member_confirmations
+          - reason
+          - member_recovery_required
+          - audit_event_ref
+        properties:
+          collective_id:
+            type: string
+            minLength: 8
+          recorded_at:
+            type: string
+            format: date-time
+          requested_by:
+            type: string
+            minLength: 1
+          status:
+            type: string
+            const: dissolved
+          member_confirmations:
+            type: object
+            minProperties: 2
+            additionalProperties:
+              type: boolean
+              const: true
+          reason:
+            type: string
+            minLength: 1
+          member_recovery_required:
+            type: boolean
+            const: true
+          audit_event_ref:
+            type: string
+            minLength: 1
+events:
+  collective.formed:
+    payload:
+      schema_ref: collective_record
+  collective.merge_closed:
+    payload:
+      schema_ref: collective_merge_session
+  collective.dissolved:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - collective_id
+          - status
+          - member_recovery_required
+        properties:
+          collective_id:
+            type: string
+            minLength: 8
+          status:
+            type: string
+            const: dissolved
+          member_recovery_required:
+            type: boolean
+            const: true

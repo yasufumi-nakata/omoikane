@@ -53,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     imc_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    collective_parser = subparsers.add_parser(
+        "collective-demo",
+        help="Run the bounded L6 collective identity, merge-thought, and recovery scenario",
+    )
+    collective_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     ewa_parser = subparsers.add_parser(
         "ewa-demo",
         help="Run the L6 External World Agent safety and veto scenario",
@@ -290,6 +296,10 @@ def main() -> None:
 
     if args.command == "imc-demo":
         _print_result(runtime.run_imc_demo(), args.json)
+        return
+
+    if args.command == "collective-demo":
+        _print_result(runtime.run_collective_demo(), args.json)
         return
 
     if args.command == "ewa-demo":

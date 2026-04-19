@@ -34,6 +34,7 @@ PYTHONPATH=src python3 -m omoikane.cli termination-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
+PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
 PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
@@ -262,6 +263,13 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 peer attestation、forward secrecy、narrow disclosure floor、
 sealed field redaction、summary+digest-only audit、
 unilateral emergency disconnect をまとめて確認する。
+
+`collective-demo` は L6 Collective Identity の reference contract
+(`interface.collective.v0`) を JSON で可視化し、
+distinct collective ID、`merge_thought` 10 秒 cap、Federation attested merge、
+WMS major divergence 後の `private_reality` escape、
+全 member の post-disconnect identity confirmation、
+collective dissolution を 1 シナリオで確認する。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、
