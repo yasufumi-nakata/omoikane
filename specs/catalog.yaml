@@ -105,6 +105,22 @@ entries:
     rationale: Required to serialize returned Federation/Heritage results and cross-tier human escalation.
   - priority: P1
     kind: schema
+    file: specs/schemas/cognitive_audit_record.schema
+    consumers:
+      - specs/interfaces/agentic.cognitive_audit.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+    rationale: Required to serialize one bounded cross-layer cognitive audit record without exposing raw sensory embeddings or sealed notes.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/cognitive_audit_resolution.schema
+    consumers:
+      - specs/interfaces/agentic.cognitive_audit.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+    rationale: Required to serialize one Council-resolved cognitive audit follow-up artifact with continuity-safe actions.
+  - priority: P1
+    kind: schema
     file: specs/schemas/task_node.schema
     consumers:
       - specs/interfaces/agentic.task_graph.v0.idl
@@ -158,6 +174,21 @@ entries:
     consumers:
       - reference-runtime
     rationale: Council lifecycle contract, including timeout policy, multi-council externalization, and distributed returned-result reconciliation.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.cognitive_audit.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make qualia/self-model/metacognition/Council audit loops machine-readable in the reference runtime.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/cognitive_audit_loop.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects qualia checkpoint binding, abrupt-change escalation, and continuity-safe Council follow-up in the cognitive audit loop.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.ethics.v0.idl

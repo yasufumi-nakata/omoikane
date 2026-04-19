@@ -1,0 +1,105 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/cognitive_audit_resolution.schema"
+title: CognitiveAuditResolution
+description: Council-resolved follow-up for one cross-layer cognitive audit record.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - resolution_id
+  - recorded_at
+  - audit_ref
+  - council_proposal_ref
+  - council_outcome
+  - decision_mode
+  - follow_up_action
+  - recommended_action
+  - qualia_checkpoint_ref
+  - metacognition_report_ref
+  - continuity_alignment
+  - digest
+properties:
+  kind:
+    const: cognitive_audit_resolution
+  schema_version:
+    const: 1.0.0
+  resolution_id:
+    type: string
+    pattern: "^cognitive-audit-resolution-[a-f0-9]{12}$"
+  recorded_at:
+    type: string
+    format: date-time
+  audit_ref:
+    type: string
+    pattern: "^cognitive-audit-[a-f0-9]{12}$"
+  council_proposal_ref:
+    type: string
+    pattern: "^proposal-[a-f0-9]{12}$"
+  council_outcome:
+    type: string
+    enum:
+      - approved
+      - rejected
+      - vetoed
+      - deferred
+      - escalated
+  decision_mode:
+    type: string
+    minLength: 1
+  follow_up_action:
+    type: string
+    enum:
+      - continue-monitoring
+      - open-guardian-review
+      - activate-containment
+      - preserve-boundary
+      - schedule-standard-session
+      - escalate-to-human-governance
+  recommended_action:
+    type: string
+    enum:
+      - record-and-monitor
+      - guardian-review
+      - contain-and-review
+  qualia_checkpoint_ref:
+    type: string
+    minLength: 16
+  metacognition_report_ref:
+    type: string
+    pattern: "^metacognition-report-[a-f0-9]{12}$"
+  continuity_alignment:
+    type: object
+    additionalProperties: false
+    required:
+      - recommended_action_matches_outcome
+      - continuity_guard_preserved
+      - containment_required
+    properties:
+      recommended_action_matches_outcome:
+        type: boolean
+      continuity_guard_preserved:
+        const: true
+      containment_required:
+        type: boolean
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: cognitive_audit_resolution
+    schema_version: 1.0.0
+    resolution_id: cognitive-audit-resolution-0123456789ab
+    recorded_at: "2026-04-19T11:24:00Z"
+    audit_ref: cognitive-audit-0123456789ab
+    council_proposal_ref: proposal-89abcdef0123
+    council_outcome: approved
+    decision_mode: weighted-majority
+    follow_up_action: open-guardian-review
+    recommended_action: guardian-review
+    qualia_checkpoint_ref: 53d6e4b6f3a7f252b9f7dfdcdd4d734ae0f6dca6b25a6c67d75e55b0dd6fdb7b
+    metacognition_report_ref: metacognition-report-0123456789ab
+    continuity_alignment:
+      recommended_action_matches_outcome: true
+      continuity_guard_preserved: true
+      containment_required: false
+    digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

@@ -482,6 +482,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
         self.assertTrue(result["validation"]["conflict_escalates_to_human"])
 
+    def test_cognitive_audit_demo_emits_cross_layer_review_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "cognitive-audit-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["ledger_categories_bound"]["qualia_checkpoint"])
+        self.assertTrue(result["self_model"]["alert"]["abrupt_change"])
+        self.assertEqual("guardian-review", result["audit"]["record"]["recommended_action"])
+        self.assertEqual("open-guardian-review", result["audit"]["resolution"]["follow_up_action"])
+        self.assertEqual("approved", result["council"]["decision"]["outcome"])
+
     def test_task_graph_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

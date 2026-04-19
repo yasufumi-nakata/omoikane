@@ -64,6 +64,7 @@ properties:
       - crystal-commit
       - connectome-snapshot
       - qualia-checkpoint
+      - cognitive-audit
       - substrate-migrate
       - substrate-release
       - self-modify
@@ -109,6 +110,17 @@ allOf:
       properties:
         category:
           const: self-modify
+    then:
+      properties:
+        signatures:
+          required:
+            - self
+            - council
+            - guardian
+  - if:
+      properties:
+        category:
+          const: cognitive-audit
     then:
       properties:
         signatures:

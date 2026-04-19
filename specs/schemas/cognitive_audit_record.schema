@@ -1,0 +1,346 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/cognitive_audit_record.schema"
+title: CognitiveAuditRecord
+description: Cross-layer cognitive audit record that binds one qualia checkpoint, self-model alert, and metacognition report into one bounded Council review request.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - audit_id
+  - created_at
+  - policy
+  - identity_id
+  - qualia_checkpoint_ref
+  - metacognition_report_ref
+  - self_model_ref
+  - qualia_summary
+  - self_model_summary
+  - metacognition_summary
+  - audit_triggers
+  - recommended_action
+  - council_brief
+  - continuity_alignment
+  - digest
+properties:
+  kind:
+    const: cognitive_audit_record
+  schema_version:
+    const: 1.0.0
+  audit_id:
+    type: string
+    pattern: "^cognitive-audit-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - allowed_layers
+      - qualia_checkpoint_category
+      - audit_category
+      - divergence_alert_threshold
+      - lucidity_guard_threshold
+      - continuity_pressure_threshold
+      - max_trigger_count
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: cross-layer-cognitive-audit-v1
+      allowed_layers:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          enum:
+            - L2
+            - L3
+            - L4
+      qualia_checkpoint_category:
+        const: qualia-checkpoint
+      audit_category:
+        const: cognitive-audit
+      divergence_alert_threshold:
+        const: 0.35
+      lucidity_guard_threshold:
+        const: 0.65
+      continuity_pressure_threshold:
+        const: 0.75
+      max_trigger_count:
+        const: 4
+  identity_id:
+    type: string
+    minLength: 1
+  qualia_checkpoint_ref:
+    type: string
+    minLength: 16
+  metacognition_report_ref:
+    type: string
+    pattern: "^metacognition-report-[a-f0-9]{12}$"
+  self_model_ref:
+    type: string
+    minLength: 24
+  qualia_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - attention_target
+      - self_awareness
+      - lucidity
+      - valence
+      - arousal
+      - clarity
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      attention_target:
+        type: string
+        minLength: 1
+      self_awareness:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      lucidity:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      valence:
+        type: number
+        minimum: -1.0
+        maximum: 1.0
+      arousal:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      clarity:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  self_model_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - abrupt_change
+      - divergence
+      - threshold
+      - active_values
+      - active_goals
+      - top_traits
+    properties:
+      abrupt_change:
+        type: boolean
+      divergence:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      threshold:
+        const: 0.35
+      active_values:
+        type: array
+        minItems: 1
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      active_goals:
+        type: array
+        minItems: 1
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      top_traits:
+        type: array
+        minItems: 1
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - trait
+            - weight
+          properties:
+            trait:
+              type: string
+              minLength: 1
+            weight:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+  metacognition_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - reflection_mode
+      - escalation_target
+      - risk_posture
+      - degraded
+      - continuity_guard_aligned
+      - coherence_score
+    properties:
+      reflection_mode:
+        type: string
+        enum:
+          - self-reflect
+          - guardian-review
+          - sandbox-hold
+      escalation_target:
+        type: string
+        enum:
+          - none
+          - guardian-review
+          - sandbox-stabilization
+      risk_posture:
+        type: string
+        enum:
+          - nominal
+          - guarded
+          - containment
+      degraded:
+        type: boolean
+      continuity_guard_aligned:
+        type: boolean
+      coherence_score:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  audit_triggers:
+    type: array
+    minItems: 1
+    maxItems: 4
+    items:
+      type: string
+      enum:
+        - abrupt-change
+        - observe-guard
+        - sandbox-notify
+        - low-lucidity
+        - high-continuity-pressure
+  recommended_action:
+    type: string
+    enum:
+      - record-and-monitor
+      - guardian-review
+      - contain-and-review
+  council_brief:
+    type: object
+    additionalProperties: false
+    required:
+      - title
+      - requested_action
+      - rationale
+      - risk_level
+      - session_mode
+    properties:
+      title:
+        type: string
+        minLength: 1
+      requested_action:
+        type: string
+        enum:
+          - record-cognitive-state
+          - open-guardian-review
+          - activate-cognitive-containment
+      rationale:
+        type: string
+        minLength: 1
+      risk_level:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+      session_mode:
+        type: string
+        enum:
+          - standard
+          - expedited
+  continuity_alignment:
+    type: object
+    additionalProperties: false
+    required:
+      - identity_matches
+      - qualia_tick_matches_report
+      - guard_consistent
+      - threshold_exceeded
+    properties:
+      identity_matches:
+        const: true
+      qualia_tick_matches_report:
+        const: true
+      guard_consistent:
+        const: true
+      threshold_exceeded:
+        type: boolean
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: cognitive_audit_record
+    schema_version: 1.0.0
+    audit_id: cognitive-audit-0123456789ab
+    created_at: "2026-04-19T11:20:00Z"
+    policy:
+      schema_version: 1.0.0
+      policy_id: cross-layer-cognitive-audit-v1
+      allowed_layers: [L2, L3, L4]
+      qualia_checkpoint_category: qualia-checkpoint
+      audit_category: cognitive-audit
+      divergence_alert_threshold: 0.35
+      lucidity_guard_threshold: 0.65
+      continuity_pressure_threshold: 0.75
+      max_trigger_count: 4
+    identity_id: identity://cognitive-audit-demo
+    qualia_checkpoint_ref: 53d6e4b6f3a7f252b9f7dfdcdd4d734ae0f6dca6b25a6c67d75e55b0dd6fdb7b
+    metacognition_report_ref: metacognition-report-0123456789ab
+    self_model_ref: self-model-observation://sha256/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    qualia_summary:
+      tick_id: 1
+      summary: identity drift review under guarded observation
+      attention_target: identity-drift-review
+      self_awareness: 0.88
+      lucidity: 0.61
+      valence: -0.21
+      arousal: 0.69
+      clarity: 0.58
+    self_model_summary:
+      abrupt_change: true
+      divergence: 0.41
+      threshold: 0.35
+      active_values: [continuity-first, consent-preserving, auditability]
+      active_goals: [stabilize-review-loop, preserve-identity-anchor]
+      top_traits:
+        - trait: vigilance
+          weight: 0.87
+    metacognition_summary:
+      reflection_mode: guardian-review
+      escalation_target: guardian-review
+      risk_posture: guarded
+      degraded: false
+      continuity_guard_aligned: true
+      coherence_score: 0.67
+    audit_triggers: [abrupt-change, observe-guard, low-lucidity]
+    recommended_action: guardian-review
+    council_brief:
+      title: Cognitive state audit review
+      requested_action: open-guardian-review
+      rationale: qualia and self-model evidence require a bounded Council review
+      risk_level: high
+      session_mode: standard
+    continuity_alignment:
+      identity_matches: true
+      qualia_tick_matches_report: true
+      guard_consistent: true
+      threshold_exceeded: true
+    digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

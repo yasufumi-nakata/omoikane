@@ -16,6 +16,7 @@
 - `mind.self_model.v0.idl`
 - `cognitive.reasoning.v0.idl`
 - `agentic.council.v0.idl`
+- `agentic.cognitive_audit.v0.idl`
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
 - `cognitive.affect.v0.idl`

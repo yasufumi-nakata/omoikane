@@ -40,6 +40,8 @@
 - `task_graph_policy.schema`
 - `consensus_message.schema`
 - `distributed_council_resolution.schema`
+- `cognitive_audit_record.schema`
+- `cognitive_audit_resolution.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
 - `sandbox_signal.schema`

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from omoikane.agentic.cognitive_audit import CognitiveAuditService
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
@@ -412,6 +413,117 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(0.99, snapshot["global_score"])
         self.assertTrue(snapshot["eligibility"]["guardian_role"])
         self.assertEqual("guardian bootstrap", snapshot["pinned_reason"])
+
+
+class CognitiveAuditTests(unittest.TestCase):
+    def test_audit_record_binds_cross_layer_refs(self) -> None:
+        service = CognitiveAuditService()
+
+        record = service.create_record(
+            identity_id="identity://audit-demo",
+            qualia_tick={
+                "tick_id": 3,
+                "summary": "identity drift review",
+                "attention_target": "identity-drift-review",
+                "self_awareness": 0.88,
+                "lucidity": 0.61,
+                "valence": -0.19,
+                "arousal": 0.67,
+                "clarity": 0.58,
+            },
+            self_model_observation={
+                "abrupt_change": True,
+                "divergence": 0.41,
+                "threshold": 0.35,
+                "snapshot": {
+                    "identity_id": "identity://audit-demo",
+                    "values": ["continuity-first", "guardian-visible", "auditability"],
+                    "goals": ["stabilize-review-loop", "preserve-identity-anchor"],
+                    "traits": {"agency": 0.82, "stability": 0.41, "vigilance": 0.87},
+                },
+            },
+            metacognition_report={
+                "report_id": "metacognition-report-0123456789ab",
+                "source_tick": {
+                    "tick_id": 3,
+                    "identity_id": "identity://audit-demo",
+                    "attention_target": "identity-drift-review",
+                    "affect_guard": "observe",
+                    "continuity_pressure": 0.81,
+                },
+                "reflection_mode": "guardian-review",
+                "escalation_target": "guardian-review",
+                "risk_posture": "guarded",
+                "degraded": False,
+                "continuity_guard": {"guard_aligned": True},
+                "coherence_score": 0.67,
+            },
+            qualia_checkpoint_ref="53d6e4b6f3a7f252b9f7dfdcdd4d734ae0f6dca6b25a6c67d75e55b0dd6fdb7b",
+        )
+
+        validation = service.validate_record(record)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("guardian-review", record["recommended_action"])
+        self.assertEqual("standard", record["council_brief"]["session_mode"])
+        self.assertTrue(record["continuity_alignment"]["identity_matches"])
+        self.assertIn("abrupt-change", record["audit_triggers"])
+        self.assertIn("observe-guard", record["audit_triggers"])
+
+    def test_resolution_maps_council_approval_to_guardian_review(self) -> None:
+        service = CognitiveAuditService()
+        record = service.create_record(
+            identity_id="identity://audit-demo",
+            qualia_tick={
+                "tick_id": 3,
+                "summary": "identity drift review",
+                "attention_target": "identity-drift-review",
+                "self_awareness": 0.88,
+                "lucidity": 0.61,
+                "valence": -0.19,
+                "arousal": 0.67,
+                "clarity": 0.58,
+            },
+            self_model_observation={
+                "abrupt_change": True,
+                "divergence": 0.41,
+                "threshold": 0.35,
+                "snapshot": {
+                    "identity_id": "identity://audit-demo",
+                    "values": ["continuity-first"],
+                    "goals": ["stabilize-review-loop"],
+                    "traits": {"vigilance": 0.87},
+                },
+            },
+            metacognition_report={
+                "report_id": "metacognition-report-0123456789ab",
+                "source_tick": {
+                    "tick_id": 3,
+                    "identity_id": "identity://audit-demo",
+                    "attention_target": "identity-drift-review",
+                    "affect_guard": "observe",
+                    "continuity_pressure": 0.81,
+                },
+                "reflection_mode": "guardian-review",
+                "escalation_target": "guardian-review",
+                "risk_posture": "guarded",
+                "degraded": False,
+                "continuity_guard": {"guard_aligned": True},
+                "coherence_score": 0.67,
+            },
+            qualia_checkpoint_ref="53d6e4b6f3a7f252b9f7dfdcdd4d734ae0f6dca6b25a6c67d75e55b0dd6fdb7b",
+        )
+
+        resolution = service.resolve(
+            record,
+            council_proposal_ref="proposal-0123456789ab",
+            council_decision={"outcome": "approved", "decision_mode": "weighted-majority"},
+        )
+        validation = service.validate_resolution(resolution)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("open-guardian-review", resolution["follow_up_action"])
+        self.assertTrue(resolution["continuity_alignment"]["recommended_action_matches_outcome"])
 
 
 if __name__ == "__main__":

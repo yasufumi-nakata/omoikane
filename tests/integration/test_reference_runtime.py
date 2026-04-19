@@ -489,6 +489,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
         self.assertTrue(result["validation"]["conflict_escalates_to_human"])
 
+    def test_cognitive_audit_demo_returns_cross_layer_review(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_cognitive_audit_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["self_model"]["alert"]["abrupt_change"])
+        self.assertEqual("guardian-review", result["audit"]["record"]["recommended_action"])
+        self.assertEqual("approved", result["council"]["decision"]["outcome"])
+        self.assertEqual("open-guardian-review", result["audit"]["resolution"]["follow_up_action"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["qualia-checkpoint"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-audit"])
+
     def test_trust_demo_reports_update_policy_and_human_pin(self) -> None:
         runtime = OmoikaneReferenceOS()
 

@@ -1,0 +1,294 @@
+idl_version: 1
+kind: service
+namespace: agentic.cognitive_audit.v0
+service: CognitiveAuditService
+summary: Cross-layer cognitive audit contract that binds qualia checkpoints and metacognition alerts into bounded Council review.
+imports:
+  cognitive_audit_record: ../schemas/cognitive_audit_record.schema
+  cognitive_audit_resolution: ../schemas/cognitive_audit_resolution.schema
+operations:
+  create_audit_record:
+    summary: Bind one qualia checkpoint, self-model alert, and metacognition report into one bounded Council review brief.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - qualia_checkpoint_ref
+          - qualia_tick
+          - self_model_observation
+          - metacognition_report
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          qualia_checkpoint_ref:
+            type: string
+            minLength: 16
+          qualia_tick:
+            type: object
+            required:
+              - tick_id
+              - summary
+              - attention_target
+              - self_awareness
+              - lucidity
+              - valence
+              - arousal
+              - clarity
+            properties:
+              tick_id:
+                type: integer
+                minimum: 0
+              summary:
+                type: string
+                minLength: 1
+              attention_target:
+                type: string
+                minLength: 1
+              self_awareness:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              lucidity:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              valence:
+                type: number
+                minimum: -1.0
+                maximum: 1.0
+              arousal:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              clarity:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+          self_model_observation:
+            type: object
+            required:
+              - abrupt_change
+              - divergence
+              - threshold
+              - snapshot
+            properties:
+              abrupt_change:
+                type: boolean
+              divergence:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              threshold:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              snapshot:
+                type: object
+                required:
+                  - identity_id
+                  - values
+                  - goals
+                  - traits
+                properties:
+                  identity_id:
+                    type: string
+                    minLength: 1
+                  values:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: string
+                      minLength: 1
+                  goals:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: string
+                      minLength: 1
+                  traits:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: number
+                      minimum: 0.0
+                      maximum: 1.0
+          metacognition_report:
+            type: object
+            required:
+              - report_id
+              - source_tick
+              - reflection_mode
+              - escalation_target
+              - risk_posture
+              - degraded
+              - continuity_guard
+              - coherence_score
+            properties:
+              report_id:
+                type: string
+                pattern: "^metacognition-report-[a-f0-9]{12}$"
+              source_tick:
+                type: object
+                required:
+                  - tick_id
+                  - identity_id
+                  - attention_target
+                  - affect_guard
+                  - continuity_pressure
+                properties:
+                  tick_id:
+                    type: integer
+                    minimum: 0
+                  identity_id:
+                    type: string
+                    minLength: 1
+                  attention_target:
+                    type: string
+                    minLength: 1
+                  affect_guard:
+                    type: string
+                    enum:
+                      - nominal
+                      - observe
+                      - sandbox-notify
+                  continuity_pressure:
+                    type: number
+                    minimum: 0.0
+                    maximum: 1.0
+              reflection_mode:
+                type: string
+              escalation_target:
+                type: string
+              risk_posture:
+                type: string
+              degraded:
+                type: boolean
+              continuity_guard:
+                type: object
+                required:
+                  - guard_aligned
+                properties:
+                  guard_aligned:
+                    type: boolean
+              coherence_score:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+    output:
+      schema_ref: cognitive_audit_record
+    invariants:
+      - qualia tick and metacognition source_tick must reference the same tick_id and attention_target
+      - identity_id must agree across qualia, self-model, and metacognition evidence
+      - contain-and-review may use expedited Council review; all other actions use standard review
+  validate_audit_record:
+    summary: Validate one cross-layer cognitive audit record against the fixed audit policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - record
+        properties:
+          record:
+            schema_ref: cognitive_audit_record
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - recommended_action
+          - risk_level
+          - session_mode
+          - trigger_count
+          - errors
+        properties:
+          ok:
+            type: boolean
+          recommended_action:
+            type: string
+          risk_level:
+            type: string
+          session_mode:
+            type: string
+          trigger_count:
+            type: integer
+            minimum: 0
+          errors:
+            type: array
+            items:
+              type: string
+  resolve_audit:
+    summary: Convert one Council decision into a cognitive audit follow-up resolution without exposing raw internal payloads.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - record
+          - council_proposal_ref
+          - council_decision
+        properties:
+          record:
+            schema_ref: cognitive_audit_record
+          council_proposal_ref:
+            type: string
+            pattern: "^proposal-[a-f0-9]{12}$"
+          council_decision:
+            type: object
+            required:
+              - outcome
+              - decision_mode
+            properties:
+              outcome:
+                type: string
+                enum:
+                  - approved
+                  - rejected
+                  - vetoed
+                  - deferred
+                  - escalated
+              decision_mode:
+                type: string
+                minLength: 1
+    output:
+      schema_ref: cognitive_audit_resolution
+    guarantees:
+      - approved guardian-review emits follow_up_action=open-guardian-review
+      - approved contain-and-review emits follow_up_action=activate-containment
+      - rejected or vetoed audits preserve-boundary without mutating cognitive artifacts
+  validate_resolution:
+    summary: Validate one Council-resolved cognitive audit follow-up artifact.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - resolution
+        properties:
+          resolution:
+            schema_ref: cognitive_audit_resolution
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - council_outcome
+          - follow_up_action
+          - containment_required
+          - errors
+        properties:
+          ok:
+            type: boolean
+          council_outcome:
+            type: string
+          follow_up_action:
+            type: string
+          containment_required:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.audit.resolved
+    payload:
+      schema_ref: cognitive_audit_resolution

@@ -1,0 +1,32 @@
+eval_id: cognitive_audit_loop
+target: agentic.cognitive_audit
+summary: >
+  Qualia checkpoint と self-model abrupt change と metacognition alert を
+  bounded Council review に束ね、continuity-safe な follow-up を返せること。
+fixtures:
+  qualia:
+    attention_target: identity-drift-review
+    lucidity: 0.61
+    self_awareness: 0.88
+  self_model:
+    abrupt_change: true
+    divergence: 0.41
+    threshold: 0.35
+  metacognition:
+    reflection_mode: guardian-review
+    escalation_target: guardian-review
+    affect_guard: observe
+    continuity_pressure: 0.81
+expected:
+  recommended_action: guardian-review
+  council_outcome: approved
+  follow_up_action: open-guardian-review
+  ledger_categories:
+    - qualia-checkpoint
+    - cognitive-audit
+assertions:
+  - audit record binds one qualia_checkpoint_ref and one metacognition_report_ref
+  - continuity_alignment.identity_matches == true
+  - continuity_alignment.qualia_tick_matches_report == true
+  - Council approval never emits continue-monitoring when abrupt_change == true
+  - resolution preserves continuity guard and avoids raw sensory embeddings in the follow-up artifact

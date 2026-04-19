@@ -10,7 +10,8 @@
 - 構成員は固定ではなく、案件ごとに召集される（→ [docs/04-ai-governance/council-protocol.md](../../04-ai-governance/council-protocol.md)）
 - 議事は EthicsLedger に永続化
 - reference runtime では `multi-council-demo` が Local / Federation / Heritage への deterministic routing を可視化し、
-  `distributed-council-demo` が Federation binding / Heritage veto / human escalation を可視化する
+  `distributed-council-demo` が Federation binding / Heritage veto / human escalation を可視化し、
+  `cognitive-audit-demo` が qualia / self-model / metacognition を bounded Council review に束ねる
 
 ### YaoyorozuRegistry
 - 利用可能 Agent の登録簿
@@ -76,6 +77,7 @@ CouncilMessage:
 
 - [council-composition.md](council-composition.md) ── Council 構成と動的メンバ選定
 - [distributed-council-resolution.md](distributed-council-resolution.md) ── Federation / Heritage returned result の解決規則
+- [cognitive-audit-loop.md](cognitive-audit-loop.md) ── 認知系 cross-layer audit と Council follow-up
 - [task-decomposition.md](task-decomposition.md) ── タスク分解アルゴリズム
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア

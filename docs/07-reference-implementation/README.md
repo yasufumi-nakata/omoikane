@@ -25,6 +25,7 @@ PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-council-demo --json
+PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
@@ -102,6 +103,13 @@ Heritage Council 要求へ外部化されること、
 `binding-rejected` になること、
 Federation と Heritage の returned result が衝突した場合は
 `escalate-human-governance` へ落ちることを確認する。
+
+`cognitive-audit-demo` は L2/L3/L4 cognitive audit loop の reference contract
+(`agentic.cognitive_audit.v0`) を JSON で可視化し、
+`qualia-checkpoint` entry、abrupt self-model observation、
+guardian-review metacognition report を 1 つの bounded Council review に束ね、
+`cognitive.audit.resolved` follow-up が raw sensory embedding や sealed note を
+含まず `open-guardian-review` へ落ちることを確認する。
 
 `task-graph-demo` は L4 TaskGraph の暫定 complexity policy
 (`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)

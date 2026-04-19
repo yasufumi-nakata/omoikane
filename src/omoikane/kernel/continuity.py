@@ -24,6 +24,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "ascension": ["self"],
     "attestation": ["guardian"],
     "qualia-checkpoint": ["self"],
+    "cognitive-audit": ["self", "council", "guardian"],
     "episodic-window": ["self"],
     "crystal-commit": ["self", "council"],
     "semantic-projection": ["self", "council"],

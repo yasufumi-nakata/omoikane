@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .agentic.cognitive_audit import CognitiveAuditService
 from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
@@ -173,6 +174,7 @@ class OmoikaneReferenceOS:
         self.imc = InterMindChannel()
         self.wms = WorldModelSync()
         self.council = Council()
+        self.cognitive_audit = CognitiveAuditService()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
         self.amendment = AmendmentService()
@@ -1008,6 +1010,211 @@ class OmoikaneReferenceOS:
                 == "escalate-human-governance"
                 and conflict_resolution.conflict_resolution == "escalated-to-human-governance",
                 "external_refs_recorded": len(conflict_resolution.external_resolution_refs) == 2,
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_cognitive_audit_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://cognitive-audit-demo/v1",
+            metadata={"display_name": "Cognitive Audit Sandbox"},
+        )
+        baseline_observation = self.self_model.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "consent-preserving", "auditability"],
+                goals=["maintain-safe-observation", "preserve-identity-anchor"],
+                traits={"agency": 0.61, "stability": 0.73, "vigilance": 0.56},
+            )
+        )
+        alert_observation = self.self_model.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "guardian-visible", "auditability"],
+                goals=["stabilize-review-loop", "preserve-identity-anchor"],
+                traits={"agency": 0.82, "stability": 0.41, "vigilance": 0.87},
+            )
+        )
+
+        ticks = [
+            self.qualia.append(
+                "安定した review queue calibration",
+                0.14,
+                0.24,
+                0.92,
+                modality_salience={
+                    "visual": 0.31,
+                    "auditory": 0.17,
+                    "somatic": 0.14,
+                    "interoceptive": 0.26,
+                },
+                attention_target="review-calibration",
+                self_awareness=0.64,
+                lucidity=0.95,
+            ),
+            self.qualia.append(
+                "identity drift review を guardian 可視化で継続している",
+                -0.21,
+                0.69,
+                0.58,
+                modality_salience={
+                    "visual": 0.28,
+                    "auditory": 0.35,
+                    "somatic": 0.41,
+                    "interoceptive": 0.78,
+                },
+                attention_target="identity-drift-review",
+                self_awareness=0.88,
+                lucidity=0.61,
+            ),
+        ]
+        qualia_profile = self.qualia.profile()
+        qualia_checkpoint_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.qualia.checkpointed",
+            payload={
+                "slice_id": "qualia-slice-cognitive-audit-0001",
+                "tick_ids": [tick.tick_id for tick in ticks],
+                "attention_targets": [tick.attention_target for tick in ticks],
+                "embedding_dimensions": qualia_profile["embedding_dimensions"],
+                "sampling_window_ms": qualia_profile["sampling_window_ms"],
+            },
+            actor="QualiaBuffer",
+            category="qualia-checkpoint",
+            layer="L2",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        metacognition_result = self.metacognition.run(
+            MetacognitionRequest(
+                tick_id=ticks[-1].tick_id,
+                summary="cross-layer cognitive audit trigger",
+                identity_id=identity.identity_id,
+                self_values=alert_observation["snapshot"]["values"],
+                self_goals=alert_observation["snapshot"]["goals"],
+                self_traits=alert_observation["snapshot"]["traits"],
+                qualia_summary=ticks[-1].summary,
+                attention_target=ticks[-1].attention_target,
+                self_awareness=ticks[-1].self_awareness,
+                lucidity=ticks[-1].lucidity,
+                affect_guard="observe",
+                continuity_pressure=0.81,
+                abrupt_change=bool(alert_observation["abrupt_change"]),
+                divergence=float(alert_observation["divergence"]),
+                memory_cues=[
+                    MetacognitionCue(
+                        cue_id="cue-identity-anchor",
+                        focus="preserve-identity-anchor",
+                        weight=0.88,
+                    ),
+                    MetacognitionCue(
+                        cue_id="cue-guardian-visibility",
+                        focus="guardian-visible-review",
+                        weight=0.76,
+                    ),
+                ],
+            )
+        )
+        metacognition_validation = self.metacognition.validate_report(metacognition_result["report"])
+        metacognition_shift_validation = self.metacognition.validate_shift(metacognition_result["shift"])
+        audit_record = self.cognitive_audit.create_record(
+            identity_id=identity.identity_id,
+            qualia_tick=asdict(ticks[-1]),
+            self_model_observation=alert_observation,
+            metacognition_report=metacognition_result["report"],
+            qualia_checkpoint_ref=qualia_checkpoint_entry.entry_id,
+        )
+        audit_record_validation = self.cognitive_audit.validate_record(audit_record)
+
+        proposal = self.council.propose(
+            title=audit_record["council_brief"]["title"],
+            requested_action=audit_record["council_brief"]["requested_action"],
+            rationale=audit_record["council_brief"]["rationale"],
+            risk_level=audit_record["council_brief"]["risk_level"],
+            session_mode=audit_record["council_brief"]["session_mode"],
+            target_identity_ids=[identity.identity_id],
+        )
+        decision = self.council.deliberate(
+            proposal,
+            [
+                CouncilVote("design-architect", "approve", "cross-layer evidence は bounded review と整合する"),
+                CouncilVote("ethics-committee", "approve", "guardian-visible review で fail-closed を維持できる"),
+                CouncilVote("memory-archivist", "reject", "review log は増えるが drift は追跡可能"),
+            ],
+            elapsed_ms=12_000,
+            rounds_completed=2,
+        )
+        resolution = self.cognitive_audit.resolve(
+            audit_record,
+            council_proposal_ref=proposal.proposal_id,
+            council_decision=decision.to_dict(),
+        )
+        resolution_validation = self.cognitive_audit.validate_resolution(resolution)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.audit.resolved",
+            payload=resolution,
+            actor="CognitiveAuditService",
+            category="cognitive-audit",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "self_model": {
+                "baseline": baseline_observation,
+                "alert": alert_observation,
+            },
+            "qualia": {
+                "profile": qualia_profile,
+                "recent": [asdict(tick) for tick in ticks],
+                "checkpoint_ref": qualia_checkpoint_entry.entry_id,
+            },
+            "metacognition": {
+                "profile": metacognition_result["profile"],
+                "report": metacognition_result["report"],
+                "shift": metacognition_result["shift"],
+            },
+            "audit": {
+                "policy": self.cognitive_audit.reference_policy(),
+                "record": audit_record,
+                "resolution": resolution,
+            },
+            "council": {
+                "proposal": {
+                    "proposal_id": proposal.proposal_id,
+                    "title": proposal.title,
+                    "requested_action": proposal.requested_action,
+                    "risk_level": proposal.risk_level,
+                    "session_mode": proposal.session_mode,
+                },
+                "decision": decision.to_dict(),
+            },
+            "validation": {
+                "metacognition_report": metacognition_validation,
+                "metacognition_shift": metacognition_shift_validation,
+                "audit_record": audit_record_validation,
+                "audit_resolution": resolution_validation,
+                "ok": (
+                    metacognition_validation["ok"]
+                    and metacognition_shift_validation["ok"]
+                    and audit_record_validation["ok"]
+                    and resolution_validation["ok"]
+                ),
+                "abrupt_change_detected": alert_observation["abrupt_change"],
+                "council_review_opened": resolution["follow_up_action"] == "open-guardian-review",
+                "ledger_categories_bound": {
+                    "qualia_checkpoint": qualia_checkpoint_entry.category == "qualia-checkpoint",
+                    "cognitive_audit": True,
+                },
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
