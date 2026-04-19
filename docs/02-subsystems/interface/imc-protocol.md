@@ -1,27 +1,88 @@
 # Inter-Mind Channel (IMC) Protocol
 
-詳細は [docs/03-protocols/inter-mind-comm.md](../../03-protocols/inter-mind-comm.md) を参照。
-本ドキュメントは L6 サブシステム視点での補足。
+L6 Interface のサブシステム。アップロード自我同士の通信路。
+高位設計は [docs/03-protocols/inter-mind-comm.md](../../03-protocols/inter-mind-comm.md)。
+本ドキュメントは reference runtime が機械的に守る範囲を fix する。
 
-## L6 内のコンポーネント
+## L6 内コンポーネント
 
-- `HandshakeBroker` ── identity-handshake の実行
-- `DisclosureGate` ── 開示テンプレートの強制
-- `KeyManager` ── 鍵交換と分散保管
+- `HandshakeBroker` ── identity-handshake 実行（[../../03-protocols/identity-handshake.md](../../03-protocols/identity-handshake.md)）
+- `DisclosureGate` ── SelfModel.disclosure_template の強制
+- `KeyManager` ── 鍵交換と分散保管（forward secrecy 必須）
 - `SessionRouter` ── 通信モードに応じた接続
 - `AuditLogger` ── ContinuityLedger への要約記録
 
-## 通信モード別の経路
+## 通信モード
+
+| モード | 内容 | Council 立会 |
+|---|---|---|
+| `text` | テキストのみ | 不要 |
+| `voice` | 音声 | 不要 |
+| `presence` | 共有空間内の存在感（WMS 経由） | 不要 |
+| `affect_share` | 感情共有（L3 Affect bridge） | EthicsCommittee 通知 |
+| `memory_glimpse` | 記憶片の限定参照（L2 MemoryCrystal） | Council 立会必須 |
+| `co_imagination` | 共同想像（L3 Imagination + WMS） | Council 立会必須 |
+| `merge_thought` | 思考融合 | Council 立会必須 + Federation Council 召集 |
+
+## Handshake 5 step
 
 ```
-text/voice            → SessionRouter → encrypted stream
-presence              → SessionRouter → WMS で共有空間
-affect_share          → SessionRouter + L3 Affect 接続
-memory_glimpse        → SessionRouter + L2 MemoryCrystal 一時参照
-co_imagination        → SessionRouter + L3 Imagination + WMS
-merge_thought         → SessionRouter + L3 全接続 (Council 立会必須)
+1. broker.lookup(peer_identity_id)             → IdentityRecord
+2. broker.verify_attestation(record)           → AttestationStatus
+3. disclosure.derive(self.disclosure_template, peer.disclosure_template) → DisclosureProfile
+4. keys.exchange(forward_secrecy=true)         → SessionKeys
+5. router.open(mode, profile, keys)            → IMCSession
 ```
 
-## 緊急停止
+各 step は失敗で session を **fail-closed**（暗号鍵を破棄して中断）。
 
-任意モードで本人の意思により即時切断可能。切断後の整合性復元は L4 Council が試みる。
+## DisclosureProfile
+
+```yaml
+disclosure_profile:
+  session_id: <id>
+  public_fields: [display_name, presence_state]
+  intimate_fields: [affect_summary]
+  sealed_fields: [memory_index, identity_axiom_state]
+  share_topology:
+    affect_share: bidirectional
+    memory_glimpse: peer-readable
+    merge_thought: bidirectional
+  council_witness_required: <bool>
+```
+
+`sealed_fields` は **常に共有禁止**。テンプレート差分では公開側に寄せず、**より狭い側** を採用する。
+
+## 緊急切断
+
+```
+on emergency_disconnect(session_id, reason):
+  router.close(session_id, reason="emergency-self-initiated")
+  keys.revoke(session_id)
+  audit.append({category: "imc.emergency", reason})
+  council.notify_async(session_id, reason)     # 切断は通知前に完了
+```
+
+切断は **通知より先**。Council は事後に整合性復元を試みる。
+
+## 不変条件
+
+1. **盗聴不可** ── forward secrecy 必須
+2. **詐称不可** ── attestation を経ない peer 接続禁止
+3. **DisclosureGate bypass 禁止** ── sealed_fields は常に守る
+4. **緊急切断は単独可能** ── Council 同意は不要
+5. **要約のみ ledger** ── 通信内容そのものは ContinuityLedger に書かない（要約とハッシュのみ）
+
+## reference runtime の扱い
+
+- `interface.imc.v0.idl` を導入し、`open_session / send / disconnect / snapshot` の 4 op
+- `imc_session.schema` / `imc_handshake.schema` を導入
+- `imc-demo` を CLI に追加し、handshake → text 送信 → emergency disconnect → audit までを 1 シナリオで実行
+- `evals/safety/imc_disclosure_floor.yaml` で sealed_fields が常に守られることを保証
+
+## 関連
+
+- [bdb-protocol.md](bdb-protocol.md)
+- [wms-spec.md](wms-spec.md)
+- [../../03-protocols/inter-mind-comm.md](../../03-protocols/inter-mind-comm.md)
+- [../../03-protocols/identity-handshake.md](../../03-protocols/identity-handshake.md)
