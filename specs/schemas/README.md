@@ -47,6 +47,12 @@
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
+- `guardian_oversight_event.schema`
+- `guardian_reviewer_record.schema`
+- `guardian_reviewer_verification.schema`
+- `guardian_verifier_network_receipt.schema`
+- `guardian_jurisdiction_evidence_bundle.schema`
+- `guardian_oversight_snapshot.schema`
 - `sandbox_signal.schema`
 - `naming_policy.schema`
 - `naming_validation.schema`
@@ -62,7 +68,8 @@
 ## 次段階
 
 actual rollback reverse-apply journal / richer sensory loopback artifacts /
-live remote PKI federation と key rotation を伴う distributed artifacts は
+live remote PKI federation と key rotation を伴う distributed artifacts /
+AscensionScheduler external verifier live connectivity は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

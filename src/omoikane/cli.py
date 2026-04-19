@@ -263,6 +263,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     oversight_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    oversight_network_parser = subparsers.add_parser(
+        "oversight-network-demo",
+        help="Run the Guardian reviewer verifier-network attestation scenario",
+    )
+    oversight_network_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     ethics_parser = subparsers.add_parser(
         "ethics-demo",
         help="Run the L1 ethics rule language and decision recording scenario",
@@ -466,6 +472,10 @@ def main() -> None:
 
     if args.command == "oversight-demo":
         _print_result(runtime.run_guardian_oversight_demo(), args.json)
+        return
+
+    if args.command == "oversight-network-demo":
+        _print_result(runtime.run_guardian_oversight_network_demo(), args.json)
         return
 
     if args.command == "ethics-demo":

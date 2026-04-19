@@ -688,6 +688,30 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["trust"]["after_breach"]["pinned_by_human"])
         self.assertFalse(result["trust"]["after_breach"]["eligibility"]["guardian_role"])
 
+    def test_oversight_network_demo_emits_verifier_network_receipt(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "oversight-network-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["network_receipt_verified"])
+        self.assertTrue(result["validation"]["network_endpoint_bound"])
+        self.assertTrue(result["validation"]["binding_carries_receipt"])
+        self.assertTrue(result["validation"]["binding_carries_trust_root"])
+        self.assertEqual(
+            "guardian-reviewer-remote-attestation-v1",
+            result["reviewer"]["credential_verification"]["network_receipt"]["network_profile_id"],
+        )
+        self.assertEqual(
+            "verifier://guardian-oversight.jp",
+            result["reviewer"]["credential_verification"]["network_receipt"]["verifier_endpoint"],
+        )
+
     def test_ethics_demo_emits_rule_language_and_events(self) -> None:
         stdout = io.StringIO()
 

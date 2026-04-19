@@ -172,5 +172,25 @@ examples:
         status: ready
         transport_profile: reviewer-live-proof-bridge-v1
         updated_at: "2026-04-19T13:00:00Z"
+      network_receipt:
+        kind: guardian_verifier_network_receipt
+        schema_version: 1.0.0
+        receipt_id: verifier-network-receipt-0123456789ab
+        reviewer_id: human-reviewer-001
+        verifier_endpoint: verifier://guardian-oversight.jp
+        verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+        jurisdiction: JP-13
+        transport_profile: reviewer-live-proof-bridge-v1
+        network_profile_id: guardian-reviewer-remote-attestation-v1
+        challenge_ref: challenge://guardian-oversight/reviewer-alpha/2026-04-19T13:00:00Z
+        challenge_digest: sha256:alpha-proof-bridge-20260419
+        authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+        trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+        trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+        freshness_window_seconds: 900
+        observed_latency_ms: 48.6
+        receipt_status: verified
+        recorded_at: "2026-04-19T13:00:00Z"
+        digest: 9524158fbd8e6ded8d0c7b0b932bffbfe53c883b0ee00f735f02cc7c73cf11ba
     revocation_reason: null
     revoked_at: null

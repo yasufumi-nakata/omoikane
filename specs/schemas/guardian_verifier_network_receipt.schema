@@ -1,0 +1,106 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/guardian_verifier_network_receipt.schema"
+title: GuardianVerifierNetworkReceipt
+description: Bounded receipt emitted by the fixed verifier network for one Guardian oversight reviewer verification.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - reviewer_id
+  - verifier_endpoint
+  - verifier_ref
+  - jurisdiction
+  - transport_profile
+  - network_profile_id
+  - challenge_ref
+  - challenge_digest
+  - authority_chain_ref
+  - trust_root_ref
+  - trust_root_digest
+  - freshness_window_seconds
+  - observed_latency_ms
+  - receipt_status
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: guardian_verifier_network_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    minLength: 1
+  reviewer_id:
+    type: string
+    minLength: 1
+  verifier_endpoint:
+    type: string
+    minLength: 1
+  verifier_ref:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  transport_profile:
+    type: string
+    enum:
+      - reviewer-live-proof-bridge-v1
+  network_profile_id:
+    const: guardian-reviewer-remote-attestation-v1
+  challenge_ref:
+    type: string
+    minLength: 1
+  challenge_digest:
+    type: string
+    minLength: 1
+  authority_chain_ref:
+    type: string
+    minLength: 1
+  trust_root_ref:
+    type: string
+    minLength: 1
+  trust_root_digest:
+    type: string
+    minLength: 1
+  freshness_window_seconds:
+    type: integer
+    minimum: 1
+  observed_latency_ms:
+    type: number
+    minimum: 0
+  receipt_status:
+    type: string
+    enum:
+      - verified
+      - stale
+      - revoked
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    minLength: 1
+examples:
+  - kind: guardian_verifier_network_receipt
+    schema_version: 1.0.0
+    receipt_id: verifier-network-receipt-0123456789ab
+    reviewer_id: human-reviewer-001
+    verifier_endpoint: verifier://guardian-oversight.jp
+    verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+    jurisdiction: JP-13
+    transport_profile: reviewer-live-proof-bridge-v1
+    network_profile_id: guardian-reviewer-remote-attestation-v1
+    challenge_ref: challenge://guardian-oversight/reviewer-alpha/2026-04-20T02:00:00Z
+    challenge_digest: sha256:alpha-proof-bridge-20260420
+    authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+    trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+    trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+    freshness_window_seconds: 900
+    observed_latency_ms: 48.6
+    receipt_status: verified
+    recorded_at: "2026-04-20T02:00:00Z"
+    digest: 9524158fbd8e6ded8d0c7b0b932bffbfe53c883b0ee00f735f02cc7c73cf11ba

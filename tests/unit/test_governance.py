@@ -76,6 +76,72 @@ class AmendmentServiceTests(unittest.TestCase):
 
 
 class OversightServiceTests(unittest.TestCase):
+    def test_network_verification_binds_verifier_receipt(self) -> None:
+        service = OversightService()
+        service.register_reviewer(
+            reviewer_id="reviewer-network",
+            display_name="Reviewer Network",
+            credential_id="credential-network",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight/reviewer-network",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight/reviewer-network",
+            escalation_contact="mailto:reviewer-network@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
+
+        verified = service.verify_reviewer_from_network(
+            "reviewer-network",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-network",
+            challenge_ref="challenge://guardian-oversight/reviewer-network/2026-04-20T02:00:00Z",
+            challenge_digest="sha256:reviewer-network-live-proof",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-20T02:00:00+00:00",
+            valid_until="2026-10-20T00:00:00+00:00",
+        )
+
+        network_receipt = verified["credential_verification"]["network_receipt"]
+        self.assertEqual("guardian-reviewer-remote-attestation-v1", network_receipt["network_profile_id"])
+        self.assertEqual("verifier://guardian-oversight.jp", network_receipt["verifier_endpoint"])
+        self.assertEqual(
+            "root://guardian-oversight.jp/reviewer-live-pki",
+            network_receipt["trust_root_ref"],
+        )
+        self.assertLessEqual(network_receipt["observed_latency_ms"], 250.0)
+
+    def test_network_verification_rejects_unknown_endpoint(self) -> None:
+        service = OversightService()
+        service.register_reviewer(
+            reviewer_id="reviewer-unknown-endpoint",
+            display_name="Reviewer Unknown Endpoint",
+            credential_id="credential-unknown-endpoint",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight/reviewer-unknown-endpoint",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight/reviewer-unknown-endpoint",
+            escalation_contact="mailto:reviewer-unknown-endpoint@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
+
+        with self.assertRaisesRegex(ValueError, "unsupported verifier network endpoint"):
+            service.verify_reviewer_from_network(
+                "reviewer-unknown-endpoint",
+                verifier_ref="verifier://guardian-oversight.us/reviewer-unknown-endpoint",
+                challenge_ref="challenge://guardian-oversight/reviewer-unknown-endpoint/2026-04-20T02:10:00Z",
+                challenge_digest="sha256:reviewer-unknown-endpoint-live-proof",
+                jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+                jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+                verified_at="2026-04-20T02:10:00+00:00",
+                valid_until="2026-10-20T00:00:00+00:00",
+            )
+
     def test_attestation_requires_live_credential_verification(self) -> None:
         service = OversightService()
         service.register_reviewer(
@@ -152,6 +218,7 @@ class OversightServiceTests(unittest.TestCase):
             "legal://jp-13/guardian-oversight/v1",
             updated["reviewer_bindings"][0]["jurisdiction_bundle_ref"],
         )
+        self.assertIsNone(updated["reviewer_bindings"][0]["network_receipt_id"])
 
     def test_attestation_rejects_reviewer_outside_scope(self) -> None:
         service = OversightService()

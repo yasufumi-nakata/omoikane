@@ -707,6 +707,28 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("breached", result["events"]["pin_renewal"]["human_attestation"]["status"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["guardian-oversight"])
 
+    def test_oversight_network_demo_binds_verifier_receipt(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_guardian_oversight_network_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["network_receipt_verified"])
+        self.assertTrue(result["validation"]["network_endpoint_bound"])
+        self.assertTrue(result["validation"]["network_profile_bound"])
+        self.assertTrue(result["validation"]["latency_within_budget"])
+        self.assertTrue(result["validation"]["binding_carries_receipt"])
+        self.assertTrue(result["validation"]["binding_carries_trust_root"])
+        self.assertTrue(result["validation"]["binding_carries_authority_chain"])
+        self.assertEqual(
+            "verifier://guardian-oversight.jp",
+            result["reviewer"]["credential_verification"]["network_receipt"]["verifier_endpoint"],
+        )
+        self.assertEqual(
+            "root://guardian-oversight.jp/reviewer-live-pki",
+            result["event"]["reviewer_bindings"][0]["trust_root_ref"],
+        )
+
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
         runtime = OmoikaneReferenceOS()
 

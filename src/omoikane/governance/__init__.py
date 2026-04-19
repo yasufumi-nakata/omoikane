@@ -5,6 +5,7 @@ from .naming import NamingService
 from .oversight import (
     GuardianOversightEvent,
     GuardianReviewerRecord,
+    GuardianVerifierNetworkReceipt,
     JurisdictionEvidenceBundle,
     OversightService,
     ReviewerCredentialVerification,
@@ -16,6 +17,7 @@ __all__ = [
     "AmendmentService",
     "AmendmentSignatures",
     "GuardianReviewerRecord",
+    "GuardianVerifierNetworkReceipt",
     "JurisdictionEvidenceBundle",
     "NamingService",
     "GuardianOversightEvent",

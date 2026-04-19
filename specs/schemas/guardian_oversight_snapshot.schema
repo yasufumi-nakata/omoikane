@@ -25,6 +25,7 @@ properties:
       - guardian_agent_by_role
       - categories
       - reviewer_identity_policy
+      - reviewer_verifier_network_policy
     properties:
       kind:
         const: guardian_oversight_policy
@@ -115,6 +116,40 @@ properties:
             minItems: 1
             items:
               type: string
+      reviewer_verifier_network_policy:
+        type: object
+        additionalProperties: false
+        required:
+          - network_profile_id
+          - supported_verifier_endpoints
+          - verification_transport_profiles
+          - required_receipt_fields
+          - freshness_window_seconds
+          - max_observed_latency_ms
+        properties:
+          network_profile_id:
+            const: guardian-reviewer-remote-attestation-v1
+          supported_verifier_endpoints:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          verification_transport_profiles:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          required_receipt_fields:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          freshness_window_seconds:
+            type: integer
+            minimum: 1
+          max_observed_latency_ms:
+            type: number
+            minimum: 0
   reviewers:
     type: array
     items:

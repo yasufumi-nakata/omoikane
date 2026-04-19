@@ -132,6 +132,22 @@ properties:
         jurisdiction_bundle_digest:
           type: string
           minLength: 1
+        network_receipt_id:
+          type:
+            - string
+            - "null"
+        authority_chain_ref:
+          type:
+            - string
+            - "null"
+        trust_root_ref:
+          type:
+            - string
+            - "null"
+        trust_root_digest:
+          type:
+            - string
+            - "null"
         guardian_role:
           type: string
           enum:

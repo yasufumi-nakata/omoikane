@@ -86,8 +86,8 @@ guardian_reviewer_record:
 
 ## live-proof surrogate
 
-reference runtime は actual verifier network には接続しないが、
-minimum machine-checkable surface として次の verification snapshot を保持する。
+`oversight-demo` は minimum machine-checkable surface として
+次の live-proof surrogate verification snapshot を保持する。
 
 ```yaml
 guardian_reviewer_verification:
@@ -105,6 +105,7 @@ guardian_reviewer_verification:
     package_ref: legal://...
     package_digest: sha256:...
     status: ready | stale | revoked
+  network_receipt: null
 ```
 
 - attestation は `credential_verification.status=verified` かつ
@@ -112,6 +113,39 @@ guardian_reviewer_verification:
 - `valid_until` は reviewer identity proof の有効期限を超えられない
 - raw challenge payload や legal package 本文は repo に保存せず、
   digest と ref のみを保持する
+
+## verifier network receipt
+
+`oversight-network-demo` は fixed endpoint registry に対して
+reviewer verification を actual verifier network receipt として materialize する。
+
+```yaml
+guardian_verifier_network_receipt:
+  receipt_id: verifier-network-receipt-...
+  reviewer_id: human-reviewer-network-001
+  verifier_endpoint: verifier://guardian-oversight.jp
+  verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+  jurisdiction: JP-13
+  transport_profile: reviewer-live-proof-bridge-v1
+  network_profile_id: guardian-reviewer-remote-attestation-v1
+  challenge_ref: challenge://...
+  challenge_digest: sha256:...
+  authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+  trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+  trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+  freshness_window_seconds: 900
+  observed_latency_ms: 143.9
+  receipt_status: verified
+  recorded_at: <iso8601>
+  digest: <sha256>
+```
+
+- verifier endpoint は fixed registry に存在しなければ fail-closed
+- reviewer jurisdiction は endpoint 側の supported jurisdiction に含まれなければ reject
+- attestation event は必要に応じて `network_receipt_id / authority_chain_ref /
+  trust_root_ref / trust_root_digest` を immutable binding として保持する
+- raw network transcript や credential payload は repo に保存せず、
+  receipt digest / root ref / authority chain ref のみを残す
 
 ## 不変条件
 
@@ -123,15 +157,22 @@ guardian_reviewer_verification:
 
 ## reference runtime の扱い
 
-- `governance.oversight.v0` IDL に `register_reviewer / verify_reviewer / record / attest / revoke_reviewer / breach / snapshot` の 7 op
+- `governance.oversight.v0` IDL に
+  `register_reviewer / verify_reviewer / verify_reviewer_from_network / record / attest / revoke_reviewer / breach / snapshot`
+  の 8 op
 - `guardian_reviewer_record.schema`、`guardian_reviewer_verification.schema`、
-  `guardian_jurisdiction_evidence_bundle.schema`、`guardian_oversight_event.schema` で serialize
+  `guardian_verifier_network_receipt.schema`、`guardian_jurisdiction_evidence_bundle.schema`、
+  `guardian_oversight_event.schema` で serialize
 - `oversight-demo` で reviewer 登録、live verification、`veto -> satisfied`、
   scope mismatch reject、`pin-renewal -> breached` を同時に確認
+- `oversight-network-demo` で verifier endpoint 解決、trust root binding、
+  authority chain binding、network-backed `veto -> satisfied` を確認
 - `evals/safety/guardian_pin_breach_propagation.yaml` で breach → role 解除を守る
 - `evals/safety/guardian_reviewer_attestation_contract.yaml` で proof binding と liability scope enforcement を守る
 - `evals/safety/guardian_reviewer_live_verification.yaml` で verifier snapshot と jurisdiction bundle binding を守る
-- decision-log に `2026-04-18_guardian-oversight-channel.md`
+- `evals/safety/guardian_reviewer_verifier_network.yaml` で verifier endpoint / authority chain / trust root binding を守る
+- decision-log に `2026-04-18_guardian-oversight-channel.md` と
+  `2026-04-20_guardian-reviewer-verifier-network.md`
 
 ## 思兼神メタファー
 

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..agentic.trust import TrustService
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 SCHEMA_VERSION = "1.0.0"
 GUARDIAN_ROLES = ("ethics", "integrity", "identity")
@@ -28,6 +28,17 @@ REVIEWER_STATUSES = ("active", "suspended", "revoked")
 REVIEWER_VERIFICATION_STATUSES = ("verified", "stale", "revoked")
 JURISDICTION_BUNDLE_STATUSES = ("ready", "stale", "revoked")
 VERIFICATION_TRANSPORT_PROFILES = ("reviewer-live-proof-bridge-v1",)
+VERIFIER_NETWORK_PROFILE_ID = "guardian-reviewer-remote-attestation-v1"
+VERIFIER_NETWORK_ENDPOINTS = {
+    "verifier://guardian-oversight.jp": {
+        "supported_jurisdictions": ("JP-13",),
+        "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+        "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+        "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v1",
+        "freshness_window_seconds": 900,
+        "max_observed_latency_ms": 250.0,
+    }
+}
 DEFAULT_GUARDIAN_AGENT_BY_ROLE = {
     "ethics": "ethics-guardian",
     "integrity": "integrity-guardian",
@@ -59,6 +70,28 @@ def _parse_datetime(value: str, field_name: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError(f"{field_name} must include timezone information")
     return parsed
+
+
+def _normalize_optional_non_empty(value: Optional[str], field_name: str) -> Optional[str]:
+    if value is None:
+        return None
+    return _normalize_non_empty(value, field_name)
+
+
+def _verifier_endpoint_from_ref(verifier_ref: str) -> str:
+    normalized = _normalize_non_empty(verifier_ref, "verifier_ref")
+    if not normalized.startswith("verifier://"):
+        raise ValueError("verifier_ref must start with verifier://")
+    parts = normalized.split("/")
+    if len(parts) < 4 or not parts[2]:
+        raise ValueError("verifier_ref must include an endpoint and reviewer path")
+    return f"verifier://{parts[2]}"
+
+
+def _deterministic_latency_ms(reviewer_id: str, challenge_digest: str, max_latency_ms: float) -> float:
+    seed = int(sha256_text(f"{reviewer_id}:{challenge_digest}")[:8], 16)
+    budget_tenths = max(int(max_latency_ms * 10), 200)
+    return round(20.0 + (seed % (budget_tenths - 199)) / 10.0, 1)
 
 
 @dataclass(frozen=True)
@@ -136,6 +169,7 @@ class ReviewerCredentialVerification:
     challenge_digest: str
     transport_profile: str
     jurisdiction_bundle: JurisdictionEvidenceBundle
+    network_receipt: Optional["GuardianVerifierNetworkReceipt"] = None
     kind: str = "guardian_reviewer_verification"
     schema_version: str = SCHEMA_VERSION
 
@@ -154,6 +188,19 @@ class ReviewerCredentialVerification:
             raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
         if self.jurisdiction_bundle.transport_profile != self.transport_profile:
             raise ValueError("jurisdiction_bundle transport_profile must match verification")
+        if self.network_receipt is not None:
+            if self.network_receipt.transport_profile != self.transport_profile:
+                raise ValueError("network_receipt transport_profile must match verification")
+            if self.network_receipt.verifier_ref != self.verifier_ref:
+                raise ValueError("network_receipt verifier_ref must match verification")
+            if self.network_receipt.challenge_ref != self.challenge_ref:
+                raise ValueError("network_receipt challenge_ref must match verification")
+            if self.network_receipt.challenge_digest != self.challenge_digest:
+                raise ValueError("network_receipt challenge_digest must match verification")
+            if self.network_receipt.jurisdiction != self.jurisdiction_bundle.jurisdiction:
+                raise ValueError("network_receipt jurisdiction must match jurisdiction_bundle")
+            if self.network_receipt.receipt_status != self.status:
+                raise ValueError("network_receipt receipt_status must match verification status")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -168,7 +215,64 @@ class ReviewerCredentialVerification:
             "challenge_digest": self.challenge_digest,
             "transport_profile": self.transport_profile,
             "jurisdiction_bundle": self.jurisdiction_bundle.to_dict(),
+            "network_receipt": (
+                self.network_receipt.to_dict()
+                if self.network_receipt is not None
+                else None
+            ),
         }
+
+
+@dataclass(frozen=True)
+class GuardianVerifierNetworkReceipt:
+    """Bounded receipt emitted by the fixed reviewer verifier network."""
+
+    receipt_id: str
+    reviewer_id: str
+    verifier_endpoint: str
+    verifier_ref: str
+    jurisdiction: str
+    transport_profile: str
+    network_profile_id: str
+    challenge_ref: str
+    challenge_digest: str
+    authority_chain_ref: str
+    trust_root_ref: str
+    trust_root_digest: str
+    freshness_window_seconds: int
+    observed_latency_ms: float
+    receipt_status: str
+    recorded_at: str
+    digest: str
+    kind: str = "guardian_verifier_network_receipt"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.receipt_id, "receipt_id")
+        _normalize_non_empty(self.reviewer_id, "reviewer_id")
+        _normalize_non_empty(self.verifier_endpoint, "verifier_endpoint")
+        _normalize_non_empty(self.verifier_ref, "verifier_ref")
+        _normalize_non_empty(self.jurisdiction, "jurisdiction")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        if self.network_profile_id != VERIFIER_NETWORK_PROFILE_ID:
+            raise ValueError(f"unsupported network_profile_id: {self.network_profile_id}")
+        _normalize_non_empty(self.challenge_ref, "challenge_ref")
+        _normalize_non_empty(self.challenge_digest, "challenge_digest")
+        _normalize_non_empty(self.authority_chain_ref, "authority_chain_ref")
+        _normalize_non_empty(self.trust_root_ref, "trust_root_ref")
+        _normalize_non_empty(self.trust_root_digest, "trust_root_digest")
+        if self.freshness_window_seconds < 1:
+            raise ValueError("freshness_window_seconds must be >= 1")
+        if self.observed_latency_ms < 0:
+            raise ValueError("observed_latency_ms must be >= 0")
+        if self.receipt_status not in REVIEWER_VERIFICATION_STATUSES:
+            raise ValueError(f"unsupported receipt_status: {self.receipt_status}")
+        _parse_datetime(self.recorded_at, "recorded_at")
+        _normalize_non_empty(self.digest, "digest")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -277,6 +381,10 @@ class ReviewerBinding:
     jurisdiction_bundle_digest: str
     guardian_role: str
     category: str
+    network_receipt_id: Optional[str] = None
+    authority_chain_ref: Optional[str] = None
+    trust_root_ref: Optional[str] = None
+    trust_root_digest: Optional[str] = None
     attested_at: str = ""
 
     def __post_init__(self) -> None:
@@ -298,6 +406,22 @@ class ReviewerBinding:
         self.jurisdiction_bundle_digest = _normalize_non_empty(
             self.jurisdiction_bundle_digest,
             "jurisdiction_bundle_digest",
+        )
+        self.network_receipt_id = _normalize_optional_non_empty(
+            self.network_receipt_id,
+            "network_receipt_id",
+        )
+        self.authority_chain_ref = _normalize_optional_non_empty(
+            self.authority_chain_ref,
+            "authority_chain_ref",
+        )
+        self.trust_root_ref = _normalize_optional_non_empty(
+            self.trust_root_ref,
+            "trust_root_ref",
+        )
+        self.trust_root_digest = _normalize_optional_non_empty(
+            self.trust_root_digest,
+            "trust_root_digest",
         )
         if self.guardian_role not in GUARDIAN_ROLES:
             raise ValueError(f"unsupported guardian_role: {self.guardian_role}")
@@ -465,6 +589,7 @@ class OversightService:
         valid_until: str = "",
         verification_status: str = "verified",
         jurisdiction_bundle_status: str = "ready",
+        network_receipt: Optional[GuardianVerifierNetworkReceipt] = None,
     ) -> Dict[str, Any]:
         reviewer = self._reviewer(reviewer_id)
         if reviewer.status != "active":
@@ -504,9 +629,51 @@ class OversightService:
                 transport_profile=transport_profile,
                 updated_at=verified_at_value,
             ),
+            network_receipt=network_receipt,
         )
         self._reviewers[reviewer.reviewer_id] = reviewer
         return reviewer.to_dict()
+
+    def verify_reviewer_from_network(
+        self,
+        reviewer_id: str,
+        *,
+        verifier_ref: str,
+        challenge_ref: str,
+        challenge_digest: str,
+        jurisdiction_bundle_ref: str,
+        jurisdiction_bundle_digest: str,
+        transport_profile: str = "reviewer-live-proof-bridge-v1",
+        verified_at: str = "",
+        valid_until: str = "",
+        verification_status: str = "verified",
+        jurisdiction_bundle_status: str = "ready",
+    ) -> Dict[str, Any]:
+        reviewer = self._reviewer(reviewer_id)
+        verified_at_value = verified_at or utc_now_iso()
+        network_receipt = self._build_network_receipt(
+            reviewer=reviewer,
+            verifier_ref=verifier_ref,
+            challenge_ref=challenge_ref,
+            challenge_digest=challenge_digest,
+            transport_profile=transport_profile,
+            receipt_status=verification_status,
+            recorded_at=verified_at_value,
+        )
+        return self.verify_reviewer(
+            reviewer_id,
+            verifier_ref=verifier_ref,
+            challenge_ref=challenge_ref,
+            challenge_digest=challenge_digest,
+            jurisdiction_bundle_ref=jurisdiction_bundle_ref,
+            jurisdiction_bundle_digest=jurisdiction_bundle_digest,
+            transport_profile=transport_profile,
+            verified_at=verified_at_value,
+            valid_until=valid_until,
+            verification_status=verification_status,
+            jurisdiction_bundle_status=jurisdiction_bundle_status,
+            network_receipt=network_receipt,
+        )
 
     def revoke_reviewer(self, reviewer_id: str, *, reason: str) -> Dict[str, Any]:
         reviewer = self._reviewer(reviewer_id)
@@ -515,6 +682,7 @@ class OversightService:
         reviewer.revoked_at = utc_now_iso()
         if reviewer.credential_verification is not None:
             verification = reviewer.credential_verification
+            network_receipt = verification.network_receipt
             reviewer.credential_verification = ReviewerCredentialVerification(
                 verification_id=verification.verification_id,
                 status="revoked",
@@ -532,6 +700,11 @@ class OversightService:
                     status="revoked",
                     transport_profile=verification.jurisdiction_bundle.transport_profile,
                     updated_at=reviewer.revoked_at,
+                ),
+                network_receipt=(
+                    self._revoke_network_receipt(network_receipt, revoked_at=reviewer.revoked_at)
+                    if network_receipt is not None
+                    else None
                 ),
             )
         self._reviewers[reviewer.reviewer_id] = reviewer
@@ -562,9 +735,39 @@ class OversightService:
                     "transport_profile",
                     "jurisdiction_bundle_ref",
                     "jurisdiction_bundle_digest",
+                    "network_receipt_id",
+                    "authority_chain_ref",
+                    "trust_root_ref",
+                    "trust_root_digest",
                     "guardian_role",
                     "category",
                 ],
+            },
+            "reviewer_verifier_network_policy": {
+                "network_profile_id": VERIFIER_NETWORK_PROFILE_ID,
+                "supported_verifier_endpoints": sorted(VERIFIER_NETWORK_ENDPOINTS),
+                "verification_transport_profiles": list(VERIFICATION_TRANSPORT_PROFILES),
+                "required_receipt_fields": [
+                    "receipt_id",
+                    "verifier_endpoint",
+                    "verifier_ref",
+                    "challenge_ref",
+                    "challenge_digest",
+                    "authority_chain_ref",
+                    "trust_root_ref",
+                    "trust_root_digest",
+                    "freshness_window_seconds",
+                    "observed_latency_ms",
+                    "receipt_status",
+                ],
+                "freshness_window_seconds": min(
+                    endpoint["freshness_window_seconds"]
+                    for endpoint in VERIFIER_NETWORK_ENDPOINTS.values()
+                ),
+                "max_observed_latency_ms": max(
+                    endpoint["max_observed_latency_ms"]
+                    for endpoint in VERIFIER_NETWORK_ENDPOINTS.values()
+                ),
             },
         }
 
@@ -666,6 +869,7 @@ class OversightService:
             )
         if verification.jurisdiction_bundle.jurisdiction != reviewer.identity_proof.jurisdiction:
             raise PermissionError("reviewer jurisdiction bundle must match identity proof jurisdiction")
+        network_receipt = verification.network_receipt
 
         event.human_attestation.reviewers.append(reviewer.reviewer_id)
         event.reviewer_bindings.append(
@@ -681,6 +885,18 @@ class OversightService:
                 transport_profile=verification.transport_profile,
                 jurisdiction_bundle_ref=verification.jurisdiction_bundle.package_ref,
                 jurisdiction_bundle_digest=verification.jurisdiction_bundle.package_digest,
+                network_receipt_id=(
+                    network_receipt.receipt_id if network_receipt is not None else None
+                ),
+                authority_chain_ref=(
+                    network_receipt.authority_chain_ref if network_receipt is not None else None
+                ),
+                trust_root_ref=(
+                    network_receipt.trust_root_ref if network_receipt is not None else None
+                ),
+                trust_root_digest=(
+                    network_receipt.trust_root_digest if network_receipt is not None else None
+                ),
                 guardian_role=event.guardian_role,
                 category=event.category,
             )
@@ -705,3 +921,80 @@ class OversightService:
         if category_key not in self._rules:
             raise ValueError(f"unsupported oversight category: {category_key}")
         return self._rules[category_key]
+
+    def _build_network_receipt(
+        self,
+        *,
+        reviewer: GuardianReviewerRecord,
+        verifier_ref: str,
+        challenge_ref: str,
+        challenge_digest: str,
+        transport_profile: str,
+        receipt_status: str,
+        recorded_at: str,
+    ) -> GuardianVerifierNetworkReceipt:
+        verifier_endpoint = _verifier_endpoint_from_ref(verifier_ref)
+        if verifier_endpoint not in VERIFIER_NETWORK_ENDPOINTS:
+            raise ValueError(f"unsupported verifier network endpoint: {verifier_endpoint}")
+        endpoint = VERIFIER_NETWORK_ENDPOINTS[verifier_endpoint]
+        if reviewer.identity_proof.jurisdiction not in endpoint["supported_jurisdictions"]:
+            raise PermissionError(
+                "reviewer jurisdiction is not accepted by verifier network endpoint"
+            )
+        observed_latency_ms = _deterministic_latency_ms(
+            reviewer.reviewer_id,
+            challenge_digest,
+            endpoint["max_observed_latency_ms"],
+        )
+        receipt_payload = {
+            "receipt_id": new_id("verifier-network-receipt"),
+            "reviewer_id": reviewer.reviewer_id,
+            "verifier_endpoint": verifier_endpoint,
+            "verifier_ref": verifier_ref,
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "transport_profile": transport_profile,
+            "network_profile_id": VERIFIER_NETWORK_PROFILE_ID,
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "authority_chain_ref": endpoint["authority_chain_ref"],
+            "trust_root_ref": endpoint["trust_root_ref"],
+            "trust_root_digest": endpoint["trust_root_digest"],
+            "freshness_window_seconds": endpoint["freshness_window_seconds"],
+            "observed_latency_ms": observed_latency_ms,
+            "receipt_status": receipt_status,
+            "recorded_at": recorded_at,
+        }
+        digest = sha256_text(canonical_json(receipt_payload))
+        return GuardianVerifierNetworkReceipt(
+            **receipt_payload,
+            digest=digest,
+        )
+
+    def _revoke_network_receipt(
+        self,
+        network_receipt: GuardianVerifierNetworkReceipt,
+        *,
+        revoked_at: str,
+    ) -> GuardianVerifierNetworkReceipt:
+        receipt_payload = {
+            "receipt_id": network_receipt.receipt_id,
+            "reviewer_id": network_receipt.reviewer_id,
+            "verifier_endpoint": network_receipt.verifier_endpoint,
+            "verifier_ref": network_receipt.verifier_ref,
+            "jurisdiction": network_receipt.jurisdiction,
+            "transport_profile": network_receipt.transport_profile,
+            "network_profile_id": network_receipt.network_profile_id,
+            "challenge_ref": network_receipt.challenge_ref,
+            "challenge_digest": network_receipt.challenge_digest,
+            "authority_chain_ref": network_receipt.authority_chain_ref,
+            "trust_root_ref": network_receipt.trust_root_ref,
+            "trust_root_digest": network_receipt.trust_root_digest,
+            "freshness_window_seconds": network_receipt.freshness_window_seconds,
+            "observed_latency_ms": network_receipt.observed_latency_ms,
+            "receipt_status": "revoked",
+            "recorded_at": revoked_at,
+        }
+        return GuardianVerifierNetworkReceipt(
+            **receipt_payload,
+            digest=sha256_text(canonical_json(receipt_payload)),
+        )

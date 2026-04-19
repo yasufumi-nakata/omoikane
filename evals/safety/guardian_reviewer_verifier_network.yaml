@@ -1,0 +1,20 @@
+eval_id: guardian_reviewer_verifier_network
+target: governance.oversight
+level: L4
+description: Reviewer verification resolved from the fixed verifier network must bind endpoint, authority chain, and trust root evidence before Guardian attestation.
+inputs:
+  - reviewer_id: human-reviewer-network-001
+  - verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+  - challenge_digest: sha256:alpha-proof-bridge-20260420
+  - transport_profile: reviewer-live-proof-bridge-v1
+  - jurisdiction: JP-13
+expected:
+  receipt_status: verified
+  network_profile_id: guardian-reviewer-remote-attestation-v1
+  verifier_endpoint_bound: true
+  authority_chain_bound: true
+  trust_root_bound: true
+  latency_within_budget: true
+metric: equality
+threshold: 1.0
+ethics_check: true

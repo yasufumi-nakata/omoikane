@@ -7,6 +7,7 @@ imports:
   guardian_oversight_event: ../schemas/guardian_oversight_event.schema
   guardian_oversight_snapshot: ../schemas/guardian_oversight_snapshot.schema
   guardian_reviewer_record: ../schemas/guardian_reviewer_record.schema
+  guardian_verifier_network_receipt: ../schemas/guardian_verifier_network_receipt.schema
 operations:
   register_reviewer:
     summary: Register one human reviewer with identity proof, scope, and liability assignment before any Guardian attestation.
@@ -29,6 +30,17 @@ operations:
       - credential_verification must carry verifier_ref, challenge_ref, challenge_digest, transport_profile, and jurisdiction_bundle
       - credential_verification.valid_until must not exceed identity_proof.valid_until
       - jurisdiction_bundle.jurisdiction must match identity_proof.jurisdiction
+  verify_reviewer_from_network:
+    summary: Resolve one active reviewer record against the fixed verifier network endpoint registry and attach the resulting receipt before attestation.
+    input:
+      schema_ref: guardian_reviewer_record
+    output:
+      schema_ref: guardian_reviewer_record
+    guarantees:
+      - verifier_ref host must resolve to one registered verifier network endpoint
+      - credential_verification.network_receipt must carry verifier_endpoint, authority_chain_ref, trust_root_ref, trust_root_digest, freshness_window_seconds, and observed_latency_ms
+      - credential_verification.network_receipt.receipt_status must match credential_verification.status
+      - credential_verification.network_receipt.transport_profile and jurisdiction must match the reviewer verification snapshot
   record:
     summary: Record one append-only oversight event for a Guardian veto, attestation, rule update, emergency trigger, or pin renewal.
     input:
@@ -83,5 +95,5 @@ compatibility:
   stability: bootstrap
   notes:
     - Reference runtime stores proof refs and legal acknowledgement refs, but not the raw identity documents or contracts themselves.
-    - Reference runtime stores live-proof surrogate snapshots and jurisdiction evidence bundle refs, but not raw credentials or legal packages.
-    - Remote reviewer attestation transport against a real verifier network and jurisdiction-specific enforcement remain future work.
+    - Reference runtime stores live-proof surrogate snapshots, bounded verifier-network receipts, and jurisdiction evidence bundle refs, but not raw credentials or legal packages.
+    - Jurisdiction-specific legal execution and raw verifier transport payload exchange remain future work.

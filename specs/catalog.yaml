@@ -1165,10 +1165,20 @@ entries:
     file: specs/schemas/guardian_reviewer_verification.schema
     consumers:
       - specs/schemas/guardian_reviewer_record.schema
+      - specs/schemas/guardian_verifier_network_receipt.schema
       - specs/interfaces/governance.oversight.v0.idl
       - docs/04-ai-governance/guardian-oversight.md
       - reference-runtime
-    rationale: Required to bind one reviewer to a live-proof surrogate verification snapshot before Guardian attestation is accepted.
+    rationale: Required to bind one reviewer to a live-proof verification snapshot with optional verifier-network receipt before Guardian attestation is accepted.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_verifier_network_receipt.schema
+    consumers:
+      - specs/schemas/guardian_reviewer_verification.schema
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize one bounded verifier-network receipt with endpoint, authority-chain, and trust-root bindings for Guardian reviewer verification.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_jurisdiction_evidence_bundle.schema
@@ -1192,7 +1202,7 @@ entries:
       - docs/04-ai-governance/guardian-oversight.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make reviewer registration, live verification, scoped attestation, breach propagation, and snapshot behavior machine-readable.
+    rationale: Required to make reviewer registration, live verification, verifier-network receipt binding, scoped attestation, breach propagation, and snapshot behavior machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.naming.v0.idl
@@ -1222,6 +1232,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects live verifier snapshot binding, jurisdiction evidence bundle readiness, and transport profile consistency for Guardian reviewers.
+  - priority: P1
+    kind: eval
+    file: evals/safety/guardian_reviewer_verifier_network.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects verifier endpoint resolution, authority-chain binding, trust-root binding, and latency budget for network-backed Guardian reviewer verification.
   - priority: P1
     kind: schema
     file: specs/schemas/amendment_proposal.schema

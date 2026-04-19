@@ -2176,6 +2176,110 @@ class OmoikaneReferenceOS:
             },
         }
 
+    def run_guardian_oversight_network_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://guardian-oversight-network-demo/v1",
+            metadata={"display_name": "Guardian Oversight Network Sandbox"},
+        )
+        reviewer = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-network-001",
+            display_name="Reviewer Network Alpha",
+            credential_id="credential-network-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight-network/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-20T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight-network/reviewer-alpha/v1",
+            escalation_contact="mailto:oversight-network-alpha@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
+        reviewer = self.oversight.verify_reviewer_from_network(
+            "human-reviewer-network-001",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-alpha",
+            challenge_ref="challenge://guardian-oversight/reviewer-alpha/2026-04-20T02:00:00Z",
+            challenge_digest="sha256:alpha-proof-bridge-20260420",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-20T02:00:00+00:00",
+            valid_until="2026-10-20T00:00:00+00:00",
+        )
+        policy = self.oversight.policy_snapshot()
+        network_receipt = reviewer["credential_verification"]["network_receipt"]
+        veto_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.veto.network-verified",
+            payload={
+                "guardian_role": "integrity",
+                "target_component": "TerminationGate",
+                "reason": "network-verified reviewer attestation required before irreversible action",
+            },
+            actor="IntegrityGuardian",
+            category="ethics-veto",
+            layer="L4",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        veto_event = self.oversight.record(
+            guardian_role="integrity",
+            category="veto",
+            payload_ref=veto_entry.entry_id,
+            escalation_path=["guardian-oversight.jp", "external-ethics-board"],
+        )
+        veto_event = self.oversight.attest(
+            veto_event["event_id"],
+            reviewer_id="human-reviewer-network-001",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.oversight.network-veto.satisfied",
+            payload=veto_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": policy,
+            "reviewer": reviewer,
+            "event": veto_event,
+            "validation": {
+                "network_receipt_verified": network_receipt["receipt_status"] == "verified",
+                "network_endpoint_bound": (
+                    network_receipt["verifier_endpoint"] == "verifier://guardian-oversight.jp"
+                ),
+                "network_profile_bound": (
+                    network_receipt["network_profile_id"]
+                    == "guardian-reviewer-remote-attestation-v1"
+                ),
+                "latency_within_budget": (
+                    network_receipt["observed_latency_ms"]
+                    <= policy["reviewer_verifier_network_policy"]["max_observed_latency_ms"]
+                ),
+                "binding_carries_receipt": bool(
+                    veto_event["reviewer_bindings"][0]["network_receipt_id"]
+                ),
+                "binding_carries_trust_root": (
+                    veto_event["reviewer_bindings"][0]["trust_root_ref"]
+                    == network_receipt["trust_root_ref"]
+                ),
+                "binding_carries_authority_chain": (
+                    veto_event["reviewer_bindings"][0]["authority_chain_ref"]
+                    == network_receipt["authority_chain_ref"]
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_ethics_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://ethics-demo/v1",
