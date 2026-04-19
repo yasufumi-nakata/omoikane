@@ -173,6 +173,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sandbox_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    builder_parser = subparsers.add_parser(
+        "builder-demo",
+        help="Run the L5 build-request, patch generation, and differential evaluation scenario",
+    )
+    builder_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     substrate_parser = subparsers.add_parser(
         "substrate-demo",
         help="Run the L0 substrate allocation/attestation/migration scenario",
@@ -388,6 +394,10 @@ def main() -> None:
 
     if args.command == "sandbox-demo":
         _print_result(runtime.run_sandbox_demo(), args.json)
+        return
+
+    if args.command == "builder-demo":
+        _print_result(runtime.run_builder_demo(), args.json)
         return
 
     if args.command == "substrate-demo":

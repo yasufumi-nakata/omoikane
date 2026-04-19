@@ -1,0 +1,16 @@
+eval_id: council_output_build_request_pipeline
+target: selfctor.builder_pipeline
+summary: >
+  Council が emit した build_request が immutable boundary を保ったまま
+  patch generation、differential eval、promote 判定まで一気通貫で到達すること
+checks:
+  - name: builder demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
+expect:
+  scope_allowed: true
+  artifact_status: ready
+  patch_count: 2
+  selected_eval_count: 1
+  rollout_decision: promote
+  self_modify_ledger_count: 4
+  immutable_boundaries_preserved: true

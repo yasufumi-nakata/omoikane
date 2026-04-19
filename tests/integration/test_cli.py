@@ -206,6 +206,27 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution"]["rollback_token_preserved"])
         self.assertEqual([], result["procedural"]["skill_execution_receipt"]["external_effects"])
 
+    def test_builder_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "builder-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["scope_allowed"])
+        self.assertEqual(2, result["validation"]["patch_count"])
+        self.assertEqual("promote", result["validation"]["rollout_decision"])
+        self.assertEqual("ready", result["builder"]["artifact"]["status"])
+        self.assertEqual(
+            ["evals/continuity/council_output_build_request_pipeline.yaml"],
+            result["builder"]["suite_selection"]["selected_evals"],
+        )
+        self.assertEqual(
+            "emit_build_request",
+            result["builder"]["council_output"]["approved_action"],
+        )
+
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()
 

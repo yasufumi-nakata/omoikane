@@ -339,13 +339,17 @@ entries:
     file: specs/interfaces/selfctor.patch_generator.v0.idl
     consumers:
       - reference-runtime
-    rationale: Builder patch generation contract.
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+    rationale: Builder patch generation contract across build_request validation, patch descriptors, and bounded runtime demos.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.diff_eval.v0.idl
     consumers:
       - reference-runtime
-    rationale: Differential evaluation contract.
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/self-modification.md
+    rationale: Differential evaluation contract across eval selection, A/B result reports, and rollout classification.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl
@@ -1226,6 +1230,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the fixed surrogate suffering threshold and immediate freeze on affect-bridge breach.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/council_output_build_request_pipeline.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects the council-approved build_request handoff, immutable boundary validation, differential eval selection, and rollout promotion classification.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

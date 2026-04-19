@@ -210,6 +210,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("sandbox-complete", result["procedural"]["skill_execution_receipt"]["status"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-execution"])
 
+    def test_builder_demo_returns_valid_build_pipeline(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_builder_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["scope_allowed"])
+        self.assertTrue(result["validation"]["immutable_boundaries_preserved"])
+        self.assertEqual(2, result["validation"]["patch_count"])
+        self.assertEqual(1, result["validation"]["selected_eval_count"])
+        self.assertEqual("promote", result["validation"]["rollout_decision"])
+        self.assertEqual("ready", result["builder"]["artifact"]["status"])
+        self.assertEqual(
+            ["evals/continuity/council_output_build_request_pipeline.yaml"],
+            result["builder"]["suite_selection"]["selected_evals"],
+        )
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["self-modify"])
+
     def test_reasoning_demo_records_baseline_and_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 

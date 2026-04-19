@@ -56,6 +56,7 @@ PYTHONPATH=src python3 -m omoikane.cli imagination-demo --json
 PYTHONPATH=src python3 -m omoikane.cli language-demo --json
 PYTHONPATH=src python3 -m omoikane.cli metacognition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
+PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
@@ -179,6 +180,14 @@ negative valence / arousal / clarity drop / somatic/interoceptive load /
 self implication を重み付きで集計して
 `freeze_threshold=0.6` 以上、または affect bridge 接続時に
 Guardian が sandbox を即時凍結することを確認する。
+
+`builder-demo` は L5 self-construction builder pipeline の reference contract
+(`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0`) を JSON で可視化し、
+Council の `emit_build_request` handoff が `build_request` / `build_artifact`
+schema に束縛されたまま immutable boundary を検証し、
+patch descriptor 生成、`council_output_build_request_pipeline` eval 選定、
+`promote` / `hold` / `rollback` の rollout 分類まで
+ledger-safe な `self-modify` chain で進むことを確認する。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、
@@ -320,5 +329,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - distributed transport key rotation / remote PKI federation を actual network に接続
 - Guardian oversight reviewer の remote attestation transport を actual verifier network に接続
 - AscensionScheduler external verifier の真正性証明と live 接続
-- specs/ から runtime への自動生成ループ
+- generated patch descriptor の actual sandbox apply / staged rollout execution
 - automation による未実装ギャップの継続充填
