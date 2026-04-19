@@ -19,6 +19,9 @@ canonical schema:
 writeback receipt schema:
 [specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
 
+skill execution receipt schema:
+[specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/procedural_skill_execution.schema)
+
 必須フィールド:
 
 - `preview_policy`
@@ -46,13 +49,18 @@ writeback receipt schema:
 
 - `mind.procedural.v0.idl` で `project / validate_snapshot` を定義
 - `mind.procedural_writeback.v0.idl` で `apply_preview / validate_receipt` を定義
+- `mind.skill_execution.v0.idl` で `execute / validate_receipt` を定義
 - `procedural-demo --json` で `MemoryCrystal` manifest と `Connectome` snapshot から preview を生成する
 - `procedural-writeback-demo --json` で preview を human-approved writeback に昇格し、
   copied `Connectome` snapshot、writeback receipt、continuity diff metadata を確認する
+- `procedural-skill-demo --json` で writeback 後の selected recommendation を
+  guardian witness 付き sandbox rehearsal へ昇格し、
+  `skill-execution` receipt、sandbox evidence ref、rollback token carryover を確認する
 - ledger には `procedural-preview` category で source manifest / connectome digest と target path 一覧を残す
 - ledger には `procedural-writeback` category で output connectome digest、human reviewer quorum、rollback token を残す
+- ledger には `procedural-execution` category で executed skill label、sandbox session、rollback token を残す
 - `weight-application` は reference runtime で bounded writeback まで固定し、
-  `skill-execution` はなお deferred のままにする
+  `skill-execution` も sandbox-only / no external actuation の範囲で固定する
 
 ## 不変条件
 
@@ -61,6 +69,7 @@ writeback receipt schema:
 3. すべての recommendation は source segment / event の trace を保持する
 4. writeback は self / council / guardian に加えて 2 名以上の human reviewer を要する
 5. すべての writeback は continuity diff と rollback token を残す
+6. skill execution は guardian witness 付き sandbox-only rehearsal に限り、external actuation を禁止する
 
 ## 関連
 
@@ -68,3 +77,4 @@ writeback receipt schema:
 - [semantic-memory.md](semantic-memory.md)
 - [../../../specs/interfaces/mind.procedural.v0.idl](../../../specs/interfaces/mind.procedural.v0.idl)
 - [../../../specs/interfaces/mind.procedural_writeback.v0.idl](../../../specs/interfaces/mind.procedural_writeback.v0.idl)
+- [../../../specs/interfaces/mind.skill_execution.v0.idl](../../../specs/interfaces/mind.skill_execution.v0.idl)

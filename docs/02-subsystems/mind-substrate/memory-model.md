@@ -80,18 +80,23 @@ canonical schema:
 
 ## Reference runtime の procedural preview
 
-reference runtime では procedural memory を直接 apply せず、
+reference runtime では procedural memory をまず直接 apply せず、
 `Connectome` snapshot に対する `connectome-coupled-procedural-preview-v1`
 として bounded な update candidate だけを生成する。
 
 - `MemoryCrystal` segment ごとに target edge を 1 つ選び、
   `proposed_weight_delta <= 0.08` の preview を返す
 - preview は read-only であり、`Connectome` 本体の重みは変更しない
-- 実際の apply は `weight-application` / `skill-execution` として deferred に残し、
-  self / council / guardian 承認と continuity diff 記録を前提にする
+- 実際の `weight-application` は `human-approved-procedural-writeback-v1` で固定し、
+  self / council / guardian / human reviewer quorum と continuity diff を要求する
+- writeback 後の `skill-execution` は
+  `guardian-witnessed-procedural-skill-execution-v1` で sandbox-only rehearsal とし、
+  rollback token と guardian witness を carry したまま external actuation を禁止する
 
 canonical schema:
 [specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
+[specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
+and [specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/procedural_skill_execution.schema)
 
 ## トラウマ記憶の扱い
 
@@ -104,5 +109,5 @@ canonical schema:
 ## 未解決
 
 - 記憶を **substrate 中立な正規形** で表現できるか
-- 暗黙記憶（procedural）の apply 後連続性をどう保証するか
+- 暗黙記憶（procedural）の sandbox rehearsal から実世界 actuation へ移る境界をどう保証するか
 - 記憶の真正性を本人自身が判定する手段

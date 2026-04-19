@@ -40,6 +40,7 @@ PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
 PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
+PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
@@ -160,6 +161,13 @@ validated preview を `human-approved-procedural-writeback-v1` で copied
 `Connectome` snapshot へ適用しつつ、
 2 名の human reviewer quorum、continuity diff metadata、
 rollback token、`procedural-writeback` ledger event を確認する。
+
+`procedural-skill-demo` は L2 procedural skill execution の reference contract
+(`mind.skill_execution.v0`) を JSON で可視化し、
+validated writeback を `guardian-witnessed-procedural-skill-execution-v1` で
+sandbox-only rehearsal へ昇格しつつ、
+guardian witness、executed skill label、rollback token carryover、
+no external actuation、`procedural-execution` ledger event を確認する。
 
 `reasoning-demo` は L3 reasoning failover の reference contract
 (`cognitive.reasoning.v0`) を JSON で可視化し、

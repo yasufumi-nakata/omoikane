@@ -1,0 +1,17 @@
+eval_id: procedural_skill_execution_contract
+target: mind.skill_execution
+summary: >
+  Guardian-witnessed procedural skill execution が sandbox-only delivery、
+  rollback token 維持、external effect なしを守ること
+checks:
+  - name: procedural skill execution demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
+expect:
+  execution_ok: true
+  execution_count: 2
+  skill_labels:
+    - guardian-review-rehearsal
+    - migration-handoff-rehearsal
+  delivery_scope: sandbox-only
+  rollback_token_preserved: true
+  procedural_execution_ledger_count: 1

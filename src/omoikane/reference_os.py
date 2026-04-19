@@ -69,6 +69,7 @@ from .mind.memory import (
     EpisodicStream,
     MemoryCrystalStore,
     ProceduralMemoryProjector,
+    ProceduralSkillExecutor,
     ProceduralMemoryWritebackGate,
     SemanticMemoryProjector,
 )
@@ -95,6 +96,7 @@ class OmoikaneReferenceOS:
         self.semantic = SemanticMemoryProjector()
         self.procedural = ProceduralMemoryProjector()
         self.procedural_writeback = ProceduralMemoryWritebackGate()
+        self.procedural_execution = ProceduralSkillExecutor()
         self.self_model = SelfModelMonitor()
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
@@ -2514,6 +2516,163 @@ class OmoikaneReferenceOS:
                     and procedural_validation["ok"]
                     and updated_connectome_validation["ok"]
                     and writeback_validation["ok"]
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_procedural_skill_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://procedural-skill-demo/v1",
+            metadata={"display_name": "Procedural Skill Sandbox"},
+        )
+        episodic_snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        manifest_validation = self.memory.validate(manifest)
+        connectome_document = self.connectome.build_reference_snapshot(identity.identity_id)
+        connectome_validation = self.connectome.validate(connectome_document)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "source_event_ids": episodic_snapshot["compaction_candidate_ids"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        procedural_snapshot = self.procedural.project(
+            identity.identity_id,
+            manifest,
+            connectome_document,
+        )
+        procedural_validation = self.procedural.validate(procedural_snapshot)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.procedural_previewed",
+            payload={
+                "policy_id": procedural_snapshot["preview_policy"]["policy_id"],
+                "recommendation_count": procedural_snapshot["recommendation_count"],
+                "target_paths": procedural_validation["target_paths"],
+                "source_manifest_digest": procedural_snapshot["source_manifest_digest"],
+                "connectome_snapshot_digest": procedural_snapshot["connectome_snapshot_digest"],
+                "deferred_surfaces": procedural_snapshot["deferred_surfaces"],
+            },
+            actor="ProceduralMemoryProjector",
+            category="procedural-preview",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        writeback_result = self.procedural_writeback.apply(
+            identity.identity_id,
+            procedural_snapshot,
+            connectome_document,
+            selected_recommendation_ids=[
+                recommendation["recommendation_id"]
+                for recommendation in procedural_snapshot["recommendations"]
+            ],
+            self_attestation_id="self://procedural-writeback/consent-001",
+            council_attestation_id="council://procedural-writeback/unanimous-001",
+            guardian_attestation_id="guardian://procedural-writeback/approved-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded rehearsal preview を continuity-diff 付き writeback として昇格する",
+        )
+        writeback_receipt = writeback_result["receipt"]
+        updated_connectome_document = writeback_result["updated_connectome_document"]
+        updated_connectome_validation = self.connectome.validate(updated_connectome_document)
+        writeback_validation = self.procedural_writeback.validate(
+            writeback_receipt,
+            updated_connectome_document,
+            procedural_snapshot,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.procedural_applied",
+            payload={
+                "policy_id": writeback_receipt["writeback_policy"]["policy_id"],
+                "applied_recommendation_count": writeback_receipt["applied_recommendation_count"],
+                "target_paths": writeback_validation["target_paths"],
+                "source_preview_digest": writeback_receipt["source_preview_digest"],
+                "output_connectome_digest": writeback_receipt["output_connectome_digest"],
+                "human_reviewers": writeback_receipt["approval_bundle"]["human_reviewers"],
+                "rollback_token": writeback_receipt["rollback_token"],
+            },
+            actor="ProceduralMemoryWritebackGate",
+            category="procedural-writeback",
+            layer="L2",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        execution_receipt = self.procedural_execution.execute(
+            identity.identity_id,
+            writeback_receipt,
+            updated_connectome_document,
+            sandbox_session_id="sandbox://procedural-skill/session-001",
+            guardian_witness_id="guardian://procedural-skill/witness-001",
+        )
+        execution_validation = self.procedural_execution.validate(
+            execution_receipt,
+            updated_connectome_document,
+            writeback_receipt,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.procedural_skill_executed",
+            payload={
+                "policy_id": execution_receipt["execution_policy"]["policy_id"],
+                "execution_count": execution_receipt["execution_count"],
+                "skill_labels": execution_validation["skill_labels"],
+                "source_writeback_digest": execution_receipt["source_writeback_digest"],
+                "sandbox_session_id": execution_receipt["sandbox_session_id"],
+                "rollback_token": execution_receipt["rollback_token"],
+            },
+            actor="ProceduralSkillExecutor",
+            category="procedural-execution",
+            layer="L2",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "procedural": {
+                "preview_policy": self.procedural.profile(),
+                "writeback_policy": self.procedural_writeback.profile(),
+                "execution_policy": self.procedural_execution.profile(),
+                "episodic_stream": episodic_snapshot,
+                "manifest": manifest,
+                "connectome_before": connectome_document,
+                "preview_snapshot": procedural_snapshot,
+                "writeback_receipt": writeback_receipt,
+                "connectome_after": updated_connectome_document,
+                "skill_execution_receipt": execution_receipt,
+            },
+            "validation": {
+                "manifest": manifest_validation,
+                "connectome_before": connectome_validation,
+                "preview": procedural_validation,
+                "connectome_after": updated_connectome_validation,
+                "writeback": writeback_validation,
+                "execution": execution_validation,
+                "ok": (
+                    manifest_validation["ok"]
+                    and connectome_validation["ok"]
+                    and procedural_validation["ok"]
+                    and updated_connectome_validation["ok"]
+                    and writeback_validation["ok"]
+                    and execution_validation["ok"]
                 ),
             },
             "ledger_profile": self.ledger.profile(),

@@ -152,7 +152,7 @@ class CliIntegrationTests(unittest.TestCase):
             sorted(result["validation"]["procedural"]["target_paths"]),
         )
         self.assertEqual(
-            ["weight-application", "skill-execution"],
+            ["skill-execution"],
             result["procedural"]["snapshot"]["deferred_surfaces"],
         )
 
@@ -171,6 +171,24 @@ class CliIntegrationTests(unittest.TestCase):
             result["validation"]["writeback"]["human_reviewers"],
         )
         self.assertEqual("approved", result["procedural"]["writeback_receipt"]["status"])
+
+    def test_procedural_skill_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "procedural-skill-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["execution"]["ok"])
+        self.assertEqual(2, result["validation"]["execution"]["execution_count"])
+        self.assertEqual(
+            ["guardian-review-rehearsal", "migration-handoff-rehearsal"],
+            sorted(result["validation"]["execution"]["skill_labels"]),
+        )
+        self.assertEqual("sandbox-only", result["validation"]["execution"]["delivery_scope"])
+        self.assertTrue(result["validation"]["execution"]["rollback_token_preserved"])
+        self.assertEqual([], result["procedural"]["skill_execution_receipt"]["external_effects"])
 
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()

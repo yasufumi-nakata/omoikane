@@ -1,0 +1,105 @@
+idl_version: 1
+kind: service
+namespace: mind.skill_execution.v0
+service: ProceduralSkillExecutor
+summary: >
+  Deterministic sandbox-only enactment contract that rehearses selected
+  procedural writeback outputs without external actuation.
+imports:
+  procedural_writeback_receipt: ../schemas/procedural_writeback_receipt.schema
+  connectome_document: ../schemas/connectome_document.schema
+  procedural_skill_execution: ../schemas/procedural_skill_execution.schema
+operations:
+  execute:
+    summary: Execute a bounded sandbox rehearsal from a validated procedural writeback receipt.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - writeback_receipt
+          - updated_connectome_document
+          - sandbox_session_id
+          - guardian_witness_id
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          writeback_receipt:
+            schema_ref: procedural_writeback_receipt
+          updated_connectome_document:
+            schema_ref: connectome_document
+          sandbox_session_id:
+            type: string
+            minLength: 1
+          guardian_witness_id:
+            type: string
+            minLength: 1
+          selected_recommendation_ids:
+            type: array
+            minItems: 1
+            maxItems: 3
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: procedural_skill_execution
+    guarantees:
+      - writeback receipt must validate before sandbox execution starts
+      - delivery_scope must remain sandbox-only and external actuation must stay disabled
+      - guardian witness and rollback token must be preserved for every executed rehearsal
+      - execution count must remain within the fixed max_rehearsal_steps ceiling
+  validate_receipt:
+    summary: Validate one procedural skill execution receipt against the fixed sandbox enactment policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+          - updated_connectome_document
+        properties:
+          receipt:
+            schema_ref: procedural_skill_execution
+          updated_connectome_document:
+            schema_ref: connectome_document
+          writeback_receipt:
+            schema_ref: procedural_writeback_receipt
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - execution_count
+          - skill_labels
+          - delivery_scope
+          - rollback_token_preserved
+          - errors
+        properties:
+          ok:
+            type: boolean
+          execution_count:
+            type: integer
+            minimum: 0
+          skill_labels:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          delivery_scope:
+            type: string
+            const: sandbox-only
+          rollback_token_preserved:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.procedural_skill_executed:
+    payload:
+      schema_ref: procedural_skill_execution

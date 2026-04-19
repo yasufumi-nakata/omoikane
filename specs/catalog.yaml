@@ -820,6 +820,29 @@ entries:
     rationale: Protects human reviewer quorum, bounded connectome delta, continuity diff metadata, and rollback token emission.
   - priority: P1
     kind: schema
+    file: specs/schemas/procedural_skill_execution.schema
+    consumers:
+      - specs/interfaces/mind.skill_execution.v0.idl
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize guardian-witnessed sandbox skill execution evidence after procedural writeback.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.skill_execution.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 sandbox skill execution contract machine-readable while preserving rollback-ready boundaries.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/procedural_skill_execution_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects sandbox-only delivery, guardian witness, rollback token carryover, and no external effects during procedural skill execution.
+  - priority: P1
+    kind: schema
     file: specs/schemas/trust_event.schema
     consumers:
       - specs/schemas/trust_snapshot.schema

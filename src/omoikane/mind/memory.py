@@ -29,9 +29,11 @@ SEMANTIC_PROJECTION_POLICY_ID = "semantic-segment-rollup-v1"
 PROCEDURAL_MEMORY_SCHEMA_VERSION = "1.0"
 PROCEDURAL_PREVIEW_POLICY_ID = "connectome-coupled-procedural-preview-v1"
 PROCEDURAL_MAX_WEIGHT_DELTA = 0.08
-PROCEDURAL_DEFERRED_SURFACES = ["weight-application", "skill-execution"]
+PROCEDURAL_DEFERRED_SURFACES = ["skill-execution"]
 PROCEDURAL_WRITEBACK_POLICY_ID = "human-approved-procedural-writeback-v1"
 PROCEDURAL_REQUIRED_HUMAN_REVIEWERS = 2
+PROCEDURAL_SKILL_EXECUTION_POLICY_ID = "guardian-witnessed-procedural-skill-execution-v1"
+PROCEDURAL_MAX_REHEARSAL_STEPS = 3
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -61,6 +63,10 @@ def _procedural_recommendation_digest_payload(recommendation: Dict[str, Any]) ->
 
 
 def _procedural_writeback_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "digest"}
+
+
+def _procedural_execution_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "digest"}
 
 
@@ -1724,6 +1730,443 @@ class ProceduralMemoryWritebackGate:
         if missing:
             raise ValueError(f"selected_recommendation_ids contain unknown ids: {missing}")
         return normalized
+
+
+class ProceduralSkillExecutor:
+    """Executes sandboxed procedural rehearsals after validated writeback."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "policy_id": PROCEDURAL_SKILL_EXECUTION_POLICY_ID,
+            "source_writeback_policy": PROCEDURAL_WRITEBACK_POLICY_ID,
+            "target_connectome_schema": CONNECTOME_SCHEMA_VERSION,
+            "delivery_scope": "sandbox-only",
+            "external_actuation_allowed": False,
+            "guardian_witness_required": True,
+            "required_human_reviewers": PROCEDURAL_REQUIRED_HUMAN_REVIEWERS,
+            "rollback_token_required": True,
+            "max_rehearsal_steps": PROCEDURAL_MAX_REHEARSAL_STEPS,
+        }
+
+    def execute(
+        self,
+        identity_id: str,
+        writeback_receipt: Dict[str, Any],
+        updated_connectome_document: Dict[str, Any],
+        *,
+        sandbox_session_id: str,
+        guardian_witness_id: str,
+        selected_recommendation_ids: Sequence[str] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(writeback_receipt, dict):
+            raise ValueError("writeback_receipt must be a mapping")
+        if not isinstance(updated_connectome_document, dict):
+            raise ValueError("updated_connectome_document must be a mapping")
+        for field_name, value in (
+            ("sandbox_session_id", sandbox_session_id),
+            ("guardian_witness_id", guardian_witness_id),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+
+        writeback_validation = ProceduralMemoryWritebackGate().validate(
+            writeback_receipt,
+            updated_connectome_document,
+        )
+        if not writeback_validation["ok"]:
+            raise ValueError(
+                "procedural skill execution requires a valid writeback receipt: "
+                f"{writeback_validation['errors']}"
+            )
+        if writeback_receipt.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match writeback_receipt.identity_id")
+        if updated_connectome_document.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match updated_connectome_document.identity_id")
+        if writeback_receipt.get("output_connectome_snapshot_id") != updated_connectome_document.get(
+            "snapshot_id"
+        ):
+            raise ValueError(
+                "writeback_receipt.output_connectome_snapshot_id must match updated_connectome_document.snapshot_id"
+            )
+
+        selected_ids = self._normalize_selected_recommendation_ids(
+            writeback_receipt["applied_recommendations"],
+            selected_recommendation_ids,
+        )
+        selected_recommendations = [
+            recommendation
+            for recommendation in writeback_receipt["applied_recommendations"]
+            if recommendation["recommendation_id"] in selected_ids
+        ]
+        if len(selected_recommendations) > PROCEDURAL_MAX_REHEARSAL_STEPS:
+            raise ValueError(
+                f"selected_recommendation_ids must contain at most {PROCEDURAL_MAX_REHEARSAL_STEPS} items"
+            )
+
+        executions = [
+            self._build_execution_record(
+                recommendation,
+                sandbox_session_id=sandbox_session_id.strip(),
+            )
+            for recommendation in selected_recommendations
+        ]
+        receipt = {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "executed_at": utc_now_iso(),
+            "execution_policy": self.profile(),
+            "source_writeback_digest": sha256_text(canonical_json(writeback_receipt)),
+            "source_preview_digest": writeback_receipt["source_preview_digest"],
+            "connectome_snapshot_id": updated_connectome_document["snapshot_id"],
+            "connectome_snapshot_digest": sha256_text(canonical_json(updated_connectome_document)),
+            "sandbox_session_id": sandbox_session_id.strip(),
+            "guardian_witness_id": guardian_witness_id.strip(),
+            "executed_recommendation_ids": list(selected_ids),
+            "execution_count": len(executions),
+            "executions": executions,
+            "status": "sandbox-complete",
+            "rollback_token": writeback_receipt["rollback_token"],
+            "external_effects": [],
+            "preserved_invariants": [
+                "no-external-actuation",
+                "guardian-witnessed",
+                "rollback-token-retained",
+            ],
+        }
+
+        validation = self.validate(receipt, updated_connectome_document, writeback_receipt)
+        if not validation["ok"]:
+            raise ValueError(
+                f"procedural skill execution receipt failed validation: {validation['errors']}"
+            )
+        return receipt
+
+    def validate(
+        self,
+        receipt: Dict[str, Any],
+        updated_connectome_document: Dict[str, Any],
+        writeback_receipt: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        skill_labels: List[str] = []
+
+        if not isinstance(receipt, dict):
+            raise ValueError("receipt must be a mapping")
+        if not isinstance(updated_connectome_document, dict):
+            raise ValueError("updated_connectome_document must be a mapping")
+        if receipt.get("schema_version") != PROCEDURAL_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {PROCEDURAL_MEMORY_SCHEMA_VERSION}, "
+                f"got {receipt.get('schema_version')!r}"
+            )
+
+        for field_name in (
+            "identity_id",
+            "executed_at",
+            "connectome_snapshot_id",
+            "sandbox_session_id",
+            "guardian_witness_id",
+            "rollback_token",
+        ):
+            MemoryCrystalStore._require_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        execution_policy = receipt.get("execution_policy")
+        if not isinstance(execution_policy, dict):
+            errors.append("execution_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if execution_policy.get(field_name) != expected_value:
+                    errors.append(f"execution_policy.{field_name} mismatch")
+
+        for field_name in (
+            "source_writeback_digest",
+            "source_preview_digest",
+            "connectome_snapshot_digest",
+        ):
+            value = receipt.get(field_name)
+            if not isinstance(value, str) or len(value) != 64:
+                errors.append(f"{field_name} must be a sha256 hex string")
+
+        executed_recommendation_ids = receipt.get("executed_recommendation_ids")
+        if not isinstance(executed_recommendation_ids, list) or not executed_recommendation_ids:
+            errors.append("executed_recommendation_ids must be a non-empty list")
+            executed_recommendation_ids = []
+        else:
+            for recommendation_id in executed_recommendation_ids:
+                if not isinstance(recommendation_id, str) or not recommendation_id.strip():
+                    errors.append("executed_recommendation_ids must contain non-empty strings")
+            if executed_recommendation_ids != _dedupe_preserve_order(executed_recommendation_ids):
+                errors.append("executed_recommendation_ids must be deduplicated")
+            if len(executed_recommendation_ids) > PROCEDURAL_MAX_REHEARSAL_STEPS:
+                errors.append(
+                    f"executed_recommendation_ids must contain at most {PROCEDURAL_MAX_REHEARSAL_STEPS} items"
+                )
+
+        executions = receipt.get("executions")
+        if not isinstance(executions, list) or not executions:
+            errors.append("executions must be a non-empty list")
+            executions = []
+
+        seen_execution_ids = set()
+        seen_recommendation_ids = []
+        continuity_refs: List[str] = []
+        for index, execution in enumerate(executions):
+            if not isinstance(execution, dict):
+                errors.append(f"executions[{index}] must be an object")
+                continue
+
+            for field_name in (
+                "execution_id",
+                "recommendation_id",
+                "target_edge_id",
+                "target_path",
+                "skill_label",
+                "rehearsal_prompt",
+                "sandbox_action",
+                "source_recommendation_digest",
+                "continuity_ref",
+                "result_summary",
+                "evidence_ref",
+            ):
+                MemoryCrystalStore._require_non_empty_string(
+                    execution.get(field_name),
+                    f"executions[{index}].{field_name}",
+                    errors,
+                )
+
+            execution_id = execution.get("execution_id")
+            if isinstance(execution_id, str) and execution_id:
+                if execution_id in seen_execution_ids:
+                    errors.append(f"duplicate execution_id: {execution_id}")
+                else:
+                    seen_execution_ids.add(execution_id)
+
+            recommendation_id = execution.get("recommendation_id")
+            if isinstance(recommendation_id, str) and recommendation_id:
+                seen_recommendation_ids.append(recommendation_id)
+
+            skill_label = execution.get("skill_label")
+            if isinstance(skill_label, str) and skill_label:
+                skill_labels.append(skill_label)
+
+            continuity_ref = execution.get("continuity_ref")
+            if isinstance(continuity_ref, str) and continuity_ref:
+                continuity_refs.append(continuity_ref)
+
+            for field_name in ("source_segment_ids", "source_event_ids", "guardrails"):
+                value = execution.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(f"executions[{index}].{field_name} must be a non-empty list")
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(
+                            f"executions[{index}].{field_name} must contain non-empty strings"
+                        )
+
+            MemoryCrystalStore._require_number_in_range(
+                execution.get("rehearsal_window_ms"),
+                1,
+                1000,
+                f"executions[{index}].rehearsal_window_ms",
+                errors,
+            )
+            MemoryCrystalStore._require_number_in_range(
+                execution.get("expected_confidence_gain"),
+                0.0,
+                1.0,
+                f"executions[{index}].expected_confidence_gain",
+                errors,
+            )
+            if execution.get("outcome") != "rehearsed":
+                errors.append(f"executions[{index}].outcome must equal 'rehearsed'")
+
+            digest = execution.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append(f"executions[{index}].digest must be a sha256 hex string")
+            else:
+                expected_digest = sha256_text(
+                    canonical_json(_procedural_execution_digest_payload(execution))
+                )
+                if digest != expected_digest:
+                    errors.append(f"executions[{index}].digest mismatch")
+
+        execution_count = receipt.get("execution_count")
+        if execution_count != len(executions):
+            errors.append(
+                f"execution_count must equal len(executions) ({len(executions)}), got {execution_count!r}"
+            )
+
+        if executed_recommendation_ids != seen_recommendation_ids:
+            errors.append("executed_recommendation_ids must match executions.recommendation_id order")
+
+        if receipt.get("status") != "sandbox-complete":
+            errors.append("status must equal 'sandbox-complete'")
+
+        external_effects = receipt.get("external_effects")
+        if external_effects != []:
+            errors.append("external_effects must equal []")
+
+        preserved_invariants = receipt.get("preserved_invariants")
+        expected_invariants = [
+            "no-external-actuation",
+            "guardian-witnessed",
+            "rollback-token-retained",
+        ]
+        if preserved_invariants != expected_invariants:
+            errors.append(f"preserved_invariants must equal {expected_invariants!r}")
+
+        connectome_validation = ConnectomeModel().validate(updated_connectome_document)
+        if not connectome_validation["ok"]:
+            errors.append("updated_connectome_document must satisfy Connectome validation")
+        else:
+            if receipt.get("identity_id") != updated_connectome_document.get("identity_id"):
+                errors.append("receipt.identity_id must match updated_connectome_document.identity_id")
+            if receipt.get("connectome_snapshot_id") != updated_connectome_document.get("snapshot_id"):
+                errors.append(
+                    "connectome_snapshot_id must match updated_connectome_document.snapshot_id"
+                )
+            expected_connectome_digest = sha256_text(canonical_json(updated_connectome_document))
+            if receipt.get("connectome_snapshot_digest") != expected_connectome_digest:
+                errors.append("connectome_snapshot_digest mismatch")
+
+        if writeback_receipt is not None:
+            writeback_validation = ProceduralMemoryWritebackGate().validate(
+                writeback_receipt,
+                updated_connectome_document,
+            )
+            if not writeback_validation["ok"]:
+                errors.append(
+                    "writeback_receipt must satisfy ProceduralMemoryWritebackGate validation"
+                )
+            else:
+                expected_writeback_digest = sha256_text(canonical_json(writeback_receipt))
+                if receipt.get("source_writeback_digest") != expected_writeback_digest:
+                    errors.append("source_writeback_digest mismatch")
+                if receipt.get("source_preview_digest") != writeback_receipt.get("source_preview_digest"):
+                    errors.append("source_preview_digest mismatch")
+                if receipt.get("rollback_token") != writeback_receipt.get("rollback_token"):
+                    errors.append("rollback_token mismatch")
+                if executed_recommendation_ids:
+                    available_ids = [
+                        record["recommendation_id"]
+                        for record in writeback_receipt["applied_recommendations"]
+                    ]
+                    missing_ids = [
+                        recommendation_id
+                        for recommendation_id in executed_recommendation_ids
+                        if recommendation_id not in available_ids
+                    ]
+                    if missing_ids:
+                        errors.append(
+                            f"executed_recommendation_ids contain unknown writeback ids: {missing_ids}"
+                        )
+                expected_refs = [
+                    record["continuity_diff_ref"]
+                    for record in writeback_receipt["applied_recommendations"]
+                    if record["recommendation_id"] in executed_recommendation_ids
+                ]
+                if continuity_refs != expected_refs:
+                    errors.append("executions.continuity_ref must match selected writeback continuity refs")
+
+        return {
+            "ok": not errors,
+            "execution_count": len(executions),
+            "skill_labels": skill_labels,
+            "delivery_scope": "sandbox-only",
+            "rollback_token_preserved": not errors or (
+                writeback_receipt is not None
+                and receipt.get("rollback_token") == writeback_receipt.get("rollback_token")
+            ),
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _normalize_selected_recommendation_ids(
+        applied_recommendations: Sequence[Dict[str, Any]],
+        selected_recommendation_ids: Sequence[str] | None,
+    ) -> List[str]:
+        available_ids = [
+            recommendation["recommendation_id"] for recommendation in applied_recommendations
+        ]
+        if selected_recommendation_ids is None:
+            return list(available_ids)
+        normalized = _dedupe_preserve_order(
+            [
+                recommendation_id.strip()
+                for recommendation_id in selected_recommendation_ids
+                if isinstance(recommendation_id, str) and recommendation_id.strip()
+            ]
+        )
+        if not normalized:
+            raise ValueError("selected_recommendation_ids must contain at least one recommendation id")
+        missing = [
+            recommendation_id for recommendation_id in normalized if recommendation_id not in available_ids
+        ]
+        if missing:
+            raise ValueError(f"selected_recommendation_ids contain unknown ids: {missing}")
+        return normalized
+
+    def _build_execution_record(
+        self,
+        recommendation: Dict[str, Any],
+        *,
+        sandbox_session_id: str,
+    ) -> Dict[str, Any]:
+        target_path = recommendation["target_path"]
+        if target_path == "continuity_integrator->ethics_gate":
+            skill_label = "guardian-review-rehearsal"
+            sandbox_action = "replay-guardian-checklist"
+            rehearsal_prompt = (
+                "Continuity evidence を guardian checklist と照合し、"
+                "ethics gate 手前で停止条件を rehearsal する"
+            )
+        else:
+            skill_label = "migration-handoff-rehearsal"
+            sandbox_action = "rehearse-handoff-checklist"
+            rehearsal_prompt = (
+                "Migration handoff の hash 照合と warm-standby continuity 確認を "
+                "sandbox 内で反復する"
+            )
+
+        execution = {
+            "execution_id": new_id("procedural-execution"),
+            "recommendation_id": recommendation["recommendation_id"],
+            "target_edge_id": recommendation["target_edge_id"],
+            "target_path": target_path,
+            "skill_label": skill_label,
+            "rehearsal_prompt": rehearsal_prompt,
+            "sandbox_action": sandbox_action,
+            "rehearsal_window_ms": 750,
+            "expected_confidence_gain": round(
+                min(0.99, 0.25 + float(recommendation["applied_weight_delta"]) * 3.5),
+                3,
+            ),
+            "source_segment_ids": list(recommendation["source_segment_ids"]),
+            "source_event_ids": list(recommendation["source_event_ids"]),
+            "source_recommendation_digest": recommendation["source_recommendation_digest"],
+            "continuity_ref": recommendation["continuity_diff_ref"],
+            "guardrails": [
+                "sandbox-only",
+                "no external actuation",
+                "guardian witness required",
+                f"session-bound:{sandbox_session_id}",
+            ],
+            "outcome": "rehearsed",
+            "result_summary": (
+                f"{skill_label} を {target_path} に対して sandbox 内で rehearsal し、"
+                "rollback-ready 境界を維持した"
+            ),
+            "evidence_ref": f"{sandbox_session_id}/{recommendation['recommendation_id']}",
+        }
+        execution["digest"] = sha256_text(
+            canonical_json(_procedural_execution_digest_payload(execution))
+        )
+        return execution
 
 
 def receipt_edge_ids(applied_recommendations: Sequence[Dict[str, Any]]) -> List[str]:

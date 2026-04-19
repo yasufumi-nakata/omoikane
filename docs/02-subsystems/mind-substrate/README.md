@@ -50,15 +50,18 @@ canonical schema:
 
 ### Procedural Memory
 `MemoryCrystal` segment と `Connectome` snapshot を照合し、
-暗黙技能の rehearsal preview と human-approved writeback を扱う層。
+暗黙技能の rehearsal preview、human-approved writeback、sandboxed skill execution を扱う層。
 - reference runtime では `connectome-coupled-procedural-preview-v1` を採用
 - `human-approved-procedural-writeback-v1` で
   bounded な `weight-application` と continuity diff / rollback token を固定
-- `skill-execution` はなお deferred に残す
+- `guardian-witnessed-procedural-skill-execution-v1` で
+  sandbox-only rehearsal、guardian witness、rollback token carryover、no external actuation を固定
 canonical schema:
 [specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
 and
 [specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
+and
+[specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/procedural_skill_execution.schema)
 
 ### EmotionalTone
 感情の地形図。Affect engine（L3）と双方向。

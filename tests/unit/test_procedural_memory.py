@@ -6,6 +6,7 @@ from omoikane.mind.connectome import ConnectomeModel
 from omoikane.mind.memory import (
     MemoryCrystalStore,
     ProceduralMemoryProjector,
+    ProceduralSkillExecutor,
     ProceduralMemoryWritebackGate,
 )
 
@@ -24,7 +25,7 @@ class ProceduralMemoryProjectorTests(unittest.TestCase):
             sorted(validation["target_paths"]),
         )
         self.assertEqual(
-            ["weight-application", "skill-execution"],
+            ["skill-execution"],
             validation["deferred_surfaces"],
         )
 
@@ -103,6 +104,76 @@ class ProceduralMemoryWritebackGateTests(unittest.TestCase):
                 guardian_attestation_id="guardian://procedural-writeback/test-001",
                 human_reviewers=["human://reviewers/alice"],
                 approval_reason="reviewer quorum 不足",
+            )
+
+
+class ProceduralSkillExecutorTests(unittest.TestCase):
+    def test_execute_returns_valid_sandbox_receipt(self) -> None:
+        projector = ProceduralMemoryProjector()
+        gate = ProceduralMemoryWritebackGate()
+        executor = ProceduralSkillExecutor()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        preview_snapshot = projector.project("identity-demo", manifest, connectome_document)
+        writeback_result = gate.apply(
+            "identity-demo",
+            preview_snapshot,
+            connectome_document,
+            self_attestation_id="self://procedural-writeback/test-001",
+            council_attestation_id="council://procedural-writeback/test-001",
+            guardian_attestation_id="guardian://procedural-writeback/test-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded preview を writeback として適用する",
+        )
+
+        receipt = executor.execute(
+            "identity-demo",
+            writeback_result["receipt"],
+            writeback_result["updated_connectome_document"],
+            sandbox_session_id="sandbox://procedural-skill/test-001",
+            guardian_witness_id="guardian://procedural-skill/test-001",
+        )
+        validation = executor.validate(
+            receipt,
+            writeback_result["updated_connectome_document"],
+            writeback_result["receipt"],
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(2, validation["execution_count"])
+        self.assertEqual(
+            ["guardian-review-rehearsal", "migration-handoff-rehearsal"],
+            sorted(validation["skill_labels"]),
+        )
+        self.assertEqual("sandbox-complete", receipt["status"])
+        self.assertEqual([], receipt["external_effects"])
+
+    def test_execute_rejects_unknown_recommendation_id(self) -> None:
+        projector = ProceduralMemoryProjector()
+        gate = ProceduralMemoryWritebackGate()
+        executor = ProceduralSkillExecutor()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        preview_snapshot = projector.project("identity-demo", manifest, connectome_document)
+        writeback_result = gate.apply(
+            "identity-demo",
+            preview_snapshot,
+            connectome_document,
+            self_attestation_id="self://procedural-writeback/test-001",
+            council_attestation_id="council://procedural-writeback/test-001",
+            guardian_attestation_id="guardian://procedural-writeback/test-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded preview を writeback として適用する",
+        )
+
+        with self.assertRaisesRegex(ValueError, "unknown ids"):
+            executor.execute(
+                "identity-demo",
+                writeback_result["receipt"],
+                writeback_result["updated_connectome_document"],
+                sandbox_session_id="sandbox://procedural-skill/test-001",
+                guardian_witness_id="guardian://procedural-skill/test-001",
+                selected_recommendation_ids=["procedural-missing"],
             )
 
 

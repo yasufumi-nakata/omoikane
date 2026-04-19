@@ -161,6 +161,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ["continuity_integrator->ethics_gate", "sensory_ingress->continuity_integrator"],
             sorted(result["validation"]["procedural"]["target_paths"]),
         )
+        self.assertEqual(["skill-execution"], result["procedural"]["snapshot"]["deferred_surfaces"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-preview"])
 
     def test_procedural_writeback_demo_returns_valid_receipt(self) -> None:
@@ -176,6 +177,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["validation"]["writeback"]["human_reviewers"],
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-writeback"])
+
+    def test_procedural_skill_demo_returns_valid_sandbox_execution(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_skill_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["execution"]["ok"])
+        self.assertEqual(2, result["validation"]["execution"]["execution_count"])
+        self.assertEqual(
+            ["guardian-review-rehearsal", "migration-handoff-rehearsal"],
+            sorted(result["validation"]["execution"]["skill_labels"]),
+        )
+        self.assertTrue(result["validation"]["execution"]["rollback_token_preserved"])
+        self.assertEqual("sandbox-complete", result["procedural"]["skill_execution_receipt"]["status"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-execution"])
 
     def test_reasoning_demo_records_baseline_and_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
