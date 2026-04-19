@@ -616,6 +616,15 @@ entries:
     rationale: Protects Method B reversible substrate failover and Method C fail-closed destructive-scan handling.
   - priority: P1
     kind: eval
+    file: evals/continuity/scheduler_governance_artifacts.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects consent/legal attestation refs, witness quorum, and governance artifact digest binding on scheduled ascension handles.
+  - priority: P1
+    kind: eval
     file: evals/performance/termination_latency.yaml
     consumers:
       - reference-runtime

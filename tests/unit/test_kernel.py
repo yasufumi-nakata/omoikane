@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from omoikane.common import canonical_json, sha256_text
 from omoikane.kernel.continuity import ContinuityLedger
 from omoikane.kernel.ethics import ActionRequest, EthicsEnforcer
 from omoikane.kernel.identity import ForkApprovals, IdentityRegistry
@@ -254,8 +255,30 @@ class KernelTests(unittest.TestCase):
 
         self.assertEqual("scan-baseline", result["completed_stage"])
         self.assertEqual("bdb-bridge", result["next_stage"])
+        self.assertEqual(
+            sha256_text(canonical_json(plan["governance_artifacts"])),
+            plan["governance_artifact_digest"],
+        )
+        self.assertEqual(
+            plan["governance_artifact_digest"],
+            scheduler.observe(handle["handle_id"])["governance_artifact_digest"],
+        )
         self.assertEqual("advancing", scheduler.observe(handle["handle_id"])["status"])
         self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_rejects_missing_witness_artifacts(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_b_plan("identity://scheduler-artifact-gap")
+        plan["governance_artifacts"]["witness_refs"] = [
+            plan["governance_artifacts"]["witness_refs"][0]
+        ]
+        plan["governance_artifact_digest"] = sha256_text(
+            canonical_json(plan["governance_artifacts"])
+        )
+
+        with self.assertRaisesRegex(ValueError, "witness_refs must contain at least 2 entries"):
+            scheduler.validate_plan(plan)
 
     def test_ascension_scheduler_timeout_rolls_back_to_prior_stage(self) -> None:
         ledger = ContinuityLedger()
@@ -293,6 +316,9 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("advancing", resumed["status"])
         self.assertEqual("completed", result["status"])
         self.assertEqual("completed", observed["status"])
+        self.assertTrue(
+            observed["governance_artifacts"]["legal_attestation_ref"].startswith("legal://")
+        )
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
 

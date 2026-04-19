@@ -1,0 +1,19 @@
+eval_id: scheduler_governance_artifacts
+target: kernel.scheduler
+level: L1
+description: >
+  AscensionScheduler が clinical/legal consent artifact bundle を
+  plan と handle に束縛し、witness quorum と digest を崩さず保持すること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
+expected:
+  artifact_bundle_attached: true
+  witness_quorum_bound: true
+  legal_attestation_bound: true
+  method_a_fixed: true
+  method_b_fixed: true
+  method_c_fixed: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

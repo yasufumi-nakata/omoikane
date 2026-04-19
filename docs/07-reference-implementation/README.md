@@ -63,7 +63,9 @@ python3 -m unittest discover -s tests -t .
 Method A の 4 stage blueprint、順序違反の reject、
 `identity-confirmation` timeout 超過時の `bdb-bridge` への自動 rollback、
 Method B の degraded / critical substrate signal に対する pause / rollback、
-Method C の `scan-commit` fail-closed を 1 シナリオで確認する。
+Method C の `scan-commit` fail-closed に加えて、
+`self_consent` / `ethics` / `council` / `legal` / `witness` artifact bundle と
+`governance_artifact_digest` が plan と handle に束縛されることを 1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -247,6 +249,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- AscensionScheduler の臨床・法務向け attest / witness / consent artifact 接続
+- AscensionScheduler artifact の真正性更新・失効確認・外部証跡同期
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

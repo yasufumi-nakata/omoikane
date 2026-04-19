@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .continuity import ContinuityLedger
 
 SCHEDULER_SCHEMA_VERSION = "1.0.0"
@@ -30,6 +30,14 @@ SCHEDULER_ALLOWED_TRANSITIONS = {
     "fail",
 }
 SCHEDULER_SIGNAL_SEVERITIES = {"watch", "degraded", "critical"}
+SCHEDULER_WITNESS_QUORUM = 2
+GOVERNANCE_ARTIFACT_PREFIXES = {
+    "self_consent_ref": "consent://",
+    "ethics_attestation_ref": "ethics://",
+    "council_attestation_ref": "council://",
+    "legal_attestation_ref": "legal://",
+    "artifact_bundle_ref": "artifact://",
+}
 METHOD_A_STAGE_BLUEPRINT = (
     {
         "stage_id": "scan-baseline",
@@ -122,6 +130,14 @@ class AscensionScheduler:
             "schema_version": SCHEDULER_SCHEMA_VERSION,
             "accepted_plan_methods": sorted(SCHEDULER_ALLOWED_METHODS),
             "executable_methods": sorted(SCHEDULER_EXECUTABLE_METHODS),
+            "artifact_policy": {
+                "self_consent_required": True,
+                "ethics_attestation_required": True,
+                "council_attestation_required": True,
+                "legal_attestation_required": True,
+                "minimum_witness_quorum": SCHEDULER_WITNESS_QUORUM,
+                "digest_algorithm": "sha256",
+            },
             "method_profiles": {
                 "A": {
                     "stages": self._method_stages("A"),
@@ -210,6 +226,8 @@ class AscensionScheduler:
             "handle_id": handle_id,
             "plan_ref": normalized_plan["plan_id"],
             "identity_id": normalized_plan["identity_id"],
+            "governance_artifacts": deepcopy(normalized_plan["governance_artifacts"]),
+            "governance_artifact_digest": normalized_plan["governance_artifact_digest"],
             "current_stage": first_stage,
             "status": "scheduled",
             "history": [],
@@ -504,12 +522,22 @@ class AscensionScheduler:
                 plan.get("council_attestation_required"),
                 "council_attestation_required",
             ),
+            "governance_artifacts": self._normalize_governance_artifacts(
+                plan.get("governance_artifacts")
+            ),
+            "governance_artifact_digest": self._normalize_non_empty_string(
+                plan.get("governance_artifact_digest"),
+                "governance_artifact_digest",
+            ),
         }
         expected = self._method_stages(normalized["method"])
         if normalized["stages"] != expected:
             raise ValueError(
                 f"method {normalized['method']} must use the fixed reference blueprint"
             )
+        expected_digest = self._governance_artifact_digest(normalized["governance_artifacts"])
+        if normalized["governance_artifact_digest"] != expected_digest:
+            raise ValueError("governance_artifact_digest must match governance_artifacts")
         return normalized
 
     def validate_handle(self, handle: Mapping[str, Any]) -> Dict[str, Any]:
@@ -524,6 +552,23 @@ class AscensionScheduler:
         self._check_non_empty_string(handle.get("handle_id"), "handle_id", errors)
         self._check_non_empty_string(handle.get("plan_ref"), "plan_ref", errors)
         self._check_non_empty_string(handle.get("identity_id"), "identity_id", errors)
+        governance_artifacts = handle.get("governance_artifacts")
+        if not isinstance(governance_artifacts, Mapping):
+            errors.append("governance_artifacts must be a mapping")
+        else:
+            errors.extend(self._check_governance_artifacts(governance_artifacts))
+        governance_digest = handle.get("governance_artifact_digest")
+        self._check_non_empty_string(
+            governance_digest,
+            "governance_artifact_digest",
+            errors,
+        )
+        if isinstance(governance_artifacts, Mapping) and isinstance(governance_digest, str):
+            expected_digest = self._governance_artifact_digest(governance_artifacts)
+            if governance_digest != expected_digest:
+                errors.append(
+                    "governance_artifact_digest must match governance_artifacts"
+                )
         self._check_non_empty_string(handle.get("current_stage"), "current_stage", errors)
 
         status = handle.get("status")
@@ -587,6 +632,8 @@ class AscensionScheduler:
             "status": handle["status"],
             "reason": reason,
             "history_length": len(handle["history"]),
+            "governance_artifact_digest": handle["governance_artifact_digest"],
+            "artifact_bundle_ref": handle["governance_artifacts"]["artifact_bundle_ref"],
         }
         entry = self.ledger.append(
             identity_id=handle["identity_id"],
@@ -661,6 +708,79 @@ class AscensionScheduler:
             return None
         return self._normalize_non_empty_string(value, "rollback_to")
 
+    def _normalize_governance_artifacts(self, value: Any) -> Dict[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError("governance_artifacts must be a mapping")
+        normalized = {
+            field_name: self._normalize_artifact_ref(
+                value.get(field_name),
+                field_name,
+                prefix,
+            )
+            for field_name, prefix in GOVERNANCE_ARTIFACT_PREFIXES.items()
+        }
+        witness_refs = value.get("witness_refs")
+        if not isinstance(witness_refs, Sequence) or isinstance(witness_refs, (str, bytes)):
+            raise ValueError("witness_refs must be a sequence")
+        normalized_witness_refs: List[str] = []
+        for index, witness_ref in enumerate(witness_refs):
+            normalized_witness_ref = self._normalize_artifact_ref(
+                witness_ref,
+                f"witness_refs[{index}]",
+                "witness://",
+            )
+            if normalized_witness_ref not in normalized_witness_refs:
+                normalized_witness_refs.append(normalized_witness_ref)
+        if len(normalized_witness_refs) < SCHEDULER_WITNESS_QUORUM:
+            raise ValueError(
+                f"witness_refs must contain at least {SCHEDULER_WITNESS_QUORUM} entries"
+            )
+        normalized["witness_refs"] = normalized_witness_refs
+        return normalized
+
+    def _check_governance_artifacts(self, value: Mapping[str, Any]) -> List[str]:
+        errors: List[str] = []
+        for field_name, prefix in GOVERNANCE_ARTIFACT_PREFIXES.items():
+            field_value = value.get(field_name)
+            if not isinstance(field_value, str) or not field_value.strip():
+                errors.append(f"governance_artifacts.{field_name} must be a non-empty string")
+            elif not field_value.startswith(prefix):
+                errors.append(
+                    f"governance_artifacts.{field_name} must start with {prefix}"
+                )
+        witness_refs = value.get("witness_refs")
+        if not isinstance(witness_refs, Sequence) or isinstance(witness_refs, (str, bytes)):
+            errors.append("governance_artifacts.witness_refs must be a sequence")
+        else:
+            normalized_witness_refs: List[str] = []
+            for index, witness_ref in enumerate(witness_refs):
+                if not isinstance(witness_ref, str) or not witness_ref.strip():
+                    errors.append(
+                        f"governance_artifacts.witness_refs[{index}] must be a non-empty string"
+                    )
+                    continue
+                if not witness_ref.startswith("witness://"):
+                    errors.append(
+                        f"governance_artifacts.witness_refs[{index}] must start with witness://"
+                    )
+                    continue
+                if witness_ref not in normalized_witness_refs:
+                    normalized_witness_refs.append(witness_ref)
+            if len(normalized_witness_refs) < SCHEDULER_WITNESS_QUORUM:
+                errors.append(
+                    f"governance_artifacts.witness_refs must contain at least {SCHEDULER_WITNESS_QUORUM} entries"
+                )
+        return errors
+
+    def _normalize_artifact_ref(self, value: Any, field_name: str, prefix: str) -> str:
+        normalized = self._normalize_non_empty_string(value, field_name)
+        if not normalized.startswith(prefix):
+            raise ValueError(f"{field_name} must start with {prefix}")
+        return normalized
+
+    def _governance_artifact_digest(self, governance_artifacts: Mapping[str, Any]) -> str:
+        return sha256_text(canonical_json(dict(governance_artifacts)))
+
     def _normalize_non_empty_string(self, value: Any, field_name: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field_name} must be a non-empty string")
@@ -723,6 +843,10 @@ class AscensionScheduler:
     ) -> Dict[str, Any]:
         normalized_identity_id = self._normalize_non_empty_string(identity_id, "identity_id")
         normalized_method = self._normalize_method(method)
+        governance_artifacts = self._reference_governance_artifacts(
+            normalized_identity_id,
+            normalized_method,
+        )
         return {
             "kind": "ascension_plan",
             "schema_version": SCHEDULER_SCHEMA_VERSION,
@@ -732,4 +856,27 @@ class AscensionScheduler:
             "stages": self._method_stages(normalized_method),
             "ethics_attestation_required": ethics_attestation_required,
             "council_attestation_required": council_attestation_required,
+            "governance_artifacts": governance_artifacts,
+            "governance_artifact_digest": self._governance_artifact_digest(governance_artifacts),
+        }
+
+    def _reference_governance_artifacts(self, identity_id: str, method: str) -> Dict[str, Any]:
+        token = sha256_text(f"{identity_id}:{method}")[:12]
+        method_token = method.lower()
+        return {
+            "self_consent_ref": f"consent://ascension/{method_token}/{token}/self-consent",
+            "ethics_attestation_ref": (
+                f"ethics://ascension/{method_token}/{token}/guardian-approval"
+            ),
+            "council_attestation_ref": (
+                f"council://ascension/{method_token}/{token}/reference-resolution"
+            ),
+            "legal_attestation_ref": (
+                f"legal://ascension/{method_token}/{token}/clinical-readiness"
+            ),
+            "witness_refs": [
+                f"witness://ascension/{method_token}/{token}/clinician-primary",
+                f"witness://ascension/{method_token}/{token}/guardian-observer",
+            ],
+            "artifact_bundle_ref": f"artifact://ascension/{method_token}/{token}/bundle",
         }

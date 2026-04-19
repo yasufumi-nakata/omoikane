@@ -38,6 +38,16 @@ ascension_plan:
       rollback_to: bdb-bridge
   ethics_attestation_required: true
   council_attestation_required: true
+  governance_artifacts:
+    self_consent_ref: consent://ascension/a/<digest>/self-consent
+    ethics_attestation_ref: ethics://ascension/a/<digest>/guardian-approval
+    council_attestation_ref: council://ascension/a/<digest>/reference-resolution
+    legal_attestation_ref: legal://ascension/a/<digest>/clinical-readiness
+    witness_refs:
+      - witness://ascension/a/<digest>/clinician-primary
+      - witness://ascension/a/<digest>/guardian-observer
+    artifact_bundle_ref: artifact://ascension/a/<digest>/bundle
+  governance_artifact_digest: <sha256 of governance_artifacts>
 ```
 
 reference runtime は Method ごとに固定 profile を持つ。
@@ -48,6 +58,8 @@ reference runtime は Method ごとに固定 profile を持つ。
   `dual-channel-review` へ rollback する
 - Method C: `consent-lock → scan-commit → activation-review` を固定実装し、
   `scan-commit` 以降は rollback を持たず、critical substrate signal で fail-closed する
+- すべての Method は `self_consent / ethics / council / legal / witness` artifact ref を
+  plan と handle に束縛し、`governance_artifact_digest` で continuity history に固定する
 
 ## 不変条件
 
@@ -57,6 +69,8 @@ reference runtime は Method ごとに固定 profile を持つ。
 4. SubstrateBroker からの degraded signal は scheduler の Pause に直結し、
    critical signal は stage policy に従って rollback または fail-closed する
 5. Method A の stage 順序を入れ替える self-modify は禁止（T-Kernel）
+6. clinical/legal consent artifact の真正性確認は repo 外だが、
+   scheduler surface には stable artifact ref と witness quorum を必ず残す
 
 ## API
 
@@ -77,9 +91,12 @@ scheduler.cancel(handle, reason) → ScheduleHandle
 - `ascension_plan.schema` / `schedule_handle.schema` を導入
 - `scheduler-demo` を CLI に追加し、Method A の順序遷移＋ forced rollback、
   Method B の reversible substrate failover、
-  Method C の fail-closed destructive scan を ContinuityLedger に記録
+  Method C の fail-closed destructive scan と governance artifact bundle を
+  ContinuityLedger に記録
 - `evals/continuity/scheduler_stage_rollback.yaml` と
-  `evals/continuity/scheduler_method_profiles.yaml` で Method A/B/C の contract を守る
+  `evals/continuity/scheduler_method_profiles.yaml`、
+  `evals/continuity/scheduler_governance_artifacts.yaml` で Method A/B/C の contract と
+  artifact binding を守る
 
 ## 思兼神メタファー
 

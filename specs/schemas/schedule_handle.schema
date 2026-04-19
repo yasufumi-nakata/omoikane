@@ -10,6 +10,8 @@ required:
   - handle_id
   - plan_ref
   - identity_id
+  - governance_artifacts
+  - governance_artifact_digest
   - current_stage
   - status
   - history
@@ -29,6 +31,41 @@ properties:
   identity_id:
     type: string
     minLength: 1
+  governance_artifacts:
+    type: object
+    additionalProperties: false
+    required:
+      - self_consent_ref
+      - ethics_attestation_ref
+      - council_attestation_ref
+      - legal_attestation_ref
+      - witness_refs
+      - artifact_bundle_ref
+    properties:
+      self_consent_ref:
+        type: string
+        pattern: "^consent://"
+      ethics_attestation_ref:
+        type: string
+        pattern: "^ethics://"
+      council_attestation_ref:
+        type: string
+        pattern: "^council://"
+      legal_attestation_ref:
+        type: string
+        pattern: "^legal://"
+      witness_refs:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          pattern: "^witness://"
+      artifact_bundle_ref:
+        type: string
+        pattern: "^artifact://"
+  governance_artifact_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   current_stage:
     type: string
     minLength: 1
@@ -91,6 +128,16 @@ examples:
     handle_id: schedule-handle-001
     plan_ref: plan-method-a-001
     identity_id: identity://amaterasu-endpoint
+    governance_artifacts:
+      self_consent_ref: consent://ascension/a/3dfb1f84a223/self-consent
+      ethics_attestation_ref: ethics://ascension/a/3dfb1f84a223/guardian-approval
+      council_attestation_ref: council://ascension/a/3dfb1f84a223/reference-resolution
+      legal_attestation_ref: legal://ascension/a/3dfb1f84a223/clinical-readiness
+      witness_refs:
+        - witness://ascension/a/3dfb1f84a223/clinician-primary
+        - witness://ascension/a/3dfb1f84a223/guardian-observer
+      artifact_bundle_ref: artifact://ascension/a/3dfb1f84a223/bundle
+    governance_artifact_digest: 8c1f6de21c0d63b33047e49d4c8b58fffe414e1f5e7d0c6c69c17a2c35e5757d
     current_stage: bdb-bridge
     status: paused
     history:

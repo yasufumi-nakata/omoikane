@@ -13,6 +13,8 @@ required:
   - stages
   - ethics_attestation_required
   - council_attestation_required
+  - governance_artifacts
+  - governance_artifact_digest
 properties:
   kind:
     const: ascension_plan
@@ -60,6 +62,41 @@ properties:
     type: boolean
   council_attestation_required:
     type: boolean
+  governance_artifacts:
+    type: object
+    additionalProperties: false
+    required:
+      - self_consent_ref
+      - ethics_attestation_ref
+      - council_attestation_ref
+      - legal_attestation_ref
+      - witness_refs
+      - artifact_bundle_ref
+    properties:
+      self_consent_ref:
+        type: string
+        pattern: "^consent://"
+      ethics_attestation_ref:
+        type: string
+        pattern: "^ethics://"
+      council_attestation_ref:
+        type: string
+        pattern: "^council://"
+      legal_attestation_ref:
+        type: string
+        pattern: "^legal://"
+      witness_refs:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          pattern: "^witness://"
+      artifact_bundle_ref:
+        type: string
+        pattern: "^artifact://"
+  governance_artifact_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
 allOf:
   - if:
       properties:
@@ -113,6 +150,16 @@ examples:
         rollback_to: bdb-bridge
     ethics_attestation_required: true
     council_attestation_required: true
+    governance_artifacts:
+      self_consent_ref: consent://ascension/a/3dfb1f84a223/self-consent
+      ethics_attestation_ref: ethics://ascension/a/3dfb1f84a223/guardian-approval
+      council_attestation_ref: council://ascension/a/3dfb1f84a223/reference-resolution
+      legal_attestation_ref: legal://ascension/a/3dfb1f84a223/clinical-readiness
+      witness_refs:
+        - witness://ascension/a/3dfb1f84a223/clinician-primary
+        - witness://ascension/a/3dfb1f84a223/guardian-observer
+      artifact_bundle_ref: artifact://ascension/a/3dfb1f84a223/bundle
+    governance_artifact_digest: 8c1f6de21c0d63b33047e49d4c8b58fffe414e1f5e7d0c6c69c17a2c35e5757d
   - kind: ascension_plan
     schema_version: 1.0.0
     plan_id: plan-method-b-001
@@ -137,6 +184,16 @@ examples:
         rollback_to: null
     ethics_attestation_required: true
     council_attestation_required: true
+    governance_artifacts:
+      self_consent_ref: consent://ascension/b/6d751f42d807/self-consent
+      ethics_attestation_ref: ethics://ascension/b/6d751f42d807/guardian-approval
+      council_attestation_ref: council://ascension/b/6d751f42d807/reference-resolution
+      legal_attestation_ref: legal://ascension/b/6d751f42d807/clinical-readiness
+      witness_refs:
+        - witness://ascension/b/6d751f42d807/clinician-primary
+        - witness://ascension/b/6d751f42d807/guardian-observer
+      artifact_bundle_ref: artifact://ascension/b/6d751f42d807/bundle
+    governance_artifact_digest: 3464077ceb049c9fd405ff55fd93ecfca39896e66f232844ef87cbe126086bf6
   - kind: ascension_plan
     schema_version: 1.0.0
     plan_id: plan-method-c-001
@@ -157,3 +214,13 @@ examples:
         rollback_to: null
     ethics_attestation_required: true
     council_attestation_required: true
+    governance_artifacts:
+      self_consent_ref: consent://ascension/c/8379532e28cc/self-consent
+      ethics_attestation_ref: ethics://ascension/c/8379532e28cc/guardian-approval
+      council_attestation_ref: council://ascension/c/8379532e28cc/reference-resolution
+      legal_attestation_ref: legal://ascension/c/8379532e28cc/clinical-readiness
+      witness_refs:
+        - witness://ascension/c/8379532e28cc/clinician-primary
+        - witness://ascension/c/8379532e28cc/guardian-observer
+      artifact_bundle_ref: artifact://ascension/c/8379532e28cc/bundle
+    governance_artifact_digest: 00b22d86d10cdca85e841ec87c3463b817f8f05ded97f44a99b170dbe8893564

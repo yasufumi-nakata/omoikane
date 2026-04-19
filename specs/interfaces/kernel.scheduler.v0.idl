@@ -8,11 +8,14 @@ imports:
   schedule_handle: ../schemas/schedule_handle.schema
 operations:
   schedule:
-    summary: Validate an ascension plan and open the first stage with append-only continuity evidence.
+    summary: Validate an ascension plan, bind its governance artifact bundle, and open the first stage with append-only continuity evidence.
     input:
       schema_ref: ascension_plan
     output:
       schema_ref: schedule_handle
+    guarantees:
+      - governance_artifact_digest must match the bound governance_artifacts bundle before scheduling starts
+      - witness_refs must contain at least two third-party witnesses for every scheduled plan
   advance:
     summary: Complete the active stage and open the next stage in the fixed Method A/B/C reference blueprint.
     input:
@@ -244,6 +247,12 @@ operations:
             type: string
     output:
       schema_ref: schedule_handle
+compatibility:
+  stability: bootstrap
+  notes:
+    - Method A/B/C stage blueprints are fixed in the reference runtime and reject custom reordering.
+    - Timeout and substrate-signal handling always append continuity evidence before exposing completed state.
+    - Clinical/legal attestation authenticity stays external to this repo, but every plan and handle must carry stable artifact refs and a bundle digest.
 events:
   - name: ascension.scheduler.enter
     payload:
