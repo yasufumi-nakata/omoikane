@@ -1,0 +1,137 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_receipt.schema"
+title: DistributedTransportReceipt
+description: >
+  Recorded verification result for one distributed council remote transport receipt.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - envelope_ref
+  - envelope_digest
+  - council_tier
+  - transport_profile
+  - result_ref
+  - result_digest
+  - route_nonce
+  - receipt_status
+  - authenticity_checks
+  - participant_bindings
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_transport_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^distributed-receipt-[a-f0-9]{12}$"
+  envelope_ref:
+    type: string
+    pattern: "^distributed-envelope-[a-f0-9]{12}$"
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    enum:
+      - federation-mtls-quorum-v1
+      - heritage-attested-review-v1
+  result_ref:
+    type: string
+    minLength: 1
+  result_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  route_nonce:
+    type: string
+    pattern: "^route-nonce-[a-f0-9]{12}$"
+  receipt_status:
+    type: string
+    enum:
+      - authenticated
+      - rejected
+      - replay-blocked
+  authenticity_checks:
+    type: object
+    additionalProperties: false
+    required:
+      - channel_authenticated
+      - required_roles_satisfied
+      - quorum_attested
+      - replay_guard_status
+    properties:
+      channel_authenticated:
+        type: boolean
+      required_roles_satisfied:
+        type: boolean
+      quorum_attested:
+        type: boolean
+      replay_guard_status:
+        type: string
+        enum:
+          - accepted
+          - blocked
+  participant_bindings:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - participant_id
+        - role
+        - attestation_ref
+        - proof_ref
+        - accepted
+      properties:
+        participant_id:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          minLength: 1
+        attestation_ref:
+          type: string
+        proof_ref:
+          type: string
+        accepted:
+          type: boolean
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_receipt
+    schema_version: 1.0.0
+    receipt_id: distributed-receipt-a4bd75d110c2
+    envelope_ref: distributed-envelope-68d8341fd25a
+    envelope_digest: c3e6505427d4632a4f49d6bd6eb3ef13f0745304c724ef8be6cba5074600e4fe
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    result_ref: resolution://federation/shared-reality-approved
+    result_digest: 7aac75648bce45186d84048ccad058068fe90f8abf8f9448f11e44a7758b9330
+    route_nonce: route-nonce-b23f7b0c3fd4
+    receipt_status: authenticated
+    authenticity_checks:
+      channel_authenticated: true
+      required_roles_satisfied: true
+      quorum_attested: true
+      replay_guard_status: accepted
+    participant_bindings:
+      - participant_id: identity://amaterasu-endpoint
+        role: self-liaison
+        attestation_ref: distributed-attestation-84cb3d0db7f1
+        proof_ref: proof://federation/7d76eb45efb0
+        accepted: true
+    recorded_at: "2026-04-19T10:22:00Z"
+    digest: 456e23d76c80b4212ed5a49f9cfd73e6a69b5735f8378ad3ae85d0a877490d48

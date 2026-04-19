@@ -40,6 +40,9 @@
 - `task_graph_policy.schema`
 - `consensus_message.schema`
 - `distributed_council_resolution.schema`
+- `distributed_participant_attestation.schema`
+- `distributed_transport_envelope.schema`
+- `distributed_transport_receipt.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
@@ -55,7 +58,7 @@
 ## 次段階
 
 procedural skill execution enactment / richer sensory loopback artifacts /
-transport-attested remote distributed artifacts は
+live remote PKI federation と key rotation を伴う distributed artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

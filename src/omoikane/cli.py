@@ -209,6 +209,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     distributed_council_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    distributed_transport_parser = subparsers.add_parser(
+        "distributed-transport-demo",
+        help="Run the L4 distributed participant attestation, transport authenticity, and replay-guard scenario",
+    )
+    distributed_transport_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     cognitive_audit_parser = subparsers.add_parser(
         "cognitive-audit-demo",
         help="Run the L2/L3/L4 cross-layer cognitive audit and bounded Council review scenario",
@@ -400,6 +406,10 @@ def main() -> None:
 
     if args.command == "distributed-council-demo":
         _print_result(runtime.run_distributed_council_demo(), args.json)
+        return
+
+    if args.command == "distributed-transport-demo":
+        _print_result(runtime.run_distributed_transport_demo(), args.json)
         return
 
     if args.command == "cognitive-audit-demo":

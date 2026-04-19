@@ -16,6 +16,7 @@
 - `mind.self_model.v0.idl`
 - `cognitive.reasoning.v0.idl`
 - `agentic.council.v0.idl`
+- `agentic.distributed_transport.v0.idl`
 - `agentic.cognitive_audit.v0.idl`
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
@@ -39,8 +40,8 @@
 
 L2 procedural skill execution enactment、
 L6 sensory loopback、
-participant attestation / transport authenticity を伴う richer distributed surfaces は
-docs 側で設計を深めてから昇格させる。
+live PKI federation / transport key rotation / multi-hop anti-replay を伴う
+richer distributed surfaces は docs 側で設計を深めてから昇格させる。
 
 ## 形式
 

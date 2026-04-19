@@ -498,6 +498,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
         self.assertTrue(result["validation"]["conflict_escalates_to_human"])
 
+    def test_distributed_transport_demo_emits_attested_handoffs_and_replay_guard(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "distributed-transport-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(
+            "federation-mtls-quorum-v1",
+            result["handoffs"]["federation"]["transport_profile"],
+        )
+        self.assertEqual("authenticated", result["receipts"]["federation"]["receipt_status"])
+        self.assertEqual("authenticated", result["receipts"]["heritage"]["receipt_status"])
+        self.assertEqual("replay-blocked", result["receipts"]["replay_blocked"]["receipt_status"])
+        self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
+
     def test_cognitive_audit_demo_emits_cross_layer_review_json(self) -> None:
         stdout = io.StringIO()
 
@@ -547,10 +564,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertTrue(result["validation"]["veto_quorum_satisfied"])
         self.assertTrue(result["validation"]["veto_binding_recorded"])
+        self.assertTrue(result["validation"]["verification_binding_recorded"])
         self.assertTrue(result["validation"]["reviewer_registry_ready"])
+        self.assertTrue(result["validation"]["live_verification_ready"])
+        self.assertTrue(result["validation"]["jurisdiction_bundle_ready"])
         self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
         self.assertEqual("joint", result["events"]["veto"]["reviewer_bindings"][0]["liability_mode"])
+        self.assertEqual(
+            "reviewer-live-proof-bridge-v1",
+            result["events"]["veto"]["reviewer_bindings"][0]["transport_profile"],
+        )
         self.assertFalse(result["trust"]["after_breach"]["pinned_by_human"])
         self.assertFalse(result["trust"]["after_breach"]["eligibility"]["guardian_role"])
 

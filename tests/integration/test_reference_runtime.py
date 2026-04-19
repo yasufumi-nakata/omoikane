@@ -505,6 +505,32 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
         self.assertTrue(result["validation"]["conflict_escalates_to_human"])
 
+    def test_distributed_transport_demo_reports_attested_handoffs_and_replay_guard(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_distributed_transport_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(
+            "federation-mtls-quorum-v1",
+            result["handoffs"]["federation"]["transport_profile"],
+        )
+        self.assertEqual(
+            "authenticated",
+            result["receipts"]["federation"]["receipt_status"],
+        )
+        self.assertEqual(
+            "authenticated",
+            result["receipts"]["heritage"]["receipt_status"],
+        )
+        self.assertEqual(
+            "replay-blocked",
+            result["receipts"]["replay_blocked"]["receipt_status"],
+        )
+        self.assertTrue(result["validation"]["federation_transport_authenticated"])
+        self.assertTrue(result["validation"]["heritage_transport_authenticated"])
+        self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
+
     def test_cognitive_audit_demo_returns_cross_layer_review(self) -> None:
         runtime = OmoikaneReferenceOS()
 
@@ -537,7 +563,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertTrue(result["validation"]["veto_quorum_satisfied"])
         self.assertTrue(result["validation"]["veto_binding_recorded"])
+        self.assertTrue(result["validation"]["verification_binding_recorded"])
         self.assertTrue(result["validation"]["reviewer_registry_ready"])
+        self.assertTrue(result["validation"]["live_verification_ready"])
+        self.assertTrue(result["validation"]["jurisdiction_bundle_ready"])
         self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
         self.assertTrue(result["validation"]["human_pin_cleared"])
@@ -545,6 +574,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "proof://oversight/reviewer-alpha/v1",
             result["events"]["veto"]["reviewer_bindings"][0]["proof_ref"],
+        )
+        self.assertEqual(
+            "verifier://guardian-oversight.jp/reviewer-alpha",
+            result["events"]["veto"]["reviewer_bindings"][0]["verifier_ref"],
         )
         self.assertEqual("breached", result["events"]["pin_renewal"]["human_attestation"]["status"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["guardian-oversight"])

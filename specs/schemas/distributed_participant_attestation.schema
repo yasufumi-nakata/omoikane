@@ -1,0 +1,71 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_participant_attestation.schema"
+title: DistributedParticipantAttestation
+description: >
+  Immutable participant attestation bound to one distributed council transport envelope.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - attestation_id
+  - participant_id
+  - council_tier
+  - role
+  - credential_ref
+  - proof_ref
+  - transport_key_ref
+  - trust_score
+  - issued_at
+properties:
+  kind:
+    const: distributed_participant_attestation
+  schema_version:
+    const: 1.0.0
+  attestation_id:
+    type: string
+    pattern: "^distributed-attestation-[a-f0-9]{12}$"
+  participant_id:
+    type: string
+    minLength: 1
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  role:
+    type: string
+    enum:
+      - self-liaison
+      - guardian
+      - cultural-representative
+      - legal-advisor
+      - ethics-committee
+  credential_ref:
+    type: string
+    minLength: 1
+  proof_ref:
+    type: string
+    minLength: 1
+  transport_key_ref:
+    type: string
+    minLength: 1
+  trust_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  issued_at:
+    type: string
+    format: date-time
+examples:
+  - kind: distributed_participant_attestation
+    schema_version: 1.0.0
+    attestation_id: distributed-attestation-84cb3d0db7f1
+    participant_id: identity://amaterasu-endpoint
+    council_tier: federation
+    role: self-liaison
+    credential_ref: credential://federation/84cb3d0db7f1
+    proof_ref: proof://federation/7d76eb45efb0
+    transport_key_ref: transport-key://federation/4a2f55e0b317
+    trust_score: 0.74
+    issued_at: "2026-04-19T10:20:00Z"

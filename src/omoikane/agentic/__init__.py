@@ -9,6 +9,7 @@ from .council import (
     DistributedCouncilResolution,
     DistributedCouncilVote,
 )
+from .distributed_transport import DistributedTransportService
 from .task_graph import TaskGraphService
 from .trust import TrustService, TrustThresholds, TrustUpdatePolicy
 
@@ -19,6 +20,7 @@ __all__ = [
     "CouncilProposal",
     "CouncilVote",
     "DistributedCouncilResolution",
+    "DistributedTransportService",
     "DistributedCouncilVote",
     "TaskGraphService",
     "TrustService",

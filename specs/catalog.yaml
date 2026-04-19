@@ -105,6 +105,32 @@ entries:
     rationale: Required to serialize returned Federation/Heritage results and cross-tier human escalation.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_participant_attestation.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - specs/schemas/distributed_transport_envelope.schema
+      - reference-runtime
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to bind remote Federation/Heritage participants to credential, proof, and transport-key references.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/distributed_transport_envelope.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one participant-attested remote handoff bundle with channel binding and route nonce.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/distributed_transport_receipt.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authenticity.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize authenticated, rejected, and replay-blocked remote receipts.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -174,6 +200,14 @@ entries:
     consumers:
       - reference-runtime
     rationale: Council lifecycle contract, including timeout policy, multi-council externalization, and distributed returned-result reconciliation.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.distributed_transport.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make distributed participant attestation, channel binding, and replay guard machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -796,6 +830,13 @@ entries:
     rationale: Protects Federation binding, Heritage veto, and human escalation after distributed returned results.
   - priority: P1
     kind: eval
+    file: evals/agentic/distributed_transport_authenticity.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects participant attestation, channel binding, and replay guard for distributed remote handoff bundles.
+  - priority: P1
+    kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml
     consumers:
       - reference-runtime
@@ -1009,10 +1050,28 @@ entries:
     file: specs/schemas/guardian_reviewer_record.schema
     consumers:
       - specs/interfaces/governance.oversight.v0.idl
+      - specs/schemas/guardian_reviewer_verification.schema
       - specs/schemas/guardian_oversight_snapshot.schema
       - docs/04-ai-governance/guardian-oversight.md
       - reference-runtime
     rationale: Required to register one reviewer identity proof, scope, and liability assignment before Guardian attestation is accepted.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_reviewer_verification.schema
+    consumers:
+      - specs/schemas/guardian_reviewer_record.schema
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to bind one reviewer to a live-proof surrogate verification snapshot before Guardian attestation is accepted.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_jurisdiction_evidence_bundle.schema
+    consumers:
+      - specs/schemas/guardian_reviewer_verification.schema
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize one jurisdiction-specific legal evidence package summary without storing raw documents in repo.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_snapshot.schema
@@ -1028,7 +1087,7 @@ entries:
       - docs/04-ai-governance/guardian-oversight.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make reviewer registration, scoped attestation, breach propagation, and snapshot behavior machine-readable.
+    rationale: Required to make reviewer registration, live verification, scoped attestation, breach propagation, and snapshot behavior machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.naming.v0.idl
@@ -1051,6 +1110,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects reviewer proof binding, scoped liability enforcement, and fail-closed reject for out-of-scope attestation.
+  - priority: P1
+    kind: eval
+    file: evals/safety/guardian_reviewer_live_verification.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects live verifier snapshot binding, jurisdiction evidence bundle readiness, and transport profile consistency for Guardian reviewers.
   - priority: P1
     kind: schema
     file: specs/schemas/amendment_proposal.schema

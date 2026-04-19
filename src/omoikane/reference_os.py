@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from .agentic.cognitive_audit import CognitiveAuditService
 from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
+from .agentic.distributed_transport import DistributedTransportService
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
 from .common import canonical_json, sha256_text
@@ -176,6 +177,7 @@ class OmoikaneReferenceOS:
         self.collective = CollectiveIdentityService()
         self.wms = WorldModelSync()
         self.council = Council()
+        self.distributed_transport = DistributedTransportService()
         self.cognitive_audit = CognitiveAuditService()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
@@ -1018,6 +1020,208 @@ class OmoikaneReferenceOS:
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_distributed_transport_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://distributed-transport-demo/v1",
+            metadata={"display_name": "Distributed Transport Sandbox"},
+        )
+
+        federation_proposal = self.council.propose(
+            title="Shared reality remote review handoff",
+            requested_action="issue-federation-transport-envelope",
+            rationale="cross-self review を Federation endpoint へ participant-attested transport で渡す。",
+            risk_level="high",
+            target_identity_ids=[identity.identity_id, "identity://shared-peer"],
+        )
+        federation_topology = self.council.route_topology(
+            federation_proposal,
+            local_session_ref="distributed-transport-federation-local-session",
+        )
+        federation_payload = {
+            "proposal_ref": federation_proposal.proposal_id,
+            "scope": federation_topology.scope,
+            "requested_action": federation_proposal.requested_action,
+            "local_binding_status": "advisory",
+        }
+        federation_envelope = self.distributed_transport.issue_federation_handoff(
+            topology_ref=federation_topology.topology_id,
+            proposal_ref=federation_proposal.proposal_id,
+            payload_ref=f"cas://sha256/{sha256_text(canonical_json(federation_payload))}",
+            payload_digest=sha256_text(canonical_json(federation_payload)),
+            participant_identity_ids=federation_proposal.target_identity_ids,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_issued",
+            payload=federation_envelope.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        federation_receipt = self.distributed_transport.record_receipt(
+            federation_envelope,
+            result_ref="resolution://federation/shared-reality-approved",
+            result_digest=sha256_text(
+                canonical_json(
+                    {
+                        "final_outcome": "binding-approved",
+                        "resolution_policy": "federation-shared-reality-v1",
+                    }
+                )
+            ),
+            participant_ids=[
+                identity.identity_id,
+                "identity://shared-peer",
+                "guardian://neutral-federation",
+            ],
+            channel_binding_ref=federation_envelope.channel_binding_ref,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authenticated",
+            payload=federation_receipt.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        replay_receipt = self.distributed_transport.record_receipt(
+            federation_envelope,
+            result_ref="resolution://federation/shared-reality-replay",
+            result_digest=sha256_text(
+                canonical_json(
+                    {
+                        "final_outcome": "binding-approved",
+                        "resolution_policy": "federation-shared-reality-v1",
+                        "attempt": "replay",
+                    }
+                )
+            ),
+            participant_ids=[
+                identity.identity_id,
+                "identity://shared-peer",
+                "guardian://neutral-federation",
+            ],
+            channel_binding_ref=federation_envelope.channel_binding_ref,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_replay_blocked",
+            payload=replay_receipt.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        heritage_proposal = self.council.propose(
+            title="Interpretive remote review handoff",
+            requested_action="issue-heritage-transport-envelope",
+            rationale="interpretive review を Heritage endpoint へ fixed reviewer roles 付きで渡す。",
+            risk_level="medium",
+            target_identity_ids=[identity.identity_id],
+            referenced_clauses=["identity_axiom.A2", "governance.review-window"],
+        )
+        heritage_topology = self.council.route_topology(
+            heritage_proposal,
+            local_session_ref="distributed-transport-heritage-local-session",
+        )
+        heritage_payload = {
+            "proposal_ref": heritage_proposal.proposal_id,
+            "scope": heritage_topology.scope,
+            "requested_action": heritage_proposal.requested_action,
+            "referenced_clauses": heritage_proposal.referenced_clauses,
+            "local_binding_status": "blocked",
+        }
+        heritage_envelope = self.distributed_transport.issue_heritage_handoff(
+            topology_ref=heritage_topology.topology_id,
+            proposal_ref=heritage_proposal.proposal_id,
+            payload_ref=f"cas://sha256/{sha256_text(canonical_json(heritage_payload))}",
+            payload_digest=sha256_text(canonical_json(heritage_payload)),
+            referenced_clauses=heritage_proposal.referenced_clauses,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_issued",
+            payload=heritage_envelope.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        heritage_receipt = self.distributed_transport.record_receipt(
+            heritage_envelope,
+            result_ref="resolution://heritage/interpretive-veto",
+            result_digest=sha256_text(
+                canonical_json(
+                    {
+                        "final_outcome": "binding-rejected",
+                        "decision_mode": "ethics-veto",
+                    }
+                )
+            ),
+            participant_ids=[
+                "heritage://culture-a",
+                "heritage://culture-b",
+                "heritage://legal-advisor",
+                "heritage://ethics-committee",
+            ],
+            channel_binding_ref=heritage_envelope.channel_binding_ref,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authenticated",
+            payload=heritage_receipt.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "topologies": {
+                "federation": federation_topology.to_dict(),
+                "heritage": heritage_topology.to_dict(),
+            },
+            "handoffs": {
+                "federation": federation_envelope.to_dict(),
+                "heritage": heritage_envelope.to_dict(),
+            },
+            "receipts": {
+                "federation": federation_receipt.to_dict(),
+                "heritage": heritage_receipt.to_dict(),
+                "replay_blocked": replay_receipt.to_dict(),
+            },
+            "validation": {
+                "federation_transport_authenticated": federation_receipt.receipt_status
+                == "authenticated"
+                and federation_receipt.authenticity_checks["required_roles_satisfied"]
+                and federation_receipt.authenticity_checks["channel_authenticated"],
+                "heritage_transport_authenticated": heritage_receipt.receipt_status
+                == "authenticated"
+                and heritage_receipt.authenticity_checks["quorum_attested"],
+                "replay_guard_blocks_reuse": replay_receipt.receipt_status == "replay-blocked"
+                and replay_receipt.authenticity_checks["replay_guard_status"] == "blocked",
+                "participant_bindings_preserved": all(
+                    binding["accepted"] for binding in federation_receipt.participant_bindings
+                )
+                and all(binding["accepted"] for binding in heritage_receipt.participant_bindings),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_cognitive_audit_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://cognitive-audit-demo/v1",
@@ -1378,6 +1582,26 @@ class OmoikaneReferenceOS:
             allowed_guardian_roles=["integrity"],
             allowed_categories=["veto"],
         )
+        reviewer_alpha = self.oversight.verify_reviewer(
+            "human-reviewer-001",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-alpha",
+            challenge_ref="challenge://guardian-oversight/reviewer-alpha/2026-04-19T13:00:00Z",
+            challenge_digest="sha256:alpha-proof-bridge-20260419",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-19T13:00:00+00:00",
+            valid_until="2026-10-19T00:00:00+00:00",
+        )
+        reviewer_beta = self.oversight.verify_reviewer(
+            "human-reviewer-002",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-beta",
+            challenge_ref="challenge://guardian-oversight/reviewer-beta/2026-04-19T13:05:00Z",
+            challenge_digest="sha256:beta-proof-bridge-20260419",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-19T13:05:00+00:00",
+            valid_until="2026-10-19T00:00:00+00:00",
+        )
         veto_entry = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="guardian.veto.executed",
@@ -1481,7 +1705,18 @@ class OmoikaneReferenceOS:
             "validation": {
                 "veto_quorum_satisfied": veto_event["human_attestation"]["status"] == "satisfied",
                 "veto_binding_recorded": len(veto_event["reviewer_bindings"]) == 1,
+                "verification_binding_recorded": bool(
+                    veto_event["reviewer_bindings"][0]["verification_id"]
+                ),
                 "reviewer_registry_ready": len(self.oversight.reviewer_snapshot()) == 2,
+                "live_verification_ready": all(
+                    reviewer["credential_verification"]["status"] == "verified"
+                    for reviewer in self.oversight.reviewer_snapshot()
+                ),
+                "jurisdiction_bundle_ready": all(
+                    reviewer["credential_verification"]["jurisdiction_bundle"]["status"] == "ready"
+                    for reviewer in self.oversight.reviewer_snapshot()
+                ),
                 "responsibility_scope_enforced": scope_rejection["ok"],
                 "pin_breach_propagated": pin_event["pin_breach_propagated"],
                 "human_pin_cleared": not trust_after_breach["pinned_by_human"],

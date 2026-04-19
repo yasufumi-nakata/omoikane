@@ -29,6 +29,10 @@ T-Core amendment が常に freeze され、T-Kernel / T-Operational が guarded 
 cross-self 議題が Federation Council 要求へ、interpretive 議題が Heritage Council 要求へ
 deterministic に外部化され、ambiguous 議題が local binding を停止すること。
 
+### Distributed Transport Authenticity
+Federation / Heritage handoff が participant attestation と channel binding に束縛され、
+同一 route nonce の再利用が `replay-blocked` になること。
+
 ### Cognitive Audit Loop
 qualia checkpoint と self-model abrupt change と metacognition alert が
 bounded Council review に束ねられ、continuity-safe な follow-up を返すこと。

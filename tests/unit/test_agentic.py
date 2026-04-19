@@ -4,8 +4,10 @@ import unittest
 
 from omoikane.agentic.cognitive_audit import CognitiveAuditService
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
+from omoikane.agentic.distributed_transport import DistributedTransportService
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
+from omoikane.common import canonical_json, sha256_text
 
 
 class CouncilTests(unittest.TestCase):
@@ -316,6 +318,90 @@ class TaskGraphServiceTests(unittest.TestCase):
                 required_roles=["schema-builder", "eval-builder", "doc-sync-builder", "codex-builder"],
             )
 
+
+class DistributedTransportServiceTests(unittest.TestCase):
+    def test_federation_handoff_binds_liaison_quorum_and_guardian(self) -> None:
+        service = DistributedTransportService()
+
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-001",
+            proposal_ref="proposal-transport-001",
+            payload_ref="cas://sha256/test-federation",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self"})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+
+        self.assertEqual("federation", envelope.council_tier)
+        self.assertEqual("federation-mtls-quorum-v1", envelope.transport_profile)
+        self.assertEqual(3, envelope.quorum)
+        self.assertEqual(
+            ["guardian", "self-liaison", "self-liaison"],
+            sorted(attestation.role for attestation in envelope.participant_attestations),
+        )
+
+    def test_heritage_receipt_authenticates_and_blocks_replay(self) -> None:
+        service = DistributedTransportService()
+
+        envelope = service.issue_heritage_handoff(
+            topology_ref="topology-transport-heritage-001",
+            proposal_ref="proposal-transport-heritage-001",
+            payload_ref="cas://sha256/test-heritage",
+            payload_digest=sha256_text(canonical_json({"scope": "interpretive"})),
+            referenced_clauses=["identity_axiom.A2"],
+        )
+        receipt = service.record_receipt(
+            envelope,
+            result_ref="resolution://heritage/001",
+            result_digest=sha256_text(canonical_json({"final_outcome": "binding-rejected"})),
+            participant_ids=[
+                "heritage://culture-a",
+                "heritage://culture-b",
+                "heritage://legal-advisor",
+                "heritage://ethics-committee",
+            ],
+            channel_binding_ref=envelope.channel_binding_ref,
+        )
+        replay = service.record_receipt(
+            envelope,
+            result_ref="resolution://heritage/replay",
+            result_digest=sha256_text(canonical_json({"final_outcome": "binding-rejected"})),
+            participant_ids=[
+                "heritage://culture-a",
+                "heritage://culture-b",
+                "heritage://legal-advisor",
+                "heritage://ethics-committee",
+            ],
+            channel_binding_ref=envelope.channel_binding_ref,
+        )
+
+        self.assertEqual("authenticated", receipt.receipt_status)
+        self.assertTrue(receipt.authenticity_checks["required_roles_satisfied"])
+        self.assertEqual("replay-blocked", replay.receipt_status)
+        self.assertEqual("blocked", replay.authenticity_checks["replay_guard_status"])
+
+    def test_receipt_rejects_channel_mismatch(self) -> None:
+        service = DistributedTransportService()
+
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-002",
+            proposal_ref="proposal-transport-002",
+            payload_ref="cas://sha256/test-federation",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self"})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        receipt = service.record_receipt(
+            envelope,
+            result_ref="resolution://federation/rejected",
+            result_digest=sha256_text(canonical_json({"final_outcome": "binding-rejected"})),
+            participant_ids=["identity://a", "identity://b", "guardian://neutral-federation"],
+            channel_binding_ref="channel-binding://federation/mismatch",
+        )
+
+        self.assertEqual("rejected", receipt.receipt_status)
+        self.assertFalse(receipt.authenticity_checks["channel_authenticated"])
+
+
+class TaskGraphExecutionTests(unittest.TestCase):
     def test_dispatch_graph_marks_root_nodes_dispatched(self) -> None:
         service = TaskGraphService()
         graph = service.build_graph(

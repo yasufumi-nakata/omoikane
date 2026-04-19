@@ -11,6 +11,7 @@
 - 議事は EthicsLedger に永続化
 - reference runtime では `multi-council-demo` が Local / Federation / Heritage への deterministic routing を可視化し、
   `distributed-council-demo` が Federation binding / Heritage veto / human escalation を可視化し、
+  `distributed-transport-demo` が participant attestation / transport authenticity / replay guard を可視化し、
   `cognitive-audit-demo` が qualia / self-model / metacognition を bounded Council review に束ねる
 
 ### YaoyorozuRegistry
@@ -77,6 +78,7 @@ CouncilMessage:
 
 - [council-composition.md](council-composition.md) ── Council 構成と動的メンバ選定
 - [distributed-council-resolution.md](distributed-council-resolution.md) ── Federation / Heritage returned result の解決規則
+- [distributed-transport-attestation.md](distributed-transport-attestation.md) ── Federation / Heritage remote handoff の attestation と transport authenticity
 - [cognitive-audit-loop.md](cognitive-audit-loop.md) ── 認知系 cross-layer audit と Council follow-up
 - [task-decomposition.md](task-decomposition.md) ── タスク分解アルゴリズム
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ

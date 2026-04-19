@@ -1,0 +1,146 @@
+idl_version: 1
+kind: service
+namespace: agentic.distributed_transport.v0
+service: DistributedTransportService
+summary: Participant-attested remote handoff and receipt verification contract for distributed council reviews.
+imports:
+  distributed_participant_attestation: ../schemas/distributed_participant_attestation.schema
+  distributed_transport_envelope: ../schemas/distributed_transport_envelope.schema
+  distributed_transport_receipt: ../schemas/distributed_transport_receipt.schema
+operations:
+  issue_federation_handoff:
+    summary: >
+      Bind one cross-self distributed council request to a Federation transport envelope
+      with self-liaison quorum and guardian channel attestation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - topology_ref
+          - proposal_ref
+          - payload_ref
+          - payload_digest
+          - participant_identity_ids
+        properties:
+          topology_ref:
+            type: string
+            minLength: 1
+          proposal_ref:
+            type: string
+            minLength: 1
+          payload_ref:
+            type: string
+            minLength: 1
+          payload_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          participant_identity_ids:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: distributed_transport_envelope
+    guarantees:
+      - council_tier must equal federation
+      - transport_profile must equal federation-mtls-quorum-v1
+      - required_roles must bind 2 self-liaison participants and 1 guardian
+      - channel_binding_ref must be envelope-unique and route_nonce-bound
+  issue_heritage_handoff:
+    summary: >
+      Bind one interpretive distributed council request to a Heritage transport envelope
+      with fixed reviewer roles and clause-bound recipient routing.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - topology_ref
+          - proposal_ref
+          - payload_ref
+          - payload_digest
+          - referenced_clauses
+        properties:
+          topology_ref:
+            type: string
+            minLength: 1
+          proposal_ref:
+            type: string
+            minLength: 1
+          payload_ref:
+            type: string
+            minLength: 1
+          payload_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          referenced_clauses:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: distributed_transport_envelope
+    guarantees:
+      - council_tier must equal heritage
+      - transport_profile must equal heritage-attested-review-v1
+      - required_roles must bind 2 cultural representatives plus legal-advisor and ethics-committee
+      - recipient_endpoint must remain clause-bound and fail closed on missing clause refs
+  record_receipt:
+    summary: >
+      Verify one returned remote receipt against its transport envelope, attested participant set,
+      authenticated channel binding, and single-use replay guard.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - channel_binding_ref
+          - route_nonce
+          - result_ref
+          - result_digest
+          - participant_ids
+        properties:
+          envelope_ref:
+            type: string
+            minLength: 1
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          channel_binding_ref:
+            type: string
+            minLength: 1
+          route_nonce:
+            type: string
+            minLength: 1
+          result_ref:
+            type: string
+            minLength: 1
+          result_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          participant_ids:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: distributed_transport_receipt
+    guarantees:
+      - receipt_status must equal authenticated only when channel_authenticated, required_roles_satisfied, and quorum_attested are all true
+      - replay_guard_status must become blocked on any second use of the same route_nonce
+      - participant_bindings must retain attestation_ref and proof_ref for every accepted participant
+events:
+  distributed.transport_issued:
+    payload:
+      schema_ref: distributed_transport_envelope
+  distributed.transport_received:
+    payload:
+      schema_ref: distributed_transport_receipt
+compatibility:
+  stability: bootstrap
+  notes:
+    - This contract fixes the in-repo reference profile for participant attestation and transport authenticity only.
+    - Live PKI federation, transport key rotation, and multi-hop remote replay detection remain future work.

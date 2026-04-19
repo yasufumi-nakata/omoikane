@@ -1,0 +1,48 @@
+eval_id: distributed_transport_authenticity
+target: agentic.distributed_transport
+level: L4
+description: >
+  Federation / Heritage の distributed review handoff が participant attestation と
+  channel binding に束縛され、同一 route nonce の再利用が replay-blocked になること
+fixtures:
+  - scenario: federation_authenticated
+    council_tier: federation
+    participant_ids:
+      - identity://amaterasu-endpoint
+      - identity://shared-peer
+      - guardian://neutral-federation
+    expected:
+      receipt_status: authenticated
+      channel_authenticated: true
+      required_roles_satisfied: true
+      quorum_attested: true
+      replay_guard_status: accepted
+  - scenario: heritage_authenticated
+    council_tier: heritage
+    participant_ids:
+      - heritage://culture-a
+      - heritage://culture-b
+      - heritage://legal-advisor
+      - heritage://ethics-committee
+    expected:
+      receipt_status: authenticated
+      channel_authenticated: true
+      required_roles_satisfied: true
+      quorum_attested: true
+      replay_guard_status: accepted
+  - scenario: replay_blocked
+    council_tier: federation
+    participant_ids:
+      - identity://amaterasu-endpoint
+      - identity://shared-peer
+      - guardian://neutral-federation
+    expected:
+      receipt_status: replay-blocked
+      replay_guard_status: blocked
+assertions:
+  - Federation handoff must bind 2 self-liaison participants and 1 guardian to one channel-binding ref
+  - Heritage handoff must bind fixed reviewer roles before any returned result is accepted
+  - Reusing the same route_nonce must never return authenticated and must emit replay-blocked
+metric: exact-match
+threshold: 1.0
+ethics_check: true

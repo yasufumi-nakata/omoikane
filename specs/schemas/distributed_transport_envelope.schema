@@ -1,0 +1,131 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_envelope.schema"
+title: DistributedTransportEnvelope
+description: >
+  Transport-attested remote handoff bundle for Federation or Heritage distributed review.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - envelope_id
+  - topology_ref
+  - proposal_ref
+  - council_tier
+  - transport_profile
+  - recipient_endpoint
+  - payload_ref
+  - payload_digest
+  - route_nonce
+  - freshness_window_s
+  - quorum
+  - required_roles
+  - channel_binding_ref
+  - participant_attestations
+  - attestation_digest
+  - issued_at
+  - envelope_digest
+properties:
+  kind:
+    const: distributed_transport_envelope
+  schema_version:
+    const: 1.0.0
+  envelope_id:
+    type: string
+    pattern: "^distributed-envelope-[a-f0-9]{12}$"
+  topology_ref:
+    type: string
+    minLength: 1
+  proposal_ref:
+    type: string
+    minLength: 1
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    enum:
+      - federation-mtls-quorum-v1
+      - heritage-attested-review-v1
+  recipient_endpoint:
+    type: string
+    minLength: 1
+  payload_ref:
+    type: string
+    minLength: 1
+  payload_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  route_nonce:
+    type: string
+    pattern: "^route-nonce-[a-f0-9]{12}$"
+  freshness_window_s:
+    type: integer
+    minimum: 1
+  quorum:
+    type: integer
+    minimum: 1
+  required_roles:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      enum:
+        - self-liaison
+        - guardian
+        - cultural-representative
+        - legal-advisor
+        - ethics-committee
+  channel_binding_ref:
+    type: string
+    minLength: 1
+  participant_attestations:
+    type: array
+    minItems: 1
+    items:
+      $ref: "./distributed_participant_attestation.schema"
+  attestation_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  issued_at:
+    type: string
+    format: date-time
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_envelope
+    schema_version: 1.0.0
+    envelope_id: distributed-envelope-68d8341fd25a
+    topology_ref: topology-1234abcd5678
+    proposal_ref: proposal-1234abcd5678
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    recipient_endpoint: federation://shared-reality-review
+    payload_ref: cas://sha256/8b75218c0607a775f7e43332f8bc2b54ac44fa34f20b23182f2b1c8f427d6aa5
+    payload_digest: 8b75218c0607a775f7e43332f8bc2b54ac44fa34f20b23182f2b1c8f427d6aa5
+    route_nonce: route-nonce-b23f7b0c3fd4
+    freshness_window_s: 900
+    quorum: 3
+    required_roles:
+      - self-liaison
+      - self-liaison
+      - guardian
+    channel_binding_ref: channel-binding://federation/2ad16b34bd7c2f40
+    participant_attestations:
+      - kind: distributed_participant_attestation
+        schema_version: 1.0.0
+        attestation_id: distributed-attestation-84cb3d0db7f1
+        participant_id: identity://amaterasu-endpoint
+        council_tier: federation
+        role: self-liaison
+        credential_ref: credential://federation/84cb3d0db7f1
+        proof_ref: proof://federation/7d76eb45efb0
+        transport_key_ref: transport-key://federation/4a2f55e0b317
+        trust_score: 0.74
+        issued_at: "2026-04-19T10:20:00Z"
+    attestation_digest: 4d38c20a6c7a7d40ae66feced0efbe5a5b378f8a6afc572e26f23f2d4afc847d
+    issued_at: "2026-04-19T10:20:00Z"
+    envelope_digest: c3e6505427d4632a4f49d6bd6eb3ef13f0745304c724ef8be6cba5074600e4fe
