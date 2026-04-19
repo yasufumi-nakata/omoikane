@@ -11,6 +11,13 @@ from ..common import new_id, utc_now_iso
 
 IMMUTABLE_BOUNDARIES = ("L1.EthicsEnforcer", "L1.ContinuityLedger")
 MANDATORY_BUILD_PIPELINE_EVAL = "evals/continuity/council_output_build_request_pipeline.yaml"
+MANDATORY_STAGED_ROLLOUT_EVAL = "evals/continuity/builder_staged_rollout_execution.yaml"
+ROLLOUT_STAGE_ORDER = (
+    ("dark-launch", 0, "shadow-only", "shadow-match"),
+    ("canary-5pct", 5, "limited-visible", "guardian-pass"),
+    ("broad-50pct", 50, "shared-visible", "continuity-stable"),
+    ("full-100pct", 100, "primary-visible", "promotion-complete"),
+)
 
 
 def _is_within_scope(candidate: str, scope_roots: Sequence[str]) -> bool:
@@ -270,3 +277,264 @@ class DifferentialEvaluatorService:
         else:
             decision = "promote"
         return {"decision": decision}
+
+
+@dataclass(frozen=True)
+class SandboxApplyPolicy:
+    """Deterministic policy for applying builder artifacts to Mirage Self."""
+
+    policy_id: str = "mirage-self-apply-v0"
+    sandbox_profile: str = "forked-self"
+    require_clean_apply: bool = True
+    require_rollback_plan: bool = True
+    max_patch_count: int = 4
+    external_effects_allowed: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "sandbox_profile": self.sandbox_profile,
+            "require_clean_apply": self.require_clean_apply,
+            "require_rollback_plan": self.require_rollback_plan,
+            "max_patch_count": self.max_patch_count,
+            "external_effects_allowed": self.external_effects_allowed,
+        }
+
+
+class SandboxApplyService:
+    """Apply bounded patch descriptors to Mirage Self and emit a receipt."""
+
+    def __init__(self, policy: SandboxApplyPolicy | None = None) -> None:
+        self._policy = policy or SandboxApplyPolicy()
+
+    def policy(self) -> Dict[str, Any]:
+        return self._policy.to_dict()
+
+    def apply_artifact(
+        self,
+        *,
+        build_request: Mapping[str, Any],
+        build_artifact: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        patches = list(build_artifact.get("patches", []))
+        rollback_plan_ref = self._artifact_ref(build_artifact, "rollback_plan")
+        build_log_ref = self._artifact_ref(build_artifact, "build_log")
+        validation = {
+            "clean_apply": bool(build_artifact.get("status") == "ready" and patches),
+            "rollback_ready": bool(rollback_plan_ref),
+            "immutable_boundaries_preserved": set(
+                build_request.get("constraints", {}).get("forbidden", [])
+            )
+            == set(IMMUTABLE_BOUNDARIES),
+            "external_effects_blocked": not self._policy.external_effects_allowed,
+        }
+        allowed = (
+            validation["clean_apply"]
+            and validation["rollback_ready"]
+            and validation["immutable_boundaries_preserved"]
+            and validation["external_effects_blocked"]
+            and len(patches) <= self._policy.max_patch_count
+        )
+
+        receipt = {
+            "kind": "sandbox_apply_receipt",
+            "schema_version": "1.0",
+            "receipt_id": new_id("sandbox-apply"),
+            "request_id": build_request["request_id"],
+            "artifact_id": build_artifact["artifact_id"],
+            "policy": self.policy(),
+            "status": "applied" if allowed else "blocked",
+            "sandbox_snapshot_ref": (
+                f"mirage://{build_request['request_id']}/snapshot/current" if allowed else ""
+            ),
+            "applied_patch_ids": [patch["patch_id"] for patch in patches] if allowed else [],
+            "applied_patch_count": len(patches) if allowed else 0,
+            "rollback_plan_ref": rollback_plan_ref,
+            "build_log_ref": build_log_ref,
+            "continuity_log_ref": build_artifact.get("continuity_log_ref", ""),
+            "external_effects": [],
+            "validation": validation,
+            "preserved_invariants": [
+                "no-external-effects",
+                "rollback-ready",
+                "immutable-boundaries-preserved",
+            ],
+            "applied_at": utc_now_iso(),
+        }
+        if not allowed:
+            receipt["blocking_rules"] = [
+                rule
+                for rule, ok in (
+                    ("build artifact must be ready with patch descriptors", validation["clean_apply"]),
+                    ("rollback plan must be present before sandbox apply", validation["rollback_ready"]),
+                    (
+                        "immutable boundaries must remain in the forbidden set",
+                        validation["immutable_boundaries_preserved"],
+                    ),
+                    ("external effects must stay blocked", validation["external_effects_blocked"]),
+                    (
+                        f"patch count must be <= {self._policy.max_patch_count}",
+                        len(patches) <= self._policy.max_patch_count,
+                    ),
+                )
+                if not ok
+            ]
+        return receipt
+
+    @staticmethod
+    def _artifact_ref(build_artifact: Mapping[str, Any], artifact_kind: str) -> str:
+        for artifact in build_artifact.get("artifacts", []):
+            if artifact.get("artifact_kind") == artifact_kind:
+                return str(artifact.get("ref", ""))
+        return ""
+
+    @staticmethod
+    def validate_receipt(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: list[str] = []
+        if receipt.get("kind") != "sandbox_apply_receipt":
+            errors.append("kind must equal sandbox_apply_receipt")
+        if receipt.get("schema_version") != "1.0":
+            errors.append("schema_version must equal 1.0")
+        if receipt.get("status") not in {"applied", "blocked"}:
+            errors.append("status must be applied or blocked")
+        if receipt.get("status") == "applied":
+            if not receipt.get("sandbox_snapshot_ref", "").startswith("mirage://"):
+                errors.append("sandbox_snapshot_ref must start with mirage://")
+            if int(receipt.get("applied_patch_count", 0)) < 1:
+                errors.append("applied_patch_count must be >= 1 for applied receipts")
+            if list(receipt.get("external_effects", [])):
+                errors.append("external_effects must stay empty")
+        validation = dict(receipt.get("validation", {}))
+        for field in (
+            "clean_apply",
+            "rollback_ready",
+            "immutable_boundaries_preserved",
+            "external_effects_blocked",
+        ):
+            if field not in validation:
+                errors.append(f"validation.{field} is required")
+        return {"ok": not errors, "errors": errors}
+
+
+@dataclass(frozen=True)
+class RolloutPlannerPolicy:
+    """Deterministic staged rollout policy for builder outputs."""
+
+    policy_id: str = "bounded-builder-staged-rollout-v1"
+    required_eval: str = MANDATORY_STAGED_ROLLOUT_EVAL
+    guardian_gate_required: bool = True
+    rollback_ready_required: bool = True
+    stage_order: tuple[tuple[str, int, str, str], ...] = ROLLOUT_STAGE_ORDER
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "required_eval": self.required_eval,
+            "guardian_gate_required": self.guardian_gate_required,
+            "rollback_ready_required": self.rollback_ready_required,
+            "stage_order": [
+                {
+                    "stage_id": stage_id,
+                    "traffic_percent": traffic_percent,
+                    "delivery_mode": delivery_mode,
+                    "promotion_signal": promotion_signal,
+                }
+                for stage_id, traffic_percent, delivery_mode, promotion_signal in self.stage_order
+            ],
+        }
+
+
+class RolloutPlannerService:
+    """Execute a bounded staged rollout after sandbox apply and A/B evals succeed."""
+
+    def __init__(self, policy: RolloutPlannerPolicy | None = None) -> None:
+        self._policy = policy or RolloutPlannerPolicy()
+
+    def policy(self) -> Dict[str, Any]:
+        return self._policy.to_dict()
+
+    def execute_rollout(
+        self,
+        *,
+        build_request: Mapping[str, Any],
+        apply_receipt: Mapping[str, Any],
+        eval_reports: Sequence[Mapping[str, Any]],
+        decision: str,
+        guardian_gate_status: str,
+    ) -> Dict[str, Any]:
+        rollback_ref = str(apply_receipt.get("rollback_plan_ref", ""))
+        stages: list[Dict[str, Any]] = []
+        for index, (stage_id, traffic_percent, delivery_mode, promotion_signal) in enumerate(
+            self._policy.stage_order
+        ):
+            if decision == "promote":
+                status = "completed"
+            elif decision == "hold":
+                status = "completed" if index == 0 else "blocked"
+            else:
+                status = "completed" if index == 0 else "rolled-back" if index == 1 else "blocked"
+            stages.append(
+                {
+                    "stage_id": stage_id,
+                    "traffic_percent": traffic_percent,
+                    "delivery_mode": delivery_mode,
+                    "status": status,
+                    "guardian_gate": "observe" if traffic_percent == 0 else guardian_gate_status,
+                    "rollback_ref": rollback_ref,
+                    "promotion_signal": promotion_signal,
+                }
+            )
+
+        completed_stage_count = sum(1 for stage in stages if stage["status"] == "completed")
+        final_status = {
+            "promote": "promoted",
+            "hold": "held",
+            "rollback": "rolled-back",
+        }[decision]
+        return {
+            "kind": "staged_rollout_session",
+            "schema_version": "1.0",
+            "session_id": new_id("rollout-session"),
+            "request_id": build_request["request_id"],
+            "artifact_id": apply_receipt["artifact_id"],
+            "apply_receipt_id": apply_receipt["receipt_id"],
+            "policy": self.policy(),
+            "decision": decision,
+            "guardian_gate_status": guardian_gate_status,
+            "status": final_status,
+            "required_evals": [report["eval_ref"] for report in eval_reports],
+            "completed_stage_count": completed_stage_count,
+            "rollback_ready": bool(apply_receipt.get("validation", {}).get("rollback_ready")),
+            "final_continuity_ref": str(apply_receipt.get("continuity_log_ref", "")),
+            "stages": stages,
+            "preserved_invariants": [
+                "guardian-gated",
+                "rollback-ready",
+                "stage-ordered",
+            ],
+            "executed_at": utc_now_iso(),
+        }
+
+    def validate_session(self, session: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: list[str] = []
+        if session.get("kind") != "staged_rollout_session":
+            errors.append("kind must equal staged_rollout_session")
+        if session.get("schema_version") != "1.0":
+            errors.append("schema_version must equal 1.0")
+        if session.get("decision") not in {"promote", "hold", "rollback"}:
+            errors.append("decision must be promote, hold, or rollback")
+        if session.get("status") not in {"promoted", "held", "rolled-back"}:
+            errors.append("status must be promoted, held, or rolled-back")
+        stages = list(session.get("stages", []))
+        expected_order = [stage_id for stage_id, *_ in self._policy.stage_order]
+        actual_order = [stage.get("stage_id") for stage in stages]
+        if actual_order != expected_order:
+            errors.append("stages must follow the fixed stage order")
+        if not bool(session.get("rollback_ready")):
+            errors.append("rollback_ready must be true")
+        if session.get("decision") == "promote":
+            if any(stage.get("status") != "completed" for stage in stages):
+                errors.append("promote sessions must complete every stage")
+            if int(session.get("completed_stage_count", 0)) != len(expected_order):
+                errors.append("promote sessions must complete all stages")
+        return {"ok": not errors, "errors": errors}

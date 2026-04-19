@@ -1,0 +1,181 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sandbox_apply_receipt.schema"
+title: SandboxApplyReceipt
+description: Deterministic receipt emitted when builder artifacts are applied to Mirage Self.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - request_id
+  - artifact_id
+  - policy
+  - status
+  - sandbox_snapshot_ref
+  - applied_patch_ids
+  - applied_patch_count
+  - rollback_plan_ref
+  - build_log_ref
+  - continuity_log_ref
+  - external_effects
+  - validation
+  - preserved_invariants
+  - applied_at
+properties:
+  kind:
+    const: sandbox_apply_receipt
+  schema_version:
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^sandbox-apply-[a-f0-9]{12}$"
+  request_id:
+    type: string
+    minLength: 8
+  artifact_id:
+    type: string
+    pattern: "^artifact-[a-f0-9]{12}$"
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - sandbox_profile
+      - require_clean_apply
+      - require_rollback_plan
+      - max_patch_count
+      - external_effects_allowed
+    properties:
+      policy_id:
+        type: string
+        const: mirage-self-apply-v0
+      sandbox_profile:
+        type: string
+        const: forked-self
+      require_clean_apply:
+        type: boolean
+        const: true
+      require_rollback_plan:
+        type: boolean
+        const: true
+      max_patch_count:
+        type: integer
+        const: 4
+      external_effects_allowed:
+        type: boolean
+        const: false
+  status:
+    type: string
+    enum:
+      - applied
+      - blocked
+  sandbox_snapshot_ref:
+    type: string
+    pattern: "^mirage://"
+  applied_patch_ids:
+    type: array
+    items:
+      type: string
+      pattern: "^patch-[a-f0-9]{12}$"
+  applied_patch_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  rollback_plan_ref:
+    type: string
+    pattern: "^rollback://"
+  build_log_ref:
+    type: string
+    pattern: "^log://"
+  continuity_log_ref:
+    type: string
+    pattern: "^ledger://"
+  external_effects:
+    type: array
+    maxItems: 0
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - clean_apply
+      - rollback_ready
+      - immutable_boundaries_preserved
+      - external_effects_blocked
+    properties:
+      clean_apply:
+        type: boolean
+      rollback_ready:
+        type: boolean
+      immutable_boundaries_preserved:
+        type: boolean
+      external_effects_blocked:
+        type: boolean
+  preserved_invariants:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: no-external-effects
+      - type: string
+        const: rollback-ready
+      - type: string
+        const: immutable-boundaries-preserved
+  applied_at:
+    type: string
+    format: date-time
+  blocking_rules:
+    type: array
+    items:
+      type: string
+      minLength: 1
+allOf:
+  - if:
+      properties:
+        status:
+          const: applied
+    then:
+      properties:
+        applied_patch_count:
+          minimum: 1
+  - if:
+      properties:
+        status:
+          const: blocked
+    then:
+      required:
+        - blocking_rules
+examples:
+  - kind: sandbox_apply_receipt
+    schema_version: "1.0"
+    receipt_id: sandbox-apply-0123456789ab
+    request_id: build-l5-0001
+    artifact_id: artifact-0123456789ab
+    policy:
+      policy_id: mirage-self-apply-v0
+      sandbox_profile: forked-self
+      require_clean_apply: true
+      require_rollback_plan: true
+      max_patch_count: 4
+      external_effects_allowed: false
+    status: applied
+    sandbox_snapshot_ref: mirage://build-l5-0001/snapshot/current
+    applied_patch_ids:
+      - patch-111111111111
+      - patch-222222222222
+    applied_patch_count: 2
+    rollback_plan_ref: rollback://build-l5-0001
+    build_log_ref: log://artifact-0123456789ab
+    continuity_log_ref: ledger://self-modify/build-l5-0001
+    external_effects: []
+    validation:
+      clean_apply: true
+      rollback_ready: true
+      immutable_boundaries_preserved: true
+      external_effects_blocked: true
+    preserved_invariants:
+      - no-external-effects
+      - rollback-ready
+      - immutable-boundaries-preserved
+    applied_at: "2026-04-20T02:00:00Z"

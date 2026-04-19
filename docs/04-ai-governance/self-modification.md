@@ -74,6 +74,10 @@ Stage 3: 100%
 
 各 Stage で問題発生 → rollback。
 
+reference runtime では `builder-demo` が
+`sandbox_apply_receipt` と `staged_rollout_session` を返し、
+上記 Stage 0/1/2/3 が固定順序で machine-checkable に実行される。
+
 ## Rollback
 
 - ContinuityLedger から直前状態を復元

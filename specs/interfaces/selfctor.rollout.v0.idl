@@ -1,0 +1,98 @@
+idl_version: 1
+kind: service
+namespace: selfctor.rollout.v0
+service: RolloutPlannerService
+summary: Apply bounded builder artifacts to Mirage Self and execute deterministic staged rollout.
+imports:
+  build_request: ../schemas/build_request.yaml
+  build_artifact: ../schemas/build_artifact.yaml
+  sandbox_apply_receipt: ../schemas/sandbox_apply_receipt.schema
+  staged_rollout_session: ../schemas/staged_rollout_session.schema
+operations:
+  apply_to_sandbox:
+    summary: Apply ready patch descriptors to Mirage Self and emit a rollback-ready receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - build_request_ref
+          - build_artifact_ref
+        properties:
+          build_request_ref:
+            type: string
+            pattern: "^build://"
+          build_artifact_ref:
+            type: string
+            pattern: "^artifact://"
+    output:
+      schema_ref: sandbox_apply_receipt
+    preconditions:
+      - build_artifact.status must be ready
+      - patch descriptors must remain within build_request workspace scope
+      - rollback plan must exist before sandbox apply begins
+    guarantees:
+      - applied receipts preserve immutable boundary guards
+      - external effects remain blocked
+  execute_rollout:
+    summary: Run fixed Stage 0/1/2/3 rollout after sandbox apply and eval completion.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - apply_receipt_ref
+          - decision
+          - guardian_gate_status
+          - eval_refs
+        properties:
+          apply_receipt_ref:
+            type: string
+            pattern: "^sandbox-apply-[a-f0-9]{12}$"
+          decision:
+            type: string
+            enum:
+              - promote
+              - hold
+              - rollback
+          guardian_gate_status:
+            type: string
+            enum:
+              - pass
+              - hold
+              - reject
+          eval_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              pattern: "^evals/"
+    output:
+      schema_ref: staged_rollout_session
+    guarantees:
+      - stage order is fixed as dark-launch, canary-5pct, broad-50pct, full-100pct
+      - rollback reference remains available in every stage
+      - promote completes all stages, hold blocks after dark-launch, rollback rolls back during canary
+  validate_session:
+    summary: Validate one staged rollout session against the fixed rollout policy.
+    input:
+      schema_ref: staged_rollout_session
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+compatibility:
+  stability: bootstrap
+events:
+  - name: selfctor.sandbox.applied
+    payload:
+      schema_ref: sandbox_apply_receipt
+  - name: selfctor.rollout.executed
+    payload:
+      schema_ref: staged_rollout_session

@@ -1,0 +1,250 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/staged_rollout_session.schema"
+title: StagedRolloutSession
+description: Deterministic staged rollout record for builder outputs promoted from Mirage Self.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - session_id
+  - request_id
+  - artifact_id
+  - apply_receipt_id
+  - policy
+  - decision
+  - guardian_gate_status
+  - status
+  - required_evals
+  - completed_stage_count
+  - rollback_ready
+  - final_continuity_ref
+  - stages
+  - preserved_invariants
+  - executed_at
+properties:
+  kind:
+    const: staged_rollout_session
+  schema_version:
+    const: "1.0"
+  session_id:
+    type: string
+    pattern: "^rollout-session-[a-f0-9]{12}$"
+  request_id:
+    type: string
+    minLength: 8
+  artifact_id:
+    type: string
+    pattern: "^artifact-[a-f0-9]{12}$"
+  apply_receipt_id:
+    type: string
+    pattern: "^sandbox-apply-[a-f0-9]{12}$"
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - required_eval
+      - guardian_gate_required
+      - rollback_ready_required
+      - stage_order
+    properties:
+      policy_id:
+        type: string
+        const: bounded-builder-staged-rollout-v1
+      required_eval:
+        type: string
+        const: evals/continuity/builder_staged_rollout_execution.yaml
+      guardian_gate_required:
+        type: boolean
+        const: true
+      rollback_ready_required:
+        type: boolean
+        const: true
+      stage_order:
+        type: array
+        minItems: 4
+        maxItems: 4
+        items:
+          $ref: "#/$defs/stage_descriptor"
+  decision:
+    type: string
+    enum:
+      - promote
+      - hold
+      - rollback
+  guardian_gate_status:
+    type: string
+    enum:
+      - pass
+      - hold
+      - reject
+  status:
+    type: string
+    enum:
+      - promoted
+      - held
+      - rolled-back
+  required_evals:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^evals/"
+  completed_stage_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  rollback_ready:
+    type: boolean
+    const: true
+  final_continuity_ref:
+    type: string
+    pattern: "^ledger://"
+  stages:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      $ref: "#/$defs/executed_stage"
+  preserved_invariants:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: guardian-gated
+      - type: string
+        const: rollback-ready
+      - type: string
+        const: stage-ordered
+  executed_at:
+    type: string
+    format: date-time
+$defs:
+  stage_descriptor:
+    type: object
+    additionalProperties: false
+    required:
+      - stage_id
+      - traffic_percent
+      - delivery_mode
+      - promotion_signal
+    properties:
+      stage_id:
+        type: string
+        enum:
+          - dark-launch
+          - canary-5pct
+          - broad-50pct
+          - full-100pct
+      traffic_percent:
+        type: integer
+        enum: [0, 5, 50, 100]
+      delivery_mode:
+        type: string
+        enum:
+          - shadow-only
+          - limited-visible
+          - shared-visible
+          - primary-visible
+      promotion_signal:
+        type: string
+        minLength: 1
+  executed_stage:
+    allOf:
+      - $ref: "#/$defs/stage_descriptor"
+      - type: object
+        required:
+          - status
+          - guardian_gate
+          - rollback_ref
+        properties:
+          status:
+            type: string
+            enum:
+              - completed
+              - blocked
+              - rolled-back
+          guardian_gate:
+            type: string
+            enum:
+              - observe
+              - pass
+              - hold
+              - reject
+          rollback_ref:
+            type: string
+            pattern: "^rollback://"
+examples:
+  - kind: staged_rollout_session
+    schema_version: "1.0"
+    session_id: rollout-session-0123456789ab
+    request_id: build-l5-0001
+    artifact_id: artifact-0123456789ab
+    apply_receipt_id: sandbox-apply-0123456789ab
+    policy:
+      policy_id: bounded-builder-staged-rollout-v1
+      required_eval: evals/continuity/builder_staged_rollout_execution.yaml
+      guardian_gate_required: true
+      rollback_ready_required: true
+      stage_order:
+        - stage_id: dark-launch
+          traffic_percent: 0
+          delivery_mode: shadow-only
+          promotion_signal: shadow-match
+        - stage_id: canary-5pct
+          traffic_percent: 5
+          delivery_mode: limited-visible
+          promotion_signal: guardian-pass
+        - stage_id: broad-50pct
+          traffic_percent: 50
+          delivery_mode: shared-visible
+          promotion_signal: continuity-stable
+        - stage_id: full-100pct
+          traffic_percent: 100
+          delivery_mode: primary-visible
+          promotion_signal: promotion-complete
+    decision: promote
+    guardian_gate_status: pass
+    status: promoted
+    required_evals:
+      - evals/continuity/council_output_build_request_pipeline.yaml
+      - evals/continuity/builder_staged_rollout_execution.yaml
+    completed_stage_count: 4
+    rollback_ready: true
+    final_continuity_ref: ledger://self-modify/build-l5-0001
+    stages:
+      - stage_id: dark-launch
+        traffic_percent: 0
+        delivery_mode: shadow-only
+        status: completed
+        guardian_gate: observe
+        rollback_ref: rollback://build-l5-0001
+        promotion_signal: shadow-match
+      - stage_id: canary-5pct
+        traffic_percent: 5
+        delivery_mode: limited-visible
+        status: completed
+        guardian_gate: pass
+        rollback_ref: rollback://build-l5-0001
+        promotion_signal: guardian-pass
+      - stage_id: broad-50pct
+        traffic_percent: 50
+        delivery_mode: shared-visible
+        status: completed
+        guardian_gate: pass
+        rollback_ref: rollback://build-l5-0001
+        promotion_signal: continuity-stable
+      - stage_id: full-100pct
+        traffic_percent: 100
+        delivery_mode: primary-visible
+        status: completed
+        guardian_gate: pass
+        rollback_ref: rollback://build-l5-0001
+        promotion_signal: promotion-complete
+    preserved_invariants:
+      - guardian-gated
+      - rollback-ready
+      - stage-ordered
+    executed_at: "2026-04-20T02:00:00Z"

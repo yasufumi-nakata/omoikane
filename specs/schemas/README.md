@@ -54,10 +54,12 @@
 - `build_request.yaml`
 - `build_artifact.yaml`
 - `patch_descriptor.schema`
+- `sandbox_apply_receipt.schema`
+- `staged_rollout_session.schema`
 
 ## 次段階
 
-procedural skill execution enactment / richer sensory loopback artifacts /
+live workspace mutation hook を伴う builder enactment / richer sensory loopback artifacts /
 live remote PKI federation と key rotation を伴う distributed artifacts は
 reference runtime の対象が広がる段階で追加する。
 

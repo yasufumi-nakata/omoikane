@@ -351,6 +351,31 @@ entries:
       - docs/04-ai-governance/self-modification.md
     rationale: Differential evaluation contract across eval selection, A/B result reports, and rollout classification.
   - priority: P1
+    kind: schema
+    file: specs/schemas/sandbox_apply_receipt.schema
+    consumers:
+      - specs/interfaces/selfctor.rollout.v0.idl
+      - docs/02-subsystems/self-construction/README.md
+      - reference-runtime
+    rationale: Required to serialize one rollback-ready Mirage Self sandbox apply receipt after builder artifacts are materialized.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/staged_rollout_session.schema
+    consumers:
+      - specs/interfaces/selfctor.rollout.v0.idl
+      - docs/04-ai-governance/self-modification.md
+      - reference-runtime
+    rationale: Required to serialize the fixed Stage 0/1/2/3 builder rollout execution and rollback-ready promotion state.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.rollout.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make Mirage Self sandbox apply and staged rollout execution machine-readable in the L5 builder pipeline.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl
     consumers:
@@ -1238,6 +1263,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/07-reference-implementation/README.md
     rationale: Protects the council-approved build_request handoff, immutable boundary validation, differential eval selection, and rollout promotion classification.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/builder_staged_rollout_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects rollback-ready sandbox apply receipts and the fixed Stage 0/1/2/3 builder rollout execution order.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

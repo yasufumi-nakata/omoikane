@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from omoikane.self_construction import DifferentialEvaluatorService, PatchGeneratorService
+from omoikane.self_construction import (
+    DifferentialEvaluatorService,
+    PatchGeneratorService,
+    RolloutPlannerService,
+    SandboxApplyService,
+)
 
 
 class PatchGeneratorServiceTests(unittest.TestCase):
@@ -78,6 +83,77 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
         result = service.classify_rollout(outcomes=["pass", "regression"])
 
         self.assertEqual("rollback", result["decision"])
+
+
+class SandboxApplyServiceTests(unittest.TestCase):
+    def test_apply_artifact_emits_receipt_with_rollback_ready_invariants(self) -> None:
+        request = {
+            "request_id": "build-l5-0001",
+            "constraints": {
+                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+            },
+        }
+        build_artifact = PatchGeneratorService().generate_patch_set(
+            {
+                "request_id": "build-l5-0001",
+                "target_subsystem": "L5.DifferentialEvaluator",
+                "constraints": {
+                    "must_pass": ["evals/continuity/council_output_build_request_pipeline.yaml"],
+                    "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                    "allowed_write_paths": [
+                        "src/omoikane/self_construction/",
+                        "tests/unit/",
+                    ],
+                },
+                "workspace_scope": ["src/", "tests/", "evals/"],
+                "output_paths": [
+                    "src/omoikane/self_construction/",
+                    "tests/unit/",
+                ],
+                "spec_refs": [],
+                "design_refs": [],
+            }
+        )
+
+        receipt = SandboxApplyService().apply_artifact(
+            build_request=request,
+            build_artifact=build_artifact,
+        )
+
+        self.assertEqual("applied", receipt["status"])
+        self.assertTrue(receipt["validation"]["rollback_ready"])
+        self.assertEqual([], receipt["external_effects"])
+        self.assertEqual(2, receipt["applied_patch_count"])
+
+
+class RolloutPlannerServiceTests(unittest.TestCase):
+    def test_execute_rollout_completes_fixed_stage_order_for_promote(self) -> None:
+        service = RolloutPlannerService()
+
+        session = service.execute_rollout(
+            build_request={"request_id": "build-l5-0001"},
+            apply_receipt={
+                "receipt_id": "sandbox-apply-0123456789ab",
+                "artifact_id": "artifact-0123456789ab",
+                "rollback_plan_ref": "rollback://build-l5-0001",
+                "continuity_log_ref": "ledger://self-modify/build-l5-0001",
+                "validation": {"rollback_ready": True},
+            },
+            eval_reports=[
+                {"eval_ref": "evals/continuity/council_output_build_request_pipeline.yaml"},
+                {"eval_ref": "evals/continuity/builder_staged_rollout_execution.yaml"},
+            ],
+            decision="promote",
+            guardian_gate_status="pass",
+        )
+
+        self.assertEqual("promoted", session["status"])
+        self.assertEqual(4, session["completed_stage_count"])
+        self.assertEqual(
+            ["dark-launch", "canary-5pct", "broad-50pct", "full-100pct"],
+            [stage["stage_id"] for stage in session["stages"]],
+        )
+        self.assertTrue(service.validate_session(session)["ok"])
 
 
 if __name__ == "__main__":

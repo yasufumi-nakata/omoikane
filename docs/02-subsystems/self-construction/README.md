@@ -51,7 +51,7 @@ ContinuityLedger に記録
 ```
 
 reference runtime では `builder-demo` がこの流れのうち
-`build_request -> patch descriptor -> differential eval -> rollout classify`
+`build_request -> patch descriptor -> sandbox apply -> differential eval -> rollout classify -> staged rollout`
 までを deterministic に再現する。
 
 ## Mirage Self（サンドボックス自我）

@@ -35,6 +35,7 @@
 - `interface.wms.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`
+- `selfctor.rollout.v0.idl`
 - `selfctor.sandboxer.v0.idl`
 
 ## 次段階

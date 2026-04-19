@@ -182,11 +182,14 @@ self implication を重み付きで集計して
 Guardian が sandbox を即時凍結することを確認する。
 
 `builder-demo` は L5 self-construction builder pipeline の reference contract
-(`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0`) を JSON で可視化し、
-Council の `emit_build_request` handoff が `build_request` / `build_artifact`
-schema に束縛されたまま immutable boundary を検証し、
-patch descriptor 生成、`council_output_build_request_pipeline` eval 選定、
-`promote` / `hold` / `rollback` の rollout 分類まで
+(`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0`) を
+JSON で可視化し、Council の `emit_build_request` handoff が
+`build_request` / `build_artifact` / `sandbox_apply_receipt` /
+`staged_rollout_session` schema に束縛されたまま immutable boundary を検証し、
+Mirage Self への sandbox apply、`council_output_build_request_pipeline` と
+`builder_staged_rollout_execution` eval 選定、`promote` / `hold` / `rollback`
+の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
+`full-100pct`) の固定順序実行まで
 ledger-safe な `self-modify` chain で進むことを確認する。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
@@ -329,5 +332,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - distributed transport key rotation / remote PKI federation を actual network に接続
 - Guardian oversight reviewer の remote attestation transport を actual verifier network に接続
 - AscensionScheduler external verifier の真正性証明と live 接続
-- generated patch descriptor の actual sandbox apply / staged rollout execution
+- builder sandbox apply / staged rollout execution の live workspace mutation hook と real eval runner 連携
 - automation による未実装ギャップの継続充填

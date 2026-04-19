@@ -51,6 +51,11 @@ Council が `emit_build_request` で発行した builder handoff が
 immutable boundary を保ったまま patch descriptor 生成、
 differential eval、promote/hold/rollback 分類まで到達するか。
 
+### Builder Staged Rollout Execution
+Mirage Self への sandbox apply が rollback-ready receipt を返し、
+builder staged rollout が dark-launch から full-100pct まで
+固定順序で完了するか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 

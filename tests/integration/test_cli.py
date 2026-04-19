@@ -216,16 +216,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["scope_allowed"])
         self.assertEqual(2, result["validation"]["patch_count"])
+        self.assertEqual("applied", result["validation"]["sandbox_apply_status"])
         self.assertEqual("promote", result["validation"]["rollout_decision"])
+        self.assertEqual("promoted", result["validation"]["rollout_status"])
+        self.assertEqual(4, result["validation"]["rollout_completed_stage_count"])
         self.assertEqual("ready", result["builder"]["artifact"]["status"])
         self.assertEqual(
-            ["evals/continuity/council_output_build_request_pipeline.yaml"],
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/builder_staged_rollout_execution.yaml",
+            ],
             result["builder"]["suite_selection"]["selected_evals"],
         )
         self.assertEqual(
             "emit_build_request",
             result["builder"]["council_output"]["approved_action"],
         )
+        self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
 
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()

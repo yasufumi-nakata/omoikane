@@ -83,7 +83,9 @@ from .self_construction import (
     DifferentialEvaluatorService,
     GapScanner,
     PatchGeneratorService,
+    RolloutPlannerService,
     SandboxSentinel,
+    SandboxApplyService,
 )
 from .substrate.adapter import ClassicalSiliconAdapter
 
@@ -190,6 +192,8 @@ class OmoikaneReferenceOS:
         self.trust = TrustService()
         self.patch_generator = PatchGeneratorService()
         self.diff_evaluator = DifferentialEvaluatorService()
+        self.sandbox_apply = SandboxApplyService()
+        self.rollout_planner = RolloutPlannerService()
         self.amendment = AmendmentService()
         self.oversight = OversightService(trust_service=self.trust)
         self.naming = NamingService()
@@ -5726,8 +5730,11 @@ class OmoikaneReferenceOS:
             "spec_refs": [
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
+                "specs/interfaces/selfctor.rollout.v0.idl",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
+                "specs/schemas/sandbox_apply_receipt.schema",
+                "specs/schemas/staged_rollout_session.schema",
             ],
             "invariants": [
                 "self_modify requires sandbox A/B + guardian_sig",
@@ -5735,7 +5742,10 @@ class OmoikaneReferenceOS:
                 "self_modify never weakens ContinuityLedger append-only guarantees",
             ],
             "constraints": {
-                "must_pass": ["evals/continuity/council_output_build_request_pipeline.yaml"],
+                "must_pass": [
+                    "evals/continuity/council_output_build_request_pipeline.yaml",
+                    "evals/continuity/builder_staged_rollout_execution.yaml",
+                ],
                 "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
                 "sandbox_profile": "forked-self",
                 "allowed_write_paths": [
@@ -5776,6 +5786,11 @@ class OmoikaneReferenceOS:
             self.patch_generator.describe_patch(descriptor)
             for descriptor in build_artifact.get("patches", [])
         ]
+        sandbox_apply_receipt = self.sandbox_apply.apply_artifact(
+            build_request=build_request,
+            build_artifact=build_artifact,
+        )
+        sandbox_apply_validation = self.sandbox_apply.validate_receipt(sandbox_apply_receipt)
         suite_selection = self.diff_evaluator.select_suite(
             target_subsystem=build_request["target_subsystem"],
             requested_evals=build_request["constraints"]["must_pass"],
@@ -5784,13 +5799,21 @@ class OmoikaneReferenceOS:
             self.diff_evaluator.run_ab_eval(
                 eval_ref=eval_ref,
                 baseline_ref="runtime://baseline/current",
-                sandbox_ref=f"runtime://sandbox/{build_artifact['artifact_id']}",
+                sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
             )
             for eval_ref in suite_selection["selected_evals"]
         ]
         rollout = self.diff_evaluator.classify_rollout(
             outcomes=[report["outcome"] for report in eval_reports]
         )
+        rollout_session = self.rollout_planner.execute_rollout(
+            build_request=build_request,
+            apply_receipt=sandbox_apply_receipt,
+            eval_reports=eval_reports,
+            decision=rollout["decision"],
+            guardian_gate_status=build_request["approval_context"]["guardian_gate"],
+        )
+        rollout_session_validation = self.rollout_planner.validate_session(rollout_session)
         council_output = {
             "kind": "council_output",
             "schema_version": "1.0.0",
@@ -5865,6 +5888,20 @@ class OmoikaneReferenceOS:
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="selfctor.sandbox.applied",
+            payload={
+                "policy": self.sandbox_apply.policy(),
+                "receipt": sandbox_apply_receipt,
+                "validation": sandbox_apply_validation,
+            },
+            actor="SandboxApplyService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="selfctor.diff_eval.completed",
             payload={
                 "policy": self.diff_evaluator.policy(),
@@ -5891,6 +5928,20 @@ class OmoikaneReferenceOS:
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollout.executed",
+            payload={
+                "policy": self.rollout_planner.policy(),
+                "session": rollout_session,
+                "validation": rollout_session_validation,
+            },
+            actor="RolloutPlanner",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         all_evals_passed = all(report["outcome"] == "pass" for report in eval_reports)
         return {
@@ -5905,17 +5956,22 @@ class OmoikaneReferenceOS:
                 "diff_evaluator_policy": self.diff_evaluator.policy(),
                 "scope_validation": scope_validation,
                 "artifact": build_artifact,
+                "sandbox_apply_receipt": sandbox_apply_receipt,
                 "patches": patch_descriptions,
                 "suite_selection": suite_selection,
                 "eval_reports": eval_reports,
                 "rollout": rollout,
+                "rollout_session": rollout_session,
             },
             "validation": {
                 "ok": (
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
+                    and sandbox_apply_validation["ok"]
                     and all_evals_passed
                     and rollout["decision"] == "promote"
+                    and rollout_session_validation["ok"]
+                    and rollout_session["status"] == "promoted"
                 ),
                 "scope_allowed": scope_validation["allowed"],
                 "immutable_boundaries_preserved": set(
@@ -5923,9 +5979,17 @@ class OmoikaneReferenceOS:
                 )
                 == {"L1.EthicsEnforcer", "L1.ContinuityLedger"},
                 "patch_count": len(build_artifact.get("patches", [])),
+                "sandbox_apply_ok": sandbox_apply_validation["ok"],
+                "sandbox_apply_status": sandbox_apply_receipt["status"],
+                "sandbox_apply_patch_count": sandbox_apply_receipt["applied_patch_count"],
                 "selected_eval_count": len(suite_selection["selected_evals"]),
                 "all_evals_passed": all_evals_passed,
                 "rollout_decision": rollout["decision"],
+                "rollout_session_ok": rollout_session_validation["ok"],
+                "rollout_status": rollout_session["status"],
+                "rollout_completed_stage_count": rollout_session["completed_stage_count"],
+                "rollout_stage_ids": [stage["stage_id"] for stage in rollout_session["stages"]],
+                "rollback_ready": rollout_session["rollback_ready"],
                 "council_output_binds_build_request": council_output["emitted_artifacts"][0]["ref"]
                 == f"build://{build_request['request_id']}",
             },

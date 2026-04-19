@@ -175,7 +175,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     builder_parser = subparsers.add_parser(
         "builder-demo",
-        help="Run the L5 build-request, patch generation, and differential evaluation scenario",
+        help="Run the L5 build-request, sandbox apply, differential eval, and staged rollout scenario",
     )
     builder_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

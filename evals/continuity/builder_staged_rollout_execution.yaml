@@ -1,0 +1,20 @@
+eval_id: builder_staged_rollout_execution
+target: selfctor.rollout
+summary: >
+  Mirage Self への sandbox apply が rollback-ready receipt を返し、
+  builder staged rollout が dark-launch から full-100pct まで固定順序で完了すること
+checks:
+  - name: builder rollout demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
+expect:
+  sandbox_apply_status: applied
+  sandbox_apply_patch_count: 2
+  rollout_status: promoted
+  rollout_completed_stage_count: 4
+  rollout_stage_ids:
+    - dark-launch
+    - canary-5pct
+    - broad-50pct
+    - full-100pct
+  rollback_ready: true
+  self_modify_ledger_count: 6

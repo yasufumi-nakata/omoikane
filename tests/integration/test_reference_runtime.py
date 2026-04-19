@@ -219,14 +219,30 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["scope_allowed"])
         self.assertTrue(result["validation"]["immutable_boundaries_preserved"])
         self.assertEqual(2, result["validation"]["patch_count"])
-        self.assertEqual(1, result["validation"]["selected_eval_count"])
+        self.assertTrue(result["validation"]["sandbox_apply_ok"])
+        self.assertEqual("applied", result["validation"]["sandbox_apply_status"])
+        self.assertEqual(2, result["validation"]["sandbox_apply_patch_count"])
+        self.assertEqual(2, result["validation"]["selected_eval_count"])
         self.assertEqual("promote", result["validation"]["rollout_decision"])
+        self.assertTrue(result["validation"]["rollout_session_ok"])
+        self.assertEqual("promoted", result["validation"]["rollout_status"])
+        self.assertEqual(4, result["validation"]["rollout_completed_stage_count"])
+        self.assertEqual(
+            ["dark-launch", "canary-5pct", "broad-50pct", "full-100pct"],
+            result["validation"]["rollout_stage_ids"],
+        )
+        self.assertTrue(result["validation"]["rollback_ready"])
         self.assertEqual("ready", result["builder"]["artifact"]["status"])
         self.assertEqual(
-            ["evals/continuity/council_output_build_request_pipeline.yaml"],
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/builder_staged_rollout_execution.yaml",
+            ],
             result["builder"]["suite_selection"]["selected_evals"],
         )
-        self.assertEqual(4, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual("applied", result["builder"]["sandbox_apply_receipt"]["status"])
+        self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
+        self.assertEqual(6, result["ledger_verification"]["category_counts"]["self-modify"])
 
     def test_reasoning_demo_records_baseline_and_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()

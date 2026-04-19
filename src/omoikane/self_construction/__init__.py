@@ -5,6 +5,10 @@ from .builders import (
     DifferentialEvaluatorService,
     PatchGeneratorPolicy,
     PatchGeneratorService,
+    RolloutPlannerPolicy,
+    RolloutPlannerService,
+    SandboxApplyPolicy,
+    SandboxApplyService,
 )
 from .gaps import GapScanner
 from .sandbox import SandboxSentinel, SandboxSignalProfile
@@ -15,6 +19,10 @@ __all__ = [
     "GapScanner",
     "PatchGeneratorPolicy",
     "PatchGeneratorService",
+    "RolloutPlannerPolicy",
+    "RolloutPlannerService",
     "SandboxSentinel",
+    "SandboxApplyPolicy",
+    "SandboxApplyService",
     "SandboxSignalProfile",
 ]
