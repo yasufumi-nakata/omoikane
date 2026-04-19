@@ -1,0 +1,152 @@
+idl_version: 1
+kind: service
+namespace: cognitive.imagination.v0
+service: ImaginationService
+summary: Deterministic imagination failover and bounded co-imagination handoff contract for the L3 reference runtime.
+imports:
+  imagination_scene: ../schemas/imagination_scene.schema
+  imagination_shift: ../schemas/imagination_shift.schema
+operations:
+  compose_scene:
+    summary: Compose one bounded counterfactual scene from attention focus, affect guard, and council witness state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - seed_prompt
+          - attention_focus
+          - affect_guard
+          - world_mode_preference
+          - continuity_pressure
+          - council_witnessed
+          - memory_cues
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+            minLength: 1
+          seed_prompt:
+            type: string
+            minLength: 1
+          attention_focus:
+            type: string
+            minLength: 1
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          world_mode_preference:
+            type: string
+            enum:
+              - shared_reality
+              - private_reality
+              - mixed
+          continuity_pressure:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          council_witnessed:
+            type: boolean
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - motif
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                motif:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+    output:
+      schema_ref: imagination_scene
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - co_imagination handoff requires council witness and nominal affect guard
+      - non-nominal affect guards must reduce the scene to private_reality
+  validate_scene:
+    summary: Validate one imagination scene snapshot against the fixed failover and handoff policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: imagination_scene
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - handoff_mode
+          - guard_aligned
+          - co_imagination_ready
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          handoff_mode:
+            type: string
+          guard_aligned:
+            type: boolean
+          co_imagination_ready:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe imagination failover summary.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: imagination_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - handoff_mode
+          - guard_aligned
+          - co_imagination_ready
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          handoff_mode:
+            type: string
+          guard_aligned:
+            type: boolean
+          co_imagination_ready:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.imagination.failover
+    payload:
+      schema_ref: imagination_shift

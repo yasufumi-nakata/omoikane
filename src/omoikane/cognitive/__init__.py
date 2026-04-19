@@ -22,6 +22,13 @@ from .volition import (
     VolitionRequest,
     VolitionService,
 )
+from .imagination import (
+    ContinuitySceneGuardBackend,
+    CounterfactualSceneBackend,
+    ImaginationCue,
+    ImaginationRequest,
+    ImaginationService,
+)
 from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
@@ -40,7 +47,12 @@ __all__ = [
     "BackendUnavailableError",
     "CognitiveProfile",
     "ContinuityAnchorAttentionBackend",
+    "ContinuitySceneGuardBackend",
+    "CounterfactualSceneBackend",
     "HomeostaticAffectBackend",
+    "ImaginationCue",
+    "ImaginationRequest",
+    "ImaginationService",
     "NarrativeReasoningBackend",
     "ReasoningService",
     "SalienceRoutingAttentionBackend",

@@ -119,6 +119,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     volition_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    imagination_parser = subparsers.add_parser(
+        "imagination-demo",
+        help="Run the L3 imagination backend failover and bounded IMC/WMS handoff scenario",
+    )
+    imagination_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     qualia_parser = subparsers.add_parser(
         "qualia-demo",
         help="Run the L2 qualia surrogate profile and checkpoint scenario",
@@ -286,6 +292,10 @@ def main() -> None:
 
     if args.command == "volition-demo":
         _print_result(runtime.run_volition_demo(), args.json)
+        return
+
+    if args.command == "imagination-demo":
+        _print_result(runtime.run_imagination_demo(), args.json)
         return
 
     if args.command == "qualia-demo":

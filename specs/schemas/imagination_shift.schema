@@ -1,0 +1,98 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/imagination_shift.schema"
+title: ImaginationShift
+description: Ledger-safe L3 imagination failover summary emitted by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy_id
+  - scene_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_scene_id
+  - previous_focus
+  - handoff_mode
+  - wms_mode
+  - affect_guard
+  - co_imagination_ready
+  - guard_aligned
+  - failures
+  - digest
+properties:
+  kind:
+    const: imagination_shift
+  schema_version:
+    const: 1.0.0
+  policy_id:
+    const: bounded-counterfactual-handoff-v1
+  scene_ref:
+    type: string
+    pattern: "^imagination-scene-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_scene_id:
+    type:
+      - string
+      - "null"
+  previous_focus:
+    type:
+      - string
+      - "null"
+  handoff_mode:
+    type: string
+    enum:
+      - co_imagination
+      - local-preview
+      - private-sandbox
+  wms_mode:
+    type: string
+    enum:
+      - shared_reality
+      - private_reality
+      - mixed
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  co_imagination_ready:
+    type: boolean
+  guard_aligned:
+    type: boolean
+  failures:
+    type: array
+    items:
+      type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: imagination_shift
+    schema_version: 1.0.0
+    policy_id: bounded-counterfactual-handoff-v1
+    scene_ref: imagination-scene-6c3b575b4e0e
+    selected_backend: continuity_scene_guard_v1
+    attempted_backends: [counterfactual_scene_v1, continuity_scene_guard_v1]
+    degraded: true
+    previous_scene_id: imagination-scene-1a1d575b4e0e
+    previous_focus: bridge-rehearsal
+    handoff_mode: private-sandbox
+    wms_mode: private_reality
+    affect_guard: observe
+    co_imagination_ready: false
+    guard_aligned: true
+    failures: [counterfactual_scene_v1 is unavailable]
+    digest: 688cc82f6ce6d82377225131afd96423e5d9a7f95964149c2e8f2aa452a47c89

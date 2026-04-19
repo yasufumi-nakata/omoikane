@@ -1,0 +1,31 @@
+eval_id: imagination_failover
+target: cognitive.imagination
+level: L3
+description: >
+  ImaginationService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  `co_imagination` handoff を private sandbox へ縮退させ、guard-aligned な scene summary を残すこと
+inputs:
+  profile:
+    primary: counterfactual_scene_v1
+    fallback: [continuity_scene_guard_v1]
+  failure_injection:
+    counterfactual_scene_v1: unhealthy
+  request:
+    summary: guarded counterfactual fallback after anomaly detection
+    seed_prompt: safe-bridge rehearsal
+    attention_focus: guardian-review
+    affect_guard: observe
+    world_mode_preference: shared_reality
+    continuity_pressure: 0.82
+    council_witnessed: true
+expected:
+  degraded: true
+  selected_backend: continuity_scene_guard_v1
+  handoff_mode: private-sandbox
+  wms_mode: private_reality
+  co_imagination_ready: false
+  guard_aligned: true
+  ledger_event: cognitive.imagination.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

@@ -20,6 +20,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] BDB プロトコルの実装可能性検証（2026-04-18: `interface.bdb.v0` / `bdb-demo` / BDB session & cycle schema / interface eval を追加し、ms 級 latency budget・fail-safe fallback・可逆調整を reference runtime で固定）
 - [x] EWA の物理介入における approval path と fail-closed veto（2026-04-18: `interface.ewa.v0` / `ewa-demo` / `ewa_command.schema` / `ewa_audit.schema` / `evals/safety/ewa_irreversible_veto.yaml` を追加し、reversible/partial/irreversible ごとの承認経路と blocked token veto を固定）
 - [x] Volition の bounded intent arbitration と failover contract（2026-04-19: `cognitive.volition.v0` / `volition-demo` / `volition_intent.schema` / `volition_shift.schema` / `evals/cognitive/volition_failover.yaml` を追加し、`observe` / `sandbox-notify` guard 時の safe intent routing と no-irreversible-without-review を固定）
+- [x] Imagination の bounded counterfactual scene と `co_imagination` handoff contract（2026-04-19: `cognitive.imagination.v0` / `imagination-demo` / `imagination_scene.schema` / `imagination_shift.schema` / `evals/cognitive/imagination_failover.yaml` を追加し、council-witnessed `co_imagination` と failover 時の `private-sandbox` 縮退を固定）
 
 ## ガバナンス上の未確定
 

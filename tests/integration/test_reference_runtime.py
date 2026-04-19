@@ -228,6 +228,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
+    def test_imagination_demo_records_private_fallback_and_shared_baseline(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_imagination_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("continuity_scene_guard_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["baseline_co_imagination_ready"])
+        self.assertTrue(result["validation"]["baseline_shared_handoff"])
+        self.assertTrue(result["validation"]["failover_private"])
+        self.assertEqual("co_imagination", result["baseline"]["handoff"]["imc_session"]["mode"])
+        self.assertEqual("private-sandbox", result["imagination"]["scene"]["handoff"]["mode"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
     def test_qualia_demo_reports_reference_sampling_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
 

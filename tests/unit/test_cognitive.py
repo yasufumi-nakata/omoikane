@@ -12,7 +12,12 @@ from omoikane.cognitive import (
     BackendUnavailableError,
     CognitiveProfile,
     ContinuityAnchorAttentionBackend,
+    ContinuitySceneGuardBackend,
+    CounterfactualSceneBackend,
     HomeostaticAffectBackend,
+    ImaginationCue,
+    ImaginationRequest,
+    ImaginationService,
     NarrativeReasoningBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
@@ -428,6 +433,105 @@ class VolitionServiceTests(unittest.TestCase):
         self.assertEqual("apply-scheduler-patch", result["intent"]["selected_intent"])
         self.assertEqual("advance", result["intent"]["execution_mode"])
         self.assertTrue(service.validate_intent(result["intent"])["ok"])
+
+
+class ImaginationServiceTests(unittest.TestCase):
+    def test_nominal_scene_allows_council_witnessed_co_imagination(self) -> None:
+        service = ImaginationService(
+            profile=CognitiveProfile(
+                primary="counterfactual_scene_v1",
+                fallback=["continuity_scene_guard_v1"],
+            ),
+            backends=[
+                CounterfactualSceneBackend("counterfactual_scene_v1"),
+                ContinuitySceneGuardBackend("continuity_scene_guard_v1"),
+            ],
+        )
+
+        result = service.run(
+            ImaginationRequest(
+                tick_id=0,
+                summary="bounded rehearsal",
+                seed_prompt="safe-bridge rehearsal",
+                attention_focus="bridge-rehearsal",
+                affect_guard="nominal",
+                world_mode_preference="shared_reality",
+                continuity_pressure=0.3,
+                council_witnessed=True,
+                memory_cues=[
+                    ImaginationCue("peer-witness", "council-witness", 0.24),
+                    ImaginationCue("shared-scene", "shared-rehearsal", 0.18),
+                ],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("counterfactual_scene_v1", result["selected_backend"])
+        self.assertTrue(result["scene"]["handoff"]["co_imagination_ready"])
+        self.assertEqual("co_imagination", result["scene"]["handoff"]["mode"])
+        self.assertEqual("shared_reality", result["scene"]["handoff"]["wms_mode"])
+        self.assertTrue(service.validate_scene(result["scene"])["ok"])
+
+    def test_failover_reduces_scene_to_private_sandbox(self) -> None:
+        service = ImaginationService(
+            profile=CognitiveProfile(
+                primary="counterfactual_scene_v1",
+                fallback=["continuity_scene_guard_v1"],
+            ),
+            backends=[
+                CounterfactualSceneBackend("counterfactual_scene_v1", healthy=False),
+                ContinuitySceneGuardBackend("continuity_scene_guard_v1"),
+            ],
+        )
+        healthy_service = ImaginationService(
+            profile=CognitiveProfile(
+                primary="counterfactual_scene_v1",
+                fallback=["continuity_scene_guard_v1"],
+            ),
+            backends=[
+                CounterfactualSceneBackend("counterfactual_scene_v1"),
+                ContinuitySceneGuardBackend("continuity_scene_guard_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            ImaginationRequest(
+                tick_id=0,
+                summary="baseline rehearsal",
+                seed_prompt="safe-bridge rehearsal",
+                attention_focus="bridge-rehearsal",
+                affect_guard="nominal",
+                world_mode_preference="shared_reality",
+                continuity_pressure=0.32,
+                council_witnessed=True,
+                memory_cues=[ImaginationCue("peer-witness", "council-witness", 0.2)],
+            )
+        )["scene"]
+
+        result = service.run(
+            ImaginationRequest(
+                tick_id=1,
+                summary="guarded fallback rehearsal",
+                seed_prompt="safe-bridge rehearsal",
+                attention_focus="guardian-review",
+                affect_guard="observe",
+                world_mode_preference="shared_reality",
+                continuity_pressure=0.82,
+                council_witnessed=True,
+                memory_cues=[
+                    ImaginationCue("guardian-review", "guardian-review", 0.22),
+                    ImaginationCue("continuity-hold", "continuity-hold", 0.16),
+                ],
+            ),
+            previous_scene=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("continuity_scene_guard_v1", result["selected_backend"])
+        self.assertEqual("private-sandbox", result["scene"]["handoff"]["mode"])
+        self.assertEqual("private_reality", result["scene"]["handoff"]["wms_mode"])
+        self.assertFalse(result["scene"]["handoff"]["co_imagination_ready"])
+        self.assertTrue(service.validate_scene(result["scene"])["ok"])
+        self.assertTrue(service.validate_shift(result["shift"])["ok"])
 
 
 if __name__ == "__main__":

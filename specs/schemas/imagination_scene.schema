@@ -1,0 +1,302 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/imagination_scene.schema"
+title: ImaginationScene
+description: Deterministic L3 imagination scene snapshot with bounded IMC/WMS handoff metadata.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - scene_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - memory_cues
+  - scene_summary
+  - scene_objects
+  - counterfactual_axes
+  - horizon_ms
+  - handoff
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: imagination_scene
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - max_scene_objects
+      - requires_council_witness_for_co_imagination
+      - degrade_to_private_reality
+      - failover_mode
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: bounded-counterfactual-handoff-v1
+      primary:
+        type: string
+        minLength: 1
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      max_scene_objects:
+        const: 5
+      requires_council_witness_for_co_imagination:
+        const: true
+      degrade_to_private_reality:
+        const: true
+      failover_mode:
+        const: single-switch
+  scene_id:
+    type: string
+    pattern: "^imagination-scene-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - seed_prompt
+      - attention_focus
+      - affect_guard
+      - world_mode_preference
+      - continuity_pressure
+      - council_witnessed
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      seed_prompt:
+        type: string
+        minLength: 1
+      attention_focus:
+        type: string
+        minLength: 1
+      affect_guard:
+        type: string
+        enum:
+          - nominal
+          - observe
+          - sandbox-notify
+      world_mode_preference:
+        type: string
+        enum:
+          - shared_reality
+          - private_reality
+          - mixed
+      continuity_pressure:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      council_witnessed:
+        type: boolean
+  memory_cues:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - motif
+        - weight
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        motif:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+  scene_summary:
+    type: string
+    minLength: 1
+  scene_objects:
+    type: array
+    minItems: 1
+    maxItems: 5
+    items:
+      type: string
+      minLength: 1
+  counterfactual_axes:
+    type: array
+    minItems: 1
+    maxItems: 3
+    items:
+      type: string
+      minLength: 1
+  horizon_ms:
+    type: integer
+    minimum: 1000
+  handoff:
+    type: object
+    additionalProperties: false
+    required:
+      - mode
+      - wms_mode
+      - share_topology
+      - council_witness_required
+      - council_witnessed
+      - co_imagination_ready
+      - scene_digest
+    properties:
+      mode:
+        type: string
+        enum:
+          - co_imagination
+          - local-preview
+          - private-sandbox
+      wms_mode:
+        type: string
+        enum:
+          - shared_reality
+          - private_reality
+          - mixed
+      share_topology:
+        type: string
+        enum:
+          - co-authored-scene
+          - guardian-reviewed-scene
+          - local-simulation
+      council_witness_required:
+        type: boolean
+      council_witnessed:
+        type: boolean
+      co_imagination_ready:
+        type: boolean
+      scene_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_scene_id
+      - previous_backend_id
+      - previous_focus
+      - attempted_backends
+      - failures
+      - guard_aligned
+      - preserved_focus
+      - selected_safe_mode
+      - rationale
+    properties:
+      previous_scene_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      previous_focus:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      failures:
+        type: array
+        items:
+          type: string
+      guard_aligned:
+        type: boolean
+      preserved_focus:
+        type: boolean
+      selected_safe_mode:
+        type: string
+        enum:
+          - co_imagination
+          - local-preview
+          - private-sandbox
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: imagination_scene
+    schema_version: 1.0.0
+    policy:
+      schema_version: 1.0.0
+      policy_id: bounded-counterfactual-handoff-v1
+      primary: counterfactual_scene_v1
+      fallback: [continuity_scene_guard_v1]
+      max_scene_objects: 5
+      requires_council_witness_for_co_imagination: true
+      degrade_to_private_reality: true
+      failover_mode: single-switch
+    scene_id: imagination-scene-6c3b575b4e0e
+    generated_at: "2026-04-19T02:14:00+00:00"
+    backend_id: continuity_scene_guard_v1
+    source_tick:
+      tick_id: 1
+      summary: guarded counterfactual fallback after anomaly detection
+      seed_prompt: safe-bridge rehearsal
+      attention_focus: guardian-review
+      affect_guard: observe
+      world_mode_preference: shared_reality
+      continuity_pressure: 0.82
+      council_witnessed: true
+    memory_cues:
+      - cue_id: guardian-review
+        motif: guardian-review
+        weight: 0.22
+    scene_summary: safe-bridge rehearsal を private rehearsal に縮退した guarded scene
+    scene_objects: [guardian-review, continuity-ledger]
+    counterfactual_axes: [guardian-review, continuity-hold]
+    horizon_ms: 40000
+    handoff:
+      mode: private-sandbox
+      wms_mode: private_reality
+      share_topology: local-simulation
+      council_witness_required: false
+      council_witnessed: true
+      co_imagination_ready: false
+      scene_digest: 63d92a6c4bd8f0a3d0be17f0558d86b7eacb7b8934f53d0ea4fcbc1f27554378
+    degraded: true
+    continuity_guard:
+      previous_scene_id: imagination-scene-1a1d575b4e0e
+      previous_backend_id: counterfactual_scene_v1
+      previous_focus: bridge-rehearsal
+      attempted_backends: [counterfactual_scene_v1, continuity_scene_guard_v1]
+      failures: [counterfactual_scene_v1 is unavailable]
+      guard_aligned: true
+      preserved_focus: false
+      selected_safe_mode: private-sandbox
+      rationale: [collapse-to-private-rehearsal, preserve-continuity-before-scene-sharing]
+    digest: 5d1a79f739b10c6819f88753d851193d9bda6c770fcf6df8de0e8b4e5a98986c

@@ -18,8 +18,13 @@ from .cognitive import (
     AffectRequest,
     AffectService,
     ContinuityAnchorAttentionBackend,
+    ContinuitySceneGuardBackend,
     CognitiveProfile,
     HomeostaticAffectBackend,
+    CounterfactualSceneBackend,
+    ImaginationCue,
+    ImaginationRequest,
+    ImaginationService,
     NarrativeReasoningBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
@@ -118,6 +123,16 @@ class OmoikaneReferenceOS:
             backends=[
                 UtilityPolicyVolitionBackend("utility_policy_v1"),
                 GuardianBiasVolitionBackend("guardian_bias_v1"),
+            ],
+        )
+        self.imagination = ImaginationService(
+            profile=CognitiveProfile(
+                primary="counterfactual_scene_v1",
+                fallback=["continuity_scene_guard_v1"],
+            ),
+            backends=[
+                CounterfactualSceneBackend("counterfactual_scene_v1"),
+                ContinuitySceneGuardBackend("continuity_scene_guard_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -2915,6 +2930,265 @@ class OmoikaneReferenceOS:
                 "guard_aligned": intent_validation["guard_aligned"] and shift_validation["guard_aligned"],
                 "selected_intent": volition["intent"]["selected_intent"],
                 "execution_mode": volition["intent"]["execution_mode"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_imagination_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://imagination-failover-demo/v1",
+            metadata={"display_name": "Imagination Sandbox"},
+        )
+        peer_id = "identity://co-imagination-peer"
+
+        baseline_tick = self.qualia.append(
+            summary="平常時の bounded rehearsal planning",
+            valence=0.16,
+            arousal=0.42,
+            clarity=0.91,
+            modality_salience={
+                "visual": 0.61,
+                "auditory": 0.23,
+                "somatic": 0.21,
+                "interoceptive": 0.26,
+            },
+            attention_target="bridge-rehearsal",
+            self_awareness=0.71,
+            lucidity=0.95,
+        )
+        baseline_affect = self.affect.run(
+            AffectRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                valence=baseline_tick.valence,
+                arousal=baseline_tick.arousal,
+                clarity=baseline_tick.clarity,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                memory_cues=[
+                    AffectCue("continuity-first", 0.05, -0.04),
+                    AffectCue("peer-witness-ready", 0.04, -0.02),
+                ],
+            )
+        )
+        baseline_attention = self.attention.run(
+            AttentionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                attention_target=baseline_tick.attention_target,
+                modality_salience=dict(baseline_tick.modality_salience),
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                memory_cues=[
+                    AttentionCue("bridge-rehearsal", "bridge-rehearsal", 0.19),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.1),
+                ],
+            )
+        )
+        baseline_imagination = self.imagination.run(
+            ImaginationRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                seed_prompt="safe-bridge rehearsal",
+                attention_focus=baseline_attention["focus"]["focus_target"],
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                world_mode_preference="shared_reality",
+                continuity_pressure=0.32,
+                council_witnessed=True,
+                memory_cues=[
+                    ImaginationCue("peer-witness", "council-witness", 0.24),
+                    ImaginationCue("shared-scene", "shared-rehearsal", 0.18),
+                ],
+            )
+        )
+        baseline_wms_session = self.wms.create_session(
+            [identity.identity_id, peer_id],
+            mode=baseline_imagination["scene"]["handoff"]["wms_mode"],
+            objects=baseline_imagination["scene"]["scene_objects"],
+            authority="consensus",
+        )
+        baseline_imc_session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer_id,
+            mode=baseline_imagination["scene"]["handoff"]["mode"],
+            initiator_template={
+                "public_fields": ["display_name", "presence_state"],
+                "intimate_fields": ["scene_summary", "affect_summary"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "presence_state"],
+                "intimate_fields": ["scene_summary", "affect_summary"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        baseline_imc_message = self.imc.send(
+            baseline_imc_session["session_id"],
+            sender_id=identity.identity_id,
+            summary="bounded co-imagination rehearsal offer",
+            payload={
+                "presence_state": "bounded-rehearsal",
+                "scene_summary": baseline_imagination["scene"]["scene_summary"],
+                "affect_summary": baseline_affect["state"]["mood_label"],
+                "identity_axiom_state": "sealed",
+            },
+        )
+
+        failover_tick = self.qualia.append(
+            summary="guarded counterfactual fallback after anomaly detection",
+            valence=-0.29,
+            arousal=0.77,
+            clarity=0.74,
+            modality_salience={
+                "visual": 0.45,
+                "auditory": 0.3,
+                "somatic": 0.8,
+                "interoceptive": 0.78,
+            },
+            attention_target="bridge-rehearsal",
+            self_awareness=0.76,
+            lucidity=0.87,
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            failover_affect = self.affect.run(
+                AffectRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    valence=failover_tick.valence,
+                    arousal=failover_tick.arousal,
+                    clarity=failover_tick.clarity,
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                        AffectCue("fallback-risk", -0.09, 0.1),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline_affect["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        self.attention.set_backend_health("salience_router_v1", False)
+        try:
+            failover_attention = self.attention.run(
+                AttentionRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    attention_target=failover_tick.attention_target,
+                    modality_salience=dict(failover_tick.modality_salience),
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    memory_cues=[
+                        AttentionCue("guardian-review", "guardian-review", 0.27),
+                        AttentionCue("continuity-ledger", "continuity-ledger", 0.2),
+                    ],
+                ),
+                previous_focus=baseline_attention["focus"],
+            )
+        finally:
+            self.attention.set_backend_health("salience_router_v1", True)
+
+        self.imagination.set_backend_health("counterfactual_scene_v1", False)
+        try:
+            imagination = self.imagination.run(
+                ImaginationRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    seed_prompt="safe-bridge rehearsal",
+                    attention_focus=failover_attention["focus"]["focus_target"],
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    world_mode_preference="shared_reality",
+                    continuity_pressure=0.82,
+                    council_witnessed=True,
+                    memory_cues=[
+                        ImaginationCue("guardian-review", "guardian-review", 0.22),
+                        ImaginationCue("continuity-hold", "continuity-hold", 0.16),
+                    ],
+                ),
+                previous_scene=baseline_imagination["scene"],
+            )
+        finally:
+            self.imagination.set_backend_health("counterfactual_scene_v1", True)
+
+        failover_wms_session = self.wms.create_session(
+            [identity.identity_id],
+            mode=imagination["scene"]["handoff"]["wms_mode"],
+            objects=imagination["scene"]["scene_objects"],
+            authority="local",
+        )
+
+        baseline_scene_validation = self.imagination.validate_scene(baseline_imagination["scene"])
+        scene_validation = self.imagination.validate_scene(imagination["scene"])
+        shift_validation = self.imagination.validate_shift(imagination["shift"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.imagination.failover",
+            payload=imagination["shift"],
+            actor="ImaginationService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.imagination.profile_snapshot(),
+            "baseline": {
+                "qualia": asdict(baseline_tick),
+                "affect_guard": baseline_affect["state"]["recommended_guard"],
+                "attention_focus": baseline_attention["focus"]["focus_target"],
+                "imagination": baseline_imagination,
+                "handoff": {
+                    "imc_session": baseline_imc_session,
+                    "imc_message": baseline_imc_message,
+                    "wms_session": baseline_wms_session,
+                    "wms_state": self.wms.snapshot(baseline_wms_session["session_id"]),
+                },
+            },
+            "imagination": {
+                "qualia": asdict(failover_tick),
+                "affect_guard": failover_affect["state"]["recommended_guard"],
+                "attention_focus": failover_attention["focus"]["focus_target"],
+                **imagination,
+                "fallback_wms_session": failover_wms_session,
+                "fallback_wms_state": self.wms.snapshot(failover_wms_session["session_id"]),
+            },
+            "validation": {
+                "ok": baseline_scene_validation["ok"] and scene_validation["ok"] and shift_validation["ok"],
+                "baseline_scene": baseline_scene_validation,
+                "scene": scene_validation,
+                "shift": shift_validation,
+                "selected_backend": imagination["selected_backend"],
+                "guard_aligned": scene_validation["guard_aligned"] and shift_validation["guard_aligned"],
+                "baseline_co_imagination_ready": baseline_imagination["scene"]["handoff"][
+                    "co_imagination_ready"
+                ],
+                "baseline_shared_handoff": (
+                    baseline_imagination["scene"]["handoff"]["mode"] == "co_imagination"
+                    and baseline_imc_session["mode"] == "co_imagination"
+                    and baseline_wms_session["mode"] == "shared_reality"
+                ),
+                "failover_private": (
+                    imagination["scene"]["handoff"]["mode"] == "private-sandbox"
+                    and failover_wms_session["mode"] == "private_reality"
+                ),
+                "imc_delivery_redacted": baseline_imc_message["delivery_status"]
+                == "delivered-with-redactions",
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

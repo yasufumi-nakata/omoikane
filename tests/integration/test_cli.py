@@ -250,6 +250,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_imagination_demo_emits_bounded_handoff_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "imagination-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("continuity_scene_guard_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["baseline_co_imagination_ready"])
+        self.assertTrue(result["validation"]["baseline_shared_handoff"])
+        self.assertTrue(result["validation"]["failover_private"])
+        self.assertTrue(result["validation"]["imc_delivery_redacted"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
 
