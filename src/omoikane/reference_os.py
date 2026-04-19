@@ -26,6 +26,11 @@ from .cognitive import (
     ImaginationCue,
     ImaginationRequest,
     ImaginationService,
+    LanguageCue,
+    LanguageRequest,
+    LanguageService,
+    SemanticFrameLanguageBackend,
+    ContinuityPhraseLanguageBackend,
     MetacognitionCue,
     MetacognitionRequest,
     MetacognitionService,
@@ -148,6 +153,16 @@ class OmoikaneReferenceOS:
             backends=[
                 ReflectiveLoopBackend("reflective_loop_v1"),
                 ContinuityMirrorBackend("continuity_mirror_v1"),
+            ],
+        )
+        self.language = LanguageService(
+            profile=CognitiveProfile(
+                primary="semantic_frame_v1",
+                fallback=["continuity_phrase_v1"],
+            ),
+            backends=[
+                SemanticFrameLanguageBackend("semantic_frame_v1"),
+                ContinuityPhraseLanguageBackend("continuity_phrase_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -3204,6 +3219,221 @@ class OmoikaneReferenceOS:
                 ),
                 "imc_delivery_redacted": baseline_imc_message["delivery_status"]
                 == "delivered-with-redactions",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_language_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://language-demo/v1",
+            metadata={"display_name": "Language Sandbox"},
+        )
+        baseline_tick = self.qualia.append(
+            "Council 向けの bounded runtime update を準備している",
+            0.11,
+            0.37,
+            0.91,
+            modality_salience={
+                "visual": 0.48,
+                "auditory": 0.26,
+                "somatic": 0.22,
+                "interoceptive": 0.24,
+            },
+            attention_target="status-brief",
+            self_awareness=0.72,
+            lucidity=0.95,
+        )
+        baseline_affect = self.affect.run(
+            AffectRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                valence=baseline_tick.valence,
+                arousal=baseline_tick.arousal,
+                clarity=baseline_tick.clarity,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                memory_cues=[
+                    AffectCue("continuity-first", 0.05, -0.04),
+                    AffectCue("council-brief", 0.03, -0.01),
+                ],
+            )
+        )
+        baseline_attention = self.attention.run(
+            AttentionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                attention_target=baseline_tick.attention_target,
+                modality_salience=dict(baseline_tick.modality_salience),
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                memory_cues=[
+                    AttentionCue("status-brief", "status-brief", 0.18),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.12),
+                ],
+            )
+        )
+        baseline_language = self.language.run(
+            LanguageRequest(
+                tick_id=baseline_tick.tick_id,
+                summary="baseline bounded outward brief",
+                internal_thought="continuity-first runtime patch status with bounded disclosure",
+                audience="council",
+                intent_label="runtime update summary",
+                attention_focus=baseline_attention["focus"]["focus_target"],
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                continuity_pressure=0.29,
+                public_points=[
+                    "continuity-first",
+                    "bounded rollout",
+                    "guardian-audited rollback",
+                ],
+                sealed_terms=["raw thought chain", "private qualia note"],
+                memory_cues=[
+                    LanguageCue("continuity-first", "continuity-first", 0.24),
+                    LanguageCue("bounded-rollout", "bounded rollout", 0.18),
+                ],
+            )
+        )
+
+        stressed_tick = self.qualia.append(
+            "自己境界の揺れを含む draft を検知し guardian review へ切り替える",
+            -0.21,
+            0.63,
+            0.71,
+            modality_salience={
+                "visual": 0.32,
+                "auditory": 0.23,
+                "somatic": 0.67,
+                "interoceptive": 0.75,
+            },
+            attention_target="status-brief",
+            self_awareness=0.78,
+            lucidity=0.83,
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            failover_affect = self.affect.run(
+                AffectRequest(
+                    tick_id=stressed_tick.tick_id,
+                    summary=stressed_tick.summary,
+                    valence=stressed_tick.valence,
+                    arousal=stressed_tick.arousal,
+                    clarity=stressed_tick.clarity,
+                    self_awareness=stressed_tick.self_awareness,
+                    lucidity=stressed_tick.lucidity,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                        AffectCue("fallback-risk", -0.08, 0.1),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline_affect["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        self.attention.set_backend_health("salience_router_v1", False)
+        try:
+            failover_attention = self.attention.run(
+                AttentionRequest(
+                    tick_id=stressed_tick.tick_id,
+                    summary=stressed_tick.summary,
+                    attention_target=stressed_tick.attention_target,
+                    modality_salience=dict(stressed_tick.modality_salience),
+                    self_awareness=stressed_tick.self_awareness,
+                    lucidity=stressed_tick.lucidity,
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    memory_cues=[
+                        AttentionCue("guardian-review", "guardian-review", 0.25),
+                        AttentionCue("continuity-ledger", "continuity-ledger", 0.2),
+                    ],
+                ),
+                previous_focus=baseline_attention["focus"],
+            )
+        finally:
+            self.attention.set_backend_health("salience_router_v1", True)
+
+        self.language.set_backend_health("semantic_frame_v1", False)
+        try:
+            language = self.language.run(
+                LanguageRequest(
+                    tick_id=stressed_tick.tick_id,
+                    summary="guarded fallback language bridge",
+                    internal_thought="raw internal rehearsal mentions identity drift and unresolved distress markers",
+                    audience="peer",
+                    intent_label="status update with anomaly note",
+                    attention_focus=failover_attention["focus"]["focus_target"],
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    continuity_pressure=0.82,
+                    public_points=[
+                        "continuity-first",
+                        "guardian review",
+                        "rollback-ready",
+                    ],
+                    sealed_terms=[
+                        "identity drift note",
+                        "private distress trace",
+                        "raw internal rehearsal",
+                    ],
+                    memory_cues=[
+                        LanguageCue("guardian-review", "guardian review", 0.22),
+                        LanguageCue("rollback-ready", "rollback-ready", 0.17),
+                    ],
+                ),
+                previous_render=baseline_language["render"],
+            )
+        finally:
+            self.language.set_backend_health("semantic_frame_v1", True)
+
+        baseline_validation = self.language.validate_render(baseline_language["render"])
+        render_validation = self.language.validate_render(language["render"])
+        shift_validation = self.language.validate_shift(language["shift"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.language.failover",
+            payload=language["shift"],
+            actor="LanguageService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.language.profile_snapshot(),
+            "baseline": {
+                "qualia": asdict(baseline_tick),
+                "affect_guard": baseline_affect["state"]["recommended_guard"],
+                "attention_focus": baseline_attention["focus"]["focus_target"],
+                "language": baseline_language,
+            },
+            "language": {
+                "qualia": asdict(stressed_tick),
+                "affect_guard": failover_affect["state"]["recommended_guard"],
+                "attention_focus": failover_attention["focus"]["focus_target"],
+                **language,
+            },
+            "validation": {
+                "ok": baseline_validation["ok"] and render_validation["ok"] and shift_validation["ok"],
+                "baseline_primary": baseline_language["selected_backend"] == "semantic_frame_v1"
+                and not baseline_language["degraded"],
+                "selected_backend": language["selected_backend"],
+                "degraded": language["degraded"],
+                "guard_aligned": render_validation["guard_aligned"] and shift_validation["guard_aligned"],
+                "redaction_applied": language["shift"]["redaction_applied"],
+                "delivery_target": language["render"]["delivery_target"],
+                "discourse_mode": language["render"]["discourse_mode"],
+                "private_channel_locked": language["render"]["disclosure_floor"][
+                    "private_channel_locked"
+                ],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

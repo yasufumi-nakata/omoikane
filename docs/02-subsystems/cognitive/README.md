@@ -79,6 +79,13 @@ handoff を許可する。
 `observe` / `sandbox-notify` guard 時は `private_reality` / `private-sandbox`
 へ縮退し、shared scene を開かない。
 
+`Language` は最小の `bounded-thought-text-bridge-v1` を採用し、
+`semantic_frame_v1 -> continuity_phrase_v1` の単純 failover と
+disclosure-floor redaction を持つ。
+`public_points` と `sealed_terms` を起点に 1 つの outward brief を構成し、
+`observe` / `sandbox-notify` guard 時は送達先を `guardian` / `self` に縮退し、
+raw internal thought を ledger-safe な `language_shift` に閉じ込める。
+
 `Metacognition` は最小の `bounded-self-monitor-loop-v1` を採用し、
 `reflective_loop_v1 -> continuity_mirror_v1` の単純 failover と
 bounded self-monitor report を持つ。
@@ -112,13 +119,14 @@ bounded self-monitor report を持つ。
 現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
 health-based failover を持つ。`Affect` は bounded failover と smoothing を持ち、
 `Attention`、`Volition`、`Imagination` も guard-aware / handoff-aware な
-single-switch failover を持つ。`Metacognition` も SelfModel/Qualia 由来の
+single-switch failover を持つ。`Language` も disclosure floor 付きの
+thought-to-text bridge を持ち、`Metacognition` も SelfModel/Qualia 由来の
 bounded self-monitor report と escalation gate を持つが、その他の cognitive surface は引き続き
 `QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
 そのため [evals/cognitive/](../../../evals/cognitive/) では
 qualia/self-model baseline に加え、reasoning failover、affect failover、
 attention failover、volition failover、imagination failover、
-metacognition failover を
+language failover、metacognition failover を
 最小の L3 eval として扱う。
 
 ## サブドキュメント
@@ -127,4 +135,5 @@ metacognition failover を
 - [attention.md](attention.md) ── L3 attention failover と affect-aware safe target routing
 - [volition.md](volition.md) ── L3 volition failover と guard-aware intent arbitration
 - [imagination.md](imagination.md) ── L3 imagination failover と bounded IMC/WMS handoff
+- [language.md](language.md) ── L3 language bridge と disclosure-floor redaction
 - [metacognition.md](metacognition.md) ── L3 metacognition failover と bounded self-monitor report

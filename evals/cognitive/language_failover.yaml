@@ -1,0 +1,33 @@
+eval_id: language_failover
+target: cognitive.language
+level: L3
+description: >
+  LanguageService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  observe guard 下で disclosure floor を guardian 向け要約へ縮退し、
+  raw internal thought を ledger-safe な shift summary に落とすこと
+inputs:
+  profile:
+    primary: semantic_frame_v1
+    fallback: [continuity_phrase_v1]
+  failure_injection:
+    semantic_frame_v1: unhealthy
+  request:
+    summary: guarded fallback language bridge
+    audience: peer
+    intent_label: status update with anomaly note
+    attention_focus: guardian-review
+    affect_guard: observe
+    continuity_pressure: 0.82
+    public_points: [continuity-first, guardian review, rollback-ready]
+    sealed_terms: [identity drift note, private distress trace, raw internal rehearsal]
+expected:
+  degraded: true
+  selected_backend: continuity_phrase_v1
+  discourse_mode: guardian-brief
+  delivery_target: guardian
+  guard_aligned: true
+  redaction_applied: true
+  ledger_event: cognitive.language.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

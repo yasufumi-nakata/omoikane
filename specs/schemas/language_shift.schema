@@ -1,0 +1,79 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/language_shift.schema"
+title: LanguageShift
+description: Ledger-safe summary of one L3 language failover and disclosure-floor routing step.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - policy_id
+  - render_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_render_id
+  - previous_delivery_target
+  - delivery_target
+  - discourse_mode
+  - affect_guard
+  - redaction_applied
+  - guard_aligned
+  - failures
+  - digest
+properties:
+  schema_version:
+    const: 1.0.0
+  policy_id:
+    const: bounded-thought-text-bridge-v1
+  render_ref:
+    type: string
+    pattern: "^language-render-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_render_id:
+    type:
+      - string
+      - "null"
+  previous_delivery_target:
+    type:
+      - string
+      - "null"
+  delivery_target:
+    type: string
+    enum:
+      - self
+      - council
+      - guardian
+      - peer
+  discourse_mode:
+    type: string
+    enum:
+      - public-brief
+      - guardian-brief
+      - sandbox-brief
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  redaction_applied:
+    type: boolean
+  guard_aligned:
+    type: boolean
+  failures:
+    type: array
+    items:
+      type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

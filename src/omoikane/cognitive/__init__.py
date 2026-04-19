@@ -36,6 +36,13 @@ from .metacognition import (
     MetacognitionService,
     ReflectiveLoopBackend,
 )
+from .language import (
+    ContinuityPhraseLanguageBackend,
+    LanguageCue,
+    LanguageRequest,
+    LanguageService,
+    SemanticFrameLanguageBackend,
+)
 from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
@@ -61,6 +68,9 @@ __all__ = [
     "ImaginationCue",
     "ImaginationRequest",
     "ImaginationService",
+    "LanguageCue",
+    "LanguageRequest",
+    "LanguageService",
     "MetacognitionCue",
     "MetacognitionRequest",
     "MetacognitionService",
@@ -76,4 +86,6 @@ __all__ = [
     "VolitionCue",
     "VolitionRequest",
     "VolitionService",
+    "ContinuityPhraseLanguageBackend",
+    "SemanticFrameLanguageBackend",
 ]

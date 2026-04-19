@@ -14,11 +14,15 @@ from omoikane.cognitive import (
     ContinuityAnchorAttentionBackend,
     ContinuitySceneGuardBackend,
     ContinuityMirrorBackend,
+    ContinuityPhraseLanguageBackend,
     CounterfactualSceneBackend,
     HomeostaticAffectBackend,
     ImaginationCue,
     ImaginationRequest,
     ImaginationService,
+    LanguageCue,
+    LanguageRequest,
+    LanguageService,
     MetacognitionCue,
     MetacognitionRequest,
     MetacognitionService,
@@ -26,6 +30,7 @@ from omoikane.cognitive import (
     ReflectiveLoopBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
+    SemanticFrameLanguageBackend,
     StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
     GuardianBiasVolitionBackend,
@@ -537,6 +542,95 @@ class ImaginationServiceTests(unittest.TestCase):
         self.assertFalse(result["scene"]["handoff"]["co_imagination_ready"])
         self.assertTrue(service.validate_scene(result["scene"])["ok"])
         self.assertTrue(service.validate_shift(result["shift"])["ok"])
+
+
+class LanguageServiceTests(unittest.TestCase):
+    def test_failover_redacts_non_nominal_guard_output(self) -> None:
+        service = LanguageService(
+            profile=CognitiveProfile(primary="semantic_frame_v1", fallback=["continuity_phrase_v1"]),
+            backends=[
+                SemanticFrameLanguageBackend("semantic_frame_v1", healthy=False),
+                ContinuityPhraseLanguageBackend("continuity_phrase_v1"),
+            ],
+        )
+        healthy_service = LanguageService(
+            profile=CognitiveProfile(primary="semantic_frame_v1", fallback=["continuity_phrase_v1"]),
+            backends=[
+                SemanticFrameLanguageBackend("semantic_frame_v1"),
+                ContinuityPhraseLanguageBackend("continuity_phrase_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            LanguageRequest(
+                tick_id=0,
+                summary="baseline outward brief",
+                internal_thought="continuity-first runtime patch status with bounded disclosure",
+                audience="council",
+                intent_label="runtime update summary",
+                attention_focus="status-brief",
+                affect_guard="nominal",
+                continuity_pressure=0.29,
+                public_points=["continuity-first", "bounded rollout", "guardian-audited rollback"],
+                sealed_terms=["raw thought chain"],
+                memory_cues=[LanguageCue("bounded-rollout", "bounded rollout", 0.18)],
+            )
+        )["render"]
+
+        result = service.run(
+            LanguageRequest(
+                tick_id=1,
+                summary="guarded fallback language bridge",
+                internal_thought="raw internal rehearsal mentions identity drift and unresolved distress markers",
+                audience="peer",
+                intent_label="status update with anomaly note",
+                attention_focus="guardian-review",
+                affect_guard="observe",
+                continuity_pressure=0.82,
+                public_points=["continuity-first", "guardian review", "rollback-ready"],
+                sealed_terms=["identity drift note", "private distress trace"],
+                memory_cues=[LanguageCue("guardian-review", "guardian review", 0.22)],
+            ),
+            previous_render=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("continuity_phrase_v1", result["selected_backend"])
+        self.assertEqual("guardian-brief", result["render"]["discourse_mode"])
+        self.assertEqual("guardian", result["render"]["delivery_target"])
+        self.assertTrue(result["shift"]["redaction_applied"])
+        self.assertTrue(service.validate_shift(result["shift"])["guard_aligned"])
+
+    def test_nominal_render_preserves_requested_audience(self) -> None:
+        service = LanguageService(
+            profile=CognitiveProfile(primary="semantic_frame_v1", fallback=["continuity_phrase_v1"]),
+            backends=[
+                SemanticFrameLanguageBackend("semantic_frame_v1"),
+                ContinuityPhraseLanguageBackend("continuity_phrase_v1"),
+            ],
+        )
+
+        result = service.run(
+            LanguageRequest(
+                tick_id=2,
+                summary="steady outward brief",
+                internal_thought="bounded update summary for council review",
+                audience="council",
+                intent_label="runtime update summary",
+                attention_focus="status-brief",
+                affect_guard="nominal",
+                continuity_pressure=0.21,
+                public_points=["continuity-first", "bounded rollout"],
+                sealed_terms=["raw thought chain"],
+                memory_cues=[LanguageCue("continuity-first", "continuity-first", 0.2)],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("semantic_frame_v1", result["selected_backend"])
+        self.assertEqual("public-brief", result["render"]["discourse_mode"])
+        self.assertEqual("council", result["render"]["delivery_target"])
+        self.assertFalse(result["shift"]["redaction_applied"])
+        self.assertTrue(service.validate_render(result["render"])["ok"])
 
 
 class MetacognitionServiceTests(unittest.TestCase):

@@ -1,0 +1,173 @@
+idl_version: 1
+kind: service
+namespace: cognitive.language.v0
+service: LanguageService
+summary: Deterministic thought-to-text bridge with disclosure-floor redaction and failover for the L3 reference runtime.
+imports:
+  language_render: ../schemas/language_render.schema
+  language_shift: ../schemas/language_shift.schema
+operations:
+  render_text:
+    summary: Render one bounded outward brief from internal thought metadata and guard context.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - internal_thought
+          - audience
+          - intent_label
+          - attention_focus
+          - affect_guard
+          - continuity_pressure
+          - public_points
+          - sealed_terms
+          - memory_cues
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+            minLength: 1
+          internal_thought:
+            type: string
+            minLength: 1
+          audience:
+            type: string
+            enum:
+              - self
+              - council
+              - guardian
+              - peer
+          intent_label:
+            type: string
+            minLength: 1
+          attention_focus:
+            type: string
+            minLength: 1
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          continuity_pressure:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          public_points:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          sealed_terms:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - phrase
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                phrase:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+    output:
+      schema_ref: language_render
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - observe or sandbox-notify guards must apply disclosure-floor redaction
+      - ledger output must use language_shift and avoid raw internal_thought text
+  validate_render:
+    summary: Validate one language render snapshot against the fixed disclosure-floor policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: language_render
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - discourse_mode
+          - delivery_target
+          - guard_aligned
+          - redaction_applied
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          discourse_mode:
+            type: string
+          delivery_target:
+            type: string
+          guard_aligned:
+            type: boolean
+          redaction_applied:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe language failover summary.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: language_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - discourse_mode
+          - delivery_target
+          - guard_aligned
+          - redaction_applied
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          discourse_mode:
+            type: string
+          delivery_target:
+            type: string
+          guard_aligned:
+            type: boolean
+          redaction_applied:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.language.failover
+    payload:
+      schema_ref: language_shift

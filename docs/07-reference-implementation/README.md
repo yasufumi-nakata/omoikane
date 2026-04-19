@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning/affect/attention/volition/imagination/metacognition failover、L6 BDB の bounded viability contract を扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -45,6 +45,7 @@ PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
 PYTHONPATH=src python3 -m omoikane.cli volition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imagination-demo --json
+PYTHONPATH=src python3 -m omoikane.cli language-demo --json
 PYTHONPATH=src python3 -m omoikane.cli metacognition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
@@ -186,6 +187,13 @@ single-switch failover、council-witnessed `co_imagination` / `shared_reality`
 handoff、guard 上昇時の `private-sandbox` / `private_reality` への縮退、
 `cognitive.imagination.failover` ledger event を確認する。
 
+`language-demo` は L3 language bridge の reference contract
+(`cognitive.language.v0`) を JSON で可視化し、
+`semantic_frame_v1` baseline から `continuity_phrase_v1` fallback への
+single-switch failover、`observe` / `sandbox-notify` guard 時の
+disclosure-floor redaction、`guardian` / `self` への送達先縮退、
+`cognitive.language.failover` ledger event を確認する。
+
 `metacognition-demo` は L3 metacognition failover の reference contract
 (`cognitive.metacognition.v0`) を JSON で可視化し、
 `reflective_loop_v1` baseline から `continuity_mirror_v1` fallback への
@@ -229,7 +237,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- L3 language の service contract
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
 - AscensionScheduler の臨床・法務向け attest / witness / consent artifact 接続

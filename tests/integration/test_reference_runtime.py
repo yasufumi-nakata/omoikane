@@ -243,6 +243,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("private-sandbox", result["imagination"]["scene"]["handoff"]["mode"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
+    def test_language_demo_records_redacted_guarded_bridge(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_language_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["baseline_primary"])
+        self.assertEqual("continuity_phrase_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertTrue(result["validation"]["redaction_applied"])
+        self.assertEqual("guardian", result["validation"]["delivery_target"])
+        self.assertEqual("guardian-brief", result["validation"]["discourse_mode"])
+        self.assertTrue(result["validation"]["private_channel_locked"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
     def test_metacognition_demo_records_guarded_fallback_and_identity_anchor(self) -> None:
         runtime = OmoikaneReferenceOS()
 

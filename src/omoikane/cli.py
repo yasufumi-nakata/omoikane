@@ -125,6 +125,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     imagination_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    language_parser = subparsers.add_parser(
+        "language-demo",
+        help="Run the L3 language bridge failover and disclosure-floor redaction scenario",
+    )
+    language_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     metacognition_parser = subparsers.add_parser(
         "metacognition-demo",
         help="Run the L3 metacognition backend failover and bounded self-monitor scenario",
@@ -302,6 +308,10 @@ def main() -> None:
 
     if args.command == "imagination-demo":
         _print_result(runtime.run_imagination_demo(), args.json)
+        return
+
+    if args.command == "language-demo":
+        _print_result(runtime.run_language_demo(), args.json)
         return
 
     if args.command == "metacognition-demo":

@@ -373,6 +373,30 @@ entries:
     rationale: Required to make the L3 imagination scene composition and handoff gate machine-readable before language or collective imagination surfaces land.
   - priority: P1
     kind: schema
+    file: specs/schemas/language_render.schema
+    consumers:
+      - specs/interfaces/cognitive.language.v0.idl
+      - docs/02-subsystems/cognitive/language.md
+      - reference-runtime
+    rationale: Required to serialize one bounded outward brief with disclosure-floor metadata and hashed thought provenance.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/language_shift.schema
+    consumers:
+      - specs/interfaces/cognitive.language.v0.idl
+      - evals/cognitive/language_failover.yaml
+      - reference-runtime
+    rationale: Required to emit a ledger-safe summary of language failover and guard-aligned delivery routing.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.language.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/language.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make the L3 thought-to-text bridge machine-readable before richer planner or syntax-tree surfaces land.
+  - priority: P1
+    kind: schema
     file: specs/schemas/metacognition_report.schema
     consumers:
       - specs/interfaces/cognitive.metacognition.v0.idl
@@ -444,6 +468,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects council-witnessed co_imagination handoff, degraded private fallback, and ledger-safe imagination shift summaries.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/language_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects disclosure-floor redaction, guardian/self delivery fallback, and ledger-safe language shift summaries.
   - priority: P1
     kind: eval
     file: evals/cognitive/metacognition_failover.yaml

@@ -1,0 +1,239 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/language_render.schema"
+title: LanguageRender
+description: Deterministic L3 language render with bounded disclosure-floor metadata and continuity-safe failover state.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - render_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - thought_digest
+  - memory_cues
+  - discourse_mode
+  - delivery_target
+  - rendered_text
+  - disclosure_floor
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: language_render
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - max_public_points
+      - max_redacted_terms
+      - failover_mode
+      - non_nominal_guard_requires_redaction
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: bounded-thought-text-bridge-v1
+      primary:
+        type: string
+        minLength: 1
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      max_public_points:
+        const: 3
+      max_redacted_terms:
+        const: 4
+      failover_mode:
+        const: single-switch
+      non_nominal_guard_requires_redaction:
+        const: true
+  render_id:
+    type: string
+    pattern: "^language-render-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - audience
+      - intent_label
+      - attention_focus
+      - affect_guard
+      - continuity_pressure
+      - public_points
+      - sealed_terms
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      audience:
+        type: string
+        enum:
+          - self
+          - council
+          - guardian
+          - peer
+      intent_label:
+        type: string
+        minLength: 1
+      attention_focus:
+        type: string
+        minLength: 1
+      affect_guard:
+        type: string
+        enum:
+          - nominal
+          - observe
+          - sandbox-notify
+      continuity_pressure:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      public_points:
+        type: array
+        minItems: 1
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      sealed_terms:
+        type: array
+        maxItems: 4
+        items:
+          type: string
+          minLength: 1
+  thought_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  memory_cues:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - phrase
+        - weight
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        phrase:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+  discourse_mode:
+    type: string
+    enum:
+      - public-brief
+      - guardian-brief
+      - sandbox-brief
+  delivery_target:
+    type: string
+    enum:
+      - self
+      - council
+      - guardian
+      - peer
+  rendered_text:
+    type: string
+    minLength: 1
+  disclosure_floor:
+    type: object
+    additionalProperties: false
+    required:
+      - public_points
+      - redacted_terms
+      - private_channel_locked
+    properties:
+      public_points:
+        type: array
+        minItems: 1
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      redacted_terms:
+        type: array
+        maxItems: 4
+        items:
+          type: string
+          minLength: 1
+      private_channel_locked:
+        type: boolean
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_render_id
+      - previous_backend_id
+      - previous_delivery_target
+      - attempted_backends
+      - failures
+      - preserved_delivery_target
+      - redaction_applied
+      - rationale
+    properties:
+      previous_render_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      previous_delivery_target:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      failures:
+        type: array
+        items:
+          type: string
+      preserved_delivery_target:
+        type: boolean
+      redaction_applied:
+        type: boolean
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
