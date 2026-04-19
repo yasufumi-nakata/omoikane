@@ -57,6 +57,7 @@ PYTHONPATH=src python3 -m omoikane.cli language-demo --json
 PYTHONPATH=src python3 -m omoikane.cli metacognition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
+PYTHONPATH=src python3 -m omoikane.cli builder-live-demo --json
 PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
@@ -192,6 +193,14 @@ Mirage Self への sandbox apply、`council_output_build_request_pipeline` と
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
 `full-100pct`) の固定順序実行まで
 ledger-safe な `self-modify` chain で進むことを確認する。
+
+`builder-live-demo` は L5 live enactment の reference contract
+(`selfctor.enactment.v0`) を JSON で可視化し、
+`PatchGeneratorService` が生成した patch descriptor を
+temp workspace にだけ materialize しつつ、
+`builder_live_enactment_execution` eval の command を実際に実行し、
+`workspace-enacted` marker を持つ mutated file と
+cleanup 済み receipt を 1 シナリオで確認する。
 
 `rollback-demo` は L5 builder rollback の reference contract
 (`selfctor.rollback.v0`) を JSON で可視化し、
@@ -342,5 +351,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - distributed transport key rotation / remote PKI federation を actual network に接続
 - Guardian oversight reviewer の remote attestation transport を actual verifier network に接続
 - AscensionScheduler external verifier の真正性証明と live 接続
-- builder sandbox apply / staged rollout execution の live workspace mutation hook と real eval runner 連携
+- builder rollback の actual reverse-apply journal と live telemetry gate 連携
 - automation による未実装ギャップの継続充填

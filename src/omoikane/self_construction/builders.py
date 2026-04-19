@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Mapping, Sequence
 
 from ..common import new_id, utc_now_iso
@@ -13,6 +16,7 @@ IMMUTABLE_BOUNDARIES = ("L1.EthicsEnforcer", "L1.ContinuityLedger")
 MANDATORY_BUILD_PIPELINE_EVAL = "evals/continuity/council_output_build_request_pipeline.yaml"
 MANDATORY_STAGED_ROLLOUT_EVAL = "evals/continuity/builder_staged_rollout_execution.yaml"
 MANDATORY_ROLLBACK_EVAL = "evals/continuity/builder_rollback_execution.yaml"
+MANDATORY_LIVE_ENACTMENT_EVAL = "evals/continuity/builder_live_enactment_execution.yaml"
 ROLLOUT_STAGE_ORDER = (
     ("dark-launch", 0, "shadow-only", "shadow-match"),
     ("canary-5pct", 5, "limited-visible", "guardian-pass"),
@@ -37,6 +41,13 @@ def _first_matching_prefix(paths: Sequence[str], prefix: str, fallback: str) -> 
         if path.startswith(prefix):
             return path
     return fallback
+
+
+def _tail_text(text: str, *, limit: int = 160) -> str:
+    normalized = text.strip()
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[-limit:]
 
 
 @dataclass(frozen=True)
@@ -685,3 +696,234 @@ class RollbackEngineService:
             if len(list(session.get("notification_refs", []))) != 3:
                 errors.append("notification_refs must notify self, council, and guardian")
         return {"ok": not errors, "errors": errors}
+
+
+@dataclass(frozen=True)
+class LiveEnactmentPolicy:
+    """Bounded live enactment policy for temp workspace mutation and eval execution."""
+
+    policy_id: str = "builder-live-enactment-v1"
+    workspace_prefix: str = "omoikane-builder-live-"
+    max_materialized_files: int = 4
+    command_timeout_seconds: int = 15
+    cleanup_after_run: bool = True
+    mandatory_eval: str = MANDATORY_LIVE_ENACTMENT_EVAL
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "workspace_prefix": self.workspace_prefix,
+            "max_materialized_files": self.max_materialized_files,
+            "command_timeout_seconds": self.command_timeout_seconds,
+            "cleanup_after_run": self.cleanup_after_run,
+            "mandatory_eval": self.mandatory_eval,
+        }
+
+
+class LiveEnactmentService:
+    """Materialize builder patches in a temp workspace and run actual eval commands."""
+
+    def __init__(self, policy: LiveEnactmentPolicy | None = None) -> None:
+        self._policy = policy or LiveEnactmentPolicy()
+
+    def policy(self) -> Dict[str, Any]:
+        return self._policy.to_dict()
+
+    def execute(
+        self,
+        *,
+        build_request: Mapping[str, Any],
+        build_artifact: Mapping[str, Any],
+        eval_refs: Sequence[str],
+        repo_root: Path | str,
+    ) -> Dict[str, Any]:
+        repo_path = Path(repo_root)
+        patches = list(build_artifact.get("patches", []))
+        allowed_write_paths = list(build_request.get("constraints", {}).get("allowed_write_paths", []))
+        blocking_rules: list[str] = []
+
+        if build_artifact.get("status") != "ready":
+            blocking_rules.append("build artifact must be ready before live enactment")
+        if not patches:
+            blocking_rules.append("build artifact must include at least one patch descriptor")
+        if len(patches) > self._policy.max_materialized_files:
+            blocking_rules.append(
+                f"materialized file count must be <= {self._policy.max_materialized_files}"
+            )
+        if not allowed_write_paths:
+            blocking_rules.append("allowed_write_paths must not be empty")
+
+        workspace_root = ""
+        materialized_files: list[Dict[str, Any]] = []
+        command_runs: list[Dict[str, Any]] = []
+        cleanup_status = "not-started"
+        snapshot_refs = {
+            "pre_apply": f"mirage://{build_request['request_id']}/snapshot/live-pre-apply",
+            "post_apply": f"mirage://{build_request['request_id']}/snapshot/live-post-apply",
+        }
+
+        if not blocking_rules:
+            temp_root = Path(tempfile.mkdtemp(prefix=self._policy.workspace_prefix))
+            workspace_root = str(temp_root)
+            try:
+                for patch in patches:
+                    target_path = str(patch.get("target_path", ""))
+                    if not _is_within_scope(target_path, allowed_write_paths):
+                        blocking_rules.append(
+                            f"patch target escapes allowed_write_paths: {target_path}"
+                        )
+                        continue
+                    target = temp_root / target_path
+                    source = repo_path / target_path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    source_state = "copied" if source.exists() else "created"
+                    base_text = source.read_text(encoding="utf-8") if source.exists() else ""
+                    marker = (
+                        f"{self._comment_prefix(target)}workspace-enacted: "
+                        f"{patch['patch_id']} target={target_path}"
+                    )
+                    if base_text and not base_text.endswith("\n"):
+                        base_text += "\n"
+                    target.write_text(f"{base_text}{marker}\n", encoding="utf-8")
+                    materialized_files.append(
+                        {
+                            "path": target_path,
+                            "patch_id": patch["patch_id"],
+                            "source_state": source_state,
+                            "marker": marker,
+                        }
+                    )
+
+                eval_commands = self._resolve_eval_commands(eval_refs=eval_refs, repo_root=repo_path)
+                if not eval_commands:
+                    blocking_rules.append("eval refs must yield at least one command")
+
+                for eval_ref, command in eval_commands:
+                    command_runs.append(
+                        self._run_command(
+                            eval_ref=eval_ref,
+                            command=command,
+                            workspace_root=temp_root,
+                        )
+                    )
+            finally:
+                if self._policy.cleanup_after_run:
+                    shutil.rmtree(temp_root, ignore_errors=True)
+                    cleanup_status = "removed"
+                else:
+                    cleanup_status = "retained"
+
+        all_commands_passed = bool(command_runs) and all(
+            run["status"] == "pass" for run in command_runs
+        )
+        status = "blocked" if blocking_rules else "passed" if all_commands_passed else "failed"
+        return {
+            "kind": "builder_live_enactment_session",
+            "schema_version": "1.0",
+            "enactment_session_id": new_id("enactment-session"),
+            "request_id": build_request["request_id"],
+            "artifact_id": build_artifact.get("artifact_id", ""),
+            "policy": self.policy(),
+            "status": status,
+            "workspace_root": workspace_root,
+            "workspace_snapshot_refs": snapshot_refs,
+            "materialized_files": materialized_files,
+            "mutated_file_count": len(materialized_files),
+            "eval_refs": list(eval_refs),
+            "command_runs": command_runs,
+            "executed_command_count": len(command_runs),
+            "all_commands_passed": all_commands_passed,
+            "cleanup_status": cleanup_status,
+            "preserved_invariants": [
+                "temp-workspace-only",
+                "immutable-boundaries-preserved",
+                "cleanup-after-run",
+            ],
+            "executed_at": utc_now_iso(),
+            **({"blocking_rules": blocking_rules} if blocking_rules else {}),
+        }
+
+    def validate_session(self, session: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: list[str] = []
+        if session.get("kind") != "builder_live_enactment_session":
+            errors.append("kind must equal builder_live_enactment_session")
+        if session.get("schema_version") != "1.0":
+            errors.append("schema_version must equal 1.0")
+        if session.get("status") not in {"passed", "failed", "blocked"}:
+            errors.append("status must be passed, failed, or blocked")
+        refs = dict(session.get("workspace_snapshot_refs", {}))
+        for key in ("pre_apply", "post_apply"):
+            if not str(refs.get(key, "")).startswith("mirage://"):
+                errors.append(f"workspace_snapshot_refs.{key} must start with mirage://")
+        if session.get("cleanup_status") not in {"removed", "retained", "not-started"}:
+            errors.append("cleanup_status must be removed, retained, or not-started")
+        if session.get("status") == "passed":
+            if int(session.get("mutated_file_count", 0)) < 1:
+                errors.append("mutated_file_count must be >= 1 for passed sessions")
+            if int(session.get("executed_command_count", 0)) < 1:
+                errors.append("executed_command_count must be >= 1 for passed sessions")
+            if not bool(session.get("all_commands_passed")):
+                errors.append("all_commands_passed must be true for passed sessions")
+            if session.get("cleanup_status") != "removed":
+                errors.append("cleanup_status must be removed for passed sessions")
+        elif session.get("status") == "blocked" and not list(session.get("blocking_rules", [])):
+            errors.append("blocked sessions must include blocking_rules")
+        return {"ok": not errors, "errors": errors}
+
+    @staticmethod
+    def _comment_prefix(path: Path) -> str:
+        if path.suffix in {".py", ".md", ".yaml", ".yml", ".txt", ".schema"}:
+            return "# "
+        return "// "
+
+    @staticmethod
+    def _resolve_eval_commands(
+        *,
+        eval_refs: Sequence[str],
+        repo_root: Path,
+    ) -> list[tuple[str, str]]:
+        commands: list[tuple[str, str]] = []
+        for eval_ref in eval_refs:
+            eval_path = repo_root / eval_ref
+            if not eval_path.exists():
+                continue
+            for line in eval_path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped.startswith("command:"):
+                    commands.append((eval_ref, stripped.split(":", 1)[1].strip()))
+        return commands
+
+    def _run_command(
+        self,
+        *,
+        eval_ref: str,
+        command: str,
+        workspace_root: Path,
+    ) -> Dict[str, Any]:
+        try:
+            completed = subprocess.run(
+                command,
+                shell=True,
+                cwd=workspace_root,
+                text=True,
+                capture_output=True,
+                timeout=self._policy.command_timeout_seconds,
+                check=False,
+            )
+            return {
+                "eval_ref": eval_ref,
+                "command": command,
+                "exit_code": completed.returncode,
+                "status": "pass" if completed.returncode == 0 else "fail",
+                "stdout_excerpt": _tail_text(completed.stdout),
+                "stderr_excerpt": _tail_text(completed.stderr),
+            }
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "eval_ref": eval_ref,
+                "command": command,
+                "exit_code": -1,
+                "status": "timeout",
+                "stdout_excerpt": _tail_text(exc.stdout or ""),
+                "stderr_excerpt": _tail_text(exc.stderr or ""),
+            }

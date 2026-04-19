@@ -234,6 +234,26 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
 
+    def test_builder_live_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "builder-live-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["enactment_ok"])
+        self.assertEqual("passed", result["validation"]["enactment_status"])
+        self.assertEqual(2, result["validation"]["mutated_file_count"])
+        self.assertEqual(2, result["validation"]["executed_command_count"])
+        self.assertTrue(result["validation"]["all_commands_passed"])
+        self.assertEqual("removed", result["validation"]["cleanup_status"])
+        self.assertEqual(
+            ["evals/continuity/builder_live_enactment_execution.yaml"],
+            result["builder"]["suite_selection"]["selected_evals"],
+        )
+        self.assertEqual("passed", result["builder"]["enactment_session"]["status"])
+
     def test_rollback_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

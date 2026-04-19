@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from omoikane.self_construction import (
     DifferentialEvaluatorService,
+    LiveEnactmentService,
     PatchGeneratorService,
     RollbackEngineService,
     RolloutPlannerService,
@@ -225,6 +227,45 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual(["dark-launch", "canary-5pct"], session["reverted_stage_ids"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
+
+
+class LiveEnactmentServiceTests(unittest.TestCase):
+    def test_execute_materializes_temp_workspace_and_runs_eval_commands(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        request = {
+            "request_id": "build-l5-live-0001",
+            "constraints": {
+                "allowed_write_paths": [
+                    "src/omoikane/self_construction/",
+                    "tests/unit/",
+                ],
+                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
+            },
+            "workspace_scope": ["src/", "tests/", "evals/"],
+            "output_paths": [
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+            ],
+            "target_subsystem": "L5.LiveEnactment",
+            "spec_refs": ["specs/interfaces/selfctor.enactment.v0.idl"],
+            "design_refs": ["docs/02-subsystems/self-construction/README.md"],
+        }
+        artifact = PatchGeneratorService().generate_patch_set(request)
+
+        session = LiveEnactmentService().execute(
+            build_request=request,
+            build_artifact=artifact,
+            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            repo_root=repo_root,
+        )
+
+        self.assertEqual("passed", session["status"])
+        self.assertEqual(2, session["mutated_file_count"])
+        self.assertEqual(2, session["executed_command_count"])
+        self.assertTrue(session["all_commands_passed"])
+        self.assertEqual("removed", session["cleanup_status"])
+        self.assertTrue(LiveEnactmentService().validate_session(session)["ok"])
 
 
 if __name__ == "__main__":

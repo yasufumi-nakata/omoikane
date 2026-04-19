@@ -179,6 +179,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     builder_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    builder_live_parser = subparsers.add_parser(
+        "builder-live-demo",
+        help="Run the L5 temp workspace mutation and actual eval command enactment scenario",
+    )
+    builder_live_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     rollback_parser = subparsers.add_parser(
         "rollback-demo",
         help="Run the L5 regression-triggered rollback and pre-apply snapshot restoration scenario",
@@ -404,6 +410,10 @@ def main() -> None:
 
     if args.command == "builder-demo":
         _print_result(runtime.run_builder_demo(), args.json)
+        return
+
+    if args.command == "builder-live-demo":
+        _print_result(runtime.run_builder_live_demo(), args.json)
         return
 
     if args.command == "rollback-demo":

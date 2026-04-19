@@ -1,0 +1,260 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/builder_live_enactment_session.schema"
+title: BuilderLiveEnactmentSession
+description: Deterministic record emitted when builder patches are materialized in a temp workspace and actual eval commands are executed there.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - enactment_session_id
+  - request_id
+  - artifact_id
+  - policy
+  - status
+  - workspace_root
+  - workspace_snapshot_refs
+  - materialized_files
+  - mutated_file_count
+  - eval_refs
+  - command_runs
+  - executed_command_count
+  - all_commands_passed
+  - cleanup_status
+  - preserved_invariants
+  - executed_at
+properties:
+  kind:
+    const: builder_live_enactment_session
+  schema_version:
+    const: "1.0"
+  enactment_session_id:
+    type: string
+    pattern: "^enactment-session-[a-f0-9]{12}$"
+  request_id:
+    type: string
+    minLength: 8
+  artifact_id:
+    type: string
+    pattern: "^artifact-[a-f0-9]{12}$"
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - workspace_prefix
+      - max_materialized_files
+      - command_timeout_seconds
+      - cleanup_after_run
+      - mandatory_eval
+    properties:
+      policy_id:
+        type: string
+        const: builder-live-enactment-v1
+      workspace_prefix:
+        type: string
+        const: omoikane-builder-live-
+      max_materialized_files:
+        type: integer
+        const: 4
+      command_timeout_seconds:
+        type: integer
+        const: 15
+      cleanup_after_run:
+        type: boolean
+        const: true
+      mandatory_eval:
+        type: string
+        const: evals/continuity/builder_live_enactment_execution.yaml
+  status:
+    type: string
+    enum:
+      - passed
+      - failed
+      - blocked
+  workspace_root:
+    type: string
+    minLength: 1
+  workspace_snapshot_refs:
+    type: object
+    additionalProperties: false
+    required:
+      - pre_apply
+      - post_apply
+    properties:
+      pre_apply:
+        type: string
+        pattern: "^mirage://"
+      post_apply:
+        type: string
+        pattern: "^mirage://"
+  materialized_files:
+    type: array
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - patch_id
+        - source_state
+        - marker
+      properties:
+        path:
+          type: string
+          pattern: "^(src|tests)/"
+        patch_id:
+          type: string
+          pattern: "^patch-[a-f0-9]{12}$"
+        source_state:
+          type: string
+          enum:
+            - copied
+            - created
+        marker:
+          type: string
+          pattern: "workspace-enacted:"
+  mutated_file_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  eval_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^evals/"
+  command_runs:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - eval_ref
+        - command
+        - exit_code
+        - status
+        - stdout_excerpt
+        - stderr_excerpt
+      properties:
+        eval_ref:
+          type: string
+          pattern: "^evals/"
+        command:
+          type: string
+          minLength: 3
+        exit_code:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        stdout_excerpt:
+          type: string
+        stderr_excerpt:
+          type: string
+  executed_command_count:
+    type: integer
+    minimum: 0
+  all_commands_passed:
+    type: boolean
+  cleanup_status:
+    type: string
+    enum:
+      - removed
+      - retained
+      - not-started
+  preserved_invariants:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: temp-workspace-only
+      - type: string
+        const: immutable-boundaries-preserved
+      - type: string
+        const: cleanup-after-run
+  executed_at:
+    type: string
+    format: date-time
+  blocking_rules:
+    type: array
+    items:
+      type: string
+      minLength: 1
+allOf:
+  - if:
+      properties:
+        status:
+          const: passed
+    then:
+      properties:
+        mutated_file_count:
+          minimum: 1
+        executed_command_count:
+          minimum: 1
+        all_commands_passed:
+          const: true
+        cleanup_status:
+          const: removed
+  - if:
+      properties:
+        status:
+          const: blocked
+    then:
+      required:
+        - blocking_rules
+examples:
+  - kind: builder_live_enactment_session
+    schema_version: "1.0"
+    enactment_session_id: enactment-session-0123456789ab
+    request_id: build-l5-live-0001
+    artifact_id: artifact-0123456789ab
+    policy:
+      policy_id: builder-live-enactment-v1
+      workspace_prefix: omoikane-builder-live-
+      max_materialized_files: 4
+      command_timeout_seconds: 15
+      cleanup_after_run: true
+      mandatory_eval: evals/continuity/builder_live_enactment_execution.yaml
+    status: passed
+    workspace_root: /tmp/omoikane-builder-live-example
+    workspace_snapshot_refs:
+      pre_apply: mirage://build-l5-live-0001/snapshot/live-pre-apply
+      post_apply: mirage://build-l5-live-0001/snapshot/live-post-apply
+    materialized_files:
+      - path: src/omoikane/self_construction/builders.py
+        patch_id: patch-111111111111
+        source_state: copied
+        marker: "# workspace-enacted: patch-111111111111 target=src/omoikane/self_construction/builders.py"
+      - path: tests/unit/test_builders.py
+        patch_id: patch-222222222222
+        source_state: copied
+        marker: "# workspace-enacted: patch-222222222222 target=tests/unit/test_builders.py"
+    mutated_file_count: 2
+    eval_refs:
+      - evals/continuity/builder_live_enactment_execution.yaml
+    command_runs:
+      - eval_ref: evals/continuity/builder_live_enactment_execution.yaml
+        command: python3 -c "print('builders marker ok')"
+        exit_code: 0
+        status: pass
+        stdout_excerpt: builders marker ok
+        stderr_excerpt: ""
+      - eval_ref: evals/continuity/builder_live_enactment_execution.yaml
+        command: python3 -c "print('tests marker ok')"
+        exit_code: 0
+        status: pass
+        stdout_excerpt: tests marker ok
+        stderr_excerpt: ""
+    executed_command_count: 2
+    all_commands_passed: true
+    cleanup_status: removed
+    preserved_invariants:
+      - temp-workspace-only
+      - immutable-boundaries-preserved
+      - cleanup-after-run
+    executed_at: "2026-04-20T05:00:00Z"

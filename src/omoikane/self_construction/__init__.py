@@ -3,6 +3,8 @@
 from .builders import (
     DifferentialEvaluationPolicy,
     DifferentialEvaluatorService,
+    LiveEnactmentPolicy,
+    LiveEnactmentService,
     PatchGeneratorPolicy,
     PatchGeneratorService,
     RollbackEnginePolicy,
@@ -19,6 +21,8 @@ __all__ = [
     "DifferentialEvaluationPolicy",
     "DifferentialEvaluatorService",
     "GapScanner",
+    "LiveEnactmentPolicy",
+    "LiveEnactmentService",
     "PatchGeneratorPolicy",
     "PatchGeneratorService",
     "RollbackEnginePolicy",

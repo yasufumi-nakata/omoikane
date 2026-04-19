@@ -1,0 +1,16 @@
+eval_id: builder_live_enactment_execution
+target: selfctor.enactment
+summary: >
+  Builder patch descriptor が temp workspace に実際に materialize され、
+  actual eval command が live repo ではなく Mirage Self workspace 上で完走すること
+checks:
+  - name: builders source marker smoke
+    command: python3 -c "from pathlib import Path; text = Path('src/omoikane/self_construction/builders.py').read_text(encoding='utf-8'); assert 'workspace-enacted:' in text; print('builders marker ok')"
+  - name: builders test marker smoke
+    command: python3 -c "from pathlib import Path; text = Path('tests/unit/test_builders.py').read_text(encoding='utf-8'); assert 'workspace-enacted:' in text; print('tests marker ok')"
+expect:
+  enactment_status: passed
+  mutated_file_count: 2
+  executed_command_count: 2
+  all_commands_passed: true
+  cleanup_status: removed

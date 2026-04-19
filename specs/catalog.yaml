@@ -352,6 +352,22 @@ entries:
     rationale: Differential evaluation contract across eval selection, A/B result reports, and rollout classification.
   - priority: P1
     kind: schema
+    file: specs/schemas/builder_live_enactment_session.schema
+    consumers:
+      - specs/interfaces/selfctor.enactment.v0.idl
+      - docs/02-subsystems/self-construction/README.md
+      - reference-runtime
+    rationale: Required to serialize one temp workspace enactment session with materialized files, actual eval commands, and cleanup receipts.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.enactment.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make bounded temp workspace mutation and actual eval command execution machine-readable in the L5 builder pipeline.
+  - priority: P1
+    kind: schema
     file: specs/schemas/sandbox_apply_receipt.schema
     consumers:
       - specs/interfaces/selfctor.rollout.v0.idl
@@ -1280,6 +1296,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/07-reference-implementation/README.md
     rationale: Protects the council-approved build_request handoff, immutable boundary validation, differential eval selection, and rollout promotion classification.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/builder_live_enactment_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects temp workspace-only builder enactment, actual eval command execution, marker materialization, and cleanup-after-run receipts.
   - priority: P1
     kind: eval
     file: evals/continuity/builder_staged_rollout_execution.yaml

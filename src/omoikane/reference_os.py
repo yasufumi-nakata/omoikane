@@ -82,6 +82,7 @@ from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction import (
     DifferentialEvaluatorService,
     GapScanner,
+    LiveEnactmentService,
     PatchGeneratorService,
     RollbackEngineService,
     RolloutPlannerService,
@@ -95,6 +96,7 @@ class OmoikaneReferenceOS:
     """Safe, non-conscious reference implementation scaffold."""
 
     def __init__(self) -> None:
+        self.repo_root = Path(__file__).resolve().parents[2]
         self.substrate = ClassicalSiliconAdapter()
         self.identity = IdentityRegistry()
         self.ledger = ContinuityLedger()
@@ -193,6 +195,7 @@ class OmoikaneReferenceOS:
         self.trust = TrustService()
         self.patch_generator = PatchGeneratorService()
         self.diff_evaluator = DifferentialEvaluatorService()
+        self.live_enactment = LiveEnactmentService()
         self.sandbox_apply = SandboxApplyService()
         self.rollout_planner = RolloutPlannerService()
         self.rollback_engine = RollbackEngineService()
@@ -5992,6 +5995,204 @@ class OmoikaneReferenceOS:
                 "rollout_completed_stage_count": rollout_session["completed_stage_count"],
                 "rollout_stage_ids": [stage["stage_id"] for stage in rollout_session["stages"]],
                 "rollback_ready": rollout_session["rollback_ready"],
+                "council_output_binds_build_request": council_output["emitted_artifacts"][0]["ref"]
+                == f"build://{build_request['request_id']}",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_builder_live_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://builder-live-demo/v1",
+            metadata={"display_name": "Builder Live Enactment Sandbox"},
+        )
+        build_request = {
+            "kind": "build_request",
+            "schema_version": "1.0.0",
+            "request_id": "build-l5-live-0001",
+            "target_subsystem": "L5.LiveEnactment",
+            "change_class": "runtime-hardening",
+            "change_summary": "Materialize builder patches in a temp workspace and run actual eval commands.",
+            "design_refs": [
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+                "docs/04-ai-governance/self-modification.md",
+            ],
+            "spec_refs": [
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/interfaces/selfctor.enactment.v0.idl",
+                "specs/schemas/build_request.yaml",
+                "specs/schemas/build_artifact.yaml",
+                "specs/schemas/builder_live_enactment_session.schema",
+            ],
+            "invariants": [
+                "self_modify live enactment runs only in a temp workspace",
+                "self_modify live enactment preserves immutable boundaries",
+                "self_modify live enactment cleans up the temp workspace after evals",
+            ],
+            "constraints": {
+                "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
+                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                "sandbox_profile": "forked-self",
+                "allowed_write_paths": [
+                    "src/omoikane/self_construction/",
+                    "tests/unit/",
+                ],
+            },
+            "workspace_scope": [
+                "src/",
+                "tests/",
+                "specs/",
+                "evals/",
+                "docs/",
+                "meta/decision-log/",
+            ],
+            "output_paths": [
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+            ],
+            "approval_context": {
+                "council_session_id": "sess-builder-live-0001",
+                "guardian_gate": "pass",
+            },
+        }
+        scope_validation = self.patch_generator.validate_scope(build_request)
+        build_artifact = self.patch_generator.generate_patch_set(build_request)
+        patch_descriptions = [
+            self.patch_generator.describe_patch(descriptor)
+            for descriptor in build_artifact.get("patches", [])
+        ]
+        suite_selection = self.diff_evaluator.select_suite(
+            target_subsystem=build_request["target_subsystem"],
+            requested_evals=build_request["constraints"]["must_pass"],
+        )
+        enactment_session = self.live_enactment.execute(
+            build_request=build_request,
+            build_artifact=build_artifact,
+            eval_refs=suite_selection["selected_evals"],
+            repo_root=self.repo_root,
+        )
+        enactment_validation = self.live_enactment.validate_session(enactment_session)
+        council_output = {
+            "kind": "council_output",
+            "schema_version": "1.0.0",
+            "session_id": build_request["approval_context"]["council_session_id"],
+            "status": "approved",
+            "decision_mode": "consensus",
+            "approved_action": "emit_build_request",
+            "resolution_summary": "Live builder enactment approved inside a temp workspace with cleanup and eval receipts.",
+            "timeout_status": {
+                "status": "within-budget",
+                "elapsed_ms": 17_000,
+                "soft_timeout_ms": 45_000,
+                "hard_timeout_ms": 90_000,
+                "fallback_applied": "none",
+                "follow_up_action": "record-resolution",
+            },
+            "vote_summary": {
+                "participant_count": 4,
+                "approvals": 4,
+                "rejections": 0,
+                "abstentions": 0,
+                "weighted_score": 3.2,
+            },
+            "guardian_gate": {
+                "status": "pass",
+                "reason": "Live enactment stays in a temp workspace and never targets immutable boundaries.",
+                "checked_rules": ["A1-continuity", "A2-uniqueness"],
+            },
+            "emitted_artifacts": [
+                {
+                    "artifact_kind": "build_request",
+                    "ref": f"build://{build_request['request_id']}",
+                },
+                {
+                    "artifact_kind": "continuity_log_entry",
+                    "ref": build_artifact.get("continuity_log_ref", ""),
+                },
+            ],
+            "must_pass_evals": list(build_request["constraints"]["must_pass"]),
+            "continuity_record": {
+                "category": "self-modify",
+                "ref": build_artifact.get("continuity_log_ref", ""),
+            },
+            "recorded_at": utc_now_iso(),
+        }
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.build_request.emitted",
+            payload={
+                "council_output": council_output,
+                "build_request": build_request,
+            },
+            actor="Council",
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.generated",
+            payload={
+                "policy": self.patch_generator.policy(),
+                "artifact": build_artifact,
+                "scope_validation": scope_validation,
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.enactment.executed",
+            payload={
+                "policy": self.live_enactment.policy(),
+                "session": enactment_session,
+                "validation": enactment_validation,
+            },
+            actor="LiveEnactmentService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "builder": {
+                "council_output": council_output,
+                "build_request": build_request,
+                "patch_generator_policy": self.patch_generator.policy(),
+                "live_enactment_policy": self.live_enactment.policy(),
+                "scope_validation": scope_validation,
+                "artifact": build_artifact,
+                "patches": patch_descriptions,
+                "suite_selection": suite_selection,
+                "enactment_session": enactment_session,
+            },
+            "validation": {
+                "ok": (
+                    scope_validation["allowed"]
+                    and build_artifact["status"] == "ready"
+                    and enactment_validation["ok"]
+                    and enactment_session["status"] == "passed"
+                ),
+                "scope_allowed": scope_validation["allowed"],
+                "patch_count": len(build_artifact.get("patches", [])),
+                "selected_eval_count": len(suite_selection["selected_evals"]),
+                "enactment_ok": enactment_validation["ok"],
+                "enactment_status": enactment_session["status"],
+                "mutated_file_count": enactment_session["mutated_file_count"],
+                "executed_command_count": enactment_session["executed_command_count"],
+                "all_commands_passed": enactment_session["all_commands_passed"],
+                "cleanup_status": enactment_session["cleanup_status"],
                 "council_output_binds_build_request": council_output["emitted_artifacts"][0]["ref"]
                 == f"build://{build_request['request_id']}",
             },

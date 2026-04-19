@@ -244,6 +244,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
         self.assertEqual(6, result["ledger_verification"]["category_counts"]["self-modify"])
 
+    def test_builder_live_demo_runs_actual_workspace_commands(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_builder_live_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["scope_allowed"])
+        self.assertTrue(result["validation"]["enactment_ok"])
+        self.assertEqual("passed", result["validation"]["enactment_status"])
+        self.assertEqual(2, result["validation"]["mutated_file_count"])
+        self.assertEqual(2, result["validation"]["executed_command_count"])
+        self.assertTrue(result["validation"]["all_commands_passed"])
+        self.assertEqual("removed", result["validation"]["cleanup_status"])
+        self.assertEqual(
+            ["evals/continuity/builder_live_enactment_execution.yaml"],
+            result["builder"]["suite_selection"]["selected_evals"],
+        )
+        self.assertEqual("passed", result["builder"]["enactment_session"]["status"])
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["self-modify"])
+
     def test_rollback_demo_restores_pre_apply_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
 

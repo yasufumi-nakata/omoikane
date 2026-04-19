@@ -1,0 +1,64 @@
+idl_version: 1
+kind: service
+namespace: selfctor.enactment.v0
+service: LiveEnactmentService
+summary: Materialize builder patch descriptors inside a temp workspace and run actual eval commands before promotion.
+imports:
+  build_request: ../schemas/build_request.yaml
+  build_artifact: ../schemas/build_artifact.yaml
+  builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
+operations:
+  execute:
+    summary: Create a temp Mirage Self workspace, materialize bounded files, and execute eval commands.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - build_request_ref
+          - build_artifact_ref
+          - eval_refs
+        properties:
+          build_request_ref:
+            type: string
+            pattern: "^build://"
+          build_artifact_ref:
+            type: string
+            pattern: "^artifact://"
+          eval_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              pattern: "^evals/"
+    output:
+      schema_ref: builder_live_enactment_session
+    preconditions:
+      - build artifact must already be ready
+      - every target_path must remain inside allowed_write_paths
+      - live enactment must run only in a temp workspace
+    guarantees:
+      - immutable boundaries remain outside the materialized file set
+      - actual eval commands run against the temp workspace rather than the live repo
+      - temp workspace cleanup completes before the session closes
+  validate_session:
+    summary: Validate one live enactment session against the bounded temp-workspace policy.
+    input:
+      schema_ref: builder_live_enactment_session
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+compatibility:
+  stability: bootstrap
+events:
+  - name: selfctor.enactment.executed
+    payload:
+      schema_ref: builder_live_enactment_session
