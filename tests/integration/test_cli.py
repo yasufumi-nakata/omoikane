@@ -265,6 +265,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["imc_delivery_redacted"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_metacognition_demo_emits_guarded_self_monitor_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "metacognition-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("continuity_mirror_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["baseline_primary"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertTrue(result["validation"]["abrupt_change_flagged"])
+        self.assertEqual("guardian-review", result["validation"]["escalation_target"])
+        self.assertTrue(result["validation"]["sealed_notes_present"])
+
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
 

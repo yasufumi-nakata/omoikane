@@ -1,0 +1,186 @@
+idl_version: 1
+kind: service
+namespace: cognitive.metacognition.v0
+service: MetacognitionService
+summary: Deterministic metacognition failover and bounded self-monitor contract for the L3 reference runtime.
+imports:
+  metacognition_report: ../schemas/metacognition_report.schema
+  metacognition_shift: ../schemas/metacognition_shift.schema
+operations:
+  generate_report:
+    summary: Generate one bounded self-monitor report from self-model deltas and qualia context.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - identity_id
+          - self_values
+          - self_goals
+          - self_traits
+          - qualia_summary
+          - attention_target
+          - self_awareness
+          - lucidity
+          - affect_guard
+          - continuity_pressure
+          - abrupt_change
+          - divergence
+          - memory_cues
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+            minLength: 1
+          identity_id:
+            type: string
+            minLength: 1
+          self_values:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          self_goals:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          self_traits:
+            type: object
+            minProperties: 1
+            additionalProperties:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+          qualia_summary:
+            type: string
+            minLength: 1
+          attention_target:
+            type: string
+            minLength: 1
+          self_awareness:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          lucidity:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          continuity_pressure:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          abrupt_change:
+            type: boolean
+          divergence:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - focus
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                focus:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+    output:
+      schema_ref: metacognition_report
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - abrupt self-model change or non-nominal affect guard must not emit escalation_target=none
+      - public reflection remains bounded to three values and three goals
+  validate_report:
+    summary: Validate one metacognition report snapshot against the fixed self-monitor policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: metacognition_report
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - reflection_mode
+          - guard_aligned
+          - abrupt_change
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          reflection_mode:
+            type: string
+          guard_aligned:
+            type: boolean
+          abrupt_change:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe metacognition failover summary.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: metacognition_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - reflection_mode
+          - guard_aligned
+          - abrupt_change
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          reflection_mode:
+            type: string
+          guard_aligned:
+            type: boolean
+          abrupt_change:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.metacognition.failover
+    payload:
+      schema_ref: metacognition_shift

@@ -1,0 +1,105 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/metacognition_shift.schema"
+title: MetacognitionShift
+description: Ledger-safe summary of one L3 metacognition failover and escalation decision.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy_id
+  - report_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_report_id
+  - previous_reflection_mode
+  - reflection_mode
+  - escalation_target
+  - affect_guard
+  - abrupt_change
+  - divergence
+  - guard_aligned
+  - failures
+  - digest
+properties:
+  kind:
+    const: metacognition_shift
+  schema_version:
+    const: 1.0.0
+  policy_id:
+    const: bounded-self-monitor-loop-v1
+  report_ref:
+    type: string
+    pattern: "^metacognition-report-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_report_id:
+    type:
+      - string
+      - "null"
+  previous_reflection_mode:
+    type:
+      - string
+      - "null"
+  reflection_mode:
+    type: string
+    enum:
+      - self-reflect
+      - guardian-review
+      - sandbox-hold
+  escalation_target:
+    type: string
+    enum:
+      - none
+      - guardian-review
+      - sandbox-stabilization
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  abrupt_change:
+    type: boolean
+  divergence:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  guard_aligned:
+    type: boolean
+  failures:
+    type: array
+    items:
+      type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: metacognition_shift
+    schema_version: 1.0.0
+    policy_id: bounded-self-monitor-loop-v1
+    report_ref: metacognition-report-0123456789ab
+    selected_backend: continuity_mirror_v1
+    attempted_backends: [reflective_loop_v1, continuity_mirror_v1]
+    degraded: true
+    previous_report_id: metacognition-report-abcdef123456
+    previous_reflection_mode: self-reflect
+    reflection_mode: guardian-review
+    escalation_target: guardian-review
+    affect_guard: observe
+    abrupt_change: true
+    divergence: 0.61
+    guard_aligned: true
+    failures:
+      - reflective_loop_v1 is unavailable
+    digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

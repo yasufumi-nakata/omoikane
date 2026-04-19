@@ -52,6 +52,7 @@ status: decided | superseded
 - [2026-04-19_procedural-memory-preview.md](2026-04-19_procedural-memory-preview.md)
 - [2026-04-19_procedural-writeback-gate.md](2026-04-19_procedural-writeback-gate.md)
 - [2026-04-19_imagination-failover-handoff.md](2026-04-19_imagination-failover-handoff.md)
+- [2026-04-19_metacognition-self-monitor-loop.md](2026-04-19_metacognition-self-monitor-loop.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

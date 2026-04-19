@@ -79,6 +79,15 @@ handoff を許可する。
 `observe` / `sandbox-notify` guard 時は `private_reality` / `private-sandbox`
 へ縮退し、shared scene を開かない。
 
+`Metacognition` は最小の `bounded-self-monitor-loop-v1` を採用し、
+`reflective_loop_v1 -> continuity_mirror_v1` の単純 failover と
+bounded self-monitor report を持つ。
+`SelfModelMonitor` の divergence / abrupt change と `QualiaBuffer` の状態を起点に
+1 つの reflection report を生成し、
+`observe` guard や abrupt change 時は `guardian-review` へ、
+`sandbox-notify` guard 時は `sandbox-hold` / `sandbox-stabilization` へ
+縮退する。
+
 ## 多実装結果の調停
 
 複数 backend が同時に走る場合（A/B 検証や信頼度向上目的）、調停は L4 Council が行う。
@@ -103,11 +112,13 @@ handoff を許可する。
 現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
 health-based failover を持つ。`Affect` は bounded failover と smoothing を持ち、
 `Attention`、`Volition`、`Imagination` も guard-aware / handoff-aware な
-single-switch failover を持つが、その他の cognitive surface は引き続き
+single-switch failover を持つ。`Metacognition` も SelfModel/Qualia 由来の
+bounded self-monitor report と escalation gate を持つが、その他の cognitive surface は引き続き
 `QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
 そのため [evals/cognitive/](../../../evals/cognitive/) では
 qualia/self-model baseline に加え、reasoning failover、affect failover、
-attention failover、volition failover、imagination failover を
+attention failover、volition failover、imagination failover、
+metacognition failover を
 最小の L3 eval として扱う。
 
 ## サブドキュメント
@@ -116,3 +127,4 @@ attention failover、volition failover、imagination failover を
 - [attention.md](attention.md) ── L3 attention failover と affect-aware safe target routing
 - [volition.md](volition.md) ── L3 volition failover と guard-aware intent arbitration
 - [imagination.md](imagination.md) ── L3 imagination failover と bounded IMC/WMS handoff
+- [metacognition.md](metacognition.md) ── L3 metacognition failover と bounded self-monitor report

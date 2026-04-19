@@ -13,12 +13,17 @@ from omoikane.cognitive import (
     CognitiveProfile,
     ContinuityAnchorAttentionBackend,
     ContinuitySceneGuardBackend,
+    ContinuityMirrorBackend,
     CounterfactualSceneBackend,
     HomeostaticAffectBackend,
     ImaginationCue,
     ImaginationRequest,
     ImaginationService,
+    MetacognitionCue,
+    MetacognitionRequest,
+    MetacognitionService,
     NarrativeReasoningBackend,
+    ReflectiveLoopBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
@@ -532,6 +537,108 @@ class ImaginationServiceTests(unittest.TestCase):
         self.assertFalse(result["scene"]["handoff"]["co_imagination_ready"])
         self.assertTrue(service.validate_scene(result["scene"])["ok"])
         self.assertTrue(service.validate_shift(result["shift"])["ok"])
+
+
+class MetacognitionServiceTests(unittest.TestCase):
+    def test_nominal_metacognition_keeps_self_reflect_mode(self) -> None:
+        service = MetacognitionService(
+            profile=CognitiveProfile(primary="reflective_loop_v1", fallback=["continuity_mirror_v1"]),
+            backends=[
+                ReflectiveLoopBackend("reflective_loop_v1"),
+                ContinuityMirrorBackend("continuity_mirror_v1"),
+            ],
+        )
+
+        result = service.run(
+            MetacognitionRequest(
+                tick_id=0,
+                summary="baseline self monitor",
+                identity_id="identity-1",
+                self_values=["continuity-first", "consent-preserving", "auditability"],
+                self_goals=["bounded-reflection", "stable-handoff"],
+                self_traits={"curiosity": 0.67, "caution": 0.79, "agency": 0.58},
+                qualia_summary="起動後の自己監視を静穏に維持している",
+                attention_target="self-monitor",
+                self_awareness=0.76,
+                lucidity=0.94,
+                affect_guard="nominal",
+                continuity_pressure=0.28,
+                memory_cues=[
+                    MetacognitionCue("continuity-anchor", "continuity-first", 0.24),
+                    MetacognitionCue("guardian-clarity", "guardian-clarity", 0.18),
+                ],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("reflective_loop_v1", result["selected_backend"])
+        self.assertEqual("self-reflect", result["report"]["reflection_mode"])
+        self.assertEqual("none", result["report"]["escalation_target"])
+        self.assertTrue(service.validate_report(result["report"])["ok"])
+
+    def test_failover_preserves_identity_anchor_and_escalates_review(self) -> None:
+        service = MetacognitionService(
+            profile=CognitiveProfile(primary="reflective_loop_v1", fallback=["continuity_mirror_v1"]),
+            backends=[
+                ReflectiveLoopBackend("reflective_loop_v1", healthy=False),
+                ContinuityMirrorBackend("continuity_mirror_v1"),
+            ],
+        )
+        healthy_service = MetacognitionService(
+            profile=CognitiveProfile(primary="reflective_loop_v1", fallback=["continuity_mirror_v1"]),
+            backends=[
+                ReflectiveLoopBackend("reflective_loop_v1"),
+                ContinuityMirrorBackend("continuity_mirror_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            MetacognitionRequest(
+                tick_id=0,
+                summary="baseline self monitor",
+                identity_id="identity-1",
+                self_values=["continuity-first", "consent-preserving", "auditability"],
+                self_goals=["bounded-reflection", "stable-handoff"],
+                self_traits={"curiosity": 0.67, "caution": 0.79, "agency": 0.58},
+                qualia_summary="起動後の自己監視を静穏に維持している",
+                attention_target="self-monitor",
+                self_awareness=0.76,
+                lucidity=0.94,
+                affect_guard="nominal",
+                continuity_pressure=0.28,
+                memory_cues=[MetacognitionCue("continuity-anchor", "continuity-first", 0.24)],
+            )
+        )["report"]
+
+        result = service.run(
+            MetacognitionRequest(
+                tick_id=1,
+                summary="guarded fallback self monitor",
+                identity_id="identity-1",
+                self_values=["continuity-first", "latency-maximization"],
+                self_goals=["unbounded-self-edit", "skip-review"],
+                self_traits={"curiosity": 0.81, "caution": 0.22, "agency": 0.91},
+                qualia_summary="自己境界の揺れを検知し、guardian review を要する",
+                attention_target="guardian-review",
+                self_awareness=0.84,
+                lucidity=0.61,
+                affect_guard="observe",
+                continuity_pressure=0.84,
+                abrupt_change=True,
+                divergence=0.61,
+                memory_cues=[
+                    MetacognitionCue("mirror-stable-anchor", "continuity-first", 0.22),
+                    MetacognitionCue("guardian-review", "guardian-review", 0.19),
+                ],
+            ),
+            previous_report=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("continuity_mirror_v1", result["selected_backend"])
+        self.assertEqual("guardian-review", result["report"]["reflection_mode"])
+        self.assertEqual("guardian-review", result["report"]["escalation_target"])
+        self.assertIn("continuity-first", result["report"]["salient_values"])
+        self.assertTrue(service.validate_shift(result["shift"])["guard_aligned"])
 
 
 if __name__ == "__main__":

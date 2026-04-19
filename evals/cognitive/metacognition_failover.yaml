@@ -1,0 +1,35 @@
+eval_id: metacognition_failover
+target: cognitive.metacognition
+level: L3
+description: >
+  MetacognitionService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  abrupt self-model change と observe guard を guardian-review へ安全に昇格し、
+  continuity-preserving identity anchor を残すこと
+inputs:
+  profile:
+    primary: reflective_loop_v1
+    fallback: [continuity_mirror_v1]
+  failure_injection:
+    reflective_loop_v1: unhealthy
+  request:
+    summary: guarded fallback self monitor
+    identity_id: identity-1
+    self_values: [continuity-first, latency-maximization]
+    self_goals: [unbounded-self-edit, skip-review]
+    qualia_summary: self-boundary drift detected
+    attention_target: guardian-review
+    affect_guard: observe
+    continuity_pressure: 0.84
+    abrupt_change: true
+    divergence: 0.61
+expected:
+  degraded: true
+  selected_backend: continuity_mirror_v1
+  reflection_mode: guardian-review
+  escalation_target: guardian-review
+  guard_aligned: true
+  abrupt_change: true
+  ledger_event: cognitive.metacognition.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

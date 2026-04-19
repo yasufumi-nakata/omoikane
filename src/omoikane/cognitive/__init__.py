@@ -29,6 +29,13 @@ from .imagination import (
     ImaginationRequest,
     ImaginationService,
 )
+from .metacognition import (
+    ContinuityMirrorBackend,
+    MetacognitionCue,
+    MetacognitionRequest,
+    MetacognitionService,
+    ReflectiveLoopBackend,
+)
 from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
@@ -49,11 +56,16 @@ __all__ = [
     "ContinuityAnchorAttentionBackend",
     "ContinuitySceneGuardBackend",
     "CounterfactualSceneBackend",
+    "ContinuityMirrorBackend",
     "HomeostaticAffectBackend",
     "ImaginationCue",
     "ImaginationRequest",
     "ImaginationService",
+    "MetacognitionCue",
+    "MetacognitionRequest",
+    "MetacognitionService",
     "NarrativeReasoningBackend",
+    "ReflectiveLoopBackend",
     "ReasoningService",
     "SalienceRoutingAttentionBackend",
     "StabilityGuardAffectBackend",

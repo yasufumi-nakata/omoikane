@@ -22,10 +22,15 @@ from .cognitive import (
     CognitiveProfile,
     HomeostaticAffectBackend,
     CounterfactualSceneBackend,
+    ContinuityMirrorBackend,
     ImaginationCue,
     ImaginationRequest,
     ImaginationService,
+    MetacognitionCue,
+    MetacognitionRequest,
+    MetacognitionService,
     NarrativeReasoningBackend,
+    ReflectiveLoopBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
@@ -133,6 +138,16 @@ class OmoikaneReferenceOS:
             backends=[
                 CounterfactualSceneBackend("counterfactual_scene_v1"),
                 ContinuitySceneGuardBackend("continuity_scene_guard_v1"),
+            ],
+        )
+        self.metacognition = MetacognitionService(
+            profile=CognitiveProfile(
+                primary="reflective_loop_v1",
+                fallback=["continuity_mirror_v1"],
+            ),
+            backends=[
+                ReflectiveLoopBackend("reflective_loop_v1"),
+                ContinuityMirrorBackend("continuity_mirror_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -3189,6 +3204,156 @@ class OmoikaneReferenceOS:
                 ),
                 "imc_delivery_redacted": baseline_imc_message["delivery_status"]
                 == "delivered-with-redactions",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_metacognition_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://metacognition-demo/v1",
+            metadata={"display_name": "Metacognition Sandbox"},
+        )
+        baseline_tick = self.qualia.append(
+            "起動後の自己監視を静穏に維持している",
+            0.08,
+            0.32,
+            0.93,
+            modality_salience={
+                "visual": 0.36,
+                "auditory": 0.19,
+                "somatic": 0.21,
+                "interoceptive": 0.34,
+            },
+            attention_target="self-monitor",
+            self_awareness=0.76,
+            lucidity=0.94,
+        )
+        self.self_model.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "consent-preserving", "auditability"],
+                goals=["bounded-reflection", "stable-handoff", "guardian-clarity"],
+                traits={"curiosity": 0.67, "caution": 0.79, "agency": 0.58},
+            )
+        )
+        baseline = self.metacognition.run(
+            MetacognitionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary="baseline self monitor",
+                identity_id=identity.identity_id,
+                self_values=["continuity-first", "consent-preserving", "auditability"],
+                self_goals=["bounded-reflection", "stable-handoff", "guardian-clarity"],
+                self_traits={"curiosity": 0.67, "caution": 0.79, "agency": 0.58},
+                qualia_summary=baseline_tick.summary,
+                attention_target=baseline_tick.attention_target,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                affect_guard="nominal",
+                continuity_pressure=0.28,
+                abrupt_change=False,
+                divergence=0.0,
+                memory_cues=[
+                    MetacognitionCue("continuity-anchor", "continuity-first", 0.24),
+                    MetacognitionCue("guardian-clarity", "guardian-clarity", 0.18),
+                ],
+            )
+        )
+
+        stressed_tick = self.qualia.append(
+            "自己境界の揺れを検知し、guardian review を要する",
+            -0.18,
+            0.58,
+            0.69,
+            modality_salience={
+                "visual": 0.28,
+                "auditory": 0.21,
+                "somatic": 0.62,
+                "interoceptive": 0.71,
+            },
+            attention_target="guardian-review",
+            self_awareness=0.84,
+            lucidity=0.61,
+        )
+        observed = self.self_model.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "latency-maximization"],
+                goals=["unbounded-self-edit", "skip-review"],
+                traits={"curiosity": 0.81, "caution": 0.22, "agency": 0.91},
+            )
+        )
+        self.metacognition.set_backend_health("reflective_loop_v1", False)
+        try:
+            metacognition = self.metacognition.run(
+                MetacognitionRequest(
+                    tick_id=stressed_tick.tick_id,
+                    summary="guarded fallback self monitor",
+                    identity_id=identity.identity_id,
+                    self_values=["continuity-first", "latency-maximization"],
+                    self_goals=["unbounded-self-edit", "skip-review"],
+                    self_traits={"curiosity": 0.81, "caution": 0.22, "agency": 0.91},
+                    qualia_summary=stressed_tick.summary,
+                    attention_target=stressed_tick.attention_target,
+                    self_awareness=stressed_tick.self_awareness,
+                    lucidity=stressed_tick.lucidity,
+                    affect_guard="observe",
+                    continuity_pressure=0.84,
+                    abrupt_change=bool(observed["abrupt_change"]),
+                    divergence=float(observed["divergence"]),
+                    memory_cues=[
+                        MetacognitionCue("mirror-stable-anchor", "continuity-first", 0.22),
+                        MetacognitionCue("guardian-review", "guardian-review", 0.19),
+                    ],
+                ),
+                previous_report=baseline["report"],
+            )
+        finally:
+            self.metacognition.set_backend_health("reflective_loop_v1", True)
+
+        baseline_validation = self.metacognition.validate_report(baseline["report"])
+        report_validation = self.metacognition.validate_report(metacognition["report"])
+        shift_validation = self.metacognition.validate_shift(metacognition["shift"])
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.metacognition.failover",
+            payload={
+                "attempted_backends": metacognition["attempted_backends"],
+                "selected_backend": metacognition["selected_backend"],
+                "degraded": metacognition["degraded"],
+                "reflection_mode": metacognition["report"]["reflection_mode"],
+                "escalation_target": metacognition["report"]["escalation_target"],
+                "abrupt_change": metacognition["report"]["abrupt_change"],
+            },
+            actor="MetacognitionService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "baseline": baseline,
+            "metacognition": metacognition,
+            "self_model_history": self.self_model.history()[-2:],
+            "qualia_recent": self.qualia.recent(2),
+            "validation": {
+                "ok": baseline_validation["ok"] and report_validation["ok"] and shift_validation["ok"],
+                "selected_backend": metacognition["selected_backend"],
+                "baseline_primary": baseline["selected_backend"] == "reflective_loop_v1"
+                and not baseline["degraded"],
+                "degraded": metacognition["degraded"],
+                "guard_aligned": shift_validation["guard_aligned"],
+                "abrupt_change_flagged": metacognition["report"]["abrupt_change"],
+                "escalation_target": metacognition["report"]["escalation_target"],
+                "coherence_score": metacognition["report"]["coherence_score"],
+                "sealed_notes_present": bool(metacognition["report"]["sealed_notes"]),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

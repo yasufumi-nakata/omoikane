@@ -21,6 +21,7 @@
 - `cognitive.attention.v0.idl`
 - `cognitive.volition.v0.idl`
 - `cognitive.imagination.v0.idl`
+- `cognitive.metacognition.v0.idl`
 - `governance.amendment.v0.idl`
 - `governance.oversight.v0.idl`
 - `governance.naming.v0.idl`
@@ -33,7 +34,7 @@
 
 ## 次段階
 
-L2 procedural skill execution enactment、L3 language / metacognition、
+L2 procedural skill execution enactment、L3 language、
 L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 reference runtime にある reasoning failover も、現時点では内部実装に留め、

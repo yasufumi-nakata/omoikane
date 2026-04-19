@@ -243,6 +243,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("private-sandbox", result["imagination"]["scene"]["handoff"]["mode"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
+    def test_metacognition_demo_records_guarded_fallback_and_identity_anchor(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_metacognition_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("continuity_mirror_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["baseline_primary"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertTrue(result["validation"]["abrupt_change_flagged"])
+        self.assertEqual("guardian-review", result["validation"]["escalation_target"])
+        self.assertIn("continuity-first", result["metacognition"]["report"]["salient_values"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
     def test_qualia_demo_reports_reference_sampling_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
 
