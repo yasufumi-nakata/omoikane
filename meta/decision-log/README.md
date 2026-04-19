@@ -61,6 +61,7 @@ status: decided | superseded
 - [2026-04-19_scheduler-verifier-root-rotation.md](2026-04-19_scheduler-verifier-root-rotation.md)
 - [2026-04-19_distributed-council-resolution.md](2026-04-19_distributed-council-resolution.md)
 - [2026-04-19_cognitive-audit-loop.md](2026-04-19_cognitive-audit-loop.md)
+- [2026-04-20_consensus-bus-reference-runtime.md](2026-04-20_consensus-bus-reference-runtime.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from omoikane.agentic.cognitive_audit import CognitiveAuditService
+from omoikane.agentic.consensus_bus import ConsensusBus
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from omoikane.agentic.distributed_transport import DistributedTransportService
 from omoikane.agentic.task_graph import TaskGraphService
@@ -317,6 +318,66 @@ class TaskGraphServiceTests(unittest.TestCase):
                 intent="4 roles を同時に走らせる",
                 required_roles=["schema-builder", "eval-builder", "doc-sync-builder", "codex-builder"],
             )
+
+
+class ConsensusBusTests(unittest.TestCase):
+    def test_publish_records_bus_only_message_and_audit_sequence(self) -> None:
+        service = ConsensusBus()
+        session_id = "session-consensus-001"
+
+        service.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="dispatch",
+            phase="brief",
+            payload={"graph_id": "graph-001", "ready_node_ids": ["node-1"]},
+            related_claim_ids=["node-1"],
+        )
+        message = service.publish(
+            session_id=session_id,
+            sender_role="integrity-guardian",
+            recipient="council",
+            intent="gate",
+            phase="gate",
+            payload={"guardian_status": "pass"},
+            related_claim_ids=["node-1"],
+            ethics_check_id="ethics://consensus-001",
+        )
+        service.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="resolve",
+            phase="resolve",
+            payload={"artifact_ref": "artifact://summary"},
+            related_claim_ids=["node-result-synthesis"],
+        )
+
+        audit = service.audit_session(session_id)
+
+        self.assertEqual("consensus-bus-only", message["transport_profile"])
+        self.assertEqual("council", message["delivery_scope"])
+        self.assertTrue(audit["all_transport_bus_only"])
+        self.assertTrue(audit["guardian_gate_present"])
+        self.assertTrue(audit["ordered_phases"])
+        self.assertEqual("resolve", audit["last_phase"])
+
+    def test_reject_direct_message_records_blocked_attempt(self) -> None:
+        service = ConsensusBus()
+
+        blocked = service.reject_direct_message(
+            session_id="session-consensus-002",
+            sender_role="MemoryRetriever",
+            recipient="agent://narrative-writer",
+            attempted_intent="report",
+            reason="use the bus",
+        )
+        audit = service.audit_session("session-consensus-002")
+
+        self.assertEqual("blocked", blocked["status"])
+        self.assertEqual("consensus-bus-only", blocked["enforced_policy"])
+        self.assertEqual(1, audit["blocked_direct_attempts"])
 
 
 class DistributedTransportServiceTests(unittest.TestCase):

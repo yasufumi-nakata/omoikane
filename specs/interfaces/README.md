@@ -15,6 +15,7 @@
 - `mind.qualia.v0.idl`
 - `mind.self_model.v0.idl`
 - `cognitive.reasoning.v0.idl`
+- `agentic.consensus_bus.v0.idl`
 - `agentic.council.v0.idl`
 - `agentic.distributed_transport.v0.idl`
 - `agentic.cognitive_audit.v0.idl`

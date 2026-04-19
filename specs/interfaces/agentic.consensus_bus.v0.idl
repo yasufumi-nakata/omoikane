@@ -1,0 +1,198 @@
+idl_version: 1
+kind: service
+namespace: agentic.consensus_bus.v0
+service: ConsensusBusService
+summary: Audited message delivery contract for Council, Builder, and Guardian coordination.
+imports:
+  consensus_message: ../schemas/consensus_message.schema
+operations:
+  publish:
+    summary: Emit one audited bus message for a Council-routed task handoff, report, gate, or resolution.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - sender_role
+          - recipient
+          - intent
+          - phase
+          - payload
+        properties:
+          session_id:
+            type: string
+          sender_role:
+            type: string
+          recipient:
+            type: string
+          intent:
+            type: string
+            enum:
+              - dispatch
+              - report
+              - vote
+              - escalate
+              - gate
+              - resolve
+          phase:
+            type: string
+            enum:
+              - brief
+              - opening
+              - rebuttal
+              - amendment
+              - decision
+              - gate
+              - resolve
+          payload:
+            oneOf:
+              - type: string
+                minLength: 1
+              - type: object
+                minProperties: 1
+          related_claim_ids:
+            type: array
+            items:
+              type: string
+          ethics_check_id:
+            type: string
+    output:
+      schema_ref: consensus_message
+    guarantees:
+      - transport_profile must always equal consensus-bus-only
+      - delivery_scope must be derived from recipient and never omitted
+      - every emitted message must carry a message_digest for audit replay
+  reject_direct_message:
+    summary: Record one blocked direct handoff attempt that tried to bypass the bus.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - sender_role
+          - recipient
+          - attempted_intent
+          - reason
+        properties:
+          session_id:
+            type: string
+          sender_role:
+            type: string
+          recipient:
+            type: string
+          attempted_intent:
+            type: string
+          reason:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - attempt_id
+          - session_id
+          - sender_role
+          - recipient
+          - attempted_intent
+          - status
+          - enforced_policy
+          - reason
+          - blocked_at
+        properties:
+          attempt_id:
+            type: string
+          session_id:
+            type: string
+          sender_role:
+            type: string
+          recipient:
+            type: string
+          attempted_intent:
+            type: string
+          status:
+            type: string
+            const: blocked
+          enforced_policy:
+            type: string
+            const: consensus-bus-only
+          reason:
+            type: string
+          blocked_at:
+            type: string
+            format: date-time
+    guarantees:
+      - direct agent handoff attempts must never be silently dropped
+      - enforced_policy must always equal consensus-bus-only
+  list_session_messages:
+    summary: Return the ordered message transcript for one bus-routed session.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+    output:
+      inline_schema:
+        type: array
+        items:
+          $ref: ../schemas/consensus_message.schema
+  audit_session:
+    summary: Compute one machine-checkable audit summary over a session transcript.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+    output:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - message_count
+          - blocked_direct_attempts
+          - all_transport_bus_only
+          - guardian_gate_present
+          - resolve_present
+          - ordered_phases
+        properties:
+          session_id:
+            type: string
+          message_count:
+            type: integer
+            minimum: 0
+          blocked_direct_attempts:
+            type: integer
+            minimum: 0
+          all_transport_bus_only:
+            type: boolean
+          guardian_gate_present:
+            type: boolean
+          resolve_present:
+            type: boolean
+          ordered_phases:
+            type: boolean
+          first_phase:
+            type:
+              - string
+              - "null"
+          last_phase:
+            type:
+              - string
+              - "null"
+          related_claim_ids:
+            type: array
+            items:
+              type: string
+events:
+  consensus.message:
+    schema_ref: consensus_message
+compatibility:
+  stability: bootstrap
+  notes:
+    - Direct agent handoff is forbidden outside this service.
+    - Recipient values map deterministically to council, agent, or broadcast delivery scopes.
+    - Reference runtime audit requires guardian gate and resolve phases before delivery is considered complete.

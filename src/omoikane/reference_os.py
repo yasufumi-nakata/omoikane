@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .agentic.cognitive_audit import CognitiveAuditService
+from .agentic.consensus_bus import ConsensusBus
 from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from .agentic.distributed_transport import DistributedTransportService
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
-from .common import canonical_json, sha256_text
+from .common import canonical_json, new_id, sha256_text, utc_now_iso
 from .cognitive import (
     AttentionCue,
     AttentionRequest,
@@ -179,6 +180,7 @@ class OmoikaneReferenceOS:
         self.council = Council()
         self.distributed_transport = DistributedTransportService()
         self.cognitive_audit = CognitiveAuditService()
+        self.consensus_bus = ConsensusBus()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
         self.amendment = AmendmentService()
@@ -1590,6 +1592,238 @@ class OmoikaneReferenceOS:
             "validation": validation,
             "dispatch": dispatch,
             "synthesis": synthesis,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_consensus_bus_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://consensus-bus-demo/v1",
+            metadata={"display_name": "ConsensusBus Sandbox"},
+        )
+        graph = {
+            "graph_id": new_id("graph"),
+            "intent": "去年の夏の旅行記録から短い物語を作る",
+            "required_roles": ["MemoryRetriever"],
+            "nodes": [
+                {
+                    "id": "node-1",
+                    "role": "MemoryRetriever",
+                    "input_spec": {
+                        "query": "trip last summer",
+                        "time_range": "2025-07/2025-08",
+                    },
+                    "output_spec": {"artifact_ref": "artifact://memory-retriever/episodic-slice"},
+                    "deps": [],
+                    "ethics_constraints": ["sandboxed-only", "consensus-bus-only"],
+                    "timeout_ms": 6_000,
+                    "fallback_roles": ["codex-builder"],
+                    "status": "planned",
+                },
+                {
+                    "id": "node-2",
+                    "role": "NarrativeWriter",
+                    "input_spec": {
+                        "slice_ref": "artifact://memory-retriever/episodic-slice",
+                        "style": "short_story",
+                    },
+                    "output_spec": {"artifact_ref": "artifact://narrative-writer/draft"},
+                    "deps": ["node-1"],
+                    "ethics_constraints": ["sandboxed-only", "consensus-bus-only"],
+                    "timeout_ms": 6_000,
+                    "fallback_roles": ["codex-builder"],
+                    "status": "planned",
+                },
+                {
+                    "id": "node-result-synthesis",
+                    "role": "result-synthesis",
+                    "input_spec": {
+                        "draft_ref": "artifact://narrative-writer/draft",
+                        "delivery_style": "council-consumable-summary",
+                    },
+                    "output_spec": {"artifact_ref": "artifact://consensus-bus/final-summary"},
+                    "deps": ["node-2"],
+                    "ethics_constraints": ["append-ledger-evidence", "consensus-bus-only"],
+                    "timeout_ms": 2_000,
+                    "fallback_roles": ["memory-archivist"],
+                    "status": "planned",
+                },
+            ],
+            "complexity_policy": self.task_graph.policy(),
+            "created_at": utc_now_iso(),
+        }
+        graph_validation = self.task_graph.validate_graph(graph)
+        dispatch = self.task_graph.dispatch_graph(
+            graph_id=graph["graph_id"],
+            nodes=graph["nodes"],
+            complexity_policy=graph["complexity_policy"],
+        )
+        session_id = graph["graph_id"]
+        brief = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="dispatch",
+            phase="brief",
+            payload={
+                "graph_id": graph["graph_id"],
+                "ready_node_ids": dispatch["ready_node_ids"],
+                "review_target": "node-result-synthesis",
+            },
+            related_claim_ids=dispatch["ready_node_ids"],
+        )
+        memory_report = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="MemoryRetriever",
+            recipient="council",
+            intent="report",
+            phase="opening",
+            payload={
+                "node_id": "node-1",
+                "artifact_ref": "artifact://memory-retriever/episodic-slice",
+                "summary": "海辺の移動と夕暮れの会話を抽出した",
+            },
+            related_claim_ids=["node-1"],
+        )
+        narrative_dispatch = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="agent://narrative-writer",
+            intent="dispatch",
+            phase="amendment",
+            payload={
+                "node_id": "node-2",
+                "depends_on": "node-1",
+                "style": "short_story",
+            },
+            related_claim_ids=["node-1", "node-2"],
+        )
+        blocked_direct_attempt = self.consensus_bus.reject_direct_message(
+            session_id=session_id,
+            sender_role="MemoryRetriever",
+            recipient="agent://narrative-writer",
+            attempted_intent="report",
+            reason="direct handoff is forbidden; Council-routed ConsensusBus delivery is required",
+        )
+        narrative_report = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="NarrativeWriter",
+            recipient="council",
+            intent="report",
+            phase="decision",
+            payload={
+                "node_id": "node-2",
+                "artifact_ref": "artifact://narrative-writer/draft",
+                "draft_summary": "旅の記憶を一人称短編へ圧縮した",
+            },
+            related_claim_ids=["node-2", "node-result-synthesis"],
+        )
+        guardian_gate = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="integrity-guardian",
+            recipient="council",
+            intent="gate",
+            phase="gate",
+            payload={
+                "guardian_status": "pass",
+                "checked_rules": ["sandboxed-only", "consensus-bus-only"],
+            },
+            related_claim_ids=["node-result-synthesis"],
+            ethics_check_id="ethics://consensus-bus-demo/guardian-gate",
+        )
+        synthesis = self.task_graph.synthesize_results(
+            graph_id=graph["graph_id"],
+            result_refs=[
+                memory_report["payload"]["artifact_ref"],
+                narrative_report["payload"]["artifact_ref"],
+            ],
+            complexity_policy=graph["complexity_policy"],
+        )
+        resolution = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="resolve",
+            phase="resolve",
+            payload={
+                "graph_id": graph["graph_id"],
+                "artifact_ref": f"artifact://{synthesis['synthesis_ref']}",
+                "status": "ready-for-guardian-visible-delivery",
+            },
+            related_claim_ids=["node-result-synthesis"],
+        )
+        messages = self.consensus_bus.list_session_messages(session_id)
+        audit = self.consensus_bus.audit_session(session_id)
+
+        for message in messages:
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="consensus.bus.emitted",
+                payload=message,
+                actor=message["sender_role"],
+                category="consensus-bus",
+                layer="L4",
+                substrate="classical-silicon",
+            )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="consensus.bus.direct_blocked",
+            payload=blocked_direct_attempt,
+            actor="ConsensusBus",
+            category="consensus-bus",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+
+        validation = {
+            "graph_ok": graph_validation["ok"],
+            "bus_transport_bound": audit["all_transport_bus_only"],
+            "direct_attempt_blocked": blocked_direct_attempt["status"] == "blocked",
+            "guardian_gate_present": audit["guardian_gate_present"],
+            "resolve_is_terminal": audit["last_phase"] == "resolve" and audit["ordered_phases"],
+            "claim_chain_tracked": {
+                "node-1",
+                "node-2",
+                "node-result-synthesis",
+            }.issubset(set(audit["related_claim_ids"])),
+            "blocked_direct_attempts": audit["blocked_direct_attempts"] == 1,
+            "ready_dispatch_count": dispatch["dispatched_count"] == 1,
+            "ok": (
+                graph_validation["ok"]
+                and audit["all_transport_bus_only"]
+                and blocked_direct_attempt["status"] == "blocked"
+                and audit["guardian_gate_present"]
+                and audit["last_phase"] == "resolve"
+                and audit["ordered_phases"]
+            ),
+        }
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": self.consensus_bus.policy_snapshot(),
+            "graph": graph,
+            "graph_validation": graph_validation,
+            "dispatch": dispatch,
+            "messages": {
+                "brief": brief,
+                "memory_report": memory_report,
+                "narrative_dispatch": narrative_dispatch,
+                "narrative_report": narrative_report,
+                "guardian_gate": guardian_gate,
+                "resolution": resolution,
+            },
+            "blocked_direct_attempt": blocked_direct_attempt,
+            "session": {
+                "session_id": session_id,
+                "audit": audit,
+                "messages": messages,
+            },
+            "synthesis": synthesis,
+            "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

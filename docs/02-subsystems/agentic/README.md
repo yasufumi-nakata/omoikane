@@ -31,6 +31,8 @@
 ### ConsensusBus
 - Agent 間の合意形成メッセージバス
 - 直接通信ではなく必ずバス経由（監査可能性のため）
+- reference runtime では `consensus-bus-demo` が dispatch / report / guardian gate /
+  resolve と direct handoff block を可視化する
 
 ### AmenoUzumePool
 - 実行担当 Agent プール（Codex 等の Builder）
@@ -42,15 +44,20 @@
 ```yaml
 CouncilMessage:
   message_id: <uuid>
-  conversation_id: <thread>
-  from: <agent_id>
-  to: <council|agent_id|broadcast>
-  intent: propose|vote|report|escalate|veto
+  session_id: <thread>
+  sender_role: <agent role>
+  recipient: <council|agent://...|broadcast>
+  delivery_scope: <council|agent|broadcast>
+  intent: dispatch|report|vote|escalate|gate|resolve
+  phase: brief|opening|rebuttal|amendment|decision|gate|resolve
+  transport_profile: consensus-bus-only
   payload:
     task_ref: <TaskGraph node>
     content: <body>
-  signatures: [...]
+  related_claim_ids: [<TaskGraph node>]
   ethics_check_id: <EthicsLedger entry>
+  signature_ref: <bus signature ref>
+  message_digest: <sha256>
 ```
 
 ## タスクライフサイクル
@@ -81,6 +88,7 @@ CouncilMessage:
 - [distributed-council-resolution.md](distributed-council-resolution.md) ── Federation / Heritage returned result の解決規則
 - [distributed-transport-attestation.md](distributed-transport-attestation.md) ── Federation / Heritage remote handoff の attestation と transport authenticity
 - [cognitive-audit-loop.md](cognitive-audit-loop.md) ── 認知系 cross-layer audit と Council follow-up
+- [consensus-bus.md](consensus-bus.md) ── audited dispatch / report / gate / resolve bus
 - [task-decomposition.md](task-decomposition.md) ── タスク分解アルゴリズム
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア

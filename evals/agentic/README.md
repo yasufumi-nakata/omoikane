@@ -19,6 +19,10 @@ expedited session が hard timeout 到達時に議事を defer し、
 reference runtime の TaskGraph が `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3`
 を超えないこと。
 
+### ConsensusBus Delivery Guard
+dispatch / report / guardian gate / resolve が `consensus-bus-only` で監査され、
+direct handoff が `blocked` として残ること。
+
 ### Trust Score Update Guard
 trust delta table と threshold gate と human pin freeze が固定値どおりに動くこと。
 

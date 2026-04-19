@@ -227,6 +227,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     task_graph_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    consensus_bus_parser = subparsers.add_parser(
+        "consensus-bus-demo",
+        help="Run the L4 ConsensusBus audited delivery and direct-handoff blocking scenario",
+    )
+    consensus_bus_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     trust_parser = subparsers.add_parser(
         "trust-demo",
         help="Run the L4 trust update policy and human pin scenario",
@@ -418,6 +424,10 @@ def main() -> None:
 
     if args.command == "task-graph-demo":
         _print_result(runtime.run_task_graph_demo(), args.json)
+        return
+
+    if args.command == "consensus-bus-demo":
+        _print_result(runtime.run_consensus_bus_demo(), args.json)
         return
 
     if args.command == "trust-demo":

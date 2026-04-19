@@ -77,7 +77,10 @@ entries:
     kind: schema
     file: specs/schemas/consensus_message.schema
     consumers:
+      - specs/interfaces/agentic.consensus_bus.v0.idl
       - specs/interfaces/agentic.council.v0.idl
+      - docs/02-subsystems/agentic/consensus-bus.md
+      - reference-runtime
     rationale: Required for ConsensusBus message exchange.
   - priority: P1
     kind: schema
@@ -197,6 +200,14 @@ entries:
     rationale: Required to express the ethics-coupled minimum energy floor.
   - priority: P1
     kind: idl
+    file: specs/interfaces/agentic.consensus_bus.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/consensus-bus.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make audited bus delivery, blocked direct handoff, and session audit machine-readable.
+  - priority: P1
+    kind: idl
     file: specs/interfaces/agentic.council.v0.idl
     consumers:
       - reference-runtime
@@ -217,6 +228,13 @@ entries:
       - docs/07-reference-implementation/README.md
       - reference-runtime
     rationale: Required to make qualia/self-model/metacognition/Council audit loops machine-readable in the reference runtime.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/consensus_bus_delivery_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects bus-only delivery, guardian gate presence, resolve completion, and direct handoff blocking.
   - priority: P1
     kind: eval
     file: evals/agentic/cognitive_audit_loop.yaml

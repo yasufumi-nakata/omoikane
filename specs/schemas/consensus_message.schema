@@ -8,9 +8,14 @@ required:
   - message_id
   - session_id
   - sender_role
+  - recipient
+  - delivery_scope
+  - intent
   - phase
+  - transport_profile
   - payload
   - emitted_at
+  - message_digest
 properties:
   message_id:
     type: string
@@ -21,6 +26,24 @@ properties:
   sender_role:
     type: string
     minLength: 1
+  recipient:
+    type: string
+    minLength: 1
+  delivery_scope:
+    type: string
+    enum:
+      - council
+      - agent
+      - broadcast
+  intent:
+    type: string
+    enum:
+      - dispatch
+      - report
+      - vote
+      - escalate
+      - gate
+      - resolve
   phase:
     type: string
     enum:
@@ -31,6 +54,9 @@ properties:
       - decision
       - gate
       - resolve
+  transport_profile:
+    type: string
+    const: consensus-bus-only
   payload:
     oneOf:
       - type: string
@@ -48,3 +74,6 @@ properties:
   signature_ref:
     type: string
     minLength: 1
+  message_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

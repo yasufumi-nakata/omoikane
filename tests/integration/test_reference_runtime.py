@@ -455,6 +455,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["dispatch"]["dispatched_count"])
         self.assertEqual(3, result["synthesis"]["accepted_result_count"])
 
+    def test_consensus_bus_demo_records_audited_delivery(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_consensus_bus_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["bus_transport_bound"])
+        self.assertTrue(result["validation"]["direct_attempt_blocked"])
+        self.assertTrue(result["validation"]["guardian_gate_present"])
+        self.assertEqual("resolve", result["session"]["audit"]["last_phase"])
+        self.assertEqual(6, result["session"]["audit"]["message_count"])
+        self.assertEqual(1, result["session"]["audit"]["blocked_direct_attempts"])
+        self.assertEqual(7, result["ledger_verification"]["category_counts"]["consensus-bus"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
     def test_multi_council_demo_externalizes_cross_self_and_interpretive_routes(self) -> None:
         runtime = OmoikaneReferenceOS()
 

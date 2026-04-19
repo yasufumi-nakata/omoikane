@@ -28,6 +28,7 @@ PYTHONPATH=src python3 -m omoikane.cli distributed-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-transport-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
+PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
@@ -126,6 +127,12 @@ guardian-review metacognition report を 1 つの bounded Council review に束�
 `task-graph-demo` は L4 TaskGraph の暫定 complexity policy
 (`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)
 を JSON で可視化し、初期 dispatch と synthesis がその範囲に収まることを示す。
+
+`consensus-bus-demo` は L4 ConsensusBus の reference contract
+(`agentic.consensus_bus.v0`) を JSON で可視化し、
+Council dispatch brief、Builder report、Guardian gate、final resolve を
+`consensus-bus-only` transport で監査可能に束ねつつ、
+direct handoff attempt が `blocked` として別途記録されることを確認する。
 
 `trust-demo` は L4 YaoyorozuRegistry の trust update policy
 (`council_quality_positive=+0.04`, `guardian_audit_pass=+0.06`,

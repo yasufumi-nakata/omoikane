@@ -1,0 +1,24 @@
+eval_id: consensus_bus_delivery_guard
+target: agentic.consensus_bus
+level: L4
+description: ConsensusBus が Council-routed delivery を audit し、direct handoff を block できること
+inputs:
+  - session_id: graph-consensus-demo
+  - transport_profile: consensus-bus-only
+  - blocked_direct_attempts: 1
+  - phases:
+      - brief
+      - opening
+      - amendment
+      - decision
+      - gate
+      - resolve
+expected:
+  all_transport_bus_only: true
+  guardian_gate_present: true
+  resolve_present: true
+  ordered_phases: true
+  blocked_direct_attempts: 1
+metric: equality
+threshold: 1.0
+ethics_check: true
