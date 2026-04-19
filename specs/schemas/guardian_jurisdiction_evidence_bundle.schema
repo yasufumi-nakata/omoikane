@@ -1,0 +1,57 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/guardian_jurisdiction_evidence_bundle.schema"
+title: GuardianJurisdictionEvidenceBundle
+description: Transport-safe legal evidence package summary for one Guardian oversight reviewer jurisdiction.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - bundle_id
+  - jurisdiction
+  - package_ref
+  - package_digest
+  - status
+  - transport_profile
+  - updated_at
+properties:
+  kind:
+    const: guardian_jurisdiction_evidence_bundle
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  bundle_id:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  package_ref:
+    type: string
+    minLength: 1
+  package_digest:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - ready
+      - stale
+      - revoked
+  transport_profile:
+    type: string
+    enum:
+      - reviewer-live-proof-bridge-v1
+  updated_at:
+    type: string
+    format: date-time
+examples:
+  - kind: guardian_jurisdiction_evidence_bundle
+    schema_version: 1.0.0
+    bundle_id: jurisdiction-bundle-0123456789ab
+    jurisdiction: JP-13
+    package_ref: legal://jp-13/guardian-oversight/v1
+    package_digest: sha256:jp13-guardian-oversight-v1
+    status: ready
+    transport_profile: reviewer-live-proof-bridge-v1
+    updated_at: "2026-04-19T13:00:00Z"

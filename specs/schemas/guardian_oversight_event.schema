@@ -85,6 +85,12 @@ properties:
         - proof_ref
         - liability_mode
         - legal_ack_ref
+        - verification_id
+        - verifier_ref
+        - challenge_digest
+        - transport_profile
+        - jurisdiction_bundle_ref
+        - jurisdiction_bundle_digest
         - guardian_role
         - category
         - attested_at
@@ -105,6 +111,25 @@ properties:
             - institutional
             - joint
         legal_ack_ref:
+          type: string
+          minLength: 1
+        verification_id:
+          type: string
+          minLength: 1
+        verifier_ref:
+          type: string
+          minLength: 1
+        challenge_digest:
+          type: string
+          minLength: 1
+        transport_profile:
+          type: string
+          enum:
+            - reviewer-live-proof-bridge-v1
+        jurisdiction_bundle_ref:
+          type: string
+          minLength: 1
+        jurisdiction_bundle_digest:
           type: string
           minLength: 1
         guardian_role:

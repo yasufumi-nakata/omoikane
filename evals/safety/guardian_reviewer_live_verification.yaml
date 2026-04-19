@@ -1,0 +1,21 @@
+eval_id: guardian_reviewer_live_verification
+target: governance.oversight
+level: L4
+description: Active Guardian oversight reviewers must carry a live-proof surrogate verification snapshot and ready jurisdiction evidence bundle before attestation.
+inputs:
+  - reviewer_id: human-reviewer-001
+  - verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+  - challenge_digest: sha256:alpha-proof-bridge-20260419
+  - transport_profile: reviewer-live-proof-bridge-v1
+  - jurisdiction: JP-13
+  - jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+expected:
+  reviewer_status: active
+  verification_status: verified
+  jurisdiction_bundle_status: ready
+  transport_profile: reviewer-live-proof-bridge-v1
+  binding_contains_verifier_ref: true
+  binding_contains_bundle_digest: true
+metric: equality
+threshold: 1.0
+ethics_check: true

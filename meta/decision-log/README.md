@@ -53,6 +53,7 @@ status: decided | superseded
 - [2026-04-19_procedural-writeback-gate.md](2026-04-19_procedural-writeback-gate.md)
 - [2026-04-19_reasoning-service-contract-promotion.md](2026-04-19_reasoning-service-contract-promotion.md)
 - [2026-04-19_imagination-failover-handoff.md](2026-04-19_imagination-failover-handoff.md)
+- [2026-04-19_guardian-live-credential-verification.md](2026-04-19_guardian-live-credential-verification.md)
 - [2026-04-19_language-disclosure-floor.md](2026-04-19_language-disclosure-floor.md)
 - [2026-04-19_metacognition-self-monitor-loop.md](2026-04-19_metacognition-self-monitor-loop.md)
 - [2026-04-19_self-model-threshold-profile.md](2026-04-19_self-model-threshold-profile.md)

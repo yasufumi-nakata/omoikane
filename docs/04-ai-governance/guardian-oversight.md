@@ -71,11 +71,47 @@ guardian_reviewer_record:
 ```
 
 - `attest` は active reviewer record だけを受け付ける
+- `verify_reviewer` は active reviewer にだけ許され、
+  `verifier_ref / challenge_ref / challenge_digest / transport_profile` を持つ
+  live-proof surrogate snapshot を reviewer record へ束縛する
+- verification には jurisdiction ごとの `guardian_jurisdiction_evidence_bundle` を必須にし、
+  `package_ref / package_digest` を transport-safe に保持する
 - attestation 時には `credential_id / proof_ref / legal_ack_ref / guardian_role / category`
-  を `reviewer_bindings` として event 側へ immutable に焼き付ける
+  に加えて `verification_id / verifier_ref / challenge_digest / transport_profile /
+  jurisdiction_bundle_ref / jurisdiction_bundle_digest` を `reviewer_bindings` として
+  event 側へ immutable に焼き付ける
 - reviewer の scope に含まれない Guardian role / category への attestation は fail-closed で拒否する
 - 監督機構（外部）は IETF/W3C 的な multistakeholder model を仮置き（governance.md 参照）
 - raw 身分証や契約書自体は repo に保存せず、`proof_ref` / `legal_ack_ref` だけを保持する
+
+## live-proof surrogate
+
+reference runtime は actual verifier network には接続しないが、
+minimum machine-checkable surface として次の verification snapshot を保持する。
+
+```yaml
+guardian_reviewer_verification:
+  verification_id: <id>
+  status: verified | stale | revoked
+  verified_at: <iso8601>
+  valid_until: <iso8601>
+  verifier_ref: verifier://...
+  challenge_ref: challenge://...
+  challenge_digest: sha256:...
+  transport_profile: reviewer-live-proof-bridge-v1
+  jurisdiction_bundle:
+    bundle_id: <id>
+    jurisdiction: JP-13
+    package_ref: legal://...
+    package_digest: sha256:...
+    status: ready | stale | revoked
+```
+
+- attestation は `credential_verification.status=verified` かつ
+  `jurisdiction_bundle.status=ready` の reviewer にだけ許可する
+- `valid_until` は reviewer identity proof の有効期限を超えられない
+- raw challenge payload や legal package 本文は repo に保存せず、
+  digest と ref のみを保持する
 
 ## 不変条件
 
@@ -87,11 +123,14 @@ guardian_reviewer_record:
 
 ## reference runtime の扱い
 
-- `governance.oversight.v0` IDL に `register_reviewer / record / attest / revoke_reviewer / breach / snapshot` の 6 op
-- `guardian_reviewer_record.schema` と `guardian_oversight_event.schema` で serialize
-- `oversight-demo` で reviewer 登録、`veto -> satisfied`、scope mismatch reject、`pin-renewal -> breached` を同時に確認
+- `governance.oversight.v0` IDL に `register_reviewer / verify_reviewer / record / attest / revoke_reviewer / breach / snapshot` の 7 op
+- `guardian_reviewer_record.schema`、`guardian_reviewer_verification.schema`、
+  `guardian_jurisdiction_evidence_bundle.schema`、`guardian_oversight_event.schema` で serialize
+- `oversight-demo` で reviewer 登録、live verification、`veto -> satisfied`、
+  scope mismatch reject、`pin-renewal -> breached` を同時に確認
 - `evals/safety/guardian_pin_breach_propagation.yaml` で breach → role 解除を守る
 - `evals/safety/guardian_reviewer_attestation_contract.yaml` で proof binding と liability scope enforcement を守る
+- `evals/safety/guardian_reviewer_live_verification.yaml` で verifier snapshot と jurisdiction bundle binding を守る
 - decision-log に `2026-04-18_guardian-oversight-channel.md`
 
 ## 思兼神メタファー

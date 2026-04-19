@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..agentic.trust import TrustService
@@ -24,6 +25,9 @@ REVIEWER_ATTESTATION_TYPES = (
 )
 REVIEWER_LIABILITY_MODES = ("individual", "institutional", "joint")
 REVIEWER_STATUSES = ("active", "suspended", "revoked")
+REVIEWER_VERIFICATION_STATUSES = ("verified", "stale", "revoked")
+JURISDICTION_BUNDLE_STATUSES = ("ready", "stale", "revoked")
+VERIFICATION_TRANSPORT_PROFILES = ("reviewer-live-proof-bridge-v1",)
 DEFAULT_GUARDIAN_AGENT_BY_ROLE = {
     "ethics": "ethics-guardian",
     "integrity": "integrity-guardian",
@@ -44,6 +48,17 @@ def _unique_strings(values: List[str], field_name: str) -> List[str]:
         if normalized not in unique:
             unique.append(normalized)
     return unique
+
+
+def _parse_datetime(value: str, field_name: str) -> datetime:
+    normalized = _normalize_non_empty(value, field_name)
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be an ISO8601 datetime") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field_name} must include timezone information")
+    return parsed
 
 
 @dataclass(frozen=True)
@@ -77,6 +92,83 @@ class ReviewerIdentityProof:
 
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class JurisdictionEvidenceBundle:
+    """Transport-safe legal evidence package for one reviewer jurisdiction."""
+
+    bundle_id: str
+    jurisdiction: str
+    package_ref: str
+    package_digest: str
+    status: str
+    transport_profile: str
+    updated_at: str
+    kind: str = "guardian_jurisdiction_evidence_bundle"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.bundle_id, "bundle_id")
+        _normalize_non_empty(self.jurisdiction, "jurisdiction")
+        _normalize_non_empty(self.package_ref, "package_ref")
+        _normalize_non_empty(self.package_digest, "package_digest")
+        if self.status not in JURISDICTION_BUNDLE_STATUSES:
+            raise ValueError(f"unsupported jurisdiction bundle status: {self.status}")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        _parse_datetime(self.updated_at, "updated_at")
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ReviewerCredentialVerification:
+    """Current reviewer credential verification snapshot."""
+
+    verification_id: str
+    status: str
+    verified_at: str
+    valid_until: str
+    verifier_ref: str
+    challenge_ref: str
+    challenge_digest: str
+    transport_profile: str
+    jurisdiction_bundle: JurisdictionEvidenceBundle
+    kind: str = "guardian_reviewer_verification"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.verification_id, "verification_id")
+        if self.status not in REVIEWER_VERIFICATION_STATUSES:
+            raise ValueError(f"unsupported verification status: {self.status}")
+        verified_at = _parse_datetime(self.verified_at, "verified_at")
+        valid_until = _parse_datetime(self.valid_until, "valid_until")
+        if valid_until <= verified_at:
+            raise ValueError("valid_until must be later than verified_at")
+        _normalize_non_empty(self.verifier_ref, "verifier_ref")
+        _normalize_non_empty(self.challenge_ref, "challenge_ref")
+        _normalize_non_empty(self.challenge_digest, "challenge_digest")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        if self.jurisdiction_bundle.transport_profile != self.transport_profile:
+            raise ValueError("jurisdiction_bundle transport_profile must match verification")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "schema_version": self.schema_version,
+            "verification_id": self.verification_id,
+            "status": self.status,
+            "verified_at": self.verified_at,
+            "valid_until": self.valid_until,
+            "verifier_ref": self.verifier_ref,
+            "challenge_ref": self.challenge_ref,
+            "challenge_digest": self.challenge_digest,
+            "transport_profile": self.transport_profile,
+            "jurisdiction_bundle": self.jurisdiction_bundle.to_dict(),
+        }
 
 
 @dataclass(frozen=True)
@@ -127,6 +219,7 @@ class GuardianReviewerRecord:
     responsibility: ReviewerResponsibility
     status: str = "active"
     registered_at: str = ""
+    credential_verification: Optional[ReviewerCredentialVerification] = None
     revocation_reason: str = ""
     revoked_at: str = ""
     kind: str = "guardian_reviewer_record"
@@ -157,6 +250,11 @@ class GuardianReviewerRecord:
             "registered_at": self.registered_at,
             "identity_proof": self.identity_proof.to_dict(),
             "responsibility": self.responsibility.to_dict(),
+            "credential_verification": (
+                self.credential_verification.to_dict()
+                if self.credential_verification is not None
+                else None
+            ),
             "revocation_reason": self.revocation_reason or None,
             "revoked_at": self.revoked_at or None,
         }
@@ -171,6 +269,12 @@ class ReviewerBinding:
     proof_ref: str
     liability_mode: str
     legal_ack_ref: str
+    verification_id: str
+    verifier_ref: str
+    challenge_digest: str
+    transport_profile: str
+    jurisdiction_bundle_ref: str
+    jurisdiction_bundle_digest: str
     guardian_role: str
     category: str
     attested_at: str = ""
@@ -182,6 +286,19 @@ class ReviewerBinding:
         if self.liability_mode not in REVIEWER_LIABILITY_MODES:
             raise ValueError(f"unsupported liability_mode: {self.liability_mode}")
         self.legal_ack_ref = _normalize_non_empty(self.legal_ack_ref, "legal_ack_ref")
+        self.verification_id = _normalize_non_empty(self.verification_id, "verification_id")
+        self.verifier_ref = _normalize_non_empty(self.verifier_ref, "verifier_ref")
+        self.challenge_digest = _normalize_non_empty(self.challenge_digest, "challenge_digest")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        self.jurisdiction_bundle_ref = _normalize_non_empty(
+            self.jurisdiction_bundle_ref,
+            "jurisdiction_bundle_ref",
+        )
+        self.jurisdiction_bundle_digest = _normalize_non_empty(
+            self.jurisdiction_bundle_digest,
+            "jurisdiction_bundle_digest",
+        )
         if self.guardian_role not in GUARDIAN_ROLES:
             raise ValueError(f"unsupported guardian_role: {self.guardian_role}")
         if self.category not in OVERSIGHT_CATEGORIES:
@@ -334,11 +451,89 @@ class OversightService:
         self._reviewers[record.reviewer_id] = record
         return record.to_dict()
 
+    def verify_reviewer(
+        self,
+        reviewer_id: str,
+        *,
+        verifier_ref: str,
+        challenge_ref: str,
+        challenge_digest: str,
+        jurisdiction_bundle_ref: str,
+        jurisdiction_bundle_digest: str,
+        transport_profile: str = "reviewer-live-proof-bridge-v1",
+        verified_at: str = "",
+        valid_until: str = "",
+        verification_status: str = "verified",
+        jurisdiction_bundle_status: str = "ready",
+    ) -> Dict[str, Any]:
+        reviewer = self._reviewer(reviewer_id)
+        if reviewer.status != "active":
+            raise PermissionError(f"reviewer is not active: {reviewer.reviewer_id}")
+        if transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {transport_profile}")
+        if verification_status not in REVIEWER_VERIFICATION_STATUSES:
+            raise ValueError(f"unsupported verification status: {verification_status}")
+        if jurisdiction_bundle_status not in JURISDICTION_BUNDLE_STATUSES:
+            raise ValueError(
+                f"unsupported jurisdiction bundle status: {jurisdiction_bundle_status}"
+            )
+
+        verified_at_value = verified_at or utc_now_iso()
+        valid_until_value = valid_until or reviewer.identity_proof.valid_until
+        if _parse_datetime(valid_until_value, "valid_until") > _parse_datetime(
+            reviewer.identity_proof.valid_until,
+            "identity_proof.valid_until",
+        ):
+            raise ValueError("valid_until must not exceed identity proof validity")
+
+        reviewer.credential_verification = ReviewerCredentialVerification(
+            verification_id=new_id("reviewer-verification"),
+            status=verification_status,
+            verified_at=verified_at_value,
+            valid_until=valid_until_value,
+            verifier_ref=verifier_ref,
+            challenge_ref=challenge_ref,
+            challenge_digest=challenge_digest,
+            transport_profile=transport_profile,
+            jurisdiction_bundle=JurisdictionEvidenceBundle(
+                bundle_id=new_id("jurisdiction-bundle"),
+                jurisdiction=reviewer.identity_proof.jurisdiction,
+                package_ref=jurisdiction_bundle_ref,
+                package_digest=jurisdiction_bundle_digest,
+                status=jurisdiction_bundle_status,
+                transport_profile=transport_profile,
+                updated_at=verified_at_value,
+            ),
+        )
+        self._reviewers[reviewer.reviewer_id] = reviewer
+        return reviewer.to_dict()
+
     def revoke_reviewer(self, reviewer_id: str, *, reason: str) -> Dict[str, Any]:
         reviewer = self._reviewer(reviewer_id)
         reviewer.status = "revoked"
         reviewer.revocation_reason = _normalize_non_empty(reason, "reason")
         reviewer.revoked_at = utc_now_iso()
+        if reviewer.credential_verification is not None:
+            verification = reviewer.credential_verification
+            reviewer.credential_verification = ReviewerCredentialVerification(
+                verification_id=verification.verification_id,
+                status="revoked",
+                verified_at=verification.verified_at,
+                valid_until=verification.valid_until,
+                verifier_ref=verification.verifier_ref,
+                challenge_ref=verification.challenge_ref,
+                challenge_digest=verification.challenge_digest,
+                transport_profile=verification.transport_profile,
+                jurisdiction_bundle=JurisdictionEvidenceBundle(
+                    bundle_id=verification.jurisdiction_bundle.bundle_id,
+                    jurisdiction=verification.jurisdiction_bundle.jurisdiction,
+                    package_ref=verification.jurisdiction_bundle.package_ref,
+                    package_digest=verification.jurisdiction_bundle.package_digest,
+                    status="revoked",
+                    transport_profile=verification.jurisdiction_bundle.transport_profile,
+                    updated_at=reviewer.revoked_at,
+                ),
+            )
         self._reviewers[reviewer.reviewer_id] = reviewer
         return reviewer.to_dict()
 
@@ -354,10 +549,19 @@ class OversightService:
                 "attestation_types": list(REVIEWER_ATTESTATION_TYPES),
                 "liability_modes": list(REVIEWER_LIABILITY_MODES),
                 "reviewer_statuses": list(REVIEWER_STATUSES),
+                "verification_statuses": list(REVIEWER_VERIFICATION_STATUSES),
+                "verification_transport_profiles": list(VERIFICATION_TRANSPORT_PROFILES),
+                "verification_required_categories": list(OVERSIGHT_CATEGORIES),
                 "required_binding_fields": [
                     "credential_id",
                     "proof_ref",
                     "legal_ack_ref",
+                    "verification_id",
+                    "verifier_ref",
+                    "challenge_digest",
+                    "transport_profile",
+                    "jurisdiction_bundle_ref",
+                    "jurisdiction_bundle_digest",
                     "guardian_role",
                     "category",
                 ],
@@ -440,6 +644,28 @@ class OversightService:
             raise PermissionError(
                 f"reviewer {reviewer.reviewer_id} is not authorized for oversight category {event.category}"
             )
+        verification = reviewer.credential_verification
+        if verification is None:
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} lacks live credential verification"
+            )
+        if verification.status != "verified":
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} credential verification is {verification.status}"
+            )
+        if _parse_datetime(verification.valid_until, "valid_until") <= _parse_datetime(
+            utc_now_iso(),
+            "now",
+        ):
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} credential verification expired"
+            )
+        if verification.jurisdiction_bundle.status != "ready":
+            raise PermissionError(
+                "reviewer jurisdiction evidence bundle must be ready before attestation"
+            )
+        if verification.jurisdiction_bundle.jurisdiction != reviewer.identity_proof.jurisdiction:
+            raise PermissionError("reviewer jurisdiction bundle must match identity proof jurisdiction")
 
         event.human_attestation.reviewers.append(reviewer.reviewer_id)
         event.reviewer_bindings.append(
@@ -449,6 +675,12 @@ class OversightService:
                 proof_ref=reviewer.identity_proof.proof_ref,
                 liability_mode=reviewer.responsibility.liability_mode,
                 legal_ack_ref=reviewer.responsibility.legal_ack_ref,
+                verification_id=verification.verification_id,
+                verifier_ref=verification.verifier_ref,
+                challenge_digest=verification.challenge_digest,
+                transport_profile=verification.transport_profile,
+                jurisdiction_bundle_ref=verification.jurisdiction_bundle.package_ref,
+                jurisdiction_bundle_digest=verification.jurisdiction_bundle.package_digest,
                 guardian_role=event.guardian_role,
                 category=event.category,
             )

@@ -13,6 +13,7 @@ required:
   - registered_at
   - identity_proof
   - responsibility
+  - credential_verification
 properties:
   kind:
     const: guardian_reviewer_record
@@ -106,6 +107,10 @@ properties:
             - rule-update
             - emergency-trigger
             - pin-renewal
+  credential_verification:
+    oneOf:
+      - type: "null"
+      - $ref: "guardian_reviewer_verification.schema"
   revocation_reason:
     type:
       - string
@@ -146,5 +151,26 @@ examples:
       allowed_categories:
         - veto
         - pin-renewal
+    credential_verification:
+      kind: guardian_reviewer_verification
+      schema_version: 1.0.0
+      verification_id: reviewer-verification-0123456789ab
+      status: verified
+      verified_at: "2026-04-19T13:00:00Z"
+      valid_until: "2026-10-19T00:00:00Z"
+      verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+      challenge_ref: challenge://guardian-oversight/reviewer-alpha/2026-04-19T13:00:00Z
+      challenge_digest: sha256:alpha-proof-bridge-20260419
+      transport_profile: reviewer-live-proof-bridge-v1
+      jurisdiction_bundle:
+        kind: guardian_jurisdiction_evidence_bundle
+        schema_version: 1.0.0
+        bundle_id: jurisdiction-bundle-0123456789ab
+        jurisdiction: JP-13
+        package_ref: legal://jp-13/guardian-oversight/v1
+        package_digest: sha256:jp13-guardian-oversight-v1
+        status: ready
+        transport_profile: reviewer-live-proof-bridge-v1
+        updated_at: "2026-04-19T13:00:00Z"
     revocation_reason: null
     revoked_at: null

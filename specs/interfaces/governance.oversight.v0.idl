@@ -18,6 +18,17 @@ operations:
       - reviewer_id must be unique
       - active reviewer records must include credential_id, proof_ref, legal_ack_ref, and non-empty scope lists
       - allowed_guardian_roles and allowed_categories must be subsets of the fixed Guardian role and oversight category enums
+  verify_reviewer:
+    summary: Bind one active reviewer record to a live-proof surrogate verification snapshot and jurisdiction evidence bundle before attestation.
+    input:
+      schema_ref: guardian_reviewer_record
+    output:
+      schema_ref: guardian_reviewer_record
+    guarantees:
+      - reviewer_id must resolve to an active guardian reviewer record
+      - credential_verification must carry verifier_ref, challenge_ref, challenge_digest, transport_profile, and jurisdiction_bundle
+      - credential_verification.valid_until must not exceed identity_proof.valid_until
+      - jurisdiction_bundle.jurisdiction must match identity_proof.jurisdiction
   record:
     summary: Record one append-only oversight event for a Guardian veto, attestation, rule update, emergency trigger, or pin renewal.
     input:
@@ -36,8 +47,9 @@ operations:
       schema_ref: guardian_oversight_event
     guarantees:
       - reviewer id must resolve to an active guardian reviewer record
-      - reviewer binding must snapshot credential_id, proof_ref, liability_mode, legal_ack_ref, guardian_role, and category
+      - reviewer binding must snapshot credential_id, proof_ref, liability_mode, legal_ack_ref, verification_id, verifier_ref, challenge_digest, transport_profile, jurisdiction_bundle_ref, jurisdiction_bundle_digest, guardian_role, and category
       - reviewer responsibility scope must include the target guardian_role and oversight category
+      - reviewer attestation must reject missing, stale, expired, or revoked credential_verification snapshots
       - reviewer ids must deduplicate without reordering existing reviewers
       - status becomes satisfied once received_quorum >= required_quorum
       - breached events must reject further attestation
@@ -71,4 +83,5 @@ compatibility:
   stability: bootstrap
   notes:
     - Reference runtime stores proof refs and legal acknowledgement refs, but not the raw identity documents or contracts themselves.
-    - Live credential verification, jurisdiction-specific legal enforcement, and remote reviewer attestation transport remain future work.
+    - Reference runtime stores live-proof surrogate snapshots and jurisdiction evidence bundle refs, but not raw credentials or legal packages.
+    - Remote reviewer attestation transport against a real verifier network and jurisdiction-specific enforcement remain future work.

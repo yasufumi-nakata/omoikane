@@ -2,7 +2,13 @@
 
 from .amendment import AmendmentProposal, AmendmentService, AmendmentSignatures
 from .naming import NamingService
-from .oversight import GuardianOversightEvent, GuardianReviewerRecord, OversightService
+from .oversight import (
+    GuardianOversightEvent,
+    GuardianReviewerRecord,
+    JurisdictionEvidenceBundle,
+    OversightService,
+    ReviewerCredentialVerification,
+)
 from .versioning import VersioningService
 
 __all__ = [
@@ -10,8 +16,10 @@ __all__ = [
     "AmendmentService",
     "AmendmentSignatures",
     "GuardianReviewerRecord",
+    "JurisdictionEvidenceBundle",
     "NamingService",
     "GuardianOversightEvent",
     "OversightService",
+    "ReviewerCredentialVerification",
     "VersioningService",
 ]

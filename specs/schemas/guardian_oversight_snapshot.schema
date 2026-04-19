@@ -75,6 +75,9 @@ properties:
           - attestation_types
           - liability_modes
           - reviewer_statuses
+          - verification_statuses
+          - verification_transport_profiles
+          - verification_required_categories
           - required_binding_fields
         properties:
           attestation_types:
@@ -88,6 +91,21 @@ properties:
             items:
               type: string
           reviewer_statuses:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          verification_statuses:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          verification_transport_profiles:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          verification_required_categories:
             type: array
             minItems: 1
             items:

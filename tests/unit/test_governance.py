@@ -76,6 +76,33 @@ class AmendmentServiceTests(unittest.TestCase):
 
 
 class OversightServiceTests(unittest.TestCase):
+    def test_attestation_requires_live_credential_verification(self) -> None:
+        service = OversightService()
+        service.register_reviewer(
+            reviewer_id="reviewer-unverified",
+            display_name="Reviewer Unverified",
+            credential_id="credential-unverified",
+            attestation_type="government-id",
+            proof_ref="proof://oversight/reviewer-unverified",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="individual",
+            legal_ack_ref="legal://oversight/reviewer-unverified",
+            escalation_contact="mailto:reviewer-unverified@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
+
+        event = service.record(
+            guardian_role="integrity",
+            category="veto",
+            payload_ref="entry-unverified",
+            escalation_path=["human-reviewer-pool-A"],
+        )
+
+        with self.assertRaisesRegex(PermissionError, "lacks live credential verification"):
+            service.attest(event["event_id"], reviewer_id="reviewer-unverified")
+
     def test_veto_event_satisfies_quorum_after_one_attestation(self) -> None:
         service = OversightService()
         service.register_reviewer(
@@ -92,6 +119,16 @@ class OversightServiceTests(unittest.TestCase):
             allowed_guardian_roles=["integrity"],
             allowed_categories=["veto"],
         )
+        service.verify_reviewer(
+            "reviewer-1",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-1",
+            challenge_ref="challenge://guardian-oversight/reviewer-1/2026-04-19T13:00:00Z",
+            challenge_digest="sha256:reviewer-1-live-proof",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-19T13:00:00+00:00",
+            valid_until="2026-10-19T00:00:00+00:00",
+        )
 
         event = service.record(
             guardian_role="integrity",
@@ -107,6 +144,14 @@ class OversightServiceTests(unittest.TestCase):
         self.assertEqual(1, len(updated["reviewer_bindings"]))
         self.assertEqual("credential-1", updated["reviewer_bindings"][0]["credential_id"])
         self.assertEqual("individual", updated["reviewer_bindings"][0]["liability_mode"])
+        self.assertEqual(
+            "reviewer-live-proof-bridge-v1",
+            updated["reviewer_bindings"][0]["transport_profile"],
+        )
+        self.assertEqual(
+            "legal://jp-13/guardian-oversight/v1",
+            updated["reviewer_bindings"][0]["jurisdiction_bundle_ref"],
+        )
 
     def test_attestation_rejects_reviewer_outside_scope(self) -> None:
         service = OversightService()
@@ -123,6 +168,16 @@ class OversightServiceTests(unittest.TestCase):
             escalation_contact="mailto:reviewer-2@example.invalid",
             allowed_guardian_roles=["integrity"],
             allowed_categories=["veto"],
+        )
+        service.verify_reviewer(
+            "reviewer-2",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-2",
+            challenge_ref="challenge://guardian-oversight/reviewer-2/2026-04-19T13:05:00Z",
+            challenge_digest="sha256:reviewer-2-live-proof",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-19T13:05:00+00:00",
+            valid_until="2026-10-19T00:00:00+00:00",
         )
 
         event = service.record(
@@ -145,6 +200,30 @@ class OversightServiceTests(unittest.TestCase):
             pinned_reason="guardian bootstrap",
         )
         service = OversightService(trust_service=trust)
+        service.register_reviewer(
+            reviewer_id="reviewer-3",
+            display_name="Reviewer Three",
+            credential_id="credential-3",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight/reviewer-3",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight/reviewer-3",
+            escalation_contact="mailto:reviewer-3@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["pin-renewal"],
+        )
+        verified = service.verify_reviewer(
+            "reviewer-3",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-3",
+            challenge_ref="challenge://guardian-oversight/reviewer-3/2026-04-19T13:10:00Z",
+            challenge_digest="sha256:reviewer-3-live-proof",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-19T13:10:00+00:00",
+            valid_until="2026-10-19T00:00:00+00:00",
+        )
 
         event = service.record(
             guardian_role="integrity",
@@ -155,6 +234,7 @@ class OversightServiceTests(unittest.TestCase):
         breached = service.breach(event["event_id"])
         snapshot = trust.snapshot("integrity-guardian")
 
+        self.assertEqual("verified", verified["credential_verification"]["status"])
         self.assertEqual("breached", breached["human_attestation"]["status"])
         self.assertTrue(breached["pin_breach_propagated"])
         self.assertFalse(snapshot["pinned_by_human"])
