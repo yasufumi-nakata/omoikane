@@ -1077,6 +1077,9 @@ class OmoikaneReferenceOS:
                 "guardian://neutral-federation",
             ],
             channel_binding_ref=federation_envelope.channel_binding_ref,
+            verified_root_refs=["root://federation/pki-a"],
+            key_epoch=1,
+            hop_nonce_chain=["hop://federation/relay-a/nonce-001"],
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -1106,11 +1109,65 @@ class OmoikaneReferenceOS:
                 "guardian://neutral-federation",
             ],
             channel_binding_ref=federation_envelope.channel_binding_ref,
+            verified_root_refs=["root://federation/pki-a"],
+            key_epoch=1,
+            hop_nonce_chain=["hop://federation/relay-a/nonce-001"],
         )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_replay_blocked",
             payload=replay_receipt.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        rotated_federation_envelope = self.distributed_transport.rotate_transport_keys(
+            federation_envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_rotated",
+            payload=rotated_federation_envelope.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        rotated_receipt = self.distributed_transport.record_receipt(
+            rotated_federation_envelope,
+            result_ref="resolution://federation/shared-reality-approved-rotated",
+            result_digest=sha256_text(
+                canonical_json(
+                    {
+                        "final_outcome": "binding-approved",
+                        "resolution_policy": "federation-shared-reality-v1",
+                        "key_epoch": 2,
+                    }
+                )
+            ),
+            participant_ids=[
+                identity.identity_id,
+                "identity://shared-peer",
+                "guardian://neutral-federation",
+            ],
+            channel_binding_ref=rotated_federation_envelope.channel_binding_ref,
+            verified_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            key_epoch=2,
+            hop_nonce_chain=[
+                "hop://federation/relay-a/nonce-002",
+                "hop://federation/relay-b/nonce-002",
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authenticated",
+            payload=rotated_receipt.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -1172,11 +1229,60 @@ class OmoikaneReferenceOS:
                 "heritage://ethics-committee",
             ],
             channel_binding_ref=heritage_envelope.channel_binding_ref,
+            verified_root_refs=["root://heritage/pki-a", "root://heritage/pki-b"],
+            key_epoch=1,
+            hop_nonce_chain=[
+                "hop://heritage/relay-a/nonce-003",
+                "hop://heritage/relay-b/nonce-003",
+            ],
         )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authenticated",
             payload=heritage_receipt.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        heritage_reissue_envelope = self.distributed_transport.issue_heritage_handoff(
+            topology_ref=heritage_topology.topology_id,
+            proposal_ref=f"{heritage_proposal.proposal_id}-reissue",
+            payload_ref=f"cas://sha256/{sha256_text(canonical_json({**heritage_payload, 'reissue': True}))}",
+            payload_digest=sha256_text(canonical_json({**heritage_payload, "reissue": True})),
+            referenced_clauses=heritage_proposal.referenced_clauses,
+        )
+        multi_hop_replay_receipt = self.distributed_transport.record_receipt(
+            heritage_reissue_envelope,
+            result_ref="resolution://heritage/interpretive-veto-replayed-hop-chain",
+            result_digest=sha256_text(
+                canonical_json(
+                    {
+                        "final_outcome": "binding-rejected",
+                        "decision_mode": "ethics-veto",
+                        "reissue": True,
+                    }
+                )
+            ),
+            participant_ids=[
+                "heritage://culture-a",
+                "heritage://culture-b",
+                "heritage://legal-advisor",
+                "heritage://ethics-committee",
+            ],
+            channel_binding_ref=heritage_reissue_envelope.channel_binding_ref,
+            verified_root_refs=["root://heritage/pki-a", "root://heritage/pki-b"],
+            key_epoch=1,
+            hop_nonce_chain=[
+                "hop://heritage/relay-a/nonce-003",
+                "hop://heritage/relay-b/nonce-003",
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_multihop_replay_blocked",
+            payload=multi_hop_replay_receipt.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -1195,27 +1301,40 @@ class OmoikaneReferenceOS:
             },
             "handoffs": {
                 "federation": federation_envelope.to_dict(),
+                "federation_rotated": rotated_federation_envelope.to_dict(),
                 "heritage": heritage_envelope.to_dict(),
+                "heritage_reissue": heritage_reissue_envelope.to_dict(),
             },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
+                "federation_rotated": rotated_receipt.to_dict(),
                 "heritage": heritage_receipt.to_dict(),
                 "replay_blocked": replay_receipt.to_dict(),
+                "multi_hop_replay_blocked": multi_hop_replay_receipt.to_dict(),
             },
             "validation": {
                 "federation_transport_authenticated": federation_receipt.receipt_status
                 == "authenticated"
                 and federation_receipt.authenticity_checks["required_roles_satisfied"]
                 and federation_receipt.authenticity_checks["channel_authenticated"],
+                "federation_rotation_authenticated": rotated_receipt.receipt_status == "authenticated"
+                and rotated_receipt.authenticity_checks["federated_roots_verified"]
+                and rotated_receipt.authenticity_checks["key_epoch_accepted"],
                 "heritage_transport_authenticated": heritage_receipt.receipt_status
                 == "authenticated"
                 and heritage_receipt.authenticity_checks["quorum_attested"],
                 "replay_guard_blocks_reuse": replay_receipt.receipt_status == "replay-blocked"
                 and replay_receipt.authenticity_checks["replay_guard_status"] == "blocked",
+                "multi_hop_replay_blocks_reuse": multi_hop_replay_receipt.receipt_status
+                == "replay-blocked"
+                and multi_hop_replay_receipt.authenticity_checks["multi_hop_replay_status"] == "blocked",
+                "federated_roots_enforced": rotated_federation_envelope.trust_root_quorum == 2
+                and rotated_receipt.authenticity_checks["federated_roots_verified"],
                 "participant_bindings_preserved": all(
                     binding["accepted"] for binding in federation_receipt.participant_bindings
                 )
-                and all(binding["accepted"] for binding in heritage_receipt.participant_bindings),
+                and all(binding["accepted"] for binding in heritage_receipt.participant_bindings)
+                and all(binding["accepted"] for binding in rotated_receipt.participant_bindings),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

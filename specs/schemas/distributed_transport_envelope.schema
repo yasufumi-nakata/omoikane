@@ -20,6 +20,12 @@ required:
   - freshness_window_s
   - quorum
   - required_roles
+  - key_epoch
+  - accepted_key_epochs
+  - trust_root_refs
+  - trust_root_quorum
+  - max_hops
+  - previous_envelope_ref
   - channel_binding_ref
   - participant_attestations
   - attestation_digest
@@ -78,6 +84,34 @@ properties:
         - cultural-representative
         - legal-advisor
         - ethics-committee
+  key_epoch:
+    type: integer
+    minimum: 1
+  accepted_key_epochs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: integer
+      minimum: 1
+  trust_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  trust_root_quorum:
+    type: integer
+    minimum: 1
+  max_hops:
+    type: integer
+    minimum: 1
+  previous_envelope_ref:
+    type:
+      - string
+      - "null"
+    pattern: "^distributed-envelope-[a-f0-9]{12}$"
   channel_binding_ref:
     type: string
     minLength: 1
@@ -113,6 +147,14 @@ examples:
       - self-liaison
       - self-liaison
       - guardian
+    key_epoch: 1
+    accepted_key_epochs:
+      - 1
+    trust_root_refs:
+      - root://federation/pki-a
+    trust_root_quorum: 1
+    max_hops: 2
+    previous_envelope_ref: null
     channel_binding_ref: channel-binding://federation/2ad16b34bd7c2f40
     participant_attestations:
       - kind: distributed_participant_attestation
@@ -123,7 +165,9 @@ examples:
         role: self-liaison
         credential_ref: credential://federation/84cb3d0db7f1
         proof_ref: proof://federation/7d76eb45efb0
-        transport_key_ref: transport-key://federation/4a2f55e0b317
+        transport_key_ref: transport-key://federation/epoch-1/4a2f55e0b317
+        trust_root_ref: root://federation/pki-a
+        key_epoch: 1
         trust_score: 0.74
         issued_at: "2026-04-19T10:20:00Z"
     attestation_digest: 4d38c20a6c7a7d40ae66feced0efbe5a5b378f8a6afc572e26f23f2d4afc847d

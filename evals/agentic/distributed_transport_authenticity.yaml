@@ -43,6 +43,7 @@ assertions:
   - Federation handoff must bind 2 self-liaison participants and 1 guardian to one channel-binding ref
   - Heritage handoff must bind fixed reviewer roles before any returned result is accepted
   - Reusing the same route_nonce must never return authenticated and must emit replay-blocked
+  - Root verification and key rotation overlap are covered by distributed_transport_rotation
 metric: exact-match
 threshold: 1.0
 ethics_check: true

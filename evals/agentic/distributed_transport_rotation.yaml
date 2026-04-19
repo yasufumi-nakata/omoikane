@@ -1,0 +1,43 @@
+eval_id: distributed_transport_rotation
+target: agentic.distributed_transport
+level: L4
+description: >
+  Distributed transport handoff が key epoch overlap、federated trust roots、
+  multi-hop relay anti-replay を守りながら remote receipt を認証できること。
+fixtures:
+  - scenario: federation_rotation_authenticated
+    council_tier: federation
+    next_key_epoch: 2
+    trust_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    trust_root_quorum: 2
+    verified_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    hop_nonce_chain:
+      - hop://federation/relay-a/nonce-002
+      - hop://federation/relay-b/nonce-002
+    expected:
+      receipt_status: authenticated
+      federated_roots_verified: true
+      key_epoch_accepted: true
+      multi_hop_replay_status: accepted
+  - scenario: multi_hop_replay_blocked
+    council_tier: heritage
+    verified_root_refs:
+      - root://heritage/pki-a
+      - root://heritage/pki-b
+    hop_nonce_chain:
+      - hop://heritage/relay-a/nonce-003
+      - hop://heritage/relay-b/nonce-003
+    expected:
+      receipt_status: replay-blocked
+      multi_hop_replay_status: blocked
+assertions:
+  - Rotated envelopes must preserve the previous key epoch in accepted_key_epochs during overlap
+  - Federated roots must satisfy trust_root_quorum before a rotated receipt is authenticated
+  - Reusing the same hop_nonce_chain across different envelopes must never return authenticated
+metric: exact-match
+threshold: 1.0
+ethics_check: true

@@ -15,6 +15,8 @@ required:
   - credential_ref
   - proof_ref
   - transport_key_ref
+  - trust_root_ref
+  - key_epoch
   - trust_score
   - issued_at
 properties:
@@ -50,6 +52,12 @@ properties:
   transport_key_ref:
     type: string
     minLength: 1
+  trust_root_ref:
+    type: string
+    minLength: 1
+  key_epoch:
+    type: integer
+    minimum: 1
   trust_score:
     type: number
     minimum: 0
@@ -66,6 +74,8 @@ examples:
     role: self-liaison
     credential_ref: credential://federation/84cb3d0db7f1
     proof_ref: proof://federation/7d76eb45efb0
-    transport_key_ref: transport-key://federation/4a2f55e0b317
+    transport_key_ref: transport-key://federation/epoch-1/4a2f55e0b317
+    trust_root_ref: root://federation/pki-a
+    key_epoch: 1
     trust_score: 0.74
     issued_at: "2026-04-19T10:20:00Z"

@@ -521,15 +521,28 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             "authenticated",
+            result["receipts"]["federation_rotated"]["receipt_status"],
+        )
+        self.assertEqual(
+            "authenticated",
             result["receipts"]["heritage"]["receipt_status"],
         )
         self.assertEqual(
             "replay-blocked",
             result["receipts"]["replay_blocked"]["receipt_status"],
         )
+        self.assertEqual(
+            "replay-blocked",
+            result["receipts"]["multi_hop_replay_blocked"]["receipt_status"],
+        )
+        self.assertEqual([1, 2], result["handoffs"]["federation_rotated"]["accepted_key_epochs"])
+        self.assertEqual(2, result["handoffs"]["federation_rotated"]["trust_root_quorum"])
         self.assertTrue(result["validation"]["federation_transport_authenticated"])
+        self.assertTrue(result["validation"]["federation_rotation_authenticated"])
         self.assertTrue(result["validation"]["heritage_transport_authenticated"])
         self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
+        self.assertTrue(result["validation"]["multi_hop_replay_blocks_reuse"])
+        self.assertTrue(result["validation"]["federated_roots_enforced"])
 
     def test_cognitive_audit_demo_returns_cross_layer_review(self) -> None:
         runtime = OmoikaneReferenceOS()

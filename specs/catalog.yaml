@@ -111,7 +111,7 @@ entries:
       - specs/schemas/distributed_transport_envelope.schema
       - reference-runtime
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to bind remote Federation/Heritage participants to credential, proof, and transport-key references.
+    rationale: Required to bind remote Federation/Heritage participants to credential, proof, transport-key, and trust-root references.
   - priority: P1
     kind: schema
     file: specs/schemas/distributed_transport_envelope.schema
@@ -119,7 +119,7 @@ entries:
       - specs/interfaces/agentic.distributed_transport.v0.idl
       - reference-runtime
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize one participant-attested remote handoff bundle with channel binding and route nonce.
+    rationale: Required to serialize one participant-attested remote handoff bundle with channel binding, key epochs, and federated trust roots.
   - priority: P1
     kind: schema
     file: specs/schemas/distributed_transport_receipt.schema
@@ -127,8 +127,9 @@ entries:
       - specs/interfaces/agentic.distributed_transport.v0.idl
       - reference-runtime
       - evals/agentic/distributed_transport_authenticity.yaml
+      - evals/agentic/distributed_transport_rotation.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize authenticated, rejected, and replay-blocked remote receipts.
+    rationale: Required to serialize authenticated, rejected, and replay-blocked remote receipts with root verification and hop-chain replay checks.
   - priority: P1
     kind: schema
     file: specs/schemas/cognitive_audit_record.schema
@@ -207,7 +208,7 @@ entries:
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make distributed participant attestation, channel binding, and replay guard machine-readable.
+    rationale: Required to make distributed participant attestation, key rotation overlap, federated roots, and replay guard machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -835,6 +836,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects participant attestation, channel binding, and replay guard for distributed remote handoff bundles.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_rotation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects key-epoch overlap, federated root quorum, and hop-chain replay blocking for distributed remote handoff bundles.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

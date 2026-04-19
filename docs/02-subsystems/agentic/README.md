@@ -11,7 +11,8 @@
 - 議事は EthicsLedger に永続化
 - reference runtime では `multi-council-demo` が Local / Federation / Heritage への deterministic routing を可視化し、
   `distributed-council-demo` が Federation binding / Heritage veto / human escalation を可視化し、
-  `distributed-transport-demo` が participant attestation / transport authenticity / replay guard を可視化し、
+  `distributed-transport-demo` が participant attestation / transport authenticity /
+  key rotation overlap / federated roots / replay guard を可視化し、
   `cognitive-audit-demo` が qualia / self-model / metacognition を bounded Council review に束ねる
 
 ### YaoyorozuRegistry

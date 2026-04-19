@@ -334,6 +334,8 @@ class DistributedTransportServiceTests(unittest.TestCase):
         self.assertEqual("federation", envelope.council_tier)
         self.assertEqual("federation-mtls-quorum-v1", envelope.transport_profile)
         self.assertEqual(3, envelope.quorum)
+        self.assertEqual(1, envelope.key_epoch)
+        self.assertEqual([1], envelope.accepted_key_epochs)
         self.assertEqual(
             ["guardian", "self-liaison", "self-liaison"],
             sorted(attestation.role for attestation in envelope.participant_attestations),
@@ -399,6 +401,59 @@ class DistributedTransportServiceTests(unittest.TestCase):
 
         self.assertEqual("rejected", receipt.receipt_status)
         self.assertFalse(receipt.authenticity_checks["channel_authenticated"])
+
+    def test_key_rotation_requires_federated_roots_and_blocks_reused_hop_chain(self) -> None:
+        service = DistributedTransportService()
+
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-rotation-001",
+            proposal_ref="proposal-transport-rotation-001",
+            payload_ref="cas://sha256/test-rotation",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self", "rotation": True})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        receipt = service.record_receipt(
+            rotated,
+            result_ref="resolution://federation/rotation-authenticated",
+            result_digest=sha256_text(canonical_json({"final_outcome": "binding-approved", "epoch": 2})),
+            participant_ids=["identity://a", "identity://b", "guardian://neutral-federation"],
+            channel_binding_ref=rotated.channel_binding_ref,
+            verified_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            key_epoch=2,
+            hop_nonce_chain=["hop://relay-a/nonce-001", "hop://relay-b/nonce-001"],
+        )
+        reissue = service.issue_federation_handoff(
+            topology_ref="topology-transport-rotation-002",
+            proposal_ref="proposal-transport-rotation-002",
+            payload_ref="cas://sha256/test-rotation-reissue",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self", "rotation": "reissue"})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        replay = service.record_receipt(
+            reissue,
+            result_ref="resolution://federation/rotation-replay",
+            result_digest=sha256_text(canonical_json({"final_outcome": "binding-approved", "epoch": 1})),
+            participant_ids=["identity://a", "identity://b", "guardian://neutral-federation"],
+            channel_binding_ref=reissue.channel_binding_ref,
+            verified_root_refs=["root://federation/pki-a"],
+            key_epoch=1,
+            hop_nonce_chain=["hop://relay-a/nonce-001", "hop://relay-b/nonce-001"],
+        )
+
+        self.assertEqual(2, rotated.key_epoch)
+        self.assertEqual([1, 2], rotated.accepted_key_epochs)
+        self.assertEqual(2, rotated.trust_root_quorum)
+        self.assertEqual("authenticated", receipt.receipt_status)
+        self.assertTrue(receipt.authenticity_checks["federated_roots_verified"])
+        self.assertTrue(receipt.authenticity_checks["key_epoch_accepted"])
+        self.assertEqual("replay-blocked", replay.receipt_status)
+        self.assertEqual("blocked", replay.authenticity_checks["multi_hop_replay_status"])
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

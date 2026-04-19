@@ -110,9 +110,11 @@ Federation と Heritage の returned result が衝突した場合は
 (`agentic.distributed_transport.v0`) を JSON で可視化し、
 Federation handoff が `self-liaison x2 + guardian x1` の participant attestation と
 `channel_binding_ref` に束縛されること、
+rotated Federation handoff が `accepted_key_epochs=[1,2]` と
+`trust_root_quorum=2` を持つ federated root overlap を要求すること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
-同一 `route_nonce` の再利用が `replay-blocked` になることを確認する。
+同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になることを確認する。
 
 `cognitive-audit-demo` は L2/L3/L4 cognitive audit loop の reference contract
 (`agentic.cognitive_audit.v0`) を JSON で可視化し、
@@ -306,7 +308,7 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- distributed transport key rotation / remote PKI federation / multi-hop anti-replay を actual network に接続
+- distributed transport key rotation / remote PKI federation / multi-hop anti-replay の telemetry を actual network に接続
 - Guardian oversight reviewer の remote attestation transport を actual verifier network に接続
 - AscensionScheduler external verifier の真正性証明と live 接続
 - specs/ から runtime への自動生成ループ

@@ -511,9 +511,14 @@ class CliIntegrationTests(unittest.TestCase):
             result["handoffs"]["federation"]["transport_profile"],
         )
         self.assertEqual("authenticated", result["receipts"]["federation"]["receipt_status"])
+        self.assertEqual("authenticated", result["receipts"]["federation_rotated"]["receipt_status"])
         self.assertEqual("authenticated", result["receipts"]["heritage"]["receipt_status"])
         self.assertEqual("replay-blocked", result["receipts"]["replay_blocked"]["receipt_status"])
+        self.assertEqual("replay-blocked", result["receipts"]["multi_hop_replay_blocked"]["receipt_status"])
+        self.assertEqual([1, 2], result["handoffs"]["federation_rotated"]["accepted_key_epochs"])
         self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
+        self.assertTrue(result["validation"]["federation_rotation_authenticated"])
+        self.assertTrue(result["validation"]["multi_hop_replay_blocks_reuse"])
 
     def test_cognitive_audit_demo_emits_cross_layer_review_json(self) -> None:
         stdout = io.StringIO()

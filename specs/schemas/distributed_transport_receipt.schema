@@ -16,6 +16,9 @@ required:
   - result_ref
   - result_digest
   - route_nonce
+  - key_epoch
+  - verified_root_refs
+  - hop_nonce_chain
   - receipt_status
   - authenticity_checks
   - participant_bindings
@@ -54,6 +57,22 @@ properties:
   route_nonce:
     type: string
     pattern: "^route-nonce-[a-f0-9]{12}$"
+  key_epoch:
+    type: integer
+    minimum: 1
+  verified_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  hop_nonce_chain:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
   receipt_status:
     type: string
     enum:
@@ -67,7 +86,10 @@ properties:
       - channel_authenticated
       - required_roles_satisfied
       - quorum_attested
+      - federated_roots_verified
+      - key_epoch_accepted
       - replay_guard_status
+      - multi_hop_replay_status
     properties:
       channel_authenticated:
         type: boolean
@@ -75,7 +97,16 @@ properties:
         type: boolean
       quorum_attested:
         type: boolean
+      federated_roots_verified:
+        type: boolean
+      key_epoch_accepted:
+        type: boolean
       replay_guard_status:
+        type: string
+        enum:
+          - accepted
+          - blocked
+      multi_hop_replay_status:
         type: string
         enum:
           - accepted
@@ -121,12 +152,20 @@ examples:
     result_ref: resolution://federation/shared-reality-approved
     result_digest: 7aac75648bce45186d84048ccad058068fe90f8abf8f9448f11e44a7758b9330
     route_nonce: route-nonce-b23f7b0c3fd4
+    key_epoch: 1
+    verified_root_refs:
+      - root://federation/pki-a
+    hop_nonce_chain:
+      - hop://federation/relay-a/nonce-001
     receipt_status: authenticated
     authenticity_checks:
       channel_authenticated: true
       required_roles_satisfied: true
       quorum_attested: true
+      federated_roots_verified: true
+      key_epoch_accepted: true
       replay_guard_status: accepted
+      multi_hop_replay_status: accepted
     participant_bindings:
       - participant_id: identity://amaterasu-endpoint
         role: self-liaison
