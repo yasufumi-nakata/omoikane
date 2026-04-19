@@ -1169,6 +1169,44 @@ class OmoikaneReferenceOS:
         }
 
     def run_scheduler_demo(self) -> Dict[str, Any]:
+        def artifact_sync_report(
+            governance_artifacts: Dict[str, Any],
+            *,
+            checked_at: str,
+            sync_token: str,
+            status_overrides: Dict[str, str] | None = None,
+        ) -> Dict[str, Any]:
+            overrides = status_overrides or {}
+            artifacts: List[Dict[str, Any]] = []
+            for artifact_key in (
+                "self_consent_ref",
+                "ethics_attestation_ref",
+                "council_attestation_ref",
+                "legal_attestation_ref",
+                "artifact_bundle_ref",
+            ):
+                artifact_ref = governance_artifacts[artifact_key]
+                status = overrides.get(artifact_key, "current")
+                artifacts.append(
+                    {
+                        "artifact_key": artifact_key,
+                        "status": status,
+                        "proof_digest": sha256_text(
+                            canonical_json(
+                                {
+                                    "artifact_key": artifact_key,
+                                    "artifact_ref": artifact_ref,
+                                    "checked_at": checked_at,
+                                    "status": status,
+                                    "sync_token": sync_token,
+                                }
+                            )
+                        ),
+                        "external_sync_ref": f"sync://scheduler-demo/{sync_token}/{artifact_key}",
+                    }
+                )
+            return {"checked_at": checked_at, "artifacts": artifacts}
+
         identity = self.identity.create(
             human_consent_proof="consent://scheduler-demo/v1",
             metadata={"display_name": "Ascension Scheduler Sandbox"},
@@ -1223,6 +1261,19 @@ class OmoikaneReferenceOS:
         )
         after_timeout = self.scheduler.observe(scheduled["handle_id"])
         retry_bdb = self.scheduler.advance(scheduled["handle_id"], "bdb-bridge")
+        artifact_gate_message = ""
+        try:
+            self.scheduler.advance(scheduled["handle_id"], "identity-confirmation")
+        except ValueError as exc:
+            artifact_gate_message = str(exc)
+        method_a_artifact_sync = self.scheduler.sync_governance_artifacts(
+            scheduled["handle_id"],
+            artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:00:00Z",
+                sync_token="method-a-current",
+            ),
+        )
         confirmation_result = self.scheduler.advance(
             scheduled["handle_id"],
             "identity-confirmation",
@@ -1245,6 +1296,25 @@ class OmoikaneReferenceOS:
             reason="replication jitter exceeded bounded sync budget",
         )
         method_b_resume = self.scheduler.resume(method_b_scheduled["handle_id"])
+        method_b_artifact_refresh_required = self.scheduler.sync_governance_artifacts(
+            method_b_scheduled["handle_id"],
+            artifact_sync_report(
+                method_b_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:05:00Z",
+                sync_token="method-b-stale",
+                status_overrides={"legal_attestation_ref": "stale"},
+            ),
+        )
+        method_b_after_refresh_required = self.scheduler.observe(method_b_scheduled["handle_id"])
+        method_b_artifact_refresh_current = self.scheduler.sync_governance_artifacts(
+            method_b_scheduled["handle_id"],
+            artifact_sync_report(
+                method_b_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:07:00Z",
+                sync_token="method-b-current",
+            ),
+        )
+        method_b_resume_after_refresh = self.scheduler.resume(method_b_scheduled["handle_id"])
         method_b_review = self.scheduler.advance(
             method_b_scheduled["handle_id"],
             "dual-channel-review",
@@ -1277,6 +1347,14 @@ class OmoikaneReferenceOS:
         )
         method_c_plan = self.scheduler.build_method_c_plan(method_c_identity.identity_id)
         method_c_scheduled = self.scheduler.schedule(method_c_plan)
+        method_c_artifact_sync = self.scheduler.sync_governance_artifacts(
+            method_c_scheduled["handle_id"],
+            artifact_sync_report(
+                method_c_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:10:00Z",
+                sync_token="method-c-current",
+            ),
+        )
         method_c_consent = self.scheduler.advance(method_c_scheduled["handle_id"], "consent-lock")
         method_c_signal_fail = self.scheduler.handle_substrate_signal(
             method_c_scheduled["handle_id"],
@@ -1286,10 +1364,28 @@ class OmoikaneReferenceOS:
         )
         method_c_final = self.scheduler.observe(method_c_scheduled["handle_id"])
         method_c_validation = self.scheduler.validate_handle(method_c_final)
+        method_c_revoked_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-c-revoked/v1",
+            metadata={"display_name": "Revoked Artifact Sandbox"},
+        )
+        method_c_revoked_plan = self.scheduler.build_method_c_plan(method_c_revoked_identity.identity_id)
+        method_c_revoked_scheduled = self.scheduler.schedule(method_c_revoked_plan)
+        method_c_revoked_sync = self.scheduler.sync_governance_artifacts(
+            method_c_revoked_scheduled["handle_id"],
+            artifact_sync_report(
+                method_c_revoked_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:12:00Z",
+                sync_token="method-c-revoked",
+                status_overrides={"legal_attestation_ref": "revoked"},
+            ),
+        )
+        method_c_revoked_final = self.scheduler.observe(method_c_revoked_scheduled["handle_id"])
+        method_c_revoked_validation = self.scheduler.validate_handle(method_c_revoked_final)
         all_validations = {
             "method_a": method_a_validation,
             "method_b": method_b_validation,
             "method_c": method_c_validation,
+            "method_c_revoked": method_c_revoked_validation,
         }
 
         return {
@@ -1303,6 +1399,7 @@ class OmoikaneReferenceOS:
                 "method_a": plan,
                 "method_b": method_b_plan,
                 "method_c": method_c_plan,
+                "method_c_revoked": method_c_revoked_plan,
             },
             "substrate": {
                 "allocation": asdict(allocation),
@@ -1321,6 +1418,11 @@ class OmoikaneReferenceOS:
                 "timeout": timeout,
                 "after_timeout": after_timeout,
                 "retry_bdb_bridge": retry_bdb,
+                "artifact_sync_gate": {
+                    "blocked": bool(artifact_gate_message),
+                    "message": artifact_gate_message,
+                },
+                "artifact_sync": method_a_artifact_sync,
                 "identity_confirmation": confirmation_result,
                 "active_handoff": handoff_result,
                 "method_b": {
@@ -1328,6 +1430,10 @@ class OmoikaneReferenceOS:
                     "shadow_sync": method_b_shadow,
                     "signal_pause": method_b_signal_pause,
                     "resume": method_b_resume,
+                    "artifact_refresh_required": method_b_artifact_refresh_required,
+                    "after_refresh_required": method_b_after_refresh_required,
+                    "artifact_refresh_current": method_b_artifact_refresh_current,
+                    "resume_after_refresh": method_b_resume_after_refresh,
                     "dual_channel_review": method_b_review,
                     "signal_rollback": method_b_signal_rollback,
                     "after_signal": method_b_after_signal,
@@ -1337,13 +1443,21 @@ class OmoikaneReferenceOS:
                 },
                 "method_c": {
                     "scheduled": method_c_scheduled,
+                    "artifact_sync": method_c_artifact_sync,
                     "consent_lock": method_c_consent,
                     "signal_fail": method_c_signal_fail,
+                    "final_handle": method_c_final,
+                },
+                "method_c_revoked": {
+                    "scheduled": method_c_revoked_scheduled,
+                    "artifact_sync": method_c_revoked_sync,
+                    "final_handle": method_c_revoked_final,
                 },
             },
             "final_handle": final_handle,
             "method_b_final_handle": method_b_final,
             "method_c_final_handle": method_c_final,
+            "method_c_revoked_final_handle": method_c_revoked_final,
             "handle_validations": all_validations,
             "validation": {
                 "ok": all(item["ok"] for item in all_validations.values()),
@@ -1351,6 +1465,7 @@ class OmoikaneReferenceOS:
                     method_a_validation["errors"]
                     + method_b_validation["errors"]
                     + method_c_validation["errors"]
+                    + method_c_revoked_validation["errors"]
                 ),
                 "history_length": method_a_validation["history_length"],
                 "rollback_count": method_a_validation["rollback_count"],
@@ -1395,6 +1510,31 @@ class OmoikaneReferenceOS:
                         "legal://"
                     )
                     for plan_item in (plan, method_b_plan, method_c_plan)
+                ),
+                "artifact_sync_gate_blocked": (
+                    "governance artifacts must be synced as current before entering active-handoff"
+                    in artifact_gate_message
+                ),
+                "artifact_sync_current_before_handoff": (
+                    method_a_artifact_sync["action"] == "accept"
+                    and method_a_artifact_sync["bundle_status"] == "current"
+                    and final_handle["artifact_sync"]["bundle_status"] == "current"
+                ),
+                "artifact_refresh_paused": (
+                    method_b_artifact_refresh_required["action"] == "pause"
+                    and method_b_after_refresh_required["status"] == "paused"
+                    and method_b_after_refresh_required["artifact_sync"]["bundle_status"]
+                    == "refresh-required"
+                ),
+                "artifact_refresh_recovered": (
+                    method_b_artifact_refresh_current["action"] == "accept"
+                    and method_b_artifact_refresh_current["bundle_status"] == "current"
+                    and method_b_resume_after_refresh["status"] == "advancing"
+                ),
+                "artifact_revocation_fail_closed": (
+                    method_c_revoked_sync["action"] == "fail"
+                    and method_c_revoked_sync["bundle_status"] == "revoked"
+                    and method_c_revoked_final["status"] == "failed"
                 ),
                 "order_violation_blocked": "stage order violation" in order_violation_message,
                 "timeout_rolled_back": timeout["action"] == "rollback"

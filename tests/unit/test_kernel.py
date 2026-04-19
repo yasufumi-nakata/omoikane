@@ -12,6 +12,45 @@ from omoikane.substrate.adapter import ClassicalSiliconAdapter
 
 
 class KernelTests(unittest.TestCase):
+    def _artifact_sync_report(
+        self,
+        governance_artifacts: dict[str, str],
+        *,
+        checked_at: str,
+        sync_token: str,
+        status_overrides: dict[str, str] | None = None,
+    ) -> dict[str, object]:
+        overrides = status_overrides or {}
+        artifacts = []
+        for artifact_key in (
+            "self_consent_ref",
+            "ethics_attestation_ref",
+            "council_attestation_ref",
+            "legal_attestation_ref",
+            "artifact_bundle_ref",
+        ):
+            artifact_ref = governance_artifacts[artifact_key]
+            status = overrides.get(artifact_key, "current")
+            artifacts.append(
+                {
+                    "artifact_key": artifact_key,
+                    "status": status,
+                    "proof_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "artifact_key": artifact_key,
+                                "artifact_ref": artifact_ref,
+                                "checked_at": checked_at,
+                                "status": status,
+                                "sync_token": sync_token,
+                            }
+                        )
+                    ),
+                    "external_sync_ref": f"sync://tests/{sync_token}/{artifact_key}",
+                }
+            )
+        return {"checked_at": checked_at, "artifacts": artifacts}
+
     def test_continuity_ledger_detects_tamper(self) -> None:
         ledger = ContinuityLedger()
         ledger.append(
@@ -280,6 +319,35 @@ class KernelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "witness_refs must contain at least 2 entries"):
             scheduler.validate_plan(plan)
 
+    def test_ascension_scheduler_blocks_protected_stage_until_artifacts_are_current(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-sync-gate")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "governance artifacts must be synced as current before entering active-handoff",
+        ):
+            scheduler.advance(handle["handle_id"], "identity-confirmation")
+
+        sync_result = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:00:00Z",
+                sync_token="method-a-current",
+            ),
+        )
+        result = scheduler.advance(handle["handle_id"], "identity-confirmation")
+
+        self.assertEqual("accept", sync_result["action"])
+        self.assertEqual("current", sync_result["bundle_status"])
+        self.assertEqual("active-handoff", result["next_stage"])
+        self.assertTrue(scheduler.validate_handle(scheduler.observe(handle["handle_id"]))["ok"])
+
     def test_ascension_scheduler_timeout_rolls_back_to_prior_stage(self) -> None:
         ledger = ContinuityLedger()
         scheduler = AscensionScheduler(ledger)
@@ -308,6 +376,14 @@ class KernelTests(unittest.TestCase):
 
         paused = scheduler.pause(handle["handle_id"], "bounded pause for continuity witness")
         resumed = scheduler.resume(handle["handle_id"])
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:01:00Z",
+                sync_token="method-a-complete",
+            ),
+        )
         scheduler.advance(handle["handle_id"], "identity-confirmation")
         result = scheduler.advance(handle["handle_id"], "active-handoff")
         observed = scheduler.observe(handle["handle_id"])
@@ -336,6 +412,24 @@ class KernelTests(unittest.TestCase):
             reason="replication jitter exceeded threshold",
         )
         resumed = scheduler.resume(handle["handle_id"])
+        refresh_required = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:02:00Z",
+                sync_token="method-b-stale",
+                status_overrides={"legal_attestation_ref": "stale"},
+            ),
+        )
+        refreshed = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:03:00Z",
+                sync_token="method-b-current",
+            ),
+        )
+        resumed_after_refresh = scheduler.resume(handle["handle_id"])
         scheduler.advance(handle["handle_id"], "dual-channel-review")
         rollback = scheduler.handle_substrate_signal(
             handle["handle_id"],
@@ -348,6 +442,9 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("pause", paused["action"])
         self.assertEqual("paused", paused["status"])
         self.assertEqual("advancing", resumed["status"])
+        self.assertEqual("pause", refresh_required["action"])
+        self.assertEqual("current", refreshed["bundle_status"])
+        self.assertEqual("advancing", resumed_after_refresh["status"])
         self.assertEqual("rollback", rollback["action"])
         self.assertEqual("dual-channel-review", rollback["rollback_target"])
         self.assertEqual("rolled-back", observed["status"])
@@ -360,6 +457,14 @@ class KernelTests(unittest.TestCase):
         scheduler = AscensionScheduler(ledger)
         plan = scheduler.build_method_c_plan("identity://scheduler-method-c")
         handle = scheduler.schedule(plan)
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:04:00Z",
+                sync_token="method-c-current",
+            ),
+        )
         scheduler.advance(handle["handle_id"], "consent-lock")
 
         signal = scheduler.handle_substrate_signal(
@@ -376,6 +481,29 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("scan-commit", observed["current_stage"])
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_revoked_artifact_fails_closed(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_c_plan("identity://scheduler-revoked")
+        handle = scheduler.schedule(plan)
+
+        result = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:05:00Z",
+                sync_token="method-c-revoked",
+                status_overrides={"legal_attestation_ref": "revoked"},
+            ),
+        )
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("fail", result["action"])
+        self.assertEqual("revoked", result["bundle_status"])
+        self.assertEqual("failed", observed["status"])
+        self.assertEqual("revoked", observed["artifact_sync"]["bundle_status"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
 
 
 if __name__ == "__main__":

@@ -65,7 +65,9 @@ Method A の 4 stage blueprint、順序違反の reject、
 Method B の degraded / critical substrate signal に対する pause / rollback、
 Method C の `scan-commit` fail-closed に加えて、
 `self_consent` / `ethics` / `council` / `legal` / `witness` artifact bundle と
-`governance_artifact_digest` が plan と handle に束縛されることを 1 シナリオで確認する。
+`governance_artifact_digest` が plan と handle に束縛されること、
+さらに `artifact_sync` が `current / stale / revoked` external proof snapshot を持ち、
+protected handoff 前に `current` bundle を要求することを 1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -249,6 +251,6 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
-- AscensionScheduler artifact の真正性更新・失効確認・外部証跡同期
+- AscensionScheduler artifact の root-of-trust rotation と外部 verifier 接続
 - specs/ から runtime への自動生成ループ
 - automation による未実装ギャップの継続充填

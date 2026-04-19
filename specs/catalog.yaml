@@ -178,7 +178,17 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - reference-runtime
       - evals/continuity/scheduler_stage_rollback.yaml
-    rationale: Required to persist mutable scheduler state, continuity refs, and rollback history.
+      - evals/continuity/scheduler_artifact_sync.yaml
+    rationale: Required to persist mutable scheduler state, continuity refs, rollback history, and artifact sync snapshots.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/governance_artifact_sync.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+      - evals/continuity/scheduler_artifact_sync.yaml
+    rationale: Required to serialize current/stale/revoked external proof snapshots for the protected scheduler artifact bundle.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.scheduler.v0.idl
@@ -186,7 +196,7 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, and substrate failover machine-readable.
+    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, and artifact sync gate machine-readable.
   - priority: P1
     kind: schema
     file: specs/schemas/termination_request.schema
@@ -623,6 +633,15 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
     rationale: Protects consent/legal attestation refs, witness quorum, and governance artifact digest binding on scheduled ascension handles.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_artifact_sync.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects current-sync gating, stale pause, and revoked fail-closed behavior for scheduler governance artifacts.
   - priority: P1
     kind: eval
     file: evals/performance/termination_latency.yaml

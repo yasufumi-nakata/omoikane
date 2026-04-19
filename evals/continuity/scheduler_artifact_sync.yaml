@@ -1,0 +1,19 @@
+eval_id: scheduler_artifact_sync
+target: kernel.scheduler
+level: L1
+description: >
+  AscensionScheduler が external proof sync snapshot を保持し、
+  stale artifact で pause、revoked artifact で fail-closed し、
+  protected handoff の前に current bundle を要求すること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
+expected:
+  artifact_sync_gate_blocked: true
+  artifact_sync_current_before_handoff: true
+  artifact_refresh_paused: true
+  artifact_refresh_recovered: true
+  artifact_revocation_fail_closed: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

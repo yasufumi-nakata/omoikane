@@ -60,6 +60,9 @@ reference runtime は Method ごとに固定 profile を持つ。
   `scan-commit` 以降は rollback を持たず、critical substrate signal で fail-closed する
 - すべての Method は `self_consent / ethics / council / legal / witness` artifact ref を
   plan と handle に束縛し、`governance_artifact_digest` で continuity history に固定する
+- `artifact_sync` は core artifact bundle の external proof snapshot を保持し、
+  `active-handoff` / `authority-handoff` / `scan-commit` の前に `current` bundle を要求する。
+  `stale` は pause + refresh-required、`revoked` は fail-closed で扱う。
 
 ## 不変条件
 
@@ -70,7 +73,8 @@ reference runtime は Method ごとに固定 profile を持つ。
    critical signal は stage policy に従って rollback または fail-closed する
 5. Method A の stage 順序を入れ替える self-modify は禁止（T-Kernel）
 6. clinical/legal consent artifact の真正性確認は repo 外だが、
-   scheduler surface には stable artifact ref と witness quorum を必ず残す
+   scheduler surface には stable artifact ref・witness quorum・最新 sync snapshot を必ず残す
+7. `artifact_sync.bundle_status != current` のまま protected handoff stage を開いてはならない
 
 ## API
 
@@ -82,6 +86,7 @@ scheduler.resume(handle) → ScheduleHandle
 scheduler.rollback(handle, to_stage_id) → ScheduleHandle
 scheduler.enforce_timeout(handle, elapsed_ms) → TimeoutResult
 scheduler.handle_substrate_signal(handle, severity, source_substrate, reason) → SignalResult
+scheduler.sync_governance_artifacts(handle, checked_at, artifacts) → ArtifactSyncResult
 scheduler.cancel(handle, reason) → ScheduleHandle
 ```
 
@@ -91,12 +96,14 @@ scheduler.cancel(handle, reason) → ScheduleHandle
 - `ascension_plan.schema` / `schedule_handle.schema` を導入
 - `scheduler-demo` を CLI に追加し、Method A の順序遷移＋ forced rollback、
   Method B の reversible substrate failover、
-  Method C の fail-closed destructive scan と governance artifact bundle を
+  Method C の fail-closed destructive scan に加えて、
+  governance artifact bundle の current / stale / revoked sync snapshot を
   ContinuityLedger に記録
 - `evals/continuity/scheduler_stage_rollback.yaml` と
   `evals/continuity/scheduler_method_profiles.yaml`、
-  `evals/continuity/scheduler_governance_artifacts.yaml` で Method A/B/C の contract と
-  artifact binding を守る
+  `evals/continuity/scheduler_governance_artifacts.yaml`、
+  `evals/continuity/scheduler_artifact_sync.yaml` で Method A/B/C の contract と
+  artifact binding / freshness gate を守る
 
 ## 思兼神メタファー
 

@@ -362,15 +362,25 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["method_b_completed"])
         self.assertTrue(result["validation"]["method_c_fail_closed"])
         self.assertTrue(result["validation"]["artifact_bundle_attached"])
+        self.assertTrue(result["validation"]["artifact_sync_gate_blocked"])
+        self.assertTrue(result["validation"]["artifact_sync_current_before_handoff"])
+        self.assertTrue(result["validation"]["artifact_refresh_paused"])
+        self.assertTrue(result["validation"]["artifact_refresh_recovered"])
+        self.assertTrue(result["validation"]["artifact_revocation_fail_closed"])
         self.assertTrue(result["validation"]["witness_quorum_bound"])
         self.assertTrue(result["validation"]["legal_attestation_bound"])
         self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
         self.assertEqual("completed", result["final_handle"]["status"])
+        self.assertEqual("current", result["final_handle"]["artifact_sync"]["bundle_status"])
         self.assertEqual(
             "dual-channel-review",
             result["scenarios"]["method_b"]["signal_rollback"]["rollback_target"],
         )
         self.assertEqual("fail", result["scenarios"]["method_c"]["signal_fail"]["action"])
+        self.assertEqual(
+            "fail",
+            result["scenarios"]["method_c_revoked"]["artifact_sync"]["action"],
+        )
 
     def test_council_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

@@ -12,6 +12,7 @@ required:
   - identity_id
   - governance_artifacts
   - governance_artifact_digest
+  - artifact_sync
   - current_stage
   - status
   - history
@@ -66,6 +67,80 @@ properties:
   governance_artifact_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  artifact_sync:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - bundle_status
+      - last_checked_at
+      - artifacts
+    properties:
+      policy_id:
+        const: attestation-freshness-v1
+      bundle_status:
+        type: string
+        enum:
+          - unsynced
+          - current
+          - refresh-required
+          - revoked
+      last_checked_at:
+        type:
+          - string
+          - "null"
+        format: date-time
+      artifacts:
+        type: array
+        minItems: 5
+        maxItems: 5
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - artifact_key
+            - artifact_ref
+            - status
+            - checked_at
+            - proof_digest
+            - external_sync_ref
+            - refresh_required
+          properties:
+            artifact_key:
+              type: string
+              enum:
+                - self_consent_ref
+                - ethics_attestation_ref
+                - council_attestation_ref
+                - legal_attestation_ref
+                - artifact_bundle_ref
+            artifact_ref:
+              type: string
+              minLength: 1
+            status:
+              type: string
+              enum:
+                - unsynced
+                - current
+                - stale
+                - revoked
+            checked_at:
+              type:
+                - string
+                - "null"
+              format: date-time
+            proof_digest:
+              type:
+                - string
+                - "null"
+              pattern: "^[a-f0-9]{64}$"
+            external_sync_ref:
+              type:
+                - string
+                - "null"
+              pattern: "^sync://"
+            refresh_required:
+              type: boolean
   current_stage:
     type: string
     minLength: 1
@@ -106,6 +181,7 @@ properties:
             - rollback
             - pause
             - resume
+            - sync
             - cancel
             - fail
         recorded_at:
@@ -138,6 +214,46 @@ examples:
         - witness://ascension/a/3dfb1f84a223/guardian-observer
       artifact_bundle_ref: artifact://ascension/a/3dfb1f84a223/bundle
     governance_artifact_digest: 8c1f6de21c0d63b33047e49d4c8b58fffe414e1f5e7d0c6c69c17a2c35e5757d
+    artifact_sync:
+      policy_id: attestation-freshness-v1
+      bundle_status: current
+      last_checked_at: "2026-04-19T06:00:00Z"
+      artifacts:
+        - artifact_key: self_consent_ref
+          artifact_ref: consent://ascension/a/3dfb1f84a223/self-consent
+          status: current
+          checked_at: "2026-04-19T06:00:00Z"
+          proof_digest: 2fddf44f71a33284c7221ec6f60f13e109c4a405f99dc5a6f1f9956a93d3c4a9
+          external_sync_ref: sync://scheduler-demo/method-a-current/self_consent_ref
+          refresh_required: false
+        - artifact_key: ethics_attestation_ref
+          artifact_ref: ethics://ascension/a/3dfb1f84a223/guardian-approval
+          status: current
+          checked_at: "2026-04-19T06:00:00Z"
+          proof_digest: 4fbf9e697cdba2aa61c7b9d26aa25bf2551ae3a83aaf6ebf2efbca33e2b5f3c7
+          external_sync_ref: sync://scheduler-demo/method-a-current/ethics_attestation_ref
+          refresh_required: false
+        - artifact_key: council_attestation_ref
+          artifact_ref: council://ascension/a/3dfb1f84a223/reference-resolution
+          status: current
+          checked_at: "2026-04-19T06:00:00Z"
+          proof_digest: 649b11c36ee62af76293fa4d32f7bf24c1ab45f625276c68fb82dc3e6d7d4244
+          external_sync_ref: sync://scheduler-demo/method-a-current/council_attestation_ref
+          refresh_required: false
+        - artifact_key: legal_attestation_ref
+          artifact_ref: legal://ascension/a/3dfb1f84a223/clinical-readiness
+          status: current
+          checked_at: "2026-04-19T06:00:00Z"
+          proof_digest: 4a67e98d76bc9782bf6431fc13d5e366228eb9cf392ed2e4c1b8b11be6eeff75
+          external_sync_ref: sync://scheduler-demo/method-a-current/legal_attestation_ref
+          refresh_required: false
+        - artifact_key: artifact_bundle_ref
+          artifact_ref: artifact://ascension/a/3dfb1f84a223/bundle
+          status: current
+          checked_at: "2026-04-19T06:00:00Z"
+          proof_digest: 5b653bcd16fc850d9e4d7f3857549ed510d9af1f8d9cb0fd78a76eb4332ea3d4
+          external_sync_ref: sync://scheduler-demo/method-a-current/artifact_bundle_ref
+          refresh_required: false
     current_stage: bdb-bridge
     status: paused
     history:

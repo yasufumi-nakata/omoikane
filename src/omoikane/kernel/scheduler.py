@@ -26,11 +26,21 @@ SCHEDULER_ALLOWED_TRANSITIONS = {
     "rollback",
     "pause",
     "resume",
+    "sync",
     "cancel",
     "fail",
 }
 SCHEDULER_SIGNAL_SEVERITIES = {"watch", "degraded", "critical"}
 SCHEDULER_WITNESS_QUORUM = 2
+SCHEDULER_ARTIFACT_SYNC_POLICY_ID = "attestation-freshness-v1"
+SCHEDULER_ARTIFACT_REFRESH_WINDOW_HOURS = 24
+SCHEDULER_ARTIFACT_BUNDLE_STATUS = {"unsynced", "current", "refresh-required", "revoked"}
+SCHEDULER_ARTIFACT_STATUS = {"unsynced", "current", "stale", "revoked"}
+SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD = {
+    "A": "active-handoff",
+    "B": "authority-handoff",
+    "C": "scan-commit",
+}
 GOVERNANCE_ARTIFACT_PREFIXES = {
     "self_consent_ref": "consent://",
     "ethics_attestation_ref": "ethics://",
@@ -38,6 +48,13 @@ GOVERNANCE_ARTIFACT_PREFIXES = {
     "legal_attestation_ref": "legal://",
     "artifact_bundle_ref": "artifact://",
 }
+SYNCED_GOVERNANCE_ARTIFACT_KEYS = (
+    "self_consent_ref",
+    "ethics_attestation_ref",
+    "council_attestation_ref",
+    "legal_attestation_ref",
+    "artifact_bundle_ref",
+)
 METHOD_A_STAGE_BLUEPRINT = (
     {
         "stage_id": "scan-baseline",
@@ -137,6 +154,11 @@ class AscensionScheduler:
                 "legal_attestation_required": True,
                 "minimum_witness_quorum": SCHEDULER_WITNESS_QUORUM,
                 "digest_algorithm": "sha256",
+                "sync_policy_id": SCHEDULER_ARTIFACT_SYNC_POLICY_ID,
+                "refresh_window_hours": SCHEDULER_ARTIFACT_REFRESH_WINDOW_HOURS,
+                "stale_action": "pause-and-refresh",
+                "revoked_action": "fail-closed",
+                "sync_required_before_stage": dict(SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD),
             },
             "method_profiles": {
                 "A": {
@@ -228,6 +250,7 @@ class AscensionScheduler:
             "identity_id": normalized_plan["identity_id"],
             "governance_artifacts": deepcopy(normalized_plan["governance_artifacts"]),
             "governance_artifact_digest": normalized_plan["governance_artifact_digest"],
+            "artifact_sync": self._initial_artifact_sync(normalized_plan["governance_artifacts"]),
             "current_stage": first_stage,
             "status": "scheduled",
             "history": [],
@@ -285,6 +308,7 @@ class AscensionScheduler:
             }
 
         next_stage = plan["stages"][stage_index + 1]["stage_id"]
+        self._ensure_artifact_sync_for_stage(handle, plan, next_stage)
         handle["current_stage"] = next_stage
         handle["status"] = "advancing"
         entered_ref = self._append_history(
@@ -489,6 +513,81 @@ class AscensionScheduler:
             "handle": rolled_back,
         }
 
+    def sync_governance_artifacts(
+        self,
+        handle_id: str,
+        sync_report: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        if handle["status"] in {"completed", "cancelled", "failed"}:
+            raise ValueError(f"cannot sync governance artifacts in status {handle['status']}")
+
+        normalized_sync = self._normalize_artifact_sync_report(
+            sync_report,
+            handle["governance_artifacts"],
+        )
+        handle["artifact_sync"] = normalized_sync
+        sync_ref = self._append_history(
+            handle,
+            stage_id=handle["current_stage"],
+            transition="sync",
+            reason=(
+                "governance artifact sync recorded with "
+                f"bundle_status={normalized_sync['bundle_status']}"
+            ),
+        )
+
+        bundle_status = normalized_sync["bundle_status"]
+        if bundle_status == "revoked":
+            handle["status"] = "failed"
+            handle["closed_at"] = utc_now_iso()
+            fail_ref = self._append_history(
+                handle,
+                stage_id=handle["current_stage"],
+                transition="fail",
+                reason="governance artifact revoked; fail-closed before protected handoff",
+            )
+            return {
+                "handle_id": handle["handle_id"],
+                "plan_ref": handle["plan_ref"],
+                "bundle_status": bundle_status,
+                "action": "fail",
+                "status": handle["status"],
+                "continuity_event_refs": [sync_ref, fail_ref],
+                "handle": deepcopy(handle),
+            }
+
+        if bundle_status == "refresh-required":
+            continuity_event_refs = [sync_ref]
+            if handle["status"] != "paused":
+                handle["status"] = "paused"
+                pause_ref = self._append_history(
+                    handle,
+                    stage_id=handle["current_stage"],
+                    transition="pause",
+                    reason="governance artifact refresh required before protected handoff",
+                )
+                continuity_event_refs.append(pause_ref)
+            return {
+                "handle_id": handle["handle_id"],
+                "plan_ref": handle["plan_ref"],
+                "bundle_status": bundle_status,
+                "action": "pause",
+                "status": handle["status"],
+                "continuity_event_refs": continuity_event_refs,
+                "handle": deepcopy(handle),
+            }
+
+        return {
+            "handle_id": handle["handle_id"],
+            "plan_ref": handle["plan_ref"],
+            "bundle_status": bundle_status,
+            "action": "accept",
+            "status": handle["status"],
+            "continuity_event_refs": [sync_ref],
+            "handle": deepcopy(handle),
+        }
+
     def cancel(self, handle_id: str, reason: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
         if handle["status"] in {"completed", "cancelled", "failed"}:
@@ -569,6 +668,11 @@ class AscensionScheduler:
                 errors.append(
                     "governance_artifact_digest must match governance_artifacts"
                 )
+        artifact_sync = handle.get("artifact_sync")
+        if not isinstance(artifact_sync, Mapping):
+            errors.append("artifact_sync must be a mapping")
+        else:
+            errors.extend(self._check_artifact_sync(artifact_sync, governance_artifacts))
         self._check_non_empty_string(handle.get("current_stage"), "current_stage", errors)
 
         status = handle.get("status")
@@ -635,6 +739,10 @@ class AscensionScheduler:
             "governance_artifact_digest": handle["governance_artifact_digest"],
             "artifact_bundle_ref": handle["governance_artifacts"]["artifact_bundle_ref"],
         }
+        artifact_sync = handle.get("artifact_sync")
+        if isinstance(artifact_sync, Mapping):
+            payload["artifact_bundle_status"] = artifact_sync.get("bundle_status", "unsynced")
+            payload["artifact_sync_checked_at"] = artifact_sync.get("last_checked_at")
         entry = self.ledger.append(
             identity_id=handle["identity_id"],
             event_type=f"ascension.scheduler.{transition}",
@@ -738,6 +846,86 @@ class AscensionScheduler:
         normalized["witness_refs"] = normalized_witness_refs
         return normalized
 
+    def _initial_artifact_sync(self, governance_artifacts: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            "policy_id": SCHEDULER_ARTIFACT_SYNC_POLICY_ID,
+            "bundle_status": "unsynced",
+            "last_checked_at": None,
+            "artifacts": [
+                {
+                    "artifact_key": artifact_key,
+                    "artifact_ref": governance_artifacts[artifact_key],
+                    "status": "unsynced",
+                    "checked_at": None,
+                    "proof_digest": None,
+                    "external_sync_ref": None,
+                    "refresh_required": False,
+                }
+                for artifact_key in SYNCED_GOVERNANCE_ARTIFACT_KEYS
+            ],
+        }
+
+    def _normalize_artifact_sync_report(
+        self,
+        value: Any,
+        governance_artifacts: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError("sync_report must be a mapping")
+        checked_at = self._normalize_non_empty_string(value.get("checked_at"), "checked_at")
+        raw_artifacts = value.get("artifacts")
+        if not isinstance(raw_artifacts, Sequence) or isinstance(raw_artifacts, (str, bytes)):
+            raise ValueError("artifacts must be a sequence")
+
+        expected_keys = list(SYNCED_GOVERNANCE_ARTIFACT_KEYS)
+        seen_keys: List[str] = []
+        normalized_artifacts: List[Dict[str, Any]] = []
+        for raw_artifact in raw_artifacts:
+            if not isinstance(raw_artifact, Mapping):
+                raise ValueError("artifacts entries must be mappings")
+            artifact_key = self._normalize_non_empty_string(
+                raw_artifact.get("artifact_key"),
+                "artifact_key",
+            )
+            if artifact_key not in expected_keys:
+                raise ValueError(
+                    f"artifact_key must be one of {sorted(SYNCED_GOVERNANCE_ARTIFACT_KEYS)}"
+                )
+            if artifact_key in seen_keys:
+                raise ValueError(f"artifact_key duplicated in sync_report: {artifact_key}")
+            seen_keys.append(artifact_key)
+            status = self._normalize_artifact_status(raw_artifact.get("status"))
+            normalized_artifacts.append(
+                {
+                    "artifact_key": artifact_key,
+                    "artifact_ref": governance_artifacts[artifact_key],
+                    "status": status,
+                    "checked_at": checked_at,
+                    "proof_digest": self._normalize_optional_digest(
+                        raw_artifact.get("proof_digest"),
+                        "proof_digest",
+                        allow_none=status == "unsynced",
+                    ),
+                    "external_sync_ref": self._normalize_optional_sync_ref(
+                        raw_artifact.get("external_sync_ref"),
+                        allow_none=status == "unsynced",
+                    ),
+                    "refresh_required": status == "stale",
+                }
+            )
+
+        missing_keys = [artifact_key for artifact_key in expected_keys if artifact_key not in seen_keys]
+        if missing_keys:
+            raise ValueError(f"sync_report is missing artifact keys: {', '.join(missing_keys)}")
+
+        bundle_status = self._bundle_status_from_artifacts(normalized_artifacts)
+        return {
+            "policy_id": SCHEDULER_ARTIFACT_SYNC_POLICY_ID,
+            "bundle_status": bundle_status,
+            "last_checked_at": checked_at,
+            "artifacts": normalized_artifacts,
+        }
+
     def _check_governance_artifacts(self, value: Mapping[str, Any]) -> List[str]:
         errors: List[str] = []
         for field_name, prefix in GOVERNANCE_ARTIFACT_PREFIXES.items():
@@ -772,14 +960,158 @@ class AscensionScheduler:
                 )
         return errors
 
+    def _check_artifact_sync(
+        self,
+        value: Mapping[str, Any],
+        governance_artifacts: Any,
+    ) -> List[str]:
+        errors: List[str] = []
+        policy_id = value.get("policy_id")
+        if policy_id != SCHEDULER_ARTIFACT_SYNC_POLICY_ID:
+            errors.append(f"artifact_sync.policy_id must be {SCHEDULER_ARTIFACT_SYNC_POLICY_ID}")
+        bundle_status = value.get("bundle_status")
+        if bundle_status not in SCHEDULER_ARTIFACT_BUNDLE_STATUS:
+            errors.append(
+                f"artifact_sync.bundle_status must be one of {sorted(SCHEDULER_ARTIFACT_BUNDLE_STATUS)}"
+            )
+        last_checked_at = value.get("last_checked_at")
+        if last_checked_at is not None and (not isinstance(last_checked_at, str) or not last_checked_at.strip()):
+            errors.append("artifact_sync.last_checked_at must be a string or null")
+
+        artifacts = value.get("artifacts")
+        if not isinstance(artifacts, list) or len(artifacts) != len(SYNCED_GOVERNANCE_ARTIFACT_KEYS):
+            errors.append(
+                f"artifact_sync.artifacts must contain {len(SYNCED_GOVERNANCE_ARTIFACT_KEYS)} entries"
+            )
+            return errors
+
+        expected_refs = {
+            artifact_key: governance_artifacts.get(artifact_key)
+            for artifact_key in SYNCED_GOVERNANCE_ARTIFACT_KEYS
+            if isinstance(governance_artifacts, Mapping)
+        }
+        seen_keys: List[str] = []
+        for item in artifacts:
+            if not isinstance(item, Mapping):
+                errors.append("artifact_sync.artifacts items must be mappings")
+                continue
+            artifact_key = item.get("artifact_key")
+            if artifact_key not in SYNCED_GOVERNANCE_ARTIFACT_KEYS:
+                errors.append(
+                    f"artifact_sync.artifact_key must be one of {sorted(SYNCED_GOVERNANCE_ARTIFACT_KEYS)}"
+                )
+                continue
+            if artifact_key in seen_keys:
+                errors.append(f"artifact_sync.artifact_key duplicated: {artifact_key}")
+            else:
+                seen_keys.append(artifact_key)
+            artifact_ref = item.get("artifact_ref")
+            if artifact_ref != expected_refs.get(artifact_key):
+                errors.append(f"artifact_sync.artifact_ref mismatch for {artifact_key}")
+            status = item.get("status")
+            if status not in SCHEDULER_ARTIFACT_STATUS:
+                errors.append(
+                    f"artifact_sync.status must be one of {sorted(SCHEDULER_ARTIFACT_STATUS)}"
+                )
+            checked_at = item.get("checked_at")
+            if checked_at is not None and (not isinstance(checked_at, str) or not checked_at.strip()):
+                errors.append(f"artifact_sync.checked_at must be a string or null for {artifact_key}")
+            proof_digest = item.get("proof_digest")
+            if proof_digest is not None and (
+                not isinstance(proof_digest, str) or len(proof_digest) != 64
+            ):
+                errors.append(f"artifact_sync.proof_digest must be 64 hex chars for {artifact_key}")
+            external_sync_ref = item.get("external_sync_ref")
+            if external_sync_ref is not None and (
+                not isinstance(external_sync_ref, str)
+                or not external_sync_ref.startswith("sync://")
+            ):
+                errors.append(
+                    f"artifact_sync.external_sync_ref must start with sync:// for {artifact_key}"
+                )
+            refresh_required = item.get("refresh_required")
+            if not isinstance(refresh_required, bool):
+                errors.append(f"artifact_sync.refresh_required must be a boolean for {artifact_key}")
+            elif refresh_required != (status == "stale"):
+                errors.append(
+                    f"artifact_sync.refresh_required mismatch for {artifact_key}"
+                )
+
+        if seen_keys != list(SYNCED_GOVERNANCE_ARTIFACT_KEYS):
+            expected_key_set = list(SYNCED_GOVERNANCE_ARTIFACT_KEYS)
+            missing = [artifact_key for artifact_key in expected_key_set if artifact_key not in seen_keys]
+            if missing:
+                errors.append(
+                    f"artifact_sync.artifacts missing keys: {', '.join(missing)}"
+                )
+        if not errors and self._bundle_status_from_artifacts(artifacts) != bundle_status:
+            errors.append("artifact_sync.bundle_status does not match artifact statuses")
+        return errors
+
     def _normalize_artifact_ref(self, value: Any, field_name: str, prefix: str) -> str:
         normalized = self._normalize_non_empty_string(value, field_name)
         if not normalized.startswith(prefix):
             raise ValueError(f"{field_name} must start with {prefix}")
         return normalized
 
+    def _normalize_artifact_status(self, value: Any) -> str:
+        status = self._normalize_non_empty_string(value, "status")
+        if status not in SCHEDULER_ARTIFACT_STATUS:
+            raise ValueError(f"status must be one of {sorted(SCHEDULER_ARTIFACT_STATUS)}")
+        return status
+
+    def _normalize_optional_digest(
+        self,
+        value: Any,
+        field_name: str,
+        *,
+        allow_none: bool,
+    ) -> Optional[str]:
+        if value is None:
+            if allow_none:
+                return None
+            raise ValueError(f"{field_name} must be a 64 character digest")
+        normalized = self._normalize_non_empty_string(value, field_name)
+        if len(normalized) != 64:
+            raise ValueError(f"{field_name} must be a 64 character digest")
+        return normalized
+
+    def _normalize_optional_sync_ref(self, value: Any, *, allow_none: bool) -> Optional[str]:
+        if value is None:
+            if allow_none:
+                return None
+            raise ValueError("external_sync_ref must start with sync://")
+        normalized = self._normalize_non_empty_string(value, "external_sync_ref")
+        if not normalized.startswith("sync://"):
+            raise ValueError("external_sync_ref must start with sync://")
+        return normalized
+
+    def _bundle_status_from_artifacts(self, artifacts: Sequence[Mapping[str, Any]]) -> str:
+        statuses = [artifact["status"] for artifact in artifacts]
+        if statuses and all(status == "unsynced" for status in statuses):
+            return "unsynced"
+        if "revoked" in statuses:
+            return "revoked"
+        if "stale" in statuses or "unsynced" in statuses:
+            return "refresh-required"
+        return "current"
+
     def _governance_artifact_digest(self, governance_artifacts: Mapping[str, Any]) -> str:
         return sha256_text(canonical_json(dict(governance_artifacts)))
+
+    def _ensure_artifact_sync_for_stage(
+        self,
+        handle: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        next_stage: str,
+    ) -> None:
+        if SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD.get(plan["method"]) != next_stage:
+            return
+        artifact_sync = handle.get("artifact_sync")
+        if not isinstance(artifact_sync, Mapping) or artifact_sync.get("bundle_status") != "current":
+            raise ValueError(
+                f"governance artifacts must be synced as current before entering {next_stage}"
+            )
 
     def _normalize_non_empty_string(self, value: Any, field_name: str) -> str:
         if not isinstance(value, str) or not value.strip():
