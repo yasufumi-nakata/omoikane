@@ -37,7 +37,8 @@
 ## 次段階
 
 L2 procedural skill execution enactment、
-L6 sensory loopback や richer distributed surfaces は
+L6 sensory loopback、
+participant attestation / transport authenticity を伴う richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
 
 ## 形式

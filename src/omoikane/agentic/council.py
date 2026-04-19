@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 @dataclass
@@ -169,6 +169,86 @@ class CouncilTopology:
             "heritage_request": self.heritage_request.to_dict(),
             "resolved_at": self.resolved_at,
             "conflict_resolution": self.conflict_resolution,
+        }
+
+
+@dataclass
+class DistributedCouncilMember:
+    """Participant in a bounded Federation or Heritage review."""
+
+    participant_id: str
+    role: str
+    trust_score: float
+    veto_holder: bool = False
+
+
+@dataclass
+class DistributedCouncilVote:
+    """One distributed council vote."""
+
+    participant_id: str
+    stance: str
+    rationale: str
+
+
+@dataclass
+class DistributedCouncilVoteSummary:
+    """Aggregated distributed council vote state."""
+
+    participant_count: int
+    quorum: int
+    approvals: int
+    rejections: int
+    abstentions: int
+    approve_weight: float
+    reject_weight: float
+    veto_triggered: bool
+    veto_holders: List[str]
+
+
+@dataclass
+class DistributedCouncilResolution:
+    """Resolved outcome for a Federation, Heritage, or human-governance review."""
+
+    resolution_id: str
+    proposal_ref: str
+    topology_ref: str
+    council_tier: str
+    local_outcome: str
+    local_binding_status: str
+    final_outcome: str
+    decision_mode: str
+    quorum_policy: Dict[str, Any]
+    vote_summary: DistributedCouncilVoteSummary
+    participant_votes: List[Dict[str, Any]]
+    conflict_resolution: str
+    external_resolution_refs: List[str]
+    follow_up_action: str
+    rationale_trace: List[str]
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_council_resolution",
+            "schema_version": "1.0.0",
+            "resolution_id": self.resolution_id,
+            "proposal_ref": self.proposal_ref,
+            "topology_ref": self.topology_ref,
+            "council_tier": self.council_tier,
+            "local_outcome": self.local_outcome,
+            "local_binding_status": self.local_binding_status,
+            "final_outcome": self.final_outcome,
+            "decision_mode": self.decision_mode,
+            "quorum_policy": self.quorum_policy,
+            "vote_summary": asdict(self.vote_summary),
+            "participant_votes": self.participant_votes,
+            "conflict_resolution": self.conflict_resolution,
+            "external_resolution_refs": self.external_resolution_refs,
+            "follow_up_action": self.follow_up_action,
+            "rationale_trace": self.rationale_trace,
+            "recorded_at": self.recorded_at,
+            "digest": self.digest,
         }
 
 
@@ -443,4 +523,359 @@ class Council:
             federation_request=federation_request,
             heritage_request=heritage_request,
             resolved_at=utc_now_iso(),
+        )
+
+    def resolve_federation_review(
+        self,
+        topology: CouncilTopology,
+        *,
+        local_decision: CouncilDecision,
+        votes: List[DistributedCouncilVote],
+    ) -> DistributedCouncilResolution:
+        if topology.scope != "cross-self":
+            raise ValueError("federation review requires cross-self topology")
+        if topology.federation_request.status != "external-pending":
+            raise ValueError("federation review requires external-pending request")
+
+        members = self._federation_members(topology.federation_request.participants or [])
+        quorum_policy = {
+            "policy_id": "federation-shared-reality-v1",
+            "quorum": len(topology.federation_request.participants or []) + 1,
+            "veto_policy": "self-liaison-unanimous-reject",
+            "required_roles": ["self-liaison", "guardian"],
+        }
+        summary, participant_votes, rationale_trace = self._distributed_vote_state(
+            members,
+            votes,
+            quorum=quorum_policy["quorum"],
+        )
+        liaison_votes = [
+            vote for vote in participant_votes if vote["role"] == "self-liaison"
+        ]
+        liaison_unanimous_reject = bool(liaison_votes) and all(
+            vote["stance"] in {"reject", "veto"} for vote in liaison_votes
+        )
+
+        if liaison_unanimous_reject:
+            final_outcome = "binding-rejected"
+            decision_mode = "liaison-unanimous-reject"
+            conflict_resolution = (
+                "federation-overrides-local" if local_decision.outcome == "approved" else "none"
+            )
+            follow_up_action = "reject-cross-self-merge"
+        elif summary.approve_weight > summary.reject_weight:
+            final_outcome = "binding-approved"
+            decision_mode = "weighted-majority"
+            conflict_resolution = "none"
+            follow_up_action = "execute-federated-review"
+        else:
+            final_outcome = "binding-rejected"
+            decision_mode = "weighted-majority"
+            conflict_resolution = (
+                "federation-overrides-local" if local_decision.outcome == "approved" else "none"
+            )
+            follow_up_action = "reject-cross-self-merge"
+
+        return self._build_distributed_resolution(
+            proposal_ref=topology.proposal_ref,
+            topology_ref=topology.topology_id,
+            council_tier="federation",
+            local_decision=local_decision,
+            local_binding_status="advisory",
+            final_outcome=final_outcome,
+            decision_mode=decision_mode,
+            quorum_policy=quorum_policy,
+            vote_summary=summary,
+            participant_votes=participant_votes,
+            conflict_resolution=conflict_resolution,
+            external_resolution_refs=[],
+            follow_up_action=follow_up_action,
+            rationale_trace=rationale_trace,
+        )
+
+    def resolve_heritage_review(
+        self,
+        topology: CouncilTopology,
+        *,
+        local_decision: CouncilDecision,
+        votes: List[DistributedCouncilVote],
+    ) -> DistributedCouncilResolution:
+        if topology.scope != "interpretive":
+            raise ValueError("heritage review requires interpretive topology")
+        if topology.heritage_request.status != "external-pending":
+            raise ValueError("heritage review requires external-pending request")
+
+        members = self._heritage_members()
+        quorum_policy = {
+            "policy_id": "heritage-interpretive-review-v1",
+            "quorum": 4,
+            "veto_policy": "ethics-committee-single-veto",
+            "required_roles": [
+                "cultural-representative",
+                "cultural-representative",
+                "legal-advisor",
+                "ethics-committee",
+            ],
+        }
+        summary, participant_votes, rationale_trace = self._distributed_vote_state(
+            members,
+            votes,
+            quorum=quorum_policy["quorum"],
+        )
+        ethics_veto = any(
+            vote["role"] == "ethics-committee" and vote["stance"] == "veto"
+            for vote in participant_votes
+        )
+
+        if ethics_veto:
+            final_outcome = "binding-rejected"
+            decision_mode = "ethics-veto"
+            conflict_resolution = (
+                "heritage-overrides-local" if local_decision.outcome == "approved" else "none"
+            )
+            follow_up_action = "block-interpretive-change"
+        elif summary.approve_weight > summary.reject_weight:
+            final_outcome = "binding-approved"
+            decision_mode = "weighted-majority"
+            conflict_resolution = "none"
+            follow_up_action = "apply-heritage-ruling"
+        else:
+            final_outcome = "binding-rejected"
+            decision_mode = "weighted-majority"
+            conflict_resolution = (
+                "heritage-overrides-local" if local_decision.outcome == "approved" else "none"
+            )
+            follow_up_action = "block-interpretive-change"
+
+        return self._build_distributed_resolution(
+            proposal_ref=topology.proposal_ref,
+            topology_ref=topology.topology_id,
+            council_tier="heritage",
+            local_decision=local_decision,
+            local_binding_status="blocked",
+            final_outcome=final_outcome,
+            decision_mode=decision_mode,
+            quorum_policy=quorum_policy,
+            vote_summary=summary,
+            participant_votes=participant_votes,
+            conflict_resolution=conflict_resolution,
+            external_resolution_refs=[],
+            follow_up_action=follow_up_action,
+            rationale_trace=rationale_trace,
+        )
+
+    def reconcile_distributed_conflict(
+        self,
+        proposal_ref: str,
+        *,
+        local_decision: CouncilDecision,
+        federation_resolution: DistributedCouncilResolution,
+        heritage_resolution: DistributedCouncilResolution,
+    ) -> DistributedCouncilResolution:
+        if federation_resolution.final_outcome == heritage_resolution.final_outcome:
+            raise ValueError("distributed conflict reconciliation requires divergent external outcomes")
+
+        rationale_trace = [
+            "Federation と Heritage の external result が衝突したため local binding を停止する。",
+            f"federation={federation_resolution.final_outcome}",
+            f"heritage={heritage_resolution.final_outcome}",
+        ]
+        summary = DistributedCouncilVoteSummary(
+            participant_count=0,
+            quorum=0,
+            approvals=0,
+            rejections=0,
+            abstentions=0,
+            approve_weight=0.0,
+            reject_weight=0.0,
+            veto_triggered=False,
+            veto_holders=[],
+        )
+        return self._build_distributed_resolution(
+            proposal_ref=proposal_ref,
+            topology_ref="human-governance://distributed-conflict",
+            council_tier="human-governance",
+            local_decision=local_decision,
+            local_binding_status="human-escalation",
+            final_outcome="escalate-human-governance",
+            decision_mode="conflict-escalation",
+            quorum_policy={
+                "policy_id": "distributed-council-conflict-v1",
+                "quorum": 0,
+                "veto_policy": "human-governance-arbitration",
+                "required_roles": ["human-governance"],
+            },
+            vote_summary=summary,
+            participant_votes=[],
+            conflict_resolution="escalated-to-human-governance",
+            external_resolution_refs=[
+                federation_resolution.resolution_id,
+                heritage_resolution.resolution_id,
+            ],
+            follow_up_action="request-human-governance-review",
+            rationale_trace=rationale_trace,
+        )
+
+    @staticmethod
+    def _federation_members(participants: List[str]) -> Dict[str, DistributedCouncilMember]:
+        members: Dict[str, DistributedCouncilMember] = {}
+        for index, participant in enumerate(participants):
+            members[participant] = DistributedCouncilMember(
+                participant_id=participant,
+                role="self-liaison",
+                trust_score=round(0.72 + (0.04 / max(len(participants), 1)) - (index * 0.02), 2),
+                veto_holder=True,
+            )
+        members["guardian://neutral-federation"] = DistributedCouncilMember(
+            participant_id="guardian://neutral-federation",
+            role="guardian",
+            trust_score=0.91,
+        )
+        return members
+
+    @staticmethod
+    def _heritage_members() -> Dict[str, DistributedCouncilMember]:
+        return {
+            "heritage://culture-a": DistributedCouncilMember(
+                participant_id="heritage://culture-a",
+                role="cultural-representative",
+                trust_score=0.73,
+            ),
+            "heritage://culture-b": DistributedCouncilMember(
+                participant_id="heritage://culture-b",
+                role="cultural-representative",
+                trust_score=0.71,
+            ),
+            "heritage://legal-advisor": DistributedCouncilMember(
+                participant_id="heritage://legal-advisor",
+                role="legal-advisor",
+                trust_score=0.78,
+            ),
+            "heritage://ethics-committee": DistributedCouncilMember(
+                participant_id="heritage://ethics-committee",
+                role="ethics-committee",
+                trust_score=0.88,
+                veto_holder=True,
+            ),
+        }
+
+    def _distributed_vote_state(
+        self,
+        members: Dict[str, DistributedCouncilMember],
+        votes: List[DistributedCouncilVote],
+        *,
+        quorum: int,
+    ) -> tuple[DistributedCouncilVoteSummary, List[Dict[str, Any]], List[str]]:
+        if set(members) != {vote.participant_id for vote in votes}:
+            raise ValueError("distributed votes must cover each required participant exactly once")
+
+        approvals = 0
+        rejections = 0
+        abstentions = 0
+        approve_weight = 0.0
+        reject_weight = 0.0
+        veto_triggered = False
+        veto_holders: List[str] = []
+        participant_votes: List[Dict[str, Any]] = []
+        rationale_trace: List[str] = []
+
+        for vote in votes:
+            member = members[vote.participant_id]
+            participant_votes.append(
+                {
+                    "participant_id": vote.participant_id,
+                    "role": member.role,
+                    "trust_score": member.trust_score,
+                    "stance": vote.stance,
+                    "rationale": vote.rationale,
+                }
+            )
+            rationale_trace.append(f"{vote.participant_id}: {vote.stance} - {vote.rationale}")
+            if vote.stance == "approve":
+                approvals += 1
+                approve_weight += member.trust_score
+            elif vote.stance in {"reject", "veto"}:
+                rejections += 1
+                reject_weight += member.trust_score
+                if vote.stance == "veto" and member.veto_holder:
+                    veto_triggered = True
+                    veto_holders.append(vote.participant_id)
+            else:
+                abstentions += 1
+
+        if approvals + rejections + abstentions < quorum:
+            raise ValueError("distributed review did not reach quorum")
+
+        return (
+            DistributedCouncilVoteSummary(
+                participant_count=approvals + rejections + abstentions,
+                quorum=quorum,
+                approvals=approvals,
+                rejections=rejections,
+                abstentions=abstentions,
+                approve_weight=round(approve_weight, 3),
+                reject_weight=round(reject_weight, 3),
+                veto_triggered=veto_triggered,
+                veto_holders=veto_holders,
+            ),
+            participant_votes,
+            rationale_trace,
+        )
+
+    def _build_distributed_resolution(
+        self,
+        *,
+        proposal_ref: str,
+        topology_ref: str,
+        council_tier: str,
+        local_decision: CouncilDecision,
+        local_binding_status: str,
+        final_outcome: str,
+        decision_mode: str,
+        quorum_policy: Dict[str, Any],
+        vote_summary: DistributedCouncilVoteSummary,
+        participant_votes: List[Dict[str, Any]],
+        conflict_resolution: str,
+        external_resolution_refs: List[str],
+        follow_up_action: str,
+        rationale_trace: List[str],
+    ) -> DistributedCouncilResolution:
+        recorded_at = utc_now_iso()
+        digest = sha256_text(
+            canonical_json(
+                {
+                    "proposal_ref": proposal_ref,
+                    "topology_ref": topology_ref,
+                    "council_tier": council_tier,
+                    "local_outcome": local_decision.outcome,
+                    "local_binding_status": local_binding_status,
+                    "final_outcome": final_outcome,
+                    "decision_mode": decision_mode,
+                    "quorum_policy": quorum_policy,
+                    "vote_summary": asdict(vote_summary),
+                    "participant_votes": participant_votes,
+                    "conflict_resolution": conflict_resolution,
+                    "external_resolution_refs": external_resolution_refs,
+                    "follow_up_action": follow_up_action,
+                }
+            )
+        )
+        return DistributedCouncilResolution(
+            resolution_id=new_id("distributed-council"),
+            proposal_ref=proposal_ref,
+            topology_ref=topology_ref,
+            council_tier=council_tier,
+            local_outcome=local_decision.outcome,
+            local_binding_status=local_binding_status,
+            final_outcome=final_outcome,
+            decision_mode=decision_mode,
+            quorum_policy=quorum_policy,
+            vote_summary=vote_summary,
+            participant_votes=participant_votes,
+            conflict_resolution=conflict_resolution,
+            external_resolution_refs=external_resolution_refs,
+            follow_up_action=follow_up_action,
+            rationale_trace=rationale_trace,
+            recorded_at=recorded_at,
+            digest=digest,
         )

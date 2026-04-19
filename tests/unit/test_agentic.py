@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from omoikane.agentic.council import Council, CouncilMember, CouncilVote
+from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
 
@@ -121,6 +121,173 @@ class CouncilTests(unittest.TestCase):
         self.assertFalse(topology.heritage_request.convened)
         self.assertEqual("none", topology.federation_request.status)
         self.assertEqual("none", topology.heritage_request.status)
+
+    def test_federation_resolution_promotes_advisory_cross_self_review(self) -> None:
+        council = Council()
+        council.register(CouncilMember("architect", "councilor", 0.6))
+        council.register(CouncilMember("committee", "councilor", 0.7))
+        council.register(CouncilMember("archivist", "councilor", 0.55))
+
+        proposal = council.propose(
+            "Shared reality merge",
+            "merge",
+            "cross-self federation returned result",
+            target_identity_ids=["identity://a", "identity://b"],
+        )
+        local_decision = council.deliberate(
+            proposal,
+            [
+                CouncilVote("architect", "approve", "advisory approve"),
+                CouncilVote("committee", "approve", "consent bundle okay"),
+                CouncilVote("archivist", "reject", "monitor drift"),
+            ],
+        )
+        topology = council.route_topology(proposal, local_session_ref="local-session-cross-self")
+        resolution = council.resolve_federation_review(
+            topology,
+            local_decision=local_decision,
+            votes=[
+                DistributedCouncilVote("identity://a", "approve", "self approves"),
+                DistributedCouncilVote("identity://b", "approve", "peer approves"),
+                DistributedCouncilVote("guardian://neutral-federation", "approve", "guardian approves"),
+            ],
+        )
+
+        self.assertEqual("federation", resolution.council_tier)
+        self.assertEqual("advisory", resolution.local_binding_status)
+        self.assertEqual("binding-approved", resolution.final_outcome)
+        self.assertEqual("weighted-majority", resolution.decision_mode)
+        self.assertEqual(3, resolution.vote_summary.quorum)
+
+    def test_heritage_resolution_allows_ethics_committee_single_veto(self) -> None:
+        council = Council()
+        council.register(CouncilMember("architect", "councilor", 0.6))
+        council.register(CouncilMember("committee", "councilor", 0.7))
+        council.register(CouncilMember("archivist", "councilor", 0.55))
+
+        proposal = council.propose(
+            "Interpret ethics axiom",
+            "rewrite",
+            "heritage returned result",
+            target_identity_ids=["identity://a"],
+            referenced_clauses=["ethics_axiom.A2"],
+        )
+        local_decision = council.deliberate(
+            proposal,
+            [
+                CouncilVote("architect", "approve", "local wording acceptable"),
+                CouncilVote("committee", "approve", "local review okay"),
+                CouncilVote("archivist", "approve", "continuity okay"),
+            ],
+        )
+        topology = council.route_topology(proposal, local_session_ref="local-session-interpretive")
+        resolution = council.resolve_heritage_review(
+            topology,
+            local_decision=local_decision,
+            votes=[
+                DistributedCouncilVote("heritage://culture-a", "approve", "culture a okay"),
+                DistributedCouncilVote("heritage://culture-b", "approve", "culture b okay"),
+                DistributedCouncilVote("heritage://legal-advisor", "approve", "law okay"),
+                DistributedCouncilVote("heritage://ethics-committee", "veto", "ethics blocks"),
+            ],
+        )
+
+        self.assertEqual("heritage", resolution.council_tier)
+        self.assertEqual("blocked", resolution.local_binding_status)
+        self.assertEqual("binding-rejected", resolution.final_outcome)
+        self.assertEqual("ethics-veto", resolution.decision_mode)
+        self.assertEqual("heritage-overrides-local", resolution.conflict_resolution)
+        self.assertTrue(resolution.vote_summary.veto_triggered)
+
+    def test_distributed_conflict_escalates_to_human_governance(self) -> None:
+        council = Council()
+        council.register(CouncilMember("architect", "councilor", 0.6))
+        council.register(CouncilMember("committee", "councilor", 0.7))
+        council.register(CouncilMember("archivist", "councilor", 0.55))
+
+        federation_proposal = council.propose(
+            "Shared reality merge",
+            "merge",
+            "cross-self federation returned result",
+            target_identity_ids=["identity://a", "identity://b"],
+        )
+        federation_local = council.deliberate(
+            federation_proposal,
+            [
+                CouncilVote("architect", "approve", "advisory approve"),
+                CouncilVote("committee", "approve", "consent okay"),
+                CouncilVote("archivist", "reject", "monitor drift"),
+            ],
+        )
+        federation_topology = council.route_topology(
+            federation_proposal,
+            local_session_ref="local-session-cross-self",
+        )
+        federation_resolution = council.resolve_federation_review(
+            federation_topology,
+            local_decision=federation_local,
+            votes=[
+                DistributedCouncilVote("identity://a", "approve", "self approves"),
+                DistributedCouncilVote("identity://b", "approve", "peer approves"),
+                DistributedCouncilVote("guardian://neutral-federation", "approve", "guardian approves"),
+            ],
+        )
+
+        heritage_proposal = council.propose(
+            "Interpret identity axiom",
+            "rewrite",
+            "heritage returned result",
+            target_identity_ids=["identity://a"],
+            referenced_clauses=["identity_axiom.A2"],
+        )
+        heritage_local = council.deliberate(
+            heritage_proposal,
+            [
+                CouncilVote("architect", "approve", "local wording acceptable"),
+                CouncilVote("committee", "approve", "local review okay"),
+                CouncilVote("archivist", "approve", "continuity okay"),
+            ],
+        )
+        heritage_topology = council.route_topology(
+            heritage_proposal,
+            local_session_ref="local-session-interpretive",
+        )
+        heritage_resolution = council.resolve_heritage_review(
+            heritage_topology,
+            local_decision=heritage_local,
+            votes=[
+                DistributedCouncilVote("heritage://culture-a", "approve", "culture a okay"),
+                DistributedCouncilVote("heritage://culture-b", "approve", "culture b okay"),
+                DistributedCouncilVote("heritage://legal-advisor", "approve", "law okay"),
+                DistributedCouncilVote("heritage://ethics-committee", "veto", "ethics blocks"),
+            ],
+        )
+
+        conflict_local = council.deliberate(
+            council.propose(
+                "Composite conflict",
+                "escalate",
+                "federation と heritage の衝突",
+                target_identity_ids=["identity://a"],
+            ),
+            [
+                CouncilVote("architect", "approve", "local escalation candidate"),
+                CouncilVote("committee", "approve", "external結果待ち"),
+                CouncilVote("archivist", "approve", "human判断が必要"),
+            ],
+        )
+        conflict = council.reconcile_distributed_conflict(
+            "proposal-conflict-001",
+            local_decision=conflict_local,
+            federation_resolution=federation_resolution,
+            heritage_resolution=heritage_resolution,
+        )
+
+        self.assertEqual("human-governance", conflict.council_tier)
+        self.assertEqual("escalate-human-governance", conflict.final_outcome)
+        self.assertEqual("conflict-escalation", conflict.decision_mode)
+        self.assertEqual("escalated-to-human-governance", conflict.conflict_resolution)
+        self.assertEqual(2, len(conflict.external_resolution_refs))
 
 
 class TaskGraphServiceTests(unittest.TestCase):

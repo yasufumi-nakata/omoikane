@@ -37,6 +37,7 @@
 - `task_node.schema`
 - `task_graph_policy.schema`
 - `consensus_message.schema`
+- `distributed_council_resolution.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
 - `sandbox_signal.schema`
@@ -49,7 +50,8 @@
 
 ## 次段階
 
-procedural skill execution surface / richer sensory loopback artifacts は
+procedural skill execution enactment / richer sensory loopback artifacts /
+transport-attested remote distributed artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

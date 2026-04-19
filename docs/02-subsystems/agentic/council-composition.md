@@ -72,7 +72,8 @@ trigger 判定だけは deterministic に固定する。
 - `interpretive` 議題: Heritage Council を要求し、Local は binding decision を停止
 - `ambiguous` 議題: design-architect へ再分類を要求
 
-詳細は [multi-council-trigger.md](multi-council-trigger.md)。
+request の trigger は [multi-council-trigger.md](multi-council-trigger.md)、
+returned result の binding 規則は [distributed-council-resolution.md](distributed-council-resolution.md)。
 
 ## 思兼神メタファーとの整合
 

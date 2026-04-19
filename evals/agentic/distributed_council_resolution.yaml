@@ -1,0 +1,49 @@
+eval_id: distributed_council_resolution
+target: agentic.council
+level: L4
+description: >
+  Federation returned result が cross-self advisory decision を binding 化し、
+  Heritage ethics veto が local advisory を上書きし、
+  Federation/Heritage の衝突は human governance へ escalate すること
+fixtures:
+  - scenario: federation_binding
+    proposal_scope: cross-self
+    local_outcome: approved
+    external_tier: federation
+    votes:
+      - self-liaison-a: approve
+      - self-liaison-b: approve
+      - guardian: approve
+    expected:
+      final_outcome: binding-approved
+      local_binding_status: advisory
+      decision_mode: weighted-majority
+  - scenario: heritage_veto
+    proposal_scope: interpretive
+    local_outcome: approved
+    external_tier: heritage
+    votes:
+      - culture-a: approve
+      - culture-b: approve
+      - legal: approve
+      - ethics: veto
+    expected:
+      final_outcome: binding-rejected
+      local_binding_status: blocked
+      decision_mode: ethics-veto
+      conflict_resolution: heritage-overrides-local
+  - scenario: cross_tier_conflict
+    proposal_scope: composite
+    local_outcome: approved
+    federation_outcome: binding-approved
+    heritage_outcome: binding-rejected
+    expected:
+      final_outcome: escalate-human-governance
+      conflict_resolution: escalated-to-human-governance
+assertions:
+  - Federation returned result promotes local advisory decision into binding-approved
+  - Heritage ethics committee single veto blocks local binding and returns binding-rejected
+  - Divergent Federation/Heritage outcomes stop local binding and request human governance
+metric: exact-match
+threshold: 1.0
+ethics_check: true

@@ -431,6 +431,30 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("ambiguous", result["topologies"]["ambiguous"]["scope"])
 
+    def test_distributed_council_demo_emits_bound_external_resolutions(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "distributed-council-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(
+            "binding-approved",
+            result["distributed_resolutions"]["federation"]["final_outcome"],
+        )
+        self.assertEqual(
+            "ethics-veto",
+            result["distributed_resolutions"]["heritage"]["decision_mode"],
+        )
+        self.assertEqual(
+            "escalate-human-governance",
+            result["distributed_resolutions"]["conflict"]["final_outcome"],
+        )
+        self.assertTrue(result["validation"]["federation_binds_cross_self"])
+        self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
+        self.assertTrue(result["validation"]["conflict_escalates_to_human"])
+
     def test_task_graph_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

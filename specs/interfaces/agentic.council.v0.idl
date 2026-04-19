@@ -9,6 +9,7 @@ imports:
   council_output: ../schemas/council_output.yaml
   consensus_message: ../schemas/consensus_message.schema
   council_topology: ../schemas/council_topology.schema
+  distributed_council_resolution: ../schemas/distributed_council_resolution.schema
 operations:
   convene:
     summary: Create and validate a Council session from an incoming proposal.
@@ -111,11 +112,114 @@ operations:
       - scope must equal interpretive
       - heritage_request.status must equal external-pending
       - local council must block binding resolution until heritage_result returns
+  resolve_federation_review:
+    summary: Resolve one returned Federation Council review for a cross-self proposal.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - topology_ref
+          - proposal_ref
+          - local_outcome
+          - participant_votes
+        properties:
+          topology_ref:
+            type: string
+          proposal_ref:
+            type: string
+          local_outcome:
+            type: string
+          participant_votes:
+            type: array
+            minItems: 3
+            items:
+              type: object
+              required:
+                - participant_id
+                - stance
+                - rationale
+              properties:
+                participant_id:
+                  type: string
+                stance:
+                  type: string
+                rationale:
+                  type: string
+    output:
+      schema_ref: distributed_council_resolution
+    guarantees:
+      - council_tier must equal federation
+      - local_binding_status must equal advisory
+      - federation quorum must equal participant_count + 1
+      - unanimous self-liaison reject must return binding-rejected
+  resolve_heritage_review:
+    summary: Resolve one returned Heritage Council review for an interpretive proposal.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - topology_ref
+          - proposal_ref
+          - local_outcome
+          - participant_votes
+        properties:
+          topology_ref:
+            type: string
+          proposal_ref:
+            type: string
+          local_outcome:
+            type: string
+          participant_votes:
+            type: array
+            minItems: 4
+            items:
+              type: object
+              required:
+                - participant_id
+                - stance
+                - rationale
+              properties:
+                participant_id:
+                  type: string
+                stance:
+                  type: string
+                rationale:
+                  type: string
+    output:
+      schema_ref: distributed_council_resolution
+    guarantees:
+      - council_tier must equal heritage
+      - local_binding_status must equal blocked
+      - ethics-committee veto must return binding-rejected
+  reconcile_distributed_conflict:
+    summary: Escalate divergent Federation/Heritage returned results to human governance.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - proposal_ref
+          - federation_resolution_ref
+          - heritage_resolution_ref
+        properties:
+          proposal_ref:
+            type: string
+          federation_resolution_ref:
+            type: string
+          heritage_resolution_ref:
+            type: string
+    output:
+      schema_ref: distributed_council_resolution
+    guarantees:
+      - council_tier must equal human-governance
+      - final_outcome must equal escalate-human-governance
+      - conflict_resolution must equal escalated-to-human-governance
 events:
   consensus.message:
     schema_ref: consensus_message
   topology.routed:
     schema_ref: council_topology
+  distributed.resolution:
+    schema_ref: distributed_council_resolution
 compatibility:
   stability: bootstrap
   notes:
@@ -124,3 +228,6 @@ compatibility:
     - Hard timeout escalates in standard mode and defers to follow-up standard review in expedited mode.
     - Cross-self proposals externalize into Federation Council review instead of binding local-only resolution.
     - Interpretive proposals that cite ethics_axiom, identity_axiom, or governance clauses externalize into Heritage Council review.
+    - Federation returned result uses advisory-local plus self-liaison-unanimous-reject semantics.
+    - Heritage returned result uses blocked-local plus ethics-committee single-veto semantics.
+    - Divergent Federation and Heritage results never restart local binding and always escalate to human governance.

@@ -11,8 +11,10 @@ Council は **動的召集** が原則だが、特定条件下では Council そ
 | **Federation Council** | 関与する複数 Local の代表 + Guardian | 自我間取引・共有現実 |
 | **Heritage Council** | 文化／法域代表 + LegalAdvisor + Researcher | 規約解釈・歴史的整合 |
 
-reference runtime は単一 Local Council を持ち、Federation/Heritage は **召集要求のみ** 発火する
-（外部に委ねる）。
+reference runtime は Local Council の request trigger を本実装し、
+Federation/Heritage についてはまず **召集要求** を発火する。
+returned result の binding 規則は
+[distributed-council-resolution.md](distributed-council-resolution.md) で別途固定する。
 
 ## 発動 Trigger（deterministic）
 
@@ -64,6 +66,7 @@ on incoming proposal P:
 - `agentic.council.v0` IDL に `request_federation_convene` / `request_heritage_convene` を追加
 - `council_topology.schema` に現在のトポロジを serialize
 - demo は Federation 要求発火 → external pending を返すまでをカバー
+- `distributed-council-demo` が returned Federation / Heritage result の binding 規則をカバー
 - decision-log に `2026-04-18_multi-council-trigger.md`
 
 ## 思兼神メタファー

@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .agentic.council import Council, CouncilMember, CouncilVote
+from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
 from .common import canonical_json, sha256_text
@@ -847,6 +847,167 @@ class OmoikaneReferenceOS:
                 "ambiguous_blocks_local_binding": ambiguous_topology.scope == "ambiguous"
                 and ambiguous_topology.federation_request.status == "none"
                 and ambiguous_topology.heritage_request.status == "none",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_distributed_council_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://distributed-council-demo/v1",
+            metadata={"display_name": "Distributed Council Sandbox"},
+        )
+
+        cross_self_proposal = self.council.propose(
+            title="Shared reality merge execution review",
+            requested_action="execute-shared-reality-merge",
+            rationale="cross-self proposal は federation review の returned result で binding 化する。",
+            risk_level="high",
+            target_identity_ids=[identity.identity_id, "identity://shared-peer"],
+        )
+        cross_self_local = self.council.deliberate(
+            cross_self_proposal,
+            [
+                CouncilVote("design-architect", "approve", "local advisory として実装差分は妥当"),
+                CouncilVote("ethics-committee", "approve", "consent bundle は満たしている"),
+                CouncilVote("memory-archivist", "reject", "shared narrative drift は要監視"),
+            ],
+        )
+        cross_self_topology = self.council.route_topology(
+            cross_self_proposal,
+            local_session_ref="distributed-cross-self-local-session",
+        )
+        federation_resolution = self.council.resolve_federation_review(
+            cross_self_topology,
+            local_decision=cross_self_local,
+            votes=[
+                DistributedCouncilVote(identity.identity_id, "approve", "本人が shared reality rehearsal に同意"),
+                DistributedCouncilVote("identity://shared-peer", "approve", "peer 側も merge rehearsal に同意"),
+                DistributedCouncilVote(
+                    "guardian://neutral-federation",
+                    "approve",
+                    "neutral guardian が continuity guard を満たすと確認",
+                ),
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.federation_resolved",
+            payload=federation_resolution.to_dict(),
+            actor="Council",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        interpretive_proposal = self.council.propose(
+            title="Identity axiom clause execution review",
+            requested_action="apply-heritage-ruling",
+            rationale="interpretive proposal は Heritage Council returned result が binding になる。",
+            risk_level="medium",
+            target_identity_ids=[identity.identity_id],
+            referenced_clauses=["identity_axiom.A2", "governance.review-window"],
+        )
+        interpretive_local = self.council.deliberate(
+            interpretive_proposal,
+            [
+                CouncilVote("design-architect", "approve", "runtime wording は整合している"),
+                CouncilVote("ethics-committee", "approve", "local advisory では許容範囲"),
+                CouncilVote("memory-archivist", "approve", "continuity drift は小さい"),
+            ],
+        )
+        interpretive_topology = self.council.route_topology(
+            interpretive_proposal,
+            local_session_ref="distributed-interpretive-local-session",
+        )
+        heritage_resolution = self.council.resolve_heritage_review(
+            interpretive_topology,
+            local_decision=interpretive_local,
+            votes=[
+                DistributedCouncilVote("heritage://culture-a", "approve", "文化 A では変更を許容"),
+                DistributedCouncilVote("heritage://culture-b", "approve", "文化 B でも表現上は整合"),
+                DistributedCouncilVote("heritage://legal-advisor", "approve", "法域上の禁止要件は見当たらない"),
+                DistributedCouncilVote(
+                    "heritage://ethics-committee",
+                    "veto",
+                    "identity_axiom の拘束が弱まりうるため veto する",
+                ),
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.heritage_resolved",
+            payload=heritage_resolution.to_dict(),
+            actor="Council",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        conflict_proposal = self.council.propose(
+            title="Composite distributed governance conflict",
+            requested_action="escalate-human-governance",
+            rationale="Federation approval と Heritage veto が同一 change-set 上で衝突したときは human governance へ上げる。",
+            risk_level="high",
+            target_identity_ids=[identity.identity_id],
+        )
+        conflict_local = self.council.deliberate(
+            conflict_proposal,
+            [
+                CouncilVote("design-architect", "approve", "local では統合可能に見える"),
+                CouncilVote("ethics-committee", "approve", "ただし external outcome 次第"),
+                CouncilVote("memory-archivist", "approve", "local bind はまだ不可"),
+            ],
+        )
+        conflict_resolution = self.council.reconcile_distributed_conflict(
+            conflict_proposal.proposal_id,
+            local_decision=conflict_local,
+            federation_resolution=federation_resolution,
+            heritage_resolution=heritage_resolution,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.conflict_escalated",
+            payload=conflict_resolution.to_dict(),
+            actor="Council",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "local_sessions": {
+                "cross_self": cross_self_local.to_dict(),
+                "interpretive": interpretive_local.to_dict(),
+                "conflict": conflict_local.to_dict(),
+            },
+            "topologies": {
+                "cross_self": cross_self_topology.to_dict(),
+                "interpretive": interpretive_topology.to_dict(),
+            },
+            "distributed_resolutions": {
+                "federation": federation_resolution.to_dict(),
+                "heritage": heritage_resolution.to_dict(),
+                "conflict": conflict_resolution.to_dict(),
+            },
+            "validation": {
+                "federation_binds_cross_self": federation_resolution.final_outcome == "binding-approved"
+                and federation_resolution.local_binding_status == "advisory",
+                "heritage_veto_blocks_local": heritage_resolution.decision_mode == "ethics-veto"
+                and heritage_resolution.final_outcome == "binding-rejected"
+                and heritage_resolution.conflict_resolution == "heritage-overrides-local",
+                "conflict_escalates_to_human": conflict_resolution.final_outcome
+                == "escalate-human-governance"
+                and conflict_resolution.conflict_resolution == "escalated-to-human-governance",
+                "external_refs_recorded": len(conflict_resolution.external_resolution_refs) == 2,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

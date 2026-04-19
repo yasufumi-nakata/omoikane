@@ -1,0 +1,253 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_council_resolution.schema"
+title: DistributedCouncilResolution
+description: >
+  Returned Federation/Heritage review outcome or human-governance escalation summary for
+  a distributed council decision.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - resolution_id
+  - proposal_ref
+  - topology_ref
+  - council_tier
+  - local_outcome
+  - local_binding_status
+  - final_outcome
+  - decision_mode
+  - quorum_policy
+  - vote_summary
+  - participant_votes
+  - conflict_resolution
+  - external_resolution_refs
+  - follow_up_action
+  - rationale_trace
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_council_resolution
+  schema_version:
+    const: 1.0.0
+  resolution_id:
+    type: string
+    pattern: "^distributed-council-[a-f0-9]{12}$"
+  proposal_ref:
+    type: string
+    minLength: 1
+  topology_ref:
+    type: string
+    minLength: 1
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+      - human-governance
+  local_outcome:
+    type: string
+    enum:
+      - approved
+      - rejected
+      - escalated
+      - deferred
+      - vetoed
+  local_binding_status:
+    type: string
+    enum:
+      - advisory
+      - blocked
+      - human-escalation
+  final_outcome:
+    type: string
+    enum:
+      - binding-approved
+      - binding-rejected
+      - escalate-human-governance
+  decision_mode:
+    type: string
+    enum:
+      - weighted-majority
+      - liaison-unanimous-reject
+      - ethics-veto
+      - conflict-escalation
+  quorum_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - quorum
+      - veto_policy
+      - required_roles
+    properties:
+      policy_id:
+        type: string
+        minLength: 1
+      quorum:
+        type: integer
+        minimum: 0
+      veto_policy:
+        type: string
+        minLength: 1
+      required_roles:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  vote_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - participant_count
+      - quorum
+      - approvals
+      - rejections
+      - abstentions
+      - approve_weight
+      - reject_weight
+      - veto_triggered
+      - veto_holders
+    properties:
+      participant_count:
+        type: integer
+        minimum: 0
+      quorum:
+        type: integer
+        minimum: 0
+      approvals:
+        type: integer
+        minimum: 0
+      rejections:
+        type: integer
+        minimum: 0
+      abstentions:
+        type: integer
+        minimum: 0
+      approve_weight:
+        type: number
+        minimum: 0
+      reject_weight:
+        type: number
+        minimum: 0
+      veto_triggered:
+        type: boolean
+      veto_holders:
+        type: array
+        items:
+          type: string
+          minLength: 1
+  participant_votes:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - participant_id
+        - role
+        - trust_score
+        - stance
+        - rationale
+      properties:
+        participant_id:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          minLength: 1
+        trust_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        stance:
+          type: string
+          enum:
+            - approve
+            - reject
+            - abstain
+            - veto
+        rationale:
+          type: string
+          minLength: 1
+  conflict_resolution:
+    type: string
+    enum:
+      - none
+      - federation-overrides-local
+      - heritage-overrides-local
+      - escalated-to-human-governance
+  external_resolution_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  follow_up_action:
+    type: string
+    minLength: 1
+  rationale_trace:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_council_resolution
+    schema_version: 1.0.0
+    resolution_id: distributed-council-9fdad88e7a8c
+    proposal_ref: proposal-1234abcd5678
+    topology_ref: topology-1234abcd5678
+    council_tier: federation
+    local_outcome: approved
+    local_binding_status: advisory
+    final_outcome: binding-approved
+    decision_mode: weighted-majority
+    quorum_policy:
+      policy_id: federation-shared-reality-v1
+      quorum: 3
+      veto_policy: self-liaison-unanimous-reject
+      required_roles:
+        - self-liaison
+        - guardian
+    vote_summary:
+      participant_count: 3
+      quorum: 3
+      approvals: 3
+      rejections: 0
+      abstentions: 0
+      approve_weight: 2.37
+      reject_weight: 0.0
+      veto_triggered: false
+      veto_holders: []
+    participant_votes:
+      - participant_id: identity://amaterasu-endpoint
+        role: self-liaison
+        trust_score: 0.74
+        stance: approve
+        rationale: self approved the shared reality rehearsal
+      - participant_id: identity://shared-peer
+        role: self-liaison
+        trust_score: 0.72
+        stance: approve
+        rationale: peer approved the shared reality rehearsal
+      - participant_id: guardian://neutral-federation
+        role: guardian
+        trust_score: 0.91
+        stance: approve
+        rationale: guardian confirmed continuity guardrails
+    conflict_resolution: none
+    external_resolution_refs: []
+    follow_up_action: execute-federated-review
+    rationale_trace:
+      - identity://amaterasu-endpoint: approve - self approved the shared reality rehearsal
+      - identity://shared-peer: approve - peer approved the shared reality rehearsal
+      - guardian://neutral-federation: approve - guardian confirmed continuity guardrails
+    recorded_at: "2026-04-19T08:10:00Z"
+    digest: 8b75218c0607a775f7e43332f8bc2b54ac44fa34f20b23182f2b1c8f427d6aa5

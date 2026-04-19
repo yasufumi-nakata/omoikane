@@ -434,6 +434,37 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("ambiguous", result["topologies"]["ambiguous"]["scope"])
         self.assertTrue(result["validation"]["ambiguous_blocks_local_binding"])
 
+    def test_distributed_council_demo_reports_bound_external_reviews(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_distributed_council_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual(
+            "binding-approved",
+            result["distributed_resolutions"]["federation"]["final_outcome"],
+        )
+        self.assertEqual(
+            "advisory",
+            result["distributed_resolutions"]["federation"]["local_binding_status"],
+        )
+        self.assertEqual(
+            "ethics-veto",
+            result["distributed_resolutions"]["heritage"]["decision_mode"],
+        )
+        self.assertEqual(
+            "heritage-overrides-local",
+            result["distributed_resolutions"]["heritage"]["conflict_resolution"],
+        )
+        self.assertEqual(
+            "escalate-human-governance",
+            result["distributed_resolutions"]["conflict"]["final_outcome"],
+        )
+        self.assertEqual(2, len(result["distributed_resolutions"]["conflict"]["external_resolution_refs"]))
+        self.assertTrue(result["validation"]["federation_binds_cross_self"])
+        self.assertTrue(result["validation"]["heritage_veto_blocks_local"])
+        self.assertTrue(result["validation"]["conflict_escalates_to_human"])
+
     def test_trust_demo_reports_update_policy_and_human_pin(self) -> None:
         runtime = OmoikaneReferenceOS()
 
