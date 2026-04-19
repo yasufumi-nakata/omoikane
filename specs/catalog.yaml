@@ -1000,9 +1000,27 @@ entries:
     file: specs/schemas/guardian_oversight_event.schema
     consumers:
       - specs/interfaces/governance.oversight.v0.idl
+      - specs/schemas/guardian_oversight_snapshot.schema
       - docs/04-ai-governance/guardian-oversight.md
       - reference-runtime
-    rationale: Required to serialize human reviewer quorum, escalation window, and breach propagation for Guardian oversight.
+    rationale: Required to serialize human reviewer quorum, immutable proof bindings, escalation window, and breach propagation for Guardian oversight.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_reviewer_record.schema
+    consumers:
+      - specs/interfaces/governance.oversight.v0.idl
+      - specs/schemas/guardian_oversight_snapshot.schema
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to register one reviewer identity proof, scope, and liability assignment before Guardian attestation is accepted.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_oversight_snapshot.schema
+    consumers:
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to snapshot oversight policy, reviewer registry, and append-only event set in one machine-readable artifact.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.oversight.v0.idl
@@ -1010,7 +1028,7 @@ entries:
       - docs/04-ai-governance/guardian-oversight.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make Guardian oversight record/attest/breach/snapshot behavior machine-readable.
+    rationale: Required to make reviewer registration, scoped attestation, breach propagation, and snapshot behavior machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.naming.v0.idl
@@ -1026,6 +1044,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects breach-triggered human pin revocation and guardian eligibility removal.
+  - priority: P1
+    kind: eval
+    file: evals/safety/guardian_reviewer_attestation_contract.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects reviewer proof binding, scoped liability enforcement, and fail-closed reject for out-of-scope attestation.
   - priority: P1
     kind: schema
     file: specs/schemas/amendment_proposal.schema

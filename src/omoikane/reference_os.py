@@ -1350,6 +1350,34 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://guardian-oversight-demo/v1",
             metadata={"display_name": "Guardian Oversight Sandbox"},
         )
+        reviewer_alpha = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-001",
+            display_name="Reviewer Alpha",
+            credential_id="credential-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-19T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight/reviewer-alpha/v1",
+            escalation_contact="mailto:oversight-alpha@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto", "pin-renewal"],
+        )
+        reviewer_beta = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-002",
+            display_name="Reviewer Beta",
+            credential_id="credential-beta",
+            attestation_type="live-session-attestation",
+            proof_ref="proof://oversight/reviewer-beta/v1",
+            jurisdiction="JP-13",
+            valid_until="2026-10-19T00:00:00+00:00",
+            liability_mode="institutional",
+            legal_ack_ref="legal://oversight/reviewer-beta/v1",
+            escalation_contact="mailto:oversight-beta@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
         veto_entry = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="guardian.veto.executed",
@@ -1405,6 +1433,21 @@ class OmoikaneReferenceOS:
             payload_ref=pin_entry.entry_id,
             escalation_path=["human-reviewer-pool-A", "external-ethics-board"],
         )
+        scope_rejection: Dict[str, Any]
+        try:
+            self.oversight.attest(
+                pin_event["event_id"],
+                reviewer_id="human-reviewer-002",
+            )
+            scope_rejection = {
+                "ok": False,
+                "reason": "scope enforcement did not trigger",
+            }
+        except PermissionError as exc:
+            scope_rejection = {
+                "ok": True,
+                "reason": str(exc),
+            }
         trust_before_breach = self.trust.snapshot("integrity-guardian")
         pin_event = self.oversight.breach(pin_event["event_id"])
         self.ledger.append(
@@ -1425,16 +1468,21 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "policy": self.oversight.policy_snapshot(),
+            "reviewers": self.oversight.reviewer_snapshot(),
             "events": {
                 "veto": veto_event,
                 "pin_renewal": pin_event,
             },
+            "scope_rejection": scope_rejection,
             "trust": {
                 "before_breach": trust_before_breach,
                 "after_breach": trust_after_breach,
             },
             "validation": {
                 "veto_quorum_satisfied": veto_event["human_attestation"]["status"] == "satisfied",
+                "veto_binding_recorded": len(veto_event["reviewer_bindings"]) == 1,
+                "reviewer_registry_ready": len(self.oversight.reviewer_snapshot()) == 2,
+                "responsibility_scope_enforced": scope_rejection["ok"],
                 "pin_breach_propagated": pin_event["pin_breach_propagated"],
                 "human_pin_cleared": not trust_after_breach["pinned_by_human"],
                 "guardian_role_removed": not trust_after_breach["eligibility"]["guardian_role"],
@@ -1442,6 +1490,10 @@ class OmoikaneReferenceOS:
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
+            "reviewer_examples": {
+                "alpha": reviewer_alpha,
+                "beta": reviewer_beta,
+            },
         }
 
     def run_ethics_demo(self) -> Dict[str, Any]:

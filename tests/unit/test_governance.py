@@ -78,6 +78,20 @@ class AmendmentServiceTests(unittest.TestCase):
 class OversightServiceTests(unittest.TestCase):
     def test_veto_event_satisfies_quorum_after_one_attestation(self) -> None:
         service = OversightService()
+        service.register_reviewer(
+            reviewer_id="reviewer-1",
+            display_name="Reviewer One",
+            credential_id="credential-1",
+            attestation_type="government-id",
+            proof_ref="proof://oversight/reviewer-1",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="individual",
+            legal_ack_ref="legal://oversight/reviewer-1",
+            escalation_contact="mailto:reviewer-1@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
 
         event = service.record(
             guardian_role="integrity",
@@ -90,6 +104,36 @@ class OversightServiceTests(unittest.TestCase):
         self.assertEqual(1, updated["human_attestation"]["required_quorum"])
         self.assertEqual(1, updated["human_attestation"]["received_quorum"])
         self.assertEqual("satisfied", updated["human_attestation"]["status"])
+        self.assertEqual(1, len(updated["reviewer_bindings"]))
+        self.assertEqual("credential-1", updated["reviewer_bindings"][0]["credential_id"])
+        self.assertEqual("individual", updated["reviewer_bindings"][0]["liability_mode"])
+
+    def test_attestation_rejects_reviewer_outside_scope(self) -> None:
+        service = OversightService()
+        service.register_reviewer(
+            reviewer_id="reviewer-2",
+            display_name="Reviewer Two",
+            credential_id="credential-2",
+            attestation_type="institutional-badge",
+            proof_ref="proof://oversight/reviewer-2",
+            jurisdiction="JP-13",
+            valid_until="2027-01-01T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://oversight/reviewer-2",
+            escalation_contact="mailto:reviewer-2@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["veto"],
+        )
+
+        event = service.record(
+            guardian_role="integrity",
+            category="pin-renewal",
+            payload_ref="entry-unauthorized",
+            escalation_path=["human-reviewer-pool-A"],
+        )
+
+        with self.assertRaisesRegex(PermissionError, "pin-renewal"):
+            service.attest(event["event_id"], reviewer_id="reviewer-2")
 
     def test_pin_breach_unpins_guardian_role(self) -> None:
         trust = TrustService()

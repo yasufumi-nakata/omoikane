@@ -5,7 +5,19 @@ service: GuardianOversightService
 summary: Deterministic human oversight quorum, attestation, breach propagation, and snapshot flow for Guardian actions.
 imports:
   guardian_oversight_event: ../schemas/guardian_oversight_event.schema
+  guardian_oversight_snapshot: ../schemas/guardian_oversight_snapshot.schema
+  guardian_reviewer_record: ../schemas/guardian_reviewer_record.schema
 operations:
+  register_reviewer:
+    summary: Register one human reviewer with identity proof, scope, and liability assignment before any Guardian attestation.
+    input:
+      schema_ref: guardian_reviewer_record
+    output:
+      schema_ref: guardian_reviewer_record
+    guarantees:
+      - reviewer_id must be unique
+      - active reviewer records must include credential_id, proof_ref, legal_ack_ref, and non-empty scope lists
+      - allowed_guardian_roles and allowed_categories must be subsets of the fixed Guardian role and oversight category enums
   record:
     summary: Record one append-only oversight event for a Guardian veto, attestation, rule update, emergency trigger, or pin renewal.
     input:
@@ -23,9 +35,21 @@ operations:
     output:
       schema_ref: guardian_oversight_event
     guarantees:
+      - reviewer id must resolve to an active guardian reviewer record
+      - reviewer binding must snapshot credential_id, proof_ref, liability_mode, legal_ack_ref, guardian_role, and category
+      - reviewer responsibility scope must include the target guardian_role and oversight category
       - reviewer ids must deduplicate without reordering existing reviewers
       - status becomes satisfied once received_quorum >= required_quorum
       - breached events must reject further attestation
+  revoke_reviewer:
+    summary: Revoke one reviewer record so that future attestations fail closed without erasing past bindings.
+    input:
+      schema_ref: guardian_reviewer_record
+    output:
+      schema_ref: guardian_reviewer_record
+    guarantees:
+      - revoked reviewers must preserve registered proof and legal ack refs for audit
+      - revoked reviewers must reject future event attestation
   breach:
     summary: Mark one unsatisfied oversight event as breached after its escalation window elapses.
     input:
@@ -37,13 +61,14 @@ operations:
       - breach propagation must make guardian_role ineligible in trust snapshots
       - satisfied events must remain unchanged
   snapshot:
-    summary: Return the current oversight policy and append-only event set.
+    summary: Return the current oversight policy, reviewer registry, and append-only event set.
     output:
-      schema_ref: guardian_oversight_event
+      schema_ref: guardian_oversight_snapshot
     guarantees:
-      - returned events must preserve append-only ordering by event_id
+      - returned reviewer records must preserve registered proof refs and duty scope
+      - returned events must preserve reviewer proof bindings once attached
 compatibility:
   stability: bootstrap
   notes:
-    - Human reviewer identity and authenticity remain external to this repo.
-    - Reference runtime counts quorum and reviewer ids only, and does not store legal evidence artifacts.
+    - Reference runtime stores proof refs and legal acknowledgement refs, but not the raw identity documents or contracts themselves.
+    - Live credential verification, jurisdiction-specific legal enforcement, and remote reviewer attestation transport remain future work.

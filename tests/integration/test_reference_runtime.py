@@ -536,9 +536,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertTrue(result["validation"]["veto_quorum_satisfied"])
+        self.assertTrue(result["validation"]["veto_binding_recorded"])
+        self.assertTrue(result["validation"]["reviewer_registry_ready"])
+        self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
         self.assertTrue(result["validation"]["human_pin_cleared"])
         self.assertTrue(result["validation"]["guardian_role_removed"])
+        self.assertEqual(
+            "proof://oversight/reviewer-alpha/v1",
+            result["events"]["veto"]["reviewer_bindings"][0]["proof_ref"],
+        )
         self.assertEqual("breached", result["events"]["pin_renewal"]["human_attestation"]["status"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["guardian-oversight"])
 

@@ -1,0 +1,121 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/guardian_oversight_snapshot.schema"
+title: GuardianOversightSnapshot
+description: Snapshot of Guardian oversight policy, registered reviewers, and append-only events.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - reviewers
+  - events
+properties:
+  kind:
+    const: guardian_oversight_snapshot
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - guardian_agent_by_role
+      - categories
+      - reviewer_identity_policy
+    properties:
+      kind:
+        const: guardian_oversight_policy
+      schema_version:
+        type: string
+        pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      guardian_agent_by_role:
+        type: object
+        additionalProperties: false
+        required:
+          - ethics
+          - integrity
+          - identity
+        properties:
+          ethics:
+            type: string
+            minLength: 1
+          integrity:
+            type: string
+            minLength: 1
+          identity:
+            type: string
+            minLength: 1
+      categories:
+        type: object
+        additionalProperties: false
+        required:
+          - veto
+          - attest
+          - rule-update
+          - emergency-trigger
+          - pin-renewal
+        properties:
+          veto:
+            $ref: "#/$defs/rule"
+          attest:
+            $ref: "#/$defs/rule"
+          rule-update:
+            $ref: "#/$defs/rule"
+          emergency-trigger:
+            $ref: "#/$defs/rule"
+          pin-renewal:
+            $ref: "#/$defs/rule"
+      reviewer_identity_policy:
+        type: object
+        additionalProperties: false
+        required:
+          - attestation_types
+          - liability_modes
+          - reviewer_statuses
+          - required_binding_fields
+        properties:
+          attestation_types:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          liability_modes:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          reviewer_statuses:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          required_binding_fields:
+            type: array
+            minItems: 1
+            items:
+              type: string
+  reviewers:
+    type: array
+    items:
+      $ref: "guardian_reviewer_record.schema"
+  events:
+    type: array
+    items:
+      $ref: "guardian_oversight_event.schema"
+$defs:
+  rule:
+    type: object
+    additionalProperties: false
+    required:
+      - required_quorum
+      - escalation_window_seconds
+    properties:
+      required_quorum:
+        type: integer
+        minimum: 1
+      escalation_window_seconds:
+        type: integer
+        minimum: 1

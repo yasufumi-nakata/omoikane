@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
-from ..common import new_id, utc_now_iso
 from ..agentic.trust import TrustService
+from ..common import new_id, utc_now_iso
 
 SCHEMA_VERSION = "1.0.0"
 GUARDIAN_ROLES = ("ethics", "integrity", "identity")
@@ -17,6 +17,13 @@ OVERSIGHT_CATEGORIES = (
     "emergency-trigger",
     "pin-renewal",
 )
+REVIEWER_ATTESTATION_TYPES = (
+    "government-id",
+    "institutional-badge",
+    "live-session-attestation",
+)
+REVIEWER_LIABILITY_MODES = ("individual", "institutional", "joint")
+REVIEWER_STATUSES = ("active", "suspended", "revoked")
 DEFAULT_GUARDIAN_AGENT_BY_ROLE = {
     "ethics": "ethics-guardian",
     "integrity": "integrity-guardian",
@@ -30,10 +37,10 @@ def _normalize_non_empty(value: str, field_name: str) -> str:
     return value.strip()
 
 
-def _unique_reviewers(reviewers: List[str]) -> List[str]:
+def _unique_strings(values: List[str], field_name: str) -> List[str]:
     unique: List[str] = []
-    for reviewer in reviewers:
-        normalized = _normalize_non_empty(reviewer, "reviewer")
+    for value in values:
+        normalized = _normalize_non_empty(value, field_name)
         if normalized not in unique:
             unique.append(normalized)
     return unique
@@ -50,6 +57,142 @@ class OversightRule:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ReviewerIdentityProof:
+    """Serializable reviewer identity evidence."""
+
+    credential_id: str
+    attestation_type: str
+    proof_ref: str
+    jurisdiction: str
+    valid_until: str
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.credential_id, "credential_id")
+        if self.attestation_type not in REVIEWER_ATTESTATION_TYPES:
+            raise ValueError(f"unsupported attestation_type: {self.attestation_type}")
+        _normalize_non_empty(self.proof_ref, "proof_ref")
+        _normalize_non_empty(self.jurisdiction, "jurisdiction")
+        _normalize_non_empty(self.valid_until, "valid_until")
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ReviewerResponsibility:
+    """Serializable reviewer duty scope and liability binding."""
+
+    liability_mode: str
+    legal_ack_ref: str
+    escalation_contact: str
+    allowed_guardian_roles: List[str]
+    allowed_categories: List[str]
+
+    def __post_init__(self) -> None:
+        if self.liability_mode not in REVIEWER_LIABILITY_MODES:
+            raise ValueError(f"unsupported liability_mode: {self.liability_mode}")
+        _normalize_non_empty(self.legal_ack_ref, "legal_ack_ref")
+        _normalize_non_empty(self.escalation_contact, "escalation_contact")
+        normalized_roles = _unique_strings(self.allowed_guardian_roles, "allowed_guardian_roles")
+        normalized_categories = _unique_strings(self.allowed_categories, "allowed_categories")
+        if not normalized_roles:
+            raise ValueError("allowed_guardian_roles must not be empty")
+        if not normalized_categories:
+            raise ValueError("allowed_categories must not be empty")
+        if any(role not in GUARDIAN_ROLES for role in normalized_roles):
+            raise ValueError("allowed_guardian_roles contains unsupported value")
+        if any(category not in OVERSIGHT_CATEGORIES for category in normalized_categories):
+            raise ValueError("allowed_categories contains unsupported value")
+        object.__setattr__(self, "allowed_guardian_roles", normalized_roles)
+        object.__setattr__(self, "allowed_categories", normalized_categories)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "liability_mode": self.liability_mode,
+            "legal_ack_ref": self.legal_ack_ref,
+            "escalation_contact": self.escalation_contact,
+            "allowed_guardian_roles": list(self.allowed_guardian_roles),
+            "allowed_categories": list(self.allowed_categories),
+        }
+
+
+@dataclass
+class GuardianReviewerRecord:
+    """Registered reviewer identity proof and duty scope."""
+
+    reviewer_id: str
+    display_name: str
+    identity_proof: ReviewerIdentityProof
+    responsibility: ReviewerResponsibility
+    status: str = "active"
+    registered_at: str = ""
+    revocation_reason: str = ""
+    revoked_at: str = ""
+    kind: str = "guardian_reviewer_record"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        self.reviewer_id = _normalize_non_empty(self.reviewer_id, "reviewer_id")
+        self.display_name = _normalize_non_empty(self.display_name, "display_name")
+        if self.status not in REVIEWER_STATUSES:
+            raise ValueError(f"unsupported reviewer status: {self.status}")
+        if not self.registered_at:
+            self.registered_at = utc_now_iso()
+        if self.status == "revoked":
+            self.revocation_reason = _normalize_non_empty(
+                self.revocation_reason,
+                "revocation_reason",
+            )
+            if not self.revoked_at:
+                self.revoked_at = utc_now_iso()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "schema_version": self.schema_version,
+            "reviewer_id": self.reviewer_id,
+            "display_name": self.display_name,
+            "status": self.status,
+            "registered_at": self.registered_at,
+            "identity_proof": self.identity_proof.to_dict(),
+            "responsibility": self.responsibility.to_dict(),
+            "revocation_reason": self.revocation_reason or None,
+            "revoked_at": self.revoked_at or None,
+        }
+
+
+@dataclass
+class ReviewerBinding:
+    """Immutable reviewer proof snapshot attached to one oversight attestation."""
+
+    reviewer_id: str
+    credential_id: str
+    proof_ref: str
+    liability_mode: str
+    legal_ack_ref: str
+    guardian_role: str
+    category: str
+    attested_at: str = ""
+
+    def __post_init__(self) -> None:
+        self.reviewer_id = _normalize_non_empty(self.reviewer_id, "reviewer_id")
+        self.credential_id = _normalize_non_empty(self.credential_id, "credential_id")
+        self.proof_ref = _normalize_non_empty(self.proof_ref, "proof_ref")
+        if self.liability_mode not in REVIEWER_LIABILITY_MODES:
+            raise ValueError(f"unsupported liability_mode: {self.liability_mode}")
+        self.legal_ack_ref = _normalize_non_empty(self.legal_ack_ref, "legal_ack_ref")
+        if self.guardian_role not in GUARDIAN_ROLES:
+            raise ValueError(f"unsupported guardian_role: {self.guardian_role}")
+        if self.category not in OVERSIGHT_CATEGORIES:
+            raise ValueError(f"unsupported category: {self.category}")
+        if not self.attested_at:
+            self.attested_at = utc_now_iso()
+
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
 @dataclass
 class HumanAttestation:
     """Serializable reviewer quorum state."""
@@ -60,7 +203,7 @@ class HumanAttestation:
     status: str = "pending"
 
     def __post_init__(self) -> None:
-        self.reviewers = _unique_reviewers(self.reviewers)
+        self.reviewers = _unique_strings(self.reviewers, "reviewer")
         if self.required_quorum < 1:
             raise ValueError("required_quorum must be >= 1")
         if self.escalation_window_seconds < 1:
@@ -91,6 +234,7 @@ class GuardianOversightEvent:
     payload_ref: str
     escalation_path: List[str]
     human_attestation: HumanAttestation
+    reviewer_bindings: List[ReviewerBinding] = field(default_factory=list)
     event_id: str = ""
     recorded_at: str = ""
     pin_breach_propagated: bool = False
@@ -103,7 +247,7 @@ class GuardianOversightEvent:
         if self.category not in OVERSIGHT_CATEGORIES:
             raise ValueError(f"unsupported oversight category: {self.category}")
         self.payload_ref = _normalize_non_empty(self.payload_ref, "payload_ref")
-        self.escalation_path = _unique_reviewers(self.escalation_path)
+        self.escalation_path = _unique_strings(self.escalation_path, "escalation_path")
         if not self.escalation_path:
             raise ValueError("escalation_path must not be empty")
         if not self.event_id:
@@ -121,6 +265,7 @@ class GuardianOversightEvent:
             "category": self.category,
             "payload_ref": self.payload_ref,
             "human_attestation": self.human_attestation.to_dict(),
+            "reviewer_bindings": [binding.to_dict() for binding in self.reviewer_bindings],
             "escalation_path": list(self.escalation_path),
             "pin_breach_propagated": self.pin_breach_propagated,
         }
@@ -140,6 +285,7 @@ class OversightService:
         if guardian_agent_by_role:
             self._guardian_agent_by_role.update(guardian_agent_by_role)
         self._events: Dict[str, GuardianOversightEvent] = {}
+        self._reviewers: Dict[str, GuardianReviewerRecord] = {}
         self._rules = {
             "veto": OversightRule(required_quorum=1, escalation_window_seconds=86_400),
             "attest": OversightRule(required_quorum=2, escalation_window_seconds=604_800),
@@ -147,6 +293,54 @@ class OversightService:
             "emergency-trigger": OversightRule(required_quorum=1, escalation_window_seconds=60),
             "pin-renewal": OversightRule(required_quorum=2, escalation_window_seconds=86_400),
         }
+
+    def register_reviewer(
+        self,
+        *,
+        reviewer_id: str,
+        display_name: str,
+        credential_id: str,
+        attestation_type: str,
+        proof_ref: str,
+        jurisdiction: str,
+        valid_until: str,
+        liability_mode: str,
+        legal_ack_ref: str,
+        escalation_contact: str,
+        allowed_guardian_roles: List[str],
+        allowed_categories: List[str],
+    ) -> Dict[str, Any]:
+        reviewer_key = _normalize_non_empty(reviewer_id, "reviewer_id")
+        if reviewer_key in self._reviewers:
+            raise ValueError(f"reviewer already registered: {reviewer_key}")
+        record = GuardianReviewerRecord(
+            reviewer_id=reviewer_key,
+            display_name=display_name,
+            identity_proof=ReviewerIdentityProof(
+                credential_id=credential_id,
+                attestation_type=attestation_type,
+                proof_ref=proof_ref,
+                jurisdiction=jurisdiction,
+                valid_until=valid_until,
+            ),
+            responsibility=ReviewerResponsibility(
+                liability_mode=liability_mode,
+                legal_ack_ref=legal_ack_ref,
+                escalation_contact=escalation_contact,
+                allowed_guardian_roles=allowed_guardian_roles,
+                allowed_categories=allowed_categories,
+            ),
+        )
+        self._reviewers[record.reviewer_id] = record
+        return record.to_dict()
+
+    def revoke_reviewer(self, reviewer_id: str, *, reason: str) -> Dict[str, Any]:
+        reviewer = self._reviewer(reviewer_id)
+        reviewer.status = "revoked"
+        reviewer.revocation_reason = _normalize_non_empty(reason, "reason")
+        reviewer.revoked_at = utc_now_iso()
+        self._reviewers[reviewer.reviewer_id] = reviewer
+        return reviewer.to_dict()
 
     def policy_snapshot(self) -> Dict[str, Any]:
         return {
@@ -156,7 +350,25 @@ class OversightService:
             "categories": {
                 category: rule.to_dict() for category, rule in sorted(self._rules.items())
             },
+            "reviewer_identity_policy": {
+                "attestation_types": list(REVIEWER_ATTESTATION_TYPES),
+                "liability_modes": list(REVIEWER_LIABILITY_MODES),
+                "reviewer_statuses": list(REVIEWER_STATUSES),
+                "required_binding_fields": [
+                    "credential_id",
+                    "proof_ref",
+                    "legal_ack_ref",
+                    "guardian_role",
+                    "category",
+                ],
+            },
         }
+
+    def reviewer_snapshot(self) -> List[Dict[str, Any]]:
+        return [
+            self._reviewers[reviewer_id].to_dict()
+            for reviewer_id in sorted(self._reviewers)
+        ]
 
     def record(
         self,
@@ -168,8 +380,6 @@ class OversightService:
         reviewers: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         rule = self._rule(category)
-        unique_reviewers = _unique_reviewers(reviewers or [])
-        status = "satisfied" if len(unique_reviewers) >= rule.required_quorum else "pending"
         event = GuardianOversightEvent(
             guardian_role=_normalize_non_empty(guardian_role, "guardian_role"),
             category=category,
@@ -178,10 +388,11 @@ class OversightService:
             human_attestation=HumanAttestation(
                 required_quorum=rule.required_quorum,
                 escalation_window_seconds=rule.escalation_window_seconds,
-                reviewers=unique_reviewers,
-                status=status,
             ),
         )
+        self._events[event.event_id] = event
+        for reviewer_id in _unique_strings(reviewers or [], "reviewers"):
+            self._bind_reviewer(event, reviewer_id)
         self._events[event.event_id] = event
         return event.to_dict()
 
@@ -189,12 +400,7 @@ class OversightService:
         event = self._event(event_id)
         if event.human_attestation.status == "breached":
             raise ValueError("breached oversight event cannot be attested")
-
-        reviewer = _normalize_non_empty(reviewer_id, "reviewer_id")
-        if reviewer not in event.human_attestation.reviewers:
-            event.human_attestation.reviewers.append(reviewer)
-        if event.human_attestation.received_quorum >= event.human_attestation.required_quorum:
-            event.human_attestation.status = "satisfied"
+        self._bind_reviewer(event, reviewer_id)
         self._events[event.event_id] = event
         return event.to_dict()
 
@@ -213,15 +419,54 @@ class OversightService:
 
     def snapshot(self) -> Dict[str, Any]:
         return {
+            "kind": "guardian_oversight_snapshot",
+            "schema_version": SCHEMA_VERSION,
             "policy": self.policy_snapshot(),
+            "reviewers": self.reviewer_snapshot(),
             "events": [self._events[event_id].to_dict() for event_id in sorted(self._events)],
         }
+
+    def _bind_reviewer(self, event: GuardianOversightEvent, reviewer_id: str) -> None:
+        reviewer = self._reviewer(reviewer_id)
+        if reviewer.status != "active":
+            raise PermissionError(f"reviewer is not active: {reviewer.reviewer_id}")
+        if reviewer.reviewer_id in event.human_attestation.reviewers:
+            return
+        if event.guardian_role not in reviewer.responsibility.allowed_guardian_roles:
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} is not authorized for guardian role {event.guardian_role}"
+            )
+        if event.category not in reviewer.responsibility.allowed_categories:
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} is not authorized for oversight category {event.category}"
+            )
+
+        event.human_attestation.reviewers.append(reviewer.reviewer_id)
+        event.reviewer_bindings.append(
+            ReviewerBinding(
+                reviewer_id=reviewer.reviewer_id,
+                credential_id=reviewer.identity_proof.credential_id,
+                proof_ref=reviewer.identity_proof.proof_ref,
+                liability_mode=reviewer.responsibility.liability_mode,
+                legal_ack_ref=reviewer.responsibility.legal_ack_ref,
+                guardian_role=event.guardian_role,
+                category=event.category,
+            )
+        )
+        if event.human_attestation.received_quorum >= event.human_attestation.required_quorum:
+            event.human_attestation.status = "satisfied"
 
     def _event(self, event_id: str) -> GuardianOversightEvent:
         event_key = _normalize_non_empty(event_id, "event_id")
         if event_key not in self._events:
             raise KeyError(f"unknown oversight event: {event_key}")
         return self._events[event_key]
+
+    def _reviewer(self, reviewer_id: str) -> GuardianReviewerRecord:
+        reviewer_key = _normalize_non_empty(reviewer_id, "reviewer_id")
+        if reviewer_key not in self._reviewers:
+            raise KeyError(f"unknown reviewer: {reviewer_key}")
+        return self._reviewers[reviewer_key]
 
     def _rule(self, category: str) -> OversightRule:
         category_key = _normalize_non_empty(category, "category")

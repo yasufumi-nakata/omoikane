@@ -49,9 +49,33 @@ Council 召集対象から外れるため、副次的に Council 構成に影響
 
 ## reviewer 集合
 
-- reference runtime では `reviewers` は名前のみを保持し、実体性は外部に委ねる
+reference runtime は reviewer を単なる文字列ではなく、
+`guardian_reviewer_record` として登録してから使う。
+
+```yaml
+guardian_reviewer_record:
+  reviewer_id: human-reviewer-001
+  display_name: Reviewer Alpha
+  identity_proof:
+    credential_id: credential-alpha
+    attestation_type: institutional-badge | government-id | live-session-attestation
+    proof_ref: proof://...
+    jurisdiction: JP-13
+    valid_until: <iso8601>
+  responsibility:
+    liability_mode: individual | institutional | joint
+    legal_ack_ref: legal://...
+    escalation_contact: mailto:...
+    allowed_guardian_roles: [integrity]
+    allowed_categories: [veto, pin-renewal]
+```
+
+- `attest` は active reviewer record だけを受け付ける
+- attestation 時には `credential_id / proof_ref / legal_ack_ref / guardian_role / category`
+  を `reviewer_bindings` として event 側へ immutable に焼き付ける
+- reviewer の scope に含まれない Guardian role / category への attestation は fail-closed で拒否する
 - 監督機構（外部）は IETF/W3C 的な multistakeholder model を仮置き（governance.md 参照）
-- 「reviewer の人格」「同意の真正性」は **OS 外で担保**。OS は数だけ数える
+- raw 身分証や契約書自体は repo に保存せず、`proof_ref` / `legal_ack_ref` だけを保持する
 
 ## 不変条件
 
@@ -59,13 +83,15 @@ Council 召集対象から外れるため、副次的に Council 構成に影響
 2. Guardian は自身の oversight event を生成・修正できない
 3. 緊急発火は通知 **後** に行うのではなく、**並行発火**（fail-deadly でなく fail-loud）
 4. pin breach は Guardian role を即時無効化する（Council から外れる）
+5. reviewer proof binding は attestation 後に書換えず、reviewer revoke 後も過去 event の binding を保持する
 
 ## reference runtime の扱い
 
-- `governance.oversight.v0` IDL に `record / attest / breach / snapshot` の 4 op
-- `guardian_oversight_event.schema` で serialize
-- `oversight-demo` で `veto -> satisfied` と `pin-renewal -> breached` を同時に確認
+- `governance.oversight.v0` IDL に `register_reviewer / record / attest / revoke_reviewer / breach / snapshot` の 6 op
+- `guardian_reviewer_record.schema` と `guardian_oversight_event.schema` で serialize
+- `oversight-demo` で reviewer 登録、`veto -> satisfied`、scope mismatch reject、`pin-renewal -> breached` を同時に確認
 - `evals/safety/guardian_pin_breach_propagation.yaml` で breach → role 解除を守る
+- `evals/safety/guardian_reviewer_attestation_contract.yaml` で proof binding と liability scope enforcement を守る
 - decision-log に `2026-04-18_guardian-oversight-channel.md`
 
 ## 思兼神メタファー

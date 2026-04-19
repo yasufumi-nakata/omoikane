@@ -13,6 +13,7 @@ required:
   - category
   - payload_ref
   - human_attestation
+  - reviewer_bindings
   - escalation_path
 properties:
   kind:
@@ -73,6 +74,56 @@ properties:
       escalation_window_seconds:
         type: integer
         minimum: 1
+  reviewer_bindings:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - reviewer_id
+        - credential_id
+        - proof_ref
+        - liability_mode
+        - legal_ack_ref
+        - guardian_role
+        - category
+        - attested_at
+      properties:
+        reviewer_id:
+          type: string
+          minLength: 1
+        credential_id:
+          type: string
+          minLength: 1
+        proof_ref:
+          type: string
+          minLength: 1
+        liability_mode:
+          type: string
+          enum:
+            - individual
+            - institutional
+            - joint
+        legal_ack_ref:
+          type: string
+          minLength: 1
+        guardian_role:
+          type: string
+          enum:
+            - ethics
+            - integrity
+            - identity
+        category:
+          type: string
+          enum:
+            - veto
+            - attest
+            - rule-update
+            - emergency-trigger
+            - pin-renewal
+        attested_at:
+          type: string
+          format: date-time
   escalation_path:
     type: array
     minItems: 1
@@ -106,6 +157,7 @@ examples:
       reviewers: []
       status: pending
       escalation_window_seconds: 86400
+    reviewer_bindings: []
     escalation_path:
       - human-reviewer-pool-A
       - external-ethics-board

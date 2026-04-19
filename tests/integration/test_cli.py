@@ -546,7 +546,11 @@ class CliIntegrationTests(unittest.TestCase):
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertTrue(result["validation"]["veto_quorum_satisfied"])
+        self.assertTrue(result["validation"]["veto_binding_recorded"])
+        self.assertTrue(result["validation"]["reviewer_registry_ready"])
+        self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
+        self.assertEqual("joint", result["events"]["veto"]["reviewer_bindings"][0]["liability_mode"])
         self.assertFalse(result["trust"]["after_breach"]["pinned_by_human"])
         self.assertFalse(result["trust"]["after_breach"]["eligibility"]["guardian_role"])
 
