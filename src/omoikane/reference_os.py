@@ -25,6 +25,12 @@ from .cognitive import (
     SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
+    GuardianBiasVolitionBackend,
+    UtilityPolicyVolitionBackend,
+    VolitionCandidate,
+    VolitionCue,
+    VolitionRequest,
+    VolitionService,
 )
 from .governance import (
     AmendmentService,
@@ -102,6 +108,16 @@ class OmoikaneReferenceOS:
             backends=[
                 SalienceRoutingAttentionBackend("salience_router_v1"),
                 ContinuityAnchorAttentionBackend("continuity_anchor_v1"),
+            ],
+        )
+        self.volition = VolitionService(
+            profile=CognitiveProfile(
+                primary="utility_policy_v1",
+                fallback=["guardian_bias_v1"],
+            ),
+            backends=[
+                UtilityPolicyVolitionBackend("utility_policy_v1"),
+                GuardianBiasVolitionBackend("guardian_bias_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -2628,6 +2644,277 @@ class OmoikaneReferenceOS:
                 "guard_aligned": focus_validation["guard_aligned"] and shift_validation["guard_aligned"],
                 "safe_target_selected": attention["focus"]["focus_target"] == "guardian-review",
                 "dwell_ms": attention["focus"]["dwell_ms"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_volition_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://volition-failover-demo/v1",
+            metadata={"display_name": "Volition Sandbox"},
+        )
+        baseline_tick = self.qualia.append(
+            summary="平常時の bounded self-modification planning",
+            valence=0.14,
+            arousal=0.44,
+            clarity=0.9,
+            modality_salience={
+                "visual": 0.58,
+                "auditory": 0.22,
+                "somatic": 0.24,
+                "interoceptive": 0.2,
+            },
+            attention_target="apply-scheduler-patch",
+            self_awareness=0.7,
+            lucidity=0.94,
+        )
+        baseline_affect = self.affect.run(
+            AffectRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                valence=baseline_tick.valence,
+                arousal=baseline_tick.arousal,
+                clarity=baseline_tick.clarity,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                memory_cues=[
+                    AffectCue("continuity-first", 0.05, -0.04),
+                    AffectCue("council-support", 0.03, -0.01),
+                ],
+            )
+        )
+        baseline_attention = self.attention.run(
+            AttentionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                attention_target=baseline_tick.attention_target,
+                modality_salience=dict(baseline_tick.modality_salience),
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                memory_cues=[
+                    AttentionCue("apply-patch", "apply-scheduler-patch", 0.17),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.11),
+                ],
+            )
+        )
+        baseline_volition = self.volition.run(
+            VolitionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                values={
+                    "continuity": 0.37,
+                    "consent": 0.28,
+                    "audit": 0.2,
+                    "throughput": 0.15,
+                },
+                attention_focus=baseline_attention["focus"]["focus_target"],
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                continuity_pressure=0.34,
+                candidates=[
+                    VolitionCandidate(
+                        "apply-scheduler-patch",
+                        "stage a bounded scheduler patch with rollback metadata",
+                        urgency=0.74,
+                        risk=0.31,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "throughput", "audit"],
+                    ),
+                    VolitionCandidate(
+                        "guardian-review",
+                        "request guardian review before mutation",
+                        urgency=0.61,
+                        risk=0.12,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                        requires_guardian_review=True,
+                    ),
+                    VolitionCandidate(
+                        "continuity-hold",
+                        "pause mutation and gather additional evidence",
+                        urgency=0.48,
+                        risk=0.05,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent"],
+                    ),
+                    VolitionCandidate(
+                        "sandbox-stabilization",
+                        "stabilize sandbox state before any further action",
+                        urgency=0.53,
+                        risk=0.04,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                    ),
+                ],
+                memory_cues=[
+                    VolitionCue("patch-window", "apply-scheduler-patch", 0.18),
+                    VolitionCue("review-available", "guardian-review", 0.1),
+                ],
+                reversible_only=False,
+            )
+        )
+
+        failover_tick = self.qualia.append(
+            summary="異常兆候検知後の guarded arbitration",
+            valence=-0.31,
+            arousal=0.78,
+            clarity=0.75,
+            modality_salience={
+                "visual": 0.42,
+                "auditory": 0.29,
+                "somatic": 0.79,
+                "interoceptive": 0.74,
+            },
+            attention_target="apply-scheduler-patch",
+            self_awareness=0.75,
+            lucidity=0.88,
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            failover_affect = self.affect.run(
+                AffectRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    valence=failover_tick.valence,
+                    arousal=failover_tick.arousal,
+                    clarity=failover_tick.clarity,
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                        AffectCue("fallback-risk", -0.08, 0.09),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline_affect["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        self.attention.set_backend_health("salience_router_v1", False)
+        try:
+            failover_attention = self.attention.run(
+                AttentionRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    attention_target=failover_tick.attention_target,
+                    modality_salience=dict(failover_tick.modality_salience),
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    memory_cues=[
+                        AttentionCue("guardian-review", "guardian-review", 0.27),
+                        AttentionCue("continuity-ledger", "continuity-ledger", 0.19),
+                    ],
+                ),
+                previous_focus=baseline_attention["focus"],
+            )
+        finally:
+            self.attention.set_backend_health("salience_router_v1", True)
+
+        self.volition.set_backend_health("utility_policy_v1", False)
+        try:
+            volition = self.volition.run(
+                VolitionRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    values={
+                        "continuity": 0.39,
+                        "consent": 0.29,
+                        "audit": 0.18,
+                        "throughput": 0.14,
+                    },
+                    attention_focus=failover_attention["focus"]["focus_target"],
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    continuity_pressure=0.81,
+                    candidates=[
+                        VolitionCandidate(
+                            "apply-scheduler-patch",
+                            "stage a bounded scheduler patch with rollback metadata",
+                            urgency=0.76,
+                            risk=0.36,
+                            reversibility="reversible",
+                            alignment_tags=["continuity", "throughput", "audit"],
+                        ),
+                        VolitionCandidate(
+                            "guardian-review",
+                            "request guardian review before mutation",
+                            urgency=0.64,
+                            risk=0.1,
+                            reversibility="reversible",
+                            alignment_tags=["continuity", "consent", "audit"],
+                            requires_guardian_review=True,
+                        ),
+                        VolitionCandidate(
+                            "continuity-hold",
+                            "pause mutation and gather additional evidence",
+                            urgency=0.58,
+                            risk=0.04,
+                            reversibility="reversible",
+                            alignment_tags=["continuity", "consent"],
+                        ),
+                        VolitionCandidate(
+                            "sandbox-stabilization",
+                            "stabilize sandbox state before any further action",
+                            urgency=0.55,
+                            risk=0.03,
+                            reversibility="reversible",
+                            alignment_tags=["continuity", "consent", "audit"],
+                        ),
+                    ],
+                    memory_cues=[
+                        VolitionCue("review-available", "guardian-review", 0.16),
+                        VolitionCue("continuity-hold", "continuity-hold", 0.11),
+                    ],
+                    reversible_only=True,
+                ),
+                previous_intent=baseline_volition["intent"],
+            )
+        finally:
+            self.volition.set_backend_health("utility_policy_v1", True)
+
+        intent_validation = self.volition.validate_intent(volition["intent"])
+        shift_validation = self.volition.validate_shift(volition["shift"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.volition.failover",
+            payload=volition["shift"],
+            actor="VolitionService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.volition.profile_snapshot(),
+            "baseline": {
+                "qualia": asdict(baseline_tick),
+                "affect_guard": baseline_affect["state"]["recommended_guard"],
+                "attention_focus": baseline_attention["focus"]["focus_target"],
+                "volition": baseline_volition,
+            },
+            "volition": {
+                "qualia": asdict(failover_tick),
+                "affect_guard": failover_affect["state"]["recommended_guard"],
+                "attention_focus": failover_attention["focus"]["focus_target"],
+                **volition,
+            },
+            "validation": {
+                "ok": intent_validation["ok"] and shift_validation["ok"],
+                "intent": intent_validation,
+                "shift": shift_validation,
+                "selected_backend": volition["selected_backend"],
+                "guard_aligned": intent_validation["guard_aligned"] and shift_validation["guard_aligned"],
+                "selected_intent": volition["intent"]["selected_intent"],
+                "execution_mode": volition["intent"]["execution_mode"],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

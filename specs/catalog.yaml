@@ -324,6 +324,30 @@ entries:
       - docs/07-reference-implementation/README.md
     rationale: Required to fix the L3 attention failover and affect-aware focus routing contract across docs, CLI, and runtime.
   - priority: P1
+    kind: schema
+    file: specs/schemas/volition_intent.schema
+    consumers:
+      - specs/interfaces/cognitive.volition.v0.idl
+      - docs/02-subsystems/cognitive/volition.md
+      - reference-runtime
+    rationale: Required to serialize the bounded intent selected from values, attention focus, and affect guards.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/volition_shift.schema
+    consumers:
+      - specs/interfaces/cognitive.volition.v0.idl
+      - evals/cognitive/volition_failover.yaml
+      - reference-runtime
+    rationale: Required to emit a ledger-safe summary of volition failover and guard-aligned intent shifts.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.volition.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/volition.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make the L3 volition arbitration contract machine-readable before imagination or richer deliberation surfaces land.
+  - priority: P1
     kind: eval
     file: evals/cognitive/qualia_contract.yaml
     consumers:
@@ -358,6 +382,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects single-switch attention fallback, affect guard alignment, and safe focus target routing.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/volition_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects guard-aligned safe intent routing and no-irreversible-without-review behavior during volition failover.
   - priority: P1
     kind: eval
     file: evals/interface/wms_private_reality_escape.yaml

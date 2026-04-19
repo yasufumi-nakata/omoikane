@@ -43,6 +43,7 @@ PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
+PYTHONPATH=src python3 -m omoikane.cli volition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
@@ -168,6 +169,14 @@ single-switch failover、`AffectService.recommended_guard` を受けた
 safe target routing、`guardian-review` への degrade shift、
 `cognitive.attention.failover` ledger event を確認する。
 
+`volition-demo` は L3 volition failover の reference contract
+(`cognitive.volition.v0`) を JSON で可視化し、
+`utility_policy_v1` baseline から `guardian_bias_v1` fallback への
+single-switch failover、`Attention` の focus と
+`AffectService.recommended_guard` を受けた safe intent routing、
+irreversible intent を review なしで advance しない policy、
+`cognitive.volition.failover` ledger event を確認する。
+
 `bdb-demo` は L6 Biological-Digital Bridge の reference contract
 (`interface.bdb.v0`) を JSON で可視化し、
 `latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
@@ -203,7 +212,7 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- L3 volition / imagination の cognitive backends と cross-service failover
+- L3 imagination の cognitive backend と `co_imagination` / WMS 連携
 - Heritage/Federation の external pending を実際の distributed council 実行へ接続
 - Guardian oversight reviewer の実体証明と法的責任分担
 - AscensionScheduler の臨床・法務向け attest / witness / consent artifact 接続

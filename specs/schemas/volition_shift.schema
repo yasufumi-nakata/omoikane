@@ -1,0 +1,91 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/volition_shift.schema"
+title: VolitionShift
+description: Ledger-safe L3 volition shift summary emitted by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy_id
+  - intent_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_intent_id
+  - previous_target
+  - selected_intent
+  - execution_mode
+  - affect_guard
+  - guard_aligned
+  - failures
+  - digest
+properties:
+  kind:
+    const: volition_shift
+  schema_version:
+    const: 1.0.0
+  policy_id:
+    const: bounded-volition-failover-v1
+  intent_ref:
+    type: string
+    pattern: "^volition-intent-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_intent_id:
+    type:
+      - string
+      - "null"
+  previous_target:
+    type:
+      - string
+      - "null"
+  selected_intent:
+    type: string
+    minLength: 1
+  execution_mode:
+    type: string
+    enum:
+      - advance
+      - review
+      - hold
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  guard_aligned:
+    type: boolean
+  failures:
+    type: array
+    items:
+      type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: volition_shift
+    schema_version: 1.0.0
+    policy_id: bounded-volition-failover-v1
+    intent_ref: volition-intent-3eb705d5d388
+    selected_backend: guardian_bias_v1
+    attempted_backends: [utility_policy_v1, guardian_bias_v1]
+    degraded: true
+    previous_intent_id: volition-intent-1ee705d5d388
+    previous_target: apply-scheduler-patch
+    selected_intent: guardian-review
+    execution_mode: review
+    affect_guard: observe
+    guard_aligned: true
+    failures: [utility_policy_v1 is unavailable]
+    digest: e5421ac3ea3e730b22c744ab37b33828d93518f844c51a3fc2ab7163098c71c5

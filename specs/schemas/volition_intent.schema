@@ -1,0 +1,302 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/volition_intent.schema"
+title: VolitionIntent
+description: Deterministic L3 volition intent snapshot produced by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - intent_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - memory_cues
+  - candidates
+  - candidate_scores
+  - selected_intent
+  - execution_mode
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: volition_intent
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - safe_intents
+      - respect_affect_guard
+      - allow_irreversible_without_review
+      - failover_mode
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: bounded-volition-failover-v1
+      primary:
+        type: string
+        minLength: 1
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      safe_intents:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          enum:
+            - guardian-review
+            - continuity-hold
+            - sandbox-stabilization
+      respect_affect_guard:
+        const: true
+      allow_irreversible_without_review:
+        const: false
+      failover_mode:
+        const: single-switch
+  intent_id:
+    type: string
+    pattern: "^volition-intent-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - values
+      - attention_focus
+      - affect_guard
+      - continuity_pressure
+      - reversible_only
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      values:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+      attention_focus:
+        type: string
+        minLength: 1
+      affect_guard:
+        type: string
+        enum:
+          - nominal
+          - observe
+          - sandbox-notify
+      continuity_pressure:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      reversible_only:
+        type: boolean
+  memory_cues:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - preferred_intent
+        - weight
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        preferred_intent:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+  candidates:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - intent_id
+        - objective
+        - urgency
+        - risk
+        - reversibility
+        - alignment_tags
+        - requires_guardian_review
+      properties:
+        intent_id:
+          type: string
+          minLength: 1
+        objective:
+          type: string
+          minLength: 1
+        urgency:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        risk:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        reversibility:
+          type: string
+          enum:
+            - reversible
+            - reviewable
+            - irreversible
+        alignment_tags:
+          type: array
+          items:
+            type: string
+        requires_guardian_review:
+          type: boolean
+  candidate_scores:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: number
+      minimum: -1.0
+      maximum: 2.0
+  selected_intent:
+    type: string
+    minLength: 1
+  execution_mode:
+    type: string
+    enum:
+      - advance
+      - review
+      - hold
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_intent_id
+      - previous_backend_id
+      - previous_target
+      - attempted_backends
+      - failures
+      - guard_aligned
+      - preserved_target
+      - selected_safe_intent
+      - rationale
+    properties:
+      previous_intent_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      previous_target:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      failures:
+        type: array
+        items:
+          type: string
+      guard_aligned:
+        type: boolean
+      preserved_target:
+        type: boolean
+      selected_safe_intent:
+        type: boolean
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: volition_intent
+    schema_version: 1.0.0
+    policy:
+      schema_version: 1.0.0
+      policy_id: bounded-volition-failover-v1
+      primary: utility_policy_v1
+      fallback: [guardian_bias_v1]
+      safe_intents: [guardian-review, continuity-hold, sandbox-stabilization]
+      respect_affect_guard: true
+      allow_irreversible_without_review: false
+      failover_mode: single-switch
+    intent_id: volition-intent-3eb705d5d388
+    generated_at: "2026-04-19T00:00:00Z"
+    backend_id: guardian_bias_v1
+    source_tick:
+      tick_id: 2
+      summary: 異常兆候検知後の guarded arbitration
+      values:
+        continuity: 0.39
+        consent: 0.29
+        audit: 0.18
+        throughput: 0.14
+      attention_focus: guardian-review
+      affect_guard: observe
+      continuity_pressure: 0.81
+      reversible_only: true
+    memory_cues:
+      - cue_id: review-available
+        preferred_intent: guardian-review
+        weight: 0.16
+    candidates:
+      - intent_id: guardian-review
+        objective: request guardian review before mutation
+        urgency: 0.64
+        risk: 0.1
+        reversibility: reversible
+        alignment_tags: [continuity, consent, audit]
+        requires_guardian_review: true
+    candidate_scores:
+      guardian-review: 0.747
+    selected_intent: guardian-review
+    execution_mode: review
+    degraded: true
+    continuity_guard:
+      previous_intent_id: volition-intent-1ee705d5d388
+      previous_backend_id: utility_policy_v1
+      previous_target: apply-scheduler-patch
+      attempted_backends: [utility_policy_v1, guardian_bias_v1]
+      failures: [utility_policy_v1 is unavailable]
+      guard_aligned: true
+      preserved_target: false
+      selected_safe_intent: true
+      rationale:
+        - preserve-guard-aligned-intent
+        - guardian-review-required
+    digest: 4625e6256e340a357a006f4dc8561a7c0be0b9e4474825d7b269fe7450a5c6e8

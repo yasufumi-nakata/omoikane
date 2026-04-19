@@ -235,6 +235,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_volition_demo_emits_guard_aligned_failover_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "volition-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("guardian_bias_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertEqual("guardian-review", result["validation"]["selected_intent"])
+        self.assertEqual("review", result["validation"]["execution_mode"])
+        self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
 

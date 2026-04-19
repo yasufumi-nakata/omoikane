@@ -1,0 +1,180 @@
+idl_version: 1
+kind: service
+namespace: cognitive.volition.v0
+service: VolitionService
+summary: Deterministic volition failover and guard-aware intent arbitration contract for the L3 reference runtime.
+imports:
+  volition_intent: ../schemas/volition_intent.schema
+  volition_shift: ../schemas/volition_shift.schema
+operations:
+  arbitrate_intent:
+    summary: Select one bounded intent from value-weighted candidates and affect/attention context.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - values
+          - attention_focus
+          - affect_guard
+          - continuity_pressure
+          - candidates
+          - memory_cues
+          - reversible_only
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+          values:
+            type: object
+            minProperties: 1
+            additionalProperties:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+          attention_focus:
+            type: string
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          continuity_pressure:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          candidates:
+            type: array
+            minItems: 3
+            items:
+              type: object
+              required:
+                - intent_id
+                - objective
+                - urgency
+                - risk
+                - reversibility
+                - alignment_tags
+                - requires_guardian_review
+              properties:
+                intent_id:
+                  type: string
+                objective:
+                  type: string
+                urgency:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                risk:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                reversibility:
+                  type: string
+                  enum:
+                    - reversible
+                    - reviewable
+                    - irreversible
+                alignment_tags:
+                  type: array
+                  items:
+                    type: string
+                requires_guardian_review:
+                  type: boolean
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - preferred_intent
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                preferred_intent:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+          reversible_only:
+            type: boolean
+    output:
+      schema_ref: volition_intent
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - affect_guard observe or sandbox-notify must move arbitration to one of the fixed safe intents
+      - irreversible intents may not execute without explicit review in the reference runtime
+  validate_intent:
+    summary: Validate one volition intent snapshot against the fixed failover policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: volition_intent
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - selected_intent
+          - guard_aligned
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          selected_intent:
+            type: string
+          guard_aligned:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe volition shift record.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: volition_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - selected_intent
+          - guard_aligned
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          selected_intent:
+            type: string
+          guard_aligned:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.volition.failover
+    payload:
+      schema_ref: volition_shift

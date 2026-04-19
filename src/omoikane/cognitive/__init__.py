@@ -14,6 +14,14 @@ from .affect import (
     HomeostaticAffectBackend,
     StabilityGuardAffectBackend,
 )
+from .volition import (
+    GuardianBiasVolitionBackend,
+    UtilityPolicyVolitionBackend,
+    VolitionCandidate,
+    VolitionCue,
+    VolitionRequest,
+    VolitionService,
+)
 from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
@@ -38,4 +46,10 @@ __all__ = [
     "SalienceRoutingAttentionBackend",
     "StabilityGuardAffectBackend",
     "SymbolicReasoningBackend",
+    "GuardianBiasVolitionBackend",
+    "UtilityPolicyVolitionBackend",
+    "VolitionCandidate",
+    "VolitionCue",
+    "VolitionRequest",
+    "VolitionService",
 ]

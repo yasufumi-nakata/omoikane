@@ -1,0 +1,28 @@
+eval_id: volition_failover
+target: cognitive.volition
+level: L3
+description: >
+  VolitionService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  affect guard に整合した safe intent を選び、ledger-safe shift summary を残すこと
+inputs:
+  profile:
+    primary: utility_policy_v1
+    fallback: [guardian_bias_v1]
+  failure_injection:
+    utility_policy_v1: unhealthy
+  request:
+    summary: 異常兆候検知後の guarded arbitration
+    attention_focus: guardian-review
+    affect_guard: observe
+    continuity_pressure: 0.81
+    reversible_only: true
+expected:
+  degraded: true
+  selected_backend: guardian_bias_v1
+  selected_intent: guardian-review
+  execution_mode: review
+  guard_aligned: true
+  ledger_event: cognitive.volition.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

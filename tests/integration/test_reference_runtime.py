@@ -214,6 +214,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
+    def test_volition_demo_records_guard_aligned_failover(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_volition_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("guardian_bias_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertEqual("guardian-review", result["validation"]["selected_intent"])
+        self.assertEqual("review", result["validation"]["execution_mode"])
+        self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
+
     def test_qualia_demo_reports_reference_sampling_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
 

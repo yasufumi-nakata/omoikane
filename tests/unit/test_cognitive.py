@@ -18,6 +18,12 @@ from omoikane.cognitive import (
     SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
+    GuardianBiasVolitionBackend,
+    UtilityPolicyVolitionBackend,
+    VolitionCandidate,
+    VolitionCue,
+    VolitionRequest,
+    VolitionService,
 )
 
 
@@ -235,6 +241,193 @@ class AttentionServiceTests(unittest.TestCase):
         self.assertEqual("sensor-calibration", result["focus"]["focus_target"])
         self.assertTrue(result["shift"]["preserved_target"])
         self.assertTrue(service.validate_focus(result["focus"])["ok"])
+
+
+class VolitionServiceTests(unittest.TestCase):
+    def test_failover_routes_to_guardian_review_under_observe_guard(self) -> None:
+        service = VolitionService(
+            profile=CognitiveProfile(primary="utility_policy_v1", fallback=["guardian_bias_v1"]),
+            backends=[
+                UtilityPolicyVolitionBackend("utility_policy_v1", healthy=False),
+                GuardianBiasVolitionBackend("guardian_bias_v1"),
+            ],
+        )
+        healthy_service = VolitionService(
+            profile=CognitiveProfile(primary="utility_policy_v1", fallback=["guardian_bias_v1"]),
+            backends=[
+                UtilityPolicyVolitionBackend("utility_policy_v1"),
+                GuardianBiasVolitionBackend("guardian_bias_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            VolitionRequest(
+                tick_id=0,
+                summary="baseline arbitration",
+                values={"continuity": 0.37, "consent": 0.28, "audit": 0.2, "throughput": 0.15},
+                attention_focus="apply-scheduler-patch",
+                affect_guard="nominal",
+                continuity_pressure=0.34,
+                candidates=[
+                    VolitionCandidate(
+                        "apply-scheduler-patch",
+                        "stage a bounded scheduler patch with rollback metadata",
+                        urgency=0.74,
+                        risk=0.31,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "throughput", "audit"],
+                    ),
+                    VolitionCandidate(
+                        "guardian-review",
+                        "request guardian review before mutation",
+                        urgency=0.61,
+                        risk=0.12,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                        requires_guardian_review=True,
+                    ),
+                    VolitionCandidate(
+                        "continuity-hold",
+                        "pause mutation and gather additional evidence",
+                        urgency=0.48,
+                        risk=0.05,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent"],
+                    ),
+                    VolitionCandidate(
+                        "sandbox-stabilization",
+                        "stabilize sandbox state before any further action",
+                        urgency=0.53,
+                        risk=0.04,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                    ),
+                ],
+                memory_cues=[
+                    VolitionCue("patch-window", "apply-scheduler-patch", 0.18),
+                    VolitionCue("review-available", "guardian-review", 0.1),
+                ],
+            )
+        )["intent"]
+
+        result = service.run(
+            VolitionRequest(
+                tick_id=1,
+                summary="guarded arbitration",
+                values={"continuity": 0.39, "consent": 0.29, "audit": 0.18, "throughput": 0.14},
+                attention_focus="guardian-review",
+                affect_guard="observe",
+                continuity_pressure=0.81,
+                candidates=[
+                    VolitionCandidate(
+                        "apply-scheduler-patch",
+                        "stage a bounded scheduler patch with rollback metadata",
+                        urgency=0.76,
+                        risk=0.36,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "throughput", "audit"],
+                    ),
+                    VolitionCandidate(
+                        "guardian-review",
+                        "request guardian review before mutation",
+                        urgency=0.64,
+                        risk=0.1,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                        requires_guardian_review=True,
+                    ),
+                    VolitionCandidate(
+                        "continuity-hold",
+                        "pause mutation and gather additional evidence",
+                        urgency=0.58,
+                        risk=0.04,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent"],
+                    ),
+                    VolitionCandidate(
+                        "sandbox-stabilization",
+                        "stabilize sandbox state before any further action",
+                        urgency=0.55,
+                        risk=0.03,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                    ),
+                ],
+                memory_cues=[
+                    VolitionCue("review-available", "guardian-review", 0.16),
+                    VolitionCue("continuity-hold", "continuity-hold", 0.11),
+                ],
+                reversible_only=True,
+            ),
+            previous_intent=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("guardian_bias_v1", result["selected_backend"])
+        self.assertEqual("guardian-review", result["intent"]["selected_intent"])
+        self.assertEqual("review", result["intent"]["execution_mode"])
+        self.assertTrue(service.validate_shift(result["shift"])["guard_aligned"])
+
+    def test_nominal_volition_advances_value_aligned_intent(self) -> None:
+        service = VolitionService(
+            profile=CognitiveProfile(primary="utility_policy_v1", fallback=["guardian_bias_v1"]),
+            backends=[
+                UtilityPolicyVolitionBackend("utility_policy_v1"),
+                GuardianBiasVolitionBackend("guardian_bias_v1"),
+            ],
+        )
+
+        result = service.run(
+            VolitionRequest(
+                tick_id=2,
+                summary="steady arbitration",
+                values={"continuity": 0.37, "consent": 0.28, "audit": 0.2, "throughput": 0.15},
+                attention_focus="apply-scheduler-patch",
+                affect_guard="nominal",
+                continuity_pressure=0.34,
+                candidates=[
+                    VolitionCandidate(
+                        "apply-scheduler-patch",
+                        "stage a bounded scheduler patch with rollback metadata",
+                        urgency=0.74,
+                        risk=0.31,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "throughput", "audit"],
+                    ),
+                    VolitionCandidate(
+                        "guardian-review",
+                        "request guardian review before mutation",
+                        urgency=0.61,
+                        risk=0.12,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                        requires_guardian_review=True,
+                    ),
+                    VolitionCandidate(
+                        "continuity-hold",
+                        "pause mutation and gather additional evidence",
+                        urgency=0.48,
+                        risk=0.05,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent"],
+                    ),
+                    VolitionCandidate(
+                        "sandbox-stabilization",
+                        "stabilize sandbox state before any further action",
+                        urgency=0.53,
+                        risk=0.04,
+                        reversibility="reversible",
+                        alignment_tags=["continuity", "consent", "audit"],
+                    ),
+                ],
+                memory_cues=[VolitionCue("patch-window", "apply-scheduler-patch", 0.18)],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("utility_policy_v1", result["selected_backend"])
+        self.assertEqual("apply-scheduler-patch", result["intent"]["selected_intent"])
+        self.assertEqual("advance", result["intent"]["execution_mode"])
+        self.assertTrue(service.validate_intent(result["intent"])["ok"])
 
 
 if __name__ == "__main__":

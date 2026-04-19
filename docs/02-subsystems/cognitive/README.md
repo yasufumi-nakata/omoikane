@@ -59,6 +59,16 @@ affect-aware safe target routing を持つ。
 `AffectService.recommended_guard` が `observe` / `sandbox-notify` に上がった時は
 `guardian-review` / `sandbox-stabilization` など固定 safe target へ寄せる。
 
+`Volition` は最小の `bounded-volition-failover-v1` を採用し、
+`utility_policy_v1 -> guardian_bias_v1` の単純 failover と
+guard-aware intent arbitration を持つ。
+`values`、`Attention` の focus、`AffectService.recommended_guard` を起点に
+1 つの bounded intent を選び、
+`observe` / `sandbox-notify` guard 時は
+`guardian-review` / `continuity-hold` / `sandbox-stabilization` など
+固定 safe intent へ寄せる。
+irreversible intent は review を経ずに advance しない。
+
 ## 多実装結果の調停
 
 複数 backend が同時に走る場合（A/B 検証や信頼度向上目的）、調停は L4 Council が行う。
@@ -82,14 +92,15 @@ affect-aware safe target routing を持つ。
 
 現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
 health-based failover を持つ。`Affect` は bounded failover と smoothing を持ち、
-`Attention` も affect-aware な single-switch failover を持つが、
+`Attention` と `Volition` も guard-aware な single-switch failover を持つが、
 その他の cognitive surface は引き続き
 `QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
 そのため [evals/cognitive/](../../../evals/cognitive/) では
 qualia/self-model baseline に加え、reasoning failover、affect failover、
-attention failover を最小の L3 eval として扱う。
+attention failover、volition failover を最小の L3 eval として扱う。
 
 ## サブドキュメント
 
 - [affect.md](affect.md) ── L3 affect failover と continuity smoothing
 - [attention.md](attention.md) ── L3 attention failover と affect-aware safe target routing
+- [volition.md](volition.md) ── L3 volition failover と guard-aware intent arbitration
