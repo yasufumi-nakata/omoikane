@@ -31,6 +31,11 @@ HERITAGE_ROOTS = (
     "root://heritage/pki-b",
     "root://heritage/pki-c",
 )
+RELAY_TELEMETRY_PROFILE = "bounded-relay-observability-v1"
+RELAY_TRANSPORT_LAYER_BY_PROFILE = {
+    "federation-mtls-quorum-v1": "mtls",
+    "heritage-attested-review-v1": "attested-bridge",
+}
 
 
 @dataclass
@@ -166,6 +171,94 @@ class DistributedTransportReceipt:
             "receipt_status": self.receipt_status,
             "authenticity_checks": dict(self.authenticity_checks),
             "participant_bindings": [dict(binding) for binding in self.participant_bindings],
+            "recorded_at": self.recorded_at,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedRelayHopTelemetry:
+    """One observed relay hop bound to a distributed transport receipt."""
+
+    hop_index: int
+    relay_id: str
+    relay_endpoint: str
+    jurisdiction: str
+    network_zone: str
+    transport_layer: str
+    hop_nonce: str
+    observed_latency_ms: float
+    root_refs_seen: List[str]
+    route_binding_ref: str
+    attested_participant_count: int
+    delivery_status: str
+    observed_at: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "hop_index": self.hop_index,
+            "relay_id": self.relay_id,
+            "relay_endpoint": self.relay_endpoint,
+            "jurisdiction": self.jurisdiction,
+            "network_zone": self.network_zone,
+            "transport_layer": self.transport_layer,
+            "hop_nonce": self.hop_nonce,
+            "observed_latency_ms": self.observed_latency_ms,
+            "root_refs_seen": list(self.root_refs_seen),
+            "route_binding_ref": self.route_binding_ref,
+            "attested_participant_count": self.attested_participant_count,
+            "delivery_status": self.delivery_status,
+            "observed_at": self.observed_at,
+        }
+
+
+@dataclass
+class DistributedTransportRelayTelemetry:
+    """Machine-checkable multi-hop relay telemetry for one distributed receipt."""
+
+    telemetry_id: str
+    envelope_ref: str
+    envelope_digest: str
+    receipt_ref: str
+    receipt_digest: str
+    council_tier: str
+    transport_profile: str
+    path_profile: str
+    route_nonce: str
+    hop_count: int
+    max_hops: int
+    hop_chain_digest: str
+    relay_hops: List[DistributedRelayHopTelemetry]
+    total_latency_ms: float
+    anti_replay_status: str
+    replay_guard_status: str
+    root_quorum_met: bool
+    end_to_end_status: str
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_relay_telemetry",
+            "schema_version": "1.0.0",
+            "telemetry_id": self.telemetry_id,
+            "envelope_ref": self.envelope_ref,
+            "envelope_digest": self.envelope_digest,
+            "receipt_ref": self.receipt_ref,
+            "receipt_digest": self.receipt_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "path_profile": self.path_profile,
+            "route_nonce": self.route_nonce,
+            "hop_count": self.hop_count,
+            "max_hops": self.max_hops,
+            "hop_chain_digest": self.hop_chain_digest,
+            "relay_hops": [hop.to_dict() for hop in self.relay_hops],
+            "total_latency_ms": self.total_latency_ms,
+            "anti_replay_status": self.anti_replay_status,
+            "replay_guard_status": self.replay_guard_status,
+            "root_quorum_met": self.root_quorum_met,
+            "end_to_end_status": self.end_to_end_status,
             "recorded_at": self.recorded_at,
             "digest": self.digest,
         }
@@ -409,6 +502,133 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def capture_relay_telemetry(
+        self,
+        envelope: DistributedTransportEnvelope,
+        receipt: DistributedTransportReceipt,
+        *,
+        relay_path: List[Dict[str, Any]],
+    ) -> DistributedTransportRelayTelemetry:
+        if receipt.envelope_ref != envelope.envelope_id:
+            raise ValueError("receipt must reference the provided envelope")
+        if not relay_path:
+            raise ValueError("relay_path must contain at least 1 hop")
+        if len(relay_path) != len(receipt.hop_nonce_chain):
+            raise ValueError("relay_path must align with receipt hop_nonce_chain length")
+        if len(relay_path) > envelope.max_hops:
+            raise ValueError("relay_path must not exceed envelope.max_hops")
+
+        accepted_count = sum(
+            1 for binding in receipt.participant_bindings if binding.get("accepted") is True
+        )
+        relay_hops: List[DistributedRelayHopTelemetry] = []
+        total_latency_ms = 0.0
+        for index, (hop_nonce, hop_data) in enumerate(zip(receipt.hop_nonce_chain, relay_path), start=1):
+            relay_id = self._require_non_empty_string(hop_data.get("relay_id"), "relay_id")
+            relay_endpoint = self._require_non_empty_string(
+                hop_data.get("relay_endpoint"),
+                "relay_endpoint",
+            )
+            jurisdiction = self._require_non_empty_string(
+                hop_data.get("jurisdiction"),
+                "jurisdiction",
+            )
+            network_zone = self._require_non_empty_string(
+                hop_data.get("network_zone"),
+                "network_zone",
+            )
+            transport_layer = self._require_non_empty_string(
+                hop_data.get(
+                    "transport_layer",
+                    RELAY_TRANSPORT_LAYER_BY_PROFILE[envelope.transport_profile],
+                ),
+                "transport_layer",
+            )
+            observed_latency_ms = self._require_positive_float(
+                hop_data.get("observed_latency_ms"),
+                "observed_latency_ms",
+            )
+            root_refs_seen = self._normalize_string_list(
+                hop_data.get("root_refs_seen", receipt.verified_root_refs),
+                "root_refs_seen",
+            )
+            observed_at = self._require_non_empty_string(
+                hop_data.get("observed_at", receipt.recorded_at),
+                "observed_at",
+            )
+            delivery_status = "forwarded"
+            if index == len(receipt.hop_nonce_chain):
+                delivery_status = receipt.receipt_status
+            route_binding_ref = (
+                f"relay-binding://{envelope.council_tier}/"
+                f"{sha256_text(f'{envelope.channel_binding_ref}:{relay_id}:{hop_nonce}')[:16]}"
+            )
+            relay_hops.append(
+                DistributedRelayHopTelemetry(
+                    hop_index=index,
+                    relay_id=relay_id,
+                    relay_endpoint=relay_endpoint,
+                    jurisdiction=jurisdiction,
+                    network_zone=network_zone,
+                    transport_layer=transport_layer,
+                    hop_nonce=hop_nonce,
+                    observed_latency_ms=observed_latency_ms,
+                    root_refs_seen=root_refs_seen,
+                    route_binding_ref=route_binding_ref,
+                    attested_participant_count=accepted_count,
+                    delivery_status=delivery_status,
+                    observed_at=observed_at,
+                )
+            )
+            total_latency_ms += observed_latency_ms
+
+        hop_chain_digest = sha256_text(canonical_json(receipt.hop_nonce_chain))
+        recorded_at = receipt.recorded_at
+        payload = {
+            "council_tier": envelope.council_tier,
+            "end_to_end_status": receipt.receipt_status,
+            "envelope_digest": envelope.envelope_digest,
+            "envelope_ref": envelope.envelope_id,
+            "hop_chain_digest": hop_chain_digest,
+            "hop_count": len(receipt.hop_nonce_chain),
+            "max_hops": envelope.max_hops,
+            "path_profile": RELAY_TELEMETRY_PROFILE,
+            "receipt_digest": receipt.digest,
+            "receipt_ref": receipt.receipt_id,
+            "recorded_at": recorded_at,
+            "relay_hops": [hop.to_dict() for hop in relay_hops],
+            "route_nonce": envelope.route_nonce,
+            "root_quorum_met": receipt.authenticity_checks["federated_roots_verified"],
+            "transport_profile": envelope.transport_profile,
+            "anti_replay_status": receipt.authenticity_checks["multi_hop_replay_status"],
+            "replay_guard_status": receipt.authenticity_checks["replay_guard_status"],
+            "total_latency_ms": round(total_latency_ms, 3),
+            "telemetry_id": new_id("distributed-telemetry"),
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportRelayTelemetry(
+            telemetry_id=payload["telemetry_id"],
+            envelope_ref=envelope.envelope_id,
+            envelope_digest=envelope.envelope_digest,
+            receipt_ref=receipt.receipt_id,
+            receipt_digest=receipt.digest,
+            council_tier=envelope.council_tier,
+            transport_profile=envelope.transport_profile,
+            path_profile=RELAY_TELEMETRY_PROFILE,
+            route_nonce=envelope.route_nonce,
+            hop_count=len(receipt.hop_nonce_chain),
+            max_hops=envelope.max_hops,
+            hop_chain_digest=hop_chain_digest,
+            relay_hops=relay_hops,
+            total_latency_ms=round(total_latency_ms, 3),
+            anti_replay_status=receipt.authenticity_checks["multi_hop_replay_status"],
+            replay_guard_status=receipt.authenticity_checks["replay_guard_status"],
+            root_quorum_met=receipt.authenticity_checks["federated_roots_verified"],
+            end_to_end_status=receipt.receipt_status,
+            recorded_at=recorded_at,
+            digest=digest,
+        )
+
     def _build_envelope(
         self,
         *,
@@ -544,3 +764,30 @@ class DistributedTransportService:
             if participant_id == "heritage://ethics-committee":
                 return "ethics-committee"
         raise ValueError(f"unsupported participant for {council_tier}: {participant_id}")
+
+    @staticmethod
+    def _require_non_empty_string(value: Any, field_name: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{field_name} must be a non-empty string")
+        return value.strip()
+
+    @classmethod
+    def _normalize_string_list(cls, values: Any, field_name: str) -> List[str]:
+        if not isinstance(values, list) or not values:
+            raise ValueError(f"{field_name} must be a non-empty list")
+        normalized: List[str] = []
+        for value in values:
+            text = cls._require_non_empty_string(value, field_name)
+            if text not in normalized:
+                normalized.append(text)
+        return normalized
+
+    @staticmethod
+    def _require_positive_float(value: Any, field_name: str) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name} must be numeric") from exc
+        if number <= 0:
+            raise ValueError(f"{field_name} must be greater than 0")
+        return number

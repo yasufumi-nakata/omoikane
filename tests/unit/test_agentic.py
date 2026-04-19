@@ -506,6 +506,50 @@ class DistributedTransportServiceTests(unittest.TestCase):
             key_epoch=1,
             hop_nonce_chain=["hop://relay-a/nonce-001", "hop://relay-b/nonce-001"],
         )
+        telemetry = service.capture_relay_telemetry(
+            rotated,
+            receipt,
+            relay_path=[
+                {
+                    "relay_id": "relay://federation/edge-a",
+                    "relay_endpoint": "relay://federation/edge-a",
+                    "jurisdiction": "JP-13",
+                    "network_zone": "apne1",
+                    "observed_latency_ms": 11.2,
+                    "root_refs_seen": ["root://federation/pki-a"],
+                },
+                {
+                    "relay_id": "relay://federation/edge-b",
+                    "relay_endpoint": "relay://federation/edge-b",
+                    "jurisdiction": "US-CA",
+                    "network_zone": "usw2",
+                    "observed_latency_ms": 15.8,
+                    "root_refs_seen": ["root://federation/pki-a", "root://federation/pki-b"],
+                },
+            ],
+        )
+        replay_telemetry = service.capture_relay_telemetry(
+            reissue,
+            replay,
+            relay_path=[
+                {
+                    "relay_id": "relay://federation/edge-a",
+                    "relay_endpoint": "relay://federation/edge-a",
+                    "jurisdiction": "JP-13",
+                    "network_zone": "apne1",
+                    "observed_latency_ms": 12.0,
+                    "root_refs_seen": ["root://federation/pki-a"],
+                },
+                {
+                    "relay_id": "relay://federation/edge-b",
+                    "relay_endpoint": "relay://federation/edge-b",
+                    "jurisdiction": "US-CA",
+                    "network_zone": "usw2",
+                    "observed_latency_ms": 16.4,
+                    "root_refs_seen": ["root://federation/pki-a"],
+                },
+            ],
+        )
 
         self.assertEqual(2, rotated.key_epoch)
         self.assertEqual([1, 2], rotated.accepted_key_epochs)
@@ -515,6 +559,14 @@ class DistributedTransportServiceTests(unittest.TestCase):
         self.assertTrue(receipt.authenticity_checks["key_epoch_accepted"])
         self.assertEqual("replay-blocked", replay.receipt_status)
         self.assertEqual("blocked", replay.authenticity_checks["multi_hop_replay_status"])
+        self.assertEqual("authenticated", telemetry.end_to_end_status)
+        self.assertEqual("accepted", telemetry.anti_replay_status)
+        self.assertEqual(2, telemetry.hop_count)
+        self.assertAlmostEqual(27.0, telemetry.total_latency_ms)
+        self.assertEqual("authenticated", telemetry.relay_hops[-1].delivery_status)
+        self.assertEqual("replay-blocked", replay_telemetry.end_to_end_status)
+        self.assertEqual("blocked", replay_telemetry.anti_replay_status)
+        self.assertEqual("replay-blocked", replay_telemetry.relay_hops[-1].delivery_status)
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

@@ -7,6 +7,7 @@ imports:
   distributed_participant_attestation: ../schemas/distributed_participant_attestation.schema
   distributed_transport_envelope: ../schemas/distributed_transport_envelope.schema
   distributed_transport_receipt: ../schemas/distributed_transport_receipt.schema
+  distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -188,6 +189,80 @@ operations:
       - replay_guard_status must become blocked on any second use of the same route_nonce
       - multi_hop_replay_status must become blocked on any reused hop_nonce_chain
       - participant_bindings must retain attestation_ref and proof_ref for every accepted participant
+  capture_relay_telemetry:
+    summary: >
+      Capture one machine-checkable relay-path telemetry snapshot for a distributed receipt
+      while preserving hop order, observed latency, seen trust roots, and anti-replay state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - receipt_ref
+          - receipt_digest
+          - relay_path
+        properties:
+          envelope_ref:
+            type: string
+            minLength: 1
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          receipt_ref:
+            type: string
+            minLength: 1
+          receipt_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          relay_path:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+                - relay_id
+                - relay_endpoint
+                - jurisdiction
+                - network_zone
+                - observed_latency_ms
+              properties:
+                relay_id:
+                  type: string
+                  minLength: 1
+                relay_endpoint:
+                  type: string
+                  minLength: 1
+                jurisdiction:
+                  type: string
+                  minLength: 1
+                network_zone:
+                  type: string
+                  minLength: 1
+                transport_layer:
+                  type: string
+                  minLength: 1
+                observed_latency_ms:
+                  type: number
+                  exclusiveMinimum: 0
+                root_refs_seen:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                observed_at:
+                  type: string
+                  format: date-time
+    output:
+      schema_ref: distributed_transport_relay_telemetry
+    guarantees:
+      - hop_count must equal the length of the receipt hop_nonce_chain and must not exceed max_hops
+      - anti_replay_status must mirror the receipt multi_hop_replay_status
+      - replay_guard_status must mirror the receipt replay_guard_status
+      - root_quorum_met must mirror the receipt federated_roots_verified result
+      - final relay hop delivery_status must equal the receipt_status
 events:
   distributed.transport_issued:
     payload:
@@ -198,8 +273,11 @@ events:
   distributed.transport_received:
     payload:
       schema_ref: distributed_transport_receipt
+  distributed.transport_telemetry_captured:
+    payload:
+      schema_ref: distributed_transport_relay_telemetry
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, federated trust roots, and multi-hop anti-replay only.
-    - Actual network PKI, remote key servers, and cross-cluster relay telemetry remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, federated trust roots, multi-hop anti-replay, and bounded relay telemetry.
+    - Actual network PKI and remote key servers remain future work.

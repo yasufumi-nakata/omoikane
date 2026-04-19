@@ -11,6 +11,7 @@
 - 同一 `route_nonce` の再利用を `replay-blocked` で止める
 - key epoch overlap と federated trust-root quorum を bounded contract として固定する
 - multi-hop relay をまたぐ `hop_nonce_chain` の再利用を `replay-blocked` で止める
+- multi-hop relay telemetry を hop 順序・latency・jurisdiction・root visibility ごとに固定する
 
 ## Federation handoff
 
@@ -67,13 +68,36 @@ reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
 route nonce replay block / multi-hop replay block を出力する。
 
+## Relay telemetry
+
+reference runtime は `capture_relay_telemetry` により、
+receipt に束縛された bounded relay observability surface も返す。
+
+| 項目 | 固定値 |
+|---|---|
+| path_profile | `bounded-relay-observability-v1` |
+| hop transport layer | Federation=`mtls`, Heritage=`attested-bridge` |
+| hop count source | `receipt.hop_nonce_chain` と同順 |
+| end-to-end status | receipt `receipt_status` を mirror |
+
+- `relay_hops` は `relay_id / relay_endpoint / jurisdiction / network_zone /
+  hop_nonce / observed_latency_ms / root_refs_seen / route_binding_ref` を保持する
+- 最終 hop の `delivery_status` は receipt `receipt_status` と一致し、
+  intermediate hop は `forwarded` として残す
+- `anti_replay_status` と `replay_guard_status` は receipt authenticity check を mirror し、
+  replay-blocked path でも telemetry 自体は残す
+- `total_latency_ms` は hop latency 合計で、`max_hops` を超える経路は fail-closed で拒否する
+
 ## 参照物
 
 - schema: `specs/schemas/distributed_participant_attestation.schema`
 - schema: `specs/schemas/distributed_transport_envelope.schema`
 - schema: `specs/schemas/distributed_transport_receipt.schema`
+- schema: `specs/schemas/distributed_transport_relay_telemetry.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
+- eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
+- decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`

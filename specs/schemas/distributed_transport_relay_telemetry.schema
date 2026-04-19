@@ -1,0 +1,224 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_relay_telemetry.schema"
+title: DistributedTransportRelayTelemetry
+description: >
+  Multi-hop relay telemetry snapshot bound to one distributed transport receipt.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - telemetry_id
+  - envelope_ref
+  - envelope_digest
+  - receipt_ref
+  - receipt_digest
+  - council_tier
+  - transport_profile
+  - path_profile
+  - route_nonce
+  - hop_count
+  - max_hops
+  - hop_chain_digest
+  - relay_hops
+  - total_latency_ms
+  - anti_replay_status
+  - replay_guard_status
+  - root_quorum_met
+  - end_to_end_status
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_transport_relay_telemetry
+  schema_version:
+    const: 1.0.0
+  telemetry_id:
+    type: string
+    pattern: "^distributed-telemetry-[a-f0-9]{12}$"
+  envelope_ref:
+    type: string
+    pattern: "^distributed-envelope-[a-f0-9]{12}$"
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_ref:
+    type: string
+    pattern: "^distributed-receipt-[a-f0-9]{12}$"
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    enum:
+      - federation-mtls-quorum-v1
+      - heritage-attested-review-v1
+  path_profile:
+    type: string
+    const: bounded-relay-observability-v1
+  route_nonce:
+    type: string
+    pattern: "^route-nonce-[a-f0-9]{12}$"
+  hop_count:
+    type: integer
+    minimum: 1
+  max_hops:
+    type: integer
+    minimum: 1
+  hop_chain_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  relay_hops:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - hop_index
+        - relay_id
+        - relay_endpoint
+        - jurisdiction
+        - network_zone
+        - transport_layer
+        - hop_nonce
+        - observed_latency_ms
+        - root_refs_seen
+        - route_binding_ref
+        - attested_participant_count
+        - delivery_status
+        - observed_at
+      properties:
+        hop_index:
+          type: integer
+          minimum: 1
+        relay_id:
+          type: string
+          minLength: 1
+        relay_endpoint:
+          type: string
+          minLength: 1
+        jurisdiction:
+          type: string
+          minLength: 1
+        network_zone:
+          type: string
+          minLength: 1
+        transport_layer:
+          type: string
+          enum:
+            - mtls
+            - attested-bridge
+        hop_nonce:
+          type: string
+          minLength: 1
+        observed_latency_ms:
+          type: number
+          exclusiveMinimum: 0
+        root_refs_seen:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        route_binding_ref:
+          type: string
+          pattern: "^relay-binding://(federation|heritage)/[a-f0-9]{16}$"
+        attested_participant_count:
+          type: integer
+          minimum: 1
+        delivery_status:
+          type: string
+          enum:
+            - forwarded
+            - authenticated
+            - rejected
+            - replay-blocked
+        observed_at:
+          type: string
+          format: date-time
+  total_latency_ms:
+    type: number
+    exclusiveMinimum: 0
+  anti_replay_status:
+    type: string
+    enum:
+      - accepted
+      - blocked
+  replay_guard_status:
+    type: string
+    enum:
+      - accepted
+      - blocked
+  root_quorum_met:
+    type: boolean
+  end_to_end_status:
+    type: string
+    enum:
+      - authenticated
+      - rejected
+      - replay-blocked
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_relay_telemetry
+    schema_version: 1.0.0
+    telemetry_id: distributed-telemetry-a4bd75d110c2
+    envelope_ref: distributed-envelope-68d8341fd25a
+    envelope_digest: c3e6505427d4632a4f49d6bd6eb3ef13f0745304c724ef8be6cba5074600e4fe
+    receipt_ref: distributed-receipt-84cb3d0db7f1
+    receipt_digest: 456e23d76c80b4212ed5a49f9cfd73e6a69b5735f8378ad3ae85d0a877490d48
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    path_profile: bounded-relay-observability-v1
+    route_nonce: route-nonce-b23f7b0c3fd4
+    hop_count: 2
+    max_hops: 2
+    hop_chain_digest: 4c7a4a7f2b47df2d7fb35be50c8d030ecf820bdc6fa0e772384f984d4a8c7c7e
+    relay_hops:
+      - hop_index: 1
+        relay_id: relay://federation/edge-a
+        relay_endpoint: relay://federation/edge-a
+        jurisdiction: JP-13
+        network_zone: apne1
+        transport_layer: mtls
+        hop_nonce: hop://federation/relay-a/nonce-002
+        observed_latency_ms: 11.2
+        root_refs_seen:
+          - root://federation/pki-a
+        route_binding_ref: relay-binding://federation/8ed7b998f21164db
+        attested_participant_count: 3
+        delivery_status: forwarded
+        observed_at: "2026-04-20T01:02:03Z"
+      - hop_index: 2
+        relay_id: relay://federation/edge-b
+        relay_endpoint: relay://federation/edge-b
+        jurisdiction: US-CA
+        network_zone: usw2
+        transport_layer: mtls
+        hop_nonce: hop://federation/relay-b/nonce-002
+        observed_latency_ms: 15.8
+        root_refs_seen:
+          - root://federation/pki-a
+          - root://federation/pki-b
+        route_binding_ref: relay-binding://federation/6aa96d151e427cbf
+        attested_participant_count: 3
+        delivery_status: authenticated
+        observed_at: "2026-04-20T01:02:04Z"
+    total_latency_ms: 27.0
+    anti_replay_status: accepted
+    replay_guard_status: accepted
+    root_quorum_met: true
+    end_to_end_status: authenticated
+    recorded_at: "2026-04-20T01:02:04Z"
+    digest: 09d5871d62b585418dc7890ae8da158c65ccf49bc8ff133634a13cd0de218353

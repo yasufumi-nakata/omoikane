@@ -558,6 +558,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
         self.assertTrue(result["validation"]["multi_hop_replay_blocks_reuse"])
         self.assertTrue(result["validation"]["federated_roots_enforced"])
+        self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
+        self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])
+        self.assertEqual(2, result["relay_telemetry"]["federation_rotated"]["hop_count"])
+        self.assertEqual(
+            "accepted",
+            result["relay_telemetry"]["federation_rotated"]["anti_replay_status"],
+        )
+        self.assertEqual(
+            "replay-blocked",
+            result["relay_telemetry"]["multi_hop_replay_blocked"]["end_to_end_status"],
+        )
 
     def test_cognitive_audit_demo_returns_cross_layer_review(self) -> None:
         runtime = OmoikaneReferenceOS()

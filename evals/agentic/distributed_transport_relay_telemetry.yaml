@@ -1,0 +1,31 @@
+eval_id: distributed_transport_relay_telemetry
+target: agentic.distributed_transport
+level: L4
+description: >
+  Distributed transport relay telemetry が hop 順序、latency 集計、root 可視性、
+  multi-hop anti-replay 状態を receipt に束縛して返すこと。
+fixtures:
+  - scenario: federation_rotated_path
+    council_tier: federation
+    hop_count: 2
+    expected:
+      end_to_end_status: authenticated
+      anti_replay_status: accepted
+      replay_guard_status: accepted
+      root_quorum_met: true
+  - scenario: heritage_replay_blocked_path
+    council_tier: heritage
+    hop_count: 2
+    expected:
+      end_to_end_status: replay-blocked
+      anti_replay_status: blocked
+      replay_guard_status: accepted
+      root_quorum_met: true
+assertions:
+  - Relay telemetry must preserve one entry per hop_nonce in order and within max_hops
+  - Final relay hop delivery_status must equal the receipt_status
+  - total_latency_ms must equal the sum of relay_hops observed_latency_ms
+  - Relay telemetry must retain seen trust roots and mirror the receipt anti-replay verdict
+metric: exact-match
+threshold: 1.0
+ethics_check: true

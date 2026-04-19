@@ -1176,6 +1176,38 @@ class OmoikaneReferenceOS:
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        rotated_telemetry = self.distributed_transport.capture_relay_telemetry(
+            rotated_federation_envelope,
+            rotated_receipt,
+            relay_path=[
+                {
+                    "relay_id": "relay://federation/edge-a",
+                    "relay_endpoint": "relay://federation/edge-a",
+                    "jurisdiction": "JP-13",
+                    "network_zone": "apne1",
+                    "observed_latency_ms": 11.2,
+                    "root_refs_seen": ["root://federation/pki-a"],
+                },
+                {
+                    "relay_id": "relay://federation/edge-b",
+                    "relay_endpoint": "relay://federation/edge-b",
+                    "jurisdiction": "US-CA",
+                    "network_zone": "usw2",
+                    "observed_latency_ms": 15.8,
+                    "root_refs_seen": ["root://federation/pki-a", "root://federation/pki-b"],
+                },
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_telemetry_captured",
+            payload=rotated_telemetry.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         heritage_proposal = self.council.propose(
             title="Interpretive remote review handoff",
@@ -1291,6 +1323,38 @@ class OmoikaneReferenceOS:
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        replay_telemetry = self.distributed_transport.capture_relay_telemetry(
+            heritage_reissue_envelope,
+            multi_hop_replay_receipt,
+            relay_path=[
+                {
+                    "relay_id": "relay://heritage/review-bridge-a",
+                    "relay_endpoint": "relay://heritage/review-bridge-a",
+                    "jurisdiction": "JP-13",
+                    "network_zone": "apne1",
+                    "observed_latency_ms": 18.4,
+                    "root_refs_seen": ["root://heritage/pki-a"],
+                },
+                {
+                    "relay_id": "relay://heritage/review-bridge-b",
+                    "relay_endpoint": "relay://heritage/review-bridge-b",
+                    "jurisdiction": "EU-DE",
+                    "network_zone": "euc1",
+                    "observed_latency_ms": 21.1,
+                    "root_refs_seen": ["root://heritage/pki-a", "root://heritage/pki-b"],
+                },
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_telemetry_captured",
+            payload=replay_telemetry.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         return {
             "identity": {
@@ -1314,6 +1378,10 @@ class OmoikaneReferenceOS:
                 "replay_blocked": replay_receipt.to_dict(),
                 "multi_hop_replay_blocked": multi_hop_replay_receipt.to_dict(),
             },
+            "relay_telemetry": {
+                "federation_rotated": rotated_telemetry.to_dict(),
+                "multi_hop_replay_blocked": replay_telemetry.to_dict(),
+            },
             "validation": {
                 "federation_transport_authenticated": federation_receipt.receipt_status
                 == "authenticated"
@@ -1332,6 +1400,14 @@ class OmoikaneReferenceOS:
                 and multi_hop_replay_receipt.authenticity_checks["multi_hop_replay_status"] == "blocked",
                 "federated_roots_enforced": rotated_federation_envelope.trust_root_quorum == 2
                 and rotated_receipt.authenticity_checks["federated_roots_verified"],
+                "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
+                == "authenticated"
+                and rotated_telemetry.anti_replay_status == "accepted"
+                and rotated_telemetry.hop_count == 2,
+                "relay_telemetry_surfaces_replay_block": replay_telemetry.end_to_end_status
+                == "replay-blocked"
+                and replay_telemetry.anti_replay_status == "blocked"
+                and replay_telemetry.hop_count == 2,
                 "participant_bindings_preserved": all(
                     binding["accepted"] for binding in federation_receipt.participant_bindings
                 )

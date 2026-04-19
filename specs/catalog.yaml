@@ -135,6 +135,15 @@ entries:
     rationale: Required to serialize authenticated, rejected, and replay-blocked remote receipts with root verification and hop-chain replay checks.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_relay_telemetry.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_relay_telemetry.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize bounded relay-path telemetry with hop order, latency, trust-root visibility, and receipt-aligned anti-replay verdicts.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -219,7 +228,7 @@ entries:
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make distributed participant attestation, key rotation overlap, federated roots, and replay guard machine-readable.
+    rationale: Required to make distributed participant attestation, key rotation overlap, federated roots, replay guard, and relay telemetry machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -861,6 +870,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects key-epoch overlap, federated root quorum, and hop-chain replay blocking for distributed remote handoff bundles.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_relay_telemetry.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects hop-ordered relay telemetry, latency aggregation, root visibility, and replay verdict mirroring for distributed remote handoff bundles.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml
