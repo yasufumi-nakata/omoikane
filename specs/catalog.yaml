@@ -262,6 +262,30 @@ entries:
     rationale: Required to serialize shared/private world-state snapshots with fixed authority and time_rate fields.
   - priority: P1
     kind: schema
+    file: specs/schemas/reasoning_trace.schema
+    consumers:
+      - specs/interfaces/cognitive.reasoning.v0.idl
+      - docs/02-subsystems/cognitive/reasoning.md
+      - reference-runtime
+    rationale: Required to serialize one bounded reasoning trace with fixed belief and evidence budgets.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/reasoning_shift.schema
+    consumers:
+      - specs/interfaces/cognitive.reasoning.v0.idl
+      - evals/cognitive/backend_failover.yaml
+      - reference-runtime
+    rationale: Required to emit a ledger-safe summary of reasoning failover without leaking raw conclusion text.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.reasoning.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/reasoning.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to fix the L3 reasoning failover and ledger-safe shift contract across docs, CLI, and runtime.
+  - priority: P1
+    kind: schema
     file: specs/schemas/wms_reconcile.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl

@@ -27,6 +27,7 @@ from omoikane.cognitive import (
     MetacognitionRequest,
     MetacognitionService,
     NarrativeReasoningBackend,
+    ReasoningRequest,
     ReflectiveLoopBackend,
     ReasoningService,
     SalienceRoutingAttentionBackend,
@@ -43,6 +44,33 @@ from omoikane.cognitive import (
 
 
 class ReasoningServiceTests(unittest.TestCase):
+    def test_structured_request_yields_valid_trace_and_shift(self) -> None:
+        service = ReasoningService(
+            profile=CognitiveProfile(primary="symbolic_v1", fallback=["narrative_v1"]),
+            backends=[
+                SymbolicReasoningBackend("symbolic_v1"),
+                NarrativeReasoningBackend("narrative_v1"),
+            ],
+        )
+
+        result = service.run(
+            ReasoningRequest(
+                tick_id=0,
+                summary="nominal review",
+                query="安全に継続できるか",
+                beliefs=["continuity-first", "append-only-ledger"],
+            )
+        )
+
+        trace_validation = service.validate_trace(dict(result["trace"]))
+        shift_validation = service.validate_shift(dict(result["shift"]))
+
+        self.assertFalse(result["degraded"])
+        self.assertTrue(trace_validation["ok"])
+        self.assertTrue(shift_validation["ok"])
+        self.assertTrue(shift_validation["safe_summary_only"])
+        self.assertEqual("symbolic_v1", result["trace"]["backend_id"])
+
     def test_failover_uses_fallback_backend(self) -> None:
         service = ReasoningService(
             profile=CognitiveProfile(primary="symbolic_v1", fallback=["narrative_v1"]),
@@ -60,6 +88,8 @@ class ReasoningServiceTests(unittest.TestCase):
         self.assertTrue(result["degraded"])
         self.assertEqual("narrative_v1", result["selected_backend"])
         self.assertEqual(["symbolic_v1", "narrative_v1"], result["attempted_backends"])
+        self.assertTrue(result["shift"]["safe_summary_only"])
+        self.assertEqual("symbolic_v1", result["shift"]["previous_backend_id"])
 
     def test_failover_raises_when_all_backends_unavailable(self) -> None:
         service = ReasoningService(

@@ -47,6 +47,7 @@ from .reasoning import (
     BackendUnavailableError,
     CognitiveProfile,
     NarrativeReasoningBackend,
+    ReasoningRequest,
     ReasoningService,
     SymbolicReasoningBackend,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "MetacognitionRequest",
     "MetacognitionService",
     "NarrativeReasoningBackend",
+    "ReasoningRequest",
     "ReflectiveLoopBackend",
     "ReasoningService",
     "SalienceRoutingAttentionBackend",

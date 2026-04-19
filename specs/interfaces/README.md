@@ -14,6 +14,7 @@
 - `mind.procedural_writeback.v0.idl`
 - `mind.qualia.v0.idl`
 - `mind.self_model.v0.idl`
+- `cognitive.reasoning.v0.idl`
 - `agentic.council.v0.idl`
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
@@ -38,8 +39,6 @@
 L2 procedural skill execution enactment、
 L6 sensory loopback や richer distributed surfaces は
 docs 側で設計を深めてから昇格させる。
-reference runtime にある reasoning failover も、現時点では内部実装に留め、
-IDL 化は service 境界が安定してから行う。
 
 ## 形式
 

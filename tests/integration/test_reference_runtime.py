@@ -177,14 +177,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-writeback"])
 
-    def test_cognitive_failover_demo_records_fallback(self) -> None:
+    def test_reasoning_demo_records_baseline_and_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
 
-        result = runtime.run_cognitive_failover_demo()
+        result = runtime.run_reasoning_demo()
 
         self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["baseline_primary"])
         self.assertTrue(result["reasoning"]["degraded"])
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
+        self.assertTrue(result["validation"]["shift_safe"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_affect_demo_records_smoothed_failover(self) -> None:

@@ -51,6 +51,7 @@ status: decided | superseded
 - [2026-04-19_semantic-memory-projection.md](2026-04-19_semantic-memory-projection.md)
 - [2026-04-19_procedural-memory-preview.md](2026-04-19_procedural-memory-preview.md)
 - [2026-04-19_procedural-writeback-gate.md](2026-04-19_procedural-writeback-gate.md)
+- [2026-04-19_reasoning-service-contract-promotion.md](2026-04-19_reasoning-service-contract-promotion.md)
 - [2026-04-19_imagination-failover-handoff.md](2026-04-19_imagination-failover-handoff.md)
 - [2026-04-19_language-disclosure-floor.md](2026-04-19_language-disclosure-floor.md)
 - [2026-04-19_metacognition-self-monitor-loop.md](2026-04-19_metacognition-self-monitor-loop.md)

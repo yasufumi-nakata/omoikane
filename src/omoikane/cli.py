@@ -95,9 +95,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     episodic_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    reasoning_parser = subparsers.add_parser(
+        "reasoning-demo",
+        help="Run the L3 reasoning backend failover and ledger-safe trace scenario",
+    )
+    reasoning_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     cognitive_parser = subparsers.add_parser(
         "cognitive-demo",
-        help="Run the L3 reasoning backend failover scenario",
+        help="Legacy alias for reasoning-demo",
     )
     cognitive_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
@@ -290,8 +296,12 @@ def main() -> None:
         _print_result(runtime.run_episodic_demo(), args.json)
         return
 
+    if args.command == "reasoning-demo":
+        _print_result(runtime.run_reasoning_demo(), args.json)
+        return
+
     if args.command == "cognitive-demo":
-        _print_result(runtime.run_cognitive_failover_demo(), args.json)
+        _print_result(runtime.run_reasoning_demo(), args.json)
         return
 
     if args.command == "affect-demo":

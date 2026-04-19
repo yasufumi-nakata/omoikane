@@ -38,10 +38,13 @@ cognitive_profile:
       - 'no_artificial_dampening_without_consent'
 ```
 
-reference runtime では、この方針の最小版として `Reasoning` に限り
-`primary -> fallback` の単純 failover を持つ。
-切替条件は backend の health check 失敗のみで、切替結果は
-ContinuityLedger に `cognitive.reasoning.failover` として記録する。
+reference runtime では `Reasoning` に対して
+`bounded-reasoning-failover-v1` を採用し、
+`symbolic_v1 -> narrative_v1` の単純 failover を持つ。
+切替条件は backend の health check 失敗のみで、
+full trace は `reasoning_trace` に閉じ込めつつ、
+ContinuityLedger には digest-safe な `reasoning_shift`
+として `cognitive.reasoning.failover` を記録する。
 繰り返し failover や policy 変更は L4 Council の審査対象とし、
 通常運転では primary のみをアクティブに保つ。
 
@@ -116,8 +119,9 @@ bounded self-monitor report を持つ。
 
 ## Reference runtime の現在地
 
-現行の reference runtime は L3 全面実装ではないが、`Reasoning` に限って
-health-based failover を持つ。`Affect` は bounded failover と smoothing を持ち、
+現行の reference runtime は L3 全面実装ではないが、`Reasoning` は
+`cognitive.reasoning.v0` と health-based failover / ledger-safe shift を持つ。
+`Affect` は bounded failover と smoothing を持ち、
 `Attention`、`Volition`、`Imagination` も guard-aware / handoff-aware な
 single-switch failover を持つ。`Language` も disclosure floor 付きの
 thought-to-text bridge を持ち、`Metacognition` も SelfModel/Qualia 由来の
@@ -131,6 +135,7 @@ language failover、metacognition failover を
 
 ## サブドキュメント
 
+- [reasoning.md](reasoning.md) ── L3 reasoning failover と ledger-safe shift summary
 - [affect.md](affect.md) ── L3 affect failover と continuity smoothing
 - [attention.md](attention.md) ── L3 attention failover と affect-aware safe target routing
 - [volition.md](volition.md) ── L3 volition failover と guard-aware intent arbitration

@@ -185,6 +185,31 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("canonical-episodic-stream-v1", result["profile"]["policy_id"])
         self.assertEqual(5, result["handoff"]["candidate_event_count"])
 
+    def test_reasoning_demo_emits_trace_and_shift_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "reasoning-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["baseline_primary"])
+        self.assertEqual("narrative_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["shift_safe"])
+        self.assertEqual("reasoning_trace", result["reasoning"]["trace"]["kind"])
+        self.assertEqual("reasoning_shift", result["reasoning"]["shift"]["kind"])
+
+    def test_cognitive_demo_remains_reasoning_alias(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "cognitive-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
+        self.assertTrue(result["reasoning"]["shift"]["safe_summary_only"])
+
     def test_substrate_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

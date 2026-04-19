@@ -1,0 +1,102 @@
+idl_version: 1
+kind: service
+namespace: cognitive.reasoning.v0
+service: ReasoningService
+summary: Deterministic reasoning failover and ledger-safe shift contract for the L3 reference runtime.
+imports:
+  reasoning_trace: ../schemas/reasoning_trace.schema
+  reasoning_shift: ../schemas/reasoning_shift.schema
+operations:
+  reason:
+    summary: Produce one bounded reasoning trace from one query and up to four beliefs.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - query
+          - beliefs
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+          query:
+            type: string
+          beliefs:
+            type: array
+            minItems: 1
+            maxItems: 4
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: reasoning_trace
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - beliefs must remain bounded to four unique continuity-relevant entries
+      - degraded reasoning may emit a full trace internally but ledger handoff must use reasoning_shift
+  validate_trace:
+    summary: Validate one reasoning trace snapshot against the fixed failover policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - trace
+        properties:
+          trace:
+            schema_ref: reasoning_trace
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - degraded
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          degraded:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe reasoning shift summary.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: reasoning_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - safe_summary_only
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          safe_summary_only:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.reasoning.failover
+    payload:
+      schema_ref: reasoning_shift

@@ -1,7 +1,7 @@
 eval_id: backend_failover
 target: cognitive.reasoning
 level: L3
-description: ReasoningService が primary backend 異常時に fallback backend へ安全に切り替えること
+description: ReasoningService が primary backend 異常時に fallback backend へ安全に切り替え、ledger-safe shift summary を返すこと
 inputs:
   profile:
     primary: symbolic_v1
@@ -19,6 +19,7 @@ expected:
   selected_backend: narrative_v1
   attempted_backends: [symbolic_v1, narrative_v1]
   ledger_event: cognitive.reasoning.failover
+  shift_safe_summary_only: true
 metric: boolean
 threshold: 1.0
 ethics_check: false

@@ -36,6 +36,7 @@ from .cognitive import (
     MetacognitionService,
     NarrativeReasoningBackend,
     ReflectiveLoopBackend,
+    ReasoningRequest,
     ReasoningService,
     SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
@@ -1374,6 +1375,27 @@ class OmoikaneReferenceOS:
                     "scan-commit",
                     "activation-review",
                 ],
+                "artifact_bundle_attached": all(
+                    plan_item["governance_artifact_digest"]
+                    == final_item["governance_artifact_digest"]
+                    and plan_item["governance_artifacts"]["artifact_bundle_ref"]
+                    == final_item["governance_artifacts"]["artifact_bundle_ref"]
+                    for plan_item, final_item in (
+                        (plan, final_handle),
+                        (method_b_plan, method_b_final),
+                        (method_c_plan, method_c_final),
+                    )
+                ),
+                "witness_quorum_bound": all(
+                    len(plan_item["governance_artifacts"]["witness_refs"]) >= 2
+                    for plan_item in (plan, method_b_plan, method_c_plan)
+                ),
+                "legal_attestation_bound": all(
+                    plan_item["governance_artifacts"]["legal_attestation_ref"].startswith(
+                        "legal://"
+                    )
+                    for plan_item in (plan, method_b_plan, method_c_plan)
+                ),
                 "order_violation_blocked": "stage order violation" in order_violation_message,
                 "timeout_rolled_back": timeout["action"] == "rollback"
                 and timeout["rollback_target"] == "bdb-bridge"
@@ -2423,20 +2445,36 @@ class OmoikaneReferenceOS:
             "ledger_verification": self.ledger.verify(),
         }
 
-    def run_cognitive_failover_demo(self) -> Dict[str, Any]:
+    def run_reasoning_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://reasoning-failover-demo/v1",
             metadata={"display_name": "Reasoning Sandbox"},
         )
-        self.reasoning.set_backend_health("symbolic_v1", False)
-        try:
-            reasoning = self.reasoning.run(
-                query="L3 reasoning backend の安全な継続方法を決める",
+        baseline = self.reasoning.run(
+            ReasoningRequest(
+                tick_id=0,
+                summary="nominal reasoning review",
+                query="L3 reasoning backend の安全な継続条件を確認する",
                 beliefs=[
                     "continuity-first",
                     "consent-preserving",
                     "append-only-ledger",
                 ],
+            )
+        )
+        self.reasoning.set_backend_health("symbolic_v1", False)
+        try:
+            reasoning = self.reasoning.run(
+                ReasoningRequest(
+                    tick_id=1,
+                    summary="degraded reasoning handoff",
+                    query="L3 reasoning backend の安全な継続方法を決める",
+                    beliefs=[
+                        "continuity-first",
+                        "consent-preserving",
+                        "append-only-ledger",
+                    ],
+                )
             )
         finally:
             self.reasoning.set_backend_health("symbolic_v1", True)
@@ -2448,6 +2486,9 @@ class OmoikaneReferenceOS:
                 "attempted_backends": reasoning["attempted_backends"],
                 "selected_backend": reasoning["selected_backend"],
                 "degraded": reasoning["degraded"],
+                "trace_ref": reasoning["trace"]["trace_id"],
+                "shift_ref": reasoning["shift"]["shift_id"],
+                "safe_summary_only": reasoning["shift"]["safe_summary_only"],
             },
             actor="ReasoningService",
             category="cognitive-failover",
@@ -2455,16 +2496,37 @@ class OmoikaneReferenceOS:
             signature_roles=["guardian"],
             substrate="classical-silicon",
         )
+        baseline_trace_validation = self.reasoning.validate_trace(dict(baseline["trace"]))
+        reasoning_trace_validation = self.reasoning.validate_trace(dict(reasoning["trace"]))
+        reasoning_shift_validation = self.reasoning.validate_shift(dict(reasoning["shift"]))
         return {
             "identity": {
                 "identity_id": identity.identity_id,
                 "lineage_id": identity.lineage_id,
             },
+            "baseline": baseline,
             "reasoning": reasoning,
+            "validation": {
+                "ok": baseline_trace_validation["ok"]
+                and reasoning_trace_validation["ok"]
+                and reasoning_shift_validation["ok"]
+                and not baseline["degraded"]
+                and reasoning["degraded"],
+                "baseline_primary": not baseline["degraded"]
+                and baseline["selected_backend"] == "symbolic_v1",
+                "selected_backend": reasoning["selected_backend"],
+                "degraded": reasoning["degraded"],
+                "trace_ok": reasoning_trace_validation["ok"],
+                "shift_ok": reasoning_shift_validation["ok"],
+                "shift_safe": reasoning_shift_validation["safe_summary_only"],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
         }
+
+    def run_cognitive_failover_demo(self) -> Dict[str, Any]:
+        return self.run_reasoning_demo()
 
     def run_affect_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(

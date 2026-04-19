@@ -1,0 +1,152 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/reasoning_trace.schema"
+title: ReasoningTrace
+description: Deterministic L3 reasoning trace produced by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - trace_id
+  - generated_at
+  - policy
+  - backend_id
+  - source_tick
+  - belief_summary
+  - conclusion
+  - evidence
+  - confidence
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: reasoning_trace
+  schema_version:
+    const: 1.0.0
+  trace_id:
+    type: string
+    pattern: "^reasoning-trace-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - max_beliefs
+      - max_evidence_items
+      - failover_mode
+      - safety_posture
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: bounded-reasoning-failover-v1
+      primary:
+        type: string
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      max_beliefs:
+        const: 4
+      max_evidence_items:
+        const: 4
+      failover_mode:
+        const: single-switch
+      safety_posture:
+        const: continuity-first
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - query
+      - beliefs
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      query:
+        type: string
+        minLength: 1
+      beliefs:
+        type: array
+        minItems: 1
+        maxItems: 4
+        items:
+          type: string
+          minLength: 1
+  belief_summary:
+    type: array
+    minItems: 1
+    maxItems: 4
+    items:
+      type: string
+      minLength: 1
+  conclusion:
+    type: string
+    minLength: 1
+  evidence:
+    type: array
+    minItems: 1
+    maxItems: 4
+    items:
+      type: string
+      minLength: 1
+  confidence:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - attempted_backends
+      - failures
+      - fallback_trigger
+      - safety_posture
+      - evidence_budget
+      - rationale
+    properties:
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      failures:
+        type: array
+        items:
+          type: string
+      fallback_trigger:
+        type: string
+        enum:
+          - none
+          - backend-health-unavailable
+      safety_posture:
+        const: continuity-first
+      evidence_budget:
+        const: 4
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

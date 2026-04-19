@@ -41,6 +41,7 @@ PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
+PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
 PYTHONPATH=src python3 -m omoikane.cli volition-demo --json
@@ -48,7 +49,6 @@ PYTHONPATH=src python3 -m omoikane.cli imagination-demo --json
 PYTHONPATH=src python3 -m omoikane.cli language-demo --json
 PYTHONPATH=src python3 -m omoikane.cli metacognition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
-PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
@@ -156,6 +156,14 @@ validated preview を `human-approved-procedural-writeback-v1` で copied
 `Connectome` snapshot へ適用しつつ、
 2 名の human reviewer quorum、continuity diff metadata、
 rollback token、`procedural-writeback` ledger event を確認する。
+
+`reasoning-demo` は L3 reasoning failover の reference contract
+(`cognitive.reasoning.v0`) を JSON で可視化し、
+`symbolic_v1` baseline から `narrative_v1` fallback への
+single-switch failover、bounded belief budget、`reasoning_trace` と
+ledger-safe な `reasoning_shift` の分離、
+`cognitive.reasoning.failover` ledger event を確認する。
+`cognitive-demo` は互換性のための alias として残す。
 
 `affect-demo` は L3 affect failover の reference contract
 (`cognitive.affect.v0`) を JSON で可視化し、
