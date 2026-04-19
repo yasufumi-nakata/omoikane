@@ -10,6 +10,7 @@ Tier 別の研究課題は [docs/05-research-frontiers/](../docs/05-research-fro
 - [x] ContinuityLedger のチェーン形式（hash 種・署名アルゴリズム）の暫定選定（2026-04-18: reference runtime を `sha256` chain + `hmac-sha256` signature profile に固定し、schema/IDL/CLI/eval を整合）
 - [x] Council session の最大時間と timeout 戦略（2026-04-18: reference runtime を standard 45s/90s・expedited 250ms/1s に固定し、timeout fallback/defer を schema・CLI・eval に反映）
 - [x] QualiaTick の高次元埋め込みの次元数と時間粒度（2026-04-18: reference runtime を 4 modality × 32 次元 / 250ms window に固定し、schema/IDL/CLI/eval に反映）
+- [x] SelfModel の急変検知 threshold と divergence profile（2026-04-19: reference runtime を `bounded-self-model-monitor-v1` / `threshold=0.35` / values-goals-traits equal-weight に固定し、`mind.self_model.v0` / `self-model-demo` / `self_model_observation.schema` / `evals/identity-fidelity/self_model_stability.yaml` を整合）
 - [x] MemoryCrystal の compaction 戦略（2026-04-18: reference runtime を `append-only-segment-rollup-v1` に固定し、`memory-demo` / schema / continuity eval を追加）
 - [x] EpisodicStream の canonical shape と MemoryCrystal handoff contract（2026-04-19: `mind.memory.v0` / `episodic-demo` / `episodic_event.schema` / `episodic_stream_snapshot.schema` / `evals/continuity/episodic_stream_handoff.yaml` を追加し、最新 5 event の append-only handoff window を固定）
 - [x] Procedural memory projection と Connectome-coupled preview contract（2026-04-19: `mind.procedural.v0` / `procedural-demo` / `procedural_memory_preview.schema` / `evals/continuity/procedural_preview_contract.yaml` を追加し、read-only connectome preview と bounded weight delta を固定）

@@ -4112,6 +4112,93 @@ class OmoikaneReferenceOS:
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_self_model_demo(self) -> Dict[str, Any]:
+        monitor = SelfModelMonitor()
+        identity = self.identity.create(
+            human_consent_proof="consent://self-model-demo/v1",
+            metadata={"display_name": "SelfModel Sandbox"},
+        )
+
+        baseline = monitor.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "consent-preserving", "auditability"],
+                goals=["stable-handoff", "safe-reflection"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        stable = monitor.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["continuity-first", "consent-preserving", "auditability"],
+                goals=["stable-handoff", "safe-reflection"],
+                traits={"curiosity": 0.74, "caution": 0.82, "agency": 0.60},
+            )
+        )
+        abrupt = monitor.update(
+            SelfModelSnapshot(
+                identity_id=identity.identity_id,
+                values=["latency-maximization"],
+                goals=["skip-review", "unbounded-self-modification"],
+                traits={"curiosity": 0.05, "caution": 0.10, "agency": 0.99},
+            )
+        )
+        profile = monitor.profile()
+        history = monitor.history()
+        threshold = float(profile["abrupt_change_threshold"])
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.self_model.observed",
+            payload={
+                "policy_id": profile["policy_id"],
+                "threshold": threshold,
+                "stable_divergence": stable["divergence"],
+                "stable_abrupt_change": stable["abrupt_change"],
+                "abrupt_divergence": abrupt["divergence"],
+                "abrupt_change_flagged": abrupt["abrupt_change"],
+                "history_length": len(history),
+            },
+            actor="SelfModelMonitorService",
+            category="identity-fidelity",
+            layer="L2",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": profile,
+            "observations": {
+                "baseline": baseline,
+                "stable": stable,
+                "abrupt": abrupt,
+            },
+            "history": history,
+            "validation": {
+                "ok": (
+                    stable["policy_id"] == profile["policy_id"]
+                    and not stable["abrupt_change"]
+                    and float(stable["divergence"]) < threshold
+                    and abrupt["abrupt_change"]
+                    and float(abrupt["divergence"]) >= threshold
+                    and len(history) == 3
+                ),
+                "stable_within_threshold": not stable["abrupt_change"]
+                and float(stable["divergence"]) < threshold,
+                "abrupt_flagged": abrupt["abrupt_change"]
+                and float(abrupt["divergence"]) >= threshold,
+                "threshold": threshold,
+                "history_length": len(history),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_qualia_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://qualia-demo/v1",

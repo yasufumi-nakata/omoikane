@@ -7,6 +7,10 @@ from typing import Dict, List, Sequence
 
 from ..common import utc_now_iso
 
+SELF_MODEL_POLICY_ID = "bounded-self-model-monitor-v1"
+SELF_MODEL_ABRUPT_CHANGE_THRESHOLD = 0.35
+SELF_MODEL_COMPARISON_COMPONENTS = ("values", "goals", "traits")
+
 
 @dataclass
 class SelfModelSnapshot:
@@ -22,9 +26,21 @@ class SelfModelSnapshot:
 class SelfModelMonitor:
     """Tracks snapshots and flags abrupt deviations."""
 
-    def __init__(self, abrupt_change_threshold: float = 0.35) -> None:
+    def __init__(
+        self,
+        abrupt_change_threshold: float = SELF_MODEL_ABRUPT_CHANGE_THRESHOLD,
+    ) -> None:
         self._history: List[SelfModelSnapshot] = []
         self._threshold = abrupt_change_threshold
+
+    def profile(self) -> Dict[str, object]:
+        return {
+            "policy_id": SELF_MODEL_POLICY_ID,
+            "abrupt_change_threshold": round(self._threshold, 2),
+            "comparison_components": list(SELF_MODEL_COMPARISON_COMPONENTS),
+            "trait_distance_mode": "mean-absolute-delta",
+            "change_window": "adjacent-snapshot",
+        }
 
     @staticmethod
     def _set_distance(left: Sequence[str], right: Sequence[str]) -> float:
@@ -61,11 +77,13 @@ class SelfModelMonitor:
 
         self._history.append(snapshot)
         return {
+            "policy_id": SELF_MODEL_POLICY_ID,
             "abrupt_change": abrupt,
             "divergence": round(divergence, 4),
+            "threshold": round(self._threshold, 2),
+            "history_length": len(self._history),
             "snapshot": asdict(snapshot),
         }
 
     def history(self) -> List[Dict[str, object]]:
         return [asdict(snapshot) for snapshot in self._history]
-

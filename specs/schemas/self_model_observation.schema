@@ -1,0 +1,47 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_observation.schema"
+title: SelfModelObservation
+description: Summary of one self-model update and abrupt-change decision.
+type: object
+additionalProperties: false
+required:
+  - policy_id
+  - abrupt_change
+  - divergence
+  - threshold
+  - history_length
+  - snapshot
+properties:
+  policy_id:
+    type: string
+    const: bounded-self-model-monitor-v1
+  abrupt_change:
+    type: boolean
+  divergence:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  threshold:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  history_length:
+    type: integer
+    minimum: 1
+  snapshot:
+    $ref: "self_model.schema"
+examples:
+  - policy_id: bounded-self-model-monitor-v1
+    abrupt_change: false
+    divergence: 0.08
+    threshold: 0.35
+    history_length: 2
+    snapshot:
+      identity_id: id-1
+      values: [continuity-first, consent-preserving]
+      goals: [stable-handoff, safe-reflection]
+      traits:
+        curiosity: 0.74
+        caution: 0.82
+        agency: 0.60
+      recorded_at: "2026-04-19T09:30:00Z"

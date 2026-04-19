@@ -34,13 +34,18 @@ SelfModel:
 2. **Council 監視** ── SelfModel の急変は人格乗っ取り or 病理の徴候。Council が検知する。
 3. **本人観察** ── 本人が自分の SelfModel を読める権利を持つ。
 
+reference runtime では `bounded-self-model-monitor-v1` を採用し、
+divergence を `values` / `goals` / `traits` の 3 成分平均で計算する。
+adjacent snapshot 間の divergence が `0.35` 以上なら `abrupt_change=true` とし、
+それ未満は stable drift として扱う。
+
 ## 急変検知
 
 ```
 急変判定:
-  - core_values の重みが 24h で 0.3 以上変動 → flag
-  - relationships の主要ノードが 7d で 50% 以上変化 → flag
-  - identity_core の name/pronouns 変更 → flag (本人意思か確認)
+  - reference runtime は `values` / `goals` / `traits` の equal-weight divergence を使う
+  - adjacent snapshot の divergence が `0.35` 以上 → flag
+  - stable drift は `0.35` 未満に留め、history は append-only で保持する
 ```
 
 flag された変化は Council が本人に確認する。**変化の自由は損なわず、外部からの操作のみ拒否する** バランス。

@@ -264,6 +264,31 @@ entries:
       - docs/02-subsystems/mind-substrate/qualia-buffer.md
     rationale: Qualia buffer append/read contract for the fixed 32d/250ms reference profile.
   - priority: P1
+    kind: schema
+    file: specs/schemas/self_model.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - reference-runtime
+    rationale: Required to serialize one declared self-model snapshot before identity-fidelity and metacognition surfaces interpret it.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/self_model_observation.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize one bounded self-model divergence observation with the fixed abrupt-change threshold.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.self_model.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make the L2 self-model monitoring threshold and append-only observation contract machine-readable.
+  - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
     consumers:
@@ -1007,6 +1032,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the fixed Omoikane romanization and Mirage Self naming policy across docs and runtime.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_stability.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+    rationale: Protects stable self-model drift from being misclassified as an abrupt takeover in the fixed 0.35 threshold profile.
   - priority: P1
     kind: schema
     file: specs/schemas/release_manifest.schema

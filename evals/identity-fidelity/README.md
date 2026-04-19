@@ -2,6 +2,14 @@
 
 自我の同一性が **アップロード前後で保たれているか** を評価する。
 
+## 実装済み eval
+
+- `self_model_stability.yaml`
+- `naming_policy_contract.yaml`
+
+`self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
+軽微な trait drift が abrupt takeover 判定に誤爆しないことを保護する。
+
 ## 評価項目（暫定）
 
 ### Episodic Recall Fidelity

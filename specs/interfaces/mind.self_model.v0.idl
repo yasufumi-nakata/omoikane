@@ -5,23 +5,61 @@ service: SelfModelMonitorService
 summary: Reference self-model snapshot and divergence detection contract.
 imports:
   self_model: ../schemas/self_model.schema
+  self_model_observation: ../schemas/self_model_observation.schema
 operations:
+  profile:
+    summary: Return the fixed divergence policy used by the reference runtime.
+    output:
+      inline_schema:
+        type: object
+        required:
+          - policy_id
+          - abrupt_change_threshold
+          - comparison_components
+          - trait_distance_mode
+          - change_window
+        properties:
+          policy_id:
+            type: string
+            const: bounded-self-model-monitor-v1
+          abrupt_change_threshold:
+            type: number
+            const: 0.35
+          comparison_components:
+            type: array
+            items:
+              type: string
+            minItems: 3
+            maxItems: 3
+          trait_distance_mode:
+            type: string
+            const: mean-absolute-delta
+          change_window:
+            type: string
+            const: adjacent-snapshot
   update:
     summary: Persist one self-model snapshot and compute divergence from the previous one.
     input:
       schema_ref: self_model
     output:
+      schema_ref: self_model_observation
+  history:
+    summary: Return the most recent self-model snapshots for one monitor instance.
+    input:
       inline_schema:
         type: object
         required:
-          - abrupt_change
-          - divergence
-          - snapshot
+          - count
         properties:
-          abrupt_change:
-            type: boolean
-          divergence:
-            type: number
-          snapshot:
-            schema_ref: self_model
-
+          count:
+            type: integer
+            minimum: 1
+    output:
+      inline_schema:
+        type: array
+        items:
+          schema_ref: self_model
+invariants:
+  - abrupt_change_threshold is fixed at 0.35 in the reference runtime
+  - values, goals, and traits contribute equally to divergence
+  - update appends snapshots monotonically within a single monitor instance

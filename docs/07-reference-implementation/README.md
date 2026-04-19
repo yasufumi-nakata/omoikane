@@ -43,6 +43,7 @@ PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
+PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
@@ -129,6 +130,13 @@ invalid self proof の reject を 1 シナリオで確認する。
 (`visual/auditory/somatic/interoceptive` の 4 modality、
 各 32 次元、250ms sampling window) を JSON で可視化し、
 checkpoint ledger event まで含めて確認する。
+
+`self-model-demo` は L2 SelfModelMonitor の reference contract
+(`mind.self_model.v0`) を JSON で可視化し、
+`bounded-self-model-monitor-v1` の `threshold=0.35`、
+values / goals / traits の equal-weight divergence、
+stable drift と abrupt takeover 候補の両観測、
+`mind.self_model.observed` ledger event を確認する。
 
 `sandbox-demo` は L5 Sandboxer の surrogate suffering proxy
 (`surrogate-suffering-proxy-v0`) を JSON で可視化し、

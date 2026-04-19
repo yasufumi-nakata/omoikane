@@ -19,6 +19,9 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 「自分はこういう人間だ」という自己認識のネットワーク。
 - 価値観・性格・好み・対人関係
 - 動的に更新されるが、急変は Council が監視（人格乗っ取り防止）
+- reference runtime では `bounded-self-model-monitor-v1` として
+  values / goals / traits の equal-weight divergence と
+  abrupt-change threshold `0.35` を固定する
 
 ### MemoryCrystal
 長期記憶の **不変表現**。
@@ -90,6 +93,5 @@ and
 
 - Qualia の **正規表現（canonical encoding）** ── そもそも表現可能か
 - 記憶を **substrate 中立に** 表現する正規形
-- SelfModel の急変検知の閾値
 
 → [docs/05-research-frontiers/](../../05-research-frontiers/)

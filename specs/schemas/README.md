@@ -10,6 +10,7 @@
 - `affect_state.schema`
 - `affect_transition.schema`
 - `self_model.schema`
+- `self_model_observation.schema`
 - `connectome_document.schema`
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`

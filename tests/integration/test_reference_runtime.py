@@ -308,6 +308,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(32, len(result["qualia"]["recent"][0]["sensory_embeddings"]["visual"]))
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["qualia-checkpoint"])
 
+    def test_self_model_demo_reports_stable_and_abrupt_observations(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_self_model_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("bounded-self-model-monitor-v1", result["profile"]["policy_id"])
+        self.assertEqual(0.35, result["validation"]["threshold"])
+        self.assertTrue(result["validation"]["stable_within_threshold"])
+        self.assertTrue(result["validation"]["abrupt_flagged"])
+        self.assertEqual(3, result["validation"]["history_length"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])
+
     def test_sandbox_demo_freezes_on_surrogate_signal(self) -> None:
         runtime = OmoikaneReferenceOS()
 

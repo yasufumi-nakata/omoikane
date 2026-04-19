@@ -73,6 +73,32 @@ class QualiaBufferTests(unittest.TestCase):
 
 
 class SelfModelMonitorTests(unittest.TestCase):
+    def test_stable_drift_stays_below_fixed_threshold(self) -> None:
+        monitor = SelfModelMonitor()
+        monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+
+        result = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.74, "caution": 0.82, "agency": 0.60},
+            )
+        )
+
+        self.assertFalse(result["abrupt_change"])
+        self.assertEqual("bounded-self-model-monitor-v1", result["policy_id"])
+        self.assertEqual(0.35, result["threshold"])
+        self.assertEqual(2, result["history_length"])
+        self.assertEqual(0.35, monitor.profile()["abrupt_change_threshold"])
+
     def test_abrupt_change_is_flagged(self) -> None:
         monitor = SelfModelMonitor(abrupt_change_threshold=0.35)
         monitor.update(
