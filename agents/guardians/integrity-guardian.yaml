@@ -10,5 +10,6 @@ prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
+  - builder staged rollout の regression を rollback 実行へ落とす時
 when_not_to_invoke: |
   - 設計議論

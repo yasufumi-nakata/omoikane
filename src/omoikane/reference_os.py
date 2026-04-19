@@ -83,6 +83,7 @@ from .self_construction import (
     DifferentialEvaluatorService,
     GapScanner,
     PatchGeneratorService,
+    RollbackEngineService,
     RolloutPlannerService,
     SandboxSentinel,
     SandboxApplyService,
@@ -194,6 +195,7 @@ class OmoikaneReferenceOS:
         self.diff_evaluator = DifferentialEvaluatorService()
         self.sandbox_apply = SandboxApplyService()
         self.rollout_planner = RolloutPlannerService()
+        self.rollback_engine = RollbackEngineService()
         self.amendment = AmendmentService()
         self.oversight = OversightService(trust_service=self.trust)
         self.naming = NamingService()
@@ -5992,6 +5994,323 @@ class OmoikaneReferenceOS:
                 "rollback_ready": rollout_session["rollback_ready"],
                 "council_output_binds_build_request": council_output["emitted_artifacts"][0]["ref"]
                 == f"build://{build_request['request_id']}",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_rollback_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://rollback-demo/v1",
+            metadata={"display_name": "Rollback Pipeline Sandbox"},
+        )
+        build_request = {
+            "kind": "build_request",
+            "schema_version": "1.0.0",
+            "request_id": "build-l5-rollback-0001",
+            "target_subsystem": "L5.RollbackEngine",
+            "change_class": "safety-hardening",
+            "change_summary": "Materialize deterministic rollback execution for the builder pipeline.",
+            "design_refs": [
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+                "docs/04-ai-governance/self-modification.md",
+            ],
+            "spec_refs": [
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/interfaces/selfctor.diff_eval.v0.idl",
+                "specs/interfaces/selfctor.rollout.v0.idl",
+                "specs/interfaces/selfctor.rollback.v0.idl",
+                "specs/schemas/build_request.yaml",
+                "specs/schemas/build_artifact.yaml",
+                "specs/schemas/sandbox_apply_receipt.schema",
+                "specs/schemas/staged_rollout_session.schema",
+                "specs/schemas/builder_rollback_session.schema",
+            ],
+            "invariants": [
+                "self_modify rollback restores pre-apply Mirage Self snapshot",
+                "self_modify rollback keeps continuity evidence append-only",
+                "self_modify rollback notifies self council guardian",
+            ],
+            "constraints": {
+                "must_pass": [
+                    "evals/continuity/council_output_build_request_pipeline.yaml",
+                    "evals/continuity/builder_staged_rollout_execution.yaml",
+                    "evals/continuity/builder_rollback_execution.yaml",
+                ],
+                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                "sandbox_profile": "forked-self",
+                "allowed_write_paths": [
+                    "src/omoikane/self_construction/",
+                    "tests/unit/",
+                    "tests/integration/",
+                    "docs/02-subsystems/self-construction/",
+                    "docs/04-ai-governance/",
+                    "evals/continuity/",
+                    "meta/decision-log/",
+                ],
+            },
+            "workspace_scope": [
+                "src/",
+                "tests/",
+                "specs/",
+                "evals/",
+                "docs/",
+                "meta/decision-log/",
+            ],
+            "output_paths": [
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "tests/integration/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
+            ],
+            "approval_context": {
+                "council_session_id": "sess-builder-rollback-0001",
+                "guardian_gate": "pass",
+            },
+        }
+        scope_validation = self.patch_generator.validate_scope(build_request)
+        build_artifact = self.patch_generator.generate_patch_set(build_request)
+        patch_descriptions = [
+            self.patch_generator.describe_patch(descriptor)
+            for descriptor in build_artifact.get("patches", [])
+        ]
+        sandbox_apply_receipt = self.sandbox_apply.apply_artifact(
+            build_request=build_request,
+            build_artifact=build_artifact,
+        )
+        sandbox_apply_validation = self.sandbox_apply.validate_receipt(sandbox_apply_receipt)
+        suite_selection = self.diff_evaluator.select_suite(
+            target_subsystem=build_request["target_subsystem"],
+            requested_evals=build_request["constraints"]["must_pass"],
+        )
+        eval_reports = [
+            self.diff_evaluator.run_ab_eval(
+                eval_ref=eval_ref,
+                baseline_ref="runtime://baseline/current",
+                sandbox_ref=(
+                    "mirage://build-l5-rollback-0001/snapshot/rollback-breach"
+                    if eval_ref == "evals/continuity/builder_rollback_execution.yaml"
+                    else sandbox_apply_receipt["sandbox_snapshot_ref"]
+                ),
+            )
+            for eval_ref in suite_selection["selected_evals"]
+        ]
+        rollout = self.diff_evaluator.classify_rollout(
+            outcomes=[report["outcome"] for report in eval_reports]
+        )
+        rollout_session = self.rollout_planner.execute_rollout(
+            build_request=build_request,
+            apply_receipt=sandbox_apply_receipt,
+            eval_reports=eval_reports,
+            decision=rollout["decision"],
+            guardian_gate_status=build_request["approval_context"]["guardian_gate"],
+        )
+        rollout_session_validation = self.rollout_planner.validate_session(rollout_session)
+        rollback_session = self.rollback_engine.execute_rollback(
+            build_request=build_request,
+            apply_receipt=sandbox_apply_receipt,
+            rollout_session=rollout_session,
+            trigger="eval-regression",
+            reason="Regression detected during canary rollout.",
+            initiator="IntegrityGuardian",
+        )
+        rollback_session_validation = self.rollback_engine.validate_session(rollback_session)
+        council_output = {
+            "kind": "council_output",
+            "schema_version": "1.0.0",
+            "session_id": build_request["approval_context"]["council_session_id"],
+            "status": "approved",
+            "decision_mode": "consensus",
+            "approved_action": "emit_build_request",
+            "resolution_summary": "Rollback surface approved after continuity-bound restoration checks.",
+            "timeout_status": {
+                "status": "within-budget",
+                "elapsed_ms": 21_000,
+                "soft_timeout_ms": 45_000,
+                "hard_timeout_ms": 90_000,
+                "fallback_applied": "none",
+                "follow_up_action": "record-resolution",
+            },
+            "vote_summary": {
+                "participant_count": 4,
+                "approvals": 4,
+                "rejections": 0,
+                "abstentions": 0,
+                "weighted_score": 3.2,
+            },
+            "guardian_gate": {
+                "status": "pass",
+                "reason": "Rollback keeps pre-apply snapshot and continuity evidence bound.",
+                "checked_rules": ["A1-continuity", "A2-uniqueness"],
+            },
+            "emitted_artifacts": [
+                {
+                    "artifact_kind": "build_request",
+                    "ref": f"build://{build_request['request_id']}",
+                },
+                {
+                    "artifact_kind": "continuity_log_entry",
+                    "ref": build_artifact.get("continuity_log_ref", ""),
+                },
+            ],
+            "must_pass_evals": list(build_request["constraints"]["must_pass"]),
+            "continuity_record": {
+                "category": "self-modify",
+                "ref": build_artifact.get("continuity_log_ref", ""),
+            },
+            "recorded_at": utc_now_iso(),
+        }
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.build_request.emitted",
+            payload={
+                "council_output": council_output,
+                "build_request": build_request,
+            },
+            actor="Council",
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.generated",
+            payload={
+                "policy": self.patch_generator.policy(),
+                "artifact": build_artifact,
+                "scope_validation": scope_validation,
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.sandbox.applied",
+            payload={
+                "policy": self.sandbox_apply.policy(),
+                "receipt": sandbox_apply_receipt,
+                "validation": sandbox_apply_validation,
+            },
+            actor="SandboxApplyService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.diff_eval.completed",
+            payload={
+                "policy": self.diff_evaluator.policy(),
+                "selected_evals": suite_selection["selected_evals"],
+                "reports": eval_reports,
+            },
+            actor="DifferentialEvaluatorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollout.classified",
+            payload={
+                "decision": rollout["decision"],
+                "artifact_id": build_artifact["artifact_id"],
+                "request_id": build_request["request_id"],
+            },
+            actor="RolloutPlanner",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollout.executed",
+            payload={
+                "policy": self.rollout_planner.policy(),
+                "session": rollout_session,
+                "validation": rollout_session_validation,
+            },
+            actor="RolloutPlanner",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollback.executed",
+            payload={
+                "policy": self.rollback_engine.policy(),
+                "session": rollback_session,
+                "validation": rollback_session_validation,
+            },
+            actor="RollbackEngineService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        regression_detected = any(report["outcome"] == "regression" for report in eval_reports)
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "builder": {
+                "council_output": council_output,
+                "build_request": build_request,
+                "patch_generator_policy": self.patch_generator.policy(),
+                "diff_evaluator_policy": self.diff_evaluator.policy(),
+                "rollback_engine_policy": self.rollback_engine.policy(),
+                "scope_validation": scope_validation,
+                "artifact": build_artifact,
+                "sandbox_apply_receipt": sandbox_apply_receipt,
+                "patches": patch_descriptions,
+                "suite_selection": suite_selection,
+                "eval_reports": eval_reports,
+                "rollout": rollout,
+                "rollout_session": rollout_session,
+                "rollback_session": rollback_session,
+            },
+            "validation": {
+                "ok": (
+                    scope_validation["allowed"]
+                    and build_artifact["status"] == "ready"
+                    and sandbox_apply_validation["ok"]
+                    and regression_detected
+                    and rollout["decision"] == "rollback"
+                    and rollout_session_validation["ok"]
+                    and rollout_session["status"] == "rolled-back"
+                    and rollback_session_validation["ok"]
+                    and rollback_session["status"] == "rolled-back"
+                ),
+                "scope_allowed": scope_validation["allowed"],
+                "sandbox_apply_ok": sandbox_apply_validation["ok"],
+                "sandbox_apply_status": sandbox_apply_receipt["status"],
+                "selected_eval_count": len(suite_selection["selected_evals"]),
+                "regression_detected": regression_detected,
+                "rollback_trigger": rollback_session["trigger"],
+                "rollout_decision": rollout["decision"],
+                "rollout_status": rollout_session["status"],
+                "rollback_status": rollback_session["status"],
+                "restored_snapshot_ref": rollback_session["restored_snapshot_ref"],
+                "reverted_patch_count": rollback_session["reverted_patch_count"],
+                "reverted_stage_ids": rollback_session["reverted_stage_ids"],
+                "continuity_event_ref_count": len(rollback_session["continuity_event_refs"]),
+                "notification_ref_count": len(rollback_session["notification_refs"]),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

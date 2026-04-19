@@ -1,0 +1,77 @@
+idl_version: 1
+kind: service
+namespace: selfctor.rollback.v0
+service: RollbackEngineService
+summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed.
+imports:
+  build_request: ../schemas/build_request.yaml
+  sandbox_apply_receipt: ../schemas/sandbox_apply_receipt.schema
+  staged_rollout_session: ../schemas/staged_rollout_session.schema
+  builder_rollback_session: ../schemas/builder_rollback_session.schema
+operations:
+  execute_rollback:
+    summary: Execute a continuity-bound rollback from the staged builder rollout state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - build_request_ref
+          - apply_receipt_ref
+          - rollout_session_ref
+          - trigger
+          - reason
+          - initiator
+        properties:
+          build_request_ref:
+            type: string
+            pattern: "^build://"
+          apply_receipt_ref:
+            type: string
+            pattern: "^sandbox-apply-[a-f0-9]{12}$"
+          rollout_session_ref:
+            type: string
+            pattern: "^rollout-session-[a-f0-9]{12}$"
+          trigger:
+            type: string
+            enum:
+              - eval-regression
+              - guardian-veto
+              - manual-review
+          reason:
+            type: string
+            minLength: 8
+          initiator:
+            type: string
+            minLength: 3
+    output:
+      schema_ref: builder_rollback_session
+    preconditions:
+      - sandbox apply receipt must be applied and rollback-ready
+      - staged rollout session must have decision=rollback
+      - rollback plan must remain bound to the same build_request
+    guarantees:
+      - rollback restores the pre-apply Mirage Self snapshot
+      - continuity evidence remains append-only
+      - self, council, and guardian are all notified
+  validate_session:
+    summary: Validate one builder rollback session against the continuity-bound rollback policy.
+    input:
+      schema_ref: builder_rollback_session
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+compatibility:
+  stability: bootstrap
+events:
+  - name: selfctor.rollback.executed
+    payload:
+      schema_ref: builder_rollback_session

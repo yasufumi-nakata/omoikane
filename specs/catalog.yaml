@@ -376,6 +376,23 @@ entries:
       - docs/07-reference-implementation/README.md
     rationale: Required to make Mirage Self sandbox apply and staged rollout execution machine-readable in the L5 builder pipeline.
   - priority: P1
+    kind: schema
+    file: specs/schemas/builder_rollback_session.schema
+    consumers:
+      - specs/interfaces/selfctor.rollback.v0.idl
+      - docs/04-ai-governance/self-modification.md
+      - reference-runtime
+    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot and binds stakeholder notifications.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.rollback.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make regression-triggered builder rollback execution machine-readable in the L5 self-construction pipeline.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl
     consumers:
@@ -1271,6 +1288,15 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/07-reference-implementation/README.md
     rationale: Protects rollback-ready sandbox apply receipts and the fixed Stage 0/1/2/3 builder rollout execution order.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/builder_rollback_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects regression-triggered builder rollback, pre-apply snapshot restoration, append-only continuity refs, and stakeholder notification bindings.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

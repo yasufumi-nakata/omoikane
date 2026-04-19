@@ -234,6 +234,31 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
 
+    def test_rollback_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "rollback-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["regression_detected"])
+        self.assertEqual("rollback", result["validation"]["rollout_decision"])
+        self.assertEqual("rolled-back", result["validation"]["rollout_status"])
+        self.assertEqual("rolled-back", result["validation"]["rollback_status"])
+        self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
+        self.assertEqual(3, result["validation"]["selected_eval_count"])
+        self.assertEqual(2, result["validation"]["reverted_patch_count"])
+        self.assertEqual(
+            ["dark-launch", "canary-5pct"],
+            result["validation"]["reverted_stage_ids"],
+        )
+        self.assertEqual(
+            "mirage://build-l5-rollback-0001/snapshot/pre-apply",
+            result["validation"]["restored_snapshot_ref"],
+        )
+        self.assertEqual("rolled-back", result["builder"]["rollback_session"]["status"])
+
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
         stdout = io.StringIO()
 

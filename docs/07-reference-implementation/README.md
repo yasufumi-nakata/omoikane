@@ -57,6 +57,7 @@ PYTHONPATH=src python3 -m omoikane.cli language-demo --json
 PYTHONPATH=src python3 -m omoikane.cli metacognition-demo --json
 PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
+PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
@@ -191,6 +192,15 @@ Mirage Self への sandbox apply、`council_output_build_request_pipeline` と
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
 `full-100pct`) の固定順序実行まで
 ledger-safe な `self-modify` chain で進むことを確認する。
+
+`rollback-demo` は L5 builder rollback の reference contract
+(`selfctor.rollback.v0`) を JSON で可視化し、
+rollback 判定済み staged rollout が `builder_rollback_session` を通じて
+`pre-apply` Mirage Self snapshot を復元し、
+`dark-launch` / `canary-5pct` の revoke 範囲、
+append-only continuity ref 2 本、
+self / council / guardian の 3 者通知を
+1 シナリオで確認する。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

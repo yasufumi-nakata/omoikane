@@ -179,6 +179,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     builder_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    rollback_parser = subparsers.add_parser(
+        "rollback-demo",
+        help="Run the L5 regression-triggered rollback and pre-apply snapshot restoration scenario",
+    )
+    rollback_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     substrate_parser = subparsers.add_parser(
         "substrate-demo",
         help="Run the L0 substrate allocation/attestation/migration scenario",
@@ -398,6 +404,10 @@ def main() -> None:
 
     if args.command == "builder-demo":
         _print_result(runtime.run_builder_demo(), args.json)
+        return
+
+    if args.command == "rollback-demo":
+        _print_result(runtime.run_rollback_demo(), args.json)
         return
 
     if args.command == "substrate-demo":

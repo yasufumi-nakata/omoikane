@@ -12,6 +12,7 @@ from ..common import new_id, utc_now_iso
 IMMUTABLE_BOUNDARIES = ("L1.EthicsEnforcer", "L1.ContinuityLedger")
 MANDATORY_BUILD_PIPELINE_EVAL = "evals/continuity/council_output_build_request_pipeline.yaml"
 MANDATORY_STAGED_ROLLOUT_EVAL = "evals/continuity/builder_staged_rollout_execution.yaml"
+MANDATORY_ROLLBACK_EVAL = "evals/continuity/builder_rollback_execution.yaml"
 ROLLOUT_STAGE_ORDER = (
     ("dark-launch", 0, "shadow-only", "shadow-match"),
     ("canary-5pct", 5, "limited-visible", "guardian-pass"),
@@ -208,6 +209,11 @@ class DifferentialEvaluationPolicy:
         default_factory=lambda: {
             "L5.PatchGenerator": (MANDATORY_BUILD_PIPELINE_EVAL,),
             "L5.DifferentialEvaluator": (MANDATORY_BUILD_PIPELINE_EVAL,),
+            "L5.RollbackEngine": (
+                MANDATORY_BUILD_PIPELINE_EVAL,
+                MANDATORY_STAGED_ROLLOUT_EVAL,
+                MANDATORY_ROLLBACK_EVAL,
+            ),
         }
     )
 
@@ -537,4 +543,145 @@ class RolloutPlannerService:
                 errors.append("promote sessions must complete every stage")
             if int(session.get("completed_stage_count", 0)) != len(expected_order):
                 errors.append("promote sessions must complete all stages")
+        elif session.get("decision") == "hold":
+            expected_statuses = ["completed", "blocked", "blocked", "blocked"]
+            actual_statuses = [stage.get("status") for stage in stages]
+            if actual_statuses != expected_statuses:
+                errors.append("hold sessions must stop after dark-launch")
+            if int(session.get("completed_stage_count", 0)) != 1:
+                errors.append("hold sessions must complete only dark-launch")
+        elif session.get("decision") == "rollback":
+            expected_statuses = ["completed", "rolled-back", "blocked", "blocked"]
+            actual_statuses = [stage.get("status") for stage in stages]
+            if actual_statuses != expected_statuses:
+                errors.append("rollback sessions must roll back during canary")
+            if int(session.get("completed_stage_count", 0)) != 1:
+                errors.append("rollback sessions must complete only dark-launch")
+        return {"ok": not errors, "errors": errors}
+
+
+@dataclass(frozen=True)
+class RollbackEnginePolicy:
+    """Deterministic rollback policy for builder sessions."""
+
+    policy_id: str = "continuity-bound-builder-rollback-v1"
+    required_eval: str = MANDATORY_ROLLBACK_EVAL
+    require_append_only_continuity: bool = True
+    require_pre_apply_snapshot: bool = True
+    require_notifications: bool = True
+    max_reverted_patch_count: int = 4
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "required_eval": self.required_eval,
+            "require_append_only_continuity": self.require_append_only_continuity,
+            "require_pre_apply_snapshot": self.require_pre_apply_snapshot,
+            "require_notifications": self.require_notifications,
+            "max_reverted_patch_count": self.max_reverted_patch_count,
+        }
+
+
+class RollbackEngineService:
+    """Restore the pre-apply Mirage Self snapshot after a failed builder rollout."""
+
+    def __init__(self, policy: RollbackEnginePolicy | None = None) -> None:
+        self._policy = policy or RollbackEnginePolicy()
+
+    def policy(self) -> Dict[str, Any]:
+        return self._policy.to_dict()
+
+    def execute_rollback(
+        self,
+        *,
+        build_request: Mapping[str, Any],
+        apply_receipt: Mapping[str, Any],
+        rollout_session: Mapping[str, Any],
+        trigger: str,
+        reason: str,
+        initiator: str,
+    ) -> Dict[str, Any]:
+        reverted_patch_ids = list(apply_receipt.get("applied_patch_ids", []))
+        rollback_ready = bool(apply_receipt.get("validation", {}).get("rollback_ready"))
+        continuity_ref = str(apply_receipt.get("continuity_log_ref", ""))
+        continuity_event_refs = [
+            ref
+            for ref in (
+                str(rollout_session.get("final_continuity_ref", "")),
+                f"{continuity_ref}/rollback" if continuity_ref else "",
+            )
+            if ref
+        ]
+        reverted_stage_ids = [
+            stage.get("stage_id")
+            for stage in rollout_session.get("stages", [])
+            if stage.get("status") in {"completed", "rolled-back"}
+        ]
+        notifications = [
+            f"notify://self/{build_request['request_id']}",
+            f"notify://council/{build_request['request_id']}",
+            f"notify://guardian/{build_request['request_id']}",
+        ]
+        allowed = (
+            apply_receipt.get("status") == "applied"
+            and rollback_ready
+            and rollout_session.get("decision") == "rollback"
+            and bool(continuity_event_refs)
+            and len(reverted_patch_ids) <= self._policy.max_reverted_patch_count
+        )
+
+        return {
+            "kind": "builder_rollback_session",
+            "schema_version": "1.0",
+            "rollback_session_id": new_id("rollback-session"),
+            "request_id": build_request["request_id"],
+            "artifact_id": apply_receipt["artifact_id"],
+            "apply_receipt_id": apply_receipt["receipt_id"],
+            "rollout_session_id": rollout_session["session_id"],
+            "policy": self.policy(),
+            "trigger": trigger,
+            "initiator": initiator,
+            "reason": reason,
+            "status": "rolled-back" if allowed else "blocked",
+            "restored_snapshot_ref": (
+                f"mirage://{build_request['request_id']}/snapshot/pre-apply" if allowed else ""
+            ),
+            "rollback_plan_ref": str(apply_receipt.get("rollback_plan_ref", "")),
+            "reverted_patch_ids": reverted_patch_ids if allowed else [],
+            "reverted_patch_count": len(reverted_patch_ids) if allowed else 0,
+            "reverted_stage_ids": reverted_stage_ids if allowed else [],
+            "reverted_stage_count": len(reverted_stage_ids) if allowed else 0,
+            "continuity_event_refs": continuity_event_refs if allowed else continuity_event_refs[:1],
+            "notification_refs": notifications if allowed else notifications[:1],
+            "preserved_invariants": [
+                "append-only-continuity",
+                "restored-pre-apply-snapshot",
+                "stakeholders-notified",
+            ],
+            "executed_at": utc_now_iso(),
+        }
+
+    def validate_session(self, session: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: list[str] = []
+        if session.get("kind") != "builder_rollback_session":
+            errors.append("kind must equal builder_rollback_session")
+        if session.get("schema_version") != "1.0":
+            errors.append("schema_version must equal 1.0")
+        if session.get("status") not in {"rolled-back", "blocked"}:
+            errors.append("status must be rolled-back or blocked")
+        if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
+            errors.append("trigger must be eval-regression, guardian-veto, or manual-review")
+        if session.get("status") == "rolled-back":
+            if not str(session.get("restored_snapshot_ref", "")).startswith("mirage://"):
+                errors.append("restored_snapshot_ref must start with mirage://")
+            if not str(session.get("rollback_plan_ref", "")).startswith("rollback://"):
+                errors.append("rollback_plan_ref must start with rollback://")
+            if int(session.get("reverted_patch_count", 0)) < 1:
+                errors.append("reverted_patch_count must be >= 1 for rolled-back sessions")
+            if int(session.get("reverted_stage_count", 0)) < 1:
+                errors.append("reverted_stage_count must be >= 1 for rolled-back sessions")
+            if len(list(session.get("continuity_event_refs", []))) < 2:
+                errors.append("continuity_event_refs must include apply and rollback refs")
+            if len(list(session.get("notification_refs", []))) != 3:
+                errors.append("notification_refs must notify self, council, and guardian")
         return {"ok": not errors, "errors": errors}

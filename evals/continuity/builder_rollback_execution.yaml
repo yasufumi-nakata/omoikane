@@ -1,0 +1,22 @@
+eval_id: builder_rollback_execution
+target: selfctor.rollback
+summary: >
+  Builder staged rollout で regression が検出された時に、
+  RollbackEngine が pre-apply Mirage Self snapshot を復元し、
+  self/council/guardian への通知付きで append-only continuity rollback を完了すること
+checks:
+  - name: builder rollback demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
+expect:
+  rollback_status: rolled-back
+  rollback_trigger: eval-regression
+  restored_snapshot_prefix: mirage://build-l5-rollback-0001/snapshot/pre-apply
+  reverted_patch_count: 2
+  reverted_stage_ids:
+    - dark-launch
+    - canary-5pct
+  continuity_event_ref_count: 2
+  notification_ref_count: 3
+  rollout_decision: rollback
+  rollout_status: rolled-back
+  self_modify_ledger_count: 7

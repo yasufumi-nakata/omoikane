@@ -5,6 +5,7 @@ import unittest
 from omoikane.self_construction import (
     DifferentialEvaluatorService,
     PatchGeneratorService,
+    RollbackEngineService,
     RolloutPlannerService,
     SandboxApplyService,
 )
@@ -153,6 +154,76 @@ class RolloutPlannerServiceTests(unittest.TestCase):
             ["dark-launch", "canary-5pct", "broad-50pct", "full-100pct"],
             [stage["stage_id"] for stage in session["stages"]],
         )
+        self.assertTrue(service.validate_session(session)["ok"])
+
+    def test_execute_rollout_marks_canary_rollback_for_regression(self) -> None:
+        service = RolloutPlannerService()
+
+        session = service.execute_rollout(
+            build_request={"request_id": "build-l5-rollback-0001"},
+            apply_receipt={
+                "receipt_id": "sandbox-apply-0123456789ab",
+                "artifact_id": "artifact-0123456789ab",
+                "rollback_plan_ref": "rollback://build-l5-rollback-0001",
+                "continuity_log_ref": "ledger://self-modify/build-l5-rollback-0001",
+                "validation": {"rollback_ready": True},
+            },
+            eval_reports=[
+                {"eval_ref": "evals/continuity/council_output_build_request_pipeline.yaml"},
+                {"eval_ref": "evals/continuity/builder_staged_rollout_execution.yaml"},
+                {"eval_ref": "evals/continuity/builder_rollback_execution.yaml"},
+            ],
+            decision="rollback",
+            guardian_gate_status="pass",
+        )
+
+        self.assertEqual("rolled-back", session["status"])
+        self.assertEqual(
+            ["completed", "rolled-back", "blocked", "blocked"],
+            [stage["status"] for stage in session["stages"]],
+        )
+        self.assertTrue(service.validate_session(session)["ok"])
+
+
+class RollbackEngineServiceTests(unittest.TestCase):
+    def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
+        service = RollbackEngineService()
+
+        session = service.execute_rollback(
+            build_request={"request_id": "build-l5-rollback-0001"},
+            apply_receipt={
+                "receipt_id": "sandbox-apply-0123456789ab",
+                "artifact_id": "artifact-0123456789ab",
+                "rollback_plan_ref": "rollback://build-l5-rollback-0001",
+                "continuity_log_ref": "ledger://self-modify/build-l5-rollback-0001",
+                "status": "applied",
+                "applied_patch_ids": ["patch-111111111111", "patch-222222222222"],
+                "validation": {"rollback_ready": True},
+            },
+            rollout_session={
+                "session_id": "rollout-session-0123456789ab",
+                "decision": "rollback",
+                "final_continuity_ref": "ledger://self-modify/build-l5-rollback-0001",
+                "stages": [
+                    {"stage_id": "dark-launch", "status": "completed"},
+                    {"stage_id": "canary-5pct", "status": "rolled-back"},
+                    {"stage_id": "broad-50pct", "status": "blocked"},
+                    {"stage_id": "full-100pct", "status": "blocked"},
+                ],
+            },
+            trigger="eval-regression",
+            reason="Regression detected during canary rollout.",
+            initiator="IntegrityGuardian",
+        )
+
+        self.assertEqual("rolled-back", session["status"])
+        self.assertEqual(
+            "mirage://build-l5-rollback-0001/snapshot/pre-apply",
+            session["restored_snapshot_ref"],
+        )
+        self.assertEqual(2, session["reverted_patch_count"])
+        self.assertEqual(["dark-launch", "canary-5pct"], session["reverted_stage_ids"])
+        self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 
 

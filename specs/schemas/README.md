@@ -56,6 +56,7 @@
 - `patch_descriptor.schema`
 - `sandbox_apply_receipt.schema`
 - `staged_rollout_session.schema`
+- `builder_rollback_session.schema`
 
 ## 次段階
 

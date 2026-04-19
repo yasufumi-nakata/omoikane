@@ -56,6 +56,11 @@ Mirage Self への sandbox apply が rollback-ready receipt を返し、
 builder staged rollout が dark-launch から full-100pct まで
 固定順序で完了するか。
 
+### Builder Rollback Execution
+builder staged rollout で regression が検出された時に、
+RollbackEngine が pre-apply Mirage Self snapshot を復元し、
+self / council / guardian 通知付きで append-only rollback を完了するか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 

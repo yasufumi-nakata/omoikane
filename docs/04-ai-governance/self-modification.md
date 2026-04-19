@@ -77,12 +77,18 @@ Stage 3: 100%
 reference runtime では `builder-demo` が
 `sandbox_apply_receipt` と `staged_rollout_session` を返し、
 上記 Stage 0/1/2/3 が固定順序で machine-checkable に実行される。
+`rollback-demo` は regression 検出時に
+`builder_rollback_session` を返し、canary rollback 後に
+pre-apply snapshot が復元されることを machine-checkable に確認する。
 
 ## Rollback
 
 - ContinuityLedger から直前状態を復元
 - 全モジュールの一貫性を保つ
 - 本人に「改修を撤回した」旨を通知
+- reference runtime では `RollbackEngineService` が
+  `selfctor.rollback.v0` / `builder_rollback_session.schema` に従って
+  self・Council・Guardian の 3 者通知を必須にする
 
 ## 監査ログ
 
