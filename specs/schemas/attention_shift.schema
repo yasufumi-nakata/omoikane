@@ -1,0 +1,72 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/attention_shift.schema"
+title: AttentionShift
+description: Ledger-safe L3 attention shift summary emitted by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy_id
+  - focus_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_focus_id
+  - previous_target
+  - focus_target
+  - affect_guard
+  - dwell_ms
+  - preserved_target
+  - failures
+  - digest
+properties:
+  kind:
+    const: attention_shift
+  schema_version:
+    const: 1.0.0
+  policy_id:
+    const: hybrid-attention-failover-v1
+  focus_ref:
+    type: string
+    pattern: "^attention-focus-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_focus_id:
+    type:
+      - string
+      - "null"
+  previous_target:
+    type:
+      - string
+      - "null"
+  focus_target:
+    type: string
+    minLength: 1
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  dwell_ms:
+    type: integer
+    minimum: 1
+  preserved_target:
+    type: boolean
+  failures:
+    type: array
+    items:
+      type: string
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

@@ -221,6 +221,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["consent_preserved"])
         self.assertEqual("observe", result["validation"]["recommended_guard"])
 
+    def test_attention_demo_emits_guard_aligned_failover_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "attention-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("continuity_anchor_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertTrue(result["validation"]["safe_target_selected"])
+        self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
 

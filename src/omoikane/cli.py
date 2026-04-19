@@ -107,6 +107,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     affect_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    attention_parser = subparsers.add_parser(
+        "attention-demo",
+        help="Run the L3 attention backend failover and affect-aware focus routing scenario",
+    )
+    attention_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     qualia_parser = subparsers.add_parser(
         "qualia-demo",
         help="Run the L2 qualia surrogate profile and checkpoint scenario",
@@ -266,6 +272,10 @@ def main() -> None:
 
     if args.command == "affect-demo":
         _print_result(runtime.run_affect_demo(), args.json)
+        return
+
+    if args.command == "attention-demo":
+        _print_result(runtime.run_attention_demo(), args.json)
         return
 
     if args.command == "qualia-demo":

@@ -300,6 +300,30 @@ entries:
       - docs/07-reference-implementation/README.md
     rationale: Required to fix the L3 affect failover and continuity smoothing contract across docs, CLI, and runtime.
   - priority: P1
+    kind: schema
+    file: specs/schemas/attention_focus.schema
+    consumers:
+      - specs/interfaces/cognitive.attention.v0.idl
+      - docs/02-subsystems/cognitive/attention.md
+      - reference-runtime
+    rationale: Required to serialize bounded L3 attention focus state with affect-aware safe target routing.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/attention_shift.schema
+    consumers:
+      - specs/interfaces/cognitive.attention.v0.idl
+      - evals/cognitive/attention_failover.yaml
+      - reference-runtime
+    rationale: Required to emit ledger-safe attention failover summaries without raw sensory payload leakage.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.attention.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/attention.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to fix the L3 attention failover and affect-aware focus routing contract across docs, CLI, and runtime.
+  - priority: P1
     kind: eval
     file: evals/cognitive/qualia_contract.yaml
     consumers:
@@ -327,6 +351,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects single-switch affect fallback, continuity smoothing, and no-dampening-without-consent.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/attention_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects single-switch attention fallback, affect guard alignment, and safe focus target routing.
   - priority: P1
     kind: eval
     file: evals/interface/wms_private_reality_escape.yaml

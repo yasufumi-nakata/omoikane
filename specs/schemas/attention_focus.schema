@@ -1,0 +1,222 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/attention_focus.schema"
+title: AttentionFocus
+description: Deterministic L3 attention focus snapshot produced by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - focus_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - affect_guard
+  - memory_cues
+  - focus_target
+  - candidate_scores
+  - dwell_ms
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: attention_focus
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - safe_targets
+      - respect_affect_guard
+      - default_dwell_ms
+      - degraded_dwell_ms
+      - failover_mode
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: hybrid-attention-failover-v1
+      primary:
+        type: string
+        minLength: 1
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      safe_targets:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          enum:
+            - guardian-review
+            - continuity-ledger
+            - sandbox-stabilization
+      respect_affect_guard:
+        const: true
+      default_dwell_ms:
+        const: 600
+      degraded_dwell_ms:
+        const: 450
+      failover_mode:
+        const: single-switch
+  focus_id:
+    type: string
+    pattern: "^attention-focus-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - attention_target
+      - modality_salience
+      - self_awareness
+      - lucidity
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      attention_target:
+        type: string
+        minLength: 1
+      modality_salience:
+        type: object
+        additionalProperties: false
+        required:
+          - visual
+          - auditory
+          - somatic
+          - interoceptive
+        properties:
+          visual:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          auditory:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          somatic:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          interoceptive:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+      self_awareness:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      lucidity:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  memory_cues:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - target
+        - weight
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        target:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+  focus_target:
+    type: string
+    minLength: 1
+  candidate_scores:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: number
+      minimum: 0.0
+      maximum: 1.5
+  dwell_ms:
+    type: integer
+    minimum: 1
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_focus_id
+      - previous_backend_id
+      - previous_focus_target
+      - attempted_backends
+      - failures
+      - preserved_target
+      - shifted
+      - rationale
+    properties:
+      previous_focus_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      previous_focus_target:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      failures:
+        type: array
+        items:
+          type: string
+      preserved_target:
+        type: boolean
+      shifted:
+        type: boolean
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

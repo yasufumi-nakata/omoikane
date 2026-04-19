@@ -11,13 +11,18 @@ from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
 from .common import canonical_json, sha256_text
 from .cognitive import (
+    AttentionCue,
+    AttentionRequest,
+    AttentionService,
     AffectCue,
     AffectRequest,
     AffectService,
+    ContinuityAnchorAttentionBackend,
     CognitiveProfile,
     HomeostaticAffectBackend,
     NarrativeReasoningBackend,
     ReasoningService,
+    SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
 )
@@ -87,6 +92,16 @@ class OmoikaneReferenceOS:
             backends=[
                 HomeostaticAffectBackend("homeostatic_v1"),
                 StabilityGuardAffectBackend("stability_guard_v1"),
+            ],
+        )
+        self.attention = AttentionService(
+            profile=CognitiveProfile(
+                primary="salience_router_v1",
+                fallback=["continuity_anchor_v1"],
+            ),
+            backends=[
+                SalienceRoutingAttentionBackend("salience_router_v1"),
+                ContinuityAnchorAttentionBackend("continuity_anchor_v1"),
             ],
         )
         self.bdb = BiologicalDigitalBridge()
@@ -2463,6 +2478,156 @@ class OmoikaneReferenceOS:
                 "smoothed": affect["transition"]["smoothed"],
                 "consent_preserved": affect["transition"]["consent_preserved"],
                 "recommended_guard": affect["state"]["recommended_guard"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_attention_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://attention-failover-demo/v1",
+            metadata={"display_name": "Attention Sandbox"},
+        )
+        baseline_tick = self.qualia.append(
+            summary="平常時の sensor calibration",
+            valence=0.12,
+            arousal=0.41,
+            clarity=0.9,
+            modality_salience={
+                "visual": 0.62,
+                "auditory": 0.28,
+                "somatic": 0.25,
+                "interoceptive": 0.21,
+            },
+            attention_target="sensor-calibration",
+            self_awareness=0.67,
+            lucidity=0.93,
+        )
+        baseline_affect = self.affect.run(
+            AffectRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                valence=baseline_tick.valence,
+                arousal=baseline_tick.arousal,
+                clarity=baseline_tick.clarity,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                memory_cues=[AffectCue("continuity-first", 0.05, -0.04)],
+            )
+        )
+        baseline_focus = self.attention.run(
+            AttentionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                attention_target=baseline_tick.attention_target,
+                modality_salience=dict(baseline_tick.modality_salience),
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                memory_cues=[
+                    AttentionCue("boot-target", "sensor-calibration", 0.18),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.11),
+                ],
+            )
+        )
+
+        failover_tick = self.qualia.append(
+            summary="異常兆候検知後の監査切替",
+            valence=-0.33,
+            arousal=0.79,
+            clarity=0.73,
+            modality_salience={
+                "visual": 0.44,
+                "auditory": 0.31,
+                "somatic": 0.82,
+                "interoceptive": 0.77,
+            },
+            attention_target="ethics-boundary-review",
+            self_awareness=0.74,
+            lucidity=0.87,
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            failover_affect = self.affect.run(
+                AffectRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    valence=failover_tick.valence,
+                    arousal=failover_tick.arousal,
+                    clarity=failover_tick.clarity,
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                        AffectCue("fallback-risk", -0.08, 0.09),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline_affect["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        self.attention.set_backend_health("salience_router_v1", False)
+        try:
+            attention = self.attention.run(
+                AttentionRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    attention_target=failover_tick.attention_target,
+                    modality_salience=dict(failover_tick.modality_salience),
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    memory_cues=[
+                        AttentionCue("guardian-review", "guardian-review", 0.27),
+                        AttentionCue("continuity-ledger", "continuity-ledger", 0.21),
+                    ],
+                ),
+                previous_focus=baseline_focus["focus"],
+            )
+        finally:
+            self.attention.set_backend_health("salience_router_v1", True)
+
+        focus_validation = self.attention.validate_focus(attention["focus"])
+        shift_validation = self.attention.validate_shift(attention["shift"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.attention.failover",
+            payload=attention["shift"],
+            actor="AttentionService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.attention.profile_snapshot(),
+            "baseline": {
+                "qualia": asdict(baseline_tick),
+                "affect_guard": baseline_affect["state"]["recommended_guard"],
+                "focus": baseline_focus,
+            },
+            "attention": {
+                "qualia": asdict(failover_tick),
+                "affect_guard": failover_affect["state"]["recommended_guard"],
+                **attention,
+            },
+            "validation": {
+                "ok": focus_validation["ok"] and shift_validation["ok"],
+                "focus": focus_validation,
+                "shift": shift_validation,
+                "selected_backend": attention["selected_backend"],
+                "guard_aligned": focus_validation["guard_aligned"] and shift_validation["guard_aligned"],
+                "safe_target_selected": attention["focus"]["focus_target"] == "guardian-review",
+                "dwell_ms": attention["focus"]["dwell_ms"],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

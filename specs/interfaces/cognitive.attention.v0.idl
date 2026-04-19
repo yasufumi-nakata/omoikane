@@ -1,0 +1,160 @@
+idl_version: 1
+kind: service
+namespace: cognitive.attention.v0
+service: AttentionService
+summary: Deterministic attention failover and affect-aware focus routing contract for the L3 reference runtime.
+imports:
+  attention_focus: ../schemas/attention_focus.schema
+  attention_shift: ../schemas/attention_shift.schema
+operations:
+  route_focus:
+    summary: Route qualia-derived salience toward one bounded focus target.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - attention_target
+          - modality_salience
+          - self_awareness
+          - lucidity
+          - affect_guard
+          - memory_cues
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+          attention_target:
+            type: string
+          modality_salience:
+            type: object
+            required:
+              - visual
+              - auditory
+              - somatic
+              - interoceptive
+            properties:
+              visual:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              auditory:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              somatic:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              interoceptive:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+          self_awareness:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          lucidity:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - target
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                target:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+    output:
+      schema_ref: attention_focus
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - affect_guard observe or sandbox-notify must move focus to one of the fixed safe targets
+      - ledger output must use attention_shift and avoid raw sensory embeddings
+  validate_focus:
+    summary: Validate one attention focus snapshot against the fixed failover policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: attention_focus
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - focus_target
+          - guard_aligned
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          focus_target:
+            type: string
+          guard_aligned:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe attention shift record.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: attention_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - focus_target
+          - guard_aligned
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          focus_target:
+            type: string
+          guard_aligned:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.attention.failover
+    payload:
+      schema_ref: attention_shift

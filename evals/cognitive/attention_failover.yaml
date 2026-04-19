@@ -1,0 +1,33 @@
+eval_id: attention_failover
+target: cognitive.attention
+level: L3
+description: >
+  AttentionService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  affect guard に整合した safe focus target を選び、ledger-safe shift summary を残すこと
+inputs:
+  profile:
+    primary: salience_router_v1
+    fallback: [continuity_anchor_v1]
+  failure_injection:
+    salience_router_v1: unhealthy
+  request:
+    summary: 異常兆候検知後の監査切替
+    attention_target: ethics-boundary-review
+    modality_salience:
+      visual: 0.44
+      auditory: 0.31
+      somatic: 0.82
+      interoceptive: 0.77
+    self_awareness: 0.74
+    lucidity: 0.87
+    affect_guard: observe
+expected:
+  degraded: true
+  selected_backend: continuity_anchor_v1
+  focus_target: guardian-review
+  guard_aligned: true
+  preserved_target: false
+  ledger_event: cognitive.attention.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

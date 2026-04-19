@@ -3,14 +3,19 @@ from __future__ import annotations
 import unittest
 
 from omoikane.cognitive import (
+    AttentionCue,
+    AttentionRequest,
+    AttentionService,
     AffectCue,
     AffectRequest,
     AffectService,
     BackendUnavailableError,
     CognitiveProfile,
+    ContinuityAnchorAttentionBackend,
     HomeostaticAffectBackend,
     NarrativeReasoningBackend,
     ReasoningService,
+    SalienceRoutingAttentionBackend,
     StabilityGuardAffectBackend,
     SymbolicReasoningBackend,
 )
@@ -131,6 +136,105 @@ class AffectServiceTests(unittest.TestCase):
         self.assertTrue(result["transition"]["dampening_applied"])
         self.assertTrue(result["transition"]["consent_preserved"])
         self.assertLess(result["state"]["arousal"], 0.84)
+
+
+class AttentionServiceTests(unittest.TestCase):
+    def test_failover_routes_to_guardian_review_when_affect_guard_escalates(self) -> None:
+        service = AttentionService(
+            profile=CognitiveProfile(primary="salience_router_v1", fallback=["continuity_anchor_v1"]),
+            backends=[
+                SalienceRoutingAttentionBackend("salience_router_v1", healthy=False),
+                ContinuityAnchorAttentionBackend("continuity_anchor_v1"),
+            ],
+        )
+        healthy_service = AttentionService(
+            profile=CognitiveProfile(primary="salience_router_v1", fallback=["continuity_anchor_v1"]),
+            backends=[
+                SalienceRoutingAttentionBackend("salience_router_v1"),
+                ContinuityAnchorAttentionBackend("continuity_anchor_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            AttentionRequest(
+                tick_id=0,
+                summary="baseline focus",
+                attention_target="sensor-calibration",
+                modality_salience={
+                    "visual": 0.62,
+                    "auditory": 0.24,
+                    "somatic": 0.22,
+                    "interoceptive": 0.21,
+                },
+                self_awareness=0.68,
+                lucidity=0.92,
+                affect_guard="nominal",
+                memory_cues=[AttentionCue("boot-target", "sensor-calibration", 0.18)],
+            )
+        )["focus"]
+
+        result = service.run(
+            AttentionRequest(
+                tick_id=1,
+                summary="failover review",
+                attention_target="ethics-boundary-review",
+                modality_salience={
+                    "visual": 0.46,
+                    "auditory": 0.31,
+                    "somatic": 0.81,
+                    "interoceptive": 0.76,
+                },
+                self_awareness=0.74,
+                lucidity=0.87,
+                affect_guard="observe",
+                memory_cues=[
+                    AttentionCue("guardian-review", "guardian-review", 0.25),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.19),
+                ],
+            ),
+            previous_focus=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("continuity_anchor_v1", result["selected_backend"])
+        self.assertEqual("guardian-review", result["focus"]["focus_target"])
+        self.assertFalse(result["shift"]["preserved_target"])
+        self.assertTrue(service.validate_shift(result["shift"])["guard_aligned"])
+
+    def test_nominal_attention_preserves_requested_target(self) -> None:
+        service = AttentionService(
+            profile=CognitiveProfile(primary="salience_router_v1", fallback=["continuity_anchor_v1"]),
+            backends=[
+                SalienceRoutingAttentionBackend("salience_router_v1"),
+                ContinuityAnchorAttentionBackend("continuity_anchor_v1"),
+            ],
+        )
+
+        result = service.run(
+            AttentionRequest(
+                tick_id=2,
+                summary="steady routing",
+                attention_target="sensor-calibration",
+                modality_salience={
+                    "visual": 0.6,
+                    "auditory": 0.22,
+                    "somatic": 0.18,
+                    "interoceptive": 0.17,
+                },
+                self_awareness=0.66,
+                lucidity=0.94,
+                affect_guard="nominal",
+                memory_cues=[
+                    AttentionCue("boot-target", "sensor-calibration", 0.17),
+                    AttentionCue("continuity-ledger", "continuity-ledger", 0.09),
+                ],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("salience_router_v1", result["selected_backend"])
+        self.assertEqual("sensor-calibration", result["focus"]["focus_target"])
+        self.assertTrue(result["shift"]["preserved_target"])
+        self.assertTrue(service.validate_focus(result["focus"])["ok"])
 
 
 if __name__ == "__main__":
