@@ -17,12 +17,15 @@ required:
   - initiator
   - reason
   - status
+  - live_enactment_session_id
   - restored_snapshot_ref
   - rollback_plan_ref
   - reverted_patch_ids
   - reverted_patch_count
   - reverted_stage_ids
   - reverted_stage_count
+  - reverse_apply_journal
+  - telemetry_gate
   - continuity_event_refs
   - notification_refs
   - preserved_invariants
@@ -93,6 +96,9 @@ properties:
     enum:
       - rolled-back
       - blocked
+  live_enactment_session_id:
+    type: string
+    pattern: "^enactment-session-[a-f0-9]{12}$|^$"
   restored_snapshot_ref:
     type: string
     pattern: "^mirage://|^$"
@@ -121,6 +127,106 @@ properties:
     type: integer
     minimum: 0
     maximum: 4
+  reverse_apply_journal:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - journal_ref
+        - path
+        - patch_id
+        - source_state
+        - rollback_action
+        - snapshot_ref
+        - marker
+      properties:
+        journal_ref:
+          type: string
+          pattern: "^journal://"
+        path:
+          type: string
+          pattern: "^(src|tests)/"
+        patch_id:
+          type: string
+          pattern: "^patch-[a-f0-9]{12}$"
+        source_state:
+          type: string
+          enum:
+            - copied
+            - created
+        rollback_action:
+          type: string
+          enum:
+            - restore-copied-file
+            - delete-created-file
+        snapshot_ref:
+          type: string
+          pattern: "^mirage://"
+        marker:
+          type: string
+          pattern: "workspace-enacted:"
+  telemetry_gate:
+    type: object
+    additionalProperties: false
+    required:
+      - gate_id
+      - source_enactment_session_id
+      - status
+      - cleanup_status
+      - executed_command_count
+      - passed_command_count
+      - journal_entry_count
+      - reverted_stage_count
+      - decision_basis
+      - blocking_reasons
+    properties:
+      gate_id:
+        type: string
+        pattern: "^telemetry-gate-[a-f0-9]{12}$"
+      source_enactment_session_id:
+        type: string
+        pattern: "^enactment-session-[a-f0-9]{12}$"
+      status:
+        type: string
+        enum:
+          - rollback-approved
+          - blocked
+      cleanup_status:
+        type: string
+        enum:
+          - removed
+          - retained
+          - not-started
+      executed_command_count:
+        type: integer
+        minimum: 0
+      passed_command_count:
+        type: integer
+        minimum: 0
+      journal_entry_count:
+        type: integer
+        minimum: 0
+      reverted_stage_count:
+        type: integer
+        minimum: 0
+        maximum: 4
+      decision_basis:
+        type: array
+        minItems: 3
+        maxItems: 3
+        prefixItems:
+          - type: string
+            const: temp-workspace-cleaned
+          - type: string
+            const: eval-command-receipts-preserved
+          - type: string
+            const: reverse-apply-journal-complete
+      blocking_reasons:
+        type: array
+        items:
+          type: string
+          minLength: 1
   continuity_event_refs:
     type: array
     minItems: 1
@@ -136,8 +242,8 @@ properties:
       pattern: "^notify://"
   preserved_invariants:
     type: array
-    minItems: 3
-    maxItems: 3
+    minItems: 4
+    maxItems: 4
     prefixItems:
       - type: string
         const: append-only-continuity
@@ -145,6 +251,8 @@ properties:
         const: restored-pre-apply-snapshot
       - type: string
         const: stakeholders-notified
+      - type: string
+        const: reverse-apply-journal-bound
   executed_at:
     type: string
     format: date-time
@@ -155,6 +263,8 @@ allOf:
           const: rolled-back
     then:
       properties:
+        live_enactment_session_id:
+          pattern: "^enactment-session-[a-f0-9]{12}$"
         restored_snapshot_ref:
           pattern: "^mirage://"
         rollback_plan_ref:
@@ -163,11 +273,22 @@ allOf:
           minimum: 1
         reverted_stage_count:
           minimum: 1
+        reverse_apply_journal:
+          minItems: 1
         continuity_event_refs:
           minItems: 2
         notification_refs:
           minItems: 3
           maxItems: 3
+        telemetry_gate:
+          properties:
+            status:
+              const: rollback-approved
+            cleanup_status:
+              const: removed
+          required:
+            - status
+            - cleanup_status
 examples:
   - kind: builder_rollback_session
     schema_version: "1.0"
@@ -187,6 +308,7 @@ examples:
     initiator: IntegrityGuardian
     reason: Regression detected during canary rollout.
     status: rolled-back
+    live_enactment_session_id: enactment-session-0123456789ab
     restored_snapshot_ref: mirage://build-l5-rollback-0001/snapshot/pre-apply
     rollback_plan_ref: rollback://build-l5-rollback-0001
     reverted_patch_ids:
@@ -197,6 +319,35 @@ examples:
       - dark-launch
       - canary-5pct
     reverted_stage_count: 2
+    reverse_apply_journal:
+      - journal_ref: journal://build-l5-rollback-0001/reverse/01
+        path: src/omoikane/self_construction/builders.py
+        patch_id: patch-111111111111
+        source_state: copied
+        rollback_action: restore-copied-file
+        snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
+        marker: "# workspace-enacted: patch-111111111111 target=src/omoikane/self_construction/builders.py"
+      - journal_ref: journal://build-l5-rollback-0001/reverse/02
+        path: tests/unit/test_builders.py
+        patch_id: patch-222222222222
+        source_state: copied
+        rollback_action: restore-copied-file
+        snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
+        marker: "# workspace-enacted: patch-222222222222 target=tests/unit/test_builders.py"
+    telemetry_gate:
+      gate_id: telemetry-gate-0123456789ab
+      source_enactment_session_id: enactment-session-0123456789ab
+      status: rollback-approved
+      cleanup_status: removed
+      executed_command_count: 2
+      passed_command_count: 2
+      journal_entry_count: 2
+      reverted_stage_count: 2
+      decision_basis:
+        - temp-workspace-cleaned
+        - eval-command-receipts-preserved
+        - reverse-apply-journal-complete
+      blocking_reasons: []
     continuity_event_refs:
       - ledger://self-modify/build-l5-rollback-0001
       - ledger://self-modify/build-l5-rollback-0001/rollback
@@ -208,4 +359,5 @@ examples:
       - append-only-continuity
       - restored-pre-apply-snapshot
       - stakeholders-notified
+      - reverse-apply-journal-bound
     executed_at: "2026-04-20T03:00:00Z"

@@ -36,6 +36,8 @@ reference runtime には `builder-demo` があり、
 `build_request` handoff、patch descriptor 生成、Mirage Self への sandbox apply、
 A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
+rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
+reverse-apply journal と telemetry gate を通過した時だけ `rolled-back` になる。
 
 ## Builder への入力フォーマット
 

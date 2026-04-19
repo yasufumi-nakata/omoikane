@@ -5,6 +5,7 @@ service: RollbackEngineService
 summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed.
 imports:
   build_request: ../schemas/build_request.yaml
+  builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
   sandbox_apply_receipt: ../schemas/sandbox_apply_receipt.schema
   staged_rollout_session: ../schemas/staged_rollout_session.schema
   builder_rollback_session: ../schemas/builder_rollback_session.schema
@@ -18,6 +19,7 @@ operations:
           - build_request_ref
           - apply_receipt_ref
           - rollout_session_ref
+          - live_enactment_session_ref
           - trigger
           - reason
           - initiator
@@ -31,6 +33,9 @@ operations:
           rollout_session_ref:
             type: string
             pattern: "^rollout-session-[a-f0-9]{12}$"
+          live_enactment_session_ref:
+            type: string
+            pattern: "^enactment-session-[a-f0-9]{12}$"
           trigger:
             type: string
             enum:
@@ -47,10 +52,13 @@ operations:
       schema_ref: builder_rollback_session
     preconditions:
       - sandbox apply receipt must be applied and rollback-ready
+      - live enactment session must have passed and cleaned its temp workspace
       - staged rollout session must have decision=rollback
       - rollback plan must remain bound to the same build_request
     guarantees:
       - rollback restores the pre-apply Mirage Self snapshot
+      - rollback emits a reverse-apply journal that covers every materialized live workspace file
+      - rollback telemetry gate binds command receipts, cleanup, and journal coverage before approval
       - continuity evidence remains append-only
       - self, council, and guardian are all notified
   validate_session:

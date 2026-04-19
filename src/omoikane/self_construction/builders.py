@@ -222,6 +222,7 @@ class DifferentialEvaluationPolicy:
             "L5.DifferentialEvaluator": (MANDATORY_BUILD_PIPELINE_EVAL,),
             "L5.RollbackEngine": (
                 MANDATORY_BUILD_PIPELINE_EVAL,
+                MANDATORY_LIVE_ENACTMENT_EVAL,
                 MANDATORY_STAGED_ROLLOUT_EVAL,
                 MANDATORY_ROLLBACK_EVAL,
             ),
@@ -580,6 +581,7 @@ class RollbackEnginePolicy:
     require_append_only_continuity: bool = True
     require_pre_apply_snapshot: bool = True
     require_notifications: bool = True
+    require_live_rollback_gate: bool = True
     max_reverted_patch_count: int = 4
 
     def to_dict(self) -> Dict[str, Any]:
@@ -589,6 +591,7 @@ class RollbackEnginePolicy:
             "require_append_only_continuity": self.require_append_only_continuity,
             "require_pre_apply_snapshot": self.require_pre_apply_snapshot,
             "require_notifications": self.require_notifications,
+            "require_live_rollback_gate": self.require_live_rollback_gate,
             "max_reverted_patch_count": self.max_reverted_patch_count,
         }
 
@@ -608,6 +611,7 @@ class RollbackEngineService:
         build_request: Mapping[str, Any],
         apply_receipt: Mapping[str, Any],
         rollout_session: Mapping[str, Any],
+        live_enactment_session: Mapping[str, Any],
         trigger: str,
         reason: str,
         initiator: str,
@@ -615,6 +619,11 @@ class RollbackEngineService:
         reverted_patch_ids = list(apply_receipt.get("applied_patch_ids", []))
         rollback_ready = bool(apply_receipt.get("validation", {}).get("rollback_ready"))
         continuity_ref = str(apply_receipt.get("continuity_log_ref", ""))
+        live_enactment_ok = live_enactment_session.get("status") == "passed"
+        reverse_apply_journal = self._build_reverse_apply_journal(
+            build_request=build_request,
+            live_enactment_session=live_enactment_session,
+        )
         continuity_event_refs = [
             ref
             for ref in (
@@ -633,12 +642,20 @@ class RollbackEngineService:
             f"notify://council/{build_request['request_id']}",
             f"notify://guardian/{build_request['request_id']}",
         ]
+        telemetry_gate = self._build_telemetry_gate(
+            live_enactment_session=live_enactment_session,
+            reverse_apply_journal=reverse_apply_journal,
+            reverted_stage_ids=reverted_stage_ids,
+        )
         allowed = (
             apply_receipt.get("status") == "applied"
             and rollback_ready
             and rollout_session.get("decision") == "rollback"
             and bool(continuity_event_refs)
             and len(reverted_patch_ids) <= self._policy.max_reverted_patch_count
+            and live_enactment_ok
+            and bool(reverse_apply_journal)
+            and telemetry_gate["status"] == "rollback-approved"
         )
 
         return {
@@ -654,6 +671,9 @@ class RollbackEngineService:
             "initiator": initiator,
             "reason": reason,
             "status": "rolled-back" if allowed else "blocked",
+            "live_enactment_session_id": (
+                str(live_enactment_session.get("enactment_session_id", "")) if allowed else ""
+            ),
             "restored_snapshot_ref": (
                 f"mirage://{build_request['request_id']}/snapshot/pre-apply" if allowed else ""
             ),
@@ -662,12 +682,17 @@ class RollbackEngineService:
             "reverted_patch_count": len(reverted_patch_ids) if allowed else 0,
             "reverted_stage_ids": reverted_stage_ids if allowed else [],
             "reverted_stage_count": len(reverted_stage_ids) if allowed else 0,
+            "reverse_apply_journal": reverse_apply_journal if allowed else [],
+            "telemetry_gate": (
+                telemetry_gate if allowed else self._build_blocked_telemetry_gate(telemetry_gate)
+            ),
             "continuity_event_refs": continuity_event_refs if allowed else continuity_event_refs[:1],
             "notification_refs": notifications if allowed else notifications[:1],
             "preserved_invariants": [
                 "append-only-continuity",
                 "restored-pre-apply-snapshot",
                 "stakeholders-notified",
+                "reverse-apply-journal-bound",
             ],
             "executed_at": utc_now_iso(),
         }
@@ -682,7 +707,10 @@ class RollbackEngineService:
             errors.append("status must be rolled-back or blocked")
         if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
             errors.append("trigger must be eval-regression, guardian-veto, or manual-review")
+        telemetry_gate = dict(session.get("telemetry_gate", {}))
         if session.get("status") == "rolled-back":
+            if not str(session.get("live_enactment_session_id", "")).startswith("enactment-session-"):
+                errors.append("live_enactment_session_id must start with enactment-session-")
             if not str(session.get("restored_snapshot_ref", "")).startswith("mirage://"):
                 errors.append("restored_snapshot_ref must start with mirage://")
             if not str(session.get("rollback_plan_ref", "")).startswith("rollback://"):
@@ -691,11 +719,101 @@ class RollbackEngineService:
                 errors.append("reverted_patch_count must be >= 1 for rolled-back sessions")
             if int(session.get("reverted_stage_count", 0)) < 1:
                 errors.append("reverted_stage_count must be >= 1 for rolled-back sessions")
+            reverse_apply_journal = list(session.get("reverse_apply_journal", []))
+            if len(reverse_apply_journal) < 1:
+                errors.append("reverse_apply_journal must include at least one entry")
+            if len(reverse_apply_journal) != int(session.get("reverted_patch_count", 0)):
+                errors.append("reverse_apply_journal must align with reverted_patch_count")
             if len(list(session.get("continuity_event_refs", []))) < 2:
                 errors.append("continuity_event_refs must include apply and rollback refs")
             if len(list(session.get("notification_refs", []))) != 3:
                 errors.append("notification_refs must notify self, council, and guardian")
+            if telemetry_gate.get("status") != "rollback-approved":
+                errors.append("telemetry_gate.status must equal rollback-approved")
+            if telemetry_gate.get("cleanup_status") != "removed":
+                errors.append("telemetry_gate.cleanup_status must equal removed")
+            if int(telemetry_gate.get("journal_entry_count", 0)) != len(reverse_apply_journal):
+                errors.append("telemetry_gate.journal_entry_count must match reverse_apply_journal")
         return {"ok": not errors, "errors": errors}
+
+    @staticmethod
+    def _build_reverse_apply_journal(
+        *,
+        build_request: Mapping[str, Any],
+        live_enactment_session: Mapping[str, Any],
+    ) -> list[Dict[str, Any]]:
+        snapshot_refs = dict(live_enactment_session.get("workspace_snapshot_refs", {}))
+        pre_apply_ref = str(snapshot_refs.get("pre_apply", ""))
+        journal: list[Dict[str, Any]] = []
+        for index, item in enumerate(live_enactment_session.get("materialized_files", []), start=1):
+            source_state = str(item.get("source_state", ""))
+            rollback_action = (
+                "restore-copied-file" if source_state == "copied" else "delete-created-file"
+            )
+            journal.append(
+                {
+                    "journal_ref": f"journal://{build_request['request_id']}/reverse/{index:02d}",
+                    "path": str(item.get("path", "")),
+                    "patch_id": str(item.get("patch_id", "")),
+                    "source_state": source_state,
+                    "rollback_action": rollback_action,
+                    "snapshot_ref": pre_apply_ref,
+                    "marker": str(item.get("marker", "")),
+                }
+            )
+        return journal
+
+    def _build_telemetry_gate(
+        self,
+        *,
+        live_enactment_session: Mapping[str, Any],
+        reverse_apply_journal: Sequence[Mapping[str, Any]],
+        reverted_stage_ids: Sequence[str],
+    ) -> Dict[str, Any]:
+        command_runs = list(live_enactment_session.get("command_runs", []))
+        passed_command_count = sum(run.get("status") == "pass" for run in command_runs)
+        mutated_file_count = int(live_enactment_session.get("mutated_file_count", 0))
+        cleanup_status = str(live_enactment_session.get("cleanup_status", "not-started"))
+        blocking_reasons: list[str] = []
+        if live_enactment_session.get("status") != "passed":
+            blocking_reasons.append("live enactment must pass before rollback telemetry can approve")
+        if cleanup_status != "removed":
+            blocking_reasons.append("temp workspace cleanup must complete before rollback")
+        if passed_command_count != len(command_runs):
+            blocking_reasons.append("all live enactment commands must pass before rollback")
+        if len(reverse_apply_journal) != mutated_file_count:
+            blocking_reasons.append("reverse-apply journal must cover every materialized file")
+        if not reverted_stage_ids:
+            blocking_reasons.append("rollback telemetry requires at least one reverted stage")
+
+        return {
+            "gate_id": new_id("telemetry-gate"),
+            "source_enactment_session_id": str(
+                live_enactment_session.get("enactment_session_id", "")
+            ),
+            "status": "rollback-approved" if not blocking_reasons else "blocked",
+            "cleanup_status": cleanup_status,
+            "executed_command_count": len(command_runs),
+            "passed_command_count": passed_command_count,
+            "journal_entry_count": len(reverse_apply_journal),
+            "reverted_stage_count": len(reverted_stage_ids),
+            "decision_basis": [
+                "temp-workspace-cleaned",
+                "eval-command-receipts-preserved",
+                "reverse-apply-journal-complete",
+            ],
+            "blocking_reasons": blocking_reasons,
+        }
+
+    @staticmethod
+    def _build_blocked_telemetry_gate(telemetry_gate: Mapping[str, Any]) -> Dict[str, Any]:
+        gate = dict(telemetry_gate)
+        gate["status"] = "blocked"
+        blocking_reasons = list(gate.get("blocking_reasons", []))
+        if not blocking_reasons:
+            blocking_reasons.append("rollback preconditions were not satisfied")
+        gate["blocking_reasons"] = blocking_reasons
+        return gate
 
 
 @dataclass(frozen=True)

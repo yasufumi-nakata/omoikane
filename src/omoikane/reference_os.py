@@ -6220,11 +6220,13 @@ class OmoikaneReferenceOS:
             ],
             "spec_refs": [
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/interfaces/selfctor.enactment.v0.idl",
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
                 "specs/interfaces/selfctor.rollout.v0.idl",
                 "specs/interfaces/selfctor.rollback.v0.idl",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
+                "specs/schemas/builder_live_enactment_session.schema",
                 "specs/schemas/sandbox_apply_receipt.schema",
                 "specs/schemas/staged_rollout_session.schema",
                 "specs/schemas/builder_rollback_session.schema",
@@ -6233,10 +6235,12 @@ class OmoikaneReferenceOS:
                 "self_modify rollback restores pre-apply Mirage Self snapshot",
                 "self_modify rollback keeps continuity evidence append-only",
                 "self_modify rollback notifies self council guardian",
+                "self_modify rollback binds reverse-apply journal to live enactment receipts",
             ],
             "constraints": {
                 "must_pass": [
                     "evals/continuity/council_output_build_request_pipeline.yaml",
+                    "evals/continuity/builder_live_enactment_execution.yaml",
                     "evals/continuity/builder_staged_rollout_execution.yaml",
                     "evals/continuity/builder_rollback_execution.yaml",
                 ],
@@ -6289,6 +6293,13 @@ class OmoikaneReferenceOS:
             target_subsystem=build_request["target_subsystem"],
             requested_evals=build_request["constraints"]["must_pass"],
         )
+        enactment_session = self.live_enactment.execute(
+            build_request=build_request,
+            build_artifact=build_artifact,
+            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            repo_root=self.repo_root,
+        )
+        enactment_validation = self.live_enactment.validate_session(enactment_session)
         eval_reports = [
             self.diff_evaluator.run_ab_eval(
                 eval_ref=eval_ref,
@@ -6316,6 +6327,7 @@ class OmoikaneReferenceOS:
             build_request=build_request,
             apply_receipt=sandbox_apply_receipt,
             rollout_session=rollout_session,
+            live_enactment_session=enactment_session,
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
@@ -6409,6 +6421,20 @@ class OmoikaneReferenceOS:
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="selfctor.enactment.executed",
+            payload={
+                "policy": self.live_enactment.policy(),
+                "session": enactment_session,
+                "validation": enactment_validation,
+            },
+            actor="LiveEnactmentService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="selfctor.diff_eval.completed",
             payload={
                 "policy": self.diff_evaluator.policy(),
@@ -6479,6 +6505,7 @@ class OmoikaneReferenceOS:
                 "scope_validation": scope_validation,
                 "artifact": build_artifact,
                 "sandbox_apply_receipt": sandbox_apply_receipt,
+                "enactment_session": enactment_session,
                 "patches": patch_descriptions,
                 "suite_selection": suite_selection,
                 "eval_reports": eval_reports,
@@ -6491,6 +6518,8 @@ class OmoikaneReferenceOS:
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
                     and sandbox_apply_validation["ok"]
+                    and enactment_validation["ok"]
+                    and enactment_session["status"] == "passed"
                     and regression_detected
                     and rollout["decision"] == "rollback"
                     and rollout_session_validation["ok"]
@@ -6502,6 +6531,8 @@ class OmoikaneReferenceOS:
                 "sandbox_apply_ok": sandbox_apply_validation["ok"],
                 "sandbox_apply_status": sandbox_apply_receipt["status"],
                 "selected_eval_count": len(suite_selection["selected_evals"]),
+                "live_enactment_ok": enactment_validation["ok"],
+                "live_enactment_status": enactment_session["status"],
                 "regression_detected": regression_detected,
                 "rollback_trigger": rollback_session["trigger"],
                 "rollout_decision": rollout["decision"],
@@ -6510,6 +6541,12 @@ class OmoikaneReferenceOS:
                 "restored_snapshot_ref": rollback_session["restored_snapshot_ref"],
                 "reverted_patch_count": rollback_session["reverted_patch_count"],
                 "reverted_stage_ids": rollback_session["reverted_stage_ids"],
+                "reverse_apply_journal_count": len(rollback_session["reverse_apply_journal"]),
+                "telemetry_gate_status": rollback_session["telemetry_gate"]["status"],
+                "telemetry_gate_cleanup_status": rollback_session["telemetry_gate"]["cleanup_status"],
+                "telemetry_gate_command_count": rollback_session["telemetry_gate"][
+                    "executed_command_count"
+                ],
                 "continuity_event_ref_count": len(rollback_session["continuity_event_refs"]),
                 "notification_ref_count": len(rollback_session["notification_refs"]),
             },

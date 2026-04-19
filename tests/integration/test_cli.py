@@ -262,17 +262,23 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["live_enactment_ok"])
         self.assertTrue(result["validation"]["regression_detected"])
         self.assertEqual("rollback", result["validation"]["rollout_decision"])
         self.assertEqual("rolled-back", result["validation"]["rollout_status"])
         self.assertEqual("rolled-back", result["validation"]["rollback_status"])
+        self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
-        self.assertEqual(3, result["validation"]["selected_eval_count"])
+        self.assertEqual(4, result["validation"]["selected_eval_count"])
         self.assertEqual(2, result["validation"]["reverted_patch_count"])
+        self.assertEqual(2, result["validation"]["reverse_apply_journal_count"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],
             result["validation"]["reverted_stage_ids"],
         )
+        self.assertEqual("rollback-approved", result["validation"]["telemetry_gate_status"])
+        self.assertEqual("removed", result["validation"]["telemetry_gate_cleanup_status"])
+        self.assertEqual(2, result["validation"]["telemetry_gate_command_count"])
         self.assertEqual(
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             result["validation"]["restored_snapshot_ref"],

@@ -355,6 +355,7 @@ entries:
     file: specs/schemas/builder_live_enactment_session.schema
     consumers:
       - specs/interfaces/selfctor.enactment.v0.idl
+      - specs/interfaces/selfctor.rollback.v0.idl
       - docs/02-subsystems/self-construction/README.md
       - reference-runtime
     rationale: Required to serialize one temp workspace enactment session with materialized files, actual eval commands, and cleanup receipts.
@@ -398,7 +399,7 @@ entries:
       - specs/interfaces/selfctor.rollback.v0.idl
       - docs/04-ai-governance/self-modification.md
       - reference-runtime
-    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot and binds stakeholder notifications.
+    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot, binds reverse-apply journal coverage to live enactment receipts, and records rollback telemetry approval.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.rollback.v0.idl
@@ -407,7 +408,7 @@ entries:
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make regression-triggered builder rollback execution machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make regression-triggered builder rollback execution, reverse-apply journal binding, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl

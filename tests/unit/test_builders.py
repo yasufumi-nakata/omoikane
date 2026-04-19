@@ -190,6 +190,50 @@ class RolloutPlannerServiceTests(unittest.TestCase):
 class RollbackEngineServiceTests(unittest.TestCase):
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
+        live_enactment_session = LiveEnactmentService().execute(
+            build_request={
+                "request_id": "build-l5-rollback-0001",
+                "constraints": {
+                    "allowed_write_paths": [
+                        "src/omoikane/self_construction/",
+                        "tests/unit/",
+                    ],
+                    "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                    "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
+                },
+                "workspace_scope": ["src/", "tests/", "evals/"],
+                "output_paths": [
+                    "src/omoikane/self_construction/",
+                    "tests/unit/",
+                ],
+                "target_subsystem": "L5.RollbackEngine",
+                "spec_refs": ["specs/interfaces/selfctor.rollback.v0.idl"],
+                "design_refs": ["docs/02-subsystems/self-construction/README.md"],
+            },
+            build_artifact=PatchGeneratorService().generate_patch_set(
+                {
+                    "request_id": "build-l5-rollback-0001",
+                    "constraints": {
+                        "allowed_write_paths": [
+                            "src/omoikane/self_construction/",
+                            "tests/unit/",
+                        ],
+                        "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
+                        "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
+                    },
+                    "workspace_scope": ["src/", "tests/", "evals/"],
+                    "output_paths": [
+                        "src/omoikane/self_construction/",
+                        "tests/unit/",
+                    ],
+                    "target_subsystem": "L5.RollbackEngine",
+                    "spec_refs": ["specs/interfaces/selfctor.rollback.v0.idl"],
+                    "design_refs": ["docs/02-subsystems/self-construction/README.md"],
+                }
+            ),
+            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            repo_root=Path(__file__).resolve().parents[2],
+        )
 
         session = service.execute_rollback(
             build_request={"request_id": "build-l5-rollback-0001"},
@@ -213,6 +257,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
                     {"stage_id": "full-100pct", "status": "blocked"},
                 ],
             },
+            live_enactment_session=live_enactment_session,
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
@@ -220,11 +265,19 @@ class RollbackEngineServiceTests(unittest.TestCase):
 
         self.assertEqual("rolled-back", session["status"])
         self.assertEqual(
+            live_enactment_session["enactment_session_id"],
+            session["live_enactment_session_id"],
+        )
+        self.assertEqual(
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             session["restored_snapshot_ref"],
         )
         self.assertEqual(2, session["reverted_patch_count"])
         self.assertEqual(["dark-launch", "canary-5pct"], session["reverted_stage_ids"])
+        self.assertEqual(2, len(session["reverse_apply_journal"]))
+        self.assertEqual("rollback-approved", session["telemetry_gate"]["status"])
+        self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
+        self.assertEqual(2, session["telemetry_gate"]["executed_command_count"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 

@@ -207,6 +207,7 @@ cleanup 済み receipt を 1 シナリオで確認する。
 rollback 判定済み staged rollout が `builder_rollback_session` を通じて
 `pre-apply` Mirage Self snapshot を復元し、
 `dark-launch` / `canary-5pct` の revoke 範囲、
+live enactment receipt に束縛された reverse-apply journal と telemetry gate、
 append-only continuity ref 2 本、
 self / council / guardian の 3 者通知を
 1 シナリオで確認する。
@@ -351,5 +352,4 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 - distributed transport key rotation / remote PKI federation を actual network に接続
 - Guardian oversight reviewer の remote attestation transport を actual verifier network に接続
 - AscensionScheduler external verifier の真正性証明と live 接続
-- builder rollback の actual reverse-apply journal と live telemetry gate 連携
 - automation による未実装ギャップの継続充填
