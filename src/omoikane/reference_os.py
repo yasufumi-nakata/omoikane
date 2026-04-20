@@ -8311,6 +8311,18 @@ class OmoikaneReferenceOS:
                 "checkout_mutation_restored": rollback_session["checkout_mutation_receipt"][
                     "restored_matches_baseline"
                 ],
+                "external_observer_status": rollback_session["checkout_mutation_receipt"][
+                    "observer_status"
+                ],
+                "external_observer_receipt_count": rollback_session["checkout_mutation_receipt"][
+                    "observer_receipt_count"
+                ],
+                "external_observer_restored": rollback_session["checkout_mutation_receipt"][
+                    "observer_restored_matches_baseline"
+                ],
+                "external_observer_stash_preserved": rollback_session[
+                    "checkout_mutation_receipt"
+                ]["observer_stash_state_preserved"],
                 "reverse_apply_cleanup_status": rollback_session["telemetry_gate"][
                     "reverse_cleanup_status"
                 ],

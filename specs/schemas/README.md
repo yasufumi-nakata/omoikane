@@ -76,7 +76,7 @@
 
 ## 次段階
 
-current-worktree direct rollback mutation / external observer receipts /
+current-worktree direct rollback mutation /
 multi-scene sensory loopback artifact families /
 external-actuation authorization artifacts / cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。

@@ -268,7 +268,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("rolled-back", session["status"])
-        self.assertEqual("1.3", session["schema_version"])
+        self.assertEqual("1.4", session["schema_version"])
         self.assertEqual(
             live_enactment_session["enactment_session_id"],
             session["live_enactment_session_id"],
@@ -295,6 +295,17 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertTrue(session["checkout_mutation_receipt"]["restored_matches_baseline"])
         self.assertEqual(2, session["checkout_mutation_receipt"]["observed_path_count"])
         self.assertEqual(2, session["checkout_mutation_receipt"]["verified_path_count"])
+        self.assertEqual(
+            "repo-root-git-observer-v1",
+            session["checkout_mutation_receipt"]["observer_profile"],
+        )
+        self.assertEqual("verified", session["checkout_mutation_receipt"]["observer_status"])
+        self.assertEqual(5, session["checkout_mutation_receipt"]["observer_receipt_count"])
+        self.assertTrue(session["checkout_mutation_receipt"]["observer_mutation_detected"])
+        self.assertTrue(
+            session["checkout_mutation_receipt"]["observer_restored_matches_baseline"]
+        )
+        self.assertTrue(session["checkout_mutation_receipt"]["observer_stash_state_preserved"])
         self.assertEqual("removed", session["checkout_mutation_receipt"]["cleanup_status"])
         self.assertEqual("rollback-approved", session["telemetry_gate"]["status"])
         self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
@@ -307,6 +318,11 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual("removed", session["telemetry_gate"]["checkout_cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["checkout_verified_path_count"])
         self.assertTrue(session["telemetry_gate"]["checkout_status_restored"])
+        self.assertEqual("verified", session["telemetry_gate"]["external_observer_status"])
+        self.assertEqual(5, session["telemetry_gate"]["external_observer_receipt_count"])
+        self.assertTrue(session["telemetry_gate"]["external_observer_restored"])
+        self.assertTrue(session["telemetry_gate"]["external_observer_stash_preserved"])
+        self.assertTrue(session["telemetry_gate"]["external_observer_mutation_detected"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 

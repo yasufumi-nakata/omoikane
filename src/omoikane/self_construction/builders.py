@@ -670,7 +670,7 @@ class RolloutPlannerService:
 class RollbackEnginePolicy:
     """Deterministic rollback policy for builder sessions."""
 
-    policy_id: str = "continuity-bound-builder-rollback-v4"
+    policy_id: str = "continuity-bound-builder-rollback-v5"
     required_eval: str = MANDATORY_ROLLBACK_EVAL
     require_append_only_continuity: bool = True
     require_pre_apply_snapshot: bool = True
@@ -679,9 +679,11 @@ class RollbackEnginePolicy:
     require_reverse_apply_commands: bool = True
     require_repo_bound_verification: bool = True
     require_checkout_mutation_receipt: bool = True
+    require_external_observer_receipts: bool = True
     rollback_workspace_prefix: str = "omoikane-builder-rollback-"
     checkout_mutation_strategy: str = "detached-git-worktree-overlay-v1"
     checkout_worktree_prefix: str = "omoikane-builder-rollback-worktree-"
+    external_observer_profile: str = "repo-root-git-observer-v1"
     repo_binding_scope: str = "current-checkout-subtree"
     command_timeout_seconds: int = 15
     cleanup_after_run: bool = True
@@ -698,9 +700,11 @@ class RollbackEnginePolicy:
             "require_reverse_apply_commands": self.require_reverse_apply_commands,
             "require_repo_bound_verification": self.require_repo_bound_verification,
             "require_checkout_mutation_receipt": self.require_checkout_mutation_receipt,
+            "require_external_observer_receipts": self.require_external_observer_receipts,
             "rollback_workspace_prefix": self.rollback_workspace_prefix,
             "checkout_mutation_strategy": self.checkout_mutation_strategy,
             "checkout_worktree_prefix": self.checkout_worktree_prefix,
+            "external_observer_profile": self.external_observer_profile,
             "repo_binding_scope": self.repo_binding_scope,
             "command_timeout_seconds": self.command_timeout_seconds,
             "cleanup_after_run": self.cleanup_after_run,
@@ -787,7 +791,7 @@ class RollbackEngineService:
 
         return {
             "kind": "builder_rollback_session",
-            "schema_version": "1.3",
+            "schema_version": "1.4",
             "rollback_session_id": new_id("rollback-session"),
             "request_id": build_request["request_id"],
             "artifact_id": apply_receipt["artifact_id"],
@@ -824,6 +828,7 @@ class RollbackEngineService:
                 "reverse-apply-journal-bound",
                 "repo-baseline-bound",
                 "checkout-bound-state-restored",
+                "external-observer-evidence-bound",
             ],
             "executed_at": utc_now_iso(),
         }
@@ -832,8 +837,8 @@ class RollbackEngineService:
         errors: list[str] = []
         if session.get("kind") != "builder_rollback_session":
             errors.append("kind must equal builder_rollback_session")
-        if session.get("schema_version") != "1.3":
-            errors.append("schema_version must equal 1.3")
+        if session.get("schema_version") != "1.4":
+            errors.append("schema_version must equal 1.4")
         if session.get("status") not in {"rolled-back", "blocked"}:
             errors.append("status must be rolled-back or blocked")
         if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
@@ -868,6 +873,16 @@ class RollbackEngineService:
             errors.append("checkout_mutation_receipt.baseline_status_digest must be sha256")
         if len(str(checkout_mutation_receipt.get("restored_status_digest", ""))) != 64:
             errors.append("checkout_mutation_receipt.restored_status_digest must be sha256")
+        if checkout_mutation_receipt.get("observer_profile") != self._policy.external_observer_profile:
+            errors.append(
+                "checkout_mutation_receipt.observer_profile must equal "
+                f"{self._policy.external_observer_profile}"
+            )
+        observer_receipts = list(checkout_mutation_receipt.get("observer_receipts", []))
+        if int(checkout_mutation_receipt.get("observer_receipt_count", 0)) != len(observer_receipts):
+            errors.append(
+                "checkout_mutation_receipt.observer_receipt_count must match observer_receipts"
+            )
         if int(checkout_mutation_receipt.get("verified_path_count", 0)) != sum(
             receipt.get("status") == "pass"
             and receipt.get("result_state") in {"restored", "deleted"}
@@ -925,6 +940,18 @@ class RollbackEngineService:
                 errors.append("checkout_mutation_receipt must record a pre-rollback mutation")
             if not bool(checkout_mutation_receipt.get("restored_matches_baseline")):
                 errors.append("checkout_mutation_receipt must restore checkout state to baseline")
+            if checkout_mutation_receipt.get("observer_status") != "verified":
+                errors.append("checkout_mutation_receipt.observer_status must equal verified")
+            if not bool(checkout_mutation_receipt.get("observer_mutation_detected")):
+                errors.append("checkout_mutation_receipt must record observer-detected mutation")
+            if not bool(checkout_mutation_receipt.get("observer_restored_matches_baseline")):
+                errors.append(
+                    "checkout_mutation_receipt must restore observer-visible worktree state"
+                )
+            if not bool(checkout_mutation_receipt.get("observer_stash_state_preserved")):
+                errors.append(
+                    "checkout_mutation_receipt must preserve observer-visible stash state"
+                )
             if checkout_mutation_receipt.get("cleanup_status") != "removed":
                 errors.append("checkout_mutation_receipt.cleanup_status must equal removed")
             if int(checkout_mutation_receipt.get("observed_path_count", 0)) != len(reverse_apply_journal):
@@ -935,6 +962,8 @@ class RollbackEngineService:
                 errors.append(
                     "checkout_mutation_receipt.verified_path_count must match reverse_apply_journal"
                 )
+            if int(checkout_mutation_receipt.get("observer_receipt_count", 0)) < 5:
+                errors.append("checkout_mutation_receipt must include observer receipts for rollback")
             if len(list(session.get("continuity_event_refs", []))) < 2:
                 errors.append("continuity_event_refs must include apply and rollback refs")
             if len(list(session.get("notification_refs", []))) != 3:
@@ -977,6 +1006,24 @@ class RollbackEngineService:
                 errors.append("telemetry_gate.checkout_cleanup_status must equal removed")
             if not bool(telemetry_gate.get("checkout_status_restored")):
                 errors.append("telemetry_gate.checkout_status_restored must be true")
+            if telemetry_gate.get("external_observer_status") != "verified":
+                errors.append("telemetry_gate.external_observer_status must equal verified")
+            if not bool(telemetry_gate.get("external_observer_restored")):
+                errors.append("telemetry_gate.external_observer_restored must be true")
+            if not bool(telemetry_gate.get("external_observer_stash_preserved")):
+                errors.append(
+                    "telemetry_gate.external_observer_stash_preserved must be true"
+                )
+            if not bool(telemetry_gate.get("external_observer_mutation_detected")):
+                errors.append(
+                    "telemetry_gate.external_observer_mutation_detected must be true"
+                )
+            if int(telemetry_gate.get("external_observer_receipt_count", 0)) != int(
+                checkout_mutation_receipt.get("observer_receipt_count", 0)
+            ):
+                errors.append(
+                    "telemetry_gate.external_observer_receipt_count must match observer_receipts"
+                )
             if int(telemetry_gate.get("checkout_verified_path_count", 0)) != len(
                 reverse_apply_journal
             ):
@@ -1103,6 +1150,21 @@ class RollbackEngineService:
         checkout_cleanup_status = str(checkout_mutation_receipt.get("cleanup_status", "not-started"))
         checkout_mutation_status = str(checkout_mutation_receipt.get("status", "blocked"))
         checkout_status_restored = bool(checkout_mutation_receipt.get("restored_matches_baseline"))
+        external_observer_status = str(
+            checkout_mutation_receipt.get("observer_status", "blocked")
+        )
+        external_observer_receipt_count = int(
+            checkout_mutation_receipt.get("observer_receipt_count", 0)
+        )
+        external_observer_restored = bool(
+            checkout_mutation_receipt.get("observer_restored_matches_baseline")
+        )
+        external_observer_stash_preserved = bool(
+            checkout_mutation_receipt.get("observer_stash_state_preserved")
+        )
+        external_observer_mutation_detected = bool(
+            checkout_mutation_receipt.get("observer_mutation_detected")
+        )
         blocking_reasons: list[str] = []
         if live_enactment_session.get("status") != "passed":
             blocking_reasons.append("live enactment must pass before rollback telemetry can approve")
@@ -1132,6 +1194,22 @@ class RollbackEngineService:
             )
         if not checkout_status_restored:
             blocking_reasons.append("checkout-bound rollback mutation must restore baseline state")
+        if external_observer_status != "verified":
+            blocking_reasons.append(
+                "external observer receipts must verify repo-root rollback state"
+            )
+        if not external_observer_restored:
+            blocking_reasons.append(
+                "external observer receipts must restore repo-root worktree view"
+            )
+        if not external_observer_stash_preserved:
+            blocking_reasons.append(
+                "external observer receipts must preserve repo-root stash state"
+            )
+        if not external_observer_mutation_detected:
+            blocking_reasons.append(
+                "external observer receipts must detect detached worktree mutation"
+            )
         if checkout_cleanup_status != "removed":
             blocking_reasons.append("checkout-bound worktree cleanup must complete before approval")
         if checkout_mutation_status != "verified":
@@ -1159,6 +1237,11 @@ class RollbackEngineService:
             "checkout_cleanup_status": checkout_cleanup_status,
             "checkout_verified_path_count": checkout_verified_path_count,
             "checkout_status_restored": checkout_status_restored,
+            "external_observer_status": external_observer_status,
+            "external_observer_receipt_count": external_observer_receipt_count,
+            "external_observer_restored": external_observer_restored,
+            "external_observer_stash_preserved": external_observer_stash_preserved,
+            "external_observer_mutation_detected": external_observer_mutation_detected,
             "journal_entry_count": len(reverse_apply_journal),
             "reverted_stage_count": len(reverted_stage_ids),
             "decision_basis": [
@@ -1234,11 +1317,53 @@ class RollbackEngineService:
         restored_status_text = ""
         restored_diff_text = ""
         path_receipts: list[Dict[str, Any]] = []
+        observer_receipts: list[Dict[str, Any]] = []
         cleanup_status = "not-started"
         added_worktree = False
+        add_worktree_result: Dict[str, Any] | None = None
+        git_worktree_list_argv = [
+            "git",
+            "-C",
+            str(repo_path),
+            "worktree",
+            "list",
+            "--porcelain",
+        ]
+        git_stash_list_argv = ["git", "-C", str(repo_path), "stash", "list"]
+
+        def record_observer_receipt(
+            stage: str,
+            command_label: str,
+            argv: Sequence[str],
+        ) -> Dict[str, Any]:
+            observer_run = _run_argv_command(
+                argv=argv,
+                cwd=repo_path,
+                timeout_seconds=self._policy.command_timeout_seconds,
+            )
+            observer_receipts.append(
+                {
+                    "observer_ref": (
+                        f"observer://current-checkout/{build_request['request_id']}/"
+                        f"{stage}/{command_label}"
+                    ),
+                    "stage": stage,
+                    "command_label": command_label,
+                    "command": observer_run["command"],
+                    "exit_code": observer_run["exit_code"],
+                    "status": observer_run["status"],
+                    "stdout_digest": sha256_text(observer_run.get("stdout", "")),
+                    "stderr_digest": sha256_text(observer_run.get("stderr", "")),
+                    "stdout_excerpt": observer_run["stdout_excerpt"],
+                    "stderr_excerpt": observer_run["stderr_excerpt"],
+                }
+            )
+            return observer_run
 
         try:
-            add_worktree = _run_argv_command(
+            record_observer_receipt("baseline", "git-worktree-list", git_worktree_list_argv)
+            record_observer_receipt("baseline", "git-stash-list", git_stash_list_argv)
+            add_worktree_result = _run_argv_command(
                 argv=[
                     "git",
                     "-C",
@@ -1253,126 +1378,122 @@ class RollbackEngineService:
                 cwd=repo_path,
                 timeout_seconds=self._policy.command_timeout_seconds,
             )
-            if add_worktree["status"] != "pass":
-                return self._blocked_checkout_mutation_receipt(
-                    build_request=build_request,
-                    observed_paths=observed_paths,
-                    git_status_command=add_worktree["command"],
-                    git_diff_command=shlex.join(git_diff_argv),
-                    cleanup_status="removed",
+            if add_worktree_result["status"] == "pass":
+                added_worktree = True
+                record_observer_receipt("mutated", "git-worktree-list", git_worktree_list_argv)
+                snapshot_root.mkdir(parents=True, exist_ok=True)
+                head_result = _run_argv_command(
+                    argv=["git", "rev-parse", "HEAD"],
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
                 )
-            added_worktree = True
-            snapshot_root.mkdir(parents=True, exist_ok=True)
-            head_result = _run_argv_command(
-                argv=["git", "rev-parse", "HEAD"],
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            if head_result["status"] == "pass":
-                head_commit = head_result["stdout"].strip() or head_commit
+                if head_result["status"] == "pass":
+                    head_commit = head_result["stdout"].strip() or head_commit
 
-            for index, item in enumerate(live_enactment_session.get("materialized_files", []), start=1):
-                target_path = str(item.get("path", ""))
-                if not target_path:
-                    continue
-                source_state = str(item.get("source_state", ""))
-                worktree_target = temp_root / target_path
-                repo_source = repo_path / target_path
-                baseline_snapshot = snapshot_root / target_path
-                if repo_source.exists():
-                    worktree_target.parent.mkdir(parents=True, exist_ok=True)
-                    baseline_snapshot.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(repo_source, worktree_target)
-                    shutil.copy2(repo_source, baseline_snapshot)
-                else:
-                    worktree_target.unlink(missing_ok=True)
-                    baseline_snapshot.unlink(missing_ok=True)
+                for index, item in enumerate(
+                    live_enactment_session.get("materialized_files", []), start=1
+                ):
+                    target_path = str(item.get("path", ""))
+                    if not target_path:
+                        continue
+                    worktree_target = temp_root / target_path
+                    repo_source = repo_path / target_path
+                    baseline_snapshot = snapshot_root / target_path
+                    if repo_source.exists():
+                        worktree_target.parent.mkdir(parents=True, exist_ok=True)
+                        baseline_snapshot.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(repo_source, worktree_target)
+                        shutil.copy2(repo_source, baseline_snapshot)
+                    else:
+                        worktree_target.unlink(missing_ok=True)
+                        baseline_snapshot.unlink(missing_ok=True)
 
-            baseline_status = _run_argv_command(
-                argv=git_status_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            baseline_diff = _run_argv_command(
-                argv=git_diff_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            baseline_status_text = baseline_status["stdout"]
-            baseline_diff_text = baseline_diff["stdout"]
-
-            for item in live_enactment_session.get("materialized_files", []):
-                target_path = str(item.get("path", ""))
-                if not target_path:
-                    continue
-                source_state = str(item.get("source_state", ""))
-                marker = str(item.get("marker", ""))
-                worktree_target = temp_root / target_path
-                baseline_snapshot = snapshot_root / target_path
-                self._materialize_reverse_apply_target(
-                    target=worktree_target,
-                    source=worktree_target,
-                    marker=marker,
-                    source_state=source_state,
+                baseline_status = _run_argv_command(
+                    argv=git_status_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
                 )
-            mutated_status = _run_argv_command(
-                argv=git_status_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            mutated_diff = _run_argv_command(
-                argv=git_diff_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            mutated_status_text = mutated_status["stdout"]
-            mutated_diff_text = mutated_diff["stdout"]
+                baseline_diff = _run_argv_command(
+                    argv=git_diff_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
+                )
+                baseline_status_text = baseline_status["stdout"]
+                baseline_diff_text = baseline_diff["stdout"]
 
-            for index, item in enumerate(live_enactment_session.get("materialized_files", []), start=1):
-                target_path = str(item.get("path", ""))
-                if not target_path:
-                    continue
-                source_state = str(item.get("source_state", ""))
-                baseline_snapshot = snapshot_root / target_path
-                command = self._build_reverse_apply_command(
-                    target_path=target_path,
-                    source=baseline_snapshot,
-                    source_state=source_state,
+                for item in live_enactment_session.get("materialized_files", []):
+                    target_path = str(item.get("path", ""))
+                    if not target_path:
+                        continue
+                    source_state = str(item.get("source_state", ""))
+                    marker = str(item.get("marker", ""))
+                    worktree_target = temp_root / target_path
+                    self._materialize_reverse_apply_target(
+                        target=worktree_target,
+                        source=worktree_target,
+                        marker=marker,
+                        source_state=source_state,
+                    )
+                mutated_status = _run_argv_command(
+                    argv=git_status_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
                 )
-                command_run = self._run_command(command=command, workspace_root=temp_root)
-                result_state = self._verify_reverse_apply_result(
-                    target=temp_root / target_path,
-                    source=baseline_snapshot,
-                    source_state=source_state,
+                mutated_diff = _run_argv_command(
+                    argv=git_diff_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
                 )
-                path_receipts.append(
-                    {
-                        "path": target_path,
-                        "source_state": source_state,
-                        "baseline_snapshot_ref": (
-                            f"baseline://{build_request['request_id']}/{index:02d}"
-                        ),
-                        "command": command_run["command"],
-                        "exit_code": command_run["exit_code"],
-                        "status": command_run["status"],
-                        "stdout_excerpt": command_run["stdout_excerpt"],
-                        "stderr_excerpt": command_run["stderr_excerpt"],
-                        "result_state": result_state,
-                    }
-                )
+                mutated_status_text = mutated_status["stdout"]
+                mutated_diff_text = mutated_diff["stdout"]
 
-            restored_status = _run_argv_command(
-                argv=git_status_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            restored_diff = _run_argv_command(
-                argv=git_diff_argv,
-                cwd=temp_root,
-                timeout_seconds=self._policy.command_timeout_seconds,
-            )
-            restored_status_text = restored_status["stdout"]
-            restored_diff_text = restored_diff["stdout"]
+                for index, item in enumerate(
+                    live_enactment_session.get("materialized_files", []), start=1
+                ):
+                    target_path = str(item.get("path", ""))
+                    if not target_path:
+                        continue
+                    source_state = str(item.get("source_state", ""))
+                    baseline_snapshot = snapshot_root / target_path
+                    command = self._build_reverse_apply_command(
+                        target_path=target_path,
+                        source=baseline_snapshot,
+                        source_state=source_state,
+                    )
+                    command_run = self._run_command(command=command, workspace_root=temp_root)
+                    result_state = self._verify_reverse_apply_result(
+                        target=temp_root / target_path,
+                        source=baseline_snapshot,
+                        source_state=source_state,
+                    )
+                    path_receipts.append(
+                        {
+                            "path": target_path,
+                            "source_state": source_state,
+                            "baseline_snapshot_ref": (
+                                f"baseline://{build_request['request_id']}/{index:02d}"
+                            ),
+                            "command": command_run["command"],
+                            "exit_code": command_run["exit_code"],
+                            "status": command_run["status"],
+                            "stdout_excerpt": command_run["stdout_excerpt"],
+                            "stderr_excerpt": command_run["stderr_excerpt"],
+                            "result_state": result_state,
+                        }
+                    )
+
+                restored_status = _run_argv_command(
+                    argv=git_status_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
+                )
+                restored_diff = _run_argv_command(
+                    argv=git_diff_argv,
+                    cwd=temp_root,
+                    timeout_seconds=self._policy.command_timeout_seconds,
+                )
+                restored_status_text = restored_status["stdout"]
+                restored_diff_text = restored_diff["stdout"]
         finally:
             if self._policy.cleanup_after_run:
                 if added_worktree:
@@ -1389,10 +1510,69 @@ class RollbackEngineService:
                         cwd=repo_path,
                         timeout_seconds=self._policy.command_timeout_seconds,
                     )
+                record_observer_receipt("restored", "git-worktree-list", git_worktree_list_argv)
+                record_observer_receipt("restored", "git-stash-list", git_stash_list_argv)
                 shutil.rmtree(temp_root, ignore_errors=True)
                 cleanup_status = "removed"
             else:
                 cleanup_status = "retained"
+
+        if not added_worktree:
+            return self._blocked_checkout_mutation_receipt(
+                build_request=build_request,
+                observed_paths=observed_paths,
+                git_status_command=(
+                    add_worktree_result["command"] if add_worktree_result else shlex.join(git_status_argv)
+                ),
+                git_diff_command=shlex.join(git_diff_argv),
+                cleanup_status=cleanup_status,
+                observer_receipts=observer_receipts,
+            )
+
+        observer_receipt_map = {
+            (receipt["stage"], receipt["command_label"]): receipt for receipt in observer_receipts
+        }
+        baseline_worktree_digest = observer_receipt_map.get(
+            ("baseline", "git-worktree-list"),
+            {},
+        ).get("stdout_digest", "")
+        mutated_worktree_digest = observer_receipt_map.get(
+            ("mutated", "git-worktree-list"),
+            {},
+        ).get("stdout_digest", "")
+        restored_worktree_digest = observer_receipt_map.get(
+            ("restored", "git-worktree-list"),
+            {},
+        ).get("stdout_digest", "")
+        baseline_stash_digest = observer_receipt_map.get(
+            ("baseline", "git-stash-list"),
+            {},
+        ).get("stdout_digest", "")
+        restored_stash_digest = observer_receipt_map.get(
+            ("restored", "git-stash-list"),
+            {},
+        ).get("stdout_digest", "")
+        observer_mutation_detected = (
+            bool(mutated_worktree_digest)
+            and baseline_worktree_digest != mutated_worktree_digest
+        )
+        observer_restored_matches_baseline = (
+            bool(baseline_worktree_digest)
+            and baseline_worktree_digest == restored_worktree_digest
+        )
+        observer_stash_state_preserved = (
+            bool(baseline_stash_digest)
+            and baseline_stash_digest == restored_stash_digest
+        )
+        observer_status = (
+            "verified"
+            if observer_receipts
+            and all(receipt["status"] == "pass" for receipt in observer_receipts)
+            and observer_mutation_detected
+            and observer_restored_matches_baseline
+            and observer_stash_state_preserved
+            else "blocked"
+        )
 
         mutation_detected = (
             sha256_text(mutated_status_text) != sha256_text(baseline_status_text)
@@ -1414,6 +1594,7 @@ class RollbackEngineService:
             "verified"
             if mutation_detected
             and restored_matches_baseline
+            and observer_status == "verified"
             and cleanup_status == "removed"
             and verified_path_count == len(path_receipts)
             else "blocked"
@@ -1431,6 +1612,13 @@ class RollbackEngineService:
             "path_receipts": path_receipts,
             "git_status_command": shlex.join(git_status_argv),
             "git_diff_command": shlex.join(git_diff_argv),
+            "observer_profile": self._policy.external_observer_profile,
+            "observer_status": observer_status,
+            "observer_receipt_count": len(observer_receipts),
+            "observer_receipts": observer_receipts,
+            "observer_mutation_detected": observer_mutation_detected,
+            "observer_restored_matches_baseline": observer_restored_matches_baseline,
+            "observer_stash_state_preserved": observer_stash_state_preserved,
             "baseline_status_digest": sha256_text(baseline_status_text),
             "baseline_diff_digest": sha256_text(baseline_diff_text),
             "mutated_status_digest": sha256_text(mutated_status_text),
@@ -1450,6 +1638,7 @@ class RollbackEngineService:
         git_status_command: str,
         git_diff_command: str,
         cleanup_status: str,
+        observer_receipts: Sequence[Mapping[str, Any]],
     ) -> Dict[str, Any]:
         return {
             "kind": "checkout_mutation_receipt",
@@ -1464,6 +1653,13 @@ class RollbackEngineService:
             "path_receipts": [],
             "git_status_command": git_status_command,
             "git_diff_command": git_diff_command,
+            "observer_profile": self._policy.external_observer_profile,
+            "observer_status": "blocked",
+            "observer_receipt_count": len(observer_receipts),
+            "observer_receipts": [dict(receipt) for receipt in observer_receipts],
+            "observer_mutation_detected": False,
+            "observer_restored_matches_baseline": False,
+            "observer_stash_state_preserved": False,
             "baseline_status_digest": sha256_text(""),
             "baseline_diff_digest": sha256_text(""),
             "mutated_status_digest": sha256_text(""),

@@ -274,6 +274,7 @@ live enactment receipt に束縛された reverse-apply journal、
 temp rollback workspace 上の actual reverse-apply command receipt、
 current checkout baseline に束縛された repo verification receipt、
 detached git worktree 上の checkout-bound mutation receipt、
+repo-root の `git worktree list --porcelain` / `git stash list` による external observer receipt、
 cleanup 済み telemetry gate、
 append-only continuity ref 2 本、
 self / council / guardian の 3 者通知を

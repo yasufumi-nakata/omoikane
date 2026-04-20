@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.rollback.v0
 service: RollbackEngineService
-summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed, with actual reverse-apply commands, repo-bound verification, and checkout-bound detached-worktree restoration executed before approval.
+summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed, with actual reverse-apply commands, repo-bound verification, checkout-bound detached-worktree restoration, and repo-root external observer receipts executed before approval.
 imports:
   build_request: ../schemas/build_request.yaml
   builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
@@ -62,6 +62,7 @@ operations:
       - rollback binds every reversed file to the current checkout baseline via repo_binding_ref and repo_source_digest
       - rollback executes repo-bound verification commands for every reversed file before approval
       - rollback replays the same mutation inside a detached git worktree checkout and requires the restored git status/diff digest to match the pre-mutation baseline
+      - rollback binds repo-root git worktree/stash observer receipts that prove detached-worktree mutation and restored baseline visibility
       - rollback telemetry gate binds live command receipts, reverse command receipts, cleanup, and verified journal coverage before approval
       - continuity evidence remains append-only
       - self, council, and guardian are all notified

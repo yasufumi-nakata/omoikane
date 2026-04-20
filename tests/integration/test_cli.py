@@ -354,6 +354,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["checkout_mutation_path_count"])
         self.assertEqual("removed", result["validation"]["checkout_mutation_cleanup_status"])
         self.assertTrue(result["validation"]["checkout_mutation_restored"])
+        self.assertEqual("verified", result["validation"]["external_observer_status"])
+        self.assertEqual(5, result["validation"]["external_observer_receipt_count"])
+        self.assertTrue(result["validation"]["external_observer_restored"])
+        self.assertTrue(result["validation"]["external_observer_stash_preserved"])
         self.assertEqual("removed", result["validation"]["reverse_apply_cleanup_status"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],

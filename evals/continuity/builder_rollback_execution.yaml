@@ -5,7 +5,7 @@ summary: >
   RollbackEngine が pre-apply Mirage Self snapshot を復元し、
   live enactment receipt に束縛された reverse-apply journal と actual reverse-apply command receipt、
   current checkout baseline に束縛された repo-bound verification receipt、
-  detached git worktree 上の checkout-bound mutation receipt、
+  detached git worktree 上の checkout-bound mutation receipt と repo-root external observer receipt、
   telemetry gate を通したうえで、
   self/council/guardian への通知付きで append-only continuity rollback を完了すること
 checks:
@@ -27,6 +27,10 @@ expect:
   checkout_mutation_path_count: 2
   checkout_mutation_cleanup_status: removed
   checkout_mutation_restored: true
+  external_observer_status: verified
+  external_observer_receipt_count: 5
+  external_observer_restored: true
+  external_observer_stash_preserved: true
   reverse_apply_cleanup_status: removed
   reverted_stage_ids:
     - dark-launch
@@ -38,4 +42,4 @@ expect:
   notification_ref_count: 3
   rollout_decision: rollback
   rollout_status: rolled-back
-  self_modify_ledger_count: 8
+  self_modify_ledger_count: 9

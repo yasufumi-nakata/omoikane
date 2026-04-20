@@ -36,7 +36,7 @@ properties:
   kind:
     const: builder_rollback_session
   schema_version:
-    const: "1.3"
+    const: "1.4"
   rollback_session_id:
     type: string
     pattern: "^rollback-session-[a-f0-9]{12}$"
@@ -65,9 +65,11 @@ properties:
       - require_reverse_apply_commands
       - require_repo_bound_verification
       - require_checkout_mutation_receipt
+      - require_external_observer_receipts
       - rollback_workspace_prefix
       - checkout_mutation_strategy
       - checkout_worktree_prefix
+      - external_observer_profile
       - repo_binding_scope
       - command_timeout_seconds
       - cleanup_after_run
@@ -75,7 +77,7 @@ properties:
     properties:
       policy_id:
         type: string
-        const: continuity-bound-builder-rollback-v4
+        const: continuity-bound-builder-rollback-v5
       required_eval:
         type: string
         const: evals/continuity/builder_rollback_execution.yaml
@@ -100,6 +102,9 @@ properties:
       require_checkout_mutation_receipt:
         type: boolean
         const: true
+      require_external_observer_receipts:
+        type: boolean
+        const: true
       rollback_workspace_prefix:
         type: string
         const: omoikane-builder-rollback-
@@ -109,6 +114,9 @@ properties:
       checkout_worktree_prefix:
         type: string
         const: omoikane-builder-rollback-worktree-
+      external_observer_profile:
+        type: string
+        const: repo-root-git-observer-v1
       repo_binding_scope:
         type: string
         const: current-checkout-subtree
@@ -312,6 +320,13 @@ properties:
       - path_receipts
       - git_status_command
       - git_diff_command
+      - observer_profile
+      - observer_status
+      - observer_receipt_count
+      - observer_receipts
+      - observer_mutation_detected
+      - observer_restored_matches_baseline
+      - observer_stash_state_preserved
       - baseline_status_digest
       - baseline_diff_digest
       - mutated_status_digest
@@ -408,6 +423,76 @@ properties:
       git_diff_command:
         type: string
         minLength: 3
+      observer_profile:
+        type: string
+        const: repo-root-git-observer-v1
+      observer_status:
+        type: string
+        enum:
+          - verified
+          - blocked
+      observer_receipt_count:
+        type: integer
+        minimum: 0
+        maximum: 8
+      observer_receipts:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - observer_ref
+            - stage
+            - command_label
+            - command
+            - exit_code
+            - status
+            - stdout_digest
+            - stderr_digest
+            - stdout_excerpt
+            - stderr_excerpt
+          properties:
+            observer_ref:
+              type: string
+              pattern: "^observer://current-checkout/"
+            stage:
+              type: string
+              enum:
+                - baseline
+                - mutated
+                - restored
+            command_label:
+              type: string
+              enum:
+                - git-worktree-list
+                - git-stash-list
+            command:
+              type: string
+              minLength: 3
+            exit_code:
+              type: integer
+            status:
+              type: string
+              enum:
+                - pass
+                - fail
+                - timeout
+            stdout_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            stderr_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            stdout_excerpt:
+              type: string
+            stderr_excerpt:
+              type: string
+      observer_mutation_detected:
+        type: boolean
+      observer_restored_matches_baseline:
+        type: boolean
+      observer_stash_state_preserved:
+        type: boolean
       baseline_status_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
@@ -455,6 +540,11 @@ properties:
       - checkout_cleanup_status
       - checkout_verified_path_count
       - checkout_status_restored
+      - external_observer_status
+      - external_observer_receipt_count
+      - external_observer_restored
+      - external_observer_stash_preserved
+      - external_observer_mutation_detected
       - journal_entry_count
       - reverted_stage_count
       - decision_basis
@@ -516,6 +606,20 @@ properties:
         type: integer
         minimum: 0
       checkout_status_restored:
+        type: boolean
+      external_observer_status:
+        type: string
+        enum:
+          - verified
+          - blocked
+      external_observer_receipt_count:
+        type: integer
+        minimum: 0
+      external_observer_restored:
+        type: boolean
+      external_observer_stash_preserved:
+        type: boolean
+      external_observer_mutation_detected:
         type: boolean
       journal_entry_count:
         type: integer
@@ -628,14 +732,14 @@ allOf:
             - reverse_cleanup_status
 examples:
   - kind: builder_rollback_session
-    schema_version: "1.3"
+    schema_version: "1.4"
     rollback_session_id: rollback-session-0123456789ab
     request_id: build-l5-rollback-0001
     artifact_id: artifact-0123456789ab
     apply_receipt_id: sandbox-apply-0123456789ab
     rollout_session_id: rollout-session-0123456789ab
     policy:
-      policy_id: continuity-bound-builder-rollback-v4
+      policy_id: continuity-bound-builder-rollback-v5
       required_eval: evals/continuity/builder_rollback_execution.yaml
       require_append_only_continuity: true
       require_pre_apply_snapshot: true
@@ -644,9 +748,11 @@ examples:
       require_reverse_apply_commands: true
       require_repo_bound_verification: true
       require_checkout_mutation_receipt: true
+      require_external_observer_receipts: true
       rollback_workspace_prefix: omoikane-builder-rollback-
       checkout_mutation_strategy: detached-git-worktree-overlay-v1
       checkout_worktree_prefix: omoikane-builder-rollback-worktree-
+      external_observer_profile: repo-root-git-observer-v1
       repo_binding_scope: current-checkout-subtree
       command_timeout_seconds: 15
       cleanup_after_run: true
@@ -749,6 +855,63 @@ examples:
           result_state: restored
       git_status_command: git status --short --untracked-files=all -- src/omoikane/self_construction/builders.py tests/unit/test_builders.py
       git_diff_command: git diff --no-ext-diff --binary -- src/omoikane/self_construction/builders.py tests/unit/test_builders.py
+      observer_profile: repo-root-git-observer-v1
+      observer_status: verified
+      observer_receipt_count: 5
+      observer_receipts:
+        - observer_ref: observer://current-checkout/build-l5-rollback-0001/baseline/git-worktree-list
+          stage: baseline
+          command_label: git-worktree-list
+          command: git -C /repo worktree list --porcelain
+          exit_code: 0
+          status: pass
+          stdout_digest: aebd95f9b37161ed7a246cb68a2772d1a1128e403c82df3354f1aef77818cdb5
+          stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stdout_excerpt: worktree /repo
+          stderr_excerpt: ""
+        - observer_ref: observer://current-checkout/build-l5-rollback-0001/baseline/git-stash-list
+          stage: baseline
+          command_label: git-stash-list
+          command: git -C /repo stash list
+          exit_code: 0
+          status: pass
+          stdout_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stdout_excerpt: ""
+          stderr_excerpt: ""
+        - observer_ref: observer://current-checkout/build-l5-rollback-0001/mutated/git-worktree-list
+          stage: mutated
+          command_label: git-worktree-list
+          command: git -C /repo worktree list --porcelain
+          exit_code: 0
+          status: pass
+          stdout_digest: b7c52b359d701fd6ed8de77dfe8e7930e85674ae4a8da9416dc7b0bca4c69418
+          stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stdout_excerpt: worktree /repo-temp
+          stderr_excerpt: ""
+        - observer_ref: observer://current-checkout/build-l5-rollback-0001/restored/git-worktree-list
+          stage: restored
+          command_label: git-worktree-list
+          command: git -C /repo worktree list --porcelain
+          exit_code: 0
+          status: pass
+          stdout_digest: aebd95f9b37161ed7a246cb68a2772d1a1128e403c82df3354f1aef77818cdb5
+          stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stdout_excerpt: worktree /repo
+          stderr_excerpt: ""
+        - observer_ref: observer://current-checkout/build-l5-rollback-0001/restored/git-stash-list
+          stage: restored
+          command_label: git-stash-list
+          command: git -C /repo stash list
+          exit_code: 0
+          status: pass
+          stdout_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          stdout_excerpt: ""
+          stderr_excerpt: ""
+      observer_mutation_detected: true
+      observer_restored_matches_baseline: true
+      observer_stash_state_preserved: true
       baseline_status_digest: a0a0d96f2197be6d37e928f4db53c4f9d1ad3f9d2b6a9a0b0e0e7d9bc1d7db51
       baseline_diff_digest: 4f499943d8bb0b18e5d73d1bc3d95c7440d7f7f3f97c8f2247a3bb7f78dca101
       mutated_status_digest: cb61b6416f6b2da6d7843eb1e1f4a8b7ac6e8cb1c509df7762c746b14987e79b
@@ -774,6 +937,11 @@ examples:
       checkout_cleanup_status: removed
       checkout_verified_path_count: 2
       checkout_status_restored: true
+      external_observer_status: verified
+      external_observer_receipt_count: 5
+      external_observer_restored: true
+      external_observer_stash_preserved: true
+      external_observer_mutation_detected: true
       journal_entry_count: 2
       reverted_stage_count: 2
       decision_basis:
