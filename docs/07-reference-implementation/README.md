@@ -81,7 +81,11 @@ Method C の `scan-commit` fail-closed に加えて、
 protected handoff 前に `current` bundle を要求すること、
 `verifier_roster` が `overlap-required` で pause、
 `rotated` で cutover 後に再開、
-`revoked` で fail-closed になることを 1 シナリオで確認する。
+`revoked` で fail-closed になることに加え、
+loopback live verifier endpoint から取得した roster に
+`connectivity_receipt` (`verifier_endpoint` / `response_digest` /
+`observed_latency_ms` / `http_status`) が束縛されることを
+1 シナリオで確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
@@ -358,5 +362,4 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 ## 今後広げる面
 
 - distributed transport key rotation / remote PKI federation を actual network に接続
-- AscensionScheduler external verifier の真正性証明と live 接続
 - automation による未実装ギャップの継続充填

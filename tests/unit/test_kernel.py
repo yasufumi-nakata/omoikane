@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
 import unittest
 
 from omoikane.common import canonical_json, sha256_text
@@ -12,6 +16,35 @@ from omoikane.substrate.adapter import ClassicalSiliconAdapter
 
 
 class KernelTests(unittest.TestCase):
+    @contextmanager
+    def _verifier_server(self, payload: dict[str, object]):
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.0"
+
+            def do_GET(self) -> None:  # noqa: N802
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                self.close_connection = True
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                return
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}/verifier-roster"
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1.0)
+
     def _artifact_sync_report(
         self,
         governance_artifacts: dict[str, str],
@@ -61,6 +94,7 @@ class KernelTests(unittest.TestCase):
                 dual_attested = True
             return {
                 "roster_ref": roster_ref,
+                "checked_at": checked_at,
                 "active_root_id": active_root["root_id"],
                 "next_root_id": next_root_id,
                 "rotation_state": verifier_rotation_state,
@@ -606,6 +640,78 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("rotated", cutover["verifier_rotation_state"])
         self.assertEqual("advancing", resumed["status"])
         self.assertTrue(scheduler.validate_handle(scheduler.observe(handle["handle_id"]))["ok"])
+
+    def test_ascension_scheduler_probes_live_verifier_roster_and_binds_receipt(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-live-verifier")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        live_report = self._artifact_sync_report(
+            plan["governance_artifacts"],
+            checked_at="2026-04-20T01:00:00Z",
+            sync_token="live-verifier",
+        )["verifier_roster"]
+
+        with self._verifier_server(live_report) as endpoint:
+            roster = scheduler.probe_live_verifier_roster(
+                handle["handle_id"],
+                verifier_endpoint=endpoint,
+                request_timeout_ms=500,
+            )
+
+        sync_result = scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            {
+                **self._artifact_sync_report(
+                    plan["governance_artifacts"],
+                    checked_at=roster["checked_at"],
+                    sync_token="live-verifier",
+                ),
+                "verifier_roster": roster,
+            },
+        )
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("reachable", roster["connectivity_receipt"]["receipt_status"])
+        self.assertEqual(200, roster["connectivity_receipt"]["http_status"])
+        self.assertEqual(roster["roster_ref"], roster["connectivity_receipt"]["roster_ref"])
+        self.assertEqual(
+            len(roster["accepted_roots"]),
+            roster["connectivity_receipt"]["accepted_root_count"],
+        )
+        self.assertEqual("accept", sync_result["action"])
+        self.assertEqual(
+            "reachable",
+            observed["verifier_roster"]["connectivity_receipt"]["receipt_status"],
+        )
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+
+    def test_ascension_scheduler_rejects_live_verifier_roster_mismatch(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-live-verifier-mismatch")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        live_report = self._artifact_sync_report(
+            plan["governance_artifacts"],
+            checked_at="2026-04-20T01:05:00Z",
+            sync_token="live-verifier-mismatch",
+        )["verifier_roster"]
+        live_report["roster_ref"] = "verifier://unexpected/root-roster"
+
+        with self._verifier_server(live_report) as endpoint:
+            with self.assertRaisesRegex(
+                ValueError,
+                "roster_ref must match governance_artifacts",
+            ):
+                scheduler.probe_live_verifier_roster(
+                    handle["handle_id"],
+                    verifier_endpoint=endpoint,
+                    request_timeout_ms=500,
+                )
 
     def test_ascension_scheduler_verifier_revocation_fails_closed(self) -> None:
         ledger = ContinuityLedger()

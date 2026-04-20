@@ -1,0 +1,96 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/governance_verifier_connectivity_receipt.schema"
+title: GovernanceVerifierConnectivityReceipt
+description: Bounded live connectivity receipt for one externally fetched AscensionScheduler verifier roster.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - roster_ref
+  - verifier_endpoint
+  - transport_profile
+  - roster_checked_at
+  - recorded_at
+  - request_timeout_ms
+  - observed_latency_ms
+  - http_status
+  - response_digest
+  - receipt_status
+  - active_root_id
+  - rotation_state
+  - accepted_root_count
+properties:
+  kind:
+    const: governance_verifier_connectivity_receipt
+  schema_version:
+    const: "1.0.0"
+  receipt_id:
+    type: string
+    minLength: 1
+  roster_ref:
+    type: string
+    pattern: "^verifier://"
+  verifier_endpoint:
+    type: string
+    pattern: "^https?://"
+  transport_profile:
+    const: live-http-json-roster-v1
+  roster_checked_at:
+    type: string
+    format: date-time
+  recorded_at:
+    type: string
+    format: date-time
+  request_timeout_ms:
+    type: integer
+    minimum: 1
+  observed_latency_ms:
+    type: number
+    minimum: 0
+  http_status:
+    type: integer
+    minimum: 100
+    maximum: 599
+  response_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_status:
+    type: string
+    enum:
+      - reachable
+      - rejected
+  active_root_id:
+    type:
+      - string
+      - "null"
+    minLength: 1
+  rotation_state:
+    type: string
+    enum:
+      - unverified
+      - stable
+      - overlap-required
+      - rotated
+      - revoked
+  accepted_root_count:
+    type: integer
+    minimum: 0
+examples:
+  - kind: governance_verifier_connectivity_receipt
+    schema_version: "1.0.0"
+    receipt_id: verifier-connectivity-0123456789ab
+    roster_ref: verifier://ascension/a/3dfb1f84a223/root-roster
+    verifier_endpoint: http://127.0.0.1:43123/verifier-roster
+    transport_profile: live-http-json-roster-v1
+    roster_checked_at: "2026-04-19T06:01:30Z"
+    recorded_at: "2026-04-19T06:01:30Z"
+    request_timeout_ms: 500
+    observed_latency_ms: 12.4
+    http_status: 200
+    response_digest: 53dfa515b1c72d0cbf9c5e7780d49dba2d2a8d566f5e92879f582d52af86f1ad
+    receipt_status: reachable
+    active_root_id: root://scheduler-demo/method-a-live-connectivity/active
+    rotation_state: stable
+    accepted_root_count: 1

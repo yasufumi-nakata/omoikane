@@ -8,6 +8,7 @@ imports:
   schedule_handle: ../schemas/schedule_handle.schema
   governance_artifact_sync: ../schemas/governance_artifact_sync.schema
   governance_verifier_roster: ../schemas/governance_verifier_roster.schema
+  governance_verifier_connectivity_receipt: ../schemas/governance_verifier_connectivity_receipt.schema
 operations:
   schedule:
     summary: Validate an ascension plan, bind its governance artifact bundle, and open the first stage with append-only continuity evidence.
@@ -249,6 +250,25 @@ operations:
             type: string
     output:
       schema_ref: schedule_handle
+  probe_live_verifier_roster:
+    summary: Fetch one external verifier roster over bounded live HTTP JSON transport and attach a connectivity receipt before sync_governance_artifacts runs.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - verifier_endpoint
+        properties:
+          handle_id:
+            type: string
+          verifier_endpoint:
+            type: string
+            pattern: "^https?://"
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: governance_verifier_roster
   sync_governance_artifacts:
     summary: Record one external proof sync snapshot and pause or fail-closed when artifacts are stale, verifier roots overlap, or verifier trust is revoked.
     input:
@@ -350,6 +370,7 @@ compatibility:
     - Timeout and substrate-signal handling always append continuity evidence before exposing completed state.
     - Clinical/legal attestation authenticity stays external to this repo, but every plan and handle must carry stable artifact refs and a bundle digest.
     - Protected handoff stages require one current governance artifact sync snapshot before they can open.
+    - probe_live_verifier_roster materializes a bounded connectivity receipt and stores only endpoint, digest, latency, and roster summary fields.
     - Stale snapshots pause the active schedule, verifier overlap snapshots pause until cutover, and revoked snapshots fail-closed before destructive or authority-bearing handoff.
 events:
   - name: ascension.scheduler.enter

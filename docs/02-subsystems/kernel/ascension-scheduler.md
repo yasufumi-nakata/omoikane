@@ -91,6 +91,7 @@ scheduler.resume(handle) → ScheduleHandle
 scheduler.rollback(handle, to_stage_id) → ScheduleHandle
 scheduler.enforce_timeout(handle, elapsed_ms) → TimeoutResult
 scheduler.handle_substrate_signal(handle, severity, source_substrate, reason) → SignalResult
+scheduler.probe_live_verifier_roster(handle, verifier_endpoint, request_timeout_ms?) → GovernanceVerifierRoster
 scheduler.sync_governance_artifacts(handle, checked_at, artifacts) → ArtifactSyncResult
 scheduler.cancel(handle, reason) → ScheduleHandle
 ```
@@ -99,25 +100,34 @@ scheduler.cancel(handle, reason) → ScheduleHandle
 `verifier_roster` snapshot
 (`roster_ref` / `active_root_id` / `next_root_id` / `rotation_state` /
 `accepted_roots` / `dual_attestation_required` / `dual_attested`) を必須とする。
+`probe_live_verifier_roster` は bounded live HTTP JSON transport を通して
+external verifier roster を取得し、
+`connectivity_receipt`
+(`verifier_endpoint` / `response_digest` / `observed_latency_ms` / `http_status`) を
+焼き付けた `verifier_roster` を返す。
 
 ## reference runtime の扱い
 
 - `kernel.scheduler.v0.idl` で機械可読に
 - `ascension_plan.schema` / `schedule_handle.schema` /
-  `governance_verifier_roster.schema` を導入
+  `governance_verifier_roster.schema` /
+  `governance_verifier_connectivity_receipt.schema` を導入
 - `scheduler-demo` を CLI に追加し、Method A の順序遷移＋ forced rollback、
   Method B の reversible substrate failover、
   Method C の fail-closed destructive scan に加えて、
   governance artifact bundle の current / stale / revoked sync snapshot を
   ContinuityLedger に記録し、
-  verifier root rotation の overlap pause / rotated cutover / revoked fail-closed を
-  1 シナリオで確認する
+  verifier root rotation の overlap pause / rotated cutover / revoked fail-closed と、
+  loopback live verifier endpoint から取得した roster の
+  connectivity receipt binding を 1 シナリオで確認する
 - `evals/continuity/scheduler_stage_rollback.yaml` と
   `evals/continuity/scheduler_method_profiles.yaml`、
   `evals/continuity/scheduler_governance_artifacts.yaml`、
   `evals/continuity/scheduler_artifact_sync.yaml`、
-  `evals/continuity/scheduler_root_rotation.yaml` で Method A/B/C の contract と
-  artifact binding / freshness gate / verifier cutover gate を守る
+  `evals/continuity/scheduler_root_rotation.yaml`、
+  `evals/continuity/scheduler_live_verifier_connectivity.yaml` で
+  Method A/B/C の contract と artifact binding / freshness gate /
+  verifier cutover gate / live connectivity receipt binding を守る
 
 ## 思兼神メタファー
 

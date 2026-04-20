@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import asdict
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import threading
 from typing import Any, Dict, List
 
 from .agentic.cognitive_audit import CognitiveAuditService
@@ -2423,6 +2427,7 @@ class OmoikaneReferenceOS:
                 dual_attested = True
             return {
                 "roster_ref": roster_ref,
+                "checked_at": checked_at,
                 "active_root_id": active_root["root_id"],
                 "next_root_id": next_root_id,
                 "rotation_state": rotation_state,
@@ -2450,6 +2455,7 @@ class OmoikaneReferenceOS:
             sync_token: str,
             status_overrides: Dict[str, str] | None = None,
             verifier_rotation_state: str = "stable",
+            verifier_roster_override: Dict[str, Any] | None = None,
         ) -> Dict[str, Any]:
             overrides = status_overrides or {}
             artifacts: List[Dict[str, Any]] = []
@@ -2483,13 +2489,45 @@ class OmoikaneReferenceOS:
             return {
                 "checked_at": checked_at,
                 "artifacts": artifacts,
-                "verifier_roster": verifier_roster_report(
+                "verifier_roster": verifier_roster_override
+                if verifier_roster_override is not None
+                else verifier_roster_report(
                     governance_artifacts,
                     checked_at=checked_at,
                     sync_token=sync_token,
                     rotation_state=verifier_rotation_state,
                 ),
             }
+
+        @contextmanager
+        def live_verifier_bridge(roster_payload: Dict[str, Any]):
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    body = json.dumps(roster_payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            endpoint = f"http://127.0.0.1:{server.server_address[1]}/verifier-roster"
+            try:
+                yield endpoint
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
 
         identity = self.identity.create(
             human_consent_proof="consent://scheduler-demo/v1",
@@ -2558,6 +2596,44 @@ class OmoikaneReferenceOS:
                 sync_token="method-a-current",
             ),
         )
+        method_a_live_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-live-verifier/v1",
+            metadata={"display_name": "Live Verifier Connectivity Sandbox"},
+        )
+        method_a_live_plan = self.scheduler.build_method_a_plan(method_a_live_identity.identity_id)
+        method_a_live_scheduled = self.scheduler.schedule(method_a_live_plan)
+        self.scheduler.advance(method_a_live_scheduled["handle_id"], "scan-baseline")
+        self.scheduler.advance(method_a_live_scheduled["handle_id"], "bdb-bridge")
+        live_roster_payload = verifier_roster_report(
+            method_a_live_plan["governance_artifacts"],
+            checked_at="2026-04-19T06:01:30Z",
+            sync_token="method-a-live-connectivity",
+        )
+        with live_verifier_bridge(live_roster_payload) as live_verifier_endpoint:
+            method_a_live_verifier_roster = self.scheduler.probe_live_verifier_roster(
+                method_a_live_scheduled["handle_id"],
+                verifier_endpoint=live_verifier_endpoint,
+                request_timeout_ms=500,
+            )
+        method_a_live_artifact_sync = self.scheduler.sync_governance_artifacts(
+            method_a_live_scheduled["handle_id"],
+            sync_report(
+                method_a_live_plan["governance_artifacts"],
+                checked_at=method_a_live_verifier_roster["checked_at"],
+                sync_token="method-a-live-connectivity",
+                verifier_roster_override=method_a_live_verifier_roster,
+            ),
+        )
+        method_a_live_confirmation = self.scheduler.advance(
+            method_a_live_scheduled["handle_id"],
+            "identity-confirmation",
+        )
+        method_a_live_handoff = self.scheduler.advance(
+            method_a_live_scheduled["handle_id"],
+            "active-handoff",
+        )
+        method_a_live_final = self.scheduler.observe(method_a_live_scheduled["handle_id"])
+        method_a_live_validation = self.scheduler.validate_handle(method_a_live_final)
         confirmation_result = self.scheduler.advance(
             scheduled["handle_id"],
             "identity-confirmation",
@@ -2727,6 +2803,7 @@ class OmoikaneReferenceOS:
         )
         all_validations = {
             "method_a": method_a_validation,
+            "method_a_live": method_a_live_validation,
             "method_a_rotation": method_a_rotation_validation,
             "method_b": method_b_validation,
             "method_c": method_c_validation,
@@ -2743,6 +2820,7 @@ class OmoikaneReferenceOS:
             "plan": plan,
             "plans": {
                 "method_a": plan,
+                "method_a_live": method_a_live_plan,
                 "method_a_rotation": method_a_rotation_plan,
                 "method_b": method_b_plan,
                 "method_c": method_c_plan,
@@ -2771,6 +2849,14 @@ class OmoikaneReferenceOS:
                     "message": artifact_gate_message,
                 },
                 "artifact_sync": method_a_artifact_sync,
+                "method_a_live": {
+                    "scheduled": method_a_live_scheduled,
+                    "verifier_roster": method_a_live_verifier_roster,
+                    "artifact_sync": method_a_live_artifact_sync,
+                    "identity_confirmation": method_a_live_confirmation,
+                    "active_handoff": method_a_live_handoff,
+                    "final_handle": method_a_live_final,
+                },
                 "method_a_rotation": {
                     "scheduled": method_a_rotation_scheduled,
                     "verifier_overlap": method_a_rotation_overlap,
@@ -2816,6 +2902,7 @@ class OmoikaneReferenceOS:
                 },
             },
             "final_handle": final_handle,
+            "method_a_live_final_handle": method_a_live_final,
             "method_a_rotation_final_handle": method_a_rotation_final,
             "method_b_final_handle": method_b_final,
             "method_c_final_handle": method_c_final,
@@ -2826,6 +2913,7 @@ class OmoikaneReferenceOS:
                 "ok": all(item["ok"] for item in all_validations.values()),
                 "errors": (
                     method_a_validation["errors"]
+                    + method_a_live_validation["errors"]
                     + method_a_rotation_validation["errors"]
                     + method_b_validation["errors"]
                     + method_c_validation["errors"]
@@ -2895,6 +2983,26 @@ class OmoikaneReferenceOS:
                     method_a_artifact_sync["action"] == "accept"
                     and method_a_artifact_sync["bundle_status"] == "current"
                     and final_handle["artifact_sync"]["bundle_status"] == "current"
+                ),
+                "live_verifier_reachable": (
+                    method_a_live_verifier_roster["connectivity_receipt"]["receipt_status"]
+                    == "reachable"
+                    and method_a_live_verifier_roster["connectivity_receipt"]["http_status"] == 200
+                    and method_a_live_verifier_roster["connectivity_receipt"]["observed_latency_ms"]
+                    >= 0
+                ),
+                "live_verifier_receipt_bound": (
+                    method_a_live_final["verifier_roster"]["connectivity_receipt"]["roster_ref"]
+                    == method_a_live_final["verifier_roster"]["roster_ref"]
+                    and method_a_live_final["verifier_roster"]["connectivity_receipt"][
+                        "accepted_root_count"
+                    ]
+                    == len(method_a_live_final["verifier_roster"]["accepted_roots"])
+                ),
+                "live_verifier_sync_accepted": (
+                    method_a_live_artifact_sync["action"] == "accept"
+                    and method_a_live_final["status"] == "completed"
+                    and method_a_live_handoff["status"] == "completed"
                 ),
                 "artifact_refresh_paused": (
                     method_b_artifact_refresh_required["action"] == "pause"

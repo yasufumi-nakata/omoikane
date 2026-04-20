@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
+import time
 from typing import Any, Dict, List, Mapping, Optional, Sequence
+from urllib import error, request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .continuity import ContinuityLedger
@@ -45,6 +48,8 @@ SCHEDULER_VERIFIER_ROTATION_STATES = {
     "revoked",
 }
 SCHEDULER_VERIFIER_ROOT_STATUSES = {"active", "candidate", "retired"}
+SCHEDULER_VERIFIER_CONNECTIVITY_TRANSPORT_PROFILE = "live-http-json-roster-v1"
+SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES = {"reachable", "rejected"}
 SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS = 2
 SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD = {
     "A": "active-handoff",
@@ -289,6 +294,72 @@ class AscensionScheduler:
 
     def observe(self, handle_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_handle(handle_id))
+
+    def probe_live_verifier_roster(
+        self,
+        handle_id: str,
+        *,
+        verifier_endpoint: str,
+        request_timeout_ms: int = 1_000,
+    ) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        normalized_endpoint = self._normalize_live_verifier_endpoint(
+            verifier_endpoint,
+            "verifier_endpoint",
+        )
+        timeout_ms = self._normalize_positive_int(request_timeout_ms, "request_timeout_ms")
+        request_started = time.monotonic()
+        try:
+            with request.urlopen(normalized_endpoint, timeout=timeout_ms / 1000.0) as response:
+                http_status = int(getattr(response, "status", 200))
+                payload_text = response.read().decode("utf-8")
+        except error.URLError as exc:
+            raise ValueError(
+                f"live verifier endpoint unreachable: {normalized_endpoint}"
+            ) from exc
+        observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 1)
+        if http_status != 200:
+            raise ValueError(
+                f"live verifier endpoint returned unexpected status {http_status}"
+            )
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("live verifier endpoint must return JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("live verifier endpoint payload must be a mapping")
+
+        checked_at = self._normalize_non_empty_string(
+            payload.get("checked_at"),
+            "verifier_roster.checked_at",
+        )
+        normalized_roster = self._normalize_verifier_roster_report(
+            payload,
+            handle["governance_artifacts"],
+            checked_at=checked_at,
+        )
+        normalized_roster["connectivity_receipt"] = {
+            "kind": "governance_verifier_connectivity_receipt",
+            "schema_version": SCHEDULER_SCHEMA_VERSION,
+            "receipt_id": new_id("verifier-connectivity"),
+            "roster_ref": normalized_roster["roster_ref"],
+            "verifier_endpoint": normalized_endpoint,
+            "transport_profile": SCHEDULER_VERIFIER_CONNECTIVITY_TRANSPORT_PROFILE,
+            "roster_checked_at": checked_at,
+            "recorded_at": utc_now_iso(),
+            "request_timeout_ms": timeout_ms,
+            "observed_latency_ms": observed_latency_ms,
+            "http_status": http_status,
+            "response_digest": sha256_text(canonical_json(payload)),
+            "receipt_status": "reachable",
+            "active_root_id": normalized_roster["active_root_id"],
+            "rotation_state": normalized_roster["rotation_state"],
+            "accepted_root_count": len(normalized_roster["accepted_roots"]),
+        }
+        errors = self._check_verifier_roster(normalized_roster, handle["governance_artifacts"])
+        if errors:
+            raise ValueError(errors[0])
+        return normalized_roster
 
     def advance(self, handle_id: str, stage_id: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
@@ -930,6 +1001,7 @@ class AscensionScheduler:
             "external_sync_ref": None,
             "dual_attestation_required": False,
             "dual_attested": False,
+            "connectivity_receipt": None,
         }
 
     def _normalize_artifact_sync_report(
@@ -1077,10 +1149,128 @@ class AscensionScheduler:
                 value.get("dual_attested"),
                 "verifier_roster.dual_attested",
             ),
+            "connectivity_receipt": self._normalize_optional_connectivity_receipt(
+                value.get("connectivity_receipt"),
+                roster_ref=self._normalize_artifact_ref(
+                    value.get("roster_ref"),
+                    "verifier_roster.roster_ref",
+                    "verifier://",
+                ),
+                roster_checked_at=checked_at,
+                active_root_id=self._normalize_optional_non_empty_string(
+                    value.get("active_root_id"),
+                    "verifier_roster.active_root_id",
+                ),
+                rotation_state=self._normalize_verifier_rotation_state(
+                    value.get("rotation_state")
+                ),
+                accepted_root_count=len(normalized_roots),
+            ),
         }
         errors = self._check_verifier_roster(normalized, governance_artifacts)
         if errors:
             raise ValueError(errors[0])
+        return normalized
+
+    def _normalize_optional_connectivity_receipt(
+        self,
+        value: Any,
+        *,
+        roster_ref: str,
+        roster_checked_at: str,
+        active_root_id: Optional[str],
+        rotation_state: str,
+        accepted_root_count: int,
+    ) -> Optional[Dict[str, Any]]:
+        if value is None:
+            return None
+        if not isinstance(value, Mapping):
+            raise ValueError("verifier_roster.connectivity_receipt must be a mapping or null")
+        normalized = {
+            "kind": self._expect_string(
+                value.get("kind"),
+                "verifier_roster.connectivity_receipt.kind",
+                "governance_verifier_connectivity_receipt",
+            ),
+            "schema_version": self._expect_schema_version(value.get("schema_version")),
+            "receipt_id": self._normalize_non_empty_string(
+                value.get("receipt_id"),
+                "verifier_roster.connectivity_receipt.receipt_id",
+            ),
+            "roster_ref": self._normalize_artifact_ref(
+                value.get("roster_ref"),
+                "verifier_roster.connectivity_receipt.roster_ref",
+                "verifier://",
+            ),
+            "verifier_endpoint": self._normalize_live_verifier_endpoint(
+                value.get("verifier_endpoint"),
+                "verifier_roster.connectivity_receipt.verifier_endpoint",
+            ),
+            "transport_profile": self._expect_string(
+                value.get("transport_profile"),
+                "verifier_roster.connectivity_receipt.transport_profile",
+                SCHEDULER_VERIFIER_CONNECTIVITY_TRANSPORT_PROFILE,
+            ),
+            "roster_checked_at": self._normalize_non_empty_string(
+                value.get("roster_checked_at"),
+                "verifier_roster.connectivity_receipt.roster_checked_at",
+            ),
+            "recorded_at": self._normalize_non_empty_string(
+                value.get("recorded_at"),
+                "verifier_roster.connectivity_receipt.recorded_at",
+            ),
+            "request_timeout_ms": self._normalize_positive_int(
+                value.get("request_timeout_ms"),
+                "verifier_roster.connectivity_receipt.request_timeout_ms",
+            ),
+            "observed_latency_ms": self._normalize_non_negative_float(
+                value.get("observed_latency_ms"),
+                "verifier_roster.connectivity_receipt.observed_latency_ms",
+            ),
+            "http_status": self._normalize_http_status(
+                value.get("http_status"),
+                "verifier_roster.connectivity_receipt.http_status",
+            ),
+            "response_digest": self._normalize_optional_digest(
+                value.get("response_digest"),
+                "verifier_roster.connectivity_receipt.response_digest",
+                allow_none=False,
+            ),
+            "receipt_status": self._normalize_connectivity_receipt_status(
+                value.get("receipt_status")
+            ),
+            "active_root_id": self._normalize_optional_non_empty_string(
+                value.get("active_root_id"),
+                "verifier_roster.connectivity_receipt.active_root_id",
+            ),
+            "rotation_state": self._normalize_verifier_rotation_state(
+                value.get("rotation_state")
+            ),
+            "accepted_root_count": self._normalize_non_negative_int(
+                value.get("accepted_root_count"),
+                "verifier_roster.connectivity_receipt.accepted_root_count",
+            ),
+        }
+        if normalized["roster_ref"] != roster_ref:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.roster_ref must match verifier_roster.roster_ref"
+            )
+        if normalized["roster_checked_at"] != roster_checked_at:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.roster_checked_at must match verifier_roster.checked_at"
+            )
+        if normalized["active_root_id"] != active_root_id:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.active_root_id must match verifier_roster.active_root_id"
+            )
+        if normalized["rotation_state"] != rotation_state:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.rotation_state must match verifier_roster.rotation_state"
+            )
+        if normalized["accepted_root_count"] != accepted_root_count:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.accepted_root_count must match verifier_roster.accepted_roots"
+            )
         return normalized
 
     def _check_governance_artifacts(self, value: Mapping[str, Any]) -> List[str]:
@@ -1255,6 +1445,9 @@ class AscensionScheduler:
         dual_attested = value.get("dual_attested")
         if not isinstance(dual_attested, bool):
             errors.append("verifier_roster.dual_attested must be a boolean")
+        connectivity_receipt = value.get("connectivity_receipt")
+        if connectivity_receipt is not None and not isinstance(connectivity_receipt, Mapping):
+            errors.append("verifier_roster.connectivity_receipt must be a mapping or null")
 
         accepted_roots = value.get("accepted_roots")
         if not isinstance(accepted_roots, list):
@@ -1315,6 +1508,17 @@ class AscensionScheduler:
                 errors.append("verifier_roster.external_sync_ref must be null while unverified")
             if dual_attestation_required or dual_attested:
                 errors.append("verifier_roster dual attestation flags must be false while unverified")
+            if isinstance(connectivity_receipt, Mapping):
+                errors.extend(
+                    self._check_connectivity_receipt(
+                        connectivity_receipt,
+                        roster_ref=value.get("roster_ref"),
+                        checked_at=checked_at,
+                        active_root_id=active_root_id,
+                        rotation_state=rotation_state,
+                        accepted_root_count=len(accepted_roots),
+                    )
+                )
             return errors
 
         if active_root_id not in status_by_root_id:
@@ -1364,6 +1568,117 @@ class AscensionScheduler:
                 errors.append("verifier_roster.next_root_id must be null when revoked")
             if dual_attestation_required:
                 errors.append("revoked verifier roster must not require dual attestation")
+        if isinstance(connectivity_receipt, Mapping):
+            errors.extend(
+                self._check_connectivity_receipt(
+                    connectivity_receipt,
+                    roster_ref=value.get("roster_ref"),
+                    checked_at=checked_at,
+                    active_root_id=active_root_id,
+                    rotation_state=rotation_state,
+                    accepted_root_count=len(accepted_roots),
+                )
+            )
+        return errors
+
+    def _check_connectivity_receipt(
+        self,
+        value: Mapping[str, Any],
+        *,
+        roster_ref: Any,
+        checked_at: Any,
+        active_root_id: Any,
+        rotation_state: Any,
+        accepted_root_count: int,
+    ) -> List[str]:
+        errors: List[str] = []
+        if value.get("kind") != "governance_verifier_connectivity_receipt":
+            errors.append(
+                "verifier_roster.connectivity_receipt.kind must be governance_verifier_connectivity_receipt"
+            )
+        if value.get("schema_version") != SCHEDULER_SCHEMA_VERSION:
+            errors.append(
+                f"verifier_roster.connectivity_receipt.schema_version must be {SCHEDULER_SCHEMA_VERSION}"
+            )
+        self._check_non_empty_string(
+            value.get("receipt_id"),
+            "verifier_roster.connectivity_receipt.receipt_id",
+            errors,
+        )
+        verifier_endpoint = value.get("verifier_endpoint")
+        if not isinstance(verifier_endpoint, str) or not verifier_endpoint.strip():
+            errors.append(
+                "verifier_roster.connectivity_receipt.verifier_endpoint must be a non-empty string"
+            )
+        elif not (
+            verifier_endpoint.startswith("http://") or verifier_endpoint.startswith("https://")
+        ):
+            errors.append(
+                "verifier_roster.connectivity_receipt.verifier_endpoint must start with http:// or https://"
+            )
+        if (
+            value.get("transport_profile")
+            != SCHEDULER_VERIFIER_CONNECTIVITY_TRANSPORT_PROFILE
+        ):
+            errors.append(
+                "verifier_roster.connectivity_receipt.transport_profile must match live verifier transport profile"
+            )
+        self._check_non_empty_string(
+            value.get("roster_checked_at"),
+            "verifier_roster.connectivity_receipt.roster_checked_at",
+            errors,
+        )
+        self._check_non_empty_string(
+            value.get("recorded_at"),
+            "verifier_roster.connectivity_receipt.recorded_at",
+            errors,
+        )
+        request_timeout_ms = value.get("request_timeout_ms")
+        if not isinstance(request_timeout_ms, int) or request_timeout_ms < 1:
+            errors.append(
+                "verifier_roster.connectivity_receipt.request_timeout_ms must be a positive integer"
+            )
+        observed_latency_ms = value.get("observed_latency_ms")
+        if not isinstance(observed_latency_ms, (int, float)) or observed_latency_ms < 0:
+            errors.append(
+                "verifier_roster.connectivity_receipt.observed_latency_ms must be non-negative"
+            )
+        http_status = value.get("http_status")
+        if not isinstance(http_status, int) or http_status < 100 or http_status > 599:
+            errors.append(
+                "verifier_roster.connectivity_receipt.http_status must be a valid HTTP status code"
+            )
+        response_digest = value.get("response_digest")
+        if not isinstance(response_digest, str) or len(response_digest) != 64:
+            errors.append(
+                "verifier_roster.connectivity_receipt.response_digest must be 64 chars"
+            )
+        receipt_status = value.get("receipt_status")
+        if receipt_status not in SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES:
+            errors.append(
+                "verifier_roster.connectivity_receipt.receipt_status must be one of "
+                f"{sorted(SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES)}"
+            )
+        if value.get("roster_ref") != roster_ref:
+            errors.append(
+                "verifier_roster.connectivity_receipt.roster_ref must match verifier_roster.roster_ref"
+            )
+        if value.get("roster_checked_at") != checked_at:
+            errors.append(
+                "verifier_roster.connectivity_receipt.roster_checked_at must match verifier_roster.checked_at"
+            )
+        if value.get("active_root_id") != active_root_id:
+            errors.append(
+                "verifier_roster.connectivity_receipt.active_root_id must match verifier_roster.active_root_id"
+            )
+        if value.get("rotation_state") != rotation_state:
+            errors.append(
+                "verifier_roster.connectivity_receipt.rotation_state must match verifier_roster.rotation_state"
+            )
+        if value.get("accepted_root_count") != accepted_root_count:
+            errors.append(
+                "verifier_roster.connectivity_receipt.accepted_root_count must match verifier_roster.accepted_roots"
+            )
         return errors
 
     def _normalize_artifact_ref(self, value: Any, field_name: str, prefix: str) -> str:
@@ -1459,6 +1774,43 @@ class AscensionScheduler:
     def _normalize_bool(self, value: Any, field_name: str) -> bool:
         if not isinstance(value, bool):
             raise ValueError(f"{field_name} must be a boolean")
+        return value
+
+    def _normalize_connectivity_receipt_status(self, value: Any) -> str:
+        status = self._normalize_non_empty_string(
+            value,
+            "verifier_roster.connectivity_receipt.receipt_status",
+        )
+        if status not in SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES:
+            raise ValueError(
+                "verifier_roster.connectivity_receipt.receipt_status must be one of "
+                f"{sorted(SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES)}"
+            )
+        return status
+
+    def _normalize_http_status(self, value: Any, field_name: str) -> int:
+        if not isinstance(value, int) or value < 100 or value > 599:
+            raise ValueError(f"{field_name} must be a valid HTTP status code")
+        return value
+
+    def _normalize_live_verifier_endpoint(self, value: Any, field_name: str) -> str:
+        normalized = self._normalize_non_empty_string(value, field_name)
+        if not (normalized.startswith("http://") or normalized.startswith("https://")):
+            raise ValueError(f"{field_name} must start with http:// or https://")
+        return normalized
+
+    def _normalize_non_negative_float(self, value: Any, field_name: str) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError(f"{field_name} must be a number")
+        if value < 0:
+            raise ValueError(f"{field_name} must be >= 0")
+        return float(value)
+
+    def _normalize_non_negative_int(self, value: Any, field_name: str) -> int:
+        if not isinstance(value, int):
+            raise ValueError(f"{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"{field_name} must be >= 0")
         return value
 
     def _normalize_verifier_rotation_state(self, value: Any) -> str:

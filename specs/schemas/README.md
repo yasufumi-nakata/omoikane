@@ -23,6 +23,7 @@
 - `ewa_command.schema`
 - `ewa_audit.schema`
 - `governance_verifier_roster.schema`
+- `governance_verifier_connectivity_receipt.schema`
 - `world_state.schema`
 - `wms_reconcile.schema`
 - `substrate_allocation.schema`
@@ -68,8 +69,7 @@
 ## 次段階
 
 actual rollback reverse-apply journal / richer sensory loopback artifacts /
-live remote PKI federation と key rotation を伴う distributed artifacts /
-AscensionScheduler external verifier live connectivity は
+live remote PKI federation と key rotation を伴う distributed artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

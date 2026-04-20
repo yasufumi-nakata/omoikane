@@ -302,6 +302,16 @@ entries:
       - evals/continuity/scheduler_root_rotation.yaml
     rationale: Required to serialize overlap, cutover, and revocation state for the scheduler external verifier root-of-trust roster.
   - priority: P1
+    kind: schema
+    file: specs/schemas/governance_verifier_connectivity_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - specs/schemas/governance_verifier_roster.schema
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+      - evals/continuity/scheduler_live_verifier_connectivity.yaml
+    rationale: Required to serialize bounded live verifier endpoint connectivity evidence without storing raw external transcripts.
+  - priority: P1
     kind: idl
     file: specs/interfaces/kernel.scheduler.v0.idl
     consumers:
@@ -883,6 +893,15 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
     rationale: Protects verifier overlap pause, rotated cutover recovery, dual-attested root history, and verifier revocation fail-closed behavior.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_live_verifier_connectivity.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects loopback live verifier roster fetch, connectivity receipt binding, and protected handoff acceptance after live sync.
   - priority: P1
     kind: eval
     file: evals/performance/termination_latency.yaml

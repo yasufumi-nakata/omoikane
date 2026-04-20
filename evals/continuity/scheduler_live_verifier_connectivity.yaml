@@ -1,0 +1,17 @@
+eval_id: scheduler_live_verifier_connectivity
+target: kernel.scheduler
+level: L1
+description: >
+  AscensionScheduler が live verifier endpoint から root roster を取得し、
+  connectivity receipt を verifier_roster に束縛したうえで
+  protected handoff を current bundle とともに完了できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
+expected:
+  live_verifier_reachable: true
+  live_verifier_receipt_bound: true
+  live_verifier_sync_accepted: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

@@ -491,6 +491,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["artifact_bundle_attached"])
         self.assertTrue(result["validation"]["artifact_sync_gate_blocked"])
         self.assertTrue(result["validation"]["artifact_sync_current_before_handoff"])
+        self.assertTrue(result["validation"]["live_verifier_reachable"])
+        self.assertTrue(result["validation"]["live_verifier_receipt_bound"])
+        self.assertTrue(result["validation"]["live_verifier_sync_accepted"])
         self.assertTrue(result["validation"]["artifact_refresh_paused"])
         self.assertTrue(result["validation"]["artifact_refresh_recovered"])
         self.assertTrue(result["validation"]["artifact_revocation_fail_closed"])
@@ -504,6 +507,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("completed", result["final_handle"]["status"])
         self.assertEqual("current", result["final_handle"]["artifact_sync"]["bundle_status"])
         self.assertEqual("stable", result["final_handle"]["verifier_roster"]["rotation_state"])
+        self.assertEqual(
+            "reachable",
+            result["method_a_live_final_handle"]["verifier_roster"]["connectivity_receipt"][
+                "receipt_status"
+            ],
+        )
         self.assertEqual(
             "rotated",
             result["method_a_rotation_final_handle"]["verifier_roster"]["rotation_state"],

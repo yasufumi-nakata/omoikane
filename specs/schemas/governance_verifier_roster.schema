@@ -82,6 +82,10 @@ properties:
     type: boolean
   dual_attested:
     type: boolean
+  connectivity_receipt:
+    anyOf:
+      - $ref: ./governance_verifier_connectivity_receipt.schema
+      - type: "null"
 examples:
   - policy_id: verifier-root-rotation-v1
     roster_ref: verifier://ascension/a/3dfb1f84a223/root-roster
@@ -100,3 +104,20 @@ examples:
     external_sync_ref: sync://scheduler-demo/method-a-rotation-cutover/verifier-roster
     dual_attestation_required: false
     dual_attested: true
+    connectivity_receipt:
+      kind: governance_verifier_connectivity_receipt
+      schema_version: "1.0.0"
+      receipt_id: verifier-connectivity-0123456789ab
+      roster_ref: verifier://ascension/a/3dfb1f84a223/root-roster
+      verifier_endpoint: http://127.0.0.1:43123/verifier-roster
+      transport_profile: live-http-json-roster-v1
+      roster_checked_at: "2026-04-19T06:03:00Z"
+      recorded_at: "2026-04-19T06:03:00Z"
+      request_timeout_ms: 500
+      observed_latency_ms: 9.7
+      http_status: 200
+      response_digest: 76b8566a170adbe0c74d65d2048f5c69f0374a78d7373f893fda51564baf9b22
+      receipt_status: reachable
+      active_root_id: root://scheduler-demo/method-a-rotation-cutover/cutover
+      rotation_state: rotated
+      accepted_root_count: 2
