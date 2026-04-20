@@ -38,7 +38,8 @@ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback
 bounded に再現できる。
 rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
 temp rollback workspace 上の actual reverse-apply command receipt、
-reverse-apply journal、telemetry gate を通過した時だけ `rolled-back` になる。
+reverse-apply journal、detached git worktree 上の checkout-bound mutation receipt、
+telemetry gate を通過した時だけ `rolled-back` になる。
 
 ## Builder への入力フォーマット
 

@@ -83,6 +83,7 @@ pre-apply snapshot が復元されることに加え、
 live enactment receipt 由来の reverse-apply journal、
 temp rollback workspace での actual reverse-apply command receipt、
 current checkout baseline に照合した repo-bound verification receipt、
+detached git worktree 上で baseline へ戻る checkout-bound mutation receipt、
 telemetry gate が
 rollback を machine-checkable に承認することを確認する。
 
@@ -95,7 +96,7 @@ rollback を machine-checkable に承認することを確認する。
   `selfctor.rollback.v0` / `builder_rollback_session.schema` に従って
   self・Council・Guardian の 3 者通知、
   reverse-apply journal、actual reverse-apply command receipt、
-  repo-bound verification receipt、live telemetry gate を必須にする
+  repo-bound verification receipt、checkout-bound mutation receipt、live telemetry gate を必須にする
 
 ## 監査ログ
 

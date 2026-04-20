@@ -26,6 +26,7 @@ required:
   - reverted_stage_count
   - reverse_apply_journal
   - repo_binding_summary
+  - checkout_mutation_receipt
   - telemetry_gate
   - continuity_event_refs
   - notification_refs
@@ -35,7 +36,7 @@ properties:
   kind:
     const: builder_rollback_session
   schema_version:
-    const: "1.2"
+    const: "1.3"
   rollback_session_id:
     type: string
     pattern: "^rollback-session-[a-f0-9]{12}$"
@@ -63,7 +64,10 @@ properties:
       - require_live_rollback_gate
       - require_reverse_apply_commands
       - require_repo_bound_verification
+      - require_checkout_mutation_receipt
       - rollback_workspace_prefix
+      - checkout_mutation_strategy
+      - checkout_worktree_prefix
       - repo_binding_scope
       - command_timeout_seconds
       - cleanup_after_run
@@ -71,7 +75,7 @@ properties:
     properties:
       policy_id:
         type: string
-        const: continuity-bound-builder-rollback-v3
+        const: continuity-bound-builder-rollback-v4
       required_eval:
         type: string
         const: evals/continuity/builder_rollback_execution.yaml
@@ -93,9 +97,18 @@ properties:
       require_repo_bound_verification:
         type: boolean
         const: true
+      require_checkout_mutation_receipt:
+        type: boolean
+        const: true
       rollback_workspace_prefix:
         type: string
         const: omoikane-builder-rollback-
+      checkout_mutation_strategy:
+        type: string
+        const: detached-git-worktree-overlay-v1
+      checkout_worktree_prefix:
+        type: string
+        const: omoikane-builder-rollback-worktree-
       repo_binding_scope:
         type: string
         const: current-checkout-subtree
@@ -283,6 +296,146 @@ properties:
       binding_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+  checkout_mutation_receipt:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - receipt_id
+      - strategy
+      - worktree_ref
+      - head_commit
+      - status
+      - observed_paths
+      - observed_path_count
+      - verified_path_count
+      - path_receipts
+      - git_status_command
+      - git_diff_command
+      - baseline_status_digest
+      - baseline_diff_digest
+      - mutated_status_digest
+      - mutated_diff_digest
+      - restored_status_digest
+      - restored_diff_digest
+      - mutation_detected
+      - restored_matches_baseline
+      - cleanup_status
+    properties:
+      kind:
+        const: checkout_mutation_receipt
+      receipt_id:
+        type: string
+        pattern: "^checkout-receipt-[a-f0-9]{12}$"
+      strategy:
+        type: string
+        const: detached-git-worktree-overlay-v1
+      worktree_ref:
+        type: string
+        pattern: "^worktree://current-checkout/"
+      head_commit:
+        type: string
+        pattern: "^[a-f0-9]{40}$"
+      status:
+        type: string
+        enum:
+          - verified
+          - blocked
+      observed_paths:
+        type: array
+        items:
+          type: string
+          pattern: "^(src|tests)/"
+      observed_path_count:
+        type: integer
+        minimum: 0
+        maximum: 4
+      verified_path_count:
+        type: integer
+        minimum: 0
+        maximum: 4
+      path_receipts:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - path
+            - source_state
+            - baseline_snapshot_ref
+            - command
+            - exit_code
+            - status
+            - stdout_excerpt
+            - stderr_excerpt
+            - result_state
+          properties:
+            path:
+              type: string
+              pattern: "^(src|tests)/"
+            source_state:
+              type: string
+              enum:
+                - copied
+                - created
+            baseline_snapshot_ref:
+              type: string
+              pattern: "^baseline://"
+            command:
+              type: string
+              minLength: 3
+            exit_code:
+              type: integer
+            status:
+              type: string
+              enum:
+                - pass
+                - fail
+                - timeout
+            stdout_excerpt:
+              type: string
+            stderr_excerpt:
+              type: string
+            result_state:
+              type: string
+              enum:
+                - restored
+                - deleted
+                - mismatch
+      git_status_command:
+        type: string
+        minLength: 3
+      git_diff_command:
+        type: string
+        minLength: 3
+      baseline_status_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      baseline_diff_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      mutated_status_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      mutated_diff_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      restored_status_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      restored_diff_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      mutation_detected:
+        type: boolean
+      restored_matches_baseline:
+        type: boolean
+      cleanup_status:
+        type: string
+        enum:
+          - removed
+          - retained
+          - not-started
   telemetry_gate:
     type: object
     additionalProperties: false
@@ -298,6 +451,10 @@ properties:
       - passed_reverse_command_count
       - verified_reverse_command_count
       - repo_bound_verified_command_count
+      - checkout_mutation_status
+      - checkout_cleanup_status
+      - checkout_verified_path_count
+      - checkout_status_restored
       - journal_entry_count
       - reverted_stage_count
       - decision_basis
@@ -344,6 +501,22 @@ properties:
       repo_bound_verified_command_count:
         type: integer
         minimum: 0
+      checkout_mutation_status:
+        type: string
+        enum:
+          - verified
+          - blocked
+      checkout_cleanup_status:
+        type: string
+        enum:
+          - removed
+          - retained
+          - not-started
+      checkout_verified_path_count:
+        type: integer
+        minimum: 0
+      checkout_status_restored:
+        type: boolean
       journal_entry_count:
         type: integer
         minimum: 0
@@ -353,8 +526,8 @@ properties:
         maximum: 4
       decision_basis:
         type: array
-        minItems: 4
-        maxItems: 4
+        minItems: 5
+        maxItems: 5
         prefixItems:
           - type: string
             const: temp-workspace-cleaned
@@ -364,6 +537,8 @@ properties:
             const: reverse-apply-journal-complete
           - type: string
             const: reverse-commands-verified
+          - type: string
+            const: checkout-state-restored
       blocking_reasons:
         type: array
         items:
@@ -419,6 +594,21 @@ allOf:
           minimum: 1
         reverse_apply_journal:
           minItems: 1
+        checkout_mutation_receipt:
+          properties:
+            status:
+              const: verified
+            cleanup_status:
+              const: removed
+            mutation_detected:
+              const: true
+            restored_matches_baseline:
+              const: true
+          required:
+            - status
+            - cleanup_status
+            - mutation_detected
+            - restored_matches_baseline
         continuity_event_refs:
           minItems: 2
         notification_refs:
@@ -438,14 +628,14 @@ allOf:
             - reverse_cleanup_status
 examples:
   - kind: builder_rollback_session
-    schema_version: "1.2"
+    schema_version: "1.3"
     rollback_session_id: rollback-session-0123456789ab
     request_id: build-l5-rollback-0001
     artifact_id: artifact-0123456789ab
     apply_receipt_id: sandbox-apply-0123456789ab
     rollout_session_id: rollout-session-0123456789ab
     policy:
-      policy_id: continuity-bound-builder-rollback-v3
+      policy_id: continuity-bound-builder-rollback-v4
       required_eval: evals/continuity/builder_rollback_execution.yaml
       require_append_only_continuity: true
       require_pre_apply_snapshot: true
@@ -453,7 +643,10 @@ examples:
       require_live_rollback_gate: true
       require_reverse_apply_commands: true
       require_repo_bound_verification: true
+      require_checkout_mutation_receipt: true
       rollback_workspace_prefix: omoikane-builder-rollback-
+      checkout_mutation_strategy: detached-git-worktree-overlay-v1
+      checkout_worktree_prefix: omoikane-builder-rollback-worktree-
       repo_binding_scope: current-checkout-subtree
       command_timeout_seconds: 15
       cleanup_after_run: true
@@ -523,6 +716,48 @@ examples:
         - src/omoikane/self_construction/builders.py
         - tests/unit/test_builders.py
       binding_digest: 42a6d35f5b5448c56a3012b5dfe9a291f3cc9199e3a24a8725fd755a0a821f79
+    checkout_mutation_receipt:
+      kind: checkout_mutation_receipt
+      receipt_id: checkout-receipt-0123456789ab
+      strategy: detached-git-worktree-overlay-v1
+      worktree_ref: worktree://current-checkout/build-l5-rollback-0001
+      head_commit: 0123456789abcdef0123456789abcdef01234567
+      status: verified
+      observed_paths:
+        - src/omoikane/self_construction/builders.py
+        - tests/unit/test_builders.py
+      observed_path_count: 2
+      verified_path_count: 2
+      path_receipts:
+        - path: src/omoikane/self_construction/builders.py
+          source_state: copied
+          baseline_snapshot_ref: baseline://build-l5-rollback-0001/01
+          command: python3 -c 'restore copied file from baseline snapshot'
+          exit_code: 0
+          status: pass
+          stdout_excerpt: restored src/omoikane/self_construction/builders.py
+          stderr_excerpt: ""
+          result_state: restored
+        - path: tests/unit/test_builders.py
+          source_state: copied
+          baseline_snapshot_ref: baseline://build-l5-rollback-0001/02
+          command: python3 -c 'restore copied file from baseline snapshot'
+          exit_code: 0
+          status: pass
+          stdout_excerpt: restored tests/unit/test_builders.py
+          stderr_excerpt: ""
+          result_state: restored
+      git_status_command: git status --short --untracked-files=all -- src/omoikane/self_construction/builders.py tests/unit/test_builders.py
+      git_diff_command: git diff --no-ext-diff --binary -- src/omoikane/self_construction/builders.py tests/unit/test_builders.py
+      baseline_status_digest: a0a0d96f2197be6d37e928f4db53c4f9d1ad3f9d2b6a9a0b0e0e7d9bc1d7db51
+      baseline_diff_digest: 4f499943d8bb0b18e5d73d1bc3d95c7440d7f7f3f97c8f2247a3bb7f78dca101
+      mutated_status_digest: cb61b6416f6b2da6d7843eb1e1f4a8b7ac6e8cb1c509df7762c746b14987e79b
+      mutated_diff_digest: 24dc6aebf7b0f5c4f3915c7d457e1bb1f11f1bc3e3dba33585c341f1cd3ab02e
+      restored_status_digest: a0a0d96f2197be6d37e928f4db53c4f9d1ad3f9d2b6a9a0b0e0e7d9bc1d7db51
+      restored_diff_digest: 4f499943d8bb0b18e5d73d1bc3d95c7440d7f7f3f97c8f2247a3bb7f78dca101
+      mutation_detected: true
+      restored_matches_baseline: true
+      cleanup_status: removed
     telemetry_gate:
       gate_id: telemetry-gate-0123456789ab
       source_enactment_session_id: enactment-session-0123456789ab
@@ -535,6 +770,10 @@ examples:
       passed_reverse_command_count: 2
       verified_reverse_command_count: 2
       repo_bound_verified_command_count: 2
+      checkout_mutation_status: verified
+      checkout_cleanup_status: removed
+      checkout_verified_path_count: 2
+      checkout_status_restored: true
       journal_entry_count: 2
       reverted_stage_count: 2
       decision_basis:
@@ -542,6 +781,7 @@ examples:
         - eval-command-receipts-preserved
         - reverse-apply-journal-complete
         - reverse-commands-verified
+        - checkout-state-restored
       blocking_reasons: []
     continuity_event_refs:
       - ledger://self-modify/build-l5-rollback-0001
@@ -556,4 +796,5 @@ examples:
       - stakeholders-notified
       - reverse-apply-journal-bound
       - repo-baseline-bound
+      - checkout-bound-state-restored
     executed_at: "2026-04-20T03:00:00Z"

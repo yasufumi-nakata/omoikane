@@ -268,7 +268,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("rolled-back", session["status"])
-        self.assertEqual("1.2", session["schema_version"])
+        self.assertEqual("1.3", session["schema_version"])
         self.assertEqual(
             live_enactment_session["enactment_session_id"],
             session["live_enactment_session_id"],
@@ -290,6 +290,12 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual("current-checkout-subtree", session["repo_binding_summary"]["binding_scope"])
         self.assertEqual(2, session["repo_binding_summary"]["bound_path_count"])
         self.assertEqual(2, session["repo_binding_summary"]["verified_path_count"])
+        self.assertEqual("verified", session["checkout_mutation_receipt"]["status"])
+        self.assertTrue(session["checkout_mutation_receipt"]["mutation_detected"])
+        self.assertTrue(session["checkout_mutation_receipt"]["restored_matches_baseline"])
+        self.assertEqual(2, session["checkout_mutation_receipt"]["observed_path_count"])
+        self.assertEqual(2, session["checkout_mutation_receipt"]["verified_path_count"])
+        self.assertEqual("removed", session["checkout_mutation_receipt"]["cleanup_status"])
         self.assertEqual("rollback-approved", session["telemetry_gate"]["status"])
         self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["executed_command_count"])
@@ -297,6 +303,10 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual(2, session["telemetry_gate"]["executed_reverse_command_count"])
         self.assertEqual(2, session["telemetry_gate"]["verified_reverse_command_count"])
         self.assertEqual(2, session["telemetry_gate"]["repo_bound_verified_command_count"])
+        self.assertEqual("verified", session["telemetry_gate"]["checkout_mutation_status"])
+        self.assertEqual("removed", session["telemetry_gate"]["checkout_cleanup_status"])
+        self.assertEqual(2, session["telemetry_gate"]["checkout_verified_path_count"])
+        self.assertTrue(session["telemetry_gate"]["checkout_status_restored"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 

@@ -76,7 +76,8 @@
 
 ## 次段階
 
-in-place checkout rollback mutation / multi-scene sensory loopback artifact families /
+current-worktree direct rollback mutation / external observer receipts /
+multi-scene sensory loopback artifact families /
 external-actuation authorization artifacts / cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。
 

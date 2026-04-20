@@ -8232,6 +8232,16 @@ class OmoikaneReferenceOS:
                 "repo_binding_path_count": rollback_session["repo_binding_summary"][
                     "bound_path_count"
                 ],
+                "checkout_mutation_status": rollback_session["checkout_mutation_receipt"]["status"],
+                "checkout_mutation_path_count": rollback_session["checkout_mutation_receipt"][
+                    "observed_path_count"
+                ],
+                "checkout_mutation_cleanup_status": rollback_session["checkout_mutation_receipt"][
+                    "cleanup_status"
+                ],
+                "checkout_mutation_restored": rollback_session["checkout_mutation_receipt"][
+                    "restored_matches_baseline"
+                ],
                 "reverse_apply_cleanup_status": rollback_session["telemetry_gate"][
                     "reverse_cleanup_status"
                 ],

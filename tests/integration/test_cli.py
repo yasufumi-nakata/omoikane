@@ -331,6 +331,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["repo_bound_verified_count"])
         self.assertEqual("current-checkout-subtree", result["validation"]["repo_binding_scope"])
         self.assertEqual(2, result["validation"]["repo_binding_path_count"])
+        self.assertEqual("verified", result["validation"]["checkout_mutation_status"])
+        self.assertEqual(2, result["validation"]["checkout_mutation_path_count"])
+        self.assertEqual("removed", result["validation"]["checkout_mutation_cleanup_status"])
+        self.assertTrue(result["validation"]["checkout_mutation_restored"])
         self.assertEqual("removed", result["validation"]["reverse_apply_cleanup_status"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],
