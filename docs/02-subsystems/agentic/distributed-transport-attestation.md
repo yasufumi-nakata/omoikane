@@ -67,7 +67,7 @@ remote endpoint から返る receipt は次を同時に満たしたときだけ 
 reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
 route nonce replay block / multi-hop replay block / live root directory probe /
-bounded authority-plane fleet probe を出力する。
+bounded authority-plane fleet probe / authority-plane churn reconciliation を出力する。
 
 ## Live Root Directory Federation
 
