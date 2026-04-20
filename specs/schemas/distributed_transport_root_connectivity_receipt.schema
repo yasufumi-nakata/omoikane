@@ -1,0 +1,88 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_root_connectivity_receipt.schema"
+title: DistributedTransportRootConnectivityReceipt
+description: Connectivity receipt for one live remote PKI root-directory probe bound to a distributed transport envelope.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - directory_ref
+  - directory_endpoint
+  - transport_profile
+  - recorded_at
+  - request_timeout_ms
+  - observed_latency_ms
+  - http_status
+  - response_digest
+  - receipt_status
+  - matched_root_count
+  - quorum_satisfied
+  - trusted_root_refs
+properties:
+  kind:
+    const: distributed_transport_root_connectivity_receipt
+  schema_version:
+    const: "1.0.0"
+  receipt_id:
+    type: string
+    pattern: "^distributed-root-connectivity-"
+  directory_ref:
+    type: string
+    pattern: "^rootdir://"
+  directory_endpoint:
+    type: string
+    pattern: "^https?://"
+  transport_profile:
+    const: live-http-json-rootdir-v1
+  recorded_at:
+    type: string
+    format: date-time
+  request_timeout_ms:
+    type: integer
+    minimum: 1
+  observed_latency_ms:
+    type: number
+    exclusiveMinimum: 0
+  http_status:
+    type: integer
+    minimum: 100
+    maximum: 599
+  response_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_status:
+    type: string
+    enum:
+      - reachable
+  matched_root_count:
+    type: integer
+    minimum: 0
+  quorum_satisfied:
+    type: boolean
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+examples:
+  - kind: distributed_transport_root_connectivity_receipt
+    schema_version: "1.0.0"
+    receipt_id: distributed-root-connectivity-0123456789ab
+    directory_ref: rootdir://federation/live-rotation-window
+    directory_endpoint: http://127.0.0.1:43821/root-directory
+    transport_profile: live-http-json-rootdir-v1
+    recorded_at: "2026-04-20T02:10:00Z"
+    request_timeout_ms: 500
+    observed_latency_ms: 8.4
+    http_status: 200
+    response_digest: 9cb49088d4d3900a0ef2da32f4185078ba4d76d1fef98f575d9165846db91ba4
+    receipt_status: reachable
+    matched_root_count: 2
+    quorum_satisfied: true
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b

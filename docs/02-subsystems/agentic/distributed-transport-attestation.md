@@ -66,7 +66,27 @@ remote endpoint から返る receipt は次を同時に満たしたときだけ 
 
 reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
-route nonce replay block / multi-hop replay block を出力する。
+route nonce replay block / multi-hop replay block / live root directory probe を出力する。
+
+## Live Root Directory Federation
+
+rotated handoff では `probe_live_root_directory` により、
+live HTTP JSON endpoint から root-directory snapshot を取得し、
+その場で trusted root quorum を envelope に束縛する。
+
+| 項目 | 固定値 |
+|---|---|
+| connectivity transport | `live-http-json-rootdir-v1` |
+| payload shape | `distributed_transport_root_directory` |
+| quorum source | envelope `trust_root_quorum` と一致 |
+| trusted roots | envelope `trust_root_refs` との交差集合 |
+
+- `connectivity_receipt` は `directory_endpoint / response_digest /
+  observed_latency_ms / matched_root_count / quorum_satisfied` を必ず保持する
+- `key_epoch` は rotated envelope の `accepted_key_epochs` に含まれなければ fail-closed
+- `trusted_root_refs` が quorum を満たした時だけ rotated receipt verification に使う
+- reference runtime は loopback endpoint でこの handoff を再現し、
+  actual remote key server を持ち込まなくても machine-checkable にする
 
 ## Relay telemetry
 
@@ -94,10 +114,14 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_envelope.schema`
 - schema: `specs/schemas/distributed_transport_receipt.schema`
 - schema: `specs/schemas/distributed_transport_relay_telemetry.schema`
+- schema: `specs/schemas/distributed_transport_root_connectivity_receipt.schema`
+- schema: `specs/schemas/distributed_transport_root_directory.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
 - eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
+- eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
+- decision log: `meta/decision-log/2026-04-20_distributed-transport-live-root-directory.md`

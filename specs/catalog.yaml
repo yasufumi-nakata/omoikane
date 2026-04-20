@@ -144,6 +144,24 @@ entries:
     rationale: Required to serialize bounded relay-path telemetry with hop order, latency, trust-root visibility, and receipt-aligned anti-replay verdicts.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_root_connectivity_receipt.schema
+    consumers:
+      - specs/schemas/distributed_transport_root_directory.schema
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize endpoint reachability, response digest, latency, and quorum outcome for one live remote PKI root-directory probe.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/distributed_transport_root_directory.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_live_root_directory.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one live remote PKI root-directory snapshot, trusted root quorum, and connectivity receipt for rotated transport envelopes.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -228,7 +246,7 @@ entries:
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make distributed participant attestation, key rotation overlap, federated roots, replay guard, and relay telemetry machine-readable.
+    rationale: Required to make distributed participant attestation, key rotation overlap, live root-directory federation, replay guard, and relay telemetry machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -985,6 +1003,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects hop-ordered relay telemetry, latency aggregation, root visibility, and replay verdict mirroring for distributed remote handoff bundles.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_live_root_directory.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects live root-directory reachability, root quorum binding, and response-digest connectivity receipts for rotated transport envelopes.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

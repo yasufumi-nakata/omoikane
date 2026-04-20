@@ -1122,6 +1122,43 @@ class OmoikaneReferenceOS:
         }
 
     def run_distributed_transport_demo(self) -> Dict[str, Any]:
+        @contextmanager
+        def live_root_directory_bridge(directory_payload: Dict[str, Any]):
+            class LocalThreadingHTTPServer(ThreadingHTTPServer):
+                def server_bind(self) -> None:
+                    self.socket.bind(self.server_address)
+                    self.server_address = self.socket.getsockname()
+                    host, port = self.server_address[:2]
+                    self.server_name = str(host)
+                    self.server_port = int(port)
+
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    body = json.dumps(directory_payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            server.daemon_threads = True
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            endpoint = f"http://127.0.0.1:{server.server_address[1]}/root-directory"
+            try:
+                yield endpoint
+            finally:
+                pass
+
         identity = self.identity.create(
             human_consent_proof="consent://distributed-transport-demo/v1",
             metadata={"display_name": "Distributed Transport Sandbox"},
@@ -1240,6 +1277,75 @@ class OmoikaneReferenceOS:
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        live_root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/live-rotation-window",
+            "checked_at": "2026-04-20T02:10:00Z",
+            "council_tier": rotated_federation_envelope.council_tier,
+            "transport_profile": rotated_federation_envelope.transport_profile,
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text(
+                        canonical_json(
+                            {
+                                "root_ref": "root://federation/pki-a",
+                                "key_epoch": 2,
+                                "status": "candidate",
+                            }
+                        )
+                    ),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text(
+                        canonical_json(
+                            {
+                                "root_ref": "root://federation/pki-b",
+                                "key_epoch": 2,
+                                "status": "active",
+                            }
+                        )
+                    ),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": rotated_federation_envelope.trust_root_quorum,
+            "proof_digest": "",
+        }
+        live_root_directory_payload["proof_digest"] = sha256_text(
+            canonical_json(
+                {
+                    "directory_ref": live_root_directory_payload["directory_ref"],
+                    "checked_at": live_root_directory_payload["checked_at"],
+                    "accepted_roots": live_root_directory_payload["accepted_roots"],
+                    "quorum_requirement": live_root_directory_payload["quorum_requirement"],
+                    "key_epoch": live_root_directory_payload["key_epoch"],
+                }
+            )
+        )
+        with live_root_directory_bridge(live_root_directory_payload) as root_directory_endpoint:
+            live_root_directory = self.distributed_transport.probe_live_root_directory(
+                rotated_federation_envelope,
+                directory_endpoint=root_directory_endpoint,
+                request_timeout_ms=500,
+            )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_root_directory_bound",
+            payload=live_root_directory.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
         rotated_receipt = self.distributed_transport.record_receipt(
             rotated_federation_envelope,
             result_ref="resolution://federation/shared-reality-approved-rotated",
@@ -1258,7 +1364,7 @@ class OmoikaneReferenceOS:
                 "guardian://neutral-federation",
             ],
             channel_binding_ref=rotated_federation_envelope.channel_binding_ref,
-            verified_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            verified_root_refs=live_root_directory.trusted_root_refs,
             key_epoch=2,
             hop_nonce_chain=[
                 "hop://federation/relay-a/nonce-002",
@@ -1470,6 +1576,9 @@ class OmoikaneReferenceOS:
                 "heritage": heritage_envelope.to_dict(),
                 "heritage_reissue": heritage_reissue_envelope.to_dict(),
             },
+            "live_root_directory": {
+                "federation_rotated": live_root_directory.to_dict(),
+            },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
                 "federation_rotated": rotated_receipt.to_dict(),
@@ -1499,6 +1608,16 @@ class OmoikaneReferenceOS:
                 and multi_hop_replay_receipt.authenticity_checks["multi_hop_replay_status"] == "blocked",
                 "federated_roots_enforced": rotated_federation_envelope.trust_root_quorum == 2
                 and rotated_receipt.authenticity_checks["federated_roots_verified"],
+                "live_root_directory_reachable": (
+                    live_root_directory.connectivity_receipt.receipt_status == "reachable"
+                    and live_root_directory.connectivity_receipt.http_status == 200
+                ),
+                "live_root_directory_quorum_bound": (
+                    live_root_directory.quorum_requirement
+                    == rotated_federation_envelope.trust_root_quorum
+                    and live_root_directory.connectivity_receipt.quorum_satisfied
+                    and live_root_directory.trusted_root_refs == rotated_receipt.verified_root_refs
+                ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"
                 and rotated_telemetry.anti_replay_status == "accepted"

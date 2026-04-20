@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
 import unittest
 
 from omoikane.agentic.cognitive_audit import CognitiveAuditService
@@ -381,6 +385,42 @@ class ConsensusBusTests(unittest.TestCase):
 
 
 class DistributedTransportServiceTests(unittest.TestCase):
+    @contextmanager
+    def _root_directory_server(self, payload: dict[str, object]):
+        class LocalThreadingHTTPServer(ThreadingHTTPServer):
+            def server_bind(self) -> None:
+                self.socket.bind(self.server_address)
+                self.server_address = self.socket.getsockname()
+                host, port = self.server_address[:2]
+                self.server_name = str(host)
+                self.server_port = int(port)
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.0"
+
+            def do_GET(self) -> None:  # noqa: N802
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                self.close_connection = True
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                return
+
+        server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.daemon_threads = True
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}/root-directory"
+        finally:
+            pass
+
     def test_federation_handoff_binds_liaison_quorum_and_guardian(self) -> None:
         service = DistributedTransportService()
 
@@ -567,6 +607,108 @@ class DistributedTransportServiceTests(unittest.TestCase):
         self.assertEqual("replay-blocked", replay_telemetry.end_to_end_status)
         self.assertEqual("blocked", replay_telemetry.anti_replay_status)
         self.assertEqual("replay-blocked", replay_telemetry.relay_hops[-1].delivery_status)
+
+    def test_live_root_directory_probe_binds_quorum_and_endpoint_receipt(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-live-root-001",
+            proposal_ref="proposal-transport-live-root-001",
+            payload_ref="cas://sha256/test-live-root",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self", "live_root": True})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/live-window",
+            "checked_at": "2026-04-20T02:10:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("live-root-window"),
+        }
+
+        with self._root_directory_server(payload) as endpoint:
+            report = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=endpoint,
+                request_timeout_ms=500,
+            )
+
+        self.assertEqual(["root://federation/pki-a", "root://federation/pki-b"], report.trusted_root_refs)
+        self.assertEqual("reachable", report.connectivity_receipt.receipt_status)
+        self.assertEqual(2, report.connectivity_receipt.matched_root_count)
+        self.assertTrue(report.connectivity_receipt.quorum_satisfied)
+        self.assertEqual(report.directory_ref, report.connectivity_receipt.directory_ref)
+
+    def test_live_root_directory_probe_rejects_quorum_mismatch(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-live-root-mismatch-001",
+            proposal_ref="proposal-transport-live-root-mismatch-001",
+            payload_ref="cas://sha256/test-live-root-mismatch",
+            payload_digest=sha256_text(canonical_json({"scope": "cross-self", "live_root": "mismatch"})),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/live-window-mismatch",
+            "checked_at": "2026-04-20T02:11:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-a",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-mismatch"),
+                    "status": "active",
+                    "key_epoch": 2,
+                }
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("live-root-window-mismatch"),
+        }
+
+        with self._root_directory_server(payload) as endpoint:
+            with self.assertRaisesRegex(
+                ValueError,
+                "live root directory must satisfy envelope trust_root_quorum",
+            ):
+                service.probe_live_root_directory(
+                    rotated,
+                    directory_endpoint=endpoint,
+                    request_timeout_ms=500,
+                )
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

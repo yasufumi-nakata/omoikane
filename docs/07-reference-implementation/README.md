@@ -123,6 +123,9 @@ Federation handoff が `self-liaison x2 + guardian x1` の participant attestati
 `channel_binding_ref` に束縛されること、
 rotated Federation handoff が `accepted_key_epochs=[1,2]` と
 `trust_root_quorum=2` を持つ federated root overlap を要求すること、
+loopback live root-directory endpoint から取得した
+`distributed_transport_root_directory` が `trusted_root_refs` と
+`connectivity_receipt` を返し、その quorum が rotated receipt verification に束縛されること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -375,5 +378,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- distributed transport key rotation / remote PKI federation を actual network に接続
+- non-loopback distributed PKI authority plane と external key server 群への接続
 - automation による未実装ギャップの継続充填

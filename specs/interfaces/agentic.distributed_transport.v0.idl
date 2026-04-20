@@ -8,6 +8,7 @@ imports:
   distributed_transport_envelope: ../schemas/distributed_transport_envelope.schema
   distributed_transport_receipt: ../schemas/distributed_transport_receipt.schema
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
+  distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -126,6 +127,37 @@ operations:
       - next_key_epoch must be greater than the current key_epoch
       - accepted_key_epochs must retain the previous epoch during overlap
       - federated root verification must require trust_root_quorum distinct roots
+  probe_live_root_directory:
+    summary: >
+      Probe one live remote PKI root-directory endpoint and bind the reachable root quorum
+      to a rotated distributed transport envelope before receipt verification.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - directory_endpoint
+        properties:
+          envelope_ref:
+            type: string
+            minLength: 1
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          directory_endpoint:
+            type: string
+            pattern: "^https?://"
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_root_directory
+    guarantees:
+      - live root directory must match envelope council_tier and transport_profile
+      - live root directory key_epoch must remain inside accepted_key_epochs
+      - trusted_root_refs must satisfy trust_root_quorum before a rotated receipt can authenticate
+      - connectivity_receipt must bind endpoint, response_digest, latency, and quorum outcome
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -279,5 +311,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, federated trust roots, multi-hop anti-replay, and bounded relay telemetry.
-    - Actual network PKI and remote key servers remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, multi-hop anti-replay, and bounded relay telemetry.
+    - Non-loopback authority planes and external key-server fleets remain future work.

@@ -1,0 +1,28 @@
+eval_id: distributed_transport_live_root_directory
+target: agentic.distributed_transport
+level: L4
+description: >
+  Rotated distributed transport handoff が live remote PKI root-directory probe を通じて
+  reachable endpoint, trusted root quorum, response digest binding を満たせること。
+fixtures:
+  - scenario: live_root_directory_reachable
+    council_tier: federation
+    next_key_epoch: 2
+    trust_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    trust_root_quorum: 2
+    expected:
+      receipt_status: reachable
+      matched_root_count: 2
+      quorum_satisfied: true
+      trusted_root_refs:
+        - root://federation/pki-a
+        - root://federation/pki-b
+assertions:
+  - Live root directory must match the rotated envelope council tier and transport profile
+  - Live root directory key_epoch must remain accepted by the rotated envelope
+  - Connectivity receipt must bind endpoint reachability, latency, and response digest
+metric: exact-match
+threshold: 1.0
+ethics_check: true

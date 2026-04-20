@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any, Dict, List
+import json
+import time
+from typing import Any, Dict, List, Mapping
+import urllib.request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -32,6 +35,7 @@ HERITAGE_ROOTS = (
     "root://heritage/pki-c",
 )
 RELAY_TELEMETRY_PROFILE = "bounded-relay-observability-v1"
+LIVE_ROOT_DIRECTORY_TRANSPORT_PROFILE = "live-http-json-rootdir-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -264,6 +268,78 @@ class DistributedTransportRelayTelemetry:
         }
 
 
+@dataclass
+class DistributedTransportRootConnectivityReceipt:
+    """Connectivity receipt for one live remote root-directory probe."""
+
+    receipt_id: str
+    directory_ref: str
+    directory_endpoint: str
+    transport_profile: str
+    recorded_at: str
+    request_timeout_ms: int
+    observed_latency_ms: float
+    http_status: int
+    response_digest: str
+    receipt_status: str
+    matched_root_count: int
+    quorum_satisfied: bool
+    trusted_root_refs: List[str]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_root_connectivity_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": self.receipt_id,
+            "directory_ref": self.directory_ref,
+            "directory_endpoint": self.directory_endpoint,
+            "transport_profile": self.transport_profile,
+            "recorded_at": self.recorded_at,
+            "request_timeout_ms": self.request_timeout_ms,
+            "observed_latency_ms": self.observed_latency_ms,
+            "http_status": self.http_status,
+            "response_digest": self.response_digest,
+            "receipt_status": self.receipt_status,
+            "matched_root_count": self.matched_root_count,
+            "quorum_satisfied": self.quorum_satisfied,
+            "trusted_root_refs": list(self.trusted_root_refs),
+        }
+
+
+@dataclass
+class DistributedTransportRootDirectory:
+    """Normalized live root-directory report bound to one transport envelope."""
+
+    directory_ref: str
+    checked_at: str
+    council_tier: str
+    transport_profile: str
+    key_epoch: int
+    active_root_ref: str
+    accepted_roots: List[Dict[str, Any]]
+    quorum_requirement: int
+    proof_digest: str
+    trusted_root_refs: List[str]
+    connectivity_receipt: DistributedTransportRootConnectivityReceipt
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": self.directory_ref,
+            "checked_at": self.checked_at,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "key_epoch": self.key_epoch,
+            "active_root_ref": self.active_root_ref,
+            "accepted_roots": [dict(root) for root in self.accepted_roots],
+            "quorum_requirement": self.quorum_requirement,
+            "proof_digest": self.proof_digest,
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "connectivity_receipt": self.connectivity_receipt.to_dict(),
+        }
+
+
 class DistributedTransportService:
     """Issue transport-attested remote handoff bundles and verify receipts."""
 
@@ -374,6 +450,39 @@ class DistributedTransportService:
             trust_root_quorum=trust_root_quorum,
             max_hops=envelope.max_hops,
             previous_envelope_ref=envelope.envelope_id,
+        )
+
+    def probe_live_root_directory(
+        self,
+        envelope: DistributedTransportEnvelope,
+        *,
+        directory_endpoint: str,
+        request_timeout_ms: int = 1_000,
+    ) -> DistributedTransportRootDirectory:
+        normalized_endpoint = self._require_non_empty_string(directory_endpoint, "directory_endpoint")
+        timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
+        request_started = time.monotonic()
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(normalized_endpoint, timeout=timeout_ms / 1000.0) as response:
+            http_status = int(getattr(response, "status", response.getcode()))
+            payload_text = response.read().decode("utf-8")
+        observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 1)
+        if http_status != 200:
+            raise ValueError(f"live root directory endpoint returned unexpected status {http_status}")
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("live root directory endpoint must return JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("live root directory payload must be a mapping")
+        return self._normalize_root_directory_report(
+            payload,
+            envelope,
+            directory_endpoint=normalized_endpoint,
+            request_timeout_ms=timeout_ms,
+            observed_latency_ms=observed_latency_ms,
+            http_status=http_status,
+            response_digest=sha256_text(canonical_json(payload)),
         )
 
     def record_receipt(
@@ -629,6 +738,114 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def _normalize_root_directory_report(
+        self,
+        payload: Mapping[str, Any],
+        envelope: DistributedTransportEnvelope,
+        *,
+        directory_endpoint: str,
+        request_timeout_ms: int,
+        observed_latency_ms: float,
+        http_status: int,
+        response_digest: str,
+    ) -> DistributedTransportRootDirectory:
+        if payload.get("kind") != "distributed_transport_root_directory":
+            raise ValueError("live root directory kind must equal distributed_transport_root_directory")
+        if payload.get("schema_version") != "1.0.0":
+            raise ValueError("live root directory schema_version must equal 1.0.0")
+
+        directory_ref = self._require_non_empty_string(payload.get("directory_ref"), "directory_ref")
+        if not directory_ref.startswith("rootdir://"):
+            raise ValueError("directory_ref must start with rootdir://")
+        checked_at = self._require_non_empty_string(payload.get("checked_at"), "checked_at")
+        council_tier = self._require_non_empty_string(payload.get("council_tier"), "council_tier")
+        if council_tier != envelope.council_tier:
+            raise ValueError("live root directory council_tier must match envelope")
+        transport_profile = self._require_non_empty_string(
+            payload.get("transport_profile"),
+            "transport_profile",
+        )
+        if transport_profile != envelope.transport_profile:
+            raise ValueError("live root directory transport_profile must match envelope")
+        key_epoch = self._require_positive_int(payload.get("key_epoch"), "key_epoch")
+        if key_epoch not in envelope.accepted_key_epochs:
+            raise ValueError("live root directory key_epoch must be accepted by envelope")
+        quorum_requirement = self._require_positive_int(
+            payload.get("quorum_requirement"),
+            "quorum_requirement",
+        )
+        if quorum_requirement != envelope.trust_root_quorum:
+            raise ValueError("live root directory quorum_requirement must match envelope trust_root_quorum")
+        proof_digest = self._require_sha256_hex(payload.get("proof_digest"), "proof_digest")
+
+        accepted_roots_raw = payload.get("accepted_roots")
+        if not isinstance(accepted_roots_raw, list) or not accepted_roots_raw:
+            raise ValueError("accepted_roots must be a non-empty list")
+        accepted_roots: List[Dict[str, Any]] = []
+        trusted_root_refs: List[str] = []
+        active_root_ref = self._require_non_empty_string(payload.get("active_root_ref"), "active_root_ref")
+        allowed_statuses = {"active", "candidate", "retired"}
+        for index, root in enumerate(accepted_roots_raw):
+            if not isinstance(root, Mapping):
+                raise ValueError("accepted_roots entries must be mappings")
+            root_ref = self._require_non_empty_string(root.get("root_ref"), f"accepted_roots[{index}].root_ref")
+            fingerprint = self._require_sha256_hex(
+                root.get("fingerprint"),
+                f"accepted_roots[{index}].fingerprint",
+            )
+            status = self._require_non_empty_string(root.get("status"), f"accepted_roots[{index}].status")
+            if status not in allowed_statuses:
+                raise ValueError("accepted_roots status must be active, candidate, or retired")
+            root_key_epoch = self._require_positive_int(
+                root.get("key_epoch"),
+                f"accepted_roots[{index}].key_epoch",
+            )
+            if root_key_epoch not in envelope.accepted_key_epochs:
+                raise ValueError("accepted_roots key_epoch must stay within envelope accepted_key_epochs")
+            normalized_root = {
+                "root_ref": root_ref,
+                "fingerprint": fingerprint,
+                "status": status,
+                "key_epoch": root_key_epoch,
+            }
+            accepted_roots.append(normalized_root)
+            if root_ref in envelope.trust_root_refs and status in {"active", "candidate"}:
+                trusted_root_refs.append(root_ref)
+        if active_root_ref not in {root["root_ref"] for root in accepted_roots}:
+            raise ValueError("active_root_ref must reference one accepted root")
+        if len(sorted(set(trusted_root_refs))) < envelope.trust_root_quorum:
+            raise ValueError("live root directory must satisfy envelope trust_root_quorum")
+
+        trusted_root_refs = sorted(set(trusted_root_refs))
+        connectivity_receipt = DistributedTransportRootConnectivityReceipt(
+            receipt_id=new_id("distributed-root-connectivity"),
+            directory_ref=directory_ref,
+            directory_endpoint=directory_endpoint,
+            transport_profile=LIVE_ROOT_DIRECTORY_TRANSPORT_PROFILE,
+            recorded_at=utc_now_iso(),
+            request_timeout_ms=request_timeout_ms,
+            observed_latency_ms=observed_latency_ms,
+            http_status=http_status,
+            response_digest=response_digest,
+            receipt_status="reachable",
+            matched_root_count=len(trusted_root_refs),
+            quorum_satisfied=len(trusted_root_refs) >= envelope.trust_root_quorum,
+            trusted_root_refs=trusted_root_refs,
+        )
+        return DistributedTransportRootDirectory(
+            directory_ref=directory_ref,
+            checked_at=checked_at,
+            council_tier=council_tier,
+            transport_profile=transport_profile,
+            key_epoch=key_epoch,
+            active_root_ref=active_root_ref,
+            accepted_roots=accepted_roots,
+            quorum_requirement=quorum_requirement,
+            proof_digest=proof_digest,
+            trusted_root_refs=trusted_root_refs,
+            connectivity_receipt=connectivity_receipt,
+        )
+
     def _build_envelope(
         self,
         *,
@@ -791,3 +1008,20 @@ class DistributedTransportService:
         if number <= 0:
             raise ValueError(f"{field_name} must be greater than 0")
         return number
+
+    @staticmethod
+    def _require_positive_int(value: Any, field_name: str) -> int:
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name} must be an integer") from exc
+        if number <= 0:
+            raise ValueError(f"{field_name} must be greater than 0")
+        return number
+
+    @staticmethod
+    def _require_sha256_hex(value: Any, field_name: str) -> str:
+        text = DistributedTransportService._require_non_empty_string(value, field_name)
+        if len(text) != 64 or any(char not in "0123456789abcdef" for char in text):
+            raise ValueError(f"{field_name} must be a sha256 hex digest")
+        return text

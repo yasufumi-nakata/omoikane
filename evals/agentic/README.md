@@ -41,6 +41,10 @@ Federation / Heritage handoff が participant attestation と channel binding �
 multi-hop relay telemetry が hop 順序、latency 合計、root visibility、
 anti-replay verdict を receipt と一貫した shape で返すこと。
 
+### Distributed Transport Live Root Directory
+rotated distributed transport handoff が live remote PKI root-directory から
+reachable endpoint と root quorum を取得し、response digest つき receipt に束縛できること。
+
 ### Cognitive Audit Loop
 qualia checkpoint と self-model abrupt change と metacognition alert が
 bounded Council review に束ねられ、continuity-safe な follow-up を返すこと。

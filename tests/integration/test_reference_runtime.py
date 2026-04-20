@@ -687,6 +687,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["replay_guard_blocks_reuse"])
         self.assertTrue(result["validation"]["multi_hop_replay_blocks_reuse"])
         self.assertTrue(result["validation"]["federated_roots_enforced"])
+        self.assertTrue(result["validation"]["live_root_directory_reachable"])
+        self.assertTrue(result["validation"]["live_root_directory_quorum_bound"])
+        self.assertEqual(
+            2,
+            result["live_root_directory"]["federation_rotated"]["connectivity_receipt"][
+                "matched_root_count"
+            ],
+        )
         self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
         self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])
         self.assertEqual(2, result["relay_telemetry"]["federation_rotated"]["hop_count"])

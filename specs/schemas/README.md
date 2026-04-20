@@ -45,6 +45,8 @@
 - `distributed_participant_attestation.schema`
 - `distributed_transport_envelope.schema`
 - `distributed_transport_receipt.schema`
+- `distributed_transport_root_connectivity_receipt.schema`
+- `distributed_transport_root_directory.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
@@ -70,7 +72,7 @@
 ## 次段階
 
 actual rollback reverse-apply journal / richer sensory loopback artifacts /
-external-actuation authorization artifacts / live remote PKI federation と key rotation を伴う distributed artifacts は
+external-actuation authorization artifacts / non-loopback remote PKI federation authority plane は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式
