@@ -18,6 +18,7 @@
 - `semantic_memory_snapshot.schema`
 - `procedural_memory_preview.schema`
 - `procedural_writeback_receipt.schema`
+- `procedural_skill_enactment_session.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
 - `ewa_command.schema`
@@ -69,7 +70,7 @@
 ## 次段階
 
 actual rollback reverse-apply journal / richer sensory loopback artifacts /
-live remote PKI federation と key rotation を伴う distributed artifacts は
+external-actuation authorization artifacts / live remote PKI federation と key rotation を伴う distributed artifacts は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

@@ -1,0 +1,118 @@
+idl_version: 1
+kind: service
+namespace: mind.skill_enactment.v0
+service: ProceduralSkillEnactor
+summary: >
+  Deterministic temp-workspace enactment contract that materializes
+  guardian-witnessed procedural skill executions and runs bounded commands
+  without external actuation.
+imports:
+  procedural_skill_execution: ../schemas/procedural_skill_execution.schema
+  connectome_document: ../schemas/connectome_document.schema
+  procedural_skill_enactment_session: ../schemas/procedural_skill_enactment_session.schema
+operations:
+  execute:
+    summary: Materialize one validated procedural skill execution receipt in a temp workspace and run bounded enactment commands.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - execution_receipt
+          - updated_connectome_document
+          - eval_refs
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          execution_receipt:
+            schema_ref: procedural_skill_execution
+          updated_connectome_document:
+            schema_ref: connectome_document
+          eval_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              pattern: "^evals/"
+    output:
+      schema_ref: procedural_skill_enactment_session
+    guarantees:
+      - execution receipt must validate before temp-workspace enactment starts
+      - delivery_scope must remain sandbox-only and external actuation must stay disabled
+      - guardian witness and rollback token must be preserved across materialization and command execution
+      - temp workspace cleanup must complete before the session closes
+  validate_session:
+    summary: Validate one procedural skill enactment session against the fixed temp-workspace policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - session
+          - updated_connectome_document
+        properties:
+          session:
+            schema_ref: procedural_skill_enactment_session
+          updated_connectome_document:
+            schema_ref: connectome_document
+          execution_receipt:
+            schema_ref: procedural_skill_execution
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - materialized_skill_count
+          - executed_command_count
+          - all_commands_passed
+          - cleanup_status
+          - enactment_status
+          - skill_labels
+          - delivery_scope
+          - rollback_token_preserved
+          - errors
+        properties:
+          ok:
+            type: boolean
+          materialized_skill_count:
+            type: integer
+            minimum: 0
+          executed_command_count:
+            type: integer
+            minimum: 0
+          all_commands_passed:
+            type: boolean
+          cleanup_status:
+            type: string
+            enum:
+              - removed
+              - retained
+              - not-started
+          enactment_status:
+            type: string
+            enum:
+              - passed
+              - failed
+              - blocked
+          skill_labels:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          delivery_scope:
+            type: string
+            const: sandbox-only
+          rollback_token_preserved:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.procedural_skill_enacted:
+    payload:
+      schema_ref: procedural_skill_enactment_session

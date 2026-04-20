@@ -1131,6 +1131,29 @@ entries:
     rationale: Protects sandbox-only delivery, guardian witness, rollback token carryover, and no external effects during procedural skill execution.
   - priority: P1
     kind: schema
+    file: specs/schemas/procedural_skill_enactment_session.schema
+    consumers:
+      - specs/interfaces/mind.skill_enactment.v0.idl
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize temp-workspace procedural enactment evidence, command receipts, cleanup status, and rollback-token carryover.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.skill_enactment.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 procedural skill enactment contract machine-readable across runtime, docs, and evals.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/procedural_skill_enactment_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects temp-workspace-only procedural enactment, command execution receipts, cleanup, and rollback token preservation.
+  - priority: P1
+    kind: schema
     file: specs/schemas/trust_event.schema
     consumers:
       - specs/schemas/trust_snapshot.schema

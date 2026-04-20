@@ -101,6 +101,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     procedural_skill_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    procedural_enactment_parser = subparsers.add_parser(
+        "procedural-enactment-demo",
+        help="Run temp-workspace procedural skill enactment from a validated sandbox execution receipt",
+    )
+    procedural_enactment_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     episodic_parser = subparsers.add_parser(
         "episodic-demo",
         help="Run the L2 episodic stream canonical shape and MemoryCrystal handoff scenario",
@@ -364,6 +370,10 @@ def main() -> None:
 
     if args.command == "procedural-skill-demo":
         _print_result(runtime.run_procedural_skill_demo(), args.json)
+        return
+
+    if args.command == "procedural-enactment-demo":
+        _print_result(runtime.run_procedural_enactment_demo(), args.json)
         return
 
     if args.command == "episodic-demo":

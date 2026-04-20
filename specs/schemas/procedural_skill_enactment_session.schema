@@ -1,0 +1,332 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/procedural_skill_enactment_session.schema"
+title: ProceduralSkillEnactmentSession
+description: Deterministic record emitted when guardian-witnessed procedural skill executions are materialized in a temp workspace and bounded commands are run there.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - enactment_session_id
+  - identity_id
+  - enactment_policy
+  - source_execution_digest
+  - source_writeback_digest
+  - connectome_snapshot_id
+  - connectome_snapshot_digest
+  - sandbox_session_id
+  - guardian_witness_id
+  - rollback_token
+  - status
+  - workspace_root
+  - workspace_snapshot_refs
+  - materialized_skills
+  - materialized_skill_count
+  - eval_refs
+  - command_runs
+  - executed_command_count
+  - all_commands_passed
+  - cleanup_status
+  - preserved_invariants
+  - executed_at
+  - digest
+properties:
+  kind:
+    const: procedural_skill_enactment_session
+  schema_version:
+    const: "1.0"
+  enactment_session_id:
+    type: string
+    pattern: "^procedural-enactment-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  enactment_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - source_execution_policy
+      - source_writeback_policy
+      - delivery_scope
+      - external_actuation_allowed
+      - guardian_witness_required
+      - workspace_prefix
+      - max_materialized_skills
+      - command_timeout_seconds
+      - cleanup_after_run
+      - mandatory_eval
+    properties:
+      schema_version:
+        const: "1.0"
+      policy_id:
+        const: guardian-witnessed-procedural-skill-enactment-v1
+      source_execution_policy:
+        const: guardian-witnessed-procedural-skill-execution-v1
+      source_writeback_policy:
+        const: human-approved-procedural-writeback-v1
+      delivery_scope:
+        const: sandbox-only
+      external_actuation_allowed:
+        const: false
+      guardian_witness_required:
+        const: true
+      workspace_prefix:
+        const: omoikane-procedural-enact-
+      max_materialized_skills:
+        const: 3
+      command_timeout_seconds:
+        const: 15
+      cleanup_after_run:
+        const: true
+      mandatory_eval:
+        const: evals/continuity/procedural_skill_enactment_execution.yaml
+  source_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_writeback_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  connectome_snapshot_id:
+    type: string
+    format: uuid
+  connectome_snapshot_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  sandbox_session_id:
+    type: string
+    pattern: "^sandbox://"
+  guardian_witness_id:
+    type: string
+    pattern: "^guardian://"
+  rollback_token:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - passed
+      - failed
+      - blocked
+  workspace_root:
+    type: string
+    minLength: 1
+  workspace_snapshot_refs:
+    type: object
+    additionalProperties: false
+    required:
+      - pre_apply
+      - post_apply
+    properties:
+      pre_apply:
+        type: string
+        pattern: "^sandbox://"
+      post_apply:
+        type: string
+        pattern: "^sandbox://"
+  materialized_skills:
+    type: array
+    minItems: 1
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - execution_id
+        - recommendation_id
+        - skill_label
+        - target_path
+        - workspace_path
+        - source_state
+        - marker
+        - evidence_ref
+      properties:
+        execution_id:
+          type: string
+          minLength: 1
+        recommendation_id:
+          type: string
+          minLength: 1
+        skill_label:
+          type: string
+          minLength: 1
+        target_path:
+          type: string
+          pattern: "^[^\\s]+$"
+        workspace_path:
+          type: string
+          pattern: "^skills/"
+        source_state:
+          type: string
+          enum:
+            - created
+            - copied
+        marker:
+          type: string
+          pattern: "procedural-enacted:"
+        evidence_ref:
+          type: string
+          pattern: "^sandbox://"
+  materialized_skill_count:
+    type: integer
+    minimum: 1
+    maximum: 3
+  eval_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^evals/"
+  command_runs:
+    type: array
+    minItems: 1
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - eval_ref
+        - command
+        - exit_code
+        - status
+        - stdout_excerpt
+        - stderr_excerpt
+      properties:
+        eval_ref:
+          type: string
+          pattern: "^evals/"
+        command:
+          type: string
+          minLength: 3
+        exit_code:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        stdout_excerpt:
+          type: string
+        stderr_excerpt:
+          type: string
+  executed_command_count:
+    type: integer
+    minimum: 0
+    maximum: 3
+  all_commands_passed:
+    type: boolean
+  cleanup_status:
+    type: string
+    enum:
+      - removed
+      - retained
+      - not-started
+  preserved_invariants:
+    type: array
+    minItems: 6
+    maxItems: 6
+    prefixItems:
+      - type: string
+        const: temp-workspace-only
+      - type: string
+        const: sandbox-only-delivery
+      - type: string
+        const: no-external-actuation
+      - type: string
+        const: guardian-witnessed
+      - type: string
+        const: rollback-token-retained
+      - type: string
+        const: cleanup-after-run
+  executed_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  blocking_rules:
+    type: array
+    items:
+      type: string
+      minLength: 1
+allOf:
+  - if:
+      properties:
+        status:
+          const: passed
+    then:
+      properties:
+        all_commands_passed:
+          const: true
+        cleanup_status:
+          const: removed
+  - if:
+      properties:
+        status:
+          const: blocked
+    then:
+      required:
+        - blocking_rules
+examples:
+  - kind: procedural_skill_enactment_session
+    schema_version: "1.0"
+    enactment_session_id: procedural-enactment-0123456789ab
+    identity_id: identity://procedural-enactment-demo
+    enactment_policy:
+      schema_version: "1.0"
+      policy_id: guardian-witnessed-procedural-skill-enactment-v1
+      source_execution_policy: guardian-witnessed-procedural-skill-execution-v1
+      source_writeback_policy: human-approved-procedural-writeback-v1
+      delivery_scope: sandbox-only
+      external_actuation_allowed: false
+      guardian_witness_required: true
+      workspace_prefix: omoikane-procedural-enact-
+      max_materialized_skills: 3
+      command_timeout_seconds: 15
+      cleanup_after_run: true
+      mandatory_eval: evals/continuity/procedural_skill_enactment_execution.yaml
+    source_execution_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    source_writeback_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+    connectome_snapshot_id: f1f81508-45d7-4134-bc20-f04f30c14096
+    connectome_snapshot_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    sandbox_session_id: sandbox://procedural-skill/session-001
+    guardian_witness_id: guardian://procedural-skill/witness-001
+    rollback_token: rollback-d9c651600b8c
+    status: passed
+    workspace_root: /tmp/omoikane-procedural-enact-example
+    workspace_snapshot_refs:
+      pre_apply: sandbox://procedural-skill/session-001/workspace/pre-apply
+      post_apply: sandbox://procedural-skill/session-001/workspace/post-apply/procedural-execution-0123456789ab
+    materialized_skills:
+      - execution_id: procedural-execution-0123456789ab
+        recommendation_id: procedural-segment-0123456789ab
+        skill_label: guardian-review-rehearsal
+        target_path: continuity_integrator->ethics_gate
+        workspace_path: skills/01-guardian-review-rehearsal.txt
+        source_state: created
+        marker: "# procedural-enacted: procedural-execution-0123456789ab target=continuity_integrator->ethics_gate"
+        evidence_ref: sandbox://procedural-skill/session-001/procedural-rec-0123456789ab
+    materialized_skill_count: 1
+    eval_refs:
+      - evals/continuity/procedural_skill_enactment_execution.yaml
+    command_runs:
+      - eval_ref: evals/continuity/procedural_skill_enactment_execution.yaml
+        command: python3 -c <procedural enactment verifier> skills/01-guardian-review-rehearsal.txt
+        exit_code: 0
+        status: pass
+        stdout_excerpt: guardian-review-rehearsal ok
+        stderr_excerpt: ""
+    executed_command_count: 1
+    all_commands_passed: true
+    cleanup_status: removed
+    preserved_invariants:
+      - temp-workspace-only
+      - sandbox-only-delivery
+      - no-external-actuation
+      - guardian-witnessed
+      - rollback-token-retained
+      - cleanup-after-run
+    executed_at: "2026-04-20T07:00:00Z"
+    digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef

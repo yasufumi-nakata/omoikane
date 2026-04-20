@@ -47,6 +47,7 @@ PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
+PYTHONPATH=src python3 -m omoikane.cli procedural-enactment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
@@ -265,6 +266,13 @@ validated writeback を `guardian-witnessed-procedural-skill-execution-v1` で
 sandbox-only rehearsal へ昇格しつつ、
 guardian witness、executed skill label、rollback token carryover、
 no external actuation、`procedural-execution` ledger event を確認する。
+
+`procedural-enactment-demo` は L2 procedural skill enactment の reference contract
+(`mind.skill_enactment.v0`) を JSON で可視化し、
+validated `skill-execution` receipt を `guardian-witnessed-procedural-skill-enactment-v1`
+で temp workspace に materialize しつつ、
+actual command receipt、cleanup、rollback token carryover、
+sandbox-only delivery、`procedural-enactment` ledger event を確認する。
 
 `reasoning-demo` は L3 reasoning failover の reference contract
 (`cognitive.reasoning.v0`) を JSON で可視化し、

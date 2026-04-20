@@ -92,11 +92,15 @@ reference runtime では procedural memory をまず直接 apply せず、
 - writeback 後の `skill-execution` は
   `guardian-witnessed-procedural-skill-execution-v1` で sandbox-only rehearsal とし、
   rollback token と guardian witness を carry したまま external actuation を禁止する
+- さらに `skill-enactment` は
+  `guardian-witnessed-procedural-skill-enactment-v1` で temp workspace に限定し、
+  actual command receipt と cleanup を残したまま rollback token を保持する
 
 canonical schema:
 [specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
 [specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
 and [specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/procedural_skill_execution.schema)
+and [specs/schemas/procedural_skill_enactment_session.schema](../../../specs/schemas/procedural_skill_enactment_session.schema)
 
 ## トラウマ記憶の扱い
 

@@ -210,6 +210,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("sandbox-complete", result["procedural"]["skill_execution_receipt"]["status"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-execution"])
 
+    def test_procedural_enactment_demo_returns_valid_temp_workspace_session(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_enactment_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["enactment"]["ok"])
+        self.assertEqual(2, result["validation"]["enactment"]["materialized_skill_count"])
+        self.assertEqual(2, result["validation"]["enactment"]["executed_command_count"])
+        self.assertTrue(result["validation"]["enactment"]["all_commands_passed"])
+        self.assertEqual("removed", result["validation"]["enactment"]["cleanup_status"])
+        self.assertEqual("passed", result["validation"]["enactment"]["enactment_status"])
+        self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
+        self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-enactment"])
+
     def test_builder_demo_returns_valid_build_pipeline(self) -> None:
         runtime = OmoikaneReferenceOS()
 

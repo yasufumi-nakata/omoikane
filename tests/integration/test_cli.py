@@ -206,6 +206,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution"]["rollback_token_preserved"])
         self.assertEqual([], result["procedural"]["skill_execution_receipt"]["external_effects"])
 
+    def test_procedural_enactment_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "procedural-enactment-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["enactment"]["ok"])
+        self.assertEqual(2, result["validation"]["enactment"]["materialized_skill_count"])
+        self.assertEqual(2, result["validation"]["enactment"]["executed_command_count"])
+        self.assertTrue(result["validation"]["enactment"]["all_commands_passed"])
+        self.assertEqual("removed", result["validation"]["enactment"]["cleanup_status"])
+        self.assertEqual("sandbox-only", result["validation"]["enactment"]["delivery_scope"])
+        self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
+        self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
+
     def test_builder_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

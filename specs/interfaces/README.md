@@ -13,6 +13,7 @@
 - `mind.procedural.v0.idl`
 - `mind.procedural_writeback.v0.idl`
 - `mind.qualia.v0.idl`
+- `mind.skill_enactment.v0.idl`
 - `mind.self_model.v0.idl`
 - `cognitive.reasoning.v0.idl`
 - `agentic.consensus_bus.v0.idl`
@@ -42,7 +43,6 @@
 
 ## 次段階
 
-L2 procedural skill execution enactment、
 L6 sensory loopback、
 live PKI federation / transport key rotation / multi-hop anti-replay を伴う
 richer distributed surfaces は docs 側で設計を深めてから昇格させる。

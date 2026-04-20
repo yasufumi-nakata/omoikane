@@ -28,6 +28,18 @@ read-only policy と deferred procedural boundary を守るか。
 MemoryCrystal segment と Connectome snapshot からの procedural preview が
 read-only policy と bounded weight delta を守るか。
 
+### Procedural Writeback Contract
+human-approved procedural writeback が reviewer quorum、
+continuity diff、rollback token を保持するか。
+
+### Procedural Skill Execution Contract
+guardian-witnessed sandbox rehearsal が no external actuation と
+rollback token carryover を守るか。
+
+### Procedural Skill Enactment Execution
+temp workspace に materialize された procedural skill enactment が
+actual command receipt、cleanup、sandbox-only delivery を守るか。
+
 ### Qualia Tick Monotonicity
 QualiaBuffer の tick_id が単調増加か。
 

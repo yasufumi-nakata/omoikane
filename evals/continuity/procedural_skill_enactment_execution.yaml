@@ -1,0 +1,17 @@
+eval_id: procedural_skill_enactment_execution
+target: mind.skill_enactment
+summary: >
+  Guardian-witnessed procedural skill enactment が temp workspace materialization、
+  actual command receipt、cleanup、rollback token 維持を守ること
+checks:
+  - name: procedural skill enactment demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli procedural-enactment-demo --json
+expect:
+  enactment_ok: true
+  enactment_status: passed
+  materialized_skill_count: 2
+  executed_command_count: 2
+  all_commands_passed: true
+  cleanup_status: removed
+  rollback_token_preserved: true
+  procedural_enactment_ledger_count: 1

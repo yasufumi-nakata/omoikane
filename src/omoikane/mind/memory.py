@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict, dataclass
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 from typing import Any, Dict, List, Sequence
 from uuid import uuid4
 
@@ -34,6 +38,10 @@ PROCEDURAL_WRITEBACK_POLICY_ID = "human-approved-procedural-writeback-v1"
 PROCEDURAL_REQUIRED_HUMAN_REVIEWERS = 2
 PROCEDURAL_SKILL_EXECUTION_POLICY_ID = "guardian-witnessed-procedural-skill-execution-v1"
 PROCEDURAL_MAX_REHEARSAL_STEPS = 3
+PROCEDURAL_SKILL_ENACTMENT_POLICY_ID = "guardian-witnessed-procedural-skill-enactment-v1"
+PROCEDURAL_MANDATORY_ENACTMENT_EVAL = "evals/continuity/procedural_skill_enactment_execution.yaml"
+PROCEDURAL_ENACTMENT_WORKSPACE_PREFIX = "omoikane-procedural-enact-"
+PROCEDURAL_ENACTMENT_COMMAND_TIMEOUT_SECONDS = 15
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -68,6 +76,29 @@ def _procedural_writeback_digest_payload(record: Dict[str, Any]) -> Dict[str, An
 
 def _procedural_execution_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "digest"}
+
+
+def _procedural_enactment_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "digest"}
+
+
+def _slugify_text(value: str) -> str:
+    lowered = value.strip().lower()
+    characters = [
+        character if character.isalnum() else "-"
+        for character in lowered
+    ]
+    slug = "".join(characters)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-") or "skill"
+
+
+def _excerpt(text: str, *, limit: int = 160) -> str:
+    normalized = text.strip()
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[-limit:]
 
 
 @dataclass
@@ -2167,6 +2198,534 @@ class ProceduralSkillExecutor:
             canonical_json(_procedural_execution_digest_payload(execution))
         )
         return execution
+
+
+class ProceduralSkillEnactmentService:
+    """Materializes procedural skill executions in a temp workspace and runs bounded commands."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "policy_id": PROCEDURAL_SKILL_ENACTMENT_POLICY_ID,
+            "source_execution_policy": PROCEDURAL_SKILL_EXECUTION_POLICY_ID,
+            "source_writeback_policy": PROCEDURAL_WRITEBACK_POLICY_ID,
+            "delivery_scope": "sandbox-only",
+            "external_actuation_allowed": False,
+            "guardian_witness_required": True,
+            "workspace_prefix": PROCEDURAL_ENACTMENT_WORKSPACE_PREFIX,
+            "max_materialized_skills": PROCEDURAL_MAX_REHEARSAL_STEPS,
+            "command_timeout_seconds": PROCEDURAL_ENACTMENT_COMMAND_TIMEOUT_SECONDS,
+            "cleanup_after_run": True,
+            "mandatory_eval": PROCEDURAL_MANDATORY_ENACTMENT_EVAL,
+        }
+
+    def execute(
+        self,
+        identity_id: str,
+        execution_receipt: Dict[str, Any],
+        updated_connectome_document: Dict[str, Any],
+        *,
+        eval_refs: Sequence[str],
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(execution_receipt, dict):
+            raise ValueError("execution_receipt must be a mapping")
+        if not isinstance(updated_connectome_document, dict):
+            raise ValueError("updated_connectome_document must be a mapping")
+
+        normalized_eval_refs = self._normalize_eval_refs(eval_refs)
+        execution_validation = ProceduralSkillExecutor().validate(
+            execution_receipt,
+            updated_connectome_document,
+        )
+        if not execution_validation["ok"]:
+            raise ValueError(
+                "procedural skill enactment requires a valid execution receipt: "
+                f"{execution_validation['errors']}"
+            )
+        if execution_receipt.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match execution_receipt.identity_id")
+        if updated_connectome_document.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match updated_connectome_document.identity_id")
+        if execution_receipt.get("connectome_snapshot_id") != updated_connectome_document.get(
+            "snapshot_id"
+        ):
+            raise ValueError(
+                "execution_receipt.connectome_snapshot_id must match updated_connectome_document.snapshot_id"
+            )
+
+        workspace_root = Path(
+            tempfile.mkdtemp(prefix=self.profile()["workspace_prefix"])
+        )
+        materialized_skills: List[Dict[str, Any]] = []
+        command_runs: List[Dict[str, Any]] = []
+        cleanup_status = "not-started"
+
+        try:
+            skills_dir = workspace_root / "skills"
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            for index, execution in enumerate(execution_receipt["executions"], start=1):
+                materialized_skill = self._materialize_execution(
+                    workspace_root,
+                    execution,
+                    index=index,
+                )
+                materialized_skills.append(materialized_skill)
+                command_runs.append(
+                    self._run_materialized_skill(workspace_root, materialized_skill)
+                )
+        finally:
+            shutil.rmtree(workspace_root, ignore_errors=True)
+            cleanup_status = "removed" if not workspace_root.exists() else "retained"
+
+        all_commands_passed = bool(command_runs) and all(
+            command_run["status"] == "pass" for command_run in command_runs
+        )
+        status = "passed" if all_commands_passed else "failed"
+        enactment_session = {
+            "kind": "procedural_skill_enactment_session",
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "enactment_session_id": new_id("procedural-enactment"),
+            "identity_id": identity_id,
+            "enactment_policy": self.profile(),
+            "source_execution_digest": sha256_text(canonical_json(execution_receipt)),
+            "source_writeback_digest": execution_receipt["source_writeback_digest"],
+            "connectome_snapshot_id": updated_connectome_document["snapshot_id"],
+            "connectome_snapshot_digest": sha256_text(canonical_json(updated_connectome_document)),
+            "sandbox_session_id": execution_receipt["sandbox_session_id"],
+            "guardian_witness_id": execution_receipt["guardian_witness_id"],
+            "rollback_token": execution_receipt["rollback_token"],
+            "status": status,
+            "workspace_root": str(workspace_root),
+            "workspace_snapshot_refs": {
+                "pre_apply": f"{execution_receipt['sandbox_session_id']}/workspace/pre-apply",
+                "post_apply": (
+                    f"{execution_receipt['sandbox_session_id']}/workspace/post-apply/"
+                    f"{materialized_skills[0]['execution_id'] if materialized_skills else 'none'}"
+                ),
+            },
+            "materialized_skills": materialized_skills,
+            "materialized_skill_count": len(materialized_skills),
+            "eval_refs": normalized_eval_refs,
+            "command_runs": command_runs,
+            "executed_command_count": len(command_runs),
+            "all_commands_passed": all_commands_passed,
+            "cleanup_status": cleanup_status,
+            "preserved_invariants": [
+                "temp-workspace-only",
+                "sandbox-only-delivery",
+                "no-external-actuation",
+                "guardian-witnessed",
+                "rollback-token-retained",
+                "cleanup-after-run",
+            ],
+            "executed_at": utc_now_iso(),
+        }
+        enactment_session["digest"] = sha256_text(
+            canonical_json(_procedural_enactment_digest_payload(enactment_session))
+        )
+
+        validation = self.validate_session(
+            enactment_session,
+            updated_connectome_document,
+            execution_receipt,
+        )
+        if not validation["ok"]:
+            raise ValueError(
+                f"procedural skill enactment session failed validation: {validation['errors']}"
+            )
+        return enactment_session
+
+    def validate_session(
+        self,
+        session: Dict[str, Any],
+        updated_connectome_document: Dict[str, Any],
+        execution_receipt: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        skill_labels: List[str] = []
+
+        if not isinstance(session, dict):
+            raise ValueError("session must be a mapping")
+        if not isinstance(updated_connectome_document, dict):
+            raise ValueError("updated_connectome_document must be a mapping")
+
+        if session.get("kind") != "procedural_skill_enactment_session":
+            errors.append("kind must equal procedural_skill_enactment_session")
+        if session.get("schema_version") != PROCEDURAL_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {PROCEDURAL_MEMORY_SCHEMA_VERSION}, "
+                f"got {session.get('schema_version')!r}"
+            )
+
+        for field_name in (
+            "enactment_session_id",
+            "identity_id",
+            "source_execution_digest",
+            "source_writeback_digest",
+            "connectome_snapshot_id",
+            "connectome_snapshot_digest",
+            "sandbox_session_id",
+            "guardian_witness_id",
+            "rollback_token",
+            "workspace_root",
+            "executed_at",
+            "digest",
+        ):
+            MemoryCrystalStore._require_non_empty_string(
+                session.get(field_name),
+                field_name,
+                errors,
+            )
+
+        enactment_policy = session.get("enactment_policy")
+        if not isinstance(enactment_policy, dict):
+            errors.append("enactment_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if enactment_policy.get(field_name) != expected_value:
+                    errors.append(f"enactment_policy.{field_name} mismatch")
+
+        for field_name in (
+            "source_execution_digest",
+            "source_writeback_digest",
+            "connectome_snapshot_digest",
+            "digest",
+        ):
+            value = session.get(field_name)
+            if not isinstance(value, str) or len(value) != 64:
+                errors.append(f"{field_name} must be a sha256 hex string")
+
+        workspace_snapshot_refs = session.get("workspace_snapshot_refs")
+        if not isinstance(workspace_snapshot_refs, dict):
+            errors.append("workspace_snapshot_refs must be an object")
+        else:
+            for field_name in ("pre_apply", "post_apply"):
+                MemoryCrystalStore._require_non_empty_string(
+                    workspace_snapshot_refs.get(field_name),
+                    f"workspace_snapshot_refs.{field_name}",
+                    errors,
+                )
+
+        eval_refs = session.get("eval_refs")
+        if not isinstance(eval_refs, list) or not eval_refs:
+            errors.append("eval_refs must be a non-empty list")
+        else:
+            for eval_ref in eval_refs:
+                if not isinstance(eval_ref, str) or not eval_ref.startswith("evals/"):
+                    errors.append("eval_refs must contain eval paths")
+            if PROCEDURAL_MANDATORY_ENACTMENT_EVAL not in eval_refs:
+                errors.append(
+                    f"eval_refs must include {PROCEDURAL_MANDATORY_ENACTMENT_EVAL}"
+                )
+
+        materialized_skills = session.get("materialized_skills")
+        if not isinstance(materialized_skills, list) or not materialized_skills:
+            errors.append("materialized_skills must be a non-empty list")
+            materialized_skills = []
+
+        seen_execution_ids = []
+        seen_recommendation_ids = []
+        for index, materialized in enumerate(materialized_skills):
+            if not isinstance(materialized, dict):
+                errors.append(f"materialized_skills[{index}] must be an object")
+                continue
+            for field_name in (
+                "execution_id",
+                "recommendation_id",
+                "skill_label",
+                "target_path",
+                "workspace_path",
+                "source_state",
+                "marker",
+                "evidence_ref",
+            ):
+                MemoryCrystalStore._require_non_empty_string(
+                    materialized.get(field_name),
+                    f"materialized_skills[{index}].{field_name}",
+                    errors,
+                )
+            source_state = materialized.get("source_state")
+            if source_state not in {"created", "copied"}:
+                errors.append("materialized_skills.source_state must be created or copied")
+            workspace_path = materialized.get("workspace_path")
+            if isinstance(workspace_path, str) and not workspace_path.startswith("skills/"):
+                errors.append("materialized_skills.workspace_path must start with skills/")
+            marker = materialized.get("marker")
+            if isinstance(marker, str) and "procedural-enacted:" not in marker:
+                errors.append("materialized_skills.marker must include procedural-enacted:")
+            execution_id = materialized.get("execution_id")
+            recommendation_id = materialized.get("recommendation_id")
+            skill_label = materialized.get("skill_label")
+            if isinstance(execution_id, str) and execution_id:
+                seen_execution_ids.append(execution_id)
+            if isinstance(recommendation_id, str) and recommendation_id:
+                seen_recommendation_ids.append(recommendation_id)
+            if isinstance(skill_label, str) and skill_label:
+                skill_labels.append(skill_label)
+
+        if session.get("materialized_skill_count") != len(materialized_skills):
+            errors.append(
+                "materialized_skill_count must equal len(materialized_skills)"
+            )
+
+        command_runs = session.get("command_runs")
+        if not isinstance(command_runs, list) or not command_runs:
+            errors.append("command_runs must be a non-empty list")
+            command_runs = []
+        for index, command_run in enumerate(command_runs):
+            if not isinstance(command_run, dict):
+                errors.append(f"command_runs[{index}] must be an object")
+                continue
+            for field_name in (
+                "eval_ref",
+                "command",
+                "status",
+                "stdout_excerpt",
+                "stderr_excerpt",
+            ):
+                if field_name in {"stdout_excerpt", "stderr_excerpt"}:
+                    if not isinstance(command_run.get(field_name), str):
+                        errors.append(
+                            f"command_runs[{index}].{field_name} must be a string"
+                        )
+                else:
+                    MemoryCrystalStore._require_non_empty_string(
+                        command_run.get(field_name),
+                        f"command_runs[{index}].{field_name}",
+                        errors,
+                    )
+            exit_code = command_run.get("exit_code")
+            if not isinstance(exit_code, int):
+                errors.append(f"command_runs[{index}].exit_code must be an integer")
+            status = command_run.get("status")
+            if status not in {"pass", "fail", "timeout"}:
+                errors.append(f"command_runs[{index}].status invalid: {status!r}")
+
+        if session.get("executed_command_count") != len(command_runs):
+            errors.append("executed_command_count must equal len(command_runs)")
+        all_commands_passed = session.get("all_commands_passed")
+        if not isinstance(all_commands_passed, bool):
+            errors.append("all_commands_passed must be a boolean")
+        elif all_commands_passed != all(
+            isinstance(command_run, dict) and command_run.get("status") == "pass"
+            for command_run in command_runs
+        ):
+            errors.append("all_commands_passed must match command_runs status")
+
+        status = session.get("status")
+        if status not in {"passed", "failed", "blocked"}:
+            errors.append("status must be one of passed/failed/blocked")
+        if status == "passed" and session.get("cleanup_status") != "removed":
+            errors.append("cleanup_status must equal removed when status is passed")
+
+        cleanup_status = session.get("cleanup_status")
+        if cleanup_status not in {"removed", "retained", "not-started"}:
+            errors.append("cleanup_status invalid")
+
+        expected_invariants = [
+            "temp-workspace-only",
+            "sandbox-only-delivery",
+            "no-external-actuation",
+            "guardian-witnessed",
+            "rollback-token-retained",
+            "cleanup-after-run",
+        ]
+        if session.get("preserved_invariants") != expected_invariants:
+            errors.append(f"preserved_invariants must equal {expected_invariants!r}")
+
+        connectome_validation = ConnectomeModel().validate(updated_connectome_document)
+        if not connectome_validation["ok"]:
+            errors.append("updated_connectome_document must satisfy Connectome validation")
+        else:
+            if session.get("identity_id") != updated_connectome_document.get("identity_id"):
+                errors.append("session.identity_id must match updated_connectome_document.identity_id")
+            if session.get("connectome_snapshot_id") != updated_connectome_document.get("snapshot_id"):
+                errors.append("connectome_snapshot_id must match updated_connectome_document.snapshot_id")
+            expected_connectome_digest = sha256_text(canonical_json(updated_connectome_document))
+            if session.get("connectome_snapshot_digest") != expected_connectome_digest:
+                errors.append("connectome_snapshot_digest mismatch")
+
+        if execution_receipt is not None:
+            execution_validation = ProceduralSkillExecutor().validate(
+                execution_receipt,
+                updated_connectome_document,
+            )
+            if not execution_validation["ok"]:
+                errors.append("execution_receipt must satisfy ProceduralSkillExecutor validation")
+            else:
+                expected_execution_digest = sha256_text(canonical_json(execution_receipt))
+                if session.get("source_execution_digest") != expected_execution_digest:
+                    errors.append("source_execution_digest mismatch")
+                if session.get("source_writeback_digest") != execution_receipt.get(
+                    "source_writeback_digest"
+                ):
+                    errors.append("source_writeback_digest mismatch")
+                if session.get("sandbox_session_id") != execution_receipt.get("sandbox_session_id"):
+                    errors.append("sandbox_session_id mismatch")
+                if session.get("guardian_witness_id") != execution_receipt.get("guardian_witness_id"):
+                    errors.append("guardian_witness_id mismatch")
+                if session.get("rollback_token") != execution_receipt.get("rollback_token"):
+                    errors.append("rollback_token mismatch")
+                if len(materialized_skills) != execution_receipt.get("execution_count"):
+                    errors.append(
+                        "materialized_skills length must match execution_receipt.execution_count"
+                    )
+                expected_execution_ids = [
+                    execution["execution_id"] for execution in execution_receipt["executions"]
+                ]
+                expected_recommendation_ids = [
+                    execution["recommendation_id"] for execution in execution_receipt["executions"]
+                ]
+                if seen_execution_ids != expected_execution_ids:
+                    errors.append("materialized_skills.execution_id order mismatch")
+                if seen_recommendation_ids != expected_recommendation_ids:
+                    errors.append("materialized_skills.recommendation_id order mismatch")
+                for materialized, execution in zip(materialized_skills, execution_receipt["executions"]):
+                    if materialized.get("skill_label") != execution.get("skill_label"):
+                        errors.append("materialized skill_label must match execution skill_label")
+                    if materialized.get("target_path") != execution.get("target_path"):
+                        errors.append("materialized target_path must match execution target_path")
+                    if materialized.get("evidence_ref") != execution.get("evidence_ref"):
+                        errors.append("materialized evidence_ref must match execution evidence_ref")
+
+        expected_digest = sha256_text(canonical_json(_procedural_enactment_digest_payload(session)))
+        if session.get("digest") != expected_digest:
+            errors.append("digest mismatch")
+
+        return {
+            "ok": not errors,
+            "materialized_skill_count": len(materialized_skills),
+            "executed_command_count": len(command_runs),
+            "all_commands_passed": bool(command_runs)
+            and all(
+                isinstance(command_run, dict) and command_run.get("status") == "pass"
+                for command_run in command_runs
+            ),
+            "cleanup_status": session.get("cleanup_status"),
+            "enactment_status": session.get("status"),
+            "skill_labels": skill_labels,
+            "delivery_scope": "sandbox-only",
+            "rollback_token_preserved": execution_receipt is None
+            or session.get("rollback_token") == execution_receipt.get("rollback_token"),
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _normalize_eval_refs(eval_refs: Sequence[str]) -> List[str]:
+        normalized = _dedupe_preserve_order(
+            [
+                eval_ref.strip()
+                for eval_ref in eval_refs
+                if isinstance(eval_ref, str) and eval_ref.strip()
+            ]
+        )
+        if not normalized:
+            raise ValueError("eval_refs must contain at least one eval path")
+        for eval_ref in normalized:
+            if not eval_ref.startswith("evals/"):
+                raise ValueError("eval_refs must contain only eval paths")
+        if PROCEDURAL_MANDATORY_ENACTMENT_EVAL not in normalized:
+            normalized.append(PROCEDURAL_MANDATORY_ENACTMENT_EVAL)
+        return normalized
+
+    def _materialize_execution(
+        self,
+        workspace_root: Path,
+        execution: Dict[str, Any],
+        *,
+        index: int,
+    ) -> Dict[str, Any]:
+        skill_slug = _slugify_text(execution["skill_label"])
+        workspace_path = f"skills/{index:02d}-{skill_slug}.txt"
+        marker = (
+            f"# procedural-enacted: {execution['execution_id']} "
+            f"target={execution['target_path']}"
+        )
+        file_path = workspace_root / workspace_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(
+            "\n".join(
+                [
+                    marker,
+                    f"skill_label={execution['skill_label']}",
+                    f"recommendation_id={execution['recommendation_id']}",
+                    f"target_path={execution['target_path']}",
+                    f"sandbox_action={execution['sandbox_action']}",
+                    f"continuity_ref={execution['continuity_ref']}",
+                    f"evidence_ref={execution['evidence_ref']}",
+                    "external_actuation=false",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return {
+            "execution_id": execution["execution_id"],
+            "recommendation_id": execution["recommendation_id"],
+            "skill_label": execution["skill_label"],
+            "target_path": execution["target_path"],
+            "workspace_path": workspace_path,
+            "source_state": "created",
+            "marker": marker,
+            "evidence_ref": execution["evidence_ref"],
+        }
+
+    def _run_materialized_skill(
+        self,
+        workspace_root: Path,
+        materialized_skill: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        script = "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "text = Path(sys.argv[1]).read_text()",
+                "assert sys.argv[2] in text",
+                "assert sys.argv[3] in text",
+                "assert 'external_actuation=false' in text",
+                "print(sys.argv[3] + ' ok')",
+            ]
+        )
+        command = [
+            "python3",
+            "-c",
+            script,
+            materialized_skill["workspace_path"],
+            materialized_skill["marker"],
+            materialized_skill["skill_label"],
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=workspace_root,
+                capture_output=True,
+                text=True,
+                timeout=PROCEDURAL_ENACTMENT_COMMAND_TIMEOUT_SECONDS,
+                check=False,
+            )
+            status = "pass" if completed.returncode == 0 else "fail"
+            stdout_excerpt = _excerpt(completed.stdout)
+            stderr_excerpt = _excerpt(completed.stderr)
+            exit_code = completed.returncode
+        except subprocess.TimeoutExpired as exc:
+            status = "timeout"
+            stdout_excerpt = _excerpt(exc.stdout or "")
+            stderr_excerpt = _excerpt(exc.stderr or "command timed out")
+            exit_code = 124
+        return {
+            "eval_ref": PROCEDURAL_MANDATORY_ENACTMENT_EVAL,
+            "command": (
+                "python3 -c <procedural enactment verifier> "
+                f"{materialized_skill['workspace_path']}"
+            ),
+            "exit_code": exit_code,
+            "status": status,
+            "stdout_excerpt": stdout_excerpt,
+            "stderr_excerpt": stderr_excerpt,
+        }
 
 
 def receipt_edge_ids(applied_recommendations: Sequence[Dict[str, Any]]) -> List[str]:

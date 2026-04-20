@@ -6,6 +6,7 @@ from omoikane.mind.connectome import ConnectomeModel
 from omoikane.mind.memory import (
     MemoryCrystalStore,
     ProceduralMemoryProjector,
+    ProceduralSkillEnactmentService,
     ProceduralSkillExecutor,
     ProceduralMemoryWritebackGate,
 )
@@ -174,6 +175,93 @@ class ProceduralSkillExecutorTests(unittest.TestCase):
                 sandbox_session_id="sandbox://procedural-skill/test-001",
                 guardian_witness_id="guardian://procedural-skill/test-001",
                 selected_recommendation_ids=["procedural-missing"],
+            )
+
+
+class ProceduralSkillEnactmentServiceTests(unittest.TestCase):
+    def test_execute_returns_valid_temp_workspace_session(self) -> None:
+        projector = ProceduralMemoryProjector()
+        gate = ProceduralMemoryWritebackGate()
+        executor = ProceduralSkillExecutor()
+        enactment = ProceduralSkillEnactmentService()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        preview_snapshot = projector.project("identity-demo", manifest, connectome_document)
+        writeback_result = gate.apply(
+            "identity-demo",
+            preview_snapshot,
+            connectome_document,
+            self_attestation_id="self://procedural-writeback/test-001",
+            council_attestation_id="council://procedural-writeback/test-001",
+            guardian_attestation_id="guardian://procedural-writeback/test-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded preview を writeback として適用する",
+        )
+        execution_receipt = executor.execute(
+            "identity-demo",
+            writeback_result["receipt"],
+            writeback_result["updated_connectome_document"],
+            sandbox_session_id="sandbox://procedural-skill/test-001",
+            guardian_witness_id="guardian://procedural-skill/test-001",
+        )
+
+        session = enactment.execute(
+            "identity-demo",
+            execution_receipt,
+            writeback_result["updated_connectome_document"],
+            eval_refs=["evals/continuity/procedural_skill_enactment_execution.yaml"],
+        )
+        validation = enactment.validate_session(
+            session,
+            writeback_result["updated_connectome_document"],
+            execution_receipt,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(2, validation["materialized_skill_count"])
+        self.assertEqual(2, validation["executed_command_count"])
+        self.assertTrue(validation["all_commands_passed"])
+        self.assertEqual("removed", validation["cleanup_status"])
+        self.assertEqual("passed", validation["enactment_status"])
+        self.assertEqual(
+            ["guardian-review-rehearsal", "migration-handoff-rehearsal"],
+            sorted(validation["skill_labels"]),
+        )
+        self.assertTrue(validation["rollback_token_preserved"])
+        self.assertEqual("passed", session["status"])
+
+    def test_execute_rejects_invalid_eval_refs(self) -> None:
+        projector = ProceduralMemoryProjector()
+        gate = ProceduralMemoryWritebackGate()
+        executor = ProceduralSkillExecutor()
+        enactment = ProceduralSkillEnactmentService()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        preview_snapshot = projector.project("identity-demo", manifest, connectome_document)
+        writeback_result = gate.apply(
+            "identity-demo",
+            preview_snapshot,
+            connectome_document,
+            self_attestation_id="self://procedural-writeback/test-001",
+            council_attestation_id="council://procedural-writeback/test-001",
+            guardian_attestation_id="guardian://procedural-writeback/test-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded preview を writeback として適用する",
+        )
+        execution_receipt = executor.execute(
+            "identity-demo",
+            writeback_result["receipt"],
+            writeback_result["updated_connectome_document"],
+            sandbox_session_id="sandbox://procedural-skill/test-001",
+            guardian_witness_id="guardian://procedural-skill/test-001",
+        )
+
+        with self.assertRaisesRegex(ValueError, "eval path"):
+            enactment.execute(
+                "identity-demo",
+                execution_receipt,
+                writeback_result["updated_connectome_document"],
+                eval_refs=["procedural-skill-enactment"],
             )
 
 
