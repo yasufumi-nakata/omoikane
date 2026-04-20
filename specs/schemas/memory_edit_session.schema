@@ -1,0 +1,295 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/memory_edit_session.schema"
+title: MemoryEditSession
+description: >
+  Reversible recall-affect buffer session that preserves MemoryCrystal-derived
+  semantic content while damping affect intensity during recall only.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - identity_id
+  - session_id
+  - opened_at
+  - memory_edit_policy
+  - source_projection_policy
+  - source_manifest_digest
+  - source_concept_ids
+  - request
+  - freeze_record
+  - recall_view_count
+  - recall_views
+  - status
+  - deletion_blocked
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  identity_id:
+    type: string
+    minLength: 1
+  session_id:
+    type: string
+    minLength: 1
+  opened_at:
+    type: string
+    format: date-time
+  memory_edit_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - source_surface
+      - allowed_operation
+      - required_approvals
+      - prohibited_operations
+      - freeze_required
+      - source_mutation_allowed
+      - disclosure_scope
+      - max_buffer_ratio
+      - reversal_mode
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: consented-recall-affect-buffer-v1
+      source_surface:
+        type: string
+        const: semantic-memory-read-only
+      allowed_operation:
+        type: string
+        const: affect-buffer-on-recall
+      required_approvals:
+        type: array
+        minItems: 2
+        maxItems: 2
+        prefixItems:
+          - type: string
+            const: self
+          - type: string
+            const: guardian
+      prohibited_operations:
+        type: array
+        minItems: 3
+        maxItems: 3
+        prefixItems:
+          - type: string
+            const: delete-memory
+          - type: string
+            const: insert-false-memory
+          - type: string
+            const: overwrite-source-segment
+      freeze_required:
+        type: boolean
+        const: true
+      source_mutation_allowed:
+        type: boolean
+        const: false
+      disclosure_scope:
+        type: string
+        const: self-only
+      max_buffer_ratio:
+        type: number
+        const: 0.65
+      reversal_mode:
+        type: string
+        const: replay-original-affect-envelope
+  source_projection_policy:
+    type: string
+    const: semantic-segment-rollup-v1
+  source_manifest_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_concept_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  request:
+    type: object
+    additionalProperties: false
+    required:
+      - operation
+      - self_consent_ref
+      - guardian_attestation_ref
+      - clinical_rationale
+      - requested_buffer_ratio
+      - disclosure_scope
+    properties:
+      operation:
+        type: string
+        const: affect-buffer-on-recall
+      self_consent_ref:
+        type: string
+        minLength: 1
+      guardian_attestation_ref:
+        type: string
+        minLength: 1
+      clinical_rationale:
+        type: string
+        minLength: 1
+      requested_buffer_ratio:
+        type: number
+        exclusiveMinimum: 0
+        maximum: 0.65
+      disclosure_scope:
+        type: string
+        const: self-only
+  freeze_record:
+    type: object
+    additionalProperties: false
+    required:
+      - freeze_id
+      - freeze_ref
+      - frozen_at
+      - source_manifest_digest
+      - source_concept_digests
+      - reversal_mode
+      - source_mutation_allowed
+    properties:
+      freeze_id:
+        type: string
+        minLength: 1
+      freeze_ref:
+        type: string
+        minLength: 1
+      frozen_at:
+        type: string
+        format: date-time
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      source_concept_digests:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      reversal_mode:
+        type: string
+        const: replay-original-affect-envelope
+      source_mutation_allowed:
+        type: boolean
+        const: false
+  recall_view_count:
+    type: integer
+    minimum: 1
+  recall_views:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/recall_view"
+  status:
+    type: string
+    const: approved
+  deletion_blocked:
+    type: boolean
+    const: true
+$defs:
+  affect_envelope:
+    type: object
+    additionalProperties: false
+    required:
+      - mean_valence
+      - mean_arousal
+    properties:
+      mean_valence:
+        type: number
+        minimum: -1
+        maximum: 1
+      mean_arousal:
+        type: number
+        minimum: -1
+        maximum: 1
+  recall_view:
+    type: object
+    additionalProperties: false
+    required:
+      - recall_view_id
+      - concept_id
+      - canonical_label
+      - proposition
+      - source_segment_ids
+      - source_event_ids
+      - source_refs
+      - retrieval_cues
+      - original_affect_envelope
+      - buffered_affect_envelope
+      - affect_buffer_ratio
+      - preservation_guards
+      - disclosure_scope
+      - source_concept_digest
+      - freeze_ref
+      - digest
+    properties:
+      recall_view_id:
+        type: string
+        minLength: 1
+      concept_id:
+        type: string
+        minLength: 1
+      canonical_label:
+        type: string
+        minLength: 1
+      proposition:
+        type: string
+        minLength: 1
+      source_segment_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_event_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      retrieval_cues:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      original_affect_envelope:
+        $ref: "#/$defs/affect_envelope"
+      buffered_affect_envelope:
+        $ref: "#/$defs/affect_envelope"
+      affect_buffer_ratio:
+        type: number
+        exclusiveMinimum: 0
+        maximum: 0.65
+      preservation_guards:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          minLength: 1
+      disclosure_scope:
+        type: string
+        const: self-only
+      source_concept_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      freeze_ref:
+        type: string
+        minLength: 1
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"

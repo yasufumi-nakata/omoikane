@@ -87,6 +87,7 @@ from .kernel.termination import TerminationGate
 from .mind.connectome import ConnectomeModel
 from .mind.memory import (
     EpisodicStream,
+    MemoryEditingService,
     MemoryCrystalStore,
     ProceduralMemoryProjector,
     ProceduralSkillEnactmentService,
@@ -127,6 +128,7 @@ class OmoikaneReferenceOS:
         self.episodic = EpisodicStream()
         self.memory = MemoryCrystalStore()
         self.semantic = SemanticMemoryProjector()
+        self.memory_edit = MemoryEditingService()
         self.procedural = ProceduralMemoryProjector()
         self.procedural_writeback = ProceduralMemoryWritebackGate()
         self.procedural_execution = ProceduralSkillExecutor()
@@ -5215,6 +5217,73 @@ class OmoikaneReferenceOS:
                 "manifest": manifest,
             },
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_memory_edit_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://memory-edit-demo/v1",
+            metadata={"display_name": "Memory Edit Sandbox"},
+        )
+        source_events = self.memory_edit.reference_events()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        manifest_validation = self.memory.validate(manifest)
+        semantic_snapshot = self.semantic.project(identity.identity_id, manifest)
+        semantic_validation = self.semantic.validate(semantic_snapshot)
+        session = self.memory_edit.apply_recall_buffer(
+            identity_id=identity.identity_id,
+            semantic_snapshot=semantic_snapshot,
+            selected_concept_ids=[semantic_snapshot["concepts"][0]["concept_id"]],
+            self_consent_ref="consent://memory-edit-demo/v1",
+            guardian_attestation_ref="guardian://memory-edit-demo/reviewer-omega",
+            clinical_rationale="内容を保持したまま想起時 affect を緩衝し再体験のみを弱める",
+            buffer_ratio=0.55,
+        )
+        edit_validation = self.memory_edit.validate_session(session)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.recall_buffered",
+            payload={
+                "policy_id": session["memory_edit_policy"]["policy_id"],
+                "source_manifest_digest": session["source_manifest_digest"],
+                "source_concept_ids": session["source_concept_ids"],
+                "freeze_ref": session["freeze_record"]["freeze_ref"],
+                "recall_view_count": session["recall_view_count"],
+                "concept_labels": edit_validation["concept_labels"],
+                "deletion_blocked": session["deletion_blocked"],
+            },
+            actor="MemoryEditingService",
+            category="memory-edit",
+            layer="L2",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "memory_edit": {
+                "policy": self.memory_edit.profile(),
+                "source_events": source_events,
+                "manifest": manifest,
+                "semantic_snapshot": semantic_snapshot,
+                "session": session,
+            },
+            "validation": {
+                "manifest": manifest_validation,
+                "semantic": semantic_validation,
+                "memory_edit": edit_validation,
+                "deletion_blocked": edit_validation["deletion_blocked"],
+                "source_manifest_preserved": edit_validation["source_preserved"],
+                "ok": (
+                    manifest_validation["ok"]
+                    and semantic_validation["ok"]
+                    and edit_validation["ok"]
+                ),
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

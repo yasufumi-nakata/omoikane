@@ -3,6 +3,7 @@
 from .connectome import ConnectomeModel
 from .memory import (
     EpisodicStream,
+    MemoryEditingService,
     MemoryCrystalStore,
     ProceduralMemoryProjector,
     ProceduralMemoryWritebackGate,
@@ -12,6 +13,7 @@ from .memory import (
 __all__ = [
     "ConnectomeModel",
     "EpisodicStream",
+    "MemoryEditingService",
     "MemoryCrystalStore",
     "SemanticMemoryProjector",
     "ProceduralMemoryProjector",

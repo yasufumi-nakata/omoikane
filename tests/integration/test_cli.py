@@ -147,6 +147,25 @@ class CliIntegrationTests(unittest.TestCase):
             len(result["memory"]["episodic_stream"]["compaction_candidate_ids"]),
         )
 
+    def test_memory_edit_demo_emits_reversible_buffer_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "memory-edit-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["memory_edit"]["ok"])
+        self.assertTrue(result["validation"]["deletion_blocked"])
+        self.assertTrue(result["validation"]["source_manifest_preserved"])
+        self.assertEqual(1, result["validation"]["memory_edit"]["recall_view_count"])
+        self.assertEqual(["trauma-recall"], result["validation"]["memory_edit"]["concept_labels"])
+        self.assertEqual(
+            ["self-only"],
+            result["validation"]["memory_edit"]["disclosure_scopes"],
+        )
+        self.assertEqual("approved", result["memory_edit"]["session"]["status"])
+
     def test_semantic_demo_emits_valid_projection_json(self) -> None:
         stdout = io.StringIO()
 

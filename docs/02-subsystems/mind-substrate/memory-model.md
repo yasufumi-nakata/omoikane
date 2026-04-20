@@ -108,7 +108,12 @@ and [specs/schemas/procedural_skill_enactment_session.schema](../../../specs/sch
 
 - 削除は許可しない（同一性破壊）
 - **「想起時の感情緩衝」** という設計選択肢を本人に提供（記憶は残るが想起時の affect を弱める）
-- 専用プロトコル → 未起稿、Open problem
+- reference runtime では `consented-recall-affect-buffer-v1` として
+  source semantic concept を不変のまま保ち、`freeze snapshot` と
+  Guardian attestation に束縛された recall overlay だけを返す
+- canonical schema:
+  [specs/schemas/memory_edit_session.schema](../../../specs/schemas/memory_edit_session.schema)
+- 専用治療プロトコルや人格境界の最終判断は引き続き Open problem
 
 ## 未解決
 

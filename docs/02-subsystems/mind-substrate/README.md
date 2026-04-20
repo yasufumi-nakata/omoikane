@@ -51,6 +51,15 @@ canonical schema:
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
 
+### Memory Editing
+`Semantic Memory` 由来の concept を source とし、
+記憶内容を変えずに recall 時の affect 強度だけを緩衝する補助層。
+- reference runtime では `consented-recall-affect-buffer-v1` を採用
+- `delete-memory` / `insert-false-memory` / `overwrite-source-segment` を禁止
+- `freeze snapshot` と Guardian attestation に束縛された recall overlay だけを返す
+canonical schema:
+[specs/schemas/memory_edit_session.schema](../../../specs/schemas/memory_edit_session.schema)
+
 ### Procedural Memory
 `MemoryCrystal` segment と `Connectome` snapshot を照合し、
 暗黙技能の rehearsal preview、human-approved writeback、sandboxed skill execution、
@@ -90,6 +99,7 @@ and
 - [episodic-stream.md](episodic-stream.md) ── episodic event の canonical shape と handoff
 - [memory-model.md](memory-model.md) ── 記憶階層の詳細
 - [semantic-memory.md](semantic-memory.md) ── MemoryCrystal からの semantic projection
+- [memory-editing.md](memory-editing.md) ── recall-affect buffer と reversible freeze
 - [procedural-memory.md](procedural-memory.md) ── Connectome-coupled procedural preview
 - [self-model.md](self-model.md) ── 自己モデルの構造
 - [qualia-buffer.md](qualia-buffer.md) ── 主観バッファの仕様

@@ -1219,6 +1219,15 @@ entries:
       - reference-runtime
     rationale: Required to serialize the deterministic semantic projection derived from MemoryCrystal segments.
   - priority: P1
+    kind: schema
+    file: specs/schemas/memory_edit_session.schema
+    consumers:
+      - specs/interfaces/mind.memory_edit.v0.idl
+      - docs/02-subsystems/mind-substrate/memory-editing.md
+      - docs/02-subsystems/mind-substrate/memory-model.md
+      - reference-runtime
+    rationale: Required to serialize a reversible recall-affect buffer session without mutating source memory.
+  - priority: P1
     kind: idl
     file: specs/interfaces/mind.semantic.v0.idl
     consumers:
@@ -1226,6 +1235,21 @@ entries:
       - docs/07-reference-implementation/README.md
       - reference-runtime
     rationale: Required to make the L2 semantic projection contract machine-readable without mutating MemoryCrystal source segments.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.memory_edit.v0.idl
+    consumers:
+      - docs/02-subsystems/mind-substrate/memory-editing.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the reversible recall-affect buffer contract machine-readable with self consent and Guardian approval.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/memory_edit_recall_buffer.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects delete-memory prohibition, freeze binding, and bounded affect damping during recall.
   - priority: P1
     kind: eval
     file: evals/continuity/semantic_projection_contract.yaml

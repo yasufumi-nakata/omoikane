@@ -1,7 +1,7 @@
 ---
 status: open
 priority: T3
-last_revisit: 2026-04-18
+last_revisit: 2026-04-21
 researcher: yasufumi
 ---
 
@@ -20,6 +20,9 @@ researcher: yasufumi
 - PTSD 治療における記憶再強化
 - 認知行動療法
 - Eternal Sunshine 等の文化的議論
+- 2026-04-21: reference runtime で `consented-recall-affect-buffer-v1` を追加し、
+  `memory-edit-demo` / `mind.memory_edit.v0` / `memory_edit_session.schema` により
+  削除禁止・freeze snapshot・Guardian 承認・reversible recall overlay を固定
 
 ## ブロッキング要因
 
@@ -37,6 +40,7 @@ researcher: yasufumi
 
 - MemoryCrystal の編集 API 仕様
 - 治療プロトコルの確立
+- 記憶内容を改変しない recall-affect buffer contract の運用条件
 
 ## 関連
 - memory-model.md

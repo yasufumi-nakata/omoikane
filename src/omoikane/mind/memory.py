@@ -30,6 +30,18 @@ COMPACTION_STRATEGY_ID = "append-only-segment-rollup-v1"
 MAX_SOURCE_EVENTS_PER_SEGMENT = 3
 SEMANTIC_MEMORY_SCHEMA_VERSION = "1.0"
 SEMANTIC_PROJECTION_POLICY_ID = "semantic-segment-rollup-v1"
+MEMORY_EDIT_SCHEMA_VERSION = "1.0"
+MEMORY_EDIT_POLICY_ID = "consented-recall-affect-buffer-v1"
+MEMORY_EDIT_ALLOWED_OPERATION = "affect-buffer-on-recall"
+MEMORY_EDIT_MAX_BUFFER_RATIO = 0.65
+MEMORY_EDIT_REQUIRED_APPROVALS = ["self", "guardian"]
+MEMORY_EDIT_PROHIBITED_OPERATIONS = [
+    "delete-memory",
+    "insert-false-memory",
+    "overwrite-source-segment",
+]
+MEMORY_EDIT_DISCLOSURE_SCOPE = "self-only"
+MEMORY_EDIT_SOURCE_SURFACE = "semantic-memory-read-only"
 PROCEDURAL_MEMORY_SCHEMA_VERSION = "1.0"
 PROCEDURAL_PREVIEW_POLICY_ID = "connectome-coupled-procedural-preview-v1"
 PROCEDURAL_MAX_WEIGHT_DELTA = 0.08
@@ -64,6 +76,10 @@ def _segment_digest_payload(segment: Dict[str, Any]) -> Dict[str, Any]:
 
 def _semantic_concept_digest_payload(concept: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in concept.items() if key != "digest"}
+
+
+def _memory_recall_view_digest_payload(view: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in view.items() if key != "digest"}
 
 
 def _procedural_recommendation_digest_payload(recommendation: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,6 +230,68 @@ def _reference_episodic_seed_events() -> List[Dict[str, Any]]:
                 narrative_role="handoff",
                 self_coherence=0.95,
                 continuity_ref="ledger://entry/episodic-0005",
+            )
+        ),
+    ]
+
+
+def _reference_memory_edit_seed_events() -> List[Dict[str, Any]]:
+    return [
+        asdict(
+            EpisodicEvent(
+                event_id="memory-edit-episode-0001",
+                occurred_at="2026-04-21T09:00:00+00:00",
+                summary="Unexpected shutdown rehearsal で強い恐怖反応が立ち上がり Guardian hold が発火した",
+                tags=["trauma-recall", "guardian-hold", "continuity"],
+                salience=0.96,
+                valence=-0.81,
+                arousal=0.88,
+                source_refs=[
+                    "ledger://guardian-hold/trauma-recall-0001",
+                    "qualia://tick/trauma-recall-0001",
+                ],
+                attention_target="guardian.hold.recall",
+                narrative_role="observation",
+                self_coherence=0.74,
+                continuity_ref="ledger://entry/memory-edit-0001",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="memory-edit-episode-0002",
+                occurred_at="2026-04-21T09:02:00+00:00",
+                summary="Guardian と本人が想起 trigger と身体反応の境界を確認し再体験を停止した",
+                tags=["trauma-recall", "guardian-review", "stabilization"],
+                salience=0.91,
+                valence=-0.63,
+                arousal=0.79,
+                source_refs=[
+                    "oversight://guardian/reviewer-omega",
+                    "ledger://guardian-review/trauma-recall-0001",
+                ],
+                attention_target="guardian.review.recall",
+                narrative_role="resolution",
+                self_coherence=0.81,
+                continuity_ref="ledger://entry/memory-edit-0002",
+            )
+        ),
+        asdict(
+            EpisodicEvent(
+                event_id="memory-edit-episode-0003",
+                occurred_at="2026-04-21T09:05:00+00:00",
+                summary="内容は保持したまま想起時 affect を弱める care plan を freeze snapshot 付きで合意した",
+                tags=["trauma-recall", "care-plan", "freeze"],
+                salience=0.89,
+                valence=-0.52,
+                arousal=0.69,
+                source_refs=[
+                    "care://memory-buffer/plan-0001",
+                    "freeze://memory-edit/pre-buffer-0001",
+                ],
+                attention_target="care.plan.recall-buffer",
+                narrative_role="verification",
+                self_coherence=0.87,
+                continuity_ref="ledger://entry/memory-edit-0003",
             )
         ),
     ]
@@ -1000,6 +1078,411 @@ class SemanticMemoryProjector:
         }
         concept["digest"] = sha256_text(canonical_json(_semantic_concept_digest_payload(concept)))
         return concept
+
+
+class MemoryEditingService:
+    """Constrains memory editing to reversible affect buffering on recall only."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": MEMORY_EDIT_SCHEMA_VERSION,
+            "policy_id": MEMORY_EDIT_POLICY_ID,
+            "source_surface": MEMORY_EDIT_SOURCE_SURFACE,
+            "allowed_operation": MEMORY_EDIT_ALLOWED_OPERATION,
+            "required_approvals": list(MEMORY_EDIT_REQUIRED_APPROVALS),
+            "prohibited_operations": list(MEMORY_EDIT_PROHIBITED_OPERATIONS),
+            "freeze_required": True,
+            "source_mutation_allowed": False,
+            "disclosure_scope": MEMORY_EDIT_DISCLOSURE_SCOPE,
+            "max_buffer_ratio": MEMORY_EDIT_MAX_BUFFER_RATIO,
+            "reversal_mode": "replay-original-affect-envelope",
+        }
+
+    def reference_events(self) -> List[Dict[str, Any]]:
+        return deepcopy(_reference_memory_edit_seed_events())
+
+    def build_reference_session(self, identity_id: str) -> Dict[str, Any]:
+        manifest = MemoryCrystalStore().compact(identity_id, self.reference_events())
+        snapshot = SemanticMemoryProjector().project(identity_id, manifest)
+        return self.apply_recall_buffer(
+            identity_id=identity_id,
+            semantic_snapshot=snapshot,
+            selected_concept_ids=[snapshot["concepts"][0]["concept_id"]],
+            self_consent_ref="consent://memory-edit-demo/v1",
+            guardian_attestation_ref="guardian://memory-edit-demo/reviewer-omega",
+            clinical_rationale="本人同意のもと、想起内容は保持したまま affect 強度のみを緩和する",
+            buffer_ratio=0.55,
+        )
+
+    def apply_recall_buffer(
+        self,
+        *,
+        identity_id: str,
+        semantic_snapshot: Dict[str, Any],
+        selected_concept_ids: Sequence[str],
+        self_consent_ref: str,
+        guardian_attestation_ref: str,
+        clinical_rationale: str,
+        buffer_ratio: float,
+        operation: str = MEMORY_EDIT_ALLOWED_OPERATION,
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if operation != MEMORY_EDIT_ALLOWED_OPERATION:
+            raise ValueError(
+                f"operation must be {MEMORY_EDIT_ALLOWED_OPERATION!r}; destructive memory edits are prohibited"
+            )
+        if not isinstance(buffer_ratio, (int, float)) or buffer_ratio <= 0 or buffer_ratio > MEMORY_EDIT_MAX_BUFFER_RATIO:
+            raise ValueError(
+                f"buffer_ratio must be > 0 and <= {MEMORY_EDIT_MAX_BUFFER_RATIO}"
+            )
+        for field_name, value in (
+            ("self_consent_ref", self_consent_ref),
+            ("guardian_attestation_ref", guardian_attestation_ref),
+            ("clinical_rationale", clinical_rationale),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+
+        validation = SemanticMemoryProjector().validate(semantic_snapshot)
+        if not validation["ok"]:
+            raise ValueError(f"semantic_snapshot must satisfy semantic projection validation: {validation['errors']}")
+        if semantic_snapshot.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match semantic_snapshot.identity_id")
+
+        concept_ids = [concept_id.strip() for concept_id in selected_concept_ids if isinstance(concept_id, str) and concept_id.strip()]
+        if not concept_ids:
+            raise ValueError("selected_concept_ids must contain at least one concept_id")
+        if len(concept_ids) != len(set(concept_ids)):
+            raise ValueError("selected_concept_ids must be unique")
+
+        concepts_by_id = {
+            concept["concept_id"]: concept
+            for concept in semantic_snapshot["concepts"]
+        }
+        missing = [concept_id for concept_id in concept_ids if concept_id not in concepts_by_id]
+        if missing:
+            raise ValueError(f"unknown concept_id(s): {', '.join(missing)}")
+
+        session_id = new_id("memory-edit")
+        freeze_ref = f"freeze://memory-edit/{session_id}/pre-buffer"
+        selected_concepts = [concepts_by_id[concept_id] for concept_id in concept_ids]
+        recall_views = [
+            self._build_recall_view(concept, buffer_ratio=round(float(buffer_ratio), 3), freeze_ref=freeze_ref)
+            for concept in selected_concepts
+        ]
+        session = {
+            "schema_version": MEMORY_EDIT_SCHEMA_VERSION,
+            "identity_id": identity_id,
+            "session_id": session_id,
+            "opened_at": utc_now_iso(),
+            "memory_edit_policy": self.profile(),
+            "source_projection_policy": semantic_snapshot["projection_policy"]["policy_id"],
+            "source_manifest_digest": semantic_snapshot["source_manifest_digest"],
+            "source_concept_ids": list(concept_ids),
+            "request": {
+                "operation": operation,
+                "self_consent_ref": self_consent_ref.strip(),
+                "guardian_attestation_ref": guardian_attestation_ref.strip(),
+                "clinical_rationale": clinical_rationale.strip(),
+                "requested_buffer_ratio": round(float(buffer_ratio), 3),
+                "disclosure_scope": MEMORY_EDIT_DISCLOSURE_SCOPE,
+            },
+            "freeze_record": {
+                "freeze_id": new_id("memory-freeze"),
+                "freeze_ref": freeze_ref,
+                "frozen_at": utc_now_iso(),
+                "source_manifest_digest": semantic_snapshot["source_manifest_digest"],
+                "source_concept_digests": [concept["digest"] for concept in selected_concepts],
+                "reversal_mode": "replay-original-affect-envelope",
+                "source_mutation_allowed": False,
+            },
+            "recall_view_count": len(recall_views),
+            "recall_views": recall_views,
+            "status": "approved",
+            "deletion_blocked": True,
+        }
+        session_validation = self.validate_session(session)
+        if not session_validation["ok"]:
+            raise ValueError(f"memory edit session failed validation: {session_validation['errors']}")
+        return session
+
+    def validate_session(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        disclosure_scopes: List[str] = []
+        concept_labels: List[str] = []
+        source_preserved = True
+        freeze_bound = True
+        buffer_within_limit = True
+
+        if not isinstance(session, dict):
+            raise ValueError("session must be a mapping")
+        if session.get("schema_version") != MEMORY_EDIT_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {MEMORY_EDIT_SCHEMA_VERSION}, got {session.get('schema_version')!r}"
+            )
+        for field_name in ("identity_id", "session_id", "opened_at", "source_projection_policy", "source_manifest_digest"):
+            MemoryCrystalStore._require_non_empty_string(session.get(field_name), field_name, errors)
+        source_manifest_digest = session.get("source_manifest_digest")
+        if isinstance(source_manifest_digest, str) and len(source_manifest_digest) != 64:
+            errors.append("source_manifest_digest must be a sha256 hex string")
+
+        policy = session.get("memory_edit_policy")
+        if not isinstance(policy, dict):
+            errors.append("memory_edit_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if policy.get(field_name) != expected_value:
+                    errors.append(f"memory_edit_policy.{field_name} mismatch")
+
+        source_concept_ids = session.get("source_concept_ids")
+        if not isinstance(source_concept_ids, list) or not source_concept_ids:
+            errors.append("source_concept_ids must be a non-empty list")
+            source_concept_ids = []
+        else:
+            for concept_id in source_concept_ids:
+                if not isinstance(concept_id, str) or not concept_id.strip():
+                    errors.append("source_concept_ids must contain non-empty strings")
+
+        request = session.get("request")
+        if not isinstance(request, dict):
+            errors.append("request must be an object")
+        else:
+            if request.get("operation") != MEMORY_EDIT_ALLOWED_OPERATION:
+                errors.append("request.operation must equal affect-buffer-on-recall")
+            for field_name in ("self_consent_ref", "guardian_attestation_ref", "clinical_rationale"):
+                MemoryCrystalStore._require_non_empty_string(request.get(field_name), f"request.{field_name}", errors)
+            if request.get("disclosure_scope") != MEMORY_EDIT_DISCLOSURE_SCOPE:
+                errors.append("request.disclosure_scope mismatch")
+            requested_buffer_ratio = request.get("requested_buffer_ratio")
+            if not isinstance(requested_buffer_ratio, (int, float)):
+                errors.append("request.requested_buffer_ratio must be a number")
+            elif requested_buffer_ratio <= 0 or requested_buffer_ratio > MEMORY_EDIT_MAX_BUFFER_RATIO:
+                errors.append(
+                    f"request.requested_buffer_ratio must be > 0 and <= {MEMORY_EDIT_MAX_BUFFER_RATIO}"
+                )
+
+        freeze_record = session.get("freeze_record")
+        freeze_ref = ""
+        freeze_digests: List[str] = []
+        if not isinstance(freeze_record, dict):
+            errors.append("freeze_record must be an object")
+        else:
+            for field_name in ("freeze_id", "freeze_ref", "frozen_at", "source_manifest_digest", "reversal_mode"):
+                MemoryCrystalStore._require_non_empty_string(freeze_record.get(field_name), f"freeze_record.{field_name}", errors)
+            freeze_ref = freeze_record.get("freeze_ref", "")
+            if freeze_record.get("reversal_mode") != "replay-original-affect-envelope":
+                errors.append("freeze_record.reversal_mode mismatch")
+            if freeze_record.get("source_mutation_allowed") is not False:
+                errors.append("freeze_record.source_mutation_allowed must be false")
+            if freeze_record.get("source_manifest_digest") != source_manifest_digest:
+                errors.append("freeze_record.source_manifest_digest mismatch")
+                freeze_bound = False
+            freeze_digests = freeze_record.get("source_concept_digests", [])
+            if not isinstance(freeze_digests, list) or not freeze_digests:
+                errors.append("freeze_record.source_concept_digests must be a non-empty list")
+                freeze_digests = []
+            else:
+                for digest in freeze_digests:
+                    if not isinstance(digest, str) or len(digest) != 64:
+                        errors.append(
+                            "freeze_record.source_concept_digests must contain sha256 hex strings"
+                        )
+
+        recall_views = session.get("recall_views")
+        if not isinstance(recall_views, list) or not recall_views:
+            errors.append("recall_views must be a non-empty list")
+            recall_views = []
+
+        seen_concept_ids = set()
+        seen_digests = set()
+        expected_digests: List[str] = []
+        for index, view in enumerate(recall_views):
+            if not isinstance(view, dict):
+                errors.append(f"recall_views[{index}] must be an object")
+                continue
+
+            for field_name in (
+                "recall_view_id",
+                "concept_id",
+                "canonical_label",
+                "proposition",
+                "source_concept_digest",
+                "freeze_ref",
+                "digest",
+            ):
+                MemoryCrystalStore._require_non_empty_string(view.get(field_name), f"recall_views[{index}].{field_name}", errors)
+
+            concept_id = view.get("concept_id")
+            if isinstance(concept_id, str) and concept_id:
+                if concept_id in seen_concept_ids:
+                    errors.append(f"duplicate recall view concept_id: {concept_id}")
+                seen_concept_ids.add(concept_id)
+            label = view.get("canonical_label")
+            if isinstance(label, str) and label:
+                concept_labels.append(label)
+
+            for field_name in ("source_segment_ids", "source_event_ids", "source_refs", "retrieval_cues", "preservation_guards"):
+                value = view.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(f"recall_views[{index}].{field_name} must be a non-empty list")
+                    source_preserved = False
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(
+                            f"recall_views[{index}].{field_name} must contain non-empty strings"
+                        )
+                        source_preserved = False
+
+            original_affect = view.get("original_affect_envelope")
+            buffered_affect = view.get("buffered_affect_envelope")
+            for envelope_name, envelope in (
+                ("original_affect_envelope", original_affect),
+                ("buffered_affect_envelope", buffered_affect),
+            ):
+                if not isinstance(envelope, dict):
+                    errors.append(f"recall_views[{index}].{envelope_name} must be an object")
+                    continue
+                MemoryCrystalStore._require_number_in_range(
+                    envelope.get("mean_valence"),
+                    -1.0,
+                    1.0,
+                    f"recall_views[{index}].{envelope_name}.mean_valence",
+                    errors,
+                )
+                MemoryCrystalStore._require_number_in_range(
+                    envelope.get("mean_arousal"),
+                    -1.0,
+                    1.0,
+                    f"recall_views[{index}].{envelope_name}.mean_arousal",
+                    errors,
+                )
+
+            ratio = view.get("affect_buffer_ratio")
+            if not isinstance(ratio, (int, float)) or ratio <= 0 or ratio > MEMORY_EDIT_MAX_BUFFER_RATIO:
+                errors.append(
+                    f"recall_views[{index}].affect_buffer_ratio must be > 0 and <= {MEMORY_EDIT_MAX_BUFFER_RATIO}"
+                )
+                buffer_within_limit = False
+
+            if (
+                isinstance(original_affect, dict)
+                and isinstance(buffered_affect, dict)
+                and isinstance(original_affect.get("mean_valence"), (int, float))
+                and isinstance(buffered_affect.get("mean_valence"), (int, float))
+            ):
+                if abs(float(buffered_affect["mean_valence"])) > abs(float(original_affect["mean_valence"])):
+                    errors.append(
+                        f"recall_views[{index}].buffered_affect_envelope.mean_valence must not amplify source affect"
+                    )
+                    buffer_within_limit = False
+            if (
+                isinstance(original_affect, dict)
+                and isinstance(buffered_affect, dict)
+                and isinstance(original_affect.get("mean_arousal"), (int, float))
+                and isinstance(buffered_affect.get("mean_arousal"), (int, float))
+            ):
+                if abs(float(buffered_affect["mean_arousal"])) > abs(float(original_affect["mean_arousal"])):
+                    errors.append(
+                        f"recall_views[{index}].buffered_affect_envelope.mean_arousal must not amplify source affect"
+                    )
+                    buffer_within_limit = False
+
+            scope = view.get("disclosure_scope")
+            if scope != MEMORY_EDIT_DISCLOSURE_SCOPE:
+                errors.append(f"recall_views[{index}].disclosure_scope mismatch")
+            else:
+                disclosure_scopes.append(scope)
+            if view.get("freeze_ref") != freeze_ref:
+                errors.append(f"recall_views[{index}].freeze_ref mismatch")
+                freeze_bound = False
+
+            source_concept_digest = view.get("source_concept_digest")
+            if isinstance(source_concept_digest, str) and len(source_concept_digest) != 64:
+                errors.append(f"recall_views[{index}].source_concept_digest must be a sha256 hex string")
+                freeze_bound = False
+            elif isinstance(source_concept_digest, str):
+                expected_digests.append(source_concept_digest)
+
+            digest = view.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append(f"recall_views[{index}].digest must be a sha256 hex string")
+            else:
+                expected_digest = sha256_text(canonical_json(_memory_recall_view_digest_payload(view)))
+                if digest != expected_digest:
+                    errors.append(f"recall_views[{index}].digest mismatch")
+                elif digest in seen_digests:
+                    errors.append(f"duplicate recall_views digest: {digest}")
+                else:
+                    seen_digests.add(digest)
+
+        if session.get("recall_view_count") != len(recall_views):
+            errors.append(
+                f"recall_view_count must equal len(recall_views) ({len(recall_views)}), got {session.get('recall_view_count')!r}"
+            )
+
+        if session.get("status") != "approved":
+            errors.append("status must equal approved")
+        if session.get("deletion_blocked") is not True:
+            errors.append("deletion_blocked must be true")
+
+        if isinstance(source_concept_ids, list) and source_concept_ids and seen_concept_ids:
+            if sorted(source_concept_ids) != sorted(seen_concept_ids):
+                errors.append("source_concept_ids must match recall view concept_ids")
+                source_preserved = False
+        if freeze_digests and expected_digests and sorted(freeze_digests) != sorted(expected_digests):
+            errors.append("freeze_record.source_concept_digests must match recall view source_concept_digest")
+            freeze_bound = False
+
+        return {
+            "ok": not errors,
+            "recall_view_count": len(recall_views),
+            "concept_labels": concept_labels,
+            "deletion_blocked": session.get("deletion_blocked") is True,
+            "source_preserved": source_preserved,
+            "freeze_bound": freeze_bound,
+            "buffer_within_limit": buffer_within_limit,
+            "disclosure_scopes": disclosure_scopes,
+            "errors": errors,
+        }
+
+    def _build_recall_view(
+        self,
+        concept: Dict[str, Any],
+        *,
+        buffer_ratio: float,
+        freeze_ref: str,
+    ) -> Dict[str, Any]:
+        original_valence = float(concept["affect_envelope"]["mean_valence"])
+        original_arousal = float(concept["affect_envelope"]["mean_arousal"])
+        view = {
+            "recall_view_id": new_id("recall-view"),
+            "concept_id": concept["concept_id"],
+            "canonical_label": concept["canonical_label"],
+            "proposition": concept["proposition"],
+            "source_segment_ids": list(concept["supporting_segment_ids"]),
+            "source_event_ids": list(concept["supporting_event_ids"]),
+            "source_refs": list(concept["source_refs"]),
+            "retrieval_cues": list(concept["retrieval_cues"]),
+            "original_affect_envelope": deepcopy(concept["affect_envelope"]),
+            "buffered_affect_envelope": {
+                "mean_valence": round(original_valence * (1 - (buffer_ratio * 0.5)), 3),
+                "mean_arousal": round(original_arousal * (1 - buffer_ratio), 3),
+            },
+            "affect_buffer_ratio": buffer_ratio,
+            "preservation_guards": [
+                "source-content-preserved",
+                "delete-memory-blocked",
+                "replay-original-affect-available",
+            ],
+            "disclosure_scope": MEMORY_EDIT_DISCLOSURE_SCOPE,
+            "source_concept_digest": concept["digest"],
+            "freeze_ref": freeze_ref,
+        }
+        view["digest"] = sha256_text(canonical_json(_memory_recall_view_digest_payload(view)))
+        return view
 
 
 class ProceduralMemoryProjector:

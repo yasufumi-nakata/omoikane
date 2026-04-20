@@ -46,6 +46,7 @@ PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli episodic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
+PYTHONPATH=src python3 -m omoikane.cli memory-edit-demo --json
 PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
@@ -284,6 +285,15 @@ source event を保持したまま最大 3 件ずつ segment 化する manifest 
 `crystal-commit` ledger event を確認する。
 入力 source event は `EpisodicStream` の handoff window から取り込み、
 `compaction_candidate_ids` をそのまま payload に残す。
+
+`memory-edit-demo` は L2 Memory Editing API の reference contract
+(`mind.memory_edit.v0`) を JSON で可視化し、
+`SemanticMemory` 由来の concept を source として
+`consented-recall-affect-buffer-v1` の recall overlay を開きつつ、
+`delete-memory` / `insert-false-memory` / `overwrite-source-segment` が
+禁止されたままであること、
+`freeze_record` が source manifest / source concept digest に束縛されること、
+`memory-edit` ledger event が policy id と freeze ref を残すことを確認する。
 
 `episodic-demo` は L2 EpisodicStream の canonical shape
 (`canonical-episodic-stream-v1`) を JSON で可視化し、

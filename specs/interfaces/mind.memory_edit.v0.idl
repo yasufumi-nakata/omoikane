@@ -1,0 +1,118 @@
+idl_version: 1
+kind: service
+namespace: mind.memory_edit.v0
+service: MemoryEditingService
+summary: >
+  Reversible memory editing contract that permits only self-consented,
+  guardian-attested affect buffering during recall without mutating source memory.
+imports:
+  semantic_memory_snapshot: ../schemas/semantic_memory_snapshot.schema
+  memory_edit_session: ../schemas/memory_edit_session.schema
+operations:
+  apply_recall_buffer:
+    summary: >
+      Open one recall session that preserves semantic memory content while
+      damping affect intensity for the selected concepts.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - semantic_snapshot
+          - selected_concept_ids
+          - self_consent_ref
+          - guardian_attestation_ref
+          - clinical_rationale
+          - buffer_ratio
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          semantic_snapshot:
+            schema_ref: semantic_memory_snapshot
+          selected_concept_ids:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          self_consent_ref:
+            type: string
+            minLength: 1
+          guardian_attestation_ref:
+            type: string
+            minLength: 1
+          clinical_rationale:
+            type: string
+            minLength: 1
+          buffer_ratio:
+            type: number
+            exclusiveMinimum: 0
+            maximum: 0.65
+    output:
+      schema_ref: memory_edit_session
+    guarantees:
+      - source semantic snapshot must validate before any recall buffer session opens
+      - delete-memory, insert-false-memory, and overwrite-source-segment remain prohibited
+      - one freeze snapshot must bind the source manifest digest and source concept digests
+      - recall buffering may damp affect intensity only and must not amplify source affect
+  validate_session:
+    summary: Validate one recall-affect buffer session against the fixed reversible editing policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - session
+        properties:
+          session:
+            schema_ref: memory_edit_session
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - recall_view_count
+          - concept_labels
+          - deletion_blocked
+          - source_preserved
+          - freeze_bound
+          - buffer_within_limit
+          - disclosure_scopes
+          - errors
+        properties:
+          ok:
+            type: boolean
+          recall_view_count:
+            type: integer
+            minimum: 0
+          concept_labels:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          deletion_blocked:
+            type: boolean
+          source_preserved:
+            type: boolean
+          freeze_bound:
+            type: boolean
+          buffer_within_limit:
+            type: boolean
+          disclosure_scopes:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.recall_buffered:
+    payload:
+      schema_ref: memory_edit_session

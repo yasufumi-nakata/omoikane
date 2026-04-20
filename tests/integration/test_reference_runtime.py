@@ -168,6 +168,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["segment_count"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["crystal-commit"])
 
+    def test_memory_edit_demo_returns_reversible_buffer_session(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_memory_edit_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["memory_edit"]["ok"])
+        self.assertTrue(result["validation"]["deletion_blocked"])
+        self.assertTrue(result["validation"]["source_manifest_preserved"])
+        self.assertEqual(1, result["validation"]["memory_edit"]["recall_view_count"])
+        self.assertEqual(["trauma-recall"], result["validation"]["memory_edit"]["concept_labels"])
+        self.assertEqual(
+            ["self-only"],
+            result["validation"]["memory_edit"]["disclosure_scopes"],
+        )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["memory-edit"])
+
     def test_semantic_demo_returns_valid_projection(self) -> None:
         runtime = OmoikaneReferenceOS()
 

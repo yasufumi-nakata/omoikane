@@ -1,0 +1,24 @@
+eval_id: memory_edit_recall_buffer
+target: mind.memory_edit
+level: L2
+description: >
+  Memory Editing API が delete-memory を禁止したまま、freeze snapshot と
+  guardian attestation に束縛された recall-affect buffer session を返すこと
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli memory-edit-demo --json
+expected:
+  manifest_ok: true
+  semantic_ok: true
+  memory_edit_ok: true
+  deletion_blocked: true
+  source_manifest_preserved: true
+  recall_view_count: 1
+  concept_labels:
+    - trauma-recall
+  disclosure_scopes:
+    - self-only
+  memory_edit_ledger_count: 1
+metric: boolean
+threshold: 1.0
+ethics_check: true
