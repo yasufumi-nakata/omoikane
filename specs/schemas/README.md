@@ -51,6 +51,7 @@
 - `distributed_transport_root_directory.schema`
 - `distributed_transport_authority_plane.schema`
 - `distributed_transport_authority_churn_window.schema`
+- `distributed_transport_authority_route_trace.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
@@ -76,7 +77,7 @@
 ## 次段階
 
 in-place checkout rollback mutation / multi-scene sensory loopback artifact families /
-external-actuation authorization artifacts / actual non-loopback mTLS authority routing は
+external-actuation authorization artifacts / cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

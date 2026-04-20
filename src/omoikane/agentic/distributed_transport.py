@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import hashlib
+import ipaddress
 import json
+from pathlib import Path
+import socket
+import ssl
 import time
 from typing import Any, Dict, List, Mapping
+from urllib.parse import urlsplit
 import urllib.request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
@@ -39,6 +45,8 @@ LIVE_ROOT_DIRECTORY_TRANSPORT_PROFILE = "live-http-json-rootdir-v1"
 LIVE_KEY_SERVER_TRANSPORT_PROFILE = "live-http-json-keyserver-v1"
 AUTHORITY_PLANE_PROFILE = "bounded-key-server-fleet-v1"
 AUTHORITY_CHURN_PROFILE = "bounded-key-server-churn-window-v1"
+AUTHORITY_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
+AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -449,6 +457,70 @@ class DistributedTransportAuthorityChurnWindow:
             "server_transitions": [dict(transition) for transition in self.server_transitions],
             "continuity_guard": dict(self.continuity_guard),
             "proof_digest": self.proof_digest,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedTransportAuthorityRouteTrace:
+    """Machine-checkable non-loopback mTLS route trace for authority-plane members."""
+
+    trace_ref: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    envelope_ref: str
+    envelope_digest: str
+    council_tier: str
+    transport_profile: str
+    trace_profile: str
+    socket_trace_profile: str
+    ca_bundle_ref: str
+    client_certificate_ref: str
+    server_name: str
+    route_count: int
+    mtls_authenticated_count: int
+    trusted_root_refs: List[str]
+    non_loopback_verified: bool
+    authority_plane_bound: bool
+    response_digest_bound: bool
+    socket_trace_complete: bool
+    route_bindings: List[Dict[str, Any]]
+    trace_status: str
+    recorded_at: str
+    total_connect_latency_ms: float
+    total_handshake_latency_ms: float
+    total_round_trip_latency_ms: float
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_ref": self.trace_ref,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "envelope_ref": self.envelope_ref,
+            "envelope_digest": self.envelope_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "trace_profile": self.trace_profile,
+            "socket_trace_profile": self.socket_trace_profile,
+            "ca_bundle_ref": self.ca_bundle_ref,
+            "client_certificate_ref": self.client_certificate_ref,
+            "server_name": self.server_name,
+            "route_count": self.route_count,
+            "mtls_authenticated_count": self.mtls_authenticated_count,
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "non_loopback_verified": self.non_loopback_verified,
+            "authority_plane_bound": self.authority_plane_bound,
+            "response_digest_bound": self.response_digest_bound,
+            "socket_trace_complete": self.socket_trace_complete,
+            "route_bindings": [dict(binding) for binding in self.route_bindings],
+            "trace_status": self.trace_status,
+            "recorded_at": self.recorded_at,
+            "total_connect_latency_ms": self.total_connect_latency_ms,
+            "total_handshake_latency_ms": self.total_handshake_latency_ms,
+            "total_round_trip_latency_ms": self.total_round_trip_latency_ms,
             "digest": self.digest,
         }
 
@@ -1159,6 +1231,235 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def trace_non_loopback_authority_routes(
+        self,
+        envelope: DistributedTransportEnvelope,
+        authority_plane: DistributedTransportAuthorityPlane,
+        *,
+        route_targets: List[Dict[str, Any]],
+        ca_cert_path: str,
+        ca_bundle_ref: str,
+        client_cert_path: str,
+        client_key_path: str,
+        client_certificate_ref: str,
+        request_timeout_ms: int = 1_000,
+    ) -> DistributedTransportAuthorityRouteTrace:
+        if authority_plane.council_tier != envelope.council_tier:
+            raise ValueError("authority route trace authority_plane council_tier must match envelope")
+        if authority_plane.transport_profile != envelope.transport_profile:
+            raise ValueError("authority route trace authority_plane transport_profile must match envelope")
+
+        normalized_targets = self._normalize_route_targets(route_targets)
+        authority_server_map = {
+            server["key_server_ref"]: dict(server) for server in authority_plane.key_servers
+        }
+        if sorted(normalized_targets) != sorted(authority_server_map):
+            raise ValueError("authority route trace must cover every reachable authority-plane key server")
+
+        timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
+        ca_path = self._require_non_empty_string(ca_cert_path, "ca_cert_path")
+        client_cert = self._require_non_empty_string(client_cert_path, "client_cert_path")
+        client_key = self._require_non_empty_string(client_key_path, "client_key_path")
+        normalized_ca_ref = self._require_non_empty_string(ca_bundle_ref, "ca_bundle_ref")
+        normalized_client_ref = self._require_non_empty_string(
+            client_certificate_ref,
+            "client_certificate_ref",
+        )
+        client_fingerprint = self._certificate_fingerprint_from_pem_file(client_cert)
+        tls_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
+        tls_context.load_cert_chain(client_cert, client_key)
+
+        route_bindings: List[Dict[str, Any]] = []
+        connect_total = 0.0
+        handshake_total = 0.0
+        round_trip_total = 0.0
+
+        for key_server_ref, target in normalized_targets.items():
+            authority_server = authority_server_map[key_server_ref]
+            server_endpoint = target["server_endpoint"]
+            server_name = target["server_name"]
+            parsed_endpoint = urlsplit(server_endpoint)
+            if parsed_endpoint.scheme != "https":
+                raise ValueError("authority route trace endpoints must use https://")
+            if not parsed_endpoint.hostname or parsed_endpoint.port is None:
+                raise ValueError("authority route trace endpoints must include host and port")
+            path = parsed_endpoint.path or "/"
+            if parsed_endpoint.query:
+                path = f"{path}?{parsed_endpoint.query}"
+
+            connect_started = time.monotonic()
+            raw_socket = socket.create_connection(
+                (parsed_endpoint.hostname, parsed_endpoint.port),
+                timeout=timeout_ms / 1000.0,
+            )
+            local_ip, local_port = raw_socket.getsockname()
+            remote_ip, remote_port = raw_socket.getpeername()
+            connect_latency_ms = round((time.monotonic() - connect_started) * 1000.0, 3)
+
+            handshake_started = time.monotonic()
+            tls_socket = tls_context.wrap_socket(raw_socket, server_hostname=server_name)
+            handshake_latency_ms = round((time.monotonic() - handshake_started) * 1000.0, 3)
+            route_started = time.monotonic()
+            request_bytes = f"GET {path} HTTP/1.1\r\nHost: {server_name}\r\nConnection: close\r\nAccept: application/json\r\n\r\n".encode(
+                "utf-8"
+            )
+            tls_socket.sendall(request_bytes)
+            response_bytes = b""
+            while True:
+                chunk = tls_socket.recv(4096)
+                if not chunk:
+                    break
+                response_bytes += chunk
+            round_trip_latency_ms = round((time.monotonic() - route_started) * 1000.0, 3)
+            peer_cert = tls_socket.getpeercert(binary_form=True)
+            cipher_suite = tls_socket.cipher()
+            tls_version = tls_socket.version()
+            tls_socket.close()
+
+            http_status, payload = self._parse_http_json_response(response_bytes)
+            response_digest = sha256_text(canonical_json(payload))
+            response_digest_bound = response_digest == authority_server["response_digest"]
+            non_loopback = (
+                not ipaddress.ip_address(local_ip).is_loopback
+                and not ipaddress.ip_address(remote_ip).is_loopback
+            )
+            mtls_status = (
+                "authenticated"
+                if http_status == 200 and response_digest_bound and peer_cert and non_loopback
+                else "rejected"
+            )
+            route_binding_ref = (
+                f"authority-route://{authority_plane.council_tier}/"
+                f"{sha256_text(f'{authority_plane.authority_plane_ref}:{key_server_ref}:{server_endpoint}')[:16]}"
+            )
+            route_bindings.append(
+                {
+                    "key_server_ref": key_server_ref,
+                    "server_role": authority_server["server_role"],
+                    "authority_status": authority_server["authority_status"],
+                    "server_endpoint": server_endpoint,
+                    "server_name": server_name,
+                    "route_binding_ref": route_binding_ref,
+                    "matched_root_refs": list(authority_server["matched_root_refs"]),
+                    "mtls_status": mtls_status,
+                    "response_digest_bound": response_digest_bound,
+                    "socket_trace": {
+                        "local_ip": local_ip,
+                        "local_port": local_port,
+                        "remote_ip": remote_ip,
+                        "remote_port": remote_port,
+                        "non_loopback": non_loopback,
+                        "transport_profile": AUTHORITY_ROUTE_SOCKET_PROFILE,
+                        "tls_version": tls_version or "",
+                        "cipher_suite": cipher_suite[0] if cipher_suite else "",
+                        "peer_certificate_fingerprint": hashlib.sha256(peer_cert).hexdigest()
+                        if peer_cert
+                        else "",
+                        "client_certificate_fingerprint": client_fingerprint,
+                        "request_bytes": len(request_bytes),
+                        "response_bytes": len(response_bytes),
+                        "http_status": http_status,
+                        "response_digest": response_digest,
+                        "connect_latency_ms": connect_latency_ms,
+                        "tls_handshake_latency_ms": handshake_latency_ms,
+                        "round_trip_latency_ms": round_trip_latency_ms,
+                    },
+                }
+            )
+            connect_total += connect_latency_ms
+            handshake_total += handshake_latency_ms
+            round_trip_total += round_trip_latency_ms
+
+        recorded_at = utc_now_iso()
+        route_count = len(route_bindings)
+        mtls_authenticated_count = sum(
+            1 for binding in route_bindings if binding["mtls_status"] == "authenticated"
+        )
+        non_loopback_verified = all(binding["socket_trace"]["non_loopback"] for binding in route_bindings)
+        authority_plane_bound = all(
+            binding["server_role"] == authority_server_map[binding["key_server_ref"]]["server_role"]
+            and binding["authority_status"]
+            == authority_server_map[binding["key_server_ref"]]["authority_status"]
+            and binding["matched_root_refs"]
+            == authority_server_map[binding["key_server_ref"]]["matched_root_refs"]
+            for binding in route_bindings
+        )
+        response_digest_bound = all(binding["response_digest_bound"] for binding in route_bindings)
+        socket_trace_complete = all(
+            binding["socket_trace"]["tls_version"]
+            and binding["socket_trace"]["cipher_suite"]
+            and binding["socket_trace"]["peer_certificate_fingerprint"]
+            and binding["socket_trace"]["client_certificate_fingerprint"]
+            and binding["socket_trace"]["http_status"] == 200
+            for binding in route_bindings
+        )
+        trace_status = (
+            "authenticated"
+            if route_count == len(authority_plane.key_servers)
+            and mtls_authenticated_count == route_count
+            and non_loopback_verified
+            and authority_plane_bound
+            and response_digest_bound
+            and socket_trace_complete
+            else "rejected"
+        )
+        payload = {
+            "trace_ref": f"authority-route-trace://{authority_plane.council_tier}/{authority_plane.authority_plane_ref.split('/')[-1]}",
+            "authority_plane_ref": authority_plane.authority_plane_ref,
+            "authority_plane_digest": authority_plane.digest,
+            "envelope_ref": envelope.envelope_id,
+            "envelope_digest": envelope.envelope_digest,
+            "council_tier": envelope.council_tier,
+            "transport_profile": envelope.transport_profile,
+            "trace_profile": AUTHORITY_ROUTE_TRACE_PROFILE,
+            "socket_trace_profile": AUTHORITY_ROUTE_SOCKET_PROFILE,
+            "ca_bundle_ref": normalized_ca_ref,
+            "client_certificate_ref": normalized_client_ref,
+            "server_name": route_bindings[0]["server_name"],
+            "route_count": route_count,
+            "mtls_authenticated_count": mtls_authenticated_count,
+            "trusted_root_refs": list(authority_plane.trusted_root_refs),
+            "non_loopback_verified": non_loopback_verified,
+            "authority_plane_bound": authority_plane_bound,
+            "response_digest_bound": response_digest_bound,
+            "socket_trace_complete": socket_trace_complete,
+            "route_bindings": route_bindings,
+            "trace_status": trace_status,
+            "recorded_at": recorded_at,
+            "total_connect_latency_ms": round(connect_total, 3),
+            "total_handshake_latency_ms": round(handshake_total, 3),
+            "total_round_trip_latency_ms": round(round_trip_total, 3),
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthorityRouteTrace(
+            trace_ref=payload["trace_ref"],
+            authority_plane_ref=authority_plane.authority_plane_ref,
+            authority_plane_digest=authority_plane.digest,
+            envelope_ref=envelope.envelope_id,
+            envelope_digest=envelope.envelope_digest,
+            council_tier=envelope.council_tier,
+            transport_profile=envelope.transport_profile,
+            trace_profile=AUTHORITY_ROUTE_TRACE_PROFILE,
+            socket_trace_profile=AUTHORITY_ROUTE_SOCKET_PROFILE,
+            ca_bundle_ref=normalized_ca_ref,
+            client_certificate_ref=normalized_client_ref,
+            server_name=payload["server_name"],
+            route_count=route_count,
+            mtls_authenticated_count=mtls_authenticated_count,
+            trusted_root_refs=list(authority_plane.trusted_root_refs),
+            non_loopback_verified=non_loopback_verified,
+            authority_plane_bound=authority_plane_bound,
+            response_digest_bound=response_digest_bound,
+            socket_trace_complete=socket_trace_complete,
+            route_bindings=route_bindings,
+            trace_status=trace_status,
+            recorded_at=recorded_at,
+            total_connect_latency_ms=payload["total_connect_latency_ms"],
+            total_handshake_latency_ms=payload["total_handshake_latency_ms"],
+            total_round_trip_latency_ms=payload["total_round_trip_latency_ms"],
+            digest=digest,
+        )
+
     def _normalize_key_server_report(
         self,
         payload: Mapping[str, Any],
@@ -1524,3 +1825,58 @@ class DistributedTransportService:
         if len(text) != 64 or any(char not in "0123456789abcdef" for char in text):
             raise ValueError(f"{field_name} must be a sha256 hex digest")
         return text
+
+    @classmethod
+    def _normalize_route_targets(cls, values: Any) -> Dict[str, Dict[str, str]]:
+        if not isinstance(values, list) or not values:
+            raise ValueError("route_targets must be a non-empty list")
+        normalized: Dict[str, Dict[str, str]] = {}
+        for index, value in enumerate(values):
+            if not isinstance(value, Mapping):
+                raise ValueError("route_targets entries must be mappings")
+            key_server_ref = cls._require_non_empty_string(
+                value.get("key_server_ref"),
+                f"route_targets[{index}].key_server_ref",
+            )
+            if key_server_ref in normalized:
+                raise ValueError("route_targets key_server_ref values must be unique")
+            normalized[key_server_ref] = {
+                "server_endpoint": cls._require_non_empty_string(
+                    value.get("server_endpoint"),
+                    f"route_targets[{index}].server_endpoint",
+                ),
+                "server_name": cls._require_non_empty_string(
+                    value.get("server_name"),
+                    f"route_targets[{index}].server_name",
+                ),
+            }
+        return normalized
+
+    @staticmethod
+    def _certificate_fingerprint_from_pem_file(path: str) -> str:
+        pem_text = Path(path).read_text(encoding="utf-8")
+        der_bytes = ssl.PEM_cert_to_DER_cert(pem_text)
+        return hashlib.sha256(der_bytes).hexdigest()
+
+    @classmethod
+    def _parse_http_json_response(cls, response_bytes: bytes) -> tuple[int, Dict[str, Any]]:
+        header_bytes, separator, body_bytes = response_bytes.partition(b"\r\n\r\n")
+        if not separator:
+            raise ValueError("authority route trace response must be valid HTTP")
+        header_lines = header_bytes.decode("utf-8").splitlines()
+        if not header_lines:
+            raise ValueError("authority route trace response must include a status line")
+        status_parts = header_lines[0].split()
+        if len(status_parts) < 2:
+            raise ValueError("authority route trace response status line is invalid")
+        try:
+            http_status = int(status_parts[1])
+        except ValueError as exc:
+            raise ValueError("authority route trace response status must be numeric") from exc
+        try:
+            payload = json.loads(body_bytes.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError("authority route trace response body must be JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("authority route trace response payload must be a mapping")
+        return http_status, dict(payload)

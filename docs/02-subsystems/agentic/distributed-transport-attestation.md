@@ -67,7 +67,8 @@ remote endpoint から返る receipt は次を同時に満たしたときだけ 
 reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
 route nonce replay block / multi-hop replay block / live root directory probe /
-bounded authority-plane fleet probe / authority-plane churn reconciliation を出力する。
+bounded authority-plane fleet probe / authority-plane churn reconciliation /
+non-loopback mTLS authority route trace を出力する。
 
 ## Live Root Directory Federation
 
@@ -129,6 +130,34 @@ overlap snapshot と post-churn snapshot を
 - `continuity_guard` は overlap count / draining removal / quorum maintained を固定し、
   `status=quorum-maintained` だけを rotated receipt 前段の valid churn outcome とする
 
+## Non-loopback mTLS authority route trace
+
+stable な authority plane に対しては
+`trace_non_loopback_authority_routes` により、
+actual non-loopback mTLS route と socket-level trace を
+current authority snapshot へ束縛する。
+
+| 項目 | 固定値 |
+|---|---|
+| trace profile | `non-loopback-mtls-authority-route-v1` |
+| socket trace profile | `mtls-socket-trace-v1` |
+| tls server name | `authority.local` |
+| route coverage | stable authority plane の全 reachable member |
+
+- 各 route binding は `key_server_ref / server_endpoint / server_name /
+  route_binding_ref / matched_root_refs / mtls_status` を保持する
+- `socket_trace` は `local_ip / local_port / remote_ip / remote_port /
+  non_loopback / tls_version / cipher_suite / peer_certificate_fingerprint /
+  client_certificate_fingerprint / request_bytes / response_bytes /
+  http_status / response_digest / connect_latency_ms /
+  tls_handshake_latency_ms / round_trip_latency_ms` を保持する
+- `response_digest` は authority-plane snapshot の per-server digest と一致しなければ fail-closed
+- remote endpoint が loopback だった場合や mTLS が成立しない場合、
+  trace 全体は `authenticated` にならない
+- reference runtime は local machine 上の non-loopback address に bind した
+  mTLS server を使い、cross-host cluster を持ち込まずに
+  actual route trace を machine-checkable にする
+
 ## Relay telemetry
 
 reference runtime は `capture_relay_telemetry` により、
@@ -159,6 +188,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
 - schema: `specs/schemas/distributed_transport_authority_plane.schema`
 - schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
+- schema: `specs/schemas/distributed_transport_authority_route_trace.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
@@ -166,9 +196,11 @@ receipt に束縛された bounded relay observability surface も返す。
 - eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
 - eval: `evals/agentic/distributed_transport_authority_plane.yaml`
 - eval: `evals/agentic/distributed_transport_authority_churn.yaml`
+- eval: `evals/agentic/distributed_transport_authority_route_trace.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-live-root-directory.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`
+- decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`

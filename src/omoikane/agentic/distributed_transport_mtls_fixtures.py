@@ -1,0 +1,147 @@
+"""Static mTLS fixture bundle for distributed transport authority route tracing."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Dict
+
+CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIICtjCCAZ4CCQD7AXlgmN5phjANBgkqhkiG9w0BAQsFADAdMRswGQYDVQQDDBJh
+dXRob3JpdHktY2EubG9jYWwwHhcNMjYwNDIwMTgwNjI4WhcNMzYwNDE3MTgwNjI4
+WjAdMRswGQYDVQQDDBJhdXRob3JpdHktY2EubG9jYWwwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQDr2lzYkEw87+NGz+b3ltWNKeooq4ZyfX6y0ABLfz1L
+GSJ2wmM5zM6F9DZtEgXp+HSbHCbzy6oQPOARb0J+xaJPYEDHs5hh+IbceyLbbR+s
+HoSBH4OcRb+L/ho5yIlIzFIsiitT8pjTekVV70i9a31Bo/TI5xr6/7osxAVj1IFT
+jm9P/TcfMOEzj8/BJlUkUmDUAw55fSKG3SRkDgX/i5he18ZyxM56/OS8UgDSWudh
+zwx9HfSHtlQiZvzMRWSKxPeiko0I76+fB1DuwmVER1cG9ndmMBexxjdirkPO7kt1
+qc+Jb0rqS1IqeTKMSAu47EeyPRBrq9ENjxredcnGGdpzAgMBAAEwDQYJKoZIhvcN
+AQELBQADggEBANn/E42+7MO/Q5hjLNR/sC7soGHR0oZZ+TxgLi5Kh/5SRGHsmj6+
+fBewWX9tkoXusakTA1KrAGzb+8AIS/1xRdR9aJj1ZAIzj0L5OBUMULQQtVNzwp0G
+foo69A/MErJbIW1QEIxT2kxuHe+sZNodJTOXID8EOUvDfWkVDxfYiKTerg8NIQQF
+vNkrTrAFrVSGKc/P26UKp5jPVh5gP0MuayCwQvNdcImuNwNR/Jrv2I7dtSEm/rfv
+9vE44M4Pp8BNG/j/CdvInQM21Zz3aJOJm+8nyC2DZdajpNRyEHsmuYCaUuqFFSER
+F5qw8fj58IWdzKBMSOHPw7lj3E7Lqx9z0sE=
+-----END CERTIFICATE-----
+"""
+
+SERVER_CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIIC7TCCAdWgAwIBAgIJAIE6u0YI7vXnMA0GCSqGSIb3DQEBCwUAMB0xGzAZBgNV
+BAMMEmF1dGhvcml0eS1jYS5sb2NhbDAeFw0yNjA0MjAxODA2MjhaFw0zNjA0MTcx
+ODA2MjhaMBoxGDAWBgNVBAMMD2F1dGhvcml0eS5sb2NhbDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBALnJsfvY/A/9/MITM7IECAGRaJv6SEoYy+S875Gd
+RYJDz04d1QAx8oW0cHuijZUDV5rJVqbk9kVvvBH9thSu/en3GYc+pLZfdGO+87IY
+kRVVVbwAHVeZpYRxOcdEl262pnuEMqXDh1FwMu+rEfnqXniUvC28BonQa26JQx2r
+2sTrkvBskofaExam702VXyfoiDCuJF3pHTiMYDCHfyWGCt1G7Jq9T4Dm19tDi+MP
+AdqYN6/UQwgCSTce3Rzr7klc0TB11mQv0zd5Qs4pU6P+w+YY2VeWFqrBnT6tFame
+HaQEPfEDb7wL/Y6MbVybaJisNrIXxz46G1TFExIuedavRccCAwEAAaMzMDEwGgYD
+VR0RBBMwEYIPYXV0aG9yaXR5LmxvY2FsMBMGA1UdJQQMMAoGCCsGAQUFBwMBMA0G
+CSqGSIb3DQEBCwUAA4IBAQCrafPFTVKayuYXhFZoDe36IJ2AtUJ67WgrvGvhFevr
+Y/ZF24UqS76AXU+RTG9aLiQLsCUo1dAR1wYQdPb6z3P5uk1I1Ir8OZIK1c2czXik
+ki6U6631ZtT1ubuQWXRi6pvOGUewmq68kpUd92kjnG4voM9vVY+PsUGk6Pv4wA9H
+EzQNAjZthCawIifMrAl14kzJPJaM2AAgNKcEn+uRIDLnOyIt0C9h7t+hUVEWMSZU
+5sZGm+g8HHz9RF9WHXkwccaqX8ByF4Fyw5JVCCmkNUqEiip955de3NYEEaX2e66Q
+z/JGA+/GpBZDJ+CZJ69TzatyJ1T+81spGIHGz+HftuEA
+-----END CERTIFICATE-----
+"""
+
+SERVER_KEY_PEM = """-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAucmx+9j8D/38whMzsgQIAZFom/pIShjL5LzvkZ1FgkPPTh3V
+ADHyhbRwe6KNlQNXmslWpuT2RW+8Ef22FK796fcZhz6ktl90Y77zshiRFVVVvAAd
+V5mlhHE5x0SXbrame4QypcOHUXAy76sR+epeeJS8LbwGidBrbolDHavaxOuS8GyS
+h9oTFqbvTZVfJ+iIMK4kXekdOIxgMId/JYYK3Ubsmr1PgObX20OL4w8B2pg3r9RD
+CAJJNx7dHOvuSVzRMHXWZC/TN3lCzilTo/7D5hjZV5YWqsGdPq0VqZ4dpAQ98QNv
+vAv9joxtXJtomKw2shfHPjobVMUTEi551q9FxwIDAQABAoIBAQCtRxSdU+8j6zuG
+tuoMKf5dmAT9FR2/HglsuVqncQuXRy9eKCy1FeCgG36dkSqDxK48S3RqDDo04NWD
+4iGkgOGJCVHh9echwT2Imlwnywnl38UqpuC3BzJ8qC2/UJX8SJZVtSKXwBnBNugK
+6H7HnHOn+vDXpvpiJuVMHvFeBx7vcUCIas5q2Ywe88CoBhHTxSsUrZPHLp5AHzwq
+iHfREMWTUG/Kr76Z1thQY/VnXsemA8cmiWJtfFXWAw2nv5NOoVPGuqXBYIH/ftaa
+sXSOa4pYrcjrpgOABWnmAV8b4U4phaKwC9j4rxRDYrMT5UKqfaFQT7VQ6TW1BzyQ
+CM6aZ1lBAoGBAODBnU+gtOz6KC24cs/Uci/kX+LZE0nUbIRo/Otx5rfRQSAgKpU1
+P15gVvJuPCN8bkljmFugb9gDE0mRYgoIuInAzG9o7NM+QWqjhzn9BrGtbLR64aiK
+P/nstCBHAMXm+ZYn+Dhwa7otdOXeIN9eCtLy8TxTa+iW4FCR3nT5xlvZAoGBANOd
+UGWkLyeVXgofjV4/0L983pAabZEfR+WFruu279xnLuFj12z5fgTd7qtVnMcg2dBe
+FxxU3UNf3e0gojh+RdEG5WisZYv+X9/3iW0qZQL5srAJ5ENZNf2rr9x8OlvDl8N8
+yoMmZqm6jm44TLTSKJX2qkezx1GOv0brLFMNO8qfAoGAXmm2tV5i4jFrc1lKEXfC
+x899YAOkEJ2FQFIB/L2KF6l1XBNnD+qgRfreS1R3OsjoYzfNJqBMm0cfcQX7Uw+6
+xVMSDbLb2RkLzcoH4hoiF70sLtx3sp7wpQID4JMzBe8y5RrBMKQ4/KpfsrgOwwX0
+Mg0PvTGl4LyQWggMlMLfynECgYB9m9JeEr/euh2w2pu6RxzsnP0rAlTpIG03w0ta
+JSNpa2H7bZ0w1UNFNkr2LoI5/LjtovwK2CDiXiRIHefMqr9cXMCNik9YcqyML83G
+G7ULuBWlwqlYhLq0kVV5BdBKKeaKpic7A+9Kbi8fI5H8fwaSRXE70G3ObnIBcZTE
+04UbNwKBgQDVx9lctU74U5daAn9njtuH1PdHK+qirzS7VFE25CQgMwJpB/hsISWO
+R7opCoCGWxLV0JoBzAXAhhRkIYQJOCQbu3KGAoPra/+rzvjm2aLPqZf7IrgerNx/
+4bVmZVGhip9hzUidWknYO7eAyBTX12dUgIBt9O7qPt071DVuvNQdMA==
+-----END RSA PRIVATE KEY-----
+"""
+
+CLIENT_CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIIC0TCCAbmgAwIBAgIJAIE6u0YI7vXoMA0GCSqGSIb3DQEBCwUAMB0xGzAZBgNV
+BAMMEmF1dGhvcml0eS1jYS5sb2NhbDAeFw0yNjA0MjAxODA2MjhaFw0zNjA0MTcx
+ODA2MjhaMBoxGDAWBgNVBAMMD2F1dGhvcml0eS5sb2NhbDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBALMs2w8B16d6vX1lexe0SKrTOCMUDSdVH4xtPYzb
+5ejBdmkWxadXk/pNYjJve+QPm2tQ0Uj0cHg6BvNK4cKhzqDHv2H3l4daPQTzBx5y
+dtT4RcF3LQEmmCLEmaSftJ/oeA8UGppErtTClU3sKx2jcdWFZZi/YjBqZBySKbX9
+pp7rRhwL1Naerdrxj1KU+Op4GfLQxS5mSRyCKzPswtyvJLBmM7Krhd4vqK3yomSB
+Pk9V1r7eQKLmr2hrHv2BjAvOBCGQ/AYA7jINfkjJDZ0EwT4R5zZIiRr2YAqqVl8z
+0RSPBK5rhzops9LVFLBt51RBZYWlAf57qD4uzl10Z1icU1cCAwEAAaMXMBUwEwYD
+VR0lBAwwCgYIKwYBBQUHAwIwDQYJKoZIhvcNAQELBQADggEBAN1nQlYZRbTL5W3b
+TibgN8x+He9yWCqRscYexQP0NssZea67Nwc9qlweDij2E+2JD8uozinw2E9yMfQi
++q1OwnGsQ/kUMRvFYbx7Y1EBgyGTwbBG+TifqhnuL5wcM/wVUXaHLTYyPO8aQm4H
+ybHbUWYluxzUzhGqQK06xJ2LgddXiAf1RrghVTvbOOC9Kz8e1uyAz90Um1b/W5w/
+7i8SAqaCPkhQyRKDwLotDqf5ark+Bof4BOFTSlPfXJ4evPTFxuXHV+UACFp4Gnm+
+a4cY2Sq6C7W6VQiIng2Q6WBjv9hJWqJe1ZR549ZdxkZgD0TWQ198ER6s6OG4yQnY
+B5o/rXs=
+-----END CERTIFICATE-----
+"""
+
+CLIENT_KEY_PEM = """-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAsyzbDwHXp3q9fWV7F7RIqtM4IxQNJ1UfjG09jNvl6MF2aRbF
+p1eT+k1iMm975A+ba1DRSPRweDoG80rhwqHOoMe/YfeXh1o9BPMHHnJ21PhFwXct
+ASaYIsSZpJ+0n+h4DxQamkSu1MKVTewrHaNx1YVlmL9iMGpkHJIptf2mnutGHAvU
+1p6t2vGPUpT46ngZ8tDFLmZJHIIrM+zC3K8ksGYzsquF3i+orfKiZIE+T1XWvt5A
+ouavaGse/YGMC84EIZD8BgDuMg1+SMkNnQTBPhHnNkiJGvZgCqpWXzPRFI8ErmuH
+Oimz0tUUsG3nVEFlhaUB/nuoPi7OXXRnWJxTVwIDAQABAoIBAQCdiIGtpywJt5Pl
+LZVVWRBPCVihFt8dxuzvFZj5QNnalEZczUXJBOo5N1JwD6747HP0neD0aN5+Bl7Y
+B+2Ip6U5nYX6R6s1uTRPJrIKpg8u3n7OQ88Q5PL8FqkTocs4kTcF4uIk4uBodhC5
+qzyZWXwbhKa37wUQlmog6K29sh+ONsqhuLJ8dvk/j+qryirAiX9jLBT2GmaTBDiU
+mEYiaXJQA/KC0wpfr/vTxkHoX9zqYWfX2k5rYayf25Dnl7A5k8hc1prV/jqFCEgC
+TX4acC06+FQISltjsd/doh/huDPePUj/vWTK6k1brc6itQonhH8csk+DidIyvv1o
+ob6dG/KpAoGBAOEWV51gdL8cN9bLCbiqqJaaV5/qiynafLrWXBTKxjuG8ck/cZNE
+7jIekfea0D6iGQ4XE4xmbMSJP11gPb4y5+kD28XxWDTDnqa3Ed4MSC6V1JAiiqDc
+9kPgDEMk0NMticVaN/wVR+zlbPro1Y55/F4Gg0u9+DXuACUQtOlcGghVAoGBAMvI
+VE73xJD+nfO+p0mIGUOov6A920UoZDlUHs/C5D8+eh9c6XuXBPaATFxDN42GsKf3
+6uC11gWKKBiyifYn5GnZWceEsqyKpVMBjFHTBbZORj02couECTO2EICREfzUacvc
+GwjX8fPBbASTg2ieIzdyeOI25KyqzT4pqrLZBYj7AoGAL+lPkQI9F4jsId5qHVLG
+O/hyemm0YZ5OOn7ybsKS24zn3oyQomZjxWtYarobZZmfd65VzObodBU61adsvRWc
+466ck0/CFMkm9hm1xewbWT8vVdbkZ0VhbiU8tvYZNTpWPxnrHM9y1ewn/GifPIqe
+u2zrea3gLaqRgVJDEAE40VkCgYAHCvhm9kcz36jj2K39a5e77+QXjKu8WyYDmTWr
+Zofu66Da3qIvJEwGnO6GrcgIuyP12iqi84XfESRLnjgIat6JDfr9W0e1kOEf2kjY
+NxvWbiQdT3lr+vc6c0tkth7SByFU61l/177D9uZdzh9XiUecTfeBkfYbRZfsUxJU
+Ng3r6wKBgQDQGos3a7F+XCtIee2G8VkhH2zZ9qPG8+1AbA5SkNiYAKnhMHC7PlHo
+IM0G+d+wZIeMg2OFLsWGgRe4N77GWt7z3Fcqbu/7KlkPYjQ4tec+o1o/XjkAS7qg
+SdKSPRtu/6/WK28zD8CCcFWOtUwFKDoPTtM9UDBpMsO9jDLwHio3og==
+-----END RSA PRIVATE KEY-----
+"""
+
+MTLS_SERVER_NAME = "authority.local"
+CA_BUNDLE_REF = "cert://distributed-transport/authority-ca/v1"
+CLIENT_CERTIFICATE_REF = "cert://distributed-transport/authority-client/v1"
+
+
+def write_fixture_bundle(target_dir: str | Path) -> Dict[str, str]:
+    """Materialize the static PEM bundle into one target directory."""
+
+    bundle_dir = Path(target_dir)
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    file_map = {
+        "ca_cert_path": ("authority-ca.crt", CA_CERT_PEM),
+        "server_cert_path": ("authority-server.crt", SERVER_CERT_PEM),
+        "server_key_path": ("authority-server.key", SERVER_KEY_PEM),
+        "client_cert_path": ("authority-client.crt", CLIENT_CERT_PEM),
+        "client_key_path": ("authority-client.key", CLIENT_KEY_PEM),
+    }
+    materialized: Dict[str, str] = {}
+    for result_key, (filename, content) in file_map.items():
+        path = bundle_dir / filename
+        path.write_text(content, encoding="utf-8")
+        materialized[result_key] = str(path)
+    return materialized

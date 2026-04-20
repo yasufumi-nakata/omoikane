@@ -3,6 +3,9 @@ from __future__ import annotations
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import socket
+import ssl
+import tempfile
 import threading
 import unittest
 
@@ -11,6 +14,12 @@ from omoikane.agentic.cognitive_audit_governance import CognitiveAuditGovernance
 from omoikane.agentic.consensus_bus import ConsensusBus
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from omoikane.agentic.distributed_transport import DistributedTransportService
+from omoikane.agentic.distributed_transport_mtls_fixtures import (
+    CA_BUNDLE_REF,
+    CLIENT_CERTIFICATE_REF,
+    MTLS_SERVER_NAME,
+    write_fixture_bundle,
+)
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
 from omoikane.common import canonical_json, sha256_text
@@ -386,6 +395,29 @@ class ConsensusBusTests(unittest.TestCase):
 
 
 class DistributedTransportServiceTests(unittest.TestCase):
+    @staticmethod
+    def _discover_non_loopback_ipv4() -> str:
+        try:
+            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe.connect(("192.0.2.1", 1))
+            address = probe.getsockname()[0]
+            probe.close()
+            if address and not address.startswith("127."):
+                return address
+        except OSError:
+            pass
+        for family, _, _, _, sockaddr in socket.getaddrinfo(
+            socket.gethostname(),
+            None,
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+        ):
+            if family == socket.AF_INET:
+                address = sockaddr[0]
+                if address and not address.startswith("127."):
+                    return address
+        raise RuntimeError("non-loopback IPv4 address could not be discovered for authority route tests")
+
     @contextmanager
     def _root_directory_server(self, payload: dict[str, object]):
         class LocalThreadingHTTPServer(ThreadingHTTPServer):
@@ -420,7 +452,9 @@ class DistributedTransportServiceTests(unittest.TestCase):
         try:
             yield f"http://127.0.0.1:{server.server_address[1]}/root-directory"
         finally:
-            pass
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1.0)
 
     @contextmanager
     def _authority_plane_servers(self, payloads: list[dict[str, object]]):
@@ -467,7 +501,78 @@ class DistributedTransportServiceTests(unittest.TestCase):
         try:
             yield [f"{base_url}{path}" for path in payload_by_path]
         finally:
-            pass
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1.0)
+
+    @contextmanager
+    def _authority_route_servers(
+        self,
+        payloads: list[dict[str, object]],
+        *,
+        bind_host: str,
+        ca_cert_path: str,
+        server_cert_path: str,
+        server_key_path: str,
+    ):
+        payload_by_path = {
+            f"/authority-route-{index}": payload
+            for index, payload in enumerate(payloads, start=1)
+        }
+
+        class LocalThreadingHTTPServer(ThreadingHTTPServer):
+            def server_bind(self) -> None:
+                self.socket.bind(self.server_address)
+                self.server_address = self.socket.getsockname()
+                host, port = self.server_address[:2]
+                self.server_name = str(host)
+                self.server_port = int(port)
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def do_GET(self) -> None:  # noqa: N802
+                payload = payload_by_path.get(self.path)
+                if payload is None:
+                    self.send_error(404)
+                    self.close_connection = True
+                    return
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                self.close_connection = True
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                return
+
+        server = LocalThreadingHTTPServer((bind_host, 0), Handler)
+        server.daemon_threads = True
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.verify_mode = ssl.CERT_REQUIRED
+        ssl_context.load_cert_chain(server_cert_path, server_key_path)
+        ssl_context.load_verify_locations(cafile=ca_cert_path)
+        server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base_url = f"https://{bind_host}:{server.server_address[1]}"
+        try:
+            yield [
+                {
+                    "key_server_ref": payload["key_server_ref"],
+                    "server_endpoint": f"{base_url}{path}",
+                    "server_name": MTLS_SERVER_NAME,
+                }
+                for path, payload in payload_by_path.items()
+            ]
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1.0)
 
     def test_federation_handoff_binds_liaison_quorum_and_guardian(self) -> None:
         service = DistributedTransportService()
@@ -1212,6 +1317,142 @@ class DistributedTransportServiceTests(unittest.TestCase):
         self.assertTrue(churn_window.continuity_guard["overlap_satisfied"])
         self.assertTrue(churn_window.continuity_guard["removed_servers_draining"])
         self.assertEqual("quorum-maintained", churn_window.continuity_guard["status"])
+
+    def test_non_loopback_authority_route_trace_binds_mtls_socket_evidence(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-route-001",
+            proposal_ref="proposal-transport-authority-route-001",
+            payload_ref="cas://sha256/test-authority-route",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "route-trace"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-route-window",
+            "checked_at": "2026-04-21T00:10:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-route"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-route"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-route"),
+        }
+        stable_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-21T00:10:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-route"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-21T00:10:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-route"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(stable_payloads) as authority_endpoints:
+            authority_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-authority-route-test-") as cert_dir:
+            cert_bundle = write_fixture_bundle(cert_dir)
+            bind_host = self._discover_non_loopback_ipv4()
+            with self._authority_route_servers(
+                stable_payloads,
+                bind_host=bind_host,
+                ca_cert_path=cert_bundle["ca_cert_path"],
+                server_cert_path=cert_bundle["server_cert_path"],
+                server_key_path=cert_bundle["server_key_path"],
+            ) as route_targets:
+                trace = service.trace_non_loopback_authority_routes(
+                    rotated,
+                    authority_plane,
+                    route_targets=route_targets,
+                    ca_cert_path=cert_bundle["ca_cert_path"],
+                    ca_bundle_ref=CA_BUNDLE_REF,
+                    client_cert_path=cert_bundle["client_cert_path"],
+                    client_key_path=cert_bundle["client_key_path"],
+                    client_certificate_ref=CLIENT_CERTIFICATE_REF,
+                    request_timeout_ms=500,
+                )
+
+        self.assertEqual("authenticated", trace.trace_status)
+        self.assertEqual(2, trace.route_count)
+        self.assertEqual(2, trace.mtls_authenticated_count)
+        self.assertEqual(CA_BUNDLE_REF, trace.ca_bundle_ref)
+        self.assertEqual(CLIENT_CERTIFICATE_REF, trace.client_certificate_ref)
+        self.assertEqual(MTLS_SERVER_NAME, trace.server_name)
+        self.assertTrue(trace.non_loopback_verified)
+        self.assertTrue(trace.authority_plane_bound)
+        self.assertTrue(trace.response_digest_bound)
+        self.assertTrue(trace.socket_trace_complete)
+        self.assertEqual(authority_plane.digest, trace.authority_plane_digest)
+        self.assertEqual(
+            ["root://federation/pki-a", "root://federation/pki-b"],
+            trace.trusted_root_refs,
+        )
+        self.assertTrue(
+            all(
+                binding["server_name"] == MTLS_SERVER_NAME
+                and binding["mtls_status"] == "authenticated"
+                and not binding["socket_trace"]["remote_ip"].startswith("127.")
+                and binding["socket_trace"]["tls_version"].startswith("TLS")
+                and binding["socket_trace"]["cipher_suite"]
+                and binding["socket_trace"]["request_bytes"] > 0
+                and binding["socket_trace"]["response_bytes"] > 0
+                for binding in trace.route_bindings
+            )
+        )
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

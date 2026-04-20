@@ -181,6 +181,15 @@ entries:
     rationale: Required to serialize one authority-plane churn window with overlap retention, draining-only removal, and preserved trust-root quorum across snapshots.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_authority_route_trace.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_route_trace.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, and digest binding for reachable authority-plane members.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -1116,6 +1125,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects overlap-safe key-server churn handling so each trusted root retains active authority coverage during replacement handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_route_trace.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, and authority-plane response-digest matching.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

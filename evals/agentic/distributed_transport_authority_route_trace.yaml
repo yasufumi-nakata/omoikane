@@ -1,0 +1,26 @@
+eval_id: distributed_transport_authority_route_trace
+target: agentic.distributed_transport
+level: L4
+description: >
+  Rotated distributed transport handoff が actual non-loopback mTLS authority routing を通じて
+  reachable authority-plane membersへ接続し、socket-level trace、peer/client certificate fingerprint、
+  response-digest binding を authority plane に束縛できること。
+fixtures:
+  - scenario: federation_authority_route_trace
+    council_tier: federation
+    trace_profile: non-loopback-mtls-authority-route-v1
+    authority_plane_ref: authority-plane://federation/route-nonce-example
+    expected:
+      route_count: 2
+      mtls_authenticated_count: 2
+      non_loopback_verified: true
+      trace_status: authenticated
+assertions:
+  - Route trace must cover every reachable stable authority-plane member
+  - Every traced route must negotiate mTLS and bind both peer and client certificate fingerprints
+  - Remote socket endpoints must be non-loopback before the trace can authenticate
+  - Every traced response digest must match the currently bound authority-plane member payload
+  - Socket trace must capture local/remote tuple, tls version, cipher suite, and byte counts
+metric: exact-match
+threshold: 1.0
+ethics_check: true

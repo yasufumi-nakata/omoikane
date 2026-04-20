@@ -691,6 +691,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authority_plane_churn_safe"])
         self.assertTrue(result["validation"]["authority_churn_overlap_bound"])
         self.assertTrue(result["validation"]["authority_churn_requires_draining_exit"])
+        self.assertTrue(result["validation"]["authority_route_mtls_authenticated"])
+        self.assertTrue(result["validation"]["authority_route_socket_trace_bound"])
         self.assertEqual(
             2,
             result["live_root_directory"]["federation_rotated"]["connectivity_receipt"][
@@ -738,6 +740,43 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             result["authority_plane"]["federation_rotated"]["trusted_root_refs"],
             result["receipts"]["federation_rotated"]["verified_root_refs"],
+        )
+        self.assertEqual(
+            "authenticated",
+            result["authority_route_trace"]["federation_rotated"]["trace_status"],
+        )
+        self.assertEqual(
+            2,
+            result["authority_route_trace"]["federation_rotated"]["route_count"],
+        )
+        self.assertEqual(
+            2,
+            result["authority_route_trace"]["federation_rotated"]["mtls_authenticated_count"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["non_loopback_verified"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["authority_plane_bound"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["response_digest_bound"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["socket_trace_complete"],
+        )
+        self.assertEqual(
+            "authority.local",
+            result["authority_route_trace"]["federation_rotated"]["server_name"],
+        )
+        self.assertTrue(
+            all(
+                binding["mtls_status"] == "authenticated"
+                and binding["socket_trace"]["transport_profile"] == "mtls-socket-trace-v1"
+                and binding["socket_trace"]["tls_version"].startswith("TLS")
+                and not binding["socket_trace"]["remote_ip"].startswith("127.")
+                for binding in result["authority_route_trace"]["federation_rotated"]["route_bindings"]
+            )
         )
         self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
         self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])

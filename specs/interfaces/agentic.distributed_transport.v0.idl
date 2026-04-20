@@ -11,6 +11,7 @@ imports:
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
+  distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -234,6 +235,72 @@ operations:
       - removed key servers must have been previously marked draining
       - quorum_requirement and trusted_root_refs must remain sufficient after churn
       - churn_profile must equal bounded-key-server-churn-window-v1
+  trace_non_loopback_authority_routes:
+    summary: >
+      Establish actual non-loopback mTLS routes to the currently reachable authority-plane members
+      and bind socket-level trace evidence, certificate fingerprints, and response digests
+      to the rotated distributed transport envelope.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - authority_plane_ref
+          - authority_plane_digest
+          - route_targets
+          - ca_bundle_ref
+          - client_certificate_ref
+        properties:
+          envelope_ref:
+            type: string
+            pattern: "^distributed-envelope-"
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          route_targets:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: object
+              required:
+                - key_server_ref
+                - server_endpoint
+                - server_name
+              properties:
+                key_server_ref:
+                  type: string
+                  pattern: "^keyserver://"
+                server_endpoint:
+                  type: string
+                  pattern: "^https://"
+                server_name:
+                  type: string
+                  minLength: 1
+          ca_bundle_ref:
+            type: string
+            minLength: 1
+          client_certificate_ref:
+            type: string
+            minLength: 1
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_authority_route_trace
+    guarantees:
+      - route trace must cover every reachable authority-plane member
+      - every traced route must negotiate mTLS and bind both peer and client certificate fingerprints
+      - remote socket endpoints must be non-loopback before the trace can authenticate
+      - every traced response digest must match the currently bound authority-plane member payload
+      - socket trace must capture local/remote endpoint tuple, tls version, cipher suite, and byte counts
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -384,8 +451,11 @@ events:
   distributed.transport_telemetry_captured:
     payload:
       schema_ref: distributed_transport_relay_telemetry
+  distributed.transport_authority_route_traced:
+    payload:
+      schema_ref: distributed_transport_authority_route_trace
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, multi-hop anti-replay, and bounded relay telemetry.
-    - Actual non-loopback mTLS authority routing and socket-level tracing remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, multi-hop anti-replay, and bounded relay telemetry.
+    - Cross-host authority routing beyond the local machine and OS-native packet capture remain future work.

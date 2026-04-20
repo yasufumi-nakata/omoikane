@@ -1,0 +1,306 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_route_trace.schema"
+title: DistributedTransportAuthorityRouteTrace
+description: >
+  Machine-checkable non-loopback mTLS authority-route trace bound to one rotated
+  distributed transport authority plane.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - trace_ref
+  - authority_plane_ref
+  - authority_plane_digest
+  - envelope_ref
+  - envelope_digest
+  - council_tier
+  - transport_profile
+  - trace_profile
+  - socket_trace_profile
+  - ca_bundle_ref
+  - client_certificate_ref
+  - server_name
+  - route_count
+  - mtls_authenticated_count
+  - trusted_root_refs
+  - non_loopback_verified
+  - authority_plane_bound
+  - response_digest_bound
+  - socket_trace_complete
+  - route_bindings
+  - trace_status
+  - recorded_at
+  - total_connect_latency_ms
+  - total_handshake_latency_ms
+  - total_round_trip_latency_ms
+  - digest
+properties:
+  kind:
+    const: distributed_transport_authority_route_trace
+  schema_version:
+    const: "1.0.0"
+  trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  envelope_ref:
+    type: string
+    pattern: "^distributed-envelope-"
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  trace_profile:
+    const: non-loopback-mtls-authority-route-v1
+  socket_trace_profile:
+    const: mtls-socket-trace-v1
+  ca_bundle_ref:
+    type: string
+    minLength: 1
+  client_certificate_ref:
+    type: string
+    minLength: 1
+  server_name:
+    type: string
+    minLength: 1
+  route_count:
+    type: integer
+    minimum: 1
+  mtls_authenticated_count:
+    type: integer
+    minimum: 0
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  non_loopback_verified:
+    type: boolean
+  authority_plane_bound:
+    type: boolean
+  response_digest_bound:
+    type: boolean
+  socket_trace_complete:
+    type: boolean
+  route_bindings:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - key_server_ref
+        - server_role
+        - authority_status
+        - server_endpoint
+        - server_name
+        - route_binding_ref
+        - matched_root_refs
+        - mtls_status
+        - response_digest_bound
+        - socket_trace
+      properties:
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        server_role:
+          type: string
+          enum:
+            - quorum-notary
+            - directory-mirror
+        authority_status:
+          type: string
+          enum:
+            - active
+            - draining
+        server_endpoint:
+          type: string
+          pattern: "^https://"
+        server_name:
+          type: string
+          minLength: 1
+        route_binding_ref:
+          type: string
+          pattern: "^authority-route://"
+        matched_root_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        mtls_status:
+          type: string
+          enum:
+            - authenticated
+            - rejected
+        response_digest_bound:
+          type: boolean
+        socket_trace:
+          type: object
+          additionalProperties: false
+          required:
+            - local_ip
+            - local_port
+            - remote_ip
+            - remote_port
+            - non_loopback
+            - transport_profile
+            - tls_version
+            - cipher_suite
+            - peer_certificate_fingerprint
+            - client_certificate_fingerprint
+            - request_bytes
+            - response_bytes
+            - http_status
+            - response_digest
+            - connect_latency_ms
+            - tls_handshake_latency_ms
+            - round_trip_latency_ms
+          properties:
+            local_ip:
+              type: string
+              minLength: 1
+            local_port:
+              type: integer
+              minimum: 1
+              maximum: 65535
+            remote_ip:
+              type: string
+              minLength: 1
+            remote_port:
+              type: integer
+              minimum: 1
+              maximum: 65535
+            non_loopback:
+              type: boolean
+            transport_profile:
+              const: mtls-socket-trace-v1
+            tls_version:
+              type: string
+              minLength: 1
+            cipher_suite:
+              type: string
+              minLength: 1
+            peer_certificate_fingerprint:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            client_certificate_fingerprint:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            request_bytes:
+              type: integer
+              minimum: 1
+            response_bytes:
+              type: integer
+              minimum: 1
+            http_status:
+              type: integer
+              minimum: 100
+              maximum: 599
+            response_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            connect_latency_ms:
+              type: number
+              exclusiveMinimum: 0
+            tls_handshake_latency_ms:
+              type: number
+              exclusiveMinimum: 0
+            round_trip_latency_ms:
+              type: number
+              exclusiveMinimum: 0
+  trace_status:
+    type: string
+    enum:
+      - authenticated
+      - rejected
+  recorded_at:
+    type: string
+    format: date-time
+  total_connect_latency_ms:
+    type: number
+    exclusiveMinimum: 0
+  total_handshake_latency_ms:
+    type: number
+    exclusiveMinimum: 0
+  total_round_trip_latency_ms:
+    type: number
+    exclusiveMinimum: 0
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_authority_route_trace
+    schema_version: "1.0.0"
+    trace_ref: authority-route-trace://federation/route-nonce-abcdef123456
+    authority_plane_ref: authority-plane://federation/route-nonce-abcdef123456
+    authority_plane_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    envelope_ref: distributed-envelope-0123456789ab
+    envelope_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    trace_profile: non-loopback-mtls-authority-route-v1
+    socket_trace_profile: mtls-socket-trace-v1
+    ca_bundle_ref: cert://distributed-transport/authority-ca/v1
+    client_certificate_ref: cert://distributed-transport/authority-client/v1
+    server_name: authority.local
+    route_count: 2
+    mtls_authenticated_count: 2
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    non_loopback_verified: true
+    authority_plane_bound: true
+    response_digest_bound: true
+    socket_trace_complete: true
+    route_bindings:
+      - key_server_ref: keyserver://federation/notary-a
+        server_role: quorum-notary
+        authority_status: active
+        server_endpoint: https://192.168.1.4:44300/authority-route-1
+        server_name: authority.local
+        route_binding_ref: authority-route://federation/5f9bece84e1db59e
+        matched_root_refs:
+          - root://federation/pki-a
+        mtls_status: authenticated
+        response_digest_bound: true
+        socket_trace:
+          local_ip: 192.168.1.4
+          local_port: 44301
+          remote_ip: 192.168.1.4
+          remote_port: 44300
+          non_loopback: true
+          transport_profile: mtls-socket-trace-v1
+          tls_version: TLSv1.3
+          cipher_suite: TLS_AES_256_GCM_SHA384
+          peer_certificate_fingerprint: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+          client_certificate_fingerprint: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+          request_bytes: 90
+          response_bytes: 512
+          http_status: 200
+          response_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          connect_latency_ms: 3.1
+          tls_handshake_latency_ms: 11.4
+          round_trip_latency_ms: 8.8
+    trace_status: authenticated
+    recorded_at: "2026-04-21T00:00:00Z"
+    total_connect_latency_ms: 6.2
+    total_handshake_latency_ms: 21.8
+    total_round_trip_latency_ms: 17.5
+    digest: 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567

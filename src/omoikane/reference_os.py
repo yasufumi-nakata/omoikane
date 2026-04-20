@@ -7,6 +7,9 @@ from dataclasses import asdict
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import socket
+import ssl
+import tempfile
 import threading
 from typing import Any, Dict, List
 
@@ -15,6 +18,12 @@ from .agentic.cognitive_audit_governance import CognitiveAuditGovernanceService
 from .agentic.consensus_bus import ConsensusBus
 from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from .agentic.distributed_transport import DistributedTransportService
+from .agentic.distributed_transport_mtls_fixtures import (
+    CA_BUNDLE_REF,
+    CLIENT_CERTIFICATE_REF,
+    MTLS_SERVER_NAME,
+    write_fixture_bundle,
+)
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
 from .common import canonical_json, new_id, sha256_text, utc_now_iso
@@ -1128,6 +1137,28 @@ class OmoikaneReferenceOS:
         }
 
     def run_distributed_transport_demo(self) -> Dict[str, Any]:
+        def discover_non_loopback_ipv4() -> str:
+            try:
+                probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                probe.connect(("192.0.2.1", 1))
+                address = probe.getsockname()[0]
+                probe.close()
+                if address and not address.startswith("127."):
+                    return address
+            except OSError:
+                pass
+            for family, _, _, _, sockaddr in socket.getaddrinfo(
+                socket.gethostname(),
+                None,
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+            ):
+                if family == socket.AF_INET:
+                    address = sockaddr[0]
+                    if address and not address.startswith("127."):
+                        return address
+            raise RuntimeError("non-loopback IPv4 address could not be discovered")
+
         @contextmanager
         def live_root_directory_bridge(directory_payload: Dict[str, Any]):
             class LocalThreadingHTTPServer(ThreadingHTTPServer):
@@ -1163,7 +1194,9 @@ class OmoikaneReferenceOS:
             try:
                 yield endpoint
             finally:
-                pass
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
 
         @contextmanager
         def authority_plane_bridge(authority_payloads: List[Dict[str, Any]]):
@@ -1210,7 +1243,77 @@ class OmoikaneReferenceOS:
             try:
                 yield [f"{base_url}{path}" for path in payload_by_path]
             finally:
-                pass
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
+
+        @contextmanager
+        def authority_route_bridge(
+            authority_payloads: List[Dict[str, Any]],
+            *,
+            bind_host: str,
+            ca_cert_path: str,
+            server_cert_path: str,
+            server_key_path: str,
+        ):
+            payload_by_path = {
+                f"/authority-route-{index}": payload
+                for index, payload in enumerate(authority_payloads, start=1)
+            }
+
+            class LocalThreadingHTTPServer(ThreadingHTTPServer):
+                def server_bind(self) -> None:
+                    self.socket.bind(self.server_address)
+                    self.server_address = self.socket.getsockname()
+                    host, port = self.server_address[:2]
+                    self.server_name = str(host)
+                    self.server_port = int(port)
+
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.1"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    payload = payload_by_path.get(self.path)
+                    if payload is None:
+                        self.send_error(404)
+                        self.close_connection = True
+                        return
+                    body = json.dumps(payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = LocalThreadingHTTPServer((bind_host, 0), Handler)
+            server.daemon_threads = True
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
+            ssl_context.load_cert_chain(server_cert_path, server_key_path)
+            ssl_context.load_verify_locations(cafile=ca_cert_path)
+            server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base_url = f"https://{bind_host}:{server.server_address[1]}"
+            try:
+                yield [
+                    {
+                        "key_server_ref": payload["key_server_ref"],
+                        "server_endpoint": f"{base_url}{path}",
+                        "server_name": MTLS_SERVER_NAME,
+                    }
+                    for path, payload in payload_by_path.items()
+                ]
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
 
         identity = self.identity.create(
             human_consent_proof="consent://distributed-transport-demo/v1",
@@ -1526,6 +1629,27 @@ class OmoikaneReferenceOS:
             initial_authority_plane,
             authority_plane,
         )
+        with tempfile.TemporaryDirectory(prefix="omoikane-authority-mtls-") as cert_dir:
+            cert_bundle = write_fixture_bundle(cert_dir)
+            non_loopback_host = discover_non_loopback_ipv4()
+            with authority_route_bridge(
+                churned_authority_plane_payloads,
+                bind_host=non_loopback_host,
+                ca_cert_path=cert_bundle["ca_cert_path"],
+                server_cert_path=cert_bundle["server_cert_path"],
+                server_key_path=cert_bundle["server_key_path"],
+            ) as authority_route_targets:
+                authority_route_trace = self.distributed_transport.trace_non_loopback_authority_routes(
+                    rotated_federation_envelope,
+                    authority_plane,
+                    route_targets=authority_route_targets,
+                    ca_cert_path=cert_bundle["ca_cert_path"],
+                    ca_bundle_ref=CA_BUNDLE_REF,
+                    client_cert_path=cert_bundle["client_cert_path"],
+                    client_key_path=cert_bundle["client_key_path"],
+                    client_certificate_ref=CLIENT_CERTIFICATE_REF,
+                    request_timeout_ms=500,
+                )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_root_directory_bound",
@@ -1560,6 +1684,16 @@ class OmoikaneReferenceOS:
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_churn_reconciled",
             payload=authority_churn.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_route_traced",
+            payload=authority_route_trace.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -1806,6 +1940,9 @@ class OmoikaneReferenceOS:
             "authority_churn": {
                 "federation_rotated": authority_churn.to_dict(),
             },
+            "authority_route_trace": {
+                "federation_rotated": authority_route_trace.to_dict(),
+            },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
                 "federation_rotated": rotated_receipt.to_dict(),
@@ -1897,6 +2034,28 @@ class OmoikaneReferenceOS:
                     and authority_churn.removed_server_refs
                     == ["keyserver://federation/mirror-b-draining"]
                     and authority_churn.added_server_refs == []
+                ),
+                "authority_route_mtls_authenticated": (
+                    authority_route_trace.trace_status == "authenticated"
+                    and authority_route_trace.route_count == 2
+                    and authority_route_trace.mtls_authenticated_count == 2
+                    and authority_route_trace.authority_plane_bound
+                    and authority_route_trace.response_digest_bound
+                    and authority_route_trace.non_loopback_verified
+                ),
+                "authority_route_socket_trace_bound": (
+                    authority_route_trace.socket_trace_complete
+                    and authority_route_trace.ca_bundle_ref == CA_BUNDLE_REF
+                    and authority_route_trace.client_certificate_ref == CLIENT_CERTIFICATE_REF
+                    and all(
+                        binding["socket_trace"]["transport_profile"] == "mtls-socket-trace-v1"
+                        and binding["socket_trace"]["tls_version"].startswith("TLS")
+                        and binding["socket_trace"]["cipher_suite"]
+                        and binding["socket_trace"]["request_bytes"] > 0
+                        and binding["socket_trace"]["response_bytes"] > 0
+                        and binding["server_name"] == MTLS_SERVER_NAME
+                        for binding in authority_route_trace.route_bindings
+                    )
                 ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"
