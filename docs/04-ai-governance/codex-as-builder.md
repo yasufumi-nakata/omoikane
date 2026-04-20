@@ -29,11 +29,11 @@ Codex（または同等の Builder LLM）は docs/ と specs/ を読み取り、
 4. 実装完了後、Council が evals/ を回す
 5. Guardian 承認 → 本体反映
 
-reference runtime には `builder-demo` があり、
-`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0` /
+reference runtime には `design-reader-demo` / `builder-demo` があり、
+`selfctor.design_reader.v0` / `selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0` /
 `selfctor.rollback.v0`
 の contract に沿って
-`build_request` handoff、patch descriptor 生成、Mirage Self への sandbox apply、
+`design_delta_manifest` handoff、`build_request` emit、patch descriptor 生成、Mirage Self への sandbox apply、
 A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
 rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
@@ -44,6 +44,8 @@ reverse-apply journal と telemetry gate を通過した時だけ `rolled-back` 
 ```yaml
 build_request:
   request_id: <uuid>
+  design_delta_ref: <design://...>
+  design_delta_digest: <sha256>
   target_subsystem: <e.g. "L2.Mind.qualia">
   design_refs:
     - docs/02-subsystems/cognitive/README.md
@@ -53,6 +55,9 @@ build_request:
     - specs/schemas/qualia_tick.schema
   invariants:
     - specs/invariants/continuity.append_only.inv
+  must_sync_docs:
+    - docs/02-subsystems/cognitive/README.md
+    - docs/02-subsystems/mind-substrate/qualia-buffer.md
   constraints:
     must_pass: [evals/cognitive/qualia_contract.yaml]
     forbidden: [docs/02-subsystems/kernel/anti-patterns.md]
@@ -64,9 +69,6 @@ build_request:
   output_paths:
     - src/omoikane/...
     - tests/...
-  must_sync_docs:
-    - README.md
-    - docs/04-ai-governance/codex-as-builder.md
 ```
 
 ## Builder の禁止事項

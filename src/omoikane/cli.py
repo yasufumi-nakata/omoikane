@@ -173,6 +173,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     self_model_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    design_reader_parser = subparsers.add_parser(
+        "design-reader-demo",
+        help="Run the L5 docs/specs design-delta handoff planning scenario",
+    )
+    design_reader_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     sandbox_parser = subparsers.add_parser(
         "sandbox-demo",
         help="Run the L5 sandbox suffering proxy and freeze scenario",
@@ -418,6 +424,10 @@ def main() -> None:
 
     if args.command == "self-model-demo":
         _print_result(runtime.run_self_model_demo(), args.json)
+        return
+
+    if args.command == "design-reader-demo":
+        _print_result(runtime.run_design_reader_demo(), args.json)
         return
 
     if args.command == "sandbox-demo":

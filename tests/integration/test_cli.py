@@ -223,6 +223,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
         self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
 
+    def test_design_reader_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "design-reader-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("ready", result["validation"]["manifest_status"])
+        self.assertEqual(7, result["validation"]["source_digest_count"])
+        self.assertEqual(3, result["validation"]["must_sync_docs_count"])
+        self.assertTrue(result["validation"]["build_request_has_design_delta_ref"])
+        self.assertTrue(result["validation"]["build_request_has_design_delta_digest"])
+        self.assertEqual(7, result["validation"]["output_path_count"])
+
     def test_builder_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 
@@ -231,6 +246,10 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["design_reader_handoff_ok"])
+        self.assertEqual("ready", result["validation"]["design_manifest_status"])
+        self.assertEqual(12, result["validation"]["design_source_digest_count"])
+        self.assertEqual(3, result["validation"]["must_sync_docs_count"])
         self.assertTrue(result["validation"]["scope_allowed"])
         self.assertEqual(2, result["validation"]["patch_count"])
         self.assertEqual("applied", result["validation"]["sandbox_apply_status"])
@@ -249,6 +268,7 @@ class CliIntegrationTests(unittest.TestCase):
             "emit_build_request",
             result["builder"]["council_output"]["approved_action"],
         )
+        self.assertTrue(result["builder"]["build_request"]["design_delta_ref"].startswith("design://"))
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
 
     def test_builder_live_demo_emits_valid_json(self) -> None:
@@ -259,6 +279,8 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["design_reader_handoff_ok"])
+        self.assertEqual("ready", result["validation"]["design_manifest_status"])
         self.assertTrue(result["validation"]["enactment_ok"])
         self.assertEqual("passed", result["validation"]["enactment_status"])
         self.assertEqual(2, result["validation"]["mutated_file_count"])
@@ -279,6 +301,8 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["design_reader_handoff_ok"])
+        self.assertEqual("ready", result["validation"]["design_manifest_status"])
         self.assertTrue(result["validation"]["live_enactment_ok"])
         self.assertTrue(result["validation"]["regression_detected"])
         self.assertEqual("rollback", result["validation"]["rollout_decision"])

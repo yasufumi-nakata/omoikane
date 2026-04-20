@@ -1,0 +1,117 @@
+idl_version: 1
+kind: service
+namespace: selfctor.design_reader.v0
+service: DesignReaderService
+summary: Reduce docs/spec references into a bounded design-delta handoff before build_request emission.
+imports:
+  design_delta_manifest: ../schemas/design_delta_manifest.schema
+  build_request: ../schemas/build_request.yaml
+operations:
+  read_design_delta:
+    summary: Read docs/spec references, compute source digests, and emit a design-delta manifest.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - target_subsystem
+          - change_summary
+          - design_refs
+          - spec_refs
+          - workspace_scope
+          - output_paths
+          - must_sync_docs
+        properties:
+          target_subsystem:
+            type: string
+          change_summary:
+            type: string
+          design_refs:
+            type: array
+            items:
+              type: string
+              pattern: "^docs/"
+          spec_refs:
+            type: array
+            items:
+              type: string
+              pattern: "^specs/"
+          workspace_scope:
+            type: array
+            items:
+              type: string
+          output_paths:
+            type: array
+            items:
+              type: string
+          must_sync_docs:
+            type: array
+            items:
+              type: string
+              pattern: "^docs/"
+    output:
+      schema_ref: design_delta_manifest
+    preconditions:
+      - every design_ref must stay under docs/
+      - every spec_ref must stay under specs/
+      - output_paths must remain inside workspace_scope
+    guarantees:
+      - ready manifests include digests for every referenced design/spec file
+      - immutable safety boundaries are bound into the downstream handoff
+      - must_sync_docs remains a subset of design_refs
+  validate_manifest:
+    summary: Validate one design-delta manifest before Council emits a build_request.
+    input:
+      schema_ref: design_delta_manifest
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  prepare_build_request:
+    summary: Convert a validated design-delta manifest into a build_request.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - manifest_ref
+          - request_id
+          - change_class
+          - must_pass
+          - council_session_id
+          - guardian_gate
+        properties:
+          manifest_ref:
+            type: string
+            pattern: "^design://"
+          request_id:
+            type: string
+          change_class:
+            type: string
+          must_pass:
+            type: array
+            items:
+              type: string
+              pattern: "^evals/"
+          council_session_id:
+            type: string
+          guardian_gate:
+            type: string
+            enum:
+              - pass
+              - veto
+              - escalate
+    output:
+      schema_ref: build_request
+compatibility:
+  stability: bootstrap
+events:
+  - name: selfctor.design.read
+    payload:
+      schema_ref: design_delta_manifest

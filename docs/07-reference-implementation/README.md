@@ -50,6 +50,7 @@ PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-enactment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
@@ -196,10 +197,15 @@ self implication を重み付きで集計して
 `freeze_threshold=0.6` 以上、または affect bridge 接続時に
 Guardian が sandbox を即時凍結することを確認する。
 
+`design-reader-demo` は L5 DesignReader の reference contract
+(`selfctor.design_reader.v0`) を JSON で可視化し、
+`docs/` / `specs/` source digest、`must_sync_docs`、
+`design_delta_manifest`、`build_request` handoff を 1 シナリオで確認する。
+
 `builder-demo` は L5 self-construction builder pipeline の reference contract
 (`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0`) を
 JSON で可視化し、Council の `emit_build_request` handoff が
-`build_request` / `build_artifact` / `sandbox_apply_receipt` /
+`design_delta_manifest` / `build_request` / `build_artifact` / `sandbox_apply_receipt` /
 `staged_rollout_session` schema に束縛されたまま immutable boundary を検証し、
 Mirage Self への sandbox apply、`council_output_build_request_pipeline` と
 `builder_staged_rollout_execution` eval 選定、`promote` / `hold` / `rollback`

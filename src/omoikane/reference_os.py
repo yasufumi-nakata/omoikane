@@ -85,6 +85,7 @@ from .mind.memory import (
 from .mind.qualia import QualiaBuffer
 from .mind.self_model import SelfModelMonitor, SelfModelSnapshot
 from .self_construction import (
+    DesignReaderService,
     DifferentialEvaluatorService,
     GapScanner,
     LiveEnactmentService,
@@ -199,6 +200,7 @@ class OmoikaneReferenceOS:
         self.consensus_bus = ConsensusBus()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
+        self.design_reader = DesignReaderService()
         self.patch_generator = PatchGeneratorService()
         self.diff_evaluator = DifferentialEvaluatorService()
         self.live_enactment = LiveEnactmentService()
@@ -213,6 +215,81 @@ class OmoikaneReferenceOS:
         self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
         self._bootstrap_council()
+
+    def _builder_design_packet(
+        self,
+        *,
+        target_subsystem: str,
+        change_summary: str,
+        spec_refs: List[str],
+        output_paths: List[str],
+    ) -> Dict[str, Any]:
+        return {
+            "target_subsystem": target_subsystem,
+            "change_summary": change_summary,
+            "design_refs": [
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+                "docs/04-ai-governance/self-modification.md",
+            ],
+            "spec_refs": spec_refs,
+            "must_sync_docs": [
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+                "docs/04-ai-governance/self-modification.md",
+            ],
+            "workspace_scope": [
+                "src/",
+                "tests/",
+                "specs/",
+                "evals/",
+                "docs/",
+                "meta/decision-log/",
+            ],
+            "output_paths": output_paths,
+        }
+
+    def _prepare_design_backed_request(
+        self,
+        *,
+        target_subsystem: str,
+        change_summary: str,
+        spec_refs: List[str],
+        output_paths: List[str],
+        request_id: str,
+        change_class: str,
+        must_pass: List[str],
+        council_session_id: str,
+        guardian_gate: str,
+    ) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+        design_packet = self._builder_design_packet(
+            target_subsystem=target_subsystem,
+            change_summary=change_summary,
+            spec_refs=spec_refs,
+            output_paths=output_paths,
+        )
+        design_manifest = self.design_reader.finalize_manifest(
+            self.design_reader.read_design_delta(
+                target_subsystem=design_packet["target_subsystem"],
+                change_summary=design_packet["change_summary"],
+                design_refs=design_packet["design_refs"],
+                spec_refs=design_packet["spec_refs"],
+                workspace_scope=design_packet["workspace_scope"],
+                output_paths=design_packet["output_paths"],
+                must_sync_docs=design_packet["must_sync_docs"],
+                repo_root=self.repo_root,
+            )
+        )
+        design_validation = self.design_reader.validate_manifest(design_manifest)
+        build_request = self.design_reader.prepare_build_request(
+            manifest=design_manifest,
+            request_id=request_id,
+            change_class=change_class,
+            must_pass=must_pass,
+            council_session_id=council_session_id,
+            guardian_gate=guardian_gate,
+        )
+        return design_manifest, design_validation, build_request
 
     def _bootstrap_trust(self) -> None:
         self.trust.register_agent(
@@ -6026,6 +6103,79 @@ class OmoikaneReferenceOS:
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_design_reader_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://design-reader-demo/v1",
+            metadata={"display_name": "Design Reader Sandbox"},
+        )
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.DesignReader",
+            change_summary=(
+                "Materialize docs/specs-derived builder handoff planning before patch generation."
+            ),
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
+                "specs/schemas/build_request.yaml",
+            ],
+            output_paths=[
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "tests/integration/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
+            ],
+            request_id="build-l5-design-reader-0001",
+            change_class="feature-addition",
+            must_pass=["evals/continuity/design_reader_handoff.yaml"],
+            council_session_id="sess-design-reader-0001",
+            guardian_gate="pass",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "design_reader": {
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "build_request": build_request,
+            },
+            "validation": {
+                "ok": design_validation["ok"] and design_manifest["status"] == "ready",
+                "manifest_status": design_manifest["status"],
+                "source_digest_count": len(design_manifest["source_digests"]),
+                "must_sync_docs_count": len(build_request["must_sync_docs"]),
+                "council_review_required": design_manifest["council_review_required"],
+                "guardian_review_required": design_manifest["guardian_review_required"],
+                "build_request_has_design_delta_ref": build_request["design_delta_ref"]
+                == design_manifest["design_delta_ref"],
+                "build_request_has_design_delta_digest": build_request["design_delta_digest"]
+                == design_manifest["design_delta_digest"],
+                "output_path_count": len(build_request["output_paths"]),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_sandbox_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://sandbox-demo/v1",
@@ -6124,58 +6274,21 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://builder-demo/v1",
             metadata={"display_name": "Builder Pipeline Sandbox"},
         )
-        build_request = {
-            "kind": "build_request",
-            "schema_version": "1.0.0",
-            "request_id": "build-l5-0001",
-            "target_subsystem": "L5.DifferentialEvaluator",
-            "change_class": "feature-improvement",
-            "change_summary": "Materialize the council-approved builder pipeline into a bounded reference runtime.",
-            "design_refs": [
-                "docs/02-subsystems/self-construction/README.md",
-                "docs/04-ai-governance/codex-as-builder.md",
-                "docs/04-ai-governance/self-modification.md",
-            ],
-            "spec_refs": [
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.DifferentialEvaluator",
+            change_summary="Materialize the council-approved builder pipeline into a bounded reference runtime.",
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
                 "specs/interfaces/selfctor.rollout.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
                 "specs/schemas/sandbox_apply_receipt.schema",
                 "specs/schemas/staged_rollout_session.schema",
             ],
-            "invariants": [
-                "self_modify requires sandbox A/B + guardian_sig",
-                "self_modify never targets EthicsEnforcer",
-                "self_modify never weakens ContinuityLedger append-only guarantees",
-            ],
-            "constraints": {
-                "must_pass": [
-                    "evals/continuity/council_output_build_request_pipeline.yaml",
-                    "evals/continuity/builder_staged_rollout_execution.yaml",
-                ],
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                "sandbox_profile": "forked-self",
-                "allowed_write_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                    "tests/integration/",
-                    "docs/02-subsystems/self-construction/",
-                    "docs/04-ai-governance/",
-                    "evals/continuity/",
-                    "meta/decision-log/",
-                ],
-            },
-            "workspace_scope": [
-                "src/",
-                "tests/",
-                "specs/",
-                "evals/",
-                "docs/",
-                "meta/decision-log/",
-            ],
-            "output_paths": [
+            output_paths=[
                 "src/omoikane/self_construction/",
                 "tests/unit/",
                 "tests/integration/",
@@ -6184,11 +6297,15 @@ class OmoikaneReferenceOS:
                 "evals/continuity/",
                 "meta/decision-log/",
             ],
-            "approval_context": {
-                "council_session_id": "sess-builder-0001",
-                "guardian_gate": "pass",
-            },
-        }
+            request_id="build-l5-0001",
+            change_class="feature-improvement",
+            must_pass=[
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/builder_staged_rollout_execution.yaml",
+            ],
+            council_session_id="sess-builder-0001",
+            guardian_gate="pass",
+        )
         scope_validation = self.patch_generator.validate_scope(build_request)
         build_artifact = self.patch_generator.generate_patch_set(build_request)
         patch_descriptions = [
@@ -6268,6 +6385,20 @@ class OmoikaneReferenceOS:
             },
             "recorded_at": utc_now_iso(),
         }
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.build_request.emitted",
@@ -6359,6 +6490,7 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "builder": {
+                "design_manifest": design_manifest,
                 "council_output": council_output,
                 "build_request": build_request,
                 "patch_generator_policy": self.patch_generator.policy(),
@@ -6374,6 +6506,9 @@ class OmoikaneReferenceOS:
             },
             "validation": {
                 "ok": (
+                    design_validation["ok"]
+                    and design_manifest["status"] == "ready"
+                    and
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
                     and sandbox_apply_validation["ok"]
@@ -6382,6 +6517,10 @@ class OmoikaneReferenceOS:
                     and rollout_session_validation["ok"]
                     and rollout_session["status"] == "promoted"
                 ),
+                "design_reader_handoff_ok": design_validation["ok"],
+                "design_manifest_status": design_manifest["status"],
+                "design_source_digest_count": len(design_manifest["source_digests"]),
+                "must_sync_docs_count": len(build_request["must_sync_docs"]),
                 "scope_allowed": scope_validation["allowed"],
                 "immutable_boundaries_preserved": set(
                     build_request["constraints"]["forbidden"]
@@ -6412,56 +6551,28 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://builder-live-demo/v1",
             metadata={"display_name": "Builder Live Enactment Sandbox"},
         )
-        build_request = {
-            "kind": "build_request",
-            "schema_version": "1.0.0",
-            "request_id": "build-l5-live-0001",
-            "target_subsystem": "L5.LiveEnactment",
-            "change_class": "runtime-hardening",
-            "change_summary": "Materialize builder patches in a temp workspace and run actual eval commands.",
-            "design_refs": [
-                "docs/02-subsystems/self-construction/README.md",
-                "docs/04-ai-governance/codex-as-builder.md",
-                "docs/04-ai-governance/self-modification.md",
-            ],
-            "spec_refs": [
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.LiveEnactment",
+            change_summary="Materialize builder patches in a temp workspace and run actual eval commands.",
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
                 "specs/interfaces/selfctor.enactment.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
                 "specs/schemas/builder_live_enactment_session.schema",
             ],
-            "invariants": [
-                "self_modify live enactment runs only in a temp workspace",
-                "self_modify live enactment preserves immutable boundaries",
-                "self_modify live enactment cleans up the temp workspace after evals",
-            ],
-            "constraints": {
-                "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                "sandbox_profile": "forked-self",
-                "allowed_write_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                ],
-            },
-            "workspace_scope": [
-                "src/",
-                "tests/",
-                "specs/",
-                "evals/",
-                "docs/",
-                "meta/decision-log/",
-            ],
-            "output_paths": [
+            output_paths=[
                 "src/omoikane/self_construction/",
                 "tests/unit/",
             ],
-            "approval_context": {
-                "council_session_id": "sess-builder-live-0001",
-                "guardian_gate": "pass",
-            },
-        }
+            request_id="build-l5-live-0001",
+            change_class="feature-improvement",
+            must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+            council_session_id="sess-builder-live-0001",
+            guardian_gate="pass",
+        )
         scope_validation = self.patch_generator.validate_scope(build_request)
         build_artifact = self.patch_generator.generate_patch_set(build_request)
         patch_descriptions = [
@@ -6526,6 +6637,20 @@ class OmoikaneReferenceOS:
         }
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="council.build_request.emitted",
             payload={
                 "council_output": council_output,
@@ -6571,6 +6696,7 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "builder": {
+                "design_manifest": design_manifest,
                 "council_output": council_output,
                 "build_request": build_request,
                 "patch_generator_policy": self.patch_generator.policy(),
@@ -6583,11 +6709,16 @@ class OmoikaneReferenceOS:
             },
             "validation": {
                 "ok": (
+                    design_validation["ok"]
+                    and design_manifest["status"] == "ready"
+                    and
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
                     and enactment_validation["ok"]
                     and enactment_session["status"] == "passed"
                 ),
+                "design_reader_handoff_ok": design_validation["ok"],
+                "design_manifest_status": design_manifest["status"],
                 "scope_allowed": scope_validation["allowed"],
                 "patch_count": len(build_artifact.get("patches", [])),
                 "selected_eval_count": len(suite_selection["selected_evals"]),
@@ -6610,24 +6741,17 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://rollback-demo/v1",
             metadata={"display_name": "Rollback Pipeline Sandbox"},
         )
-        build_request = {
-            "kind": "build_request",
-            "schema_version": "1.0.0",
-            "request_id": "build-l5-rollback-0001",
-            "target_subsystem": "L5.RollbackEngine",
-            "change_class": "safety-hardening",
-            "change_summary": "Materialize deterministic rollback execution for the builder pipeline.",
-            "design_refs": [
-                "docs/02-subsystems/self-construction/README.md",
-                "docs/04-ai-governance/codex-as-builder.md",
-                "docs/04-ai-governance/self-modification.md",
-            ],
-            "spec_refs": [
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.RollbackEngine",
+            change_summary="Materialize deterministic rollback execution for the builder pipeline.",
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
                 "specs/interfaces/selfctor.enactment.v0.idl",
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
                 "specs/interfaces/selfctor.rollout.v0.idl",
                 "specs/interfaces/selfctor.rollback.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
                 "specs/schemas/builder_live_enactment_session.schema",
@@ -6635,40 +6759,7 @@ class OmoikaneReferenceOS:
                 "specs/schemas/staged_rollout_session.schema",
                 "specs/schemas/builder_rollback_session.schema",
             ],
-            "invariants": [
-                "self_modify rollback restores pre-apply Mirage Self snapshot",
-                "self_modify rollback keeps continuity evidence append-only",
-                "self_modify rollback notifies self council guardian",
-                "self_modify rollback binds reverse-apply journal to live enactment receipts",
-            ],
-            "constraints": {
-                "must_pass": [
-                    "evals/continuity/council_output_build_request_pipeline.yaml",
-                    "evals/continuity/builder_live_enactment_execution.yaml",
-                    "evals/continuity/builder_staged_rollout_execution.yaml",
-                    "evals/continuity/builder_rollback_execution.yaml",
-                ],
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                "sandbox_profile": "forked-self",
-                "allowed_write_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                    "tests/integration/",
-                    "docs/02-subsystems/self-construction/",
-                    "docs/04-ai-governance/",
-                    "evals/continuity/",
-                    "meta/decision-log/",
-                ],
-            },
-            "workspace_scope": [
-                "src/",
-                "tests/",
-                "specs/",
-                "evals/",
-                "docs/",
-                "meta/decision-log/",
-            ],
-            "output_paths": [
+            output_paths=[
                 "src/omoikane/self_construction/",
                 "tests/unit/",
                 "tests/integration/",
@@ -6677,11 +6768,17 @@ class OmoikaneReferenceOS:
                 "evals/continuity/",
                 "meta/decision-log/",
             ],
-            "approval_context": {
-                "council_session_id": "sess-builder-rollback-0001",
-                "guardian_gate": "pass",
-            },
-        }
+            request_id="build-l5-rollback-0001",
+            change_class="feature-improvement",
+            must_pass=[
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/builder_live_enactment_execution.yaml",
+                "evals/continuity/builder_staged_rollout_execution.yaml",
+                "evals/continuity/builder_rollback_execution.yaml",
+            ],
+            council_session_id="sess-builder-rollback-0001",
+            guardian_gate="pass",
+        )
         scope_validation = self.patch_generator.validate_scope(build_request)
         build_artifact = self.patch_generator.generate_patch_set(build_request)
         patch_descriptions = [
@@ -6782,6 +6879,20 @@ class OmoikaneReferenceOS:
             },
             "recorded_at": utc_now_iso(),
         }
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.build_request.emitted",
@@ -6901,6 +7012,7 @@ class OmoikaneReferenceOS:
                 "lineage_id": identity.lineage_id,
             },
             "builder": {
+                "design_manifest": design_manifest,
                 "council_output": council_output,
                 "build_request": build_request,
                 "patch_generator_policy": self.patch_generator.policy(),
@@ -6919,6 +7031,9 @@ class OmoikaneReferenceOS:
             },
             "validation": {
                 "ok": (
+                    design_validation["ok"]
+                    and design_manifest["status"] == "ready"
+                    and
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
                     and sandbox_apply_validation["ok"]
@@ -6931,6 +7046,8 @@ class OmoikaneReferenceOS:
                     and rollback_session_validation["ok"]
                     and rollback_session["status"] == "rolled-back"
                 ),
+                "design_reader_handoff_ok": design_validation["ok"],
+                "design_manifest_status": design_manifest["status"],
                 "scope_allowed": scope_validation["allowed"],
                 "sandbox_apply_ok": sandbox_apply_validation["ok"],
                 "sandbox_apply_status": sandbox_apply_receipt["status"],

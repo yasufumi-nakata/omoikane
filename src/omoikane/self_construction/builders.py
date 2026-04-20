@@ -84,14 +84,28 @@ class PatchGeneratorService:
         forbidden = list(constraints.get("forbidden", []))
         workspace_scope = list(request.get("workspace_scope", []))
         allowed_write_paths = list(constraints.get("allowed_write_paths", []))
+        must_sync_docs = list(request.get("must_sync_docs", []))
 
         blocking_rules: list[str] = []
+        design_delta_ref = str(request.get("design_delta_ref", ""))
+        if not design_delta_ref.startswith("design://"):
+            blocking_rules.append("design_delta_ref must start with design://")
+        design_delta_digest = str(request.get("design_delta_digest", ""))
+        if len(design_delta_digest) != 64:
+            blocking_rules.append("design_delta_digest must be a sha256 hex digest")
         for boundary in self._policy.immutable_boundaries:
             if boundary not in forbidden:
                 blocking_rules.append(f"immutable boundary missing from forbidden list: {boundary}")
         for path in allowed_write_paths:
             if not _is_within_scope(path, workspace_scope):
                 blocking_rules.append(f"allowed write path escapes workspace scope: {path}")
+        if not must_sync_docs:
+            blocking_rules.append("must_sync_docs must not be empty")
+        for path in must_sync_docs:
+            if not path.startswith("docs/"):
+                blocking_rules.append(f"must_sync_docs must stay under docs/: {path}")
+            elif not _is_within_scope(path, workspace_scope):
+                blocking_rules.append(f"must_sync_docs escapes workspace scope: {path}")
         if not allowed_write_paths:
             blocking_rules.append("allowed_write_paths must not be empty")
         if not workspace_scope:
@@ -166,8 +180,16 @@ class PatchGeneratorService:
                 "applies_cleanly": True,
             },
         ]
-        build_artifact["summary"] = "Patch descriptors and regression plan emitted for sandbox-only builder execution."
+        build_artifact["summary"] = (
+            "Patch descriptors, doc-sync handoff, and regression plan emitted for sandbox-only "
+            "builder execution."
+        )
         build_artifact["artifacts"] = [
+            {
+                "artifact_kind": "design_delta_manifest",
+                "ref": request["design_delta_ref"],
+                "summary": "DesignReader handoff was bound before patch emission.",
+            },
             {
                 "artifact_kind": "patch_descriptor",
                 "ref": f"patch://{patches[0]['patch_id']}",

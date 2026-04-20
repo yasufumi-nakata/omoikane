@@ -34,6 +34,7 @@
 - `interface.bdb.v0.idl`
 - `interface.ewa.v0.idl`
 - `interface.wms.v0.idl`
+- `selfctor.design_reader.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.diff_eval.v0.idl`
 - `selfctor.enactment.v0.idl`

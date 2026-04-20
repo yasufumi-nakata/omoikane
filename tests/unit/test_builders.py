@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from omoikane.self_construction import (
+    DesignReaderService,
     DifferentialEvaluatorService,
     LiveEnactmentService,
     PatchGeneratorService,
@@ -13,30 +14,81 @@ from omoikane.self_construction import (
 )
 
 
-class PatchGeneratorServiceTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.request = {
-            "request_id": "build-l5-0001",
-            "target_subsystem": "L5.DifferentialEvaluator",
-            "constraints": {
-                "must_pass": ["evals/continuity/council_output_build_request_pipeline.yaml"],
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                "allowed_write_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                ],
-            },
-            "workspace_scope": ["src/", "tests/", "evals/"],
-            "output_paths": [
+def _design_backed_request(
+    *,
+    target_subsystem: str,
+    request_id: str,
+    must_pass: list[str],
+    output_paths: list[str] | None = None,
+) -> dict[str, object]:
+    repo_root = Path(__file__).resolve().parents[2]
+    reader = DesignReaderService()
+    design_manifest = reader.finalize_manifest(
+        reader.read_design_delta(
+            target_subsystem=target_subsystem,
+            change_summary="Unit-test DesignReader handoff.",
+            design_refs=[
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+            ],
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
+                "specs/schemas/build_request.yaml",
+            ],
+            workspace_scope=["src/", "tests/", "specs/", "evals/", "docs/", "meta/decision-log/"],
+            output_paths=output_paths or ["src/omoikane/self_construction/", "tests/unit/"],
+            must_sync_docs=[
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
+            ],
+            repo_root=repo_root,
+        )
+    )
+    return reader.prepare_build_request(
+        manifest=design_manifest,
+        request_id=request_id,
+        change_class="feature-improvement",
+        must_pass=must_pass,
+        council_session_id=f"sess-{request_id}",
+        guardian_gate="pass",
+    )
+
+
+class DesignReaderServiceTests(unittest.TestCase):
+    def test_prepare_build_request_binds_design_delta_manifest(self) -> None:
+        request = _design_backed_request(
+            target_subsystem="L5.DesignReader",
+            request_id="build-l5-design-reader-0001",
+            must_pass=["evals/continuity/design_reader_handoff.yaml"],
+            output_paths=[
                 "src/omoikane/self_construction/",
                 "tests/unit/",
+                "docs/02-subsystems/self-construction/",
+                "evals/continuity/",
             ],
-            "spec_refs": [
-                "specs/interfaces/selfctor.patch_generator.v0.idl",
-                "specs/interfaces/selfctor.diff_eval.v0.idl",
+        )
+
+        self.assertTrue(str(request["design_delta_ref"]).startswith("design://"))
+        self.assertEqual(64, len(str(request["design_delta_digest"])))
+        self.assertEqual(
+            [
+                "docs/02-subsystems/self-construction/README.md",
+                "docs/04-ai-governance/codex-as-builder.md",
             ],
-            "design_refs": ["docs/04-ai-governance/codex-as-builder.md"],
-        }
+            request["must_sync_docs"],
+        )
+        self.assertIn("evals/continuity/design_reader_handoff.yaml", request["constraints"]["must_pass"])
+
+
+class PatchGeneratorServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.request = _design_backed_request(
+            target_subsystem="L5.DifferentialEvaluator",
+            request_id="build-l5-0001",
+            must_pass=["evals/continuity/council_output_build_request_pipeline.yaml"],
+        )
 
     def test_validate_scope_rejects_missing_immutable_boundary(self) -> None:
         service = PatchGeneratorService()
@@ -90,33 +142,12 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
 
 class SandboxApplyServiceTests(unittest.TestCase):
     def test_apply_artifact_emits_receipt_with_rollback_ready_invariants(self) -> None:
-        request = {
-            "request_id": "build-l5-0001",
-            "constraints": {
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-            },
-        }
-        build_artifact = PatchGeneratorService().generate_patch_set(
-            {
-                "request_id": "build-l5-0001",
-                "target_subsystem": "L5.DifferentialEvaluator",
-                "constraints": {
-                    "must_pass": ["evals/continuity/council_output_build_request_pipeline.yaml"],
-                    "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                    "allowed_write_paths": [
-                        "src/omoikane/self_construction/",
-                        "tests/unit/",
-                    ],
-                },
-                "workspace_scope": ["src/", "tests/", "evals/"],
-                "output_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                ],
-                "spec_refs": [],
-                "design_refs": [],
-            }
+        request = _design_backed_request(
+            target_subsystem="L5.DifferentialEvaluator",
+            request_id="build-l5-0001",
+            must_pass=["evals/continuity/council_output_build_request_pipeline.yaml"],
         )
+        build_artifact = PatchGeneratorService().generate_patch_set(request)
 
         receipt = SandboxApplyService().apply_artifact(
             build_request=request,
@@ -191,45 +222,17 @@ class RollbackEngineServiceTests(unittest.TestCase):
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
         live_enactment_session = LiveEnactmentService().execute(
-            build_request={
-                "request_id": "build-l5-rollback-0001",
-                "constraints": {
-                    "allowed_write_paths": [
-                        "src/omoikane/self_construction/",
-                        "tests/unit/",
-                    ],
-                    "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                    "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
-                },
-                "workspace_scope": ["src/", "tests/", "evals/"],
-                "output_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                ],
-                "target_subsystem": "L5.RollbackEngine",
-                "spec_refs": ["specs/interfaces/selfctor.rollback.v0.idl"],
-                "design_refs": ["docs/02-subsystems/self-construction/README.md"],
-            },
+            build_request=_design_backed_request(
+                target_subsystem="L5.RollbackEngine",
+                request_id="build-l5-rollback-0001",
+                must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+            ),
             build_artifact=PatchGeneratorService().generate_patch_set(
-                {
-                    "request_id": "build-l5-rollback-0001",
-                    "constraints": {
-                        "allowed_write_paths": [
-                            "src/omoikane/self_construction/",
-                            "tests/unit/",
-                        ],
-                        "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                        "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
-                    },
-                    "workspace_scope": ["src/", "tests/", "evals/"],
-                    "output_paths": [
-                        "src/omoikane/self_construction/",
-                        "tests/unit/",
-                    ],
-                    "target_subsystem": "L5.RollbackEngine",
-                    "spec_refs": ["specs/interfaces/selfctor.rollback.v0.idl"],
-                    "design_refs": ["docs/02-subsystems/self-construction/README.md"],
-                }
+                _design_backed_request(
+                    target_subsystem="L5.RollbackEngine",
+                    request_id="build-l5-rollback-0001",
+                    must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+                )
             ),
             eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
             repo_root=Path(__file__).resolve().parents[2],
@@ -285,25 +288,11 @@ class RollbackEngineServiceTests(unittest.TestCase):
 class LiveEnactmentServiceTests(unittest.TestCase):
     def test_execute_materializes_temp_workspace_and_runs_eval_commands(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        request = {
-            "request_id": "build-l5-live-0001",
-            "constraints": {
-                "allowed_write_paths": [
-                    "src/omoikane/self_construction/",
-                    "tests/unit/",
-                ],
-                "forbidden": ["L1.EthicsEnforcer", "L1.ContinuityLedger"],
-                "must_pass": ["evals/continuity/builder_live_enactment_execution.yaml"],
-            },
-            "workspace_scope": ["src/", "tests/", "evals/"],
-            "output_paths": [
-                "src/omoikane/self_construction/",
-                "tests/unit/",
-            ],
-            "target_subsystem": "L5.LiveEnactment",
-            "spec_refs": ["specs/interfaces/selfctor.enactment.v0.idl"],
-            "design_refs": ["docs/02-subsystems/self-construction/README.md"],
-        }
+        request = _design_backed_request(
+            target_subsystem="L5.LiveEnactment",
+            request_id="build-l5-live-0001",
+            must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+        )
         artifact = PatchGeneratorService().generate_patch_set(request)
 
         session = LiveEnactmentService().execute(

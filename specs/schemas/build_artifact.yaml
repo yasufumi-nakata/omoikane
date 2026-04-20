@@ -49,6 +49,7 @@ properties:
         artifact_kind:
           type: string
           enum:
+            - design_delta_manifest
             - patch_descriptor
             - test_report
             - build_log

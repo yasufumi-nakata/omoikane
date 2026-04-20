@@ -14,10 +14,13 @@ from .builders import (
     SandboxApplyPolicy,
     SandboxApplyService,
 )
+from .design_reader import DesignReaderPolicy, DesignReaderService
 from .gaps import GapScanner
 from .sandbox import SandboxSentinel, SandboxSignalProfile
 
 __all__ = [
+    "DesignReaderPolicy",
+    "DesignReaderService",
     "DifferentialEvaluationPolicy",
     "DifferentialEvaluatorService",
     "GapScanner",

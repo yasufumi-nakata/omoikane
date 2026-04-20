@@ -63,6 +63,10 @@ Council が `emit_build_request` で発行した builder handoff が
 immutable boundary を保ったまま patch descriptor 生成、
 differential eval、promote/hold/rollback 分類まで到達するか。
 
+### Design Reader Handoff
+DesignReader が docs/specs から source digest と must-sync docs を束ねた
+design delta manifest を生成し、Council emit 前の build_request へ安全に接続できるか。
+
 ### Builder Staged Rollout Execution
 Mirage Self への sandbox apply が rollback-ready receipt を返し、
 builder staged rollout が dark-launch から full-100pct まで

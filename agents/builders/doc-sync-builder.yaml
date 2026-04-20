@@ -2,13 +2,17 @@ name: doc-sync-builder
 role: builder
 version: 0.1.0
 capabilities:
+  - design.delta.read
   - sync.docs-to-impl
   - sync.impl-to-docs
 trust_floor: 0.6
+input_schema_ref: specs/schemas/design_delta_manifest.schema
+output_schema_ref: specs/schemas/build_request.yaml
 ethics_constraints: []
 prompt_or_policy_ref: agents/builders/codex-builder.policy.md
 when_to_invoke: |
   - docs/ と同一 repo の reference runtime の整合性検査が必要な時
+  - DesignReader handoff から build_request を起こす時
   - 実装側の発見を docs/ に反映する提案を作る時
 when_not_to_invoke: |
   - docs 内部の整合性のみ（DesignArchitect の管轄）

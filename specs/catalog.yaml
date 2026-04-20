@@ -345,6 +345,25 @@ entries:
       - reference-runtime
     rationale: Required to make the L1 termination gate machine-readable before scheduler cancellation and richer lifecycle orchestration land.
   - priority: P1
+    kind: schema
+    file: specs/schemas/design_delta_manifest.schema
+    consumers:
+      - specs/interfaces/selfctor.design_reader.v0.idl
+      - specs/schemas/build_request.yaml
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - reference-runtime
+    rationale: Required to serialize one docs/specs-derived builder handoff before Council emits a build_request.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.design_reader.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make DesignReader handoff planning and build_request preparation machine-readable in the L5 builder pipeline.
+  - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.patch_generator.v0.idl
     consumers:
@@ -419,6 +438,13 @@ entries:
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
     rationale: Required to make regression-triggered builder rollback execution, reverse-apply journal binding, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/design_reader_handoff.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/doc-sync-builder.yaml
+    rationale: Protects DesignReader digest binding, must-sync docs coverage, and build_request handoff readiness.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl

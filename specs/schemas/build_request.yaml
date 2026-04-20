@@ -8,11 +8,14 @@ required:
   - kind
   - schema_version
   - request_id
+  - design_delta_ref
+  - design_delta_digest
   - target_subsystem
   - change_class
   - design_refs
   - spec_refs
   - invariants
+  - must_sync_docs
   - constraints
   - workspace_scope
   - output_paths
@@ -25,6 +28,12 @@ properties:
   request_id:
     type: string
     minLength: 8
+  design_delta_ref:
+    type: string
+    pattern: "^design://"
+  design_delta_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   target_subsystem:
     type: string
     minLength: 1
@@ -58,6 +67,12 @@ properties:
     items:
       type: string
       minLength: 1
+  must_sync_docs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^docs/"
   constraints:
     type: object
     additionalProperties: false
@@ -142,6 +157,8 @@ examples:
   - kind: build_request
     schema_version: 1.0.0
     request_id: build-0001
+    design_delta_ref: design://design-delta-0001
+    design_delta_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     target_subsystem: L5.DifferentialEvaluator
     change_class: feature-improvement
     change_summary: Harden rollback boundary checks in sandbox promotion.
@@ -153,6 +170,8 @@ examples:
     invariants:
       - self_modify requires sandbox A/B + guardian_sig
       - self_modify never targets EthicsEnforcer
+    must_sync_docs:
+      - docs/04-ai-governance/self-modification.md
     constraints:
       must_pass:
         - evals/continuity/council_output_build_request_pipeline.yaml
