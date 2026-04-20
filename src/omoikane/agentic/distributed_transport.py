@@ -36,6 +36,8 @@ HERITAGE_ROOTS = (
 )
 RELAY_TELEMETRY_PROFILE = "bounded-relay-observability-v1"
 LIVE_ROOT_DIRECTORY_TRANSPORT_PROFILE = "live-http-json-rootdir-v1"
+LIVE_KEY_SERVER_TRANSPORT_PROFILE = "live-http-json-keyserver-v1"
+AUTHORITY_PLANE_PROFILE = "bounded-key-server-fleet-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -340,6 +342,48 @@ class DistributedTransportRootDirectory:
         }
 
 
+@dataclass
+class DistributedTransportAuthorityPlane:
+    """Bounded authority-plane snapshot for external key-server fleets."""
+
+    authority_plane_ref: str
+    checked_at: str
+    council_tier: str
+    transport_profile: str
+    authority_profile: str
+    key_epoch: int
+    directory_ref: str
+    directory_digest: str
+    quorum_requirement: int
+    reachable_server_count: int
+    matched_root_count: int
+    trusted_root_refs: List[str]
+    key_servers: List[Dict[str, Any]]
+    proof_digest: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_plane",
+            "schema_version": "1.0.0",
+            "authority_plane_ref": self.authority_plane_ref,
+            "checked_at": self.checked_at,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "authority_profile": self.authority_profile,
+            "key_epoch": self.key_epoch,
+            "directory_ref": self.directory_ref,
+            "directory_digest": self.directory_digest,
+            "quorum_requirement": self.quorum_requirement,
+            "reachable_server_count": self.reachable_server_count,
+            "matched_root_count": self.matched_root_count,
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "key_servers": [dict(server) for server in self.key_servers],
+            "proof_digest": self.proof_digest,
+            "digest": self.digest,
+        }
+
+
 class DistributedTransportService:
     """Issue transport-attested remote handoff bundles and verify receipts."""
 
@@ -483,6 +527,106 @@ class DistributedTransportService:
             observed_latency_ms=observed_latency_ms,
             http_status=http_status,
             response_digest=sha256_text(canonical_json(payload)),
+        )
+
+    def probe_authority_plane(
+        self,
+        envelope: DistributedTransportEnvelope,
+        root_directory: DistributedTransportRootDirectory,
+        *,
+        authority_endpoints: List[str],
+        request_timeout_ms: int = 1_000,
+    ) -> DistributedTransportAuthorityPlane:
+        if root_directory.council_tier != envelope.council_tier:
+            raise ValueError("authority plane root_directory council_tier must match envelope")
+        if root_directory.transport_profile != envelope.transport_profile:
+            raise ValueError("authority plane root_directory transport_profile must match envelope")
+        if root_directory.key_epoch not in envelope.accepted_key_epochs:
+            raise ValueError("authority plane root_directory key_epoch must be accepted by envelope")
+
+        normalized_endpoints = self._normalize_string_list(authority_endpoints, "authority_endpoints")
+        timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
+        directory_digest = sha256_text(canonical_json(root_directory.to_dict()))
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        checked_at = utc_now_iso()
+        key_servers: List[Dict[str, Any]] = []
+        matched_root_refs: List[str] = []
+        for endpoint in normalized_endpoints:
+            request_started = time.monotonic()
+            with opener.open(endpoint, timeout=timeout_ms / 1000.0) as response:
+                http_status = int(getattr(response, "status", response.getcode()))
+                payload_text = response.read().decode("utf-8")
+            observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 1)
+            if http_status != 200:
+                raise ValueError(
+                    f"authority plane key server endpoint returned unexpected status {http_status}"
+                )
+            try:
+                payload = json.loads(payload_text)
+            except json.JSONDecodeError as exc:
+                raise ValueError("authority plane key server endpoint must return JSON") from exc
+            if not isinstance(payload, Mapping):
+                raise ValueError("authority plane key server payload must be a mapping")
+            normalized_server = self._normalize_key_server_report(
+                payload,
+                envelope,
+                root_directory,
+                server_endpoint=endpoint,
+                request_timeout_ms=timeout_ms,
+                observed_latency_ms=observed_latency_ms,
+                http_status=http_status,
+                response_digest=sha256_text(canonical_json(payload)),
+            )
+            key_servers.append(normalized_server)
+            matched_root_refs.extend(normalized_server["matched_root_refs"])
+
+        trusted_root_refs = sorted(set(matched_root_refs))
+        if len(trusted_root_refs) < envelope.trust_root_quorum:
+            raise ValueError("authority plane must satisfy envelope trust_root_quorum")
+        proof_digest = sha256_text(
+            canonical_json(
+                {
+                    "authority_plane_ref": f"authority-plane://{envelope.council_tier}/{envelope.route_nonce}",
+                    "directory_digest": directory_digest,
+                    "key_server_refs": [server["key_server_ref"] for server in key_servers],
+                    "matched_root_refs": trusted_root_refs,
+                    "quorum_requirement": envelope.trust_root_quorum,
+                }
+            )
+        )
+        payload = {
+            "authority_plane_ref": f"authority-plane://{envelope.council_tier}/{envelope.route_nonce}",
+            "authority_profile": AUTHORITY_PLANE_PROFILE,
+            "checked_at": checked_at,
+            "council_tier": envelope.council_tier,
+            "directory_digest": directory_digest,
+            "directory_ref": root_directory.directory_ref,
+            "key_epoch": root_directory.key_epoch,
+            "key_servers": key_servers,
+            "matched_root_count": len(trusted_root_refs),
+            "proof_digest": proof_digest,
+            "quorum_requirement": envelope.trust_root_quorum,
+            "reachable_server_count": len(key_servers),
+            "transport_profile": envelope.transport_profile,
+            "trusted_root_refs": trusted_root_refs,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthorityPlane(
+            authority_plane_ref=payload["authority_plane_ref"],
+            checked_at=checked_at,
+            council_tier=envelope.council_tier,
+            transport_profile=envelope.transport_profile,
+            authority_profile=AUTHORITY_PLANE_PROFILE,
+            key_epoch=root_directory.key_epoch,
+            directory_ref=root_directory.directory_ref,
+            directory_digest=directory_digest,
+            quorum_requirement=envelope.trust_root_quorum,
+            reachable_server_count=len(key_servers),
+            matched_root_count=len(trusted_root_refs),
+            trusted_root_refs=trusted_root_refs,
+            key_servers=key_servers,
+            proof_digest=proof_digest,
+            digest=digest,
         )
 
     def record_receipt(
@@ -737,6 +881,84 @@ class DistributedTransportService:
             recorded_at=recorded_at,
             digest=digest,
         )
+
+    def _normalize_key_server_report(
+        self,
+        payload: Mapping[str, Any],
+        envelope: DistributedTransportEnvelope,
+        root_directory: DistributedTransportRootDirectory,
+        *,
+        server_endpoint: str,
+        request_timeout_ms: int,
+        observed_latency_ms: float,
+        http_status: int,
+        response_digest: str,
+    ) -> Dict[str, Any]:
+        if payload.get("kind") != "distributed_transport_key_server":
+            raise ValueError("authority plane key server kind must equal distributed_transport_key_server")
+        if payload.get("schema_version") != "1.0.0":
+            raise ValueError("authority plane key server schema_version must equal 1.0.0")
+        key_server_ref = self._require_non_empty_string(payload.get("key_server_ref"), "key_server_ref")
+        if not key_server_ref.startswith("keyserver://"):
+            raise ValueError("key_server_ref must start with keyserver://")
+        checked_at = self._require_non_empty_string(payload.get("checked_at"), "checked_at")
+        council_tier = self._require_non_empty_string(payload.get("council_tier"), "council_tier")
+        if council_tier != envelope.council_tier:
+            raise ValueError("authority plane key server council_tier must match envelope")
+        served_transport_profile = self._require_non_empty_string(
+            payload.get("served_transport_profile"),
+            "served_transport_profile",
+        )
+        if served_transport_profile != envelope.transport_profile:
+            raise ValueError("authority plane key server served_transport_profile must match envelope")
+        server_role = self._require_non_empty_string(payload.get("server_role"), "server_role")
+        if server_role not in {"directory-mirror", "quorum-notary"}:
+            raise ValueError("authority plane key server role must be directory-mirror or quorum-notary")
+        authority_status = self._require_non_empty_string(
+            payload.get("authority_status"),
+            "authority_status",
+        )
+        if authority_status not in {"active", "draining"}:
+            raise ValueError("authority plane key server authority_status must be active or draining")
+        key_epoch = self._require_positive_int(payload.get("key_epoch"), "key_epoch")
+        if key_epoch != root_directory.key_epoch or key_epoch not in envelope.accepted_key_epochs:
+            raise ValueError("authority plane key server key_epoch must match accepted root directory epoch")
+        proof_digest = self._require_sha256_hex(payload.get("proof_digest"), "proof_digest")
+        advertised_root_refs = self._normalize_string_list(
+            payload.get("advertised_root_refs"),
+            "advertised_root_refs",
+        )
+        matched_root_refs = sorted(
+            {
+                root_ref
+                for root_ref in advertised_root_refs
+                if root_ref in root_directory.trusted_root_refs
+            }
+        )
+        if not matched_root_refs:
+            raise ValueError("authority plane key server must advertise at least 1 trusted root")
+        return {
+            "kind": "distributed_transport_key_server",
+            "schema_version": "1.0.0",
+            "key_server_ref": key_server_ref,
+            "checked_at": checked_at,
+            "council_tier": council_tier,
+            "served_transport_profile": served_transport_profile,
+            "server_role": server_role,
+            "authority_status": authority_status,
+            "key_epoch": key_epoch,
+            "advertised_root_refs": advertised_root_refs,
+            "matched_root_refs": matched_root_refs,
+            "server_endpoint": server_endpoint,
+            "transport_profile": LIVE_KEY_SERVER_TRANSPORT_PROFILE,
+            "request_timeout_ms": request_timeout_ms,
+            "observed_latency_ms": observed_latency_ms,
+            "http_status": http_status,
+            "response_digest": response_digest,
+            "receipt_status": "reachable",
+            "proof_digest": proof_digest,
+            "recorded_at": utc_now_iso(),
+        }
 
     def _normalize_root_directory_report(
         self,

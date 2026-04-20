@@ -689,11 +689,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["federated_roots_enforced"])
         self.assertTrue(result["validation"]["live_root_directory_reachable"])
         self.assertTrue(result["validation"]["live_root_directory_quorum_bound"])
+        self.assertTrue(result["validation"]["authority_plane_fleet_bound"])
+        self.assertTrue(result["validation"]["authority_plane_root_directory_bound"])
         self.assertEqual(
             2,
             result["live_root_directory"]["federation_rotated"]["connectivity_receipt"][
                 "matched_root_count"
             ],
+        )
+        self.assertEqual(
+            2,
+            result["authority_plane"]["federation_rotated"]["reachable_server_count"],
+        )
+        self.assertEqual(
+            ["root://federation/pki-a", "root://federation/pki-b"],
+            result["authority_plane"]["federation_rotated"]["trusted_root_refs"],
+        )
+        self.assertEqual(
+            result["authority_plane"]["federation_rotated"]["trusted_root_refs"],
+            result["receipts"]["federation_rotated"]["verified_root_refs"],
         )
         self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
         self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])

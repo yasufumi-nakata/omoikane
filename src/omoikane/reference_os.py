@@ -1159,6 +1159,53 @@ class OmoikaneReferenceOS:
             finally:
                 pass
 
+        @contextmanager
+        def authority_plane_bridge(authority_payloads: List[Dict[str, Any]]):
+            payload_by_path = {
+                f"/key-server-{index}": payload
+                for index, payload in enumerate(authority_payloads, start=1)
+            }
+
+            class LocalThreadingHTTPServer(ThreadingHTTPServer):
+                def server_bind(self) -> None:
+                    self.socket.bind(self.server_address)
+                    self.server_address = self.socket.getsockname()
+                    host, port = self.server_address[:2]
+                    self.server_name = str(host)
+                    self.server_port = int(port)
+
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    payload = payload_by_path.get(self.path)
+                    if payload is None:
+                        self.send_error(404)
+                        self.close_connection = True
+                        return
+                    body = json.dumps(payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            server.daemon_threads = True
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            try:
+                yield [f"{base_url}{path}" for path in payload_by_path]
+            finally:
+                pass
+
         identity = self.identity.create(
             human_consent_proof="consent://distributed-transport-demo/v1",
             metadata={"display_name": "Distributed Transport Sandbox"},
@@ -1336,10 +1383,73 @@ class OmoikaneReferenceOS:
                 directory_endpoint=root_directory_endpoint,
                 request_timeout_ms=500,
             )
+        authority_plane_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:11:00Z",
+                "council_tier": rotated_federation_envelope.council_tier,
+                "served_transport_profile": rotated_federation_envelope.transport_profile,
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "key_server_ref": "keyserver://federation/notary-a",
+                            "root_refs": ["root://federation/pki-a"],
+                            "key_epoch": 2,
+                            "server_role": "quorum-notary",
+                        }
+                    )
+                ),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-b",
+                "checked_at": "2026-04-20T02:11:01Z",
+                "council_tier": rotated_federation_envelope.council_tier,
+                "served_transport_profile": rotated_federation_envelope.transport_profile,
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "key_server_ref": "keyserver://federation/mirror-b",
+                            "root_refs": ["root://federation/pki-b"],
+                            "key_epoch": 2,
+                            "server_role": "directory-mirror",
+                        }
+                    )
+                ),
+            },
+        ]
+        with authority_plane_bridge(authority_plane_payloads) as authority_plane_endpoints:
+            authority_plane = self.distributed_transport.probe_authority_plane(
+                rotated_federation_envelope,
+                live_root_directory,
+                authority_endpoints=authority_plane_endpoints,
+                request_timeout_ms=500,
+            )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_root_directory_bound",
             payload=live_root_directory.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_plane_bound",
+            payload=authority_plane.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -1364,7 +1474,7 @@ class OmoikaneReferenceOS:
                 "guardian://neutral-federation",
             ],
             channel_binding_ref=rotated_federation_envelope.channel_binding_ref,
-            verified_root_refs=live_root_directory.trusted_root_refs,
+            verified_root_refs=authority_plane.trusted_root_refs,
             key_epoch=2,
             hop_nonce_chain=[
                 "hop://federation/relay-a/nonce-002",
@@ -1579,6 +1689,9 @@ class OmoikaneReferenceOS:
             "live_root_directory": {
                 "federation_rotated": live_root_directory.to_dict(),
             },
+            "authority_plane": {
+                "federation_rotated": authority_plane.to_dict(),
+            },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
                 "federation_rotated": rotated_receipt.to_dict(),
@@ -1616,7 +1729,18 @@ class OmoikaneReferenceOS:
                     live_root_directory.quorum_requirement
                     == rotated_federation_envelope.trust_root_quorum
                     and live_root_directory.connectivity_receipt.quorum_satisfied
-                    and live_root_directory.trusted_root_refs == rotated_receipt.verified_root_refs
+                ),
+                "authority_plane_fleet_bound": (
+                    authority_plane.quorum_requirement == rotated_federation_envelope.trust_root_quorum
+                    and authority_plane.reachable_server_count == 2
+                    and authority_plane.matched_root_count == 2
+                    and authority_plane.trusted_root_refs == rotated_receipt.verified_root_refs
+                ),
+                "authority_plane_root_directory_bound": (
+                    authority_plane.directory_ref == live_root_directory.directory_ref
+                    and authority_plane.directory_digest
+                    == sha256_text(canonical_json(live_root_directory.to_dict()))
+                    and authority_plane.key_epoch == live_root_directory.key_epoch
                 ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"

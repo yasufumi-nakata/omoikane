@@ -1,0 +1,27 @@
+eval_id: distributed_transport_authority_plane
+target: agentic.distributed_transport
+level: L4
+description: >
+  Rotated distributed transport handoff が bounded external key-server fleet probe を通じて
+  reachable authority members, trusted root coverage, root-directory digest binding を満たせること。
+fixtures:
+  - scenario: federation_authority_plane_bound
+    council_tier: federation
+    key_epoch: 2
+    authority_endpoints:
+      - keyserver://federation/notary-a
+      - keyserver://federation/mirror-b
+    expected:
+      reachable_server_count: 2
+      matched_root_count: 2
+      trusted_root_refs:
+        - root://federation/pki-a
+        - root://federation/pki-b
+assertions:
+  - Authority plane must match the rotated envelope council tier and transport profile
+  - Every reachable key server must advertise an accepted key_epoch and at least one trusted root
+  - Authority plane trusted_root_refs must satisfy trust_root_quorum before rotated receipt verification
+  - Authority plane must bind the live root-directory digest and per-server connectivity receipts
+metric: exact-match
+threshold: 1.0
+ethics_check: true

@@ -66,7 +66,8 @@ remote endpoint から返る receipt は次を同時に満たしたときだけ 
 
 reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
-route nonce replay block / multi-hop replay block / live root directory probe を出力する。
+route nonce replay block / multi-hop replay block / live root directory probe /
+bounded authority-plane fleet probe を出力する。
 
 ## Live Root Directory Federation
 
@@ -87,6 +88,29 @@ live HTTP JSON endpoint から root-directory snapshot を取得し、
 - `trusted_root_refs` が quorum を満たした時だけ rotated receipt verification に使う
 - reference runtime は loopback endpoint でこの handoff を再現し、
   actual remote key server を持ち込まなくても machine-checkable にする
+
+## Authority Plane Fleet
+
+live root directory の次段では `probe_authority_plane` により、
+bounded external key-server fleet を probe し、
+`root-directory -> authority-plane -> rotated receipt` の束縛を固定する。
+
+| 項目 | 固定値 |
+|---|---|
+| authority profile | `bounded-key-server-fleet-v1` |
+| server transport | `live-http-json-keyserver-v1` |
+| server roles | `quorum-notary`, `directory-mirror` |
+| quorum source | envelope `trust_root_quorum` と一致 |
+
+- 各 `key_servers` entry は `key_server_ref / server_role / server_endpoint /
+  observed_latency_ms / response_digest / matched_root_refs / proof_digest`
+  を保持し、authority plane digest に含める
+- 各 server の `served_transport_profile` と `key_epoch` は
+  envelope / root-directory と一致しなければ fail-closed
+- `trusted_root_refs` は reachable server 群が広告した root のうち
+  root-directory `trusted_root_refs` と交差するものだけを採用する
+- rotated receipt verification は root-directory 直結ではなく、
+  authority plane が返した `trusted_root_refs` を使って authenticate する
 
 ## Relay telemetry
 
@@ -116,12 +140,15 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_relay_telemetry.schema`
 - schema: `specs/schemas/distributed_transport_root_connectivity_receipt.schema`
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
+- schema: `specs/schemas/distributed_transport_authority_plane.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
 - eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
 - eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
+- eval: `evals/agentic/distributed_transport_authority_plane.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-live-root-directory.md`
+- decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`

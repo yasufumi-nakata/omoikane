@@ -9,6 +9,7 @@ imports:
   distributed_transport_receipt: ../schemas/distributed_transport_receipt.schema
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
+  distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -158,6 +159,45 @@ operations:
       - live root directory key_epoch must remain inside accepted_key_epochs
       - trusted_root_refs must satisfy trust_root_quorum before a rotated receipt can authenticate
       - connectivity_receipt must bind endpoint, response_digest, latency, and quorum outcome
+  probe_authority_plane:
+    summary: >
+      Probe one bounded external key-server fleet and bind its reachable authority members
+      to a rotated distributed transport envelope after live root-directory federation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - directory_ref
+          - authority_endpoints
+        properties:
+          envelope_ref:
+            type: string
+            minLength: 1
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          directory_ref:
+            type: string
+            pattern: "^rootdir://"
+          authority_endpoints:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^https?://"
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_authority_plane
+    guarantees:
+      - authority plane must match the envelope council_tier and transport_profile
+      - every reachable key server must advertise a key_epoch accepted by both the envelope and root directory
+      - trusted_root_refs must satisfy trust_root_quorum across the reachable key-server fleet
+      - each key server receipt must bind endpoint, response_digest, latency, and matched_root_refs
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -311,5 +351,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, multi-hop anti-replay, and bounded relay telemetry.
-    - Non-loopback authority planes and external key-server fleets remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, multi-hop anti-replay, and bounded relay telemetry.
+    - Actual non-loopback mTLS authority routing, dynamic external key-server churn, and socket-level tracing remain future work.

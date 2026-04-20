@@ -421,6 +421,53 @@ class DistributedTransportServiceTests(unittest.TestCase):
         finally:
             pass
 
+    @contextmanager
+    def _authority_plane_servers(self, payloads: list[dict[str, object]]):
+        payload_by_path = {
+            f"/key-server-{index}": payload
+            for index, payload in enumerate(payloads, start=1)
+        }
+
+        class LocalThreadingHTTPServer(ThreadingHTTPServer):
+            def server_bind(self) -> None:
+                self.socket.bind(self.server_address)
+                self.server_address = self.socket.getsockname()
+                host, port = self.server_address[:2]
+                self.server_name = str(host)
+                self.server_port = int(port)
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.0"
+
+            def do_GET(self) -> None:  # noqa: N802
+                payload = payload_by_path.get(self.path)
+                if payload is None:
+                    self.send_error(404)
+                    self.close_connection = True
+                    return
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                self.close_connection = True
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                return
+
+        server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.daemon_threads = True
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            yield [f"{base_url}{path}" for path in payload_by_path]
+        finally:
+            pass
+
     def test_federation_handoff_binds_liaison_quorum_and_guardian(self) -> None:
         service = DistributedTransportService()
 
@@ -707,6 +754,186 @@ class DistributedTransportServiceTests(unittest.TestCase):
                 service.probe_live_root_directory(
                     rotated,
                     directory_endpoint=endpoint,
+                    request_timeout_ms=500,
+                )
+
+    def test_authority_plane_probe_binds_key_server_fleet_to_root_directory(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-001",
+            proposal_ref="proposal-transport-authority-001",
+            payload_ref="cas://sha256/test-authority-plane",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": True})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-window",
+            "checked_at": "2026-04-20T02:12:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window"),
+        }
+        authority_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:12:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-b",
+                "checked_at": "2026-04-20T02:12:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-b"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(authority_payloads) as authority_endpoints:
+            authority_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        self.assertEqual("bounded-key-server-fleet-v1", authority_plane.authority_profile)
+        self.assertEqual(2, authority_plane.reachable_server_count)
+        self.assertEqual(2, authority_plane.matched_root_count)
+        self.assertEqual(
+            ["root://federation/pki-a", "root://federation/pki-b"],
+            authority_plane.trusted_root_refs,
+        )
+        self.assertEqual(root_directory.directory_ref, authority_plane.directory_ref)
+        self.assertEqual(
+            sha256_text(canonical_json(root_directory.to_dict())),
+            authority_plane.directory_digest,
+        )
+        self.assertEqual(
+            ["keyserver://federation/notary-a", "keyserver://federation/mirror-b"],
+            [server["key_server_ref"] for server in authority_plane.key_servers],
+        )
+
+    def test_authority_plane_probe_rejects_insufficient_root_coverage(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-mismatch-001",
+            proposal_ref="proposal-transport-authority-mismatch-001",
+            payload_ref="cas://sha256/test-authority-plane-mismatch",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "mismatch"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-window-mismatch",
+            "checked_at": "2026-04-20T02:13:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-a",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-mismatch"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-mismatch"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-mismatch"),
+        }
+        authority_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:13:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-mismatch"),
+            }
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(authority_payloads) as authority_endpoints:
+            with self.assertRaisesRegex(
+                ValueError,
+                "authority plane must satisfy envelope trust_root_quorum",
+            ):
+                service.probe_authority_plane(
+                    rotated,
+                    root_directory,
+                    authority_endpoints=authority_endpoints,
                     request_timeout_ms=500,
                 )
 

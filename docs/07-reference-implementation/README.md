@@ -52,6 +52,7 @@ PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
 PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
+PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
 PYTHONPATH=src python3 -m omoikane.cli attention-demo --json
 PYTHONPATH=src python3 -m omoikane.cli volition-demo --json
@@ -126,6 +127,10 @@ rotated Federation handoff が `accepted_key_epochs=[1,2]` と
 loopback live root-directory endpoint から取得した
 `distributed_transport_root_directory` が `trusted_root_refs` と
 `connectivity_receipt` を返し、その quorum が rotated receipt verification に束縛されること、
+さらに bounded external key-server fleet から取得した
+`distributed_transport_authority_plane` が `directory_digest` と
+per-server connectivity receipt を返し、その `trusted_root_refs` が
+rotated receipt verification に最終的に束縛されること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -378,5 +383,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- non-loopback distributed PKI authority plane と external key server 群への接続
+- actual non-loopback mTLS authority routing と dynamic external key server churn handling
 - automation による未実装ギャップの継続充填

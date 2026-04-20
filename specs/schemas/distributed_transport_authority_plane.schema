@@ -1,0 +1,239 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_plane.schema"
+title: DistributedTransportAuthorityPlane
+description: Bounded external key-server fleet snapshot bound to one distributed transport root-directory probe.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - authority_plane_ref
+  - checked_at
+  - council_tier
+  - transport_profile
+  - authority_profile
+  - key_epoch
+  - directory_ref
+  - directory_digest
+  - quorum_requirement
+  - reachable_server_count
+  - matched_root_count
+  - trusted_root_refs
+  - key_servers
+  - proof_digest
+  - digest
+properties:
+  kind:
+    const: distributed_transport_authority_plane
+  schema_version:
+    const: "1.0.0"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  checked_at:
+    type: string
+    format: date-time
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  authority_profile:
+    const: bounded-key-server-fleet-v1
+  key_epoch:
+    type: integer
+    minimum: 1
+  directory_ref:
+    type: string
+    pattern: "^rootdir://"
+  directory_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  quorum_requirement:
+    type: integer
+    minimum: 1
+  reachable_server_count:
+    type: integer
+    minimum: 1
+  matched_root_count:
+    type: integer
+    minimum: 1
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  key_servers:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - schema_version
+        - key_server_ref
+        - checked_at
+        - council_tier
+        - served_transport_profile
+        - server_role
+        - authority_status
+        - key_epoch
+        - advertised_root_refs
+        - matched_root_refs
+        - server_endpoint
+        - transport_profile
+        - request_timeout_ms
+        - observed_latency_ms
+        - http_status
+        - response_digest
+        - receipt_status
+        - proof_digest
+        - recorded_at
+      properties:
+        kind:
+          const: distributed_transport_key_server
+        schema_version:
+          const: "1.0.0"
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        checked_at:
+          type: string
+          format: date-time
+        council_tier:
+          type: string
+          enum:
+            - federation
+            - heritage
+        served_transport_profile:
+          type: string
+          minLength: 1
+        server_role:
+          type: string
+          enum:
+            - directory-mirror
+            - quorum-notary
+        authority_status:
+          type: string
+          enum:
+            - active
+            - draining
+        key_epoch:
+          type: integer
+          minimum: 1
+        advertised_root_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        matched_root_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        server_endpoint:
+          type: string
+          pattern: "^https?://"
+        transport_profile:
+          const: live-http-json-keyserver-v1
+        request_timeout_ms:
+          type: integer
+          minimum: 1
+        observed_latency_ms:
+          type: number
+          exclusiveMinimum: 0
+        http_status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        response_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        receipt_status:
+          const: reachable
+        proof_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        recorded_at:
+          type: string
+          format: date-time
+  proof_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_authority_plane
+    schema_version: "1.0.0"
+    authority_plane_ref: authority-plane://federation/route-nonce-0123456789ab
+    checked_at: "2026-04-20T02:11:02Z"
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    authority_profile: bounded-key-server-fleet-v1
+    key_epoch: 2
+    directory_ref: rootdir://federation/live-rotation-window
+    directory_digest: 0f162bf6e7bbd5a0d50cdbb686145bff49fc3bfe86d9bbfe69cd151f8d487ce4
+    quorum_requirement: 2
+    reachable_server_count: 2
+    matched_root_count: 2
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    key_servers:
+      - kind: distributed_transport_key_server
+        schema_version: "1.0.0"
+        key_server_ref: keyserver://federation/notary-a
+        checked_at: "2026-04-20T02:11:00Z"
+        council_tier: federation
+        served_transport_profile: federation-mtls-quorum-v1
+        server_role: quorum-notary
+        authority_status: active
+        key_epoch: 2
+        advertised_root_refs:
+          - root://federation/pki-a
+        matched_root_refs:
+          - root://federation/pki-a
+        server_endpoint: http://127.0.0.1:43821/key-server-1
+        transport_profile: live-http-json-keyserver-v1
+        request_timeout_ms: 500
+        observed_latency_ms: 7.3
+        http_status: 200
+        response_digest: 2138c5f8d1f8adb567e81dd3314f861f555f7dd46b9d5ea9c58bbf7b6f48ac41
+        receipt_status: reachable
+        proof_digest: a8fdcbe4475c233d03a0d44bbad3e3410a9a56782c91fb23d9a775fa1ae6fb37
+        recorded_at: "2026-04-20T02:11:02Z"
+      - kind: distributed_transport_key_server
+        schema_version: "1.0.0"
+        key_server_ref: keyserver://federation/mirror-b
+        checked_at: "2026-04-20T02:11:01Z"
+        council_tier: federation
+        served_transport_profile: federation-mtls-quorum-v1
+        server_role: directory-mirror
+        authority_status: active
+        key_epoch: 2
+        advertised_root_refs:
+          - root://federation/pki-b
+        matched_root_refs:
+          - root://federation/pki-b
+        server_endpoint: http://127.0.0.1:43821/key-server-2
+        transport_profile: live-http-json-keyserver-v1
+        request_timeout_ms: 500
+        observed_latency_ms: 6.8
+        http_status: 200
+        response_digest: 44d39334bb56dce0634e27de33d8af9536f2a2a993a82d806d99f6a495ed0f4d
+        receipt_status: reachable
+        proof_digest: 8dfe0804d0a1c65ee5832ddb5f8ec416f815f73008a849fdb988698d92b8037a
+        recorded_at: "2026-04-20T02:11:02Z"
+    proof_digest: 4f52cc31ea6252778f9fc98adce63bf1501b26a87db2239bf3b283d899887f4e
+    digest: 66aecfa60ec15266cdf16fb6c92d4c7bff225ee0586d95bd48e4b17e36d94f50

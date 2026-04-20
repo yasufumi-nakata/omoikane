@@ -162,6 +162,15 @@ entries:
     rationale: Required to serialize one live remote PKI root-directory snapshot, trusted root quorum, and connectivity receipt for rotated transport envelopes.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_authority_plane.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_plane.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, and trusted-root coverage for rotated transport envelopes.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -1010,6 +1019,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects live root-directory reachability, root quorum binding, and response-digest connectivity receipts for rotated transport envelopes.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_plane.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects bounded key-server fleet reachability, trusted-root coverage, and root-directory digest binding for rotated transport envelopes.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml
