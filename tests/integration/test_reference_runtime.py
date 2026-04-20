@@ -749,11 +749,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["authority_plane"]["federation_rotated"]["root_coverage"][1]["coverage_status"],
         )
         self.assertEqual(
-            ["keyserver://federation/mirror-c"],
+            [],
             result["authority_churn"]["federation_rotated"]["added_server_refs"],
         )
         self.assertEqual(
-            ["keyserver://federation/mirror-b"],
+            ["keyserver://federation/mirror-b-draining"],
             result["authority_churn"]["federation_rotated"]["removed_server_refs"],
         )
         self.assertEqual(
