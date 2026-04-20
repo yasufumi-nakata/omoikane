@@ -25,6 +25,7 @@
 - `sensory_loopback_receipt.schema`
 - `ewa_command.schema`
 - `ewa_audit.schema`
+- `external_actuation_authorization.schema`
 - `governance_verifier_roster.schema`
 - `governance_verifier_connectivity_receipt.schema`
 - `world_state.schema`
@@ -78,7 +79,7 @@
 
 current-worktree direct rollback mutation /
 multi-scene sensory loopback artifact families /
-external-actuation authorization artifacts / cross-host authority routing + OS-native packet capture は
+cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

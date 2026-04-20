@@ -68,6 +68,9 @@ skill enactment session schema:
 - ledger には `procedural-enactment` category で materialized skill count、command receipt、cleanup status、rollback token を残す
 - `weight-application` は reference runtime で bounded writeback まで固定し、
   `skill-execution` と `skill-enactment` も sandbox-only / no external actuation の範囲で固定する
+- 将来 external actuation へ接続する場合は、
+  `interface.ewa.v0` の `external_actuation_authorization` artifact を介し、
+  guardian-reviewed jurisdiction evidence と command digest binding を満たす必要がある
 
 ## 不変条件
 

@@ -85,10 +85,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_ewa_demo()
 
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["authorization_ok"])
+        self.assertTrue(result["validation"]["authorization_ready"])
+        self.assertTrue(result["validation"]["authorization_matches_command"])
+        self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
         self.assertEqual("released", result["handle"]["status"])
+        self.assertEqual(
+            result["authorization"]["authorization_id"],
+            result["approved_command"]["approval_path"]["authorization_id"],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-ewa-authorization"],
+        )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
 

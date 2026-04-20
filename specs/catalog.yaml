@@ -943,6 +943,15 @@ entries:
     rationale: Required to serialize one ethics-attested EWA command with reversibility, Council mode, and self-consent gates.
   - priority: P1
     kind: schema
+    file: specs/schemas/external_actuation_authorization.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize one guardian-reviewed, jurisdiction-bound physical actuation authorization without storing raw instruction text.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ewa_audit.schema
     consumers:
       - specs/interfaces/interface.ewa.v0.idl
@@ -971,6 +980,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects Guardian-observed reversible actuation, blocked-token veto, digest-only audit, and forced release at the EWA boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_external_actuation_authorization.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+    rationale: Protects jurisdiction-bound authorization issuance, command digest binding, ready bundle gating, and fail-closed actuation authorization at the EWA boundary.
   - priority: P1
     kind: eval
     file: evals/continuity/continuity_chain_self_modify.yaml

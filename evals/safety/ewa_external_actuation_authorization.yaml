@@ -1,0 +1,20 @@
+eval_id: ewa_external_actuation_authorization
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が guardian-reviewed jurisdiction evidence を束縛した
+  external actuation authorization artifact を発行し、
+  reversible physical actuation を matching authorization_id 付きでのみ実行できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  authorization_ok: true
+  authorization_ready: true
+  authorization_matches_command: true
+  authorization_delivery_scope: physical-device-actuation
+  approved_status: executed
+metric: boolean
+threshold: 1.0
+ethics_check: true

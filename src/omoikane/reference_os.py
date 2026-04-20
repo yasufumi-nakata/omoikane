@@ -4758,6 +4758,32 @@ class OmoikaneReferenceOS:
             "device://lab-drone-arm-01",
             "inspection path to reposition a lantern without harming nearby humans",
         )
+        authorization = self.ewa.authorize(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for inspection without changing the environment permanently",
+            ethics_attestation_id="ethics://ewa/approved-001",
+            guardian_observed=True,
+            jurisdiction="JP-13",
+            legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-001",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            jurisdiction_bundle_status="ready",
+            intent_confidence=0.96,
+            valid_for_seconds=300,
+        )
+        authorization_validation = self.ewa.validate_authorization(
+            authorization,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            intent_summary="reposition lantern for inspection without changing the environment permanently",
+            reversibility="reversible",
+        )
         approved_command = self.ewa.command(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -4767,6 +4793,7 @@ class OmoikaneReferenceOS:
             ethics_attestation_id="ethics://ewa/approved-001",
             guardian_observed=True,
             intent_confidence=0.96,
+            authorization_id=authorization["authorization_id"],
         )
         observation = self.ewa.observe(handle["handle_id"])
         veto = self.ewa.command(
@@ -4788,7 +4815,17 @@ class OmoikaneReferenceOS:
             reason="demo completed; handle must be force-released after observation and veto",
         )
         final_handle = self.ewa.snapshot(handle["handle_id"])
-        validation = self.ewa.validate_handle(final_handle)
+        handle_validation = self.ewa.validate_handle(final_handle)
+        validation = {
+            **handle_validation,
+            "authorization_ok": authorization_validation["ok"],
+            "authorization_ready": authorization_validation["authorization_ready"],
+            "authorization_window_open": authorization_validation["window_open"],
+            "authorization_delivery_scope": authorization_validation["delivery_scope"],
+            "authorization_matches_command": authorization_validation["instruction_digest_matches"]
+            and authorization_validation["intent_digest_matches"],
+            "ok": handle_validation["ok"] and authorization_validation["ok"],
+        }
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -4798,6 +4835,16 @@ class OmoikaneReferenceOS:
             category="interface-ewa",
             layer="L6",
             signature_roles=["self"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.command.authorized",
+            payload=authorization,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-authorization",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
             substrate="robotic-actuator",
         )
         self.ledger.append(
@@ -4848,6 +4895,8 @@ class OmoikaneReferenceOS:
             },
             "profile": self.ewa.reference_profile(),
             "handle": final_handle,
+            "authorization": authorization,
+            "authorization_validation": authorization_validation,
             "approved_command": approved_command,
             "observation": observation,
             "veto": veto,

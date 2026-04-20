@@ -64,6 +64,7 @@ status: decided | superseded
 - [2026-04-20_consensus-bus-reference-runtime.md](2026-04-20_consensus-bus-reference-runtime.md)
 - [2026-04-20_distributed-transport-live-root-directory.md](2026-04-20_distributed-transport-live-root-directory.md)
 - [2026-04-21_distributed-transport-non-loopback-route-trace.md](2026-04-21_distributed-transport-non-loopback-route-trace.md)
+- [2026-04-21_external-actuation-authorization-artifact.md](2026-04-21_external-actuation-authorization-artifact.md)
 - [2026-04-21_builder-rollback-external-observer-receipts.md](2026-04-21_builder-rollback-external-observer-receipts.md)
 - [2026-04-20_builder-sandbox-apply-rollout.md](2026-04-20_builder-sandbox-apply-rollout.md)
 - [2026-04-20_sensory-loopback-reference-runtime.md](2026-04-20_sensory-loopback-reference-runtime.md)

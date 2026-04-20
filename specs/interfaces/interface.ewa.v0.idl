@@ -6,6 +6,7 @@ summary: Canonical L6 contract for ethics-first physical-world actuation through
 imports:
   ewa_command: ../schemas/ewa_command.schema
   ewa_audit: ../schemas/ewa_audit.schema
+  external_actuation_authorization: ../schemas/external_actuation_authorization.schema
 operations:
   acquire:
     summary: Acquire one device handle before any physical-world operation is attempted.
@@ -58,6 +59,55 @@ operations:
     guarantees:
       - no command may execute before acquire returns a live handle_id
       - acquire must append one audit entry immediately
+  authorize:
+    summary: Bind one non-read-only actuation command to guardian-reviewed jurisdiction evidence before execution.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - command
+          - jurisdiction
+          - legal_basis_ref
+          - guardian_verification_ref
+          - jurisdiction_bundle_ref
+          - jurisdiction_bundle_digest
+          - jurisdiction_bundle_status
+        properties:
+          command:
+            schema_ref: ewa_command
+          jurisdiction:
+            type: string
+            minLength: 1
+          legal_basis_ref:
+            type: string
+            minLength: 1
+          guardian_verification_ref:
+            type: string
+            minLength: 1
+          jurisdiction_bundle_ref:
+            type: string
+            minLength: 1
+          jurisdiction_bundle_digest:
+            type: string
+            minLength: 1
+          jurisdiction_bundle_status:
+            type: string
+            enum:
+              - ready
+              - stale
+              - revoked
+          valid_for_seconds:
+            type: integer
+            minimum: 60
+            maximum: 900
+    output:
+      schema_ref: external_actuation_authorization
+    guarantees:
+      - read-only commands must not request actuation authorization
+      - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, and approval path
+      - stale or revoked jurisdiction bundles must fail closed before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
     input:
@@ -66,10 +116,65 @@ operations:
       schema_ref: ewa_audit
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
+      - non-read-only commands require one active authorization_id whose digests match the command payload
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
       - audit output must retain only instruction_digest, never the raw instruction
+  validate_authorization:
+    summary: Validate one external actuation authorization artifact against the fixed jurisdiction-bound policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - authorization
+          - command
+        properties:
+          authorization:
+            schema_ref: external_actuation_authorization
+          command:
+            schema_ref: ewa_command
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - authorization_ready
+          - approval_path_valid
+          - instruction_digest_matches
+          - intent_digest_matches
+          - jurisdiction_bundle_ready
+          - window_open
+          - status_authorized
+          - delivery_scope
+          - errors
+        properties:
+          ok:
+            type: boolean
+          authorization_ready:
+            type: boolean
+          approval_path_valid:
+            type: boolean
+          instruction_digest_matches:
+            type: boolean
+          intent_digest_matches:
+            type: boolean
+          jurisdiction_bundle_ready:
+            type: boolean
+          window_open:
+            type: boolean
+          status_authorized:
+            type: boolean
+          delivery_scope:
+            type: string
+            const: physical-device-actuation
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   observe:
     summary: Read one digest-only device state summary without persisting raw sensor data into the audit log.
     input:
@@ -170,6 +275,9 @@ events:
           status:
             type: string
             const: acquired
+  ewa.command_authorized:
+    payload:
+      schema_ref: external_actuation_authorization
   ewa.command_recorded:
     payload:
       schema_ref: ewa_audit
@@ -180,4 +288,4 @@ compatibility:
   stability: bootstrap
   notes:
     - This contract proves only bounded safety gating for physical actuation.
-    - Device-specific motor semantics and jurisdiction-specific legal compliance remain future work.
+    - Device-specific motor semantics and full jurisdiction-specific legal compliance execution remain future work.

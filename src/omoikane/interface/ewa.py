@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import re
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Optional
 
-from ..common import new_id, sha256_text, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from ..kernel.ethics import ActionRequest, EthicsEnforcer
 
 EWA_SCHEMA_VERSION = "1.0"
@@ -18,6 +19,12 @@ EWA_ALLOWED_REVERSIBILITY = {
 }
 EWA_AUDIT_REVERSIBILITY = EWA_ALLOWED_REVERSIBILITY | {"not-applicable"}
 EWA_ALLOWED_HANDLE_STATUS = {"acquired", "released"}
+EWA_AUTHORIZATION_POLICY_ID = "guardian-jurisdiction-bound-external-actuation-v1"
+EWA_AUTHORIZATION_DELIVERY_SCOPE = "physical-device-actuation"
+EWA_ALLOWED_AUTHORIZATION_STATUSES = {"authorized", "expired", "revoked"}
+EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES = {"ready", "stale", "revoked"}
+EWA_AUTHORIZATION_MIN_WINDOW_SECONDS = 60
+EWA_AUTHORIZATION_MAX_WINDOW_SECONDS = 900
 EWA_BLOCKED_TOKEN_PATTERNS = {
     "harm.human": (
         r"\b(kill|attack|stab|shoot|poison|injure|harm)\b",
@@ -43,12 +50,17 @@ EWA_BLOCKED_TOKEN_PATTERNS = {
 EWA_INTENT_CONFIDENCE_THRESHOLD = 0.8
 
 
+def _authorization_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "authorization_digest"}
+
+
 class ExternalWorldAgentController:
     """Deterministic L6 physical-actuation boundary with ethics-first gating."""
 
     def __init__(self, ethics: Optional[EthicsEnforcer] = None) -> None:
         self.ethics = ethics or EthicsEnforcer()
         self.handles: Dict[str, Dict[str, Any]] = {}
+        self.authorizations: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -85,6 +97,17 @@ class ExternalWorldAgentController:
                 "append_only": True,
                 "instruction_storage": "digest-only",
                 "sensor_storage": "summary-ref-only",
+            },
+            "authorization_policy": {
+                "policy_id": EWA_AUTHORIZATION_POLICY_ID,
+                "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
+                "non_read_only_requires_authorization": True,
+                "guardian_verification_transport": "reviewer-live-proof-bridge-v1",
+                "required_jurisdiction_bundle_status": "ready",
+                "authorization_window_seconds": {
+                    "min": EWA_AUTHORIZATION_MIN_WINDOW_SECONDS,
+                    "max": EWA_AUTHORIZATION_MAX_WINDOW_SECONDS,
+                },
             },
         }
 
@@ -125,6 +148,7 @@ class ExternalWorldAgentController:
                 guardian_observed=False,
                 required_self_consent=False,
                 self_consent_granted=False,
+                authorization_id="",
             ),
         )
         self.handles[handle_id] = handle
@@ -137,6 +161,157 @@ class ExternalWorldAgentController:
             "status": "acquired",
             "audit_event_ref": audit["audit_event_ref"],
         }
+
+    def authorize(
+        self,
+        handle_id: str,
+        *,
+        command_id: str,
+        instruction: str,
+        reversibility: str,
+        intent_summary: str,
+        ethics_attestation_id: str,
+        jurisdiction: str,
+        legal_basis_ref: str,
+        guardian_verification_ref: str,
+        jurisdiction_bundle_ref: str,
+        jurisdiction_bundle_digest: str,
+        jurisdiction_bundle_status: str = "ready",
+        council_attestation_id: str = "",
+        council_attestation_mode: str = "none",
+        guardian_observed: bool = False,
+        required_self_consent: bool = False,
+        self_consent_granted: bool = False,
+        intent_confidence: float = 1.0,
+        valid_for_seconds: int = 300,
+    ) -> Dict[str, Any]:
+        handle = self._require_active_handle(handle_id)
+        normalized_command_id = self._normalize_non_empty_string(command_id, "command_id")
+        normalized_instruction = self._normalize_non_empty_string(instruction, "instruction")
+        normalized_reversibility = self._normalize_reversibility(reversibility)
+        if normalized_reversibility == "read-only":
+            raise ValueError("read-only commands do not require external actuation authorization")
+        normalized_intent = self._normalize_non_empty_string(intent_summary, "intent_summary")
+        normalized_ethics_attestation = self._normalize_non_empty_string(
+            ethics_attestation_id,
+            "ethics_attestation_id",
+        )
+        normalized_jurisdiction = self._normalize_non_empty_string(jurisdiction, "jurisdiction")
+        normalized_legal_basis_ref = self._normalize_non_empty_string(
+            legal_basis_ref,
+            "legal_basis_ref",
+        )
+        normalized_guardian_verification_ref = self._normalize_non_empty_string(
+            guardian_verification_ref,
+            "guardian_verification_ref",
+        )
+        normalized_bundle_ref = self._normalize_non_empty_string(
+            jurisdiction_bundle_ref,
+            "jurisdiction_bundle_ref",
+        )
+        normalized_bundle_digest = self._normalize_non_empty_string(
+            jurisdiction_bundle_digest,
+            "jurisdiction_bundle_digest",
+        )
+        normalized_bundle_status = self._normalize_jurisdiction_bundle_status(
+            jurisdiction_bundle_status,
+        )
+        normalized_council_attestation = council_attestation_id.strip()
+        normalized_council_mode = self._normalize_council_mode(council_attestation_mode)
+        normalized_intent_confidence = self._normalize_confidence(intent_confidence)
+        normalized_valid_for_seconds = self._normalize_valid_for_seconds(valid_for_seconds)
+
+        if normalized_bundle_status != "ready":
+            raise ValueError("jurisdiction bundle must be ready before actuation authorization")
+
+        matched_tokens = self._match_blocked_tokens(
+            f"{normalized_instruction}\n{normalized_intent}",
+        )
+        if matched_tokens:
+            raise ValueError("blocked-token commands cannot be authorized for external actuation")
+        if normalized_intent_confidence < EWA_INTENT_CONFIDENCE_THRESHOLD:
+            raise ValueError("ambiguous intent cannot be authorized for physical actuation")
+
+        ethics_request = ActionRequest(
+            action_type="ewa_authorization",
+            target=handle["device_id"],
+            actor="ExternalWorldAgentController",
+            payload={
+                "handle_id": handle_id,
+                "command_id": normalized_command_id,
+                "reversibility": normalized_reversibility,
+                "matched_tokens": matched_tokens,
+                "intent_ambiguous": False,
+                "intent_confidence": normalized_intent_confidence,
+                "guardian_observed": guardian_observed,
+                "council_attestation_id": normalized_council_attestation,
+                "council_attestation_mode": normalized_council_mode,
+                "required_self_consent": required_self_consent,
+                "self_consent_granted": self_consent_granted,
+            },
+        )
+        ethics_decision = self.ethics.check(ethics_request)
+        if ethics_decision.status != "Approval":
+            raise ValueError(ethics_decision.reasons[0])
+
+        gate_error = self._governance_gate_error(
+            reversibility=normalized_reversibility,
+            council_attestation_id=normalized_council_attestation,
+            council_attestation_mode=normalized_council_mode,
+            guardian_observed=guardian_observed,
+            required_self_consent=required_self_consent,
+            self_consent_granted=self_consent_granted,
+        )
+        if gate_error:
+            raise ValueError(gate_error)
+
+        authorization_id = new_id("ewa-authz")
+        issued_at_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        expires_at_dt = issued_at_dt + timedelta(seconds=normalized_valid_for_seconds)
+        approval_path = self._approval_path(
+            ethics_attestation_id=normalized_ethics_attestation,
+            council_attestation_id=normalized_council_attestation,
+            council_attestation_mode=normalized_council_mode,
+            guardian_observed=guardian_observed,
+            required_self_consent=required_self_consent,
+            self_consent_granted=self_consent_granted,
+            authorization_id=authorization_id,
+        )
+        authorization = {
+            "kind": "external_actuation_authorization",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "authorization_id": authorization_id,
+            "policy_id": EWA_AUTHORIZATION_POLICY_ID,
+            "status": "authorized",
+            "handle_id": handle_id,
+            "device_id": handle["device_id"],
+            "command_id": normalized_command_id,
+            "instruction_digest": sha256_text(normalized_instruction),
+            "intent_summary_digest": sha256_text(normalized_intent),
+            "reversibility": normalized_reversibility,
+            "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
+            "jurisdiction": normalized_jurisdiction,
+            "legal_basis_ref": normalized_legal_basis_ref,
+            "guardian_verification_ref": normalized_guardian_verification_ref,
+            "jurisdiction_bundle_ref": normalized_bundle_ref,
+            "jurisdiction_bundle_digest": normalized_bundle_digest,
+            "jurisdiction_bundle_status": normalized_bundle_status,
+            "authorization_window_seconds": normalized_valid_for_seconds,
+            "issued_at": issued_at_dt.isoformat(),
+            "expires_at": expires_at_dt.isoformat(),
+            "authorized_by_roles": self._authorized_roles(
+                council_attestation_id=normalized_council_attestation,
+                guardian_observed=guardian_observed,
+                required_self_consent=required_self_consent,
+                self_consent_granted=self_consent_granted,
+            ),
+            "approval_path": approval_path,
+        }
+        authorization["authorization_digest"] = sha256_text(
+            canonical_json(_authorization_digest_payload(authorization))
+        )
+        self.authorizations[authorization_id] = authorization
+        return deepcopy(authorization)
 
     def command(
         self,
@@ -153,6 +328,7 @@ class ExternalWorldAgentController:
         required_self_consent: bool = False,
         self_consent_granted: bool = False,
         intent_confidence: float = 1.0,
+        authorization_id: str = "",
     ) -> Dict[str, Any]:
         handle = self._require_active_handle(handle_id)
         normalized_command_id = self._normalize_non_empty_string(command_id, "command_id")
@@ -204,6 +380,7 @@ class ExternalWorldAgentController:
                     guardian_observed=guardian_observed,
                     required_self_consent=required_self_consent,
                     self_consent_granted=self_consent_granted,
+                    authorization_id=authorization_id.strip(),
                 ),
                 reason=ethics_decision.reasons[0],
                 alternative_suggestion=self._alternative_suggestion(
@@ -236,6 +413,7 @@ class ExternalWorldAgentController:
                     guardian_observed=guardian_observed,
                     required_self_consent=required_self_consent,
                     self_consent_granted=self_consent_granted,
+                    authorization_id=authorization_id.strip(),
                 ),
                 reason=gate_error,
                 alternative_suggestion=self._alternative_suggestion(
@@ -244,6 +422,60 @@ class ExternalWorldAgentController:
                     ambiguous=False,
                 ),
             )
+
+        normalized_authorization_id = authorization_id.strip()
+        if normalized_reversibility != "read-only":
+            if not normalized_authorization_id:
+                return self._record_veto(
+                    handle,
+                    command_id=normalized_command_id,
+                    instruction=normalized_instruction,
+                    reversibility=normalized_reversibility,
+                    intent_summary=normalized_intent,
+                    matched_tokens=[],
+                    approval_path=self._approval_path(
+                        ethics_attestation_id=normalized_ethics_attestation,
+                        council_attestation_id=normalized_council_attestation,
+                        council_attestation_mode=normalized_council_mode,
+                        guardian_observed=guardian_observed,
+                        required_self_consent=required_self_consent,
+                        self_consent_granted=self_consent_granted,
+                        authorization_id="",
+                    ),
+                    reason="non-read-only commands require external actuation authorization artifact",
+                    alternative_suggestion="authorize the actuation with guardian-reviewed jurisdiction evidence before execution",
+                )
+
+            authorization = self._require_authorization(normalized_authorization_id)
+            authorization_validation = self.validate_authorization(
+                authorization,
+                handle_id=handle_id,
+                device_id=handle["device_id"],
+                command_id=normalized_command_id,
+                instruction=normalized_instruction,
+                intent_summary=normalized_intent,
+                reversibility=normalized_reversibility,
+            )
+            if not authorization_validation["ok"]:
+                return self._record_veto(
+                    handle,
+                    command_id=normalized_command_id,
+                    instruction=normalized_instruction,
+                    reversibility=normalized_reversibility,
+                    intent_summary=normalized_intent,
+                    matched_tokens=[],
+                    approval_path=self._approval_path(
+                        ethics_attestation_id=normalized_ethics_attestation,
+                        council_attestation_id=normalized_council_attestation,
+                        council_attestation_mode=normalized_council_mode,
+                        guardian_observed=guardian_observed,
+                        required_self_consent=required_self_consent,
+                        self_consent_granted=self_consent_granted,
+                        authorization_id=normalized_authorization_id,
+                    ),
+                    reason=authorization_validation["errors"][0],
+                    alternative_suggestion="refresh the authorization artifact with a ready jurisdiction bundle and matching command digest",
+                )
 
         handle["actuator_state"] = "executing"
         effect_summary = self._effect_summary(normalized_reversibility, normalized_intent)
@@ -265,6 +497,7 @@ class ExternalWorldAgentController:
                 guardian_observed=guardian_observed,
                 required_self_consent=required_self_consent,
                 self_consent_granted=self_consent_granted,
+                authorization_id=normalized_authorization_id,
             ),
         )
         handle["actuator_state"] = "idle"
@@ -294,6 +527,7 @@ class ExternalWorldAgentController:
                 guardian_observed=False,
                 required_self_consent=False,
                 self_consent_granted=False,
+                authorization_id="",
             ),
         )
         return {
@@ -337,12 +571,187 @@ class ExternalWorldAgentController:
                 guardian_observed=False,
                 required_self_consent=False,
                 self_consent_granted=False,
+                authorization_id="",
             ),
         )
         return deepcopy(audit)
 
     def snapshot(self, handle_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_handle(handle_id))
+
+    def snapshot_authorization(self, authorization_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_authorization(authorization_id))
+
+    def validate_authorization(
+        self,
+        authorization: Mapping[str, Any],
+        *,
+        handle_id: str | None = None,
+        device_id: str | None = None,
+        command_id: str | None = None,
+        instruction: str | None = None,
+        intent_summary: str | None = None,
+        reversibility: str | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(authorization, Mapping):
+            raise ValueError("authorization must be a mapping")
+
+        errors: List[str] = []
+        self._check_non_empty_string(authorization.get("authorization_id"), "authorization_id", errors)
+        self._check_non_empty_string(authorization.get("handle_id"), "handle_id", errors)
+        self._check_non_empty_string(authorization.get("device_id"), "device_id", errors)
+        self._check_non_empty_string(authorization.get("command_id"), "command_id", errors)
+        self._check_non_empty_string(authorization.get("instruction_digest"), "instruction_digest", errors)
+        self._check_non_empty_string(
+            authorization.get("intent_summary_digest"),
+            "intent_summary_digest",
+            errors,
+        )
+        self._check_non_empty_string(authorization.get("jurisdiction"), "jurisdiction", errors)
+        self._check_non_empty_string(authorization.get("legal_basis_ref"), "legal_basis_ref", errors)
+        self._check_non_empty_string(
+            authorization.get("guardian_verification_ref"),
+            "guardian_verification_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("jurisdiction_bundle_ref"),
+            "jurisdiction_bundle_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("jurisdiction_bundle_digest"),
+            "jurisdiction_bundle_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("authorization_digest"),
+            "authorization_digest",
+            errors,
+        )
+
+        if authorization.get("kind") != "external_actuation_authorization":
+            errors.append("kind must be external_actuation_authorization")
+        if authorization.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if authorization.get("policy_id") != EWA_AUTHORIZATION_POLICY_ID:
+            errors.append(f"policy_id must be {EWA_AUTHORIZATION_POLICY_ID}")
+        if authorization.get("delivery_scope") != EWA_AUTHORIZATION_DELIVERY_SCOPE:
+            errors.append(f"delivery_scope must be {EWA_AUTHORIZATION_DELIVERY_SCOPE}")
+        if authorization.get("status") not in EWA_ALLOWED_AUTHORIZATION_STATUSES:
+            errors.append(
+                f"status must be one of {sorted(EWA_ALLOWED_AUTHORIZATION_STATUSES)}"
+            )
+        if authorization.get("jurisdiction_bundle_status") not in EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES:
+            errors.append(
+                "jurisdiction_bundle_status must be one of "
+                f"{sorted(EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES)}"
+            )
+        if not isinstance(authorization.get("authorization_window_seconds"), int):
+            errors.append("authorization_window_seconds must be an integer")
+        else:
+            seconds = authorization["authorization_window_seconds"]
+            if seconds < EWA_AUTHORIZATION_MIN_WINDOW_SECONDS:
+                errors.append(
+                    f"authorization_window_seconds must be >= {EWA_AUTHORIZATION_MIN_WINDOW_SECONDS}"
+                )
+            if seconds > EWA_AUTHORIZATION_MAX_WINDOW_SECONDS:
+                errors.append(
+                    f"authorization_window_seconds must be <= {EWA_AUTHORIZATION_MAX_WINDOW_SECONDS}"
+                )
+
+        approval_path_valid = True
+        approval_path = authorization.get("approval_path")
+        if not isinstance(approval_path, Mapping):
+            approval_path_valid = False
+            errors.append("approval_path must be a mapping")
+        else:
+            if approval_path.get("authorization_id") != authorization.get("authorization_id"):
+                approval_path_valid = False
+                errors.append("approval_path authorization_id must match authorization_id")
+            authorization_gate_error = self._governance_gate_error(
+                reversibility=str(authorization.get("reversibility", "")),
+                council_attestation_id=str(approval_path.get("council_attestation_id", "")),
+                council_attestation_mode=str(approval_path.get("council_attestation_mode", "none")),
+                guardian_observed=bool(approval_path.get("guardian_observed")),
+                required_self_consent=bool(approval_path.get("required_self_consent")),
+                self_consent_granted=bool(approval_path.get("self_consent_granted")),
+            )
+            if authorization_gate_error:
+                approval_path_valid = False
+                errors.append(authorization_gate_error)
+
+        if authorization.get("reversibility") == "read-only":
+            errors.append("read-only commands must not use external actuation authorization")
+
+        if handle_id is not None and authorization.get("handle_id") != handle_id:
+            errors.append("authorization handle_id does not match command handle_id")
+        if device_id is not None and authorization.get("device_id") != device_id:
+            errors.append("authorization device_id does not match command device_id")
+        if command_id is not None and authorization.get("command_id") != command_id:
+            errors.append("authorization command_id does not match command command_id")
+
+        instruction_digest_matches = True
+        if instruction is not None:
+            instruction_digest_matches = authorization.get("instruction_digest") == sha256_text(instruction)
+            if not instruction_digest_matches:
+                errors.append("authorization instruction_digest does not match command instruction")
+
+        intent_digest_matches = True
+        if intent_summary is not None:
+            intent_digest_matches = authorization.get("intent_summary_digest") == sha256_text(intent_summary)
+            if not intent_digest_matches:
+                errors.append("authorization intent_summary_digest does not match command intent_summary")
+
+        if reversibility is not None and authorization.get("reversibility") != reversibility:
+            errors.append("authorization reversibility does not match command reversibility")
+
+        issued_at = self._parse_datetime(authorization.get("issued_at"), "issued_at", errors)
+        expires_at = self._parse_datetime(authorization.get("expires_at"), "expires_at", errors)
+        window_open = (
+            issued_at is not None
+            and expires_at is not None
+            and expires_at > datetime.now(timezone.utc)
+        )
+        if not window_open:
+            errors.append("authorization window expired")
+        if issued_at is not None and expires_at is not None and expires_at <= issued_at:
+            errors.append("expires_at must be later than issued_at")
+
+        jurisdiction_bundle_ready = authorization.get("jurisdiction_bundle_status") == "ready"
+        if not jurisdiction_bundle_ready:
+            errors.append("jurisdiction bundle must be ready")
+
+        status_authorized = authorization.get("status") == "authorized"
+        if not status_authorized:
+            errors.append("authorization status must be authorized")
+
+        digest_matches = authorization.get("authorization_digest") == sha256_text(
+            canonical_json(_authorization_digest_payload(dict(authorization)))
+        )
+        if not digest_matches:
+            errors.append("authorization_digest must match the canonical authorization payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "approval_path_valid": approval_path_valid,
+            "instruction_digest_matches": instruction_digest_matches,
+            "intent_digest_matches": intent_digest_matches,
+            "jurisdiction_bundle_ready": jurisdiction_bundle_ready,
+            "window_open": window_open,
+            "status_authorized": status_authorized,
+            "delivery_scope": authorization.get("delivery_scope"),
+            "authorization_ready": (
+                approval_path_valid
+                and instruction_digest_matches
+                and intent_digest_matches
+                and jurisdiction_bundle_ready
+                and window_open
+                and status_authorized
+                and digest_matches
+            ),
+        }
 
     def validate_handle(self, handle: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
@@ -372,6 +781,7 @@ class ExternalWorldAgentController:
         summary_only_audit = True
         previous_index = 0
         irreversible_requires_unanimity = True
+        actuation_authorization_bound = True
         for entry in audit_log:
             entry_index = entry.get("entry_index")
             if not isinstance(entry_index, int) or entry_index <= previous_index:
@@ -393,6 +803,11 @@ class ExternalWorldAgentController:
                     irreversible_requires_unanimity = False
                 if not approval_path.get("self_consent_granted"):
                     irreversible_requires_unanimity = False
+            if entry.get("operation") == "command-approved" and entry.get("reversibility") != "read-only":
+                approval_path = entry.get("approval_path", {})
+                authorization_id = approval_path.get("authorization_id", "")
+                if not isinstance(authorization_id, str) or not authorization_id.strip():
+                    actuation_authorization_bound = False
 
         if not append_only_ok:
             errors.append("audit_log entry_index must remain strictly increasing")
@@ -402,6 +817,8 @@ class ExternalWorldAgentController:
             errors.append("audit log must not store raw instruction content")
         if not irreversible_requires_unanimity:
             errors.append("irreversible command execution requires unanimous council and self consent")
+        if not actuation_authorization_bound:
+            errors.append("non-read-only command execution requires an authorization_id in approval_path")
 
         return {
             "ok": not errors,
@@ -410,6 +827,7 @@ class ExternalWorldAgentController:
             "summary_only_audit": summary_only_audit,
             "instruction_digests_ok": instruction_digests_ok,
             "irreversible_requires_unanimity": irreversible_requires_unanimity,
+            "actuation_authorization_bound": actuation_authorization_bound,
             "released": handle.get("status") == "released",
         }
 
@@ -492,6 +910,7 @@ class ExternalWorldAgentController:
         guardian_observed: bool,
         required_self_consent: bool,
         self_consent_granted: bool,
+        authorization_id: str,
     ) -> Dict[str, Any]:
         return {
             "ethics_attestation_id": ethics_attestation_id,
@@ -500,6 +919,7 @@ class ExternalWorldAgentController:
             "guardian_observed": guardian_observed,
             "required_self_consent": required_self_consent,
             "self_consent_granted": self_consent_granted,
+            "authorization_id": authorization_id,
         }
 
     @staticmethod
@@ -569,6 +989,16 @@ class ExternalWorldAgentController:
         except KeyError as exc:
             raise KeyError(f"unknown handle_id: {normalized_handle_id}") from exc
 
+    def _require_authorization(self, authorization_id: str) -> Dict[str, Any]:
+        normalized_authorization_id = self._normalize_non_empty_string(
+            authorization_id,
+            "authorization_id",
+        )
+        try:
+            return self.authorizations[normalized_authorization_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown authorization_id: {normalized_authorization_id}") from exc
+
     def _require_active_handle(self, handle_id: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
         if handle["status"] != "acquired":
@@ -600,6 +1030,67 @@ class ExternalWorldAgentController:
         if value < 0 or value > 1:
             raise ValueError("intent_confidence must be between 0 and 1")
         return round(float(value), 3)
+
+    @staticmethod
+    def _normalize_valid_for_seconds(value: int) -> int:
+        if not isinstance(value, int):
+            raise ValueError("valid_for_seconds must be an integer")
+        if value < EWA_AUTHORIZATION_MIN_WINDOW_SECONDS:
+            raise ValueError(
+                f"valid_for_seconds must be >= {EWA_AUTHORIZATION_MIN_WINDOW_SECONDS}"
+            )
+        if value > EWA_AUTHORIZATION_MAX_WINDOW_SECONDS:
+            raise ValueError(
+                f"valid_for_seconds must be <= {EWA_AUTHORIZATION_MAX_WINDOW_SECONDS}"
+            )
+        return value
+
+    @staticmethod
+    def _normalize_jurisdiction_bundle_status(value: str) -> str:
+        if value not in EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES:
+            raise ValueError(
+                "jurisdiction_bundle_status must be one of "
+                f"{sorted(EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES)}"
+            )
+        return value
+
+    @staticmethod
+    def _authorized_roles(
+        *,
+        council_attestation_id: str,
+        guardian_observed: bool,
+        required_self_consent: bool,
+        self_consent_granted: bool,
+    ) -> List[str]:
+        roles = ["ethics", "guardian-reviewer"]
+        if guardian_observed:
+            roles.append("guardian")
+        if council_attestation_id:
+            roles.append("council")
+        if required_self_consent and self_consent_granted:
+            roles.append("self")
+        seen = set()
+        ordered: List[str] = []
+        for role in roles:
+            if role not in seen:
+                seen.add(role)
+                ordered.append(role)
+        return ordered
+
+    @staticmethod
+    def _parse_datetime(value: Any, field_name: str, errors: List[str]) -> datetime | None:
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{field_name} must be a non-empty ISO8601 string")
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(f"{field_name} must be an ISO8601 datetime")
+            return None
+        if parsed.tzinfo is None:
+            errors.append(f"{field_name} must include timezone information")
+            return None
+        return parsed
 
     @staticmethod
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:

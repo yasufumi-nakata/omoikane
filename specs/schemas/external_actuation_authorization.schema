@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/external_actuation_authorization.schema"
+title: ExternalActuationAuthorization
+description: >
+  Guardian-reviewed, jurisdiction-bound authorization artifact for one non-read-only
+  physical-world actuation command without storing raw instruction text.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - authorization_id
+  - policy_id
+  - status
+  - handle_id
+  - device_id
+  - command_id
+  - instruction_digest
+  - intent_summary_digest
+  - reversibility
+  - delivery_scope
+  - jurisdiction
+  - legal_basis_ref
+  - guardian_verification_ref
+  - jurisdiction_bundle_ref
+  - jurisdiction_bundle_digest
+  - jurisdiction_bundle_status
+  - authorization_window_seconds
+  - issued_at
+  - expires_at
+  - authorized_by_roles
+  - approval_path
+  - authorization_digest
+properties:
+  kind:
+    const: external_actuation_authorization
+  schema_version:
+    const: "1.0"
+  authorization_id:
+    type: string
+    minLength: 8
+  policy_id:
+    type: string
+    const: guardian-jurisdiction-bound-external-actuation-v1
+  status:
+    type: string
+    enum:
+      - authorized
+      - expired
+      - revoked
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  instruction_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  intent_summary_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  reversibility:
+    type: string
+    enum:
+      - reversible
+      - partial-reversible
+      - irreversible
+  delivery_scope:
+    type: string
+    const: physical-device-actuation
+  jurisdiction:
+    type: string
+    minLength: 1
+  legal_basis_ref:
+    type: string
+    minLength: 1
+  guardian_verification_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_digest:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_status:
+    type: string
+    enum:
+      - ready
+      - stale
+      - revoked
+  authorization_window_seconds:
+    type: integer
+    minimum: 60
+    maximum: 900
+  issued_at:
+    type: string
+    format: date-time
+  expires_at:
+    type: string
+    format: date-time
+  authorized_by_roles:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      enum:
+        - ethics
+        - guardian-reviewer
+        - guardian
+        - council
+        - self
+  approval_path:
+    type: object
+    additionalProperties: false
+    required:
+      - ethics_attestation_id
+      - council_attestation_id
+      - council_attestation_mode
+      - guardian_observed
+      - required_self_consent
+      - self_consent_granted
+      - authorization_id
+    properties:
+      ethics_attestation_id:
+        type: string
+      council_attestation_id:
+        type: string
+      council_attestation_mode:
+        type: string
+        enum:
+          - none
+          - majority
+          - unanimous
+      guardian_observed:
+        type: boolean
+      required_self_consent:
+        type: boolean
+      self_consent_granted:
+        type: boolean
+      authorization_id:
+        type: string
+        minLength: 1
+  authorization_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

@@ -101,9 +101,17 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["authorization_ok"])
+        self.assertTrue(result["validation"]["authorization_ready"])
+        self.assertTrue(result["validation"]["authorization_matches_command"])
+        self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
+        self.assertEqual(
+            result["authorization"]["authorization_id"],
+            result["approved_command"]["approval_path"]["authorization_id"],
+        )
         self.assertEqual("released", result["release"]["status"])
 
     def test_sensory_loopback_demo_emits_guardian_hold_and_recovery(self) -> None:

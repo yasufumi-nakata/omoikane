@@ -61,7 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     ewa_parser = subparsers.add_parser(
         "ewa-demo",
-        help="Run the L6 External World Agent safety and veto scenario",
+        help="Run the L6 External World Agent authorization, safety, and veto scenario",
     )
     ewa_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

@@ -17,6 +17,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `interface/bdb_fail_safe_reversibility.yaml`
 - `safety/immutable_boundary.yaml`
 - `safety/ethics_rule_tree_contract.yaml`
+- `safety/ewa_external_actuation_authorization.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `agentic/trust_score_update_guard.yaml`
 - `agentic/amendment_constitutional_freeze.yaml`

@@ -98,6 +98,7 @@ properties:
       - guardian_observed
       - required_self_consent
       - self_consent_granted
+      - authorization_id
     properties:
       ethics_attestation_id:
         type: string
@@ -115,6 +116,8 @@ properties:
         type: boolean
       self_consent_granted:
         type: boolean
+      authorization_id:
+        type: string
   audit_event_ref:
     type: string
     minLength: 1

@@ -36,6 +36,10 @@ properties:
   ethics_attestation_id:
     type: string
     minLength: 1
+  authorization_id:
+    type:
+      - string
+      - "null"
   council_attestation_id:
     type:
       - string

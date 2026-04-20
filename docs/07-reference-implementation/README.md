@@ -412,6 +412,10 @@ collective dissolution を 1 シナリオで確認する。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、
+guardian-reviewed jurisdiction evidence に束縛された
+`external_actuation_authorization` artifact が
+`instruction_digest` / `intent_summary_digest` / `legal_basis_ref` /
+`guardian_verification_ref` / `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 blocked token を含む irreversible command を
 fail-closed で veto し、digest-only audit と forced release を確認する。
