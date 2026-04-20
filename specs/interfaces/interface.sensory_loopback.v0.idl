@@ -1,0 +1,149 @@
+idl_version: 1
+kind: service
+namespace: interface.sensory_loopback.v0
+service: SensoryLoopbackService
+summary: Canonical L6 contract for bounded visual/audio/haptic self-feedback with guardian stabilization.
+imports:
+  sensory_loopback_session: ../schemas/sensory_loopback_session.schema
+  sensory_loopback_receipt: ../schemas/sensory_loopback_receipt.schema
+operations:
+  open_session:
+    summary: Bind one loopback session to a world-state anchor and a virtual body anchor before delivery begins.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - world_state_ref
+          - body_anchor_ref
+          - channels
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          world_state_ref:
+            type: string
+            minLength: 1
+          body_anchor_ref:
+            type: string
+            minLength: 1
+          channels:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+                - visual
+                - auditory
+                - haptic
+    output:
+      schema_ref: sensory_loopback_session
+    guarantees:
+      - loopback sessions must bind to one world_state_ref before any delivery occurs
+      - channels must cover at least 2 modalities to claim body-coherent feedback
+  deliver_bundle:
+    summary: Deliver one bounded multi-sensory bundle or degrade it into a guardian-controlled safe baseline.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - scene_summary
+          - artifact_refs
+          - latency_ms
+          - body_coherence_score
+          - attention_target
+          - guardian_observed
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          scene_summary:
+            type: string
+            minLength: 1
+          artifact_refs:
+            type: object
+            minProperties: 2
+            additionalProperties: false
+            properties:
+              visual:
+                type: string
+                minLength: 1
+              auditory:
+                type: string
+                minLength: 1
+              haptic:
+                type: string
+                minLength: 1
+          latency_ms:
+            type: number
+            minimum: 0
+          body_coherence_score:
+            type: number
+            minimum: 0
+            maximum: 1
+          attention_target:
+            type: string
+            minLength: 1
+          guardian_observed:
+            type: boolean
+          qualia_binding_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: sensory_loopback_receipt
+    guarantees:
+      - coherent bundles must remain within 90ms latency and 0.20 body drift
+      - degraded bundles require guardian observation before attenuation or hold
+      - guardian-hold receipts must apply safe baseline and flag council review
+      - audit output must retain artifact refs and digest only, never raw loopback payloads
+  stabilize:
+    summary: Recover a stabilizing or held session back to an active body anchor.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - reason
+          - restored_body_anchor_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          reason:
+            type: string
+            minLength: 1
+          restored_body_anchor_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: sensory_loopback_receipt
+    guarantees:
+      - stabilize may only resume sessions previously marked stabilizing or held
+      - restored_body_anchor_ref must replace the previous drifted anchor on success
+  snapshot:
+    summary: Read the current loopback session state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: sensory_loopback_session
+events:
+  sensory_loopback.bundle_recorded:
+    payload:
+      schema_ref: sensory_loopback_receipt
+  sensory_loopback.session_stabilized:
+    payload:
+      schema_ref: sensory_loopback_receipt
+compatibility:
+  stability: bootstrap
+  notes:
+    - This contract proves digest-only, body-coherent loopback handling inside the reference runtime.
+    - Raw retinal/audio/haptic streams, richer avatar-body maps, and hardware-specific actuator timing remain future work.

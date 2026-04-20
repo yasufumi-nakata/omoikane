@@ -92,6 +92,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
 
+    def test_sensory_loopback_demo_reports_guardian_hold_and_recovery(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_sensory_loopback_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["coherent_delivery"])
+        self.assertTrue(result["validation"]["guardian_hold_triggered"])
+        self.assertTrue(result["validation"]["stabilized_active"])
+        self.assertTrue(result["validation"]["qualia_binding_bound"])
+        self.assertEqual("active", result["session"]["status"])
+        self.assertEqual("guardian-hold", result["receipts"]["degraded"]["delivery_status"])
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-sensory-loopback-guardian"],
+        )
+
     def test_reference_scenario_runs(self) -> None:
         runtime = OmoikaneReferenceOS()
 

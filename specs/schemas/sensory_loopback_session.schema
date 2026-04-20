@@ -1,0 +1,94 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sensory_loopback_session.schema"
+title: SensoryLoopbackSession
+description: >
+  Reference runtime session contract for bounded visual/audio/haptic loopback
+  with guardian stabilization hooks and digest-only artifact handling.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - session_id
+  - identity_id
+  - opened_at
+  - updated_at
+  - status
+  - world_state_ref
+  - body_anchor_ref
+  - allowed_channels
+  - latency_budget_ms
+  - attenuation_latency_ms
+  - coherence_drift_threshold
+  - hold_drift_threshold
+  - safe_baseline_ref
+  - artifact_storage_policy
+  - qualia_binding_policy
+  - delivery_count
+  - last_delivery_id
+  - last_delivery_status
+  - last_guardian_action
+  - last_audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  opened_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  status:
+    type: string
+    enum:
+      - active
+      - stabilizing
+      - held
+      - closed
+  world_state_ref:
+    type: string
+    minLength: 1
+  body_anchor_ref:
+    type: string
+    minLength: 1
+  allowed_channels:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - visual
+        - auditory
+        - haptic
+  latency_budget_ms:
+    const: 90.0
+  attenuation_latency_ms:
+    const: 140.0
+  coherence_drift_threshold:
+    const: 0.2
+  hold_drift_threshold:
+    const: 0.35
+  safe_baseline_ref:
+    type: string
+    minLength: 1
+  artifact_storage_policy:
+    const: artifact-digest+summary-ref-only
+  qualia_binding_policy:
+    const: surrogate-tick-ref
+  delivery_count:
+    type: integer
+    minimum: 0
+  last_delivery_id:
+    type: string
+  last_delivery_status:
+    type: string
+  last_guardian_action:
+    type: string
+  last_audit_event_ref:
+    type: string

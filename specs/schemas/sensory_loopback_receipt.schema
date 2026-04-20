@@ -1,0 +1,111 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sensory_loopback_receipt.schema"
+title: SensoryLoopbackReceipt
+description: >
+  Deterministic result for one bounded sensory loopback delivery or guardian-led
+  stabilization step.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - delivery_id
+  - session_id
+  - recorded_at
+  - scene_summary
+  - delivered_channels
+  - artifact_refs
+  - artifact_digest
+  - latency_ms
+  - body_coherence_score
+  - classification
+  - delivery_status
+  - guardian_action
+  - immersion_preserved
+  - safe_baseline_applied
+  - requires_council_review
+  - qualia_binding_ref
+  - attention_target
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  delivery_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  scene_summary:
+    type: string
+    minLength: 1
+  delivered_channels:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - visual
+        - auditory
+        - haptic
+  artifact_refs:
+    type: object
+    additionalProperties: false
+    properties:
+      visual:
+        type: string
+        minLength: 1
+      auditory:
+        type: string
+        minLength: 1
+      haptic:
+        type: string
+        minLength: 1
+  artifact_digest:
+    type: string
+    minLength: 32
+  latency_ms:
+    type: number
+    minimum: 0
+  body_coherence_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  classification:
+    type: string
+    enum:
+      - coherent
+      - attenuated
+      - held
+      - stabilized
+  delivery_status:
+    type: string
+    enum:
+      - delivered
+      - attenuate-to-safe-baseline
+      - guardian-hold
+      - stabilized
+  guardian_action:
+    type: string
+    enum:
+      - continue-loopback
+      - stabilize-session
+      - freeze-loopback
+      - resume-loopback
+  immersion_preserved:
+    type: boolean
+  safe_baseline_applied:
+    type: boolean
+  requires_council_review:
+    type: boolean
+  qualia_binding_ref:
+    type: string
+    minLength: 1
+  attention_target:
+    type: string
+    minLength: 1
+  audit_event_ref:
+    type: string
+    minLength: 1

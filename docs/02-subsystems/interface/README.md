@@ -40,6 +40,9 @@
 ### Sensory Loopback (SL)
 - 感覚出力（音／映像／触覚）のフィードバック
 - 仮想空間での自己身体感覚
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json`
+  で coherent delivery、guardian hold、safe baseline からの stabilization、
+  qualia binding ref をまとめて検証する
 
 ### External World Agents (EWA)
 - ロボット・ドローン・センサ等の物理世界 actuator
@@ -81,5 +84,6 @@ if shared_reality.state_hash != local_belief.state_hash:
 - [bdb-protocol.md](bdb-protocol.md)
 - [collective-identity.md](collective-identity.md)
 - [imc-protocol.md](imc-protocol.md)
+- [sensory-loopback.md](sensory-loopback.md)
 - [wms-spec.md](wms-spec.md)
 - [ewa-safety.md](ewa-safety.md)

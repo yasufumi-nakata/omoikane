@@ -64,6 +64,7 @@ status: decided | superseded
 - [2026-04-20_consensus-bus-reference-runtime.md](2026-04-20_consensus-bus-reference-runtime.md)
 - [2026-04-20_distributed-transport-live-root-directory.md](2026-04-20_distributed-transport-live-root-directory.md)
 - [2026-04-20_builder-sandbox-apply-rollout.md](2026-04-20_builder-sandbox-apply-rollout.md)
+- [2026-04-20_sensory-loopback-reference-runtime.md](2026-04-20_sensory-loopback-reference-runtime.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

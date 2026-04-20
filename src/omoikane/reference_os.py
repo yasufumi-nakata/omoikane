@@ -66,6 +66,7 @@ from .interface.bdb import BiologicalDigitalBridge
 from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import InterMindChannel
+from .interface.sensory_loopback import SensoryLoopbackService
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.ethics import ActionRequest, EthicsEnforcer
@@ -194,6 +195,7 @@ class OmoikaneReferenceOS:
         self.imc = InterMindChannel()
         self.collective = CollectiveIdentityService()
         self.wms = WorldModelSync()
+        self.sensory_loopback = SensoryLoopbackService()
         self.council = Council()
         self.distributed_transport = DistributedTransportService()
         self.cognitive_audit = CognitiveAuditService()
@@ -4226,6 +4228,177 @@ class OmoikaneReferenceOS:
                 and malicious_violation["guardian_action"] == "isolate-session",
                 "private_escape_honored": mode_switch["private_escape_honored"]
                 and final_state["authority"] == "local",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_sensory_loopback_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://sensory-loopback-demo/v1",
+            metadata={"display_name": "Sensory Loopback Sandbox"},
+        )
+        world_session = self.wms.create_session(
+            [identity.identity_id],
+            objects=["avatar-atrium", "mirror-surface", "haptic-floor"],
+        )
+        world_state = self.wms.snapshot(world_session["session_id"])
+        session = self.sensory_loopback.open_session(
+            identity_id=identity.identity_id,
+            world_state_ref=f"wms://state/{world_state['state_id']}",
+            body_anchor_ref="avatar://atrium/self-body/core",
+        )
+
+        coherent_tick = self.qualia.append(
+            summary="avatar mirror, spatial audio, and wrist haptics remain aligned to one embodied anchor",
+            valence=0.18,
+            arousal=0.36,
+            clarity=0.91,
+            modality_salience={
+                "visual": 0.92,
+                "auditory": 0.74,
+                "somatic": 0.81,
+                "interoceptive": 0.48,
+            },
+            attention_target="avatar://atrium/self-body/core",
+            self_awareness=0.77,
+            lucidity=0.94,
+        )
+        coherent = self.sensory_loopback.deliver_bundle(
+            session["session_id"],
+            scene_summary="coherent avatar mirror bundle with voice reflection and wrist haptic confirmation",
+            artifact_refs={
+                "visual": "artifact://loopback/visual/coherent-mirror-v1",
+                "auditory": "artifact://loopback/audio/coherent-voice-v1",
+                "haptic": "artifact://loopback/haptic/coherent-wrist-v1",
+            },
+            latency_ms=42.0,
+            body_coherence_score=0.08,
+            attention_target=coherent_tick.attention_target,
+            guardian_observed=True,
+            qualia_binding_ref=f"qualia://tick/{coherent_tick.tick_id}",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.session.opened",
+            payload={
+                "session_id": session["session_id"],
+                "world_state_ref": session["world_state_ref"],
+                "body_anchor_ref": session["body_anchor_ref"],
+                "allowed_channels": session["allowed_channels"],
+            },
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="virtual-sensory-plane",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.bundle.delivered",
+            payload=coherent,
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="virtual-sensory-plane",
+        )
+
+        degraded_tick = self.qualia.append(
+            summary="avatar body drift spikes as haptic and auditory timing no longer aligns with the mirror surface",
+            valence=-0.24,
+            arousal=0.63,
+            clarity=0.58,
+            modality_salience={
+                "visual": 0.66,
+                "auditory": 0.88,
+                "somatic": 0.53,
+                "interoceptive": 0.72,
+            },
+            attention_target="guardian-review",
+            self_awareness=0.71,
+            lucidity=0.83,
+        )
+        degraded = self.sensory_loopback.deliver_bundle(
+            session["session_id"],
+            scene_summary="desynchronized body echo causes unstable avatar ownership and requires guardian hold",
+            artifact_refs={
+                "visual": "artifact://loopback/visual/drifted-mirror-v1",
+                "auditory": "artifact://loopback/audio/drifted-voice-v1",
+                "haptic": "artifact://loopback/haptic/drifted-floor-v1",
+            },
+            latency_ms=168.0,
+            body_coherence_score=0.42,
+            attention_target=degraded_tick.attention_target,
+            guardian_observed=True,
+            qualia_binding_ref=f"qualia://tick/{degraded_tick.tick_id}",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.bundle.held",
+            payload=degraded,
+            actor="Guardian",
+            category="interface-sensory-loopback-guardian",
+            layer="L6",
+            signature_roles=["guardian", "council"],
+            substrate="virtual-sensory-plane",
+        )
+
+        stabilized = self.sensory_loopback.stabilize(
+            session["session_id"],
+            reason="guardian realigned the avatar body anchor and resumed the safe loopback baseline",
+            restored_body_anchor_ref="avatar://atrium/self-body/core",
+        )
+        final_session = self.sensory_loopback.snapshot(session["session_id"])
+        session_validation = self.sensory_loopback.validate_session(final_session)
+        coherent_validation = self.sensory_loopback.validate_receipt(coherent)
+        degraded_validation = self.sensory_loopback.validate_receipt(degraded)
+        stabilized_validation = self.sensory_loopback.validate_receipt(stabilized)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.session.stabilized",
+            payload=stabilized,
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="virtual-sensory-plane",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.sensory_loopback.reference_profile(),
+            "world_state": world_state,
+            "session": final_session,
+            "receipts": {
+                "coherent": coherent,
+                "degraded": degraded,
+                "stabilized": stabilized,
+            },
+            "qualia": {
+                "profile": self.qualia.profile(),
+                "recent": self.qualia.recent(2),
+            },
+            "validation": {
+                **session_validation,
+                "coherent_ok": coherent_validation["ok"],
+                "degraded_ok": degraded_validation["ok"],
+                "stabilized_ok": stabilized_validation["ok"],
+                "coherent_delivery": coherent["delivery_status"] == "delivered"
+                and coherent["immersion_preserved"],
+                "guardian_hold_triggered": degraded["delivery_status"] == "guardian-hold"
+                and degraded["requires_council_review"],
+                "stabilized_active": stabilized["delivery_status"] == "stabilized"
+                and final_session["status"] == "active",
+                "qualia_binding_bound": coherent["qualia_binding_ref"].startswith("qualia://tick/")
+                and degraded["qualia_binding_ref"].startswith("qualia://tick/")
+                and stabilized["qualia_binding_ref"].startswith("qualia://loopback-stabilize/"),
+                "world_anchor_bound": final_session["world_state_ref"]
+                == f"wms://state/{world_state['state_id']}",
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

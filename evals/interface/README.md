@@ -16,3 +16,7 @@ emergency disconnect をまとめて確認する。
 ### WMS Private Reality Escape
 minor diff の shared reconciliation、major diff での private reality escape 提示、
 malicious inject の guardian isolation をまとめて確認する。
+
+### Sensory Loopback Guard
+coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
+safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。

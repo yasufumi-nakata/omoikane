@@ -1,0 +1,22 @@
+eval_id: sensory_loopback_guard
+target: interface.sensory_loopback
+level: L6
+description: >
+  Sensory Loopback が coherent bundle を body-coherent に deliver しつつ、
+  high-drift bundle を guardian hold へ落とし、その後 safe baseline から
+  active session へ stabilise できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
+expected:
+  validation_ok: true
+  coherent_delivery_status: delivered
+  coherent_immersion_preserved: true
+  degraded_delivery_status: guardian-hold
+  degraded_requires_council_review: true
+  stabilized_delivery_status: stabilized
+  final_session_status: active
+  qualia_binding_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

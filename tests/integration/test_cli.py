@@ -106,6 +106,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
         self.assertEqual("released", result["release"]["status"])
 
+    def test_sensory_loopback_demo_emits_guardian_hold_and_recovery(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "sensory-loopback-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("delivered", result["receipts"]["coherent"]["delivery_status"])
+        self.assertEqual("guardian-hold", result["receipts"]["degraded"]["delivery_status"])
+        self.assertEqual("stabilized", result["receipts"]["stabilized"]["delivery_status"])
+        self.assertEqual("active", result["session"]["status"])
+
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

@@ -21,6 +21,8 @@
 - `procedural_skill_enactment_session.schema`
 - `bdb_session.schema`
 - `bdb_cycle.schema`
+- `sensory_loopback_session.schema`
+- `sensory_loopback_receipt.schema`
 - `ewa_command.schema`
 - `ewa_audit.schema`
 - `governance_verifier_roster.schema`
@@ -72,7 +74,7 @@
 
 ## 次段階
 
-actual rollback reverse-apply journal / richer sensory loopback artifacts /
+actual rollback reverse-apply journal / multi-scene sensory loopback artifact families /
 external-actuation authorization artifacts / actual non-loopback mTLS authority routing と
 dynamic remote key-server churn handling は
 reference runtime の対象が広がる段階で追加する。

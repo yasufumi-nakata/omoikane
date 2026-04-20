@@ -32,6 +32,7 @@
 - `governance.oversight.v0.idl`
 - `governance.naming.v0.idl`
 - `interface.bdb.v0.idl`
+- `interface.sensory_loopback.v0.idl`
 - `interface.ewa.v0.idl`
 - `interface.wms.v0.idl`
 - `selfctor.design_reader.v0.idl`
@@ -44,7 +45,6 @@
 
 ## 次段階
 
-L6 sensory loopback、
 live PKI federation / transport key rotation / multi-hop anti-replay を伴う
 richer distributed surfaces は docs 側で設計を深めてから昇格させる。
 

@@ -71,6 +71,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     wms_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    sensory_loopback_parser = subparsers.add_parser(
+        "sensory-loopback-demo",
+        help="Run the L6 sensory loopback coherence, guardian hold, and stabilization scenario",
+    )
+    sensory_loopback_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     memory_parser = subparsers.add_parser(
         "memory-demo",
         help="Emit a reference MemoryCrystal compaction manifest and validation summary",
@@ -356,6 +362,10 @@ def main() -> None:
 
     if args.command == "wms-demo":
         _print_result(runtime.run_wms_demo(), args.json)
+        return
+
+    if args.command == "sensory-loopback-demo":
+        _print_result(runtime.run_sensory_loopback_demo(), args.json)
         return
 
     if args.command == "memory-demo":
