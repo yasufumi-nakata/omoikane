@@ -3,7 +3,8 @@ target: selfctor.rollback
 summary: >
   Builder staged rollout で regression が検出された時に、
   RollbackEngine が pre-apply Mirage Self snapshot を復元し、
-  live enactment receipt に束縛された reverse-apply journal と telemetry gate を通したうえで、
+  live enactment receipt に束縛された reverse-apply journal と actual reverse-apply command receipt、
+  telemetry gate を通したうえで、
   self/council/guardian への通知付きで append-only continuity rollback を完了すること
 checks:
   - name: builder rollback demo smoke
@@ -15,6 +16,9 @@ expect:
   restored_snapshot_prefix: mirage://build-l5-rollback-0001/snapshot/pre-apply
   reverted_patch_count: 2
   reverse_apply_journal_count: 2
+  reverse_apply_command_count: 2
+  reverse_apply_verified_count: 2
+  reverse_apply_cleanup_status: removed
   reverted_stage_ids:
     - dark-launch
     - canary-5pct

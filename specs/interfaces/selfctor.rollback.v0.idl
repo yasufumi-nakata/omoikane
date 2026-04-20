@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.rollback.v0
 service: RollbackEngineService
-summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed.
+summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed, with actual reverse-apply commands executed in a temp rollback workspace.
 imports:
   build_request: ../schemas/build_request.yaml
   builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
@@ -58,7 +58,8 @@ operations:
     guarantees:
       - rollback restores the pre-apply Mirage Self snapshot
       - rollback emits a reverse-apply journal that covers every materialized live workspace file
-      - rollback telemetry gate binds command receipts, cleanup, and journal coverage before approval
+      - rollback executes actual reverse-apply commands for every journaled file before approval
+      - rollback telemetry gate binds live command receipts, reverse command receipts, cleanup, and verified journal coverage before approval
       - continuity evidence remains append-only
       - self, council, and guardian are all notified
   validate_session:

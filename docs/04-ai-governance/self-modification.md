@@ -80,7 +80,9 @@ reference runtime では `builder-demo` が
 `rollback-demo` は regression 検出時に
 `builder_rollback_session` を返し、canary rollback 後に
 pre-apply snapshot が復元されることに加え、
-live enactment receipt 由来の reverse-apply journal と telemetry gate が
+live enactment receipt 由来の reverse-apply journal、
+temp rollback workspace での actual reverse-apply command receipt、
+telemetry gate が
 rollback を machine-checkable に承認することを確認する。
 
 ## Rollback
@@ -90,7 +92,8 @@ rollback を machine-checkable に承認することを確認する。
 - 本人に「改修を撤回した」旨を通知
 - reference runtime では `RollbackEngineService` が
   `selfctor.rollback.v0` / `builder_rollback_session.schema` に従って
-  self・Council・Guardian の 3 者通知、reverse-apply journal、live telemetry gate を必須にする
+  self・Council・Guardian の 3 者通知、
+  reverse-apply journal、actual reverse-apply command receipt、live telemetry gate を必須にする
 
 ## 監査ログ
 

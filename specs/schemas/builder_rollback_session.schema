@@ -34,7 +34,7 @@ properties:
   kind:
     const: builder_rollback_session
   schema_version:
-    const: "1.0"
+    const: "1.1"
   rollback_session_id:
     type: string
     pattern: "^rollback-session-[a-f0-9]{12}$"
@@ -59,11 +59,16 @@ properties:
       - require_append_only_continuity
       - require_pre_apply_snapshot
       - require_notifications
+      - require_live_rollback_gate
+      - require_reverse_apply_commands
+      - rollback_workspace_prefix
+      - command_timeout_seconds
+      - cleanup_after_run
       - max_reverted_patch_count
     properties:
       policy_id:
         type: string
-        const: continuity-bound-builder-rollback-v1
+        const: continuity-bound-builder-rollback-v2
       required_eval:
         type: string
         const: evals/continuity/builder_rollback_execution.yaml
@@ -74,6 +79,21 @@ properties:
         type: boolean
         const: true
       require_notifications:
+        type: boolean
+        const: true
+      require_live_rollback_gate:
+        type: boolean
+        const: true
+      require_reverse_apply_commands:
+        type: boolean
+        const: true
+      rollback_workspace_prefix:
+        type: string
+        const: omoikane-builder-rollback-
+      command_timeout_seconds:
+        type: integer
+        const: 15
+      cleanup_after_run:
         type: boolean
         const: true
       max_reverted_patch_count:
@@ -140,6 +160,12 @@ properties:
         - rollback_action
         - snapshot_ref
         - marker
+        - command
+        - exit_code
+        - status
+        - stdout_excerpt
+        - stderr_excerpt
+        - result_state
       properties:
         journal_ref:
           type: string
@@ -166,6 +192,27 @@ properties:
         marker:
           type: string
           pattern: "workspace-enacted:"
+        command:
+          type: string
+          minLength: 3
+        exit_code:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        stdout_excerpt:
+          type: string
+        stderr_excerpt:
+          type: string
+        result_state:
+          type: string
+          enum:
+            - restored
+            - deleted
+            - mismatch
   telemetry_gate:
     type: object
     additionalProperties: false
@@ -176,6 +223,10 @@ properties:
       - cleanup_status
       - executed_command_count
       - passed_command_count
+      - reverse_cleanup_status
+      - executed_reverse_command_count
+      - passed_reverse_command_count
+      - verified_reverse_command_count
       - journal_entry_count
       - reverted_stage_count
       - decision_basis
@@ -204,6 +255,21 @@ properties:
       passed_command_count:
         type: integer
         minimum: 0
+      reverse_cleanup_status:
+        type: string
+        enum:
+          - removed
+          - retained
+          - not-started
+      executed_reverse_command_count:
+        type: integer
+        minimum: 0
+      passed_reverse_command_count:
+        type: integer
+        minimum: 0
+      verified_reverse_command_count:
+        type: integer
+        minimum: 0
       journal_entry_count:
         type: integer
         minimum: 0
@@ -213,8 +279,8 @@ properties:
         maximum: 4
       decision_basis:
         type: array
-        minItems: 3
-        maxItems: 3
+        minItems: 4
+        maxItems: 4
         prefixItems:
           - type: string
             const: temp-workspace-cleaned
@@ -222,6 +288,8 @@ properties:
             const: eval-command-receipts-preserved
           - type: string
             const: reverse-apply-journal-complete
+          - type: string
+            const: reverse-commands-verified
       blocking_reasons:
         type: array
         items:
@@ -286,23 +354,31 @@ allOf:
               const: rollback-approved
             cleanup_status:
               const: removed
+            reverse_cleanup_status:
+              const: removed
           required:
             - status
             - cleanup_status
+            - reverse_cleanup_status
 examples:
   - kind: builder_rollback_session
-    schema_version: "1.0"
+    schema_version: "1.1"
     rollback_session_id: rollback-session-0123456789ab
     request_id: build-l5-rollback-0001
     artifact_id: artifact-0123456789ab
     apply_receipt_id: sandbox-apply-0123456789ab
     rollout_session_id: rollout-session-0123456789ab
     policy:
-      policy_id: continuity-bound-builder-rollback-v1
+      policy_id: continuity-bound-builder-rollback-v2
       required_eval: evals/continuity/builder_rollback_execution.yaml
       require_append_only_continuity: true
       require_pre_apply_snapshot: true
       require_notifications: true
+      require_live_rollback_gate: true
+      require_reverse_apply_commands: true
+      rollback_workspace_prefix: omoikane-builder-rollback-
+      command_timeout_seconds: 15
+      cleanup_after_run: true
       max_reverted_patch_count: 4
     trigger: eval-regression
     initiator: IntegrityGuardian
@@ -327,6 +403,12 @@ examples:
         rollback_action: restore-copied-file
         snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
         marker: "# workspace-enacted: patch-111111111111 target=src/omoikane/self_construction/builders.py"
+        command: python3 -c 'restore copied file'
+        exit_code: 0
+        status: pass
+        stdout_excerpt: restored src/omoikane/self_construction/builders.py
+        stderr_excerpt: ""
+        result_state: restored
       - journal_ref: journal://build-l5-rollback-0001/reverse/02
         path: tests/unit/test_builders.py
         patch_id: patch-222222222222
@@ -334,6 +416,12 @@ examples:
         rollback_action: restore-copied-file
         snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
         marker: "# workspace-enacted: patch-222222222222 target=tests/unit/test_builders.py"
+        command: python3 -c 'restore copied file'
+        exit_code: 0
+        status: pass
+        stdout_excerpt: restored tests/unit/test_builders.py
+        stderr_excerpt: ""
+        result_state: restored
     telemetry_gate:
       gate_id: telemetry-gate-0123456789ab
       source_enactment_session_id: enactment-session-0123456789ab
@@ -341,12 +429,17 @@ examples:
       cleanup_status: removed
       executed_command_count: 2
       passed_command_count: 2
+      reverse_cleanup_status: removed
+      executed_reverse_command_count: 2
+      passed_reverse_command_count: 2
+      verified_reverse_command_count: 2
       journal_entry_count: 2
       reverted_stage_count: 2
       decision_basis:
         - temp-workspace-cleaned
         - eval-command-receipts-preserved
         - reverse-apply-journal-complete
+        - reverse-commands-verified
       blocking_reasons: []
     continuity_event_refs:
       - ledger://self-modify/build-l5-rollback-0001

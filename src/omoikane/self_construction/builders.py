@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -48,6 +50,39 @@ def _tail_text(text: str, *, limit: int = 160) -> str:
     if len(normalized) <= limit:
         return normalized
     return normalized[-limit:]
+
+
+def _run_shell_command(
+    *,
+    command: str,
+    cwd: Path,
+    timeout_seconds: int,
+) -> Dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            command,
+            shell=True,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+        return {
+            "command": command,
+            "exit_code": completed.returncode,
+            "status": "pass" if completed.returncode == 0 else "fail",
+            "stdout_excerpt": _tail_text(completed.stdout),
+            "stderr_excerpt": _tail_text(completed.stderr),
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "command": command,
+            "exit_code": -1,
+            "status": "timeout",
+            "stdout_excerpt": _tail_text(exc.stdout or ""),
+            "stderr_excerpt": _tail_text(exc.stderr or ""),
+        }
 
 
 @dataclass(frozen=True)
@@ -598,12 +633,16 @@ class RolloutPlannerService:
 class RollbackEnginePolicy:
     """Deterministic rollback policy for builder sessions."""
 
-    policy_id: str = "continuity-bound-builder-rollback-v1"
+    policy_id: str = "continuity-bound-builder-rollback-v2"
     required_eval: str = MANDATORY_ROLLBACK_EVAL
     require_append_only_continuity: bool = True
     require_pre_apply_snapshot: bool = True
     require_notifications: bool = True
     require_live_rollback_gate: bool = True
+    require_reverse_apply_commands: bool = True
+    rollback_workspace_prefix: str = "omoikane-builder-rollback-"
+    command_timeout_seconds: int = 15
+    cleanup_after_run: bool = True
     max_reverted_patch_count: int = 4
 
     def to_dict(self) -> Dict[str, Any]:
@@ -614,6 +653,10 @@ class RollbackEnginePolicy:
             "require_pre_apply_snapshot": self.require_pre_apply_snapshot,
             "require_notifications": self.require_notifications,
             "require_live_rollback_gate": self.require_live_rollback_gate,
+            "require_reverse_apply_commands": self.require_reverse_apply_commands,
+            "rollback_workspace_prefix": self.rollback_workspace_prefix,
+            "command_timeout_seconds": self.command_timeout_seconds,
+            "cleanup_after_run": self.cleanup_after_run,
             "max_reverted_patch_count": self.max_reverted_patch_count,
         }
 
@@ -634,6 +677,7 @@ class RollbackEngineService:
         apply_receipt: Mapping[str, Any],
         rollout_session: Mapping[str, Any],
         live_enactment_session: Mapping[str, Any],
+        repo_root: Path | str,
         trigger: str,
         reason: str,
         initiator: str,
@@ -642,9 +686,10 @@ class RollbackEngineService:
         rollback_ready = bool(apply_receipt.get("validation", {}).get("rollback_ready"))
         continuity_ref = str(apply_receipt.get("continuity_log_ref", ""))
         live_enactment_ok = live_enactment_session.get("status") == "passed"
-        reverse_apply_journal = self._build_reverse_apply_journal(
+        reverse_apply_journal, reverse_cleanup_status = self._build_reverse_apply_journal(
             build_request=build_request,
             live_enactment_session=live_enactment_session,
+            repo_root=repo_root,
         )
         continuity_event_refs = [
             ref
@@ -668,6 +713,7 @@ class RollbackEngineService:
             live_enactment_session=live_enactment_session,
             reverse_apply_journal=reverse_apply_journal,
             reverted_stage_ids=reverted_stage_ids,
+            reverse_cleanup_status=reverse_cleanup_status,
         )
         allowed = (
             apply_receipt.get("status") == "applied"
@@ -682,7 +728,7 @@ class RollbackEngineService:
 
         return {
             "kind": "builder_rollback_session",
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "rollback_session_id": new_id("rollback-session"),
             "request_id": build_request["request_id"],
             "artifact_id": apply_receipt["artifact_id"],
@@ -723,8 +769,8 @@ class RollbackEngineService:
         errors: list[str] = []
         if session.get("kind") != "builder_rollback_session":
             errors.append("kind must equal builder_rollback_session")
-        if session.get("schema_version") != "1.0":
-            errors.append("schema_version must equal 1.0")
+        if session.get("schema_version") != "1.1":
+            errors.append("schema_version must equal 1.1")
         if session.get("status") not in {"rolled-back", "blocked"}:
             errors.append("status must be rolled-back or blocked")
         if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
@@ -746,6 +792,15 @@ class RollbackEngineService:
                 errors.append("reverse_apply_journal must include at least one entry")
             if len(reverse_apply_journal) != int(session.get("reverted_patch_count", 0)):
                 errors.append("reverse_apply_journal must align with reverted_patch_count")
+            if any(entry.get("status") != "pass" for entry in reverse_apply_journal):
+                errors.append("reverse_apply_journal entries must all pass")
+            if any(
+                entry.get("result_state") not in {"restored", "deleted"}
+                for entry in reverse_apply_journal
+            ):
+                errors.append(
+                    "reverse_apply_journal entries must end in restored or deleted state"
+                )
             if len(list(session.get("continuity_event_refs", []))) < 2:
                 errors.append("continuity_event_refs must include apply and rollback refs")
             if len(list(session.get("notification_refs", []))) != 3:
@@ -754,36 +809,96 @@ class RollbackEngineService:
                 errors.append("telemetry_gate.status must equal rollback-approved")
             if telemetry_gate.get("cleanup_status") != "removed":
                 errors.append("telemetry_gate.cleanup_status must equal removed")
+            if telemetry_gate.get("reverse_cleanup_status") != "removed":
+                errors.append("telemetry_gate.reverse_cleanup_status must equal removed")
             if int(telemetry_gate.get("journal_entry_count", 0)) != len(reverse_apply_journal):
                 errors.append("telemetry_gate.journal_entry_count must match reverse_apply_journal")
+            if int(telemetry_gate.get("executed_reverse_command_count", 0)) != len(
+                reverse_apply_journal
+            ):
+                errors.append(
+                    "telemetry_gate.executed_reverse_command_count must match reverse_apply_journal"
+                )
+            if int(telemetry_gate.get("passed_reverse_command_count", 0)) != len(
+                reverse_apply_journal
+            ):
+                errors.append(
+                    "telemetry_gate.passed_reverse_command_count must match reverse_apply_journal"
+                )
+            if int(telemetry_gate.get("verified_reverse_command_count", 0)) != len(
+                reverse_apply_journal
+            ):
+                errors.append(
+                    "telemetry_gate.verified_reverse_command_count must match reverse_apply_journal"
+                )
         return {"ok": not errors, "errors": errors}
 
-    @staticmethod
     def _build_reverse_apply_journal(
+        self,
         *,
         build_request: Mapping[str, Any],
         live_enactment_session: Mapping[str, Any],
-    ) -> list[Dict[str, Any]]:
+        repo_root: Path | str,
+    ) -> tuple[list[Dict[str, Any]], str]:
+        repo_path = Path(repo_root)
         snapshot_refs = dict(live_enactment_session.get("workspace_snapshot_refs", {}))
         pre_apply_ref = str(snapshot_refs.get("pre_apply", ""))
         journal: list[Dict[str, Any]] = []
-        for index, item in enumerate(live_enactment_session.get("materialized_files", []), start=1):
-            source_state = str(item.get("source_state", ""))
-            rollback_action = (
-                "restore-copied-file" if source_state == "copied" else "delete-created-file"
-            )
-            journal.append(
-                {
-                    "journal_ref": f"journal://{build_request['request_id']}/reverse/{index:02d}",
-                    "path": str(item.get("path", "")),
-                    "patch_id": str(item.get("patch_id", "")),
-                    "source_state": source_state,
-                    "rollback_action": rollback_action,
-                    "snapshot_ref": pre_apply_ref,
-                    "marker": str(item.get("marker", "")),
-                }
-            )
-        return journal
+        temp_root = Path(tempfile.mkdtemp(prefix=self._policy.rollback_workspace_prefix))
+        cleanup_status = "not-started"
+        try:
+            for index, item in enumerate(
+                live_enactment_session.get("materialized_files", []), start=1
+            ):
+                target_path = str(item.get("path", ""))
+                source_state = str(item.get("source_state", ""))
+                rollback_action = (
+                    "restore-copied-file" if source_state == "copied" else "delete-created-file"
+                )
+                marker = str(item.get("marker", ""))
+                target = temp_root / target_path
+                source = repo_path / target_path
+                self._materialize_reverse_apply_target(
+                    target=target,
+                    source=source,
+                    marker=marker,
+                    source_state=source_state,
+                )
+                command = self._build_reverse_apply_command(
+                    target_path=target_path,
+                    source=source,
+                    source_state=source_state,
+                )
+                command_run = self._run_command(command=command, workspace_root=temp_root)
+                result_state = self._verify_reverse_apply_result(
+                    target=target,
+                    source=source,
+                    source_state=source_state,
+                )
+                journal.append(
+                    {
+                        "journal_ref": f"journal://{build_request['request_id']}/reverse/{index:02d}",
+                        "path": target_path,
+                        "patch_id": str(item.get("patch_id", "")),
+                        "source_state": source_state,
+                        "rollback_action": rollback_action,
+                        "snapshot_ref": pre_apply_ref,
+                        "marker": marker,
+                        "command": command_run["command"],
+                        "exit_code": command_run["exit_code"],
+                        "status": command_run["status"],
+                        "stdout_excerpt": command_run["stdout_excerpt"],
+                        "stderr_excerpt": command_run["stderr_excerpt"],
+                        "result_state": result_state,
+                    }
+                )
+        finally:
+            if self._policy.cleanup_after_run:
+                shutil.rmtree(temp_root, ignore_errors=True)
+                cleanup_status = "removed"
+            else:
+                cleanup_status = "retained"
+        return journal, cleanup_status
 
     def _build_telemetry_gate(
         self,
@@ -791,9 +906,17 @@ class RollbackEngineService:
         live_enactment_session: Mapping[str, Any],
         reverse_apply_journal: Sequence[Mapping[str, Any]],
         reverted_stage_ids: Sequence[str],
+        reverse_cleanup_status: str,
     ) -> Dict[str, Any]:
         command_runs = list(live_enactment_session.get("command_runs", []))
         passed_command_count = sum(run.get("status") == "pass" for run in command_runs)
+        passed_reverse_command_count = sum(
+            entry.get("status") == "pass" for entry in reverse_apply_journal
+        )
+        verified_reverse_command_count = sum(
+            entry.get("result_state") in {"restored", "deleted"}
+            for entry in reverse_apply_journal
+        )
         mutated_file_count = int(live_enactment_session.get("mutated_file_count", 0))
         cleanup_status = str(live_enactment_session.get("cleanup_status", "not-started"))
         blocking_reasons: list[str] = []
@@ -805,6 +928,14 @@ class RollbackEngineService:
             blocking_reasons.append("all live enactment commands must pass before rollback")
         if len(reverse_apply_journal) != mutated_file_count:
             blocking_reasons.append("reverse-apply journal must cover every materialized file")
+        if passed_reverse_command_count != len(reverse_apply_journal):
+            blocking_reasons.append("all reverse-apply commands must pass before rollback")
+        if verified_reverse_command_count != len(reverse_apply_journal):
+            blocking_reasons.append(
+                "reverse-apply verification must restore or delete every materialized file"
+            )
+        if reverse_cleanup_status != "removed":
+            blocking_reasons.append("rollback temp workspace cleanup must complete before approval")
         if not reverted_stage_ids:
             blocking_reasons.append("rollback telemetry requires at least one reverted stage")
 
@@ -817,12 +948,17 @@ class RollbackEngineService:
             "cleanup_status": cleanup_status,
             "executed_command_count": len(command_runs),
             "passed_command_count": passed_command_count,
+            "reverse_cleanup_status": reverse_cleanup_status,
+            "executed_reverse_command_count": len(reverse_apply_journal),
+            "passed_reverse_command_count": passed_reverse_command_count,
+            "verified_reverse_command_count": verified_reverse_command_count,
             "journal_entry_count": len(reverse_apply_journal),
             "reverted_stage_count": len(reverted_stage_ids),
             "decision_basis": [
                 "temp-workspace-cleaned",
                 "eval-command-receipts-preserved",
                 "reverse-apply-journal-complete",
+                "reverse-commands-verified",
             ],
             "blocking_reasons": blocking_reasons,
         }
@@ -836,6 +972,69 @@ class RollbackEngineService:
             blocking_reasons.append("rollback preconditions were not satisfied")
         gate["blocking_reasons"] = blocking_reasons
         return gate
+
+    def _materialize_reverse_apply_target(
+        self,
+        *,
+        target: Path,
+        source: Path,
+        marker: str,
+        source_state: str,
+    ) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        base_text = source.read_text(encoding="utf-8") if source.exists() else ""
+        if source_state == "copied" and base_text and not base_text.endswith("\n"):
+            base_text += "\n"
+        target.write_text(f"{base_text}{marker}\n", encoding="utf-8")
+
+    @staticmethod
+    def _build_reverse_apply_command(
+        *,
+        target_path: str,
+        source: Path,
+        source_state: str,
+    ) -> str:
+        if source_state == "copied":
+            script = (
+                "from pathlib import Path; "
+                f"target = Path({json.dumps(target_path)}); "
+                f"source = Path({json.dumps(str(source))}); "
+                "target.parent.mkdir(parents=True, exist_ok=True); "
+                "target.write_text(source.read_text(encoding='utf-8'), encoding='utf-8'); "
+                f"print({json.dumps(f'restored {target_path}')})"
+            )
+        else:
+            script = (
+                "from pathlib import Path; "
+                f"target = Path({json.dumps(target_path)}); "
+                "target.unlink(missing_ok=True); "
+                f"print({json.dumps(f'deleted {target_path}')})"
+            )
+        return f"python3 -c {shlex.quote(script)}"
+
+    @staticmethod
+    def _verify_reverse_apply_result(
+        *,
+        target: Path,
+        source: Path,
+        source_state: str,
+    ) -> str:
+        if source_state == "copied":
+            if not source.exists() or not target.exists():
+                return "mismatch"
+            return (
+                "restored"
+                if target.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+                else "mismatch"
+            )
+        return "deleted" if not target.exists() else "mismatch"
+
+    def _run_command(self, *, command: str, workspace_root: Path) -> Dict[str, Any]:
+        return _run_shell_command(
+            command=command,
+            cwd=workspace_root,
+            timeout_seconds=self._policy.command_timeout_seconds,
+        )
 
 
 @dataclass(frozen=True)
@@ -1040,30 +1239,11 @@ class LiveEnactmentService:
         command: str,
         workspace_root: Path,
     ) -> Dict[str, Any]:
-        try:
-            completed = subprocess.run(
-                command,
-                shell=True,
+        return {
+            "eval_ref": eval_ref,
+            **_run_shell_command(
+                command=command,
                 cwd=workspace_root,
-                text=True,
-                capture_output=True,
-                timeout=self._policy.command_timeout_seconds,
-                check=False,
-            )
-            return {
-                "eval_ref": eval_ref,
-                "command": command,
-                "exit_code": completed.returncode,
-                "status": "pass" if completed.returncode == 0 else "fail",
-                "stdout_excerpt": _tail_text(completed.stdout),
-                "stderr_excerpt": _tail_text(completed.stderr),
-            }
-        except subprocess.TimeoutExpired as exc:
-            return {
-                "eval_ref": eval_ref,
-                "command": command,
-                "exit_code": -1,
-                "status": "timeout",
-                "stdout_excerpt": _tail_text(exc.stdout or ""),
-                "stderr_excerpt": _tail_text(exc.stderr or ""),
-            }
+                timeout_seconds=self._policy.command_timeout_seconds,
+            ),
+        }

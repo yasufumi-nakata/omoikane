@@ -7825,6 +7825,7 @@ class OmoikaneReferenceOS:
             apply_receipt=sandbox_apply_receipt,
             rollout_session=rollout_session,
             live_enactment_session=enactment_session,
+            repo_root=self.repo_root,
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
@@ -8059,6 +8060,15 @@ class OmoikaneReferenceOS:
                 "reverted_patch_count": rollback_session["reverted_patch_count"],
                 "reverted_stage_ids": rollback_session["reverted_stage_ids"],
                 "reverse_apply_journal_count": len(rollback_session["reverse_apply_journal"]),
+                "reverse_apply_command_count": rollback_session["telemetry_gate"][
+                    "executed_reverse_command_count"
+                ],
+                "reverse_apply_verified_count": rollback_session["telemetry_gate"][
+                    "verified_reverse_command_count"
+                ],
+                "reverse_apply_cleanup_status": rollback_session["telemetry_gate"][
+                    "reverse_cleanup_status"
+                ],
                 "telemetry_gate_status": rollback_session["telemetry_gate"]["status"],
                 "telemetry_gate_cleanup_status": rollback_session["telemetry_gate"]["cleanup_status"],
                 "telemetry_gate_command_count": rollback_session["telemetry_gate"][

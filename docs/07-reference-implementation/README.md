@@ -264,7 +264,9 @@ cleanup 済み receipt を 1 シナリオで確認する。
 rollback 判定済み staged rollout が `builder_rollback_session` を通じて
 `pre-apply` Mirage Self snapshot を復元し、
 `dark-launch` / `canary-5pct` の revoke 範囲、
-live enactment receipt に束縛された reverse-apply journal と telemetry gate、
+live enactment receipt に束縛された reverse-apply journal、
+temp rollback workspace 上の actual reverse-apply command receipt、
+cleanup 済み telemetry gate、
 append-only continuity ref 2 本、
 self / council / guardian の 3 者通知を
 1 シナリオで確認する。

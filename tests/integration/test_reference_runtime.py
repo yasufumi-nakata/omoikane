@@ -345,6 +345,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(2, result["validation"]["reverted_patch_count"])
         self.assertEqual(2, result["validation"]["reverse_apply_journal_count"])
+        self.assertEqual(2, result["validation"]["reverse_apply_command_count"])
+        self.assertEqual(2, result["validation"]["reverse_apply_verified_count"])
+        self.assertEqual("removed", result["validation"]["reverse_apply_cleanup_status"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],
             result["validation"]["reverted_stage_ids"],

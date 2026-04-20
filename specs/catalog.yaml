@@ -497,7 +497,7 @@ entries:
       - specs/interfaces/selfctor.rollback.v0.idl
       - docs/04-ai-governance/self-modification.md
       - reference-runtime
-    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot, binds reverse-apply journal coverage to live enactment receipts, and records rollback telemetry approval.
+    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot, binds reverse-apply journal and actual reverse command receipts to live enactment evidence, and records rollback telemetry approval.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.rollback.v0.idl
@@ -506,7 +506,7 @@ entries:
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make regression-triggered builder rollback execution, reverse-apply journal binding, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make regression-triggered builder rollback execution, reverse-apply command verification, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
