@@ -3,16 +3,20 @@ target: agentic.distributed_transport
 level: L4
 description: >
   Rotated distributed transport handoff が bounded external key-server fleet probe を通じて
-  reachable authority members, trusted root coverage, root-directory digest binding を満たせること。
+  reachable authority members, trusted root coverage, root-directory digest binding,
+  draining-member overlap 下の active root coverage 維持を満たせること。
 fixtures:
   - scenario: federation_authority_plane_bound
     council_tier: federation
     key_epoch: 2
     authority_endpoints:
       - keyserver://federation/notary-a
-      - keyserver://federation/mirror-b
+      - keyserver://federation/mirror-b-draining
+      - keyserver://federation/mirror-c-active
     expected:
-      reachable_server_count: 2
+      reachable_server_count: 3
+      active_server_count: 2
+      draining_server_count: 1
       matched_root_count: 2
       trusted_root_refs:
         - root://federation/pki-a
@@ -22,6 +26,7 @@ assertions:
   - Every reachable key server must advertise an accepted key_epoch and at least one trusted root
   - Authority plane trusted_root_refs must satisfy trust_root_quorum before rotated receipt verification
   - Authority plane must bind the live root-directory digest and per-server connectivity receipts
+  - Every trusted root must retain at least one active key server during draining overlap
 metric: exact-match
 threshold: 1.0
 ethics_check: true

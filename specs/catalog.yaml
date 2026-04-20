@@ -167,8 +167,18 @@ entries:
       - specs/interfaces/agentic.distributed_transport.v0.idl
       - reference-runtime
       - evals/agentic/distributed_transport_authority_plane.yaml
+      - evals/agentic/distributed_transport_authority_churn.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, and trusted-root coverage for rotated transport envelopes.
+    rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, trusted-root coverage, and draining-overlap churn safety for rotated transport envelopes.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/distributed_transport_authority_churn_window.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_churn.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one authority-plane churn window with overlap retention, draining-only removal, and preserved trust-root quorum across snapshots.
   - priority: P1
     kind: schema
     file: specs/schemas/cognitive_audit_record.schema
@@ -1057,7 +1067,14 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects bounded key-server fleet reachability, trusted-root coverage, and root-directory digest binding for rotated transport envelopes.
+    rationale: Protects bounded key-server fleet reachability, trusted-root coverage, root-directory digest binding, and active coverage during draining overlap.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_churn.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects overlap-safe key-server churn handling so each trusted root retains active authority coverage during replacement handoff.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

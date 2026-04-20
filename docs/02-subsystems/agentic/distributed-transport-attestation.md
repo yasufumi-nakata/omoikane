@@ -109,8 +109,25 @@ bounded external key-server fleet を probe し、
   envelope / root-directory と一致しなければ fail-closed
 - `trusted_root_refs` は reachable server 群が広告した root のうち
   root-directory `trusted_root_refs` と交差するものだけを採用する
+- authority plane は `overlap-safe-authority-handoff-v1` を固定 churn profile とし、
+  `authority_status=draining` の server が残る間も各 `trusted_root_ref` に
+  少なくとも 1 つの `authority_status=active` server を要求する
+- `root_coverage` は root ごとに `active_server_refs / draining_server_refs /
+  coverage_status` (`stable` or `handoff-ready`) を保持し、
+  draining overlap が replacement server で吸収できていることを machine-checkable にする
 - rotated receipt verification は root-directory 直結ではなく、
   authority plane が返した `trusted_root_refs` を使って authenticate する
+
+authority membership が実際に変わる時は `reconcile_authority_churn` により、
+overlap snapshot と post-churn snapshot を
+`distributed_transport_authority_churn_window` に束縛する。
+
+- `retained_server_refs` は churn 中も残った key server を示し、
+  membership change が起きた場合は少なくとも 1 server の overlap を要求する
+- `removed_server_refs` は previous snapshot で `draining` だった server だけを許容し、
+  fail-closed で abrupt removal を防ぐ
+- `continuity_guard` は overlap count / draining removal / quorum maintained を固定し、
+  `status=quorum-maintained` だけを rotated receipt 前段の valid churn outcome とする
 
 ## Relay telemetry
 
@@ -141,14 +158,17 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_root_connectivity_receipt.schema`
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
 - schema: `specs/schemas/distributed_transport_authority_plane.schema`
+- schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
 - eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
 - eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
 - eval: `evals/agentic/distributed_transport_authority_plane.yaml`
+- eval: `evals/agentic/distributed_transport_authority_churn.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-live-root-directory.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`
+- decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`

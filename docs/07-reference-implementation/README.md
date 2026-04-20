@@ -130,8 +130,13 @@ loopback live root-directory endpoint から取得した
 `connectivity_receipt` を返し、その quorum が rotated receipt verification に束縛されること、
 さらに bounded external key-server fleet から取得した
 `distributed_transport_authority_plane` が `directory_digest` と
-per-server connectivity receipt を返し、その `trusted_root_refs` が
+per-server connectivity receipt を返し、
+draining member と replacement member の overlap を
+`root_coverage` / `churn_profile=overlap-safe-authority-handoff-v1` で固定しつつ、
+その `trusted_root_refs` が
 rotated receipt verification に最終的に束縛されること、
+さらに `authority_churn` が overlap snapshot から stable snapshot への
+draining exit を `bounded-key-server-churn-window-v1` で証明すること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -394,5 +399,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- actual non-loopback mTLS authority routing と dynamic external key server churn handling
+- actual non-loopback mTLS authority routing と socket-level tracing
 - automation による未実装ギャップの継続充填

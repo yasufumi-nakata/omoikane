@@ -12,13 +12,18 @@ required:
   - council_tier
   - transport_profile
   - authority_profile
+  - churn_profile
   - key_epoch
   - directory_ref
   - directory_digest
   - quorum_requirement
   - reachable_server_count
+  - active_server_count
+  - draining_server_count
   - matched_root_count
   - trusted_root_refs
+  - root_coverage
+  - churn_safe
   - key_servers
   - proof_digest
   - digest
@@ -43,6 +48,8 @@ properties:
     minLength: 1
   authority_profile:
     const: bounded-key-server-fleet-v1
+  churn_profile:
+    const: overlap-safe-authority-handoff-v1
   key_epoch:
     type: integer
     minimum: 1
@@ -58,6 +65,12 @@ properties:
   reachable_server_count:
     type: integer
     minimum: 1
+  active_server_count:
+    type: integer
+    minimum: 1
+  draining_server_count:
+    type: integer
+    minimum: 0
   matched_root_count:
     type: integer
     minimum: 1
@@ -68,6 +81,41 @@ properties:
     items:
       type: string
       minLength: 1
+  root_coverage:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - root_ref
+        - active_server_refs
+        - draining_server_refs
+        - coverage_status
+      properties:
+        root_ref:
+          type: string
+          minLength: 1
+        active_server_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^keyserver://"
+        draining_server_refs:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^keyserver://"
+        coverage_status:
+          type: string
+          enum:
+            - stable
+            - handoff-ready
+  churn_safe:
+    type: boolean
   key_servers:
     type: array
     minItems: 1
@@ -181,15 +229,31 @@ examples:
     council_tier: federation
     transport_profile: federation-mtls-quorum-v1
     authority_profile: bounded-key-server-fleet-v1
+    churn_profile: overlap-safe-authority-handoff-v1
     key_epoch: 2
     directory_ref: rootdir://federation/live-rotation-window
     directory_digest: 0f162bf6e7bbd5a0d50cdbb686145bff49fc3bfe86d9bbfe69cd151f8d487ce4
     quorum_requirement: 2
-    reachable_server_count: 2
+    reachable_server_count: 3
+    active_server_count: 2
+    draining_server_count: 1
     matched_root_count: 2
     trusted_root_refs:
       - root://federation/pki-a
       - root://federation/pki-b
+    root_coverage:
+      - root_ref: root://federation/pki-a
+        active_server_refs:
+          - keyserver://federation/notary-a
+        draining_server_refs: []
+        coverage_status: stable
+      - root_ref: root://federation/pki-b
+        active_server_refs:
+          - keyserver://federation/mirror-c-active
+        draining_server_refs:
+          - keyserver://federation/mirror-b-draining
+        coverage_status: handoff-ready
+    churn_safe: true
     key_servers:
       - kind: distributed_transport_key_server
         schema_version: "1.0.0"
@@ -215,12 +279,12 @@ examples:
         recorded_at: "2026-04-20T02:11:02Z"
       - kind: distributed_transport_key_server
         schema_version: "1.0.0"
-        key_server_ref: keyserver://federation/mirror-b
+        key_server_ref: keyserver://federation/mirror-b-draining
         checked_at: "2026-04-20T02:11:01Z"
         council_tier: federation
         served_transport_profile: federation-mtls-quorum-v1
         server_role: directory-mirror
-        authority_status: active
+        authority_status: draining
         key_epoch: 2
         advertised_root_refs:
           - root://federation/pki-b
@@ -235,5 +299,27 @@ examples:
         receipt_status: reachable
         proof_digest: 8dfe0804d0a1c65ee5832ddb5f8ec416f815f73008a849fdb988698d92b8037a
         recorded_at: "2026-04-20T02:11:02Z"
+      - kind: distributed_transport_key_server
+        schema_version: "1.0.0"
+        key_server_ref: keyserver://federation/mirror-c-active
+        checked_at: "2026-04-20T02:11:02Z"
+        council_tier: federation
+        served_transport_profile: federation-mtls-quorum-v1
+        server_role: directory-mirror
+        authority_status: active
+        key_epoch: 2
+        advertised_root_refs:
+          - root://federation/pki-b
+        matched_root_refs:
+          - root://federation/pki-b
+        server_endpoint: http://127.0.0.1:43821/key-server-3
+        transport_profile: live-http-json-keyserver-v1
+        request_timeout_ms: 500
+        observed_latency_ms: 6.1
+        http_status: 200
+        response_digest: 5dc2702c5d8aa95ffb5d1a421516f1b0dca274907efc0c3d722f958332d826d5
+        receipt_status: reachable
+        proof_digest: 33f289d0939f92642acdbe6cc3ea2a69f6ca2f9d89dfb72364773afb2b810f08
+        recorded_at: "2026-04-20T02:11:03Z"
     proof_digest: 4f52cc31ea6252778f9fc98adce63bf1501b26a87db2239bf3b283d899887f4e
     digest: 66aecfa60ec15266cdf16fb6c92d4c7bff225ee0586d95bd48e4b17e36d94f50

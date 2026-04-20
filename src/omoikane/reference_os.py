@@ -1385,7 +1385,7 @@ class OmoikaneReferenceOS:
                 directory_endpoint=root_directory_endpoint,
                 request_timeout_ms=500,
             )
-        authority_plane_payloads = [
+        initial_authority_plane_payloads = [
             {
                 "kind": "distributed_transport_key_server",
                 "schema_version": "1.0.0",
@@ -1411,8 +1411,31 @@ class OmoikaneReferenceOS:
             {
                 "kind": "distributed_transport_key_server",
                 "schema_version": "1.0.0",
-                "key_server_ref": "keyserver://federation/mirror-b",
+                "key_server_ref": "keyserver://federation/mirror-b-draining",
                 "checked_at": "2026-04-20T02:11:01Z",
+                "council_tier": rotated_federation_envelope.council_tier,
+                "served_transport_profile": rotated_federation_envelope.transport_profile,
+                "server_role": "directory-mirror",
+                "authority_status": "draining",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "key_server_ref": "keyserver://federation/mirror-b-draining",
+                            "root_refs": ["root://federation/pki-b"],
+                            "key_epoch": 2,
+                            "server_role": "directory-mirror",
+                            "authority_status": "draining",
+                        }
+                    )
+                ),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-20T02:11:02Z",
                 "council_tier": rotated_federation_envelope.council_tier,
                 "served_transport_profile": rotated_federation_envelope.transport_profile,
                 "server_role": "directory-mirror",
@@ -1422,22 +1445,83 @@ class OmoikaneReferenceOS:
                 "proof_digest": sha256_text(
                     canonical_json(
                         {
-                            "key_server_ref": "keyserver://federation/mirror-b",
+                            "key_server_ref": "keyserver://federation/mirror-c-active",
                             "root_refs": ["root://federation/pki-b"],
                             "key_epoch": 2,
                             "server_role": "directory-mirror",
+                            "authority_status": "active",
+                            "window": "overlap",
                         }
                     )
                 ),
             },
         ]
-        with authority_plane_bridge(authority_plane_payloads) as authority_plane_endpoints:
+        churned_authority_plane_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:11:10Z",
+                "council_tier": rotated_federation_envelope.council_tier,
+                "served_transport_profile": rotated_federation_envelope.transport_profile,
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "key_server_ref": "keyserver://federation/notary-a",
+                            "root_refs": ["root://federation/pki-a"],
+                            "key_epoch": 2,
+                            "server_role": "quorum-notary",
+                            "window": "post-churn",
+                        }
+                    )
+                ),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-20T02:11:02Z",
+                "council_tier": rotated_federation_envelope.council_tier,
+                "served_transport_profile": rotated_federation_envelope.transport_profile,
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text(
+                    canonical_json(
+                        {
+                            "key_server_ref": "keyserver://federation/mirror-c-active",
+                            "root_refs": ["root://federation/pki-b"],
+                            "key_epoch": 2,
+                            "server_role": "directory-mirror",
+                            "authority_status": "active",
+                        }
+                    )
+                ),
+            },
+        ]
+        with authority_plane_bridge(initial_authority_plane_payloads) as authority_plane_endpoints:
+            initial_authority_plane = self.distributed_transport.probe_authority_plane(
+                rotated_federation_envelope,
+                live_root_directory,
+                authority_endpoints=authority_plane_endpoints,
+                request_timeout_ms=500,
+            )
+        with authority_plane_bridge(churned_authority_plane_payloads) as authority_plane_endpoints:
             authority_plane = self.distributed_transport.probe_authority_plane(
                 rotated_federation_envelope,
                 live_root_directory,
                 authority_endpoints=authority_plane_endpoints,
                 request_timeout_ms=500,
             )
+        authority_churn = self.distributed_transport.reconcile_authority_churn(
+            initial_authority_plane,
+            authority_plane,
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_root_directory_bound",
@@ -1451,7 +1535,27 @@ class OmoikaneReferenceOS:
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_plane_bound",
+            payload=initial_authority_plane.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_plane_bound",
             payload=authority_plane.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_churn_reconciled",
+            payload=authority_churn.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -1692,7 +1796,11 @@ class OmoikaneReferenceOS:
                 "federation_rotated": live_root_directory.to_dict(),
             },
             "authority_plane": {
+                "federation_rotated_initial": initial_authority_plane.to_dict(),
                 "federation_rotated": authority_plane.to_dict(),
+            },
+            "authority_churn": {
+                "federation_rotated": authority_churn.to_dict(),
             },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
@@ -1735,6 +1843,8 @@ class OmoikaneReferenceOS:
                 "authority_plane_fleet_bound": (
                     authority_plane.quorum_requirement == rotated_federation_envelope.trust_root_quorum
                     and authority_plane.reachable_server_count == 2
+                    and authority_plane.active_server_count == 2
+                    and authority_plane.draining_server_count == 0
                     and authority_plane.matched_root_count == 2
                     and authority_plane.trusted_root_refs == rotated_receipt.verified_root_refs
                 ),
@@ -1743,6 +1853,46 @@ class OmoikaneReferenceOS:
                     and authority_plane.directory_digest
                     == sha256_text(canonical_json(live_root_directory.to_dict()))
                     and authority_plane.key_epoch == live_root_directory.key_epoch
+                ),
+                "authority_plane_churn_safe": initial_authority_plane.churn_profile
+                == "overlap-safe-authority-handoff-v1"
+                and initial_authority_plane.churn_safe
+                and initial_authority_plane.reachable_server_count == 3
+                and initial_authority_plane.root_coverage
+                == [
+                    {
+                        "root_ref": "root://federation/pki-a",
+                        "active_server_refs": ["keyserver://federation/notary-a"],
+                        "draining_server_refs": [],
+                        "coverage_status": "stable",
+                    },
+                    {
+                        "root_ref": "root://federation/pki-b",
+                        "active_server_refs": ["keyserver://federation/mirror-c-active"],
+                        "draining_server_refs": ["keyserver://federation/mirror-b-draining"],
+                        "coverage_status": "handoff-ready",
+                    },
+                ]
+                and authority_plane.churn_safe
+                and all(
+                    coverage["coverage_status"] == "stable"
+                    for coverage in authority_plane.root_coverage
+                ),
+                "authority_churn_overlap_bound": (
+                    authority_churn.continuity_guard["overlap_satisfied"]
+                    and authority_churn.continuity_guard["overlap_server_count"] == 2
+                    and authority_churn.retained_server_refs
+                    == [
+                        "keyserver://federation/mirror-c-active",
+                        "keyserver://federation/notary-a",
+                    ]
+                ),
+                "authority_churn_requires_draining_exit": (
+                    authority_churn.continuity_guard["removed_servers_require_draining"]
+                    and authority_churn.continuity_guard["removed_servers_draining"]
+                    and authority_churn.removed_server_refs
+                    == ["keyserver://federation/mirror-b-draining"]
+                    and authority_churn.added_server_refs == []
                 ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"

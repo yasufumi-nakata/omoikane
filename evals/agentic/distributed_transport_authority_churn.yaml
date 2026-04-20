@@ -1,0 +1,28 @@
+eval_id: distributed_transport_authority_churn
+target: agentic.distributed_transport
+level: L4
+description: >
+  Rotated distributed transport authority churn window が overlap server を保持しつつ、
+  draining server の退出後も trust_root_quorum と root coverage を維持できること。
+fixtures:
+  - scenario: federation_authority_churn_overlap
+    council_tier: federation
+    key_epoch: 2
+    previous_authority_endpoints:
+      - keyserver://federation/notary-a
+      - keyserver://federation/mirror-b-draining
+      - keyserver://federation/mirror-c-active
+    next_authority_endpoints:
+      - keyserver://federation/notary-a
+      - keyserver://federation/mirror-c-active
+    expected:
+      churn_profile: bounded-key-server-churn-window-v1
+      removed_server_ref: keyserver://federation/mirror-b-draining
+      overlap_server_count: 2
+assertions:
+  - Churn window must retain at least one overlapping key server whenever membership changes
+  - Removed key servers must have been previously marked draining
+  - Churn window must preserve directory digest, key epoch, and trust_root_quorum across the transition
+metric: exact-match
+threshold: 1.0
+ethics_check: true

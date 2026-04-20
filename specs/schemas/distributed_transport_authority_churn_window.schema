@@ -1,0 +1,258 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_churn_window.schema"
+title: DistributedTransportAuthorityChurnWindow
+description: Authority-plane churn reconciliation window bound across previous and next key-server fleet snapshots.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - churn_window_ref
+  - checked_at
+  - council_tier
+  - transport_profile
+  - churn_profile
+  - key_epoch
+  - directory_ref
+  - directory_digest
+  - previous_authority_plane_ref
+  - next_authority_plane_ref
+  - quorum_requirement
+  - trusted_root_refs
+  - retained_server_refs
+  - added_server_refs
+  - removed_server_refs
+  - draining_server_refs
+  - retained_root_refs
+  - added_root_refs
+  - removed_root_refs
+  - server_transitions
+  - continuity_guard
+  - proof_digest
+  - digest
+properties:
+  kind:
+    const: distributed_transport_authority_churn_window
+  schema_version:
+    const: "1.0.0"
+  churn_window_ref:
+    type: string
+    pattern: "^authority-churn://"
+  checked_at:
+    type: string
+    format: date-time
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  churn_profile:
+    const: bounded-key-server-churn-window-v1
+  key_epoch:
+    type: integer
+    minimum: 1
+  directory_ref:
+    type: string
+    pattern: "^rootdir://"
+  directory_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  previous_authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  next_authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  quorum_requirement:
+    type: integer
+    minimum: 1
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  retained_server_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^keyserver://"
+  added_server_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^keyserver://"
+  removed_server_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^keyserver://"
+  draining_server_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^keyserver://"
+  retained_root_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  added_root_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  removed_root_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  server_transitions:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - key_server_ref
+        - transition
+        - previous_status
+        - current_status
+        - matched_root_refs
+      properties:
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        transition:
+          type: string
+          enum:
+            - retained
+            - retained-draining
+            - added
+            - removed
+        previous_status:
+          type: string
+          enum:
+            - active
+            - draining
+            - missing
+        current_status:
+          type: string
+          enum:
+            - active
+            - draining
+            - missing
+        matched_root_refs:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - minimum_overlap_required
+      - overlap_server_count
+      - overlap_satisfied
+      - removed_servers_require_draining
+      - removed_servers_draining
+      - quorum_maintained
+      - churn_detected
+      - status
+    properties:
+      minimum_overlap_required:
+        type: integer
+        minimum: 0
+      overlap_server_count:
+        type: integer
+        minimum: 0
+      overlap_satisfied:
+        type: boolean
+      removed_servers_require_draining:
+        type: boolean
+      removed_servers_draining:
+        type: boolean
+      quorum_maintained:
+        type: boolean
+      churn_detected:
+        type: boolean
+      status:
+        const: quorum-maintained
+  proof_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_authority_churn_window
+    schema_version: "1.0.0"
+    churn_window_ref: authority-churn://federation/51dbf84d7998c7af
+    checked_at: "2026-04-20T02:11:12Z"
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    churn_profile: bounded-key-server-churn-window-v1
+    key_epoch: 2
+    directory_ref: rootdir://federation/live-rotation-window
+    directory_digest: 0f162bf6e7bbd5a0d50cdbb686145bff49fc3bfe86d9bbfe69cd151f8d487ce4
+    previous_authority_plane_ref: authority-plane://federation/route-nonce-prev
+    next_authority_plane_ref: authority-plane://federation/route-nonce-next
+    quorum_requirement: 2
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    retained_server_refs:
+      - keyserver://federation/notary-a
+    added_server_refs:
+      - keyserver://federation/mirror-c
+    removed_server_refs:
+      - keyserver://federation/mirror-b
+    draining_server_refs:
+      - keyserver://federation/mirror-b
+    retained_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    added_root_refs: []
+    removed_root_refs: []
+    server_transitions:
+      - key_server_ref: keyserver://federation/notary-a
+        transition: retained
+        previous_status: active
+        current_status: active
+        matched_root_refs:
+          - root://federation/pki-a
+      - key_server_ref: keyserver://federation/mirror-b
+        transition: removed
+        previous_status: draining
+        current_status: missing
+        matched_root_refs:
+          - root://federation/pki-b
+      - key_server_ref: keyserver://federation/mirror-c
+        transition: added
+        previous_status: missing
+        current_status: active
+        matched_root_refs:
+          - root://federation/pki-b
+    continuity_guard:
+      minimum_overlap_required: 1
+      overlap_server_count: 1
+      overlap_satisfied: true
+      removed_servers_require_draining: true
+      removed_servers_draining: true
+      quorum_maintained: true
+      churn_detected: true
+      status: quorum-maintained
+    proof_digest: 742df7f22b9d34c95ea0fd68fc52a2ad2519f4286ec8637cecb7cb062829887e
+    digest: 29b50a1697c410a0fba1fdffb2c2df8550ed7ccfba9857a1bb8f8ce2085b6b6a

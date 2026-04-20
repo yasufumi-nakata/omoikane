@@ -665,6 +665,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["live_root_directory_quorum_bound"])
         self.assertTrue(result["validation"]["authority_plane_fleet_bound"])
         self.assertTrue(result["validation"]["authority_plane_root_directory_bound"])
+        self.assertTrue(result["validation"]["authority_plane_churn_safe"])
+        self.assertTrue(result["validation"]["authority_churn_overlap_bound"])
+        self.assertTrue(result["validation"]["authority_churn_requires_draining_exit"])
         self.assertEqual(
             2,
             result["live_root_directory"]["federation_rotated"]["connectivity_receipt"][
@@ -672,12 +675,42 @@ class CliIntegrationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
+            3,
+            result["authority_plane"]["federation_rotated_initial"]["reachable_server_count"],
+        )
+        self.assertEqual(
             2,
             result["authority_plane"]["federation_rotated"]["reachable_server_count"],
         )
         self.assertEqual(
+            2,
+            result["authority_plane"]["federation_rotated_initial"]["active_server_count"],
+        )
+        self.assertEqual(
+            1,
+            result["authority_plane"]["federation_rotated_initial"]["draining_server_count"],
+        )
+        self.assertEqual(
             ["root://federation/pki-a", "root://federation/pki-b"],
             result["authority_plane"]["federation_rotated"]["trusted_root_refs"],
+        )
+        self.assertEqual(
+            "handoff-ready",
+            result["authority_plane"]["federation_rotated_initial"]["root_coverage"][1][
+                "coverage_status"
+            ],
+        )
+        self.assertEqual(
+            "stable",
+            result["authority_plane"]["federation_rotated"]["root_coverage"][1]["coverage_status"],
+        )
+        self.assertEqual(
+            [],
+            result["authority_churn"]["federation_rotated"]["added_server_refs"],
+        )
+        self.assertEqual(
+            ["keyserver://federation/mirror-b-draining"],
+            result["authority_churn"]["federation_rotated"]["removed_server_refs"],
         )
         self.assertEqual(
             result["authority_plane"]["federation_rotated"]["trusted_root_refs"],

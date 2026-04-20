@@ -10,6 +10,7 @@ imports:
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
+  distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -162,7 +163,8 @@ operations:
   probe_authority_plane:
     summary: >
       Probe one bounded external key-server fleet and bind its reachable authority members
-      to a rotated distributed transport envelope after live root-directory federation.
+      to a rotated distributed transport envelope after live root-directory federation,
+      while retaining active root coverage across draining-member churn.
     input:
       inline_schema:
         type: object
@@ -197,7 +199,41 @@ operations:
       - authority plane must match the envelope council_tier and transport_profile
       - every reachable key server must advertise a key_epoch accepted by both the envelope and root directory
       - trusted_root_refs must satisfy trust_root_quorum across the reachable key-server fleet
+      - every trusted_root_ref must retain at least one active key server during draining overlap
+      - churn_profile must equal overlap-safe-authority-handoff-v1 when draining members remain in the fleet
       - each key server receipt must bind endpoint, response_digest, latency, and matched_root_refs
+  reconcile_authority_churn:
+    summary: >
+      Reconcile two authority-plane snapshots into one machine-checkable churn window
+      that proves overlap retention, draining-only removal, and preserved root quorum.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - previous_authority_plane_ref
+          - previous_authority_plane_digest
+          - next_authority_plane_ref
+          - next_authority_plane_digest
+        properties:
+          previous_authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          previous_authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          next_authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          next_authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+    output:
+      schema_ref: distributed_transport_authority_churn_window
+    guarantees:
+      - authority churn must retain at least one overlapping key server whenever membership changes
+      - removed key servers must have been previously marked draining
+      - quorum_requirement and trusted_root_refs must remain sufficient after churn
+      - churn_profile must equal bounded-key-server-churn-window-v1
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -351,5 +387,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, multi-hop anti-replay, and bounded relay telemetry.
-    - Actual non-loopback mTLS authority routing, dynamic external key-server churn, and socket-level tracing remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, multi-hop anti-replay, and bounded relay telemetry.
+    - Actual non-loopback mTLS authority routing and socket-level tracing remain future work.

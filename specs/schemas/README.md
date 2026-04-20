@@ -50,6 +50,7 @@
 - `distributed_transport_root_connectivity_receipt.schema`
 - `distributed_transport_root_directory.schema`
 - `distributed_transport_authority_plane.schema`
+- `distributed_transport_authority_churn_window.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
@@ -75,8 +76,7 @@
 ## 次段階
 
 actual rollback reverse-apply journal / multi-scene sensory loopback artifact families /
-external-actuation authorization artifacts / actual non-loopback mTLS authority routing と
-dynamic remote key-server churn handling は
+external-actuation authorization artifacts / actual non-loopback mTLS authority routing は
 reference runtime の対象が広がる段階で追加する。
 
 ## 形式

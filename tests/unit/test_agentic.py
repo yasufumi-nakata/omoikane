@@ -817,15 +817,28 @@ class DistributedTransportServiceTests(unittest.TestCase):
             {
                 "kind": "distributed_transport_key_server",
                 "schema_version": "1.0.0",
-                "key_server_ref": "keyserver://federation/mirror-b",
+                "key_server_ref": "keyserver://federation/mirror-b-draining",
                 "checked_at": "2026-04-20T02:12:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "draining",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-b"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-20T02:12:03Z",
                 "council_tier": "federation",
                 "served_transport_profile": "federation-mtls-quorum-v1",
                 "server_role": "directory-mirror",
                 "authority_status": "active",
                 "key_epoch": 2,
                 "advertised_root_refs": ["root://federation/pki-b"],
-                "proof_digest": sha256_text("authority-keyserver-b"),
+                "proof_digest": sha256_text("authority-keyserver-c"),
             },
         ]
 
@@ -844,11 +857,32 @@ class DistributedTransportServiceTests(unittest.TestCase):
             )
 
         self.assertEqual("bounded-key-server-fleet-v1", authority_plane.authority_profile)
-        self.assertEqual(2, authority_plane.reachable_server_count)
+        self.assertEqual("overlap-safe-authority-handoff-v1", authority_plane.churn_profile)
+        self.assertEqual(3, authority_plane.reachable_server_count)
+        self.assertEqual(2, authority_plane.active_server_count)
+        self.assertEqual(1, authority_plane.draining_server_count)
         self.assertEqual(2, authority_plane.matched_root_count)
+        self.assertTrue(authority_plane.churn_safe)
         self.assertEqual(
             ["root://federation/pki-a", "root://federation/pki-b"],
             authority_plane.trusted_root_refs,
+        )
+        self.assertEqual(
+            [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "active_server_refs": ["keyserver://federation/notary-a"],
+                    "draining_server_refs": [],
+                    "coverage_status": "stable",
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "active_server_refs": ["keyserver://federation/mirror-c-active"],
+                    "draining_server_refs": ["keyserver://federation/mirror-b-draining"],
+                    "coverage_status": "handoff-ready",
+                },
+            ],
+            authority_plane.root_coverage,
         )
         self.assertEqual(root_directory.directory_ref, authority_plane.directory_ref)
         self.assertEqual(
@@ -856,7 +890,11 @@ class DistributedTransportServiceTests(unittest.TestCase):
             authority_plane.directory_digest,
         )
         self.assertEqual(
-            ["keyserver://federation/notary-a", "keyserver://federation/mirror-b"],
+            [
+                "keyserver://federation/notary-a",
+                "keyserver://federation/mirror-b-draining",
+                "keyserver://federation/mirror-c-active",
+            ],
             [server["key_server_ref"] for server in authority_plane.key_servers],
         )
 
@@ -936,6 +974,243 @@ class DistributedTransportServiceTests(unittest.TestCase):
                     authority_endpoints=authority_endpoints,
                     request_timeout_ms=500,
                 )
+
+    def test_authority_plane_probe_rejects_draining_root_without_active_replacement(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-draining-001",
+            proposal_ref="proposal-transport-authority-draining-001",
+            payload_ref="cas://sha256/test-authority-plane-draining",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "draining-only"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-window-draining",
+            "checked_at": "2026-04-20T02:14:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-draining"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-draining"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-draining"),
+        }
+        authority_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:14:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-draining"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-b-draining",
+                "checked_at": "2026-04-20T02:14:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "draining",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-b-draining-only"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(authority_payloads) as authority_endpoints:
+            with self.assertRaisesRegex(
+                ValueError,
+                "authority plane trusted root coverage must retain at least 1 active key server per root",
+            ):
+                service.probe_authority_plane(
+                    rotated,
+                    root_directory,
+                    authority_endpoints=authority_endpoints,
+                    request_timeout_ms=500,
+                )
+
+    def test_authority_churn_reconciliation_tracks_overlap_and_draining_exit(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-churn-001",
+            proposal_ref="proposal-transport-authority-churn-001",
+            payload_ref="cas://sha256/test-authority-plane-churn",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "churn"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-window-churn",
+            "checked_at": "2026-04-20T02:15:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-churn"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-churn"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-churn"),
+        }
+        overlap_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:15:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-churn"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-b-draining",
+                "checked_at": "2026-04-20T02:15:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "draining",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-b-churn"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-20T02:15:03Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-churn"),
+            },
+        ]
+        stable_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-20T02:15:11Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-churn-stable"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-20T02:15:12Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-churn-stable"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(overlap_payloads) as authority_endpoints:
+            overlap_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(stable_payloads) as authority_endpoints:
+            stable_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        churn_window = service.reconcile_authority_churn(overlap_plane, stable_plane)
+
+        self.assertEqual("bounded-key-server-churn-window-v1", churn_window.churn_profile)
+        self.assertEqual(
+            ["keyserver://federation/mirror-c-active", "keyserver://federation/notary-a"],
+            churn_window.retained_server_refs,
+        )
+        self.assertEqual([], churn_window.added_server_refs)
+        self.assertEqual(["keyserver://federation/mirror-b-draining"], churn_window.removed_server_refs)
+        self.assertTrue(churn_window.continuity_guard["overlap_satisfied"])
+        self.assertTrue(churn_window.continuity_guard["removed_servers_draining"])
+        self.assertEqual("quorum-maintained", churn_window.continuity_guard["status"])
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

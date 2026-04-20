@@ -38,6 +38,7 @@ RELAY_TELEMETRY_PROFILE = "bounded-relay-observability-v1"
 LIVE_ROOT_DIRECTORY_TRANSPORT_PROFILE = "live-http-json-rootdir-v1"
 LIVE_KEY_SERVER_TRANSPORT_PROFILE = "live-http-json-keyserver-v1"
 AUTHORITY_PLANE_PROFILE = "bounded-key-server-fleet-v1"
+AUTHORITY_CHURN_PROFILE = "bounded-key-server-churn-window-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -351,13 +352,18 @@ class DistributedTransportAuthorityPlane:
     council_tier: str
     transport_profile: str
     authority_profile: str
+    churn_profile: str
     key_epoch: int
     directory_ref: str
     directory_digest: str
     quorum_requirement: int
     reachable_server_count: int
+    active_server_count: int
+    draining_server_count: int
     matched_root_count: int
     trusted_root_refs: List[str]
+    root_coverage: List[Dict[str, Any]]
+    churn_safe: bool
     key_servers: List[Dict[str, Any]]
     proof_digest: str
     digest: str
@@ -371,14 +377,77 @@ class DistributedTransportAuthorityPlane:
             "council_tier": self.council_tier,
             "transport_profile": self.transport_profile,
             "authority_profile": self.authority_profile,
+            "churn_profile": self.churn_profile,
             "key_epoch": self.key_epoch,
             "directory_ref": self.directory_ref,
             "directory_digest": self.directory_digest,
             "quorum_requirement": self.quorum_requirement,
             "reachable_server_count": self.reachable_server_count,
+            "active_server_count": self.active_server_count,
+            "draining_server_count": self.draining_server_count,
             "matched_root_count": self.matched_root_count,
             "trusted_root_refs": list(self.trusted_root_refs),
+            "root_coverage": [dict(coverage) for coverage in self.root_coverage],
+            "churn_safe": self.churn_safe,
             "key_servers": [dict(server) for server in self.key_servers],
+            "proof_digest": self.proof_digest,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedTransportAuthorityChurnWindow:
+    """Machine-checkable authority-plane churn window bound across two snapshots."""
+
+    churn_window_ref: str
+    checked_at: str
+    council_tier: str
+    transport_profile: str
+    churn_profile: str
+    key_epoch: int
+    directory_ref: str
+    directory_digest: str
+    previous_authority_plane_ref: str
+    next_authority_plane_ref: str
+    quorum_requirement: int
+    trusted_root_refs: List[str]
+    retained_server_refs: List[str]
+    added_server_refs: List[str]
+    removed_server_refs: List[str]
+    draining_server_refs: List[str]
+    retained_root_refs: List[str]
+    added_root_refs: List[str]
+    removed_root_refs: List[str]
+    server_transitions: List[Dict[str, Any]]
+    continuity_guard: Dict[str, Any]
+    proof_digest: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_churn_window",
+            "schema_version": "1.0.0",
+            "churn_window_ref": self.churn_window_ref,
+            "checked_at": self.checked_at,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "churn_profile": self.churn_profile,
+            "key_epoch": self.key_epoch,
+            "directory_ref": self.directory_ref,
+            "directory_digest": self.directory_digest,
+            "previous_authority_plane_ref": self.previous_authority_plane_ref,
+            "next_authority_plane_ref": self.next_authority_plane_ref,
+            "quorum_requirement": self.quorum_requirement,
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "retained_server_refs": list(self.retained_server_refs),
+            "added_server_refs": list(self.added_server_refs),
+            "removed_server_refs": list(self.removed_server_refs),
+            "draining_server_refs": list(self.draining_server_refs),
+            "retained_root_refs": list(self.retained_root_refs),
+            "added_root_refs": list(self.added_root_refs),
+            "removed_root_refs": list(self.removed_root_refs),
+            "server_transitions": [dict(transition) for transition in self.server_transitions],
+            "continuity_guard": dict(self.continuity_guard),
             "proof_digest": self.proof_digest,
             "digest": self.digest,
         }
@@ -583,13 +652,48 @@ class DistributedTransportService:
         trusted_root_refs = sorted(set(matched_root_refs))
         if len(trusted_root_refs) < envelope.trust_root_quorum:
             raise ValueError("authority plane must satisfy envelope trust_root_quorum")
+        active_server_count = sum(
+            1 for server in key_servers if server["authority_status"] == "active"
+        )
+        draining_server_count = sum(
+            1 for server in key_servers if server["authority_status"] == "draining"
+        )
+        root_coverage: List[Dict[str, Any]] = []
+        for root_ref in trusted_root_refs:
+            active_server_refs = sorted(
+                server["key_server_ref"]
+                for server in key_servers
+                if server["authority_status"] == "active" and root_ref in server["matched_root_refs"]
+            )
+            draining_server_refs = sorted(
+                server["key_server_ref"]
+                for server in key_servers
+                if server["authority_status"] == "draining" and root_ref in server["matched_root_refs"]
+            )
+            if not active_server_refs:
+                raise ValueError(
+                    "authority plane trusted root coverage must retain at least 1 active key server per root"
+                )
+            root_coverage.append(
+                {
+                    "root_ref": root_ref,
+                    "active_server_refs": active_server_refs,
+                    "draining_server_refs": draining_server_refs,
+                    "coverage_status": "handoff-ready" if draining_server_refs else "stable",
+                }
+            )
+        churn_safe = all(
+            coverage["coverage_status"] in {"stable", "handoff-ready"} for coverage in root_coverage
+        )
         proof_digest = sha256_text(
             canonical_json(
                 {
                     "authority_plane_ref": f"authority-plane://{envelope.council_tier}/{envelope.route_nonce}",
+                    "churn_profile": "overlap-safe-authority-handoff-v1",
                     "directory_digest": directory_digest,
                     "key_server_refs": [server["key_server_ref"] for server in key_servers],
                     "matched_root_refs": trusted_root_refs,
+                    "root_coverage": root_coverage,
                     "quorum_requirement": envelope.trust_root_quorum,
                 }
             )
@@ -599,14 +703,19 @@ class DistributedTransportService:
             "authority_profile": AUTHORITY_PLANE_PROFILE,
             "checked_at": checked_at,
             "council_tier": envelope.council_tier,
+            "churn_profile": "overlap-safe-authority-handoff-v1",
             "directory_digest": directory_digest,
             "directory_ref": root_directory.directory_ref,
             "key_epoch": root_directory.key_epoch,
             "key_servers": key_servers,
+            "active_server_count": active_server_count,
+            "draining_server_count": draining_server_count,
             "matched_root_count": len(trusted_root_refs),
             "proof_digest": proof_digest,
             "quorum_requirement": envelope.trust_root_quorum,
             "reachable_server_count": len(key_servers),
+            "root_coverage": root_coverage,
+            "churn_safe": churn_safe,
             "transport_profile": envelope.transport_profile,
             "trusted_root_refs": trusted_root_refs,
         }
@@ -617,14 +726,182 @@ class DistributedTransportService:
             council_tier=envelope.council_tier,
             transport_profile=envelope.transport_profile,
             authority_profile=AUTHORITY_PLANE_PROFILE,
+            churn_profile=payload["churn_profile"],
             key_epoch=root_directory.key_epoch,
             directory_ref=root_directory.directory_ref,
             directory_digest=directory_digest,
             quorum_requirement=envelope.trust_root_quorum,
             reachable_server_count=len(key_servers),
+            active_server_count=active_server_count,
+            draining_server_count=draining_server_count,
             matched_root_count=len(trusted_root_refs),
             trusted_root_refs=trusted_root_refs,
+            root_coverage=root_coverage,
+            churn_safe=churn_safe,
             key_servers=key_servers,
+            proof_digest=proof_digest,
+            digest=digest,
+        )
+
+    def reconcile_authority_churn(
+        self,
+        previous_authority_plane: DistributedTransportAuthorityPlane,
+        next_authority_plane: DistributedTransportAuthorityPlane,
+    ) -> DistributedTransportAuthorityChurnWindow:
+        if previous_authority_plane.council_tier != next_authority_plane.council_tier:
+            raise ValueError("authority churn council_tier must remain stable across snapshots")
+        if previous_authority_plane.transport_profile != next_authority_plane.transport_profile:
+            raise ValueError("authority churn transport_profile must remain stable across snapshots")
+        if previous_authority_plane.directory_ref != next_authority_plane.directory_ref:
+            raise ValueError("authority churn directory_ref must remain stable across snapshots")
+        if previous_authority_plane.directory_digest != next_authority_plane.directory_digest:
+            raise ValueError("authority churn directory_digest must remain stable across snapshots")
+        if previous_authority_plane.key_epoch != next_authority_plane.key_epoch:
+            raise ValueError("authority churn key_epoch must remain stable across snapshots")
+        if previous_authority_plane.quorum_requirement != next_authority_plane.quorum_requirement:
+            raise ValueError("authority churn quorum_requirement must remain stable across snapshots")
+
+        previous_servers = {
+            server["key_server_ref"]: dict(server) for server in previous_authority_plane.key_servers
+        }
+        next_servers = {server["key_server_ref"]: dict(server) for server in next_authority_plane.key_servers}
+        previous_refs = set(previous_servers)
+        next_refs = set(next_servers)
+        retained_server_refs = sorted(previous_refs & next_refs)
+        added_server_refs = sorted(next_refs - previous_refs)
+        removed_server_refs = sorted(previous_refs - next_refs)
+        draining_server_refs = sorted(
+            {
+                ref
+                for ref, server in {**previous_servers, **next_servers}.items()
+                if server.get("authority_status") == "draining"
+            }
+        )
+        churn_detected = bool(added_server_refs or removed_server_refs)
+        minimum_overlap_required = 1 if churn_detected else 0
+        if len(retained_server_refs) < minimum_overlap_required:
+            raise ValueError("authority churn must retain at least 1 overlapping key server")
+        removed_servers_draining = all(
+            previous_servers[ref].get("authority_status") == "draining" for ref in removed_server_refs
+        )
+        if not removed_servers_draining:
+            raise ValueError("authority churn may remove only previously draining key servers")
+        if len(next_authority_plane.trusted_root_refs) < next_authority_plane.quorum_requirement:
+            raise ValueError("authority churn must preserve trust_root_quorum")
+
+        retained_root_refs = sorted(
+            set(previous_authority_plane.trusted_root_refs) & set(next_authority_plane.trusted_root_refs)
+        )
+        added_root_refs = sorted(
+            set(next_authority_plane.trusted_root_refs) - set(previous_authority_plane.trusted_root_refs)
+        )
+        removed_root_refs = sorted(
+            set(previous_authority_plane.trusted_root_refs) - set(next_authority_plane.trusted_root_refs)
+        )
+        server_transitions: List[Dict[str, Any]] = []
+        for key_server_ref in sorted(previous_refs | next_refs):
+            previous_server = previous_servers.get(key_server_ref)
+            next_server = next_servers.get(key_server_ref)
+            if previous_server and next_server:
+                transition = "retained-draining" if next_server.get("authority_status") == "draining" else "retained"
+            elif next_server:
+                transition = "added"
+            else:
+                transition = "removed"
+            server_transitions.append(
+                {
+                    "key_server_ref": key_server_ref,
+                    "transition": transition,
+                    "previous_status": previous_server.get("authority_status", "missing")
+                    if previous_server
+                    else "missing",
+                    "current_status": next_server.get("authority_status", "missing")
+                    if next_server
+                    else "missing",
+                    "matched_root_refs": list(
+                        next_server.get("matched_root_refs", previous_server.get("matched_root_refs", []))
+                        if previous_server and next_server
+                        else (next_server or previous_server).get("matched_root_refs", [])
+                    ),
+                }
+            )
+
+        continuity_guard = {
+            "minimum_overlap_required": minimum_overlap_required,
+            "overlap_server_count": len(retained_server_refs),
+            "overlap_satisfied": len(retained_server_refs) >= minimum_overlap_required,
+            "removed_servers_require_draining": True,
+            "removed_servers_draining": removed_servers_draining,
+            "quorum_maintained": len(next_authority_plane.trusted_root_refs)
+            >= next_authority_plane.quorum_requirement,
+            "churn_detected": churn_detected,
+            "status": "quorum-maintained",
+        }
+        checked_at = utc_now_iso()
+        proof_digest = sha256_text(
+            canonical_json(
+                {
+                    "previous_authority_plane_ref": previous_authority_plane.authority_plane_ref,
+                    "next_authority_plane_ref": next_authority_plane.authority_plane_ref,
+                    "retained_server_refs": retained_server_refs,
+                    "added_server_refs": added_server_refs,
+                    "removed_server_refs": removed_server_refs,
+                    "retained_root_refs": retained_root_refs,
+                    "trusted_root_refs": next_authority_plane.trusted_root_refs,
+                    "continuity_guard": continuity_guard,
+                }
+            )
+        )
+        payload = {
+            "churn_window_ref": (
+                f"authority-churn://{next_authority_plane.council_tier}/"
+                f"{sha256_text(f'{previous_authority_plane.authority_plane_ref}:{next_authority_plane.authority_plane_ref}')[:16]}"
+            ),
+            "checked_at": checked_at,
+            "council_tier": next_authority_plane.council_tier,
+            "transport_profile": next_authority_plane.transport_profile,
+            "churn_profile": AUTHORITY_CHURN_PROFILE,
+            "key_epoch": next_authority_plane.key_epoch,
+            "directory_ref": next_authority_plane.directory_ref,
+            "directory_digest": next_authority_plane.directory_digest,
+            "previous_authority_plane_ref": previous_authority_plane.authority_plane_ref,
+            "next_authority_plane_ref": next_authority_plane.authority_plane_ref,
+            "quorum_requirement": next_authority_plane.quorum_requirement,
+            "trusted_root_refs": list(next_authority_plane.trusted_root_refs),
+            "retained_server_refs": retained_server_refs,
+            "added_server_refs": added_server_refs,
+            "removed_server_refs": removed_server_refs,
+            "draining_server_refs": draining_server_refs,
+            "retained_root_refs": retained_root_refs,
+            "added_root_refs": added_root_refs,
+            "removed_root_refs": removed_root_refs,
+            "server_transitions": server_transitions,
+            "continuity_guard": continuity_guard,
+            "proof_digest": proof_digest,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthorityChurnWindow(
+            churn_window_ref=payload["churn_window_ref"],
+            checked_at=checked_at,
+            council_tier=next_authority_plane.council_tier,
+            transport_profile=next_authority_plane.transport_profile,
+            churn_profile=AUTHORITY_CHURN_PROFILE,
+            key_epoch=next_authority_plane.key_epoch,
+            directory_ref=next_authority_plane.directory_ref,
+            directory_digest=next_authority_plane.directory_digest,
+            previous_authority_plane_ref=previous_authority_plane.authority_plane_ref,
+            next_authority_plane_ref=next_authority_plane.authority_plane_ref,
+            quorum_requirement=next_authority_plane.quorum_requirement,
+            trusted_root_refs=list(next_authority_plane.trusted_root_refs),
+            retained_server_refs=retained_server_refs,
+            added_server_refs=added_server_refs,
+            removed_server_refs=removed_server_refs,
+            draining_server_refs=draining_server_refs,
+            retained_root_refs=retained_root_refs,
+            added_root_refs=added_root_refs,
+            removed_root_refs=removed_root_refs,
+            server_transitions=server_transitions,
+            continuity_guard=continuity_guard,
             proof_digest=proof_digest,
             digest=digest,
         )
