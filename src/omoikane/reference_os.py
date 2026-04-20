@@ -8066,6 +8066,13 @@ class OmoikaneReferenceOS:
                 "reverse_apply_verified_count": rollback_session["telemetry_gate"][
                     "verified_reverse_command_count"
                 ],
+                "repo_bound_verified_count": rollback_session["telemetry_gate"][
+                    "repo_bound_verified_command_count"
+                ],
+                "repo_binding_scope": rollback_session["repo_binding_summary"]["binding_scope"],
+                "repo_binding_path_count": rollback_session["repo_binding_summary"][
+                    "bound_path_count"
+                ],
                 "reverse_apply_cleanup_status": rollback_session["telemetry_gate"][
                     "reverse_cleanup_status"
                 ],

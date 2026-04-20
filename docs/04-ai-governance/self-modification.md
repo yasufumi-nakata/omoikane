@@ -82,6 +82,7 @@ reference runtime では `builder-demo` が
 pre-apply snapshot が復元されることに加え、
 live enactment receipt 由来の reverse-apply journal、
 temp rollback workspace での actual reverse-apply command receipt、
+current checkout baseline に照合した repo-bound verification receipt、
 telemetry gate が
 rollback を machine-checkable に承認することを確認する。
 
@@ -93,7 +94,8 @@ rollback を machine-checkable に承認することを確認する。
 - reference runtime では `RollbackEngineService` が
   `selfctor.rollback.v0` / `builder_rollback_session.schema` に従って
   self・Council・Guardian の 3 者通知、
-  reverse-apply journal、actual reverse-apply command receipt、live telemetry gate を必須にする
+  reverse-apply journal、actual reverse-apply command receipt、
+  repo-bound verification receipt、live telemetry gate を必須にする
 
 ## 監査ログ
 

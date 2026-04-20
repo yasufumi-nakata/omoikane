@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Mapping, Sequence
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 IMMUTABLE_BOUNDARIES = ("L1.EthicsEnforcer", "L1.ContinuityLedger")
@@ -633,14 +633,16 @@ class RolloutPlannerService:
 class RollbackEnginePolicy:
     """Deterministic rollback policy for builder sessions."""
 
-    policy_id: str = "continuity-bound-builder-rollback-v2"
+    policy_id: str = "continuity-bound-builder-rollback-v3"
     required_eval: str = MANDATORY_ROLLBACK_EVAL
     require_append_only_continuity: bool = True
     require_pre_apply_snapshot: bool = True
     require_notifications: bool = True
     require_live_rollback_gate: bool = True
     require_reverse_apply_commands: bool = True
+    require_repo_bound_verification: bool = True
     rollback_workspace_prefix: str = "omoikane-builder-rollback-"
+    repo_binding_scope: str = "current-checkout-subtree"
     command_timeout_seconds: int = 15
     cleanup_after_run: bool = True
     max_reverted_patch_count: int = 4
@@ -654,7 +656,9 @@ class RollbackEnginePolicy:
             "require_notifications": self.require_notifications,
             "require_live_rollback_gate": self.require_live_rollback_gate,
             "require_reverse_apply_commands": self.require_reverse_apply_commands,
+            "require_repo_bound_verification": self.require_repo_bound_verification,
             "rollback_workspace_prefix": self.rollback_workspace_prefix,
+            "repo_binding_scope": self.repo_binding_scope,
             "command_timeout_seconds": self.command_timeout_seconds,
             "cleanup_after_run": self.cleanup_after_run,
             "max_reverted_patch_count": self.max_reverted_patch_count,
@@ -691,6 +695,10 @@ class RollbackEngineService:
             live_enactment_session=live_enactment_session,
             repo_root=repo_root,
         )
+        repo_binding_summary = self._build_repo_binding_summary(
+            build_request=build_request,
+            reverse_apply_journal=reverse_apply_journal,
+        )
         continuity_event_refs = [
             ref
             for ref in (
@@ -723,12 +731,13 @@ class RollbackEngineService:
             and len(reverted_patch_ids) <= self._policy.max_reverted_patch_count
             and live_enactment_ok
             and bool(reverse_apply_journal)
+            and repo_binding_summary["verified_path_count"] == len(reverse_apply_journal)
             and telemetry_gate["status"] == "rollback-approved"
         )
 
         return {
             "kind": "builder_rollback_session",
-            "schema_version": "1.1",
+            "schema_version": "1.2",
             "rollback_session_id": new_id("rollback-session"),
             "request_id": build_request["request_id"],
             "artifact_id": apply_receipt["artifact_id"],
@@ -751,6 +760,7 @@ class RollbackEngineService:
             "reverted_stage_ids": reverted_stage_ids if allowed else [],
             "reverted_stage_count": len(reverted_stage_ids) if allowed else 0,
             "reverse_apply_journal": reverse_apply_journal if allowed else [],
+            "repo_binding_summary": repo_binding_summary,
             "telemetry_gate": (
                 telemetry_gate if allowed else self._build_blocked_telemetry_gate(telemetry_gate)
             ),
@@ -761,6 +771,7 @@ class RollbackEngineService:
                 "restored-pre-apply-snapshot",
                 "stakeholders-notified",
                 "reverse-apply-journal-bound",
+                "repo-baseline-bound",
             ],
             "executed_at": utc_now_iso(),
         }
@@ -769,12 +780,24 @@ class RollbackEngineService:
         errors: list[str] = []
         if session.get("kind") != "builder_rollback_session":
             errors.append("kind must equal builder_rollback_session")
-        if session.get("schema_version") != "1.1":
-            errors.append("schema_version must equal 1.1")
+        if session.get("schema_version") != "1.2":
+            errors.append("schema_version must equal 1.2")
         if session.get("status") not in {"rolled-back", "blocked"}:
             errors.append("status must be rolled-back or blocked")
         if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
             errors.append("trigger must be eval-regression, guardian-veto, or manual-review")
+        repo_binding_summary = dict(session.get("repo_binding_summary", {}))
+        if repo_binding_summary.get("binding_scope") != self._policy.repo_binding_scope:
+            errors.append(
+                f"repo_binding_summary.binding_scope must equal {self._policy.repo_binding_scope}"
+            )
+        if not str(repo_binding_summary.get("binding_root_ref", "")).startswith("repo://current-checkout/"):
+            errors.append("repo_binding_summary.binding_root_ref must start with repo://current-checkout/")
+        if len(str(repo_binding_summary.get("binding_digest", ""))) != 64:
+            errors.append("repo_binding_summary.binding_digest must be a sha256 hex string")
+        bound_paths = list(repo_binding_summary.get("bound_paths", []))
+        if int(repo_binding_summary.get("bound_path_count", 0)) != len(bound_paths):
+            errors.append("repo_binding_summary.bound_path_count must match bound_paths")
         telemetry_gate = dict(session.get("telemetry_gate", {}))
         if session.get("status") == "rolled-back":
             if not str(session.get("live_enactment_session_id", "")).startswith("enactment-session-"):
@@ -800,6 +823,23 @@ class RollbackEngineService:
             ):
                 errors.append(
                     "reverse_apply_journal entries must end in restored or deleted state"
+                )
+            if any(
+                not str(entry.get("repo_binding_ref", "")).startswith("repo://current-checkout/")
+                for entry in reverse_apply_journal
+            ):
+                errors.append(
+                    "reverse_apply_journal entries must bind repo://current-checkout/ refs"
+                )
+            if any(len(str(entry.get("repo_source_digest", ""))) != 64 for entry in reverse_apply_journal):
+                errors.append("reverse_apply_journal entries must include repo_source_digest")
+            if any(entry.get("verification_status") != "pass" for entry in reverse_apply_journal):
+                errors.append("reverse_apply_journal verification commands must all pass")
+            if int(repo_binding_summary.get("bound_path_count", 0)) != len(reverse_apply_journal):
+                errors.append("repo_binding_summary.bound_path_count must match reverse_apply_journal")
+            if int(repo_binding_summary.get("verified_path_count", 0)) != len(reverse_apply_journal):
+                errors.append(
+                    "repo_binding_summary.verified_path_count must match reverse_apply_journal"
                 )
             if len(list(session.get("continuity_event_refs", []))) < 2:
                 errors.append("continuity_event_refs must include apply and rollback refs")
@@ -830,6 +870,12 @@ class RollbackEngineService:
             ):
                 errors.append(
                     "telemetry_gate.verified_reverse_command_count must match reverse_apply_journal"
+                )
+            if int(telemetry_gate.get("repo_bound_verified_command_count", 0)) != len(
+                reverse_apply_journal
+            ):
+                errors.append(
+                    "telemetry_gate.repo_bound_verified_command_count must match reverse_apply_journal"
                 )
         return {"ok": not errors, "errors": errors}
 
@@ -875,6 +921,18 @@ class RollbackEngineService:
                     source=source,
                     source_state=source_state,
                 )
+                verification_command = self._build_repo_verification_command(
+                    target_path=target_path,
+                    source=source,
+                    source_state=source_state,
+                )
+                verification_run = self._run_command(
+                    command=verification_command,
+                    workspace_root=temp_root,
+                )
+                repo_source_digest = sha256_text(
+                    source.read_text(encoding="utf-8") if source.exists() else ""
+                )
                 journal.append(
                     {
                         "journal_ref": f"journal://{build_request['request_id']}/reverse/{index:02d}",
@@ -884,11 +942,20 @@ class RollbackEngineService:
                         "rollback_action": rollback_action,
                         "snapshot_ref": pre_apply_ref,
                         "marker": marker,
+                        "repo_binding_ref": (
+                            f"repo://current-checkout/{build_request['request_id']}/{index:02d}"
+                        ),
+                        "repo_source_digest": repo_source_digest,
                         "command": command_run["command"],
                         "exit_code": command_run["exit_code"],
                         "status": command_run["status"],
                         "stdout_excerpt": command_run["stdout_excerpt"],
                         "stderr_excerpt": command_run["stderr_excerpt"],
+                        "verification_command": verification_run["command"],
+                        "verification_exit_code": verification_run["exit_code"],
+                        "verification_status": verification_run["status"],
+                        "verification_stdout_excerpt": verification_run["stdout_excerpt"],
+                        "verification_stderr_excerpt": verification_run["stderr_excerpt"],
                         "result_state": result_state,
                     }
                 )
@@ -917,6 +984,9 @@ class RollbackEngineService:
             entry.get("result_state") in {"restored", "deleted"}
             for entry in reverse_apply_journal
         )
+        repo_bound_verified_command_count = sum(
+            entry.get("verification_status") == "pass" for entry in reverse_apply_journal
+        )
         mutated_file_count = int(live_enactment_session.get("mutated_file_count", 0))
         cleanup_status = str(live_enactment_session.get("cleanup_status", "not-started"))
         blocking_reasons: list[str] = []
@@ -933,6 +1003,10 @@ class RollbackEngineService:
         if verified_reverse_command_count != len(reverse_apply_journal):
             blocking_reasons.append(
                 "reverse-apply verification must restore or delete every materialized file"
+            )
+        if repo_bound_verified_command_count != len(reverse_apply_journal):
+            blocking_reasons.append(
+                "repo-bound verification must succeed for every reversed file"
             )
         if reverse_cleanup_status != "removed":
             blocking_reasons.append("rollback temp workspace cleanup must complete before approval")
@@ -952,6 +1026,7 @@ class RollbackEngineService:
             "executed_reverse_command_count": len(reverse_apply_journal),
             "passed_reverse_command_count": passed_reverse_command_count,
             "verified_reverse_command_count": verified_reverse_command_count,
+            "repo_bound_verified_command_count": repo_bound_verified_command_count,
             "journal_entry_count": len(reverse_apply_journal),
             "reverted_stage_count": len(reverted_stage_ids),
             "decision_basis": [
@@ -1013,6 +1088,38 @@ class RollbackEngineService:
         return f"python3 -c {shlex.quote(script)}"
 
     @staticmethod
+    def _build_repo_verification_command(
+        *,
+        target_path: str,
+        source: Path,
+        source_state: str,
+    ) -> str:
+        if source_state == "copied":
+            script = (
+                "from pathlib import Path; import sys; "
+                f"target = Path({json.dumps(target_path)}); "
+                f"source = Path({json.dumps(str(source))}); "
+                "ok = ("
+                "target.exists() and source.exists() and "
+                "target.read_text(encoding='utf-8') == source.read_text(encoding='utf-8')"
+                "); "
+                f"print({json.dumps(f'repo-bound match {target_path}')} if ok else "
+                f"{json.dumps(f'repo-bound mismatch {target_path}')}); "
+                "sys.exit(0 if ok else 1)"
+            )
+        else:
+            script = (
+                "from pathlib import Path; import sys; "
+                f"target = Path({json.dumps(target_path)}); "
+                f"source = Path({json.dumps(str(source))}); "
+                "ok = (not target.exists()) and (not source.exists()); "
+                f"print({json.dumps(f'repo-bound absent {target_path}')} if ok else "
+                f"{json.dumps(f'repo-bound mismatch {target_path}')}); "
+                "sys.exit(0 if ok else 1)"
+            )
+        return f"python3 -c {shlex.quote(script)}"
+
+    @staticmethod
     def _verify_reverse_apply_result(
         *,
         target: Path,
@@ -1028,6 +1135,39 @@ class RollbackEngineService:
                 else "mismatch"
             )
         return "deleted" if not target.exists() else "mismatch"
+
+    def _build_repo_binding_summary(
+        self,
+        *,
+        build_request: Mapping[str, Any],
+        reverse_apply_journal: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        path_bindings = [
+            {
+                "path": str(entry.get("path", "")),
+                "repo_binding_ref": str(entry.get("repo_binding_ref", "")),
+                "repo_source_digest": str(entry.get("repo_source_digest", "")),
+            }
+            for entry in reverse_apply_journal
+        ]
+        return {
+            "binding_root_ref": f"repo://current-checkout/{build_request['request_id']}",
+            "binding_scope": self._policy.repo_binding_scope,
+            "bound_path_count": len(path_bindings),
+            "verified_path_count": sum(
+                entry.get("verification_status") == "pass" for entry in reverse_apply_journal
+            ),
+            "bound_paths": [binding["path"] for binding in path_bindings],
+            "binding_digest": sha256_text(
+                canonical_json(
+                    {
+                        "request_id": build_request["request_id"],
+                        "binding_scope": self._policy.repo_binding_scope,
+                        "paths": path_bindings,
+                    }
+                )
+            ),
+        }
 
     def _run_command(self, *, command: str, workspace_root: Path) -> Dict[str, Any]:
         return _run_shell_command(

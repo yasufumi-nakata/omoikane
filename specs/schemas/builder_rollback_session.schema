@@ -25,6 +25,7 @@ required:
   - reverted_stage_ids
   - reverted_stage_count
   - reverse_apply_journal
+  - repo_binding_summary
   - telemetry_gate
   - continuity_event_refs
   - notification_refs
@@ -34,7 +35,7 @@ properties:
   kind:
     const: builder_rollback_session
   schema_version:
-    const: "1.1"
+    const: "1.2"
   rollback_session_id:
     type: string
     pattern: "^rollback-session-[a-f0-9]{12}$"
@@ -61,14 +62,16 @@ properties:
       - require_notifications
       - require_live_rollback_gate
       - require_reverse_apply_commands
+      - require_repo_bound_verification
       - rollback_workspace_prefix
+      - repo_binding_scope
       - command_timeout_seconds
       - cleanup_after_run
       - max_reverted_patch_count
     properties:
       policy_id:
         type: string
-        const: continuity-bound-builder-rollback-v2
+        const: continuity-bound-builder-rollback-v3
       required_eval:
         type: string
         const: evals/continuity/builder_rollback_execution.yaml
@@ -87,9 +90,15 @@ properties:
       require_reverse_apply_commands:
         type: boolean
         const: true
+      require_repo_bound_verification:
+        type: boolean
+        const: true
       rollback_workspace_prefix:
         type: string
         const: omoikane-builder-rollback-
+      repo_binding_scope:
+        type: string
+        const: current-checkout-subtree
       command_timeout_seconds:
         type: integer
         const: 15
@@ -160,11 +169,18 @@ properties:
         - rollback_action
         - snapshot_ref
         - marker
+        - repo_binding_ref
+        - repo_source_digest
         - command
         - exit_code
         - status
         - stdout_excerpt
         - stderr_excerpt
+        - verification_command
+        - verification_exit_code
+        - verification_status
+        - verification_stdout_excerpt
+        - verification_stderr_excerpt
         - result_state
       properties:
         journal_ref:
@@ -192,6 +208,12 @@ properties:
         marker:
           type: string
           pattern: "workspace-enacted:"
+        repo_binding_ref:
+          type: string
+          pattern: "^repo://current-checkout/"
+        repo_source_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
         command:
           type: string
           minLength: 3
@@ -207,12 +229,60 @@ properties:
           type: string
         stderr_excerpt:
           type: string
+        verification_command:
+          type: string
+          minLength: 3
+        verification_exit_code:
+          type: integer
+        verification_status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        verification_stdout_excerpt:
+          type: string
+        verification_stderr_excerpt:
+          type: string
         result_state:
           type: string
           enum:
             - restored
             - deleted
             - mismatch
+  repo_binding_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - binding_root_ref
+      - binding_scope
+      - bound_path_count
+      - verified_path_count
+      - bound_paths
+      - binding_digest
+    properties:
+      binding_root_ref:
+        type: string
+        pattern: "^repo://current-checkout/"
+      binding_scope:
+        type: string
+        const: current-checkout-subtree
+      bound_path_count:
+        type: integer
+        minimum: 0
+        maximum: 4
+      verified_path_count:
+        type: integer
+        minimum: 0
+        maximum: 4
+      bound_paths:
+        type: array
+        items:
+          type: string
+          pattern: "^(src|tests)/"
+      binding_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
   telemetry_gate:
     type: object
     additionalProperties: false
@@ -227,6 +297,7 @@ properties:
       - executed_reverse_command_count
       - passed_reverse_command_count
       - verified_reverse_command_count
+      - repo_bound_verified_command_count
       - journal_entry_count
       - reverted_stage_count
       - decision_basis
@@ -270,6 +341,9 @@ properties:
       verified_reverse_command_count:
         type: integer
         minimum: 0
+      repo_bound_verified_command_count:
+        type: integer
+        minimum: 0
       journal_entry_count:
         type: integer
         minimum: 0
@@ -310,8 +384,8 @@ properties:
       pattern: "^notify://"
   preserved_invariants:
     type: array
-    minItems: 4
-    maxItems: 4
+    minItems: 5
+    maxItems: 5
     prefixItems:
       - type: string
         const: append-only-continuity
@@ -321,6 +395,8 @@ properties:
         const: stakeholders-notified
       - type: string
         const: reverse-apply-journal-bound
+      - type: string
+        const: repo-baseline-bound
   executed_at:
     type: string
     format: date-time
@@ -362,21 +438,23 @@ allOf:
             - reverse_cleanup_status
 examples:
   - kind: builder_rollback_session
-    schema_version: "1.1"
+    schema_version: "1.2"
     rollback_session_id: rollback-session-0123456789ab
     request_id: build-l5-rollback-0001
     artifact_id: artifact-0123456789ab
     apply_receipt_id: sandbox-apply-0123456789ab
     rollout_session_id: rollout-session-0123456789ab
     policy:
-      policy_id: continuity-bound-builder-rollback-v2
+      policy_id: continuity-bound-builder-rollback-v3
       required_eval: evals/continuity/builder_rollback_execution.yaml
       require_append_only_continuity: true
       require_pre_apply_snapshot: true
       require_notifications: true
       require_live_rollback_gate: true
       require_reverse_apply_commands: true
+      require_repo_bound_verification: true
       rollback_workspace_prefix: omoikane-builder-rollback-
+      repo_binding_scope: current-checkout-subtree
       command_timeout_seconds: 15
       cleanup_after_run: true
       max_reverted_patch_count: 4
@@ -403,11 +481,18 @@ examples:
         rollback_action: restore-copied-file
         snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
         marker: "# workspace-enacted: patch-111111111111 target=src/omoikane/self_construction/builders.py"
+        repo_binding_ref: repo://current-checkout/build-l5-rollback-0001/01
+        repo_source_digest: 95d59c65f07e2b25d79bc4a81260e44ca0ad979ea9b5eb4f5bb786b15ecae6a9
         command: python3 -c 'restore copied file'
         exit_code: 0
         status: pass
         stdout_excerpt: restored src/omoikane/self_construction/builders.py
         stderr_excerpt: ""
+        verification_command: python3 -c 'repo-bound verify copied file'
+        verification_exit_code: 0
+        verification_status: pass
+        verification_stdout_excerpt: repo-bound match src/omoikane/self_construction/builders.py
+        verification_stderr_excerpt: ""
         result_state: restored
       - journal_ref: journal://build-l5-rollback-0001/reverse/02
         path: tests/unit/test_builders.py
@@ -416,12 +501,28 @@ examples:
         rollback_action: restore-copied-file
         snapshot_ref: mirage://build-l5-rollback-0001/snapshot/live-pre-apply
         marker: "# workspace-enacted: patch-222222222222 target=tests/unit/test_builders.py"
+        repo_binding_ref: repo://current-checkout/build-l5-rollback-0001/02
+        repo_source_digest: 486f7bf4a4345e9ec8f4faa1aa03e36f0bff6b9739036ce5d998e4764f0b31db
         command: python3 -c 'restore copied file'
         exit_code: 0
         status: pass
         stdout_excerpt: restored tests/unit/test_builders.py
         stderr_excerpt: ""
+        verification_command: python3 -c 'repo-bound verify copied file'
+        verification_exit_code: 0
+        verification_status: pass
+        verification_stdout_excerpt: repo-bound match tests/unit/test_builders.py
+        verification_stderr_excerpt: ""
         result_state: restored
+    repo_binding_summary:
+      binding_root_ref: repo://current-checkout/build-l5-rollback-0001
+      binding_scope: current-checkout-subtree
+      bound_path_count: 2
+      verified_path_count: 2
+      bound_paths:
+        - src/omoikane/self_construction/builders.py
+        - tests/unit/test_builders.py
+      binding_digest: 42a6d35f5b5448c56a3012b5dfe9a291f3cc9199e3a24a8725fd755a0a821f79
     telemetry_gate:
       gate_id: telemetry-gate-0123456789ab
       source_enactment_session_id: enactment-session-0123456789ab
@@ -433,6 +534,7 @@ examples:
       executed_reverse_command_count: 2
       passed_reverse_command_count: 2
       verified_reverse_command_count: 2
+      repo_bound_verified_command_count: 2
       journal_entry_count: 2
       reverted_stage_count: 2
       decision_basis:
@@ -453,4 +555,5 @@ examples:
       - restored-pre-apply-snapshot
       - stakeholders-notified
       - reverse-apply-journal-bound
+      - repo-baseline-bound
     executed_at: "2026-04-20T03:00:00Z"

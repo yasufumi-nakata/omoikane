@@ -268,7 +268,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("rolled-back", session["status"])
-        self.assertEqual("1.1", session["schema_version"])
+        self.assertEqual("1.2", session["schema_version"])
         self.assertEqual(
             live_enactment_session["enactment_session_id"],
             session["live_enactment_session_id"],
@@ -284,12 +284,19 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertTrue(
             all(entry["result_state"] == "restored" for entry in session["reverse_apply_journal"])
         )
+        self.assertTrue(
+            all(entry["verification_status"] == "pass" for entry in session["reverse_apply_journal"])
+        )
+        self.assertEqual("current-checkout-subtree", session["repo_binding_summary"]["binding_scope"])
+        self.assertEqual(2, session["repo_binding_summary"]["bound_path_count"])
+        self.assertEqual(2, session["repo_binding_summary"]["verified_path_count"])
         self.assertEqual("rollback-approved", session["telemetry_gate"]["status"])
         self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["executed_command_count"])
         self.assertEqual("removed", session["telemetry_gate"]["reverse_cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["executed_reverse_command_count"])
         self.assertEqual(2, session["telemetry_gate"]["verified_reverse_command_count"])
+        self.assertEqual(2, session["telemetry_gate"]["repo_bound_verified_command_count"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 

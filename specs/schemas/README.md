@@ -75,7 +75,7 @@
 
 ## 次段階
 
-live-repo reverse-apply / multi-scene sensory loopback artifact families /
+in-place checkout rollback mutation / multi-scene sensory loopback artifact families /
 external-actuation authorization artifacts / actual non-loopback mTLS authority routing は
 reference runtime の対象が広がる段階で追加する。
 
