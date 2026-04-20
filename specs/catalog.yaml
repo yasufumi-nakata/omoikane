@@ -197,6 +197,15 @@ entries:
     rationale: Required to serialize one Council-resolved cognitive audit follow-up artifact with continuity-safe actions.
   - priority: P1
     kind: schema
+    file: specs/schemas/cognitive_audit_governance_binding.schema
+    consumers:
+      - specs/interfaces/agentic.cognitive_audit_governance.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to serialize one governance-bound cognitive audit follow-up with distributed council verdicts and network-attested oversight evidence.
+  - priority: P1
+    kind: schema
     file: specs/schemas/task_node.schema
     consumers:
       - specs/interfaces/agentic.task_graph.v0.idl
@@ -275,6 +284,14 @@ entries:
       - reference-runtime
     rationale: Required to make qualia/self-model/metacognition/Council audit loops machine-readable in the reference runtime.
   - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.cognitive_audit_governance.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make cognitive audit follow-up binding across oversight, Federation, and Heritage review machine-readable.
+  - priority: P1
     kind: eval
     file: evals/agentic/consensus_bus_delivery_guard.yaml
     consumers:
@@ -288,6 +305,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects qualia checkpoint binding, abrupt-change escalation, and continuity-safe Council follow-up in the cognitive audit loop.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/cognitive_audit_governance_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects network-attested oversight binding plus Federation/Heritage governance routing for cognitive audit follow-up.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.ethics.v0.idl

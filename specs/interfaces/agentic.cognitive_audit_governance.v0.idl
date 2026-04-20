@@ -1,0 +1,146 @@
+idl_version: 1
+kind: service
+namespace: agentic.cognitive_audit_governance.v0
+service: CognitiveAuditGovernanceService
+summary: Bind one local cognitive audit resolution to distributed council verdicts and network-attested oversight evidence.
+imports:
+  cognitive_audit_record: ../schemas/cognitive_audit_record.schema
+  cognitive_audit_resolution: ../schemas/cognitive_audit_resolution.schema
+  cognitive_audit_governance_binding: ../schemas/cognitive_audit_governance_binding.schema
+operations:
+  bind_governance:
+    summary: >
+      Convert one local cognitive audit resolution plus distributed council verdicts and
+      oversight evidence into one governance-bound follow-up artifact.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - record
+          - local_resolution
+          - oversight_event
+        properties:
+          record:
+            schema_ref: cognitive_audit_record
+          local_resolution:
+            schema_ref: cognitive_audit_resolution
+          distributed_resolutions:
+            type: array
+            maxItems: 2
+            items:
+              type: object
+              required:
+                - resolution_id
+                - topology_ref
+                - council_tier
+                - final_outcome
+                - decision_mode
+                - conflict_resolution
+                - follow_up_action
+                - external_resolution_refs
+              properties:
+                resolution_id:
+                  type: string
+                  pattern: "^distributed-council-[a-f0-9]{12}$"
+                topology_ref:
+                  type: string
+                  pattern: "^topology-[a-f0-9]{12}$"
+                council_tier:
+                  type: string
+                  enum:
+                    - federation
+                    - heritage
+                final_outcome:
+                  type: string
+                  enum:
+                    - binding-approved
+                    - binding-rejected
+                    - escalate-human-governance
+                decision_mode:
+                  type: string
+                  minLength: 1
+                conflict_resolution:
+                  type: string
+                  minLength: 1
+                follow_up_action:
+                  type: string
+                  minLength: 1
+                external_resolution_refs:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+          oversight_event:
+            type: object
+            required:
+              - event_id
+              - human_attestation
+              - reviewer_bindings
+            properties:
+              event_id:
+                type: string
+                pattern: "^oversight-event-[a-f0-9]{12}$"
+              human_attestation:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    const: satisfied
+              reviewer_bindings:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                    - reviewer_id
+                    - network_receipt_id
+                  properties:
+                    reviewer_id:
+                      type: string
+                      minLength: 1
+                    network_receipt_id:
+                      type: string
+                      pattern: "^verifier-network-receipt-[a-f0-9]{12}$"
+    output:
+      schema_ref: cognitive_audit_governance_binding
+    guarantees:
+      - open-guardian-review and activate-containment require network-bound oversight evidence
+      - heritage binding-rejected verdict overrides the local follow-up with preserve-boundary
+      - conflicting federation-approved and heritage-rejected verdicts escalate to human governance
+  validate_binding:
+    summary: Validate one governance-bound cognitive audit follow-up artifact.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - binding
+        properties:
+          binding:
+            schema_ref: cognitive_audit_governance_binding
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - execution_gate
+          - final_follow_up_action
+          - distributed_verdict_count
+          - oversight_network_bound
+          - errors
+        properties:
+          ok:
+            type: boolean
+          execution_gate:
+            type: string
+          final_follow_up_action:
+            type: string
+          distributed_verdict_count:
+            type: integer
+            minimum: 0
+          oversight_network_bound:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string

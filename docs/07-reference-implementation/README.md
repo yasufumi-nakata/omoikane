@@ -27,6 +27,7 @@ PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-transport-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-demo --json
+PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-governance-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
@@ -149,6 +150,16 @@ receipt verdict と同じ形で返すことを確認する。
 guardian-review metacognition report を 1 つの bounded Council review に束ね、
 `cognitive.audit.resolved` follow-up が raw sensory embedding や sealed note を
 含まず `open-guardian-review` へ落ちることを確認する。
+
+`cognitive-audit-governance-demo` は cognitive audit governance binding の
+reference contract (`agentic.cognitive_audit_governance.v0`) を JSON で可視化し、
+network-attested reviewer quorum を持つ `guardian-oversight` event と、
+Federation の `binding-approved` returned result、
+Heritage の `binding-rejected` returned result を
+同一 cognitive audit follow-up に束ねつつ、
+`federation-attested-review` / `heritage-veto-boundary` /
+`distributed-conflict-human-escalation` の 3 gate を
+raw cognitive payload を露出せずに切り替えることを確認する。
 
 `task-graph-demo` は L4 TaskGraph の暫定 complexity policy
 (`max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3 / max_result_refs=5`)

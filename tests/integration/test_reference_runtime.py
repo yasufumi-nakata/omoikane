@@ -785,6 +785,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["qualia-checkpoint"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-audit"])
 
+    def test_cognitive_audit_governance_demo_binds_distributed_and_oversight_review(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_cognitive_audit_governance_demo()
+
+        self.assertTrue(result["validation"]["all_bindings_valid"])
+        self.assertTrue(result["validation"]["oversight_network_bound"])
+        self.assertTrue(result["validation"]["federation_gate_preserves_review"])
+        self.assertTrue(result["validation"]["heritage_gate_preserves_boundary"])
+        self.assertTrue(result["validation"]["conflict_escalates_human_governance"])
+        self.assertEqual("federation-attested-review", result["bindings"]["federation"]["execution_gate"])
+        self.assertEqual("heritage-veto-boundary", result["bindings"]["heritage"]["execution_gate"])
+        self.assertEqual(
+            "distributed-conflict-human-escalation",
+            result["bindings"]["conflict"]["execution_gate"],
+        )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["council-distributed"])
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["cognitive-audit"])
+
     def test_trust_demo_reports_update_policy_and_human_pin(self) -> None:
         runtime = OmoikaneReferenceOS()
 

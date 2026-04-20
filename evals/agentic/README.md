@@ -48,3 +48,9 @@ reachable endpoint と root quorum を取得し、response digest つき receipt
 ### Cognitive Audit Loop
 qualia checkpoint と self-model abrupt change と metacognition alert が
 bounded Council review に束ねられ、continuity-safe な follow-up を返すこと。
+
+### Cognitive Audit Governance Binding
+network-attested reviewer quorum と Federation / Heritage returned result が
+cognitive audit follow-up に束縛され、
+review preserve / boundary preserve / human governance escalation を
+deterministic に切り替えられること。

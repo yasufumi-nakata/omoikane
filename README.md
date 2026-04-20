@@ -65,6 +65,7 @@ meta/                 ── 用語集・決定履歴
 - `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-governance-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli council-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json`

@@ -257,6 +257,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     cognitive_audit_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    cognitive_audit_governance_parser = subparsers.add_parser(
+        "cognitive-audit-governance-demo",
+        help="Run the L2/L3/L4 cognitive audit governance binding across oversight, Federation, and Heritage review",
+    )
+    cognitive_audit_governance_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON only",
+    )
+
     task_graph_parser = subparsers.add_parser(
         "task-graph-demo",
         help="Run the L4 TaskGraph complexity policy and dispatch scenario",
@@ -486,6 +496,10 @@ def main() -> None:
 
     if args.command == "cognitive-audit-demo":
         _print_result(runtime.run_cognitive_audit_demo(), args.json)
+        return
+
+    if args.command == "cognitive-audit-governance-demo":
+        _print_result(runtime.run_cognitive_audit_governance_demo(), args.json)
         return
 
     if args.command == "task-graph-demo":

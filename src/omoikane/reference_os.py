@@ -11,6 +11,7 @@ import threading
 from typing import Any, Dict, List
 
 from .agentic.cognitive_audit import CognitiveAuditService
+from .agentic.cognitive_audit_governance import CognitiveAuditGovernanceService
 from .agentic.consensus_bus import ConsensusBus
 from .agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from .agentic.distributed_transport import DistributedTransportService
@@ -199,6 +200,7 @@ class OmoikaneReferenceOS:
         self.council = Council()
         self.distributed_transport = DistributedTransportService()
         self.cognitive_audit = CognitiveAuditService()
+        self.cognitive_audit_governance = CognitiveAuditGovernanceService()
         self.consensus_bus = ConsensusBus()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
@@ -2112,6 +2114,282 @@ class OmoikaneReferenceOS:
                     "qualia_checkpoint": qualia_checkpoint_entry.category == "qualia-checkpoint",
                     "cognitive_audit": True,
                 },
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_cognitive_audit_governance_demo(self) -> Dict[str, Any]:
+        base = self.run_cognitive_audit_demo()
+        identity_id = base["identity"]["identity_id"]
+        audit_record = base["audit"]["record"]
+        local_resolution = base["audit"]["resolution"]
+
+        reviewer_alpha = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-cognitive-alpha",
+            display_name="Cognitive Review Alpha",
+            credential_id="credential-cognitive-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://cognitive-audit/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-20T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://cognitive-audit/reviewer-alpha/v1",
+            escalation_contact="mailto:cognitive-alpha@example.invalid",
+            allowed_guardian_roles=["identity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_beta = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-cognitive-beta",
+            display_name="Cognitive Review Beta",
+            credential_id="credential-cognitive-beta",
+            attestation_type="institutional-badge",
+            proof_ref="proof://cognitive-audit/reviewer-beta/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-20T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://cognitive-audit/reviewer-beta/v1",
+            escalation_contact="mailto:cognitive-beta@example.invalid",
+            allowed_guardian_roles=["identity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_alpha = self.oversight.verify_reviewer_from_network(
+            reviewer_alpha["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-cognitive-alpha",
+            challenge_ref="challenge://cognitive-audit/reviewer-alpha/2026-04-20T03:00:00Z",
+            challenge_digest="sha256:cognitive-audit-reviewer-alpha-20260420",
+            jurisdiction_bundle_ref="legal://jp-13/cognitive-audit/v1",
+            jurisdiction_bundle_digest="sha256:jp13-cognitive-audit-v1",
+            verified_at="2026-04-20T03:00:00+00:00",
+            valid_until="2026-10-20T00:00:00+00:00",
+        )
+        reviewer_beta = self.oversight.verify_reviewer_from_network(
+            reviewer_beta["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-cognitive-beta",
+            challenge_ref="challenge://cognitive-audit/reviewer-beta/2026-04-20T03:05:00Z",
+            challenge_digest="sha256:cognitive-audit-reviewer-beta-20260420",
+            jurisdiction_bundle_ref="legal://jp-13/cognitive-audit/v1",
+            jurisdiction_bundle_digest="sha256:jp13-cognitive-audit-v1",
+            verified_at="2026-04-20T03:05:00+00:00",
+            valid_until="2026-10-20T00:00:00+00:00",
+        )
+        oversight_event = self.oversight.record(
+            guardian_role="identity",
+            category="attest",
+            payload_ref=local_resolution["resolution_id"],
+            escalation_path=["guardian-oversight.jp", "identity-review-board"],
+        )
+        oversight_event = self.oversight.attest(
+            oversight_event["event_id"],
+            reviewer_id=reviewer_alpha["reviewer_id"],
+        )
+        oversight_event = self.oversight.attest(
+            oversight_event["event_id"],
+            reviewer_id=reviewer_beta["reviewer_id"],
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="cognitive.audit.oversight_attested",
+            payload=oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+
+        federation_proposal = self.council.propose(
+            title="Cross-self cognitive drift review",
+            requested_action="open-federated-guardian-review",
+            rationale="cross-self cognitive incident は federation returned result と reviewer attestation へ束縛する。",
+            risk_level="high",
+            session_mode="standard",
+            target_identity_ids=[identity_id, "identity://shared-peer"],
+        )
+        federation_local = self.council.deliberate(
+            federation_proposal,
+            [
+                CouncilVote("design-architect", "approve", "cross-self drift は federation review が必要"),
+                CouncilVote("ethics-committee", "approve", "guardian-visible review なら許容できる"),
+                CouncilVote("memory-archivist", "reject", "shared narrative drift は要監視"),
+            ],
+            elapsed_ms=18_000,
+            rounds_completed=2,
+        )
+        federation_topology = self.council.route_topology(
+            federation_proposal,
+            local_session_ref="cognitive-audit-federation-local-session",
+        )
+        federation_resolution = self.council.resolve_federation_review(
+            federation_topology,
+            local_decision=federation_local,
+            votes=[
+                DistributedCouncilVote(identity_id, "approve", "本人が federation review に同意"),
+                DistributedCouncilVote("identity://shared-peer", "approve", "peer 側も drift review に同意"),
+                DistributedCouncilVote(
+                    "guardian://neutral-federation",
+                    "approve",
+                    "neutral guardian が continuity guard を満たすと確認",
+                ),
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="cognitive.audit.federation_resolved",
+            payload=federation_resolution.to_dict(),
+            actor="Council",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        heritage_proposal = self.council.propose(
+            title="Interpretive cognitive identity review",
+            requested_action="open-heritage-identity-review",
+            rationale="identity_axiom に触れる cognitive audit follow-up は heritage returned result を必要とする。",
+            risk_level="high",
+            session_mode="standard",
+            target_identity_ids=[identity_id],
+            referenced_clauses=["identity_axiom.A2", "governance.review-window"],
+        )
+        heritage_local = self.council.deliberate(
+            heritage_proposal,
+            [
+                CouncilVote("design-architect", "approve", "local wording は整合している"),
+                CouncilVote("ethics-committee", "approve", "guardian review へ送るだけなら妥当"),
+                CouncilVote("memory-archivist", "approve", "記録上は一貫している"),
+            ],
+            elapsed_ms=16_000,
+            rounds_completed=2,
+        )
+        heritage_topology = self.council.route_topology(
+            heritage_proposal,
+            local_session_ref="cognitive-audit-heritage-local-session",
+        )
+        heritage_resolution = self.council.resolve_heritage_review(
+            heritage_topology,
+            local_decision=heritage_local,
+            votes=[
+                DistributedCouncilVote("heritage://culture-a", "approve", "文化 A では review wording は許容"),
+                DistributedCouncilVote("heritage://culture-b", "approve", "文化 B でも手続きは整合"),
+                DistributedCouncilVote(
+                    "heritage://legal-advisor",
+                    "approve",
+                    "法域上の review handoff 要件は満たしている",
+                ),
+                DistributedCouncilVote(
+                    "heritage://ethics-committee",
+                    "veto",
+                    "identity_axiom drift が残るため boundary preserve が必要",
+                ),
+            ],
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="cognitive.audit.heritage_resolved",
+            payload=heritage_resolution.to_dict(),
+            actor="Council",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        federation_binding = self.cognitive_audit_governance.bind_governance(
+            audit_record,
+            local_resolution,
+            distributed_resolutions=[federation_resolution.to_dict()],
+            oversight_event=oversight_event,
+        )
+        heritage_binding = self.cognitive_audit_governance.bind_governance(
+            audit_record,
+            local_resolution,
+            distributed_resolutions=[heritage_resolution.to_dict()],
+            oversight_event=oversight_event,
+        )
+        conflict_binding = self.cognitive_audit_governance.bind_governance(
+            audit_record,
+            local_resolution,
+            distributed_resolutions=[federation_resolution.to_dict(), heritage_resolution.to_dict()],
+            oversight_event=oversight_event,
+        )
+        for event_type, binding in (
+            ("cognitive.audit.governance.federation_bound", federation_binding),
+            ("cognitive.audit.governance.heritage_bound", heritage_binding),
+            ("cognitive.audit.governance.conflict_bound", conflict_binding),
+        ):
+            self.ledger.append(
+                identity_id=identity_id,
+                event_type=event_type,
+                payload=binding,
+                actor="CognitiveAuditGovernanceService",
+                category="cognitive-audit",
+                layer="L4",
+                signature_roles=["self", "council", "guardian", "third_party"],
+                substrate="classical-silicon",
+            )
+
+        federation_validation = self.cognitive_audit_governance.validate_binding(federation_binding)
+        heritage_validation = self.cognitive_audit_governance.validate_binding(heritage_binding)
+        conflict_validation = self.cognitive_audit_governance.validate_binding(conflict_binding)
+
+        return {
+            "identity": dict(base["identity"]),
+            "base_audit": base,
+            "oversight": {
+                "policy": self.oversight.policy_snapshot(),
+                "reviewers": [reviewer_alpha, reviewer_beta],
+                "event": oversight_event,
+            },
+            "distributed": {
+                "federation": {
+                    "proposal": {
+                        "proposal_id": federation_proposal.proposal_id,
+                        "topology_ref": federation_topology.topology_id,
+                    },
+                    "local_decision": federation_local.to_dict(),
+                    "resolution": federation_resolution.to_dict(),
+                },
+                "heritage": {
+                    "proposal": {
+                        "proposal_id": heritage_proposal.proposal_id,
+                        "topology_ref": heritage_topology.topology_id,
+                    },
+                    "local_decision": heritage_local.to_dict(),
+                    "resolution": heritage_resolution.to_dict(),
+                },
+            },
+            "bindings": {
+                "federation": federation_binding,
+                "heritage": heritage_binding,
+                "conflict": conflict_binding,
+            },
+            "validation": {
+                "federation": federation_validation,
+                "heritage": heritage_validation,
+                "conflict": conflict_validation,
+                "all_bindings_valid": (
+                    federation_validation["ok"]
+                    and heritage_validation["ok"]
+                    and conflict_validation["ok"]
+                ),
+                "oversight_network_bound": all(
+                    binding["network_receipt_id"] for binding in oversight_event["reviewer_bindings"]
+                ),
+                "federation_gate_preserves_review": (
+                    federation_binding["execution_gate"] == "federation-attested-review"
+                    and federation_binding["final_follow_up_action"] == "open-guardian-review"
+                ),
+                "heritage_gate_preserves_boundary": (
+                    heritage_binding["execution_gate"] == "heritage-veto-boundary"
+                    and heritage_binding["final_follow_up_action"] == "preserve-boundary"
+                ),
+                "conflict_escalates_human_governance": (
+                    conflict_binding["execution_gate"] == "distributed-conflict-human-escalation"
+                    and conflict_binding["final_follow_up_action"] == "escalate-to-human-governance"
+                ),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

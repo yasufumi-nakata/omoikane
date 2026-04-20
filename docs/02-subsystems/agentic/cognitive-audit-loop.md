@@ -65,6 +65,21 @@ reference runtime では trigger を最大 4 件までに固定し、
   - `schedule-standard-session`
   - `escalate-to-human-governance`
 
+### `cognitive_audit_governance_binding`
+
+- local `cognitive_audit_resolution`
+- optional Federation / Heritage `distributed_council_resolution`
+- network-attested `guardian_oversight` reviewer binding
+- `execution_gate`
+  - `oversight-attested-local`
+  - `federation-attested-review`
+  - `heritage-veto-boundary`
+  - `distributed-conflict-human-escalation`
+- `final_follow_up_action`
+  - local review action を preserve
+  - Heritage veto 時は `preserve-boundary`
+  - Federation approve と Heritage reject が衝突した時は `escalate-to-human-governance`
+
 ## 不変条件
 
 1. qualia tick と metacognition source tick は同一 `tick_id` / `attention_target` を共有する
@@ -72,6 +87,9 @@ reference runtime では trigger を最大 4 件までに固定し、
 3. qualia checkpoint は ledger に append されてから audit record に束縛される
 4. follow-up artifact は raw sensory embedding や private metacognition note を含まない
 5. `abrupt_change` を含む監査は `continue-monitoring` で閉じない
+6. `open-guardian-review` / `activate-containment` は network-bound reviewer receipt を持つ oversight event なしでは governance bind できない
+7. Heritage `binding-rejected` returned result は local review action より優先して `preserve-boundary` に落とす
+8. Federation `binding-approved` と Heritage `binding-rejected` が同時に来た時は human governance へ escalate する
 
 ## Reference Runtime
 
@@ -81,3 +99,8 @@ reference runtime では trigger を最大 4 件までに固定し、
   - metacognition guardian-review
   - Council approval
   - `cognitive.audit.resolved` ledger entry
+- `cognitive-audit-governance-demo --json`
+  - `cognitive.audit.resolved` を起点に reviewer verifier-network receipt を持つ oversight attestation
+  - Federation returned result による review preserve
+  - Heritage returned result による boundary preserve
+  - Federation / Heritage conflict 時の human governance escalation

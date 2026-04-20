@@ -1,0 +1,25 @@
+eval_id: cognitive_audit_governance_binding
+target: agentic.cognitive_audit_governance
+summary: >
+  cognitive audit follow-up が network-attested oversight と Federation / Heritage
+  returned result に束縛され、review / boundary preserve / human governance escalation
+  を deterministic に分岐できること。
+fixtures:
+  local_follow_up_action: open-guardian-review
+  reviewer_binding_count: 2
+  network_receipt_bound: true
+  federation_final_outcome: binding-approved
+  heritage_final_outcome: binding-rejected
+expected:
+  federation_gate: federation-attested-review
+  heritage_gate: heritage-veto-boundary
+  conflict_gate: distributed-conflict-human-escalation
+  federation_action: open-guardian-review
+  heritage_action: preserve-boundary
+  conflict_action: escalate-to-human-governance
+  oversight_network_bound: true
+assertions:
+  - federation binding preserves the local review action only when oversight reviewer quorum is network-attested
+  - heritage binding overrides the local review action with preserve-boundary when the returned result is binding-rejected
+  - conflicting federation-approved and heritage-rejected verdicts escalate to human governance without exposing raw cognitive payloads
+  - every reviewer binding carries a verifier-network receipt id

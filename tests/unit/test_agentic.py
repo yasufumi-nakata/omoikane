@@ -7,6 +7,7 @@ import threading
 import unittest
 
 from omoikane.agentic.cognitive_audit import CognitiveAuditService
+from omoikane.agentic.cognitive_audit_governance import CognitiveAuditGovernanceService
 from omoikane.agentic.consensus_bus import ConsensusBus
 from omoikane.agentic.council import Council, CouncilMember, CouncilVote, DistributedCouncilVote
 from omoikane.agentic.distributed_transport import DistributedTransportService
@@ -1422,6 +1423,143 @@ class CognitiveAuditTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertEqual("open-guardian-review", resolution["follow_up_action"])
         self.assertTrue(resolution["continuity_alignment"]["recommended_action_matches_outcome"])
+
+
+class CognitiveAuditGovernanceTests(unittest.TestCase):
+    def _build_record_and_resolution(self) -> tuple[dict[str, object], dict[str, object]]:
+        audit_service = CognitiveAuditService()
+        record = audit_service.create_record(
+            identity_id="identity://audit-demo",
+            qualia_tick={
+                "tick_id": 3,
+                "summary": "identity drift review",
+                "attention_target": "identity-drift-review",
+                "self_awareness": 0.88,
+                "lucidity": 0.61,
+                "valence": -0.19,
+                "arousal": 0.67,
+                "clarity": 0.58,
+            },
+            self_model_observation={
+                "abrupt_change": True,
+                "divergence": 0.41,
+                "threshold": 0.35,
+                "snapshot": {
+                    "identity_id": "identity://audit-demo",
+                    "values": ["continuity-first"],
+                    "goals": ["stabilize-review-loop"],
+                    "traits": {"vigilance": 0.87},
+                },
+            },
+            metacognition_report={
+                "report_id": "metacognition-report-0123456789ab",
+                "source_tick": {
+                    "tick_id": 3,
+                    "identity_id": "identity://audit-demo",
+                    "attention_target": "identity-drift-review",
+                    "affect_guard": "observe",
+                    "continuity_pressure": 0.81,
+                },
+                "reflection_mode": "guardian-review",
+                "escalation_target": "guardian-review",
+                "risk_posture": "guarded",
+                "degraded": False,
+                "continuity_guard": {"guard_aligned": True},
+                "coherence_score": 0.67,
+            },
+            qualia_checkpoint_ref="53d6e4b6f3a7f252b9f7dfdcdd4d734ae0f6dca6b25a6c67d75e55b0dd6fdb7b",
+        )
+        resolution = audit_service.resolve(
+            record,
+            council_proposal_ref="proposal-0123456789ab",
+            council_decision={"outcome": "approved", "decision_mode": "weighted-majority"},
+        )
+        return record, resolution
+
+    @staticmethod
+    def _oversight_event() -> dict[str, object]:
+        return {
+            "event_id": "oversight-event-0123456789ab",
+            "human_attestation": {"status": "satisfied"},
+            "reviewer_bindings": [
+                {
+                    "reviewer_id": "human-reviewer-alpha",
+                    "network_receipt_id": "verifier-network-receipt-0123456789ab",
+                },
+                {
+                    "reviewer_id": "human-reviewer-beta",
+                    "network_receipt_id": "verifier-network-receipt-89abcdef0123",
+                },
+            ],
+        }
+
+    def test_governance_binding_preserves_federated_review(self) -> None:
+        service = CognitiveAuditGovernanceService()
+        record, resolution = self._build_record_and_resolution()
+
+        binding = service.bind_governance(
+            record,
+            resolution,
+            distributed_resolutions=[
+                {
+                    "resolution_id": "distributed-council-fedcba987654",
+                    "topology_ref": "topology-13579bdf2468",
+                    "council_tier": "federation",
+                    "final_outcome": "binding-approved",
+                    "decision_mode": "federation-weighted-majority",
+                    "conflict_resolution": "federation-overrides-local",
+                    "follow_up_action": "open-shared-review-window",
+                    "external_resolution_refs": ["federation://identity-a/result"],
+                }
+            ],
+            oversight_event=self._oversight_event(),
+        )
+        validation = service.validate_binding(binding)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("federation-attested-review", binding["execution_gate"])
+        self.assertEqual("open-guardian-review", binding["final_follow_up_action"])
+        self.assertEqual(1, validation["distributed_verdict_count"])
+        self.assertTrue(validation["oversight_network_bound"])
+
+    def test_governance_binding_escalates_conflicting_distributed_verdicts(self) -> None:
+        service = CognitiveAuditGovernanceService()
+        record, resolution = self._build_record_and_resolution()
+
+        binding = service.bind_governance(
+            record,
+            resolution,
+            distributed_resolutions=[
+                {
+                    "resolution_id": "distributed-council-fedcba987654",
+                    "topology_ref": "topology-13579bdf2468",
+                    "council_tier": "federation",
+                    "final_outcome": "binding-approved",
+                    "decision_mode": "federation-weighted-majority",
+                    "conflict_resolution": "federation-overrides-local",
+                    "follow_up_action": "open-shared-review-window",
+                    "external_resolution_refs": ["federation://identity-a/result"],
+                },
+                {
+                    "resolution_id": "distributed-council-02468ace1357",
+                    "topology_ref": "topology-abcdef012345",
+                    "council_tier": "heritage",
+                    "final_outcome": "binding-rejected",
+                    "decision_mode": "ethics-veto",
+                    "conflict_resolution": "heritage-overrides-local",
+                    "follow_up_action": "preserve-identity-boundary",
+                    "external_resolution_refs": ["heritage://ethics/result"],
+                },
+            ],
+            oversight_event=self._oversight_event(),
+        )
+        validation = service.validate_binding(binding)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("distributed-conflict-human-escalation", binding["execution_gate"])
+        self.assertEqual("escalate-to-human-governance", binding["final_follow_up_action"])
+        self.assertTrue(binding["continuity_guard"]["conflict_detected"])
+        self.assertEqual(2, validation["distributed_verdict_count"])
 
 
 if __name__ == "__main__":

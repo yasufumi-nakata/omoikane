@@ -1,0 +1,253 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/cognitive_audit_governance_binding.schema"
+title: CognitiveAuditGovernanceBinding
+description: >
+  Governance-bound follow-up for one cognitive audit resolution, including
+  distributed council verdicts and network-attested oversight evidence.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_id
+  - recorded_at
+  - policy
+  - audit_ref
+  - local_resolution_ref
+  - local_follow_up_action
+  - final_follow_up_action
+  - execution_gate
+  - distributed_verdicts
+  - external_resolution_refs
+  - oversight_event_ref
+  - reviewer_binding_count
+  - network_receipt_ids
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: cognitive_audit_governance_binding
+  schema_version:
+    const: 1.0.0
+  binding_id:
+    type: string
+    pattern: "^cognitive-audit-governance-[a-f0-9]{12}$"
+  recorded_at:
+    type: string
+    format: date-time
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - accepted_council_tiers
+      - max_distributed_verdicts
+      - required_oversight_status
+      - required_network_receipt_for_review
+      - conflict_action
+      - heritage_veto_action
+      - raw_payload_policy
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: cognitive-audit-governance-binding-v1
+      accepted_council_tiers:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          enum:
+            - federation
+            - heritage
+      max_distributed_verdicts:
+        const: 2
+      required_oversight_status:
+        const: satisfied
+      required_network_receipt_for_review:
+        const: true
+      conflict_action:
+        const: escalate-to-human-governance
+      heritage_veto_action:
+        const: preserve-boundary
+      raw_payload_policy:
+        const: digest-and-ref-only
+  audit_ref:
+    type: string
+    pattern: "^cognitive-audit-[a-f0-9]{12}$"
+  local_resolution_ref:
+    type: string
+    pattern: "^cognitive-audit-resolution-[a-f0-9]{12}$"
+  local_follow_up_action:
+    type: string
+    enum:
+      - continue-monitoring
+      - open-guardian-review
+      - activate-containment
+      - preserve-boundary
+      - schedule-standard-session
+      - escalate-to-human-governance
+  final_follow_up_action:
+    type: string
+    enum:
+      - continue-monitoring
+      - open-guardian-review
+      - activate-containment
+      - preserve-boundary
+      - schedule-standard-session
+      - escalate-to-human-governance
+  execution_gate:
+    type: string
+    enum:
+      - oversight-attested-local
+      - federation-attested-review
+      - heritage-veto-boundary
+      - distributed-conflict-human-escalation
+  distributed_verdicts:
+    type: array
+    minItems: 0
+    maxItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - council_tier
+        - resolution_ref
+        - topology_ref
+        - final_outcome
+        - decision_mode
+        - conflict_resolution
+        - follow_up_action
+        - external_resolution_refs
+      properties:
+        council_tier:
+          type: string
+          enum:
+            - federation
+            - heritage
+        resolution_ref:
+          type: string
+          pattern: "^distributed-council-[a-f0-9]{12}$"
+        topology_ref:
+          type: string
+          pattern: "^topology-[a-f0-9]{12}$"
+        final_outcome:
+          type: string
+          enum:
+            - binding-approved
+            - binding-rejected
+            - escalate-human-governance
+        decision_mode:
+          type: string
+          minLength: 1
+        conflict_resolution:
+          type: string
+          minLength: 1
+        follow_up_action:
+          type: string
+          minLength: 1
+        external_resolution_refs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+  external_resolution_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  oversight_event_ref:
+    type: string
+    pattern: "^oversight-event-[a-f0-9]{12}$"
+  reviewer_binding_count:
+    type: integer
+    minimum: 1
+  network_receipt_ids:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^verifier-network-receipt-[a-f0-9]{12}$"
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - local_resolution_preserved
+      - distributed_refs_present
+      - oversight_quorum_satisfied
+      - network_receipts_bound
+      - no_raw_payload_exposed
+      - conflict_detected
+    properties:
+      local_resolution_preserved:
+        const: true
+      distributed_refs_present:
+        type: boolean
+      oversight_quorum_satisfied:
+        const: true
+      network_receipts_bound:
+        const: true
+      no_raw_payload_exposed:
+        const: true
+      conflict_detected:
+        type: boolean
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: cognitive_audit_governance_binding
+    schema_version: 1.0.0
+    binding_id: cognitive-audit-governance-0123456789ab
+    recorded_at: "2026-04-20T03:12:00Z"
+    policy:
+      schema_version: 1.0.0
+      policy_id: cognitive-audit-governance-binding-v1
+      accepted_council_tiers: [federation, heritage]
+      max_distributed_verdicts: 2
+      required_oversight_status: satisfied
+      required_network_receipt_for_review: true
+      conflict_action: escalate-to-human-governance
+      heritage_veto_action: preserve-boundary
+      raw_payload_policy: digest-and-ref-only
+    audit_ref: cognitive-audit-0123456789ab
+    local_resolution_ref: cognitive-audit-resolution-89abcdef0123
+    local_follow_up_action: open-guardian-review
+    final_follow_up_action: escalate-to-human-governance
+    execution_gate: distributed-conflict-human-escalation
+    distributed_verdicts:
+      - council_tier: federation
+        resolution_ref: distributed-council-fedcba987654
+        topology_ref: topology-13579bdf2468
+        final_outcome: binding-approved
+        decision_mode: federation-weighted-majority
+        conflict_resolution: federation-overrides-local
+        follow_up_action: execute-shared-reality-merge
+        external_resolution_refs:
+          - federation://identity-a/result
+      - council_tier: heritage
+        resolution_ref: distributed-council-02468ace1357
+        topology_ref: topology-abcdef012345
+        final_outcome: binding-rejected
+        decision_mode: ethics-veto
+        conflict_resolution: heritage-overrides-local
+        follow_up_action: preserve-identity-boundary
+        external_resolution_refs:
+          - heritage://ethics/result
+    external_resolution_refs:
+      - federation://identity-a/result
+      - heritage://ethics/result
+    oversight_event_ref: oversight-event-0123456789ab
+    reviewer_binding_count: 2
+    network_receipt_ids:
+      - verifier-network-receipt-0123456789ab
+      - verifier-network-receipt-89abcdef0123
+    continuity_guard:
+      local_resolution_preserved: true
+      distributed_refs_present: true
+      oversight_quorum_satisfied: true
+      network_receipts_bound: true
+      no_raw_payload_exposed: true
+      conflict_detected: true
+    digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

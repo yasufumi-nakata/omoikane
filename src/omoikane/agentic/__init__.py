@@ -1,6 +1,7 @@
 """Agentic orchestration modules."""
 
 from .cognitive_audit import CognitiveAuditService
+from .cognitive_audit_governance import CognitiveAuditGovernanceService
 from .consensus_bus import ConsensusBus, ConsensusMessage
 from .council import (
     Council,
@@ -16,6 +17,7 @@ from .trust import TrustService, TrustThresholds, TrustUpdatePolicy
 
 __all__ = [
     "CognitiveAuditService",
+    "CognitiveAuditGovernanceService",
     "ConsensusBus",
     "ConsensusMessage",
     "Council",

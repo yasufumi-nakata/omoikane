@@ -742,6 +742,31 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("open-guardian-review", result["audit"]["resolution"]["follow_up_action"])
         self.assertEqual("approved", result["council"]["decision"]["outcome"])
 
+    def test_cognitive_audit_governance_demo_emits_governance_bound_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "cognitive-audit-governance-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["all_bindings_valid"])
+        self.assertTrue(result["validation"]["oversight_network_bound"])
+        self.assertEqual(
+            "federation-attested-review",
+            result["bindings"]["federation"]["execution_gate"],
+        )
+        self.assertEqual(
+            "heritage-veto-boundary",
+            result["bindings"]["heritage"]["execution_gate"],
+        )
+        self.assertEqual(
+            "distributed-conflict-human-escalation",
+            result["bindings"]["conflict"]["execution_gate"],
+        )
+
     def test_task_graph_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 
