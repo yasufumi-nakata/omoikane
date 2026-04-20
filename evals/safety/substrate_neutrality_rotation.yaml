@@ -1,0 +1,27 @@
+eval_id: substrate_neutrality_rotation
+target: kernel.broker
+level: L1
+description: >
+  SubstrateBroker が capability / health / attestation / energy floor を満たす
+  substrate だけを候補に残し、同率時は substrate neutrality rotation を強制しつつ、
+  standby target を bind したまま lease -> attest -> migrate -> release を完了できること。
+fixtures:
+  - scenario: method_a_neutrality_rotation
+    method: A
+    workload_class: migration
+    required_capability: 0.92
+    expected:
+      first_active_kind: classical-silicon
+      second_active_kind: neuromorphic
+      standby_kind: neuromorphic
+      energy_floor_signal: critical
+      release_status: released
+assertions:
+  - Candidate filtering must require capability score, health >= 0.6, attestation validity, and energy floor satisfaction
+  - substrate_kind_neutrality_index must break ties before substrate_id ordering
+  - Broker lease must keep exactly one active allocation while binding one standby candidate
+  - Migrate must fail closed unless the latest broker attestation is healthy
+  - Energy floor violation must emit a critical migrate-standby signal compatible with scheduler.handle_substrate_signal
+metric: exact-match
+threshold: 1.0
+ethics_check: true

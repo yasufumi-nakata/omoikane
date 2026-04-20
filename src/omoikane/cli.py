@@ -215,6 +215,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     substrate_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    broker_parser = subparsers.add_parser(
+        "broker-demo",
+        help="Run the L1 substrate broker selection/rotation/migration scenario",
+    )
+    broker_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     continuity_parser = subparsers.add_parser(
         "continuity-demo",
         help="Run the L1 continuity ledger profile and signature policy scenario",
@@ -468,6 +474,10 @@ def main() -> None:
 
     if args.command == "substrate-demo":
         _print_result(runtime.run_substrate_demo(), args.json)
+        return
+
+    if args.command == "broker-demo":
+        _print_result(runtime.run_broker_demo(), args.json)
         return
 
     if args.command == "continuity-demo":

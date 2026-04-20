@@ -1,0 +1,385 @@
+idl_version: 1
+kind: service
+namespace: kernel.broker.v0
+service: SubstrateBrokerService
+summary: Deterministic L1 substrate broker contract for neutrality-aware selection and bounded migration handoff.
+imports:
+  substrate_allocation: ../schemas/substrate_allocation.schema
+  substrate_attestation: ../schemas/substrate_attestation.schema
+  substrate_transfer: ../schemas/substrate_transfer.schema
+  substrate_release: ../schemas/substrate_release.schema
+  energy_floor: ../schemas/energy_floor.schema
+operations:
+  list_registry:
+    summary: List broker-manageable substrates with current capability, health, and neutrality rotation index.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        properties: {}
+    output:
+      inline_schema:
+        type: object
+        required:
+          - policy_id
+          - minimum_health_score
+          - neutrality_window
+          - registry
+        properties:
+          policy_id:
+            type: string
+          minimum_health_score:
+            type: number
+            minimum: 0
+            maximum: 1
+          neutrality_window:
+            type: integer
+            minimum: 1
+          registry:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+                - substrate_id
+                - substrate_kind
+                - capability_score
+                - health_score
+                - attestation_valid
+                - energy_capacity_jps
+                - substrate_kind_neutrality_index
+              properties:
+                substrate_id:
+                  type: string
+                  minLength: 1
+                substrate_kind:
+                  type: string
+                  minLength: 1
+                capability_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                health_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                attestation_valid:
+                  type: boolean
+                energy_capacity_jps:
+                  type: integer
+                  minimum: 1
+                substrate_kind_neutrality_index:
+                  type: integer
+                  minimum: 0
+    guarantees:
+      - registry must expose the substrate_kind_neutrality_index used for tie-breaking
+      - registry entries must retain capability_score, health_score, and energy capacity for deterministic filtering
+  select_substrate:
+    summary: Select one active substrate and one standby candidate for one requested method and workload class.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - method
+          - required_capability
+          - workload_class
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          method:
+            type: string
+            enum:
+              - A
+              - B
+              - C
+          required_capability:
+            type: number
+            minimum: 0
+            maximum: 1
+          workload_class:
+            type: string
+            enum:
+              - baseline
+              - sandbox
+              - council
+              - migration
+    output:
+      inline_schema:
+        type: object
+        required:
+          - selection_id
+          - active_substrate
+          - ranked_candidates
+          - required_energy_floor_jps
+          - neutrality_rotation_applied
+        properties:
+          selection_id:
+            type: string
+            minLength: 1
+          required_energy_floor_jps:
+            type: integer
+            minimum: 1
+          active_substrate:
+            type: object
+            required:
+              - substrate_id
+              - substrate_kind
+              - health_score
+              - substrate_kind_neutrality_index
+            properties:
+              substrate_id:
+                type: string
+                minLength: 1
+              substrate_kind:
+                type: string
+                minLength: 1
+              health_score:
+                type: number
+                minimum: 0
+                maximum: 1
+              substrate_kind_neutrality_index:
+                type: integer
+                minimum: 0
+          standby_substrate:
+            type:
+              - object
+              - "null"
+          ranked_candidates:
+            type: array
+            minItems: 1
+            items:
+              type: object
+          neutrality_rotation_applied:
+            type: boolean
+    guarantees:
+      - candidates must satisfy capability, health, attestation validity, and energy floor filters before ranking
+      - ties must be broken by substrate_kind_neutrality_index before stable substrate_id ordering
+      - standby_substrate must prefer a different substrate_kind when an equally safe candidate exists
+  lease:
+    summary: Create one active lease on the selected substrate and bind one standby candidate for later migrate.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - units
+          - purpose
+          - method
+          - required_capability
+          - workload_class
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          units:
+            type: integer
+            minimum: 1
+          purpose:
+            type: string
+            minLength: 1
+          method:
+            type: string
+            enum:
+              - A
+              - B
+              - C
+          required_capability:
+            type: number
+            minimum: 0
+            maximum: 1
+          workload_class:
+            type: string
+            enum:
+              - baseline
+              - sandbox
+              - council
+              - migration
+    output:
+      schema_ref: substrate_allocation
+    guarantees:
+      - same identity may not hold two active leases at once
+      - lease output must remain one SubstrateAllocation bound to the selected active substrate
+      - standby target must be recorded without creating a second active lease in the reference runtime
+  attest:
+    summary: Emit one broker-bound attestation for the active lease before migrate.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - integrity
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          integrity:
+            type: object
+            minProperties: 1
+    output:
+      schema_ref: substrate_attestation
+    guarantees:
+      - attestation must bind the active allocation_id selected by the lease
+      - attestation status other than healthy must block migrate
+  migrate:
+    summary: Migrate one attested active lease onto its standby target or an explicitly supplied safe destination.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - state
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          state:
+            type: object
+            minProperties: 1
+          destination_substrate:
+            type: string
+            minLength: 1
+          continuity_mode:
+            type: string
+            enum:
+              - cold-copy
+              - warm-standby
+              - hot-handoff
+    output:
+      schema_ref: substrate_transfer
+    guarantees:
+      - migrate must fail closed when the latest attestation is missing or unhealthy
+      - destination_substrate must default to the bound standby candidate when omitted
+      - transfer output must reuse the canonical substrate_transfer schema
+  release:
+    summary: Release the source lease after a successful migrate or explicit broker teardown.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - reason
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: substrate_release
+    guarantees:
+      - release must apply to the active source lease bound by lease
+      - released source leases must not accept a second release
+  handle_energy_floor_signal:
+    summary: Emit one scheduler-compatible signal when the active substrate approaches or violates its minimum energy floor.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - current_joules_per_second
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          current_joules_per_second:
+            type: integer
+            minimum: 0
+    output:
+      inline_schema:
+        type: object
+        required:
+          - signal_id
+          - severity
+          - source_substrate
+          - recommended_action
+          - status
+          - minimum_joules_per_second
+          - current_joules_per_second
+          - scheduler_input
+        properties:
+          signal_id:
+            type: string
+            minLength: 1
+          severity:
+            type: string
+            enum:
+              - watch
+              - degraded
+              - critical
+          source_substrate:
+            type: string
+            minLength: 1
+          standby_substrate:
+            type:
+              - string
+              - "null"
+          recommended_action:
+            type: string
+            enum:
+              - pause-and-review
+              - migrate-standby
+          status:
+            type: string
+            enum:
+              - within-floor
+              - standby-advised
+              - standby-required
+          minimum_joules_per_second:
+            type: integer
+            minimum: 1
+          current_joules_per_second:
+            type: integer
+            minimum: 0
+          scheduler_input:
+            type: object
+            required:
+              - severity
+              - source_substrate
+              - reason
+            properties:
+              severity:
+                type: string
+                enum:
+                  - watch
+                  - degraded
+                  - critical
+              source_substrate:
+                type: string
+                minLength: 1
+              reason:
+                type: string
+                minLength: 1
+    guarantees:
+      - energy floor violations must emit severity=critical and recommend migrate-standby
+      - scheduler_input must stay compatible with kernel.scheduler.v0 handle_substrate_signal
+      - standby_substrate must remain the pre-bound standby candidate when one exists
+events:
+  broker.selection_made:
+    payload:
+      inline_schema:
+        type: object
+        required:
+          - selection_id
+          - active_substrate_id
+        properties:
+          selection_id:
+            type: string
+          active_substrate_id:
+            type: string
+  substrate.attested:
+    payload:
+      schema_ref: substrate_attestation
+  substrate.migrated:
+    payload:
+      schema_ref: substrate_transfer
+  substrate.released:
+    payload:
+      schema_ref: substrate_release
+compatibility:
+  stability: bootstrap
+  notes:
+    - The reference runtime keeps one active lease plus one standby candidate to avoid dual-active identity allocation while preserving a deterministic migrate target.
+    - Actual live dual allocation and continuous cross-substrate attestation streaming remain future work beyond the bounded broker contract.

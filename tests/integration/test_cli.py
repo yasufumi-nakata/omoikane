@@ -388,6 +388,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("released", result["substrate"]["allocation"]["status"])
         self.assertEqual("warm-standby", result["substrate"]["transfer"]["continuity_mode"])
 
+    def test_broker_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "broker-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["neutrality_rotation_triggered"])
+        self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
+        self.assertEqual(
+            result["broker"]["selection"]["standby_substrate"]["substrate_id"],
+            result["broker"]["migration"]["destination_substrate"],
+        )
+        self.assertEqual("released", result["broker"]["release"]["status"])
+
     def test_qualia_demo_emits_reference_profile(self) -> None:
         stdout = io.StringIO()
 

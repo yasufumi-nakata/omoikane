@@ -36,13 +36,20 @@ on substrate_request(req):
 
 `substrate_kind_neutrality_index` は **AP-2 を防ぐ** ための指標で、
 特定 substrate kind が連続選定された場合にスコアが下がる（rotation を促す）。
+reference runtime では `neutrality_window=2` を固定し、
+直近 2 回の選定に含まれた kind の回数を `substrate_kind_neutrality_index`
+として tie-break に使う。
 
 ## 多重化
 
-- **Active + Hot Standby**: 同期 attestation（差分 < 50ms）
-- **Active + Cold Standby**: 周期的 snapshot（reference runtime: 5 分間隔）
-- **Failover**: Active が `health_score < 0.4` または `attestation_invalid` で
-  Standby に切替。**ContinuityLedger に必ず append**
+- reference runtime は **1 active lease + 1 standby candidate** を固定する。
+  AP-3 を避けるため、standby は migrate 前に別 active lease としては materialize しない。
+- `standby_class=hot-standby` の candidate は「次の migrate target」として先に固定し、
+  `warm-standby` transfer record に束縛する。
+- `standby_class=cold-standby` の candidate は低優先 fallback として registry に残す。
+- **Failover signal**: `handle_energy_floor_signal` は
+  `severity=critical` なら `recommended_action=migrate-standby` を返し、
+  scheduler に渡す `scheduler_input` を同時に焼き付ける。
 
 ## 移行プロトコル
 
@@ -68,6 +75,15 @@ broker はこれを **連結** し、ContinuityLedger に `category: substrate.t
 
 - `kernel.broker.v0.idl` で機械可読に
 - 既存 `substrate_allocation` / `substrate_attestation` / `substrate_transfer` / `substrate_release` schema を再利用
+- `select_substrate` は `health_score >= 0.6`、`attestation_valid`、
+  `energy_capacity_jps >= energy_floor` を満たす candidate だけを残し、
+  `-priority_for_method / -health_score / substrate_kind_neutrality_index`
+  の順で deterministic に選定する
+- `lease` は 1 つの active allocation だけを返し、
+  standby は `standby_substrate_id` として broker state に保持する
+- `attest` が `healthy` 以外を返した場合は `migrate` へ進めない（fail-closed）
+- `handle_energy_floor_signal` は energy floor 未満で
+  `critical + migrate-standby` を返し、scheduler-compatible な signal payload を持つ
 - `broker-demo` を CLI に追加。lease → attest → migrate → release の 4 step を 1 シナリオで実行
 - `evals/safety/substrate_neutrality_rotation.yaml` で rotation 強制
 

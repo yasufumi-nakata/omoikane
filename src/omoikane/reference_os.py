@@ -70,6 +70,7 @@ from .interface.imc import InterMindChannel
 from .interface.sensory_loopback import SensoryLoopbackService
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
+from .kernel.broker import SubstrateBrokerService
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
 from .kernel.scheduler import AscensionScheduler
@@ -106,6 +107,7 @@ class OmoikaneReferenceOS:
     def __init__(self) -> None:
         self.repo_root = Path(__file__).resolve().parents[2]
         self.substrate = ClassicalSiliconAdapter()
+        self.broker = SubstrateBrokerService.reference_service(self.substrate)
         self.identity = IdentityRegistry()
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
@@ -3993,6 +3995,156 @@ class OmoikaneReferenceOS:
                 "transfer": asdict(transfer),
                 "release": release,
                 "snapshot": self.substrate.snapshot(),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_broker_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://broker-demo/v1",
+            metadata={"display_name": "Substrate Broker Sandbox"},
+        )
+        allocation = self.broker.lease(
+            identity_id=identity.identity_id,
+            units=72,
+            purpose="broker-rotation-and-migration-eval",
+            method="A",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        leased_state = self.broker.observe(identity.identity_id)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.broker.leased",
+            payload={
+                "selection_id": leased_state["selection"]["selection_id"],
+                "allocation_id": allocation.allocation_id,
+                "active_substrate_id": leased_state["active_substrate_id"],
+                "standby_substrate_id": leased_state["standby_substrate_id"],
+            },
+            actor="SubstrateBroker",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate=allocation.substrate,
+        )
+        rotation_probe = self.broker.select(
+            identity_id="identity://neutrality-rotation-probe",
+            method="A",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        signal = self.broker.handle_energy_floor_signal(
+            identity.identity_id,
+            current_joules_per_second=leased_state["energy_floor"]["minimum_joules_per_second"] - 2,
+        )
+        attestation = self.broker.attest(
+            identity.identity_id,
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+                "standby_substrate_id": leased_state["standby_substrate_id"],
+            },
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.attested",
+            payload=asdict(attestation),
+            actor="SubstrateBroker",
+            category="attestation",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate=attestation.substrate,
+        )
+        transfer = self.broker.migrate(
+            identity.identity_id,
+            state={
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "checkpoint": "reference-connectome-v1",
+                "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
+            },
+            continuity_mode="warm-standby",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.migrated",
+            payload=asdict(transfer),
+            actor="SubstrateBroker",
+            category="substrate-migrate",
+            layer="L1",
+            signature_roles=["self", "council", "guardian"],
+            substrate=transfer.destination_substrate,
+        )
+        release = self.broker.release(
+            identity.identity_id,
+            reason="rotation-handoff-complete",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.released",
+            payload=release,
+            actor="SubstrateBroker",
+            category="substrate-release",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate=allocation.substrate,
+        )
+        final_state = self.broker.observe(identity.identity_id)
+        selection = leased_state["selection"]
+        standby = selection["standby_substrate"]
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "broker": {
+                "profile": self.broker.profile(),
+                "selection": selection,
+                "rotation_probe": rotation_probe,
+                "lease": asdict(allocation),
+                "energy_floor_signal": signal,
+                "attestation": asdict(attestation),
+                "migration": asdict(transfer),
+                "release": release,
+                "final_state": final_state,
+                "snapshot": self.broker.snapshot(),
+            },
+            "validation": {
+                "ok": bool(
+                    standby
+                    and selection["active_substrate"]["substrate_kind"]
+                    != standby["substrate_kind"]
+                    and rotation_probe["neutrality_rotation_applied"]
+                    and rotation_probe["active_substrate"]["substrate_kind"]
+                    != selection["active_substrate"]["substrate_kind"]
+                    and signal["severity"] == "critical"
+                    and signal["standby_substrate"] == standby["substrate_id"]
+                    and attestation.status == "healthy"
+                    and transfer.destination_substrate == standby["substrate_id"]
+                    and transfer.continuity_mode == "warm-standby"
+                    and release["status"] == "released"
+                    and final_state["release"]["status"] == "released"
+                ),
+                "neutrality_rotation_triggered": rotation_probe["neutrality_rotation_applied"],
+                "standby_kind_differs": bool(
+                    standby
+                    and selection["active_substrate"]["substrate_kind"] != standby["substrate_kind"]
+                ),
+                "energy_floor_signal_routes_to_standby": bool(
+                    standby
+                    and signal["severity"] == "critical"
+                    and signal["standby_substrate"] == standby["substrate_id"]
+                    and signal["scheduler_input"]["severity"] == "critical"
+                ),
+                "healthy_attestation_required": attestation.status == "healthy",
+                "migration_binds_selected_standby": bool(
+                    standby and transfer.destination_substrate == standby["substrate_id"]
+                ),
+                "release_completes_source_lease": release["status"] == "released",
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

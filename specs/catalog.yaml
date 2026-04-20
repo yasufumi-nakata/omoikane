@@ -255,6 +255,14 @@ entries:
     rationale: Required to express the ethics-coupled minimum energy floor.
   - priority: P1
     kind: idl
+    file: specs/interfaces/kernel.broker.v0.idl
+    consumers:
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make deterministic substrate selection, neutrality rotation, standby-bound migration, and energy-floor signals machine-readable.
+  - priority: P1
+    kind: idl
     file: specs/interfaces/agentic.consensus_bus.v0.idl
     consumers:
       - docs/02-subsystems/agentic/consensus-bus.md
@@ -968,6 +976,15 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects attestation, migration, and release continuity at the L0 boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/substrate_neutrality_rotation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects deterministic substrate neutrality rotation, one-active-plus-standby broker state, healthy-attestation gating, and energy-floor failover signaling.
   - priority: P1
     kind: eval
     file: evals/continuity/scheduler_stage_rollback.yaml

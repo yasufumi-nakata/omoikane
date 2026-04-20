@@ -36,6 +36,7 @@ PYTHONPATH=src python3 -m omoikane.cli oversight-network-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
 PYTHONPATH=src python3 -m omoikane.cli termination-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
+PYTHONPATH=src python3 -m omoikane.cli broker-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
@@ -73,6 +74,18 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+
+`broker-demo` は L1 SubstrateBroker の reference contract
+(`kernel.broker.v0`) を JSON で可視化し、
+Method A candidate selection が
+`health_score >= 0.6` / `attestation_valid` / `energy_floor` を満たす substrate だけを残し、
+直近 2 回の `substrate_kind_neutrality_index` で tie-break すること、
+1 active lease + 1 standby candidate の bounded broker state を保ったまま
+lease → attest → migrate → release の 4 step を実行すること、
+さらに energy floor violation が `critical + migrate-standby` の
+scheduler-compatible signal を返し、
+selected standby がそのまま migration destination に束縛されることを
+1 シナリオで確認する。
 
 `scheduler-demo` は L1 AscensionScheduler の reference contract
 (`kernel.scheduler.v0`) を JSON で可視化し、

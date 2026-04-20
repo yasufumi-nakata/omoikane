@@ -60,12 +60,23 @@ class EnergyFloor:
 class ClassicalSiliconAdapter:
     """Minimal L0 adapter for the reference runtime."""
 
-    def __init__(self) -> None:
-        self.substrate_id = "classical_silicon"
+    ENERGY_FLOOR_TABLE = {
+        "baseline": 12,
+        "sandbox": 18,
+        "council": 24,
+        "migration": 30,
+    }
+
+    def __init__(self, substrate_id: str = "classical_silicon") -> None:
+        self.substrate_id = substrate_id
         self.allocations: Dict[str, SubstrateAllocation] = {}
         self.transfers: List[SubstrateTransferRecord] = []
         self.releases: List[Dict[str, Any]] = []
         self.energy_floors: Dict[str, EnergyFloor] = {}
+
+    @classmethod
+    def minimum_energy_floor_for(cls, workload_class: str = "baseline") -> int:
+        return int(cls.ENERGY_FLOOR_TABLE.get(workload_class, cls.ENERGY_FLOOR_TABLE["baseline"]))
 
     def allocate(self, units: int, purpose: str, identity_id: str = "system") -> SubstrateAllocation:
         if units < 1:
@@ -127,13 +138,7 @@ class ClassicalSiliconAdapter:
         return record
 
     def energy_floor(self, identity_id: str, workload_class: str = "baseline") -> EnergyFloor:
-        floor_table = {
-            "baseline": 12,
-            "sandbox": 18,
-            "council": 24,
-            "migration": 30,
-        }
-        minimum = floor_table.get(workload_class, floor_table["baseline"])
+        minimum = self.minimum_energy_floor_for(workload_class)
         floor = EnergyFloor(
             identity_id=identity_id,
             minimum_joules_per_second=minimum,

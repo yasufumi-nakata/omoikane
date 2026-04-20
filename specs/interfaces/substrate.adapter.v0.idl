@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: substrate.adapter.v0
 service: SubstrateAdapterService
-summary: Canonical L0 contract for the reference substrate broker.
+summary: Canonical L0 contract for one reference substrate adapter.
 imports:
   substrate_allocation: ../schemas/substrate_allocation.schema
   substrate_attestation: ../schemas/substrate_attestation.schema

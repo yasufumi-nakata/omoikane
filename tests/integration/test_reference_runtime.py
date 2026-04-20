@@ -515,6 +515,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("released", result["substrate"]["release"]["status"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["substrate-migrate"])
 
+    def test_broker_demo_records_rotation_and_release(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_broker_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["neutrality_rotation_triggered"])
+        self.assertTrue(result["validation"]["standby_kind_differs"])
+        self.assertTrue(result["validation"]["energy_floor_signal_routes_to_standby"])
+        self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
+        self.assertEqual(
+            result["broker"]["selection"]["standby_substrate"]["substrate_id"],
+            result["broker"]["migration"]["destination_substrate"],
+        )
+        self.assertEqual("released", result["broker"]["release"]["status"])
+        self.assertEqual("released", result["broker"]["final_state"]["release"]["status"])
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
 
