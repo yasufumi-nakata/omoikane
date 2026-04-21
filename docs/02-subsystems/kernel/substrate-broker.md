@@ -8,7 +8,7 @@ Substrate 中立性（[ethics.md](../../00-philosophy/ethics.md) §3）を **構
 1. 利用可能 substrate のレジストリ管理
 2. AscensionPlan / 緊急退避 / 自我再配置 に応じた substrate 選定
 3. 多重化（active + standby + bounded shadow-sync overlap）と health probe
-4. 移行（migration）時の attestation chain の連結
+4. 移行（migration）時の attestation chain と keepalive stream の連結
 5. EnergyFloor 違反時の自動退避
 
 ## 選定アルゴリズム（deterministic）
@@ -69,9 +69,10 @@ reference runtime では `neutrality_window=2` を固定し、
 3. broker.attest(target, source_attestation)         → SubstrateAttestation
 4. broker.bridge_attestation_chain(state_digest)     → SubstrateAttestationChain
 5. broker.open_dual_allocation_window(state_digest)  → SubstrateDualAllocationWindow
-6. broker.migrate(source, target, evidence_set)      → SubstrateTransfer
-7. broker.close_dual_allocation_window(reason)       → SubstrateDualAllocationWindow
-8. broker.release(source, reason)                    → SubstrateRelease
+6. broker.seal_attestation_stream(state_digest)      → SubstrateAttestationStream
+7. broker.migrate(source, target, evidence_set)      → SubstrateTransfer
+8. broker.close_dual_allocation_window(reason)       → SubstrateDualAllocationWindow
+9. broker.release(source, reason)                    → SubstrateRelease
 ```
 
 各 step は同名の schema にそのまま serialize される（既存 `substrate_*.schema`）。
@@ -80,6 +81,9 @@ broker はこれを **連結** し、ContinuityLedger に `category: substrate.t
 固定 3 beat / 250ms cadence の window に束ね、
 pending handoff の `expected_state_digest` と migration destination を
 事前に machine-checkable にする。
+その後 `seal_attestation_stream` が shadow-active dual allocation window 上で
+fixed 5 beat / 250ms cadence の keepalive を sealed receipt に落とし、
+`hot-handoff` migrate が参照する final handoff state digest を固定する。
 
 ## 不変条件
 
@@ -112,16 +116,21 @@ pending handoff の `expected_state_digest` と migration destination を
   ready standby probe + healthy attestation + handoff-ready chain の後段でのみ
   second active allocation を materialize し、
   `shadow-sync` / `authority-handoff` binding と fixed overlap budget を焼き付ける
+- `seal_attestation_stream` は shadow-active dual allocation window に束縛され、
+  `5 healthy beats / 250ms cadence / drift<=0.08` の keepalive receipt を sealed した時だけ
+  `hot-handoff` migrate に進める
 - `handle_energy_floor_signal` は energy floor 未満で
   `critical + migrate-standby` を返し、scheduler-compatible な signal payload を持つ
 - `broker-demo` は CLI 上で
-  `lease -> probe_standby -> attest -> bridge_attestation_chain -> open_dual_allocation_window -> migrate -> close_dual_allocation_window -> release`
+  `lease -> probe_standby -> attest -> bridge_attestation_chain -> open_dual_allocation_window -> seal_attestation_stream -> migrate -> close_dual_allocation_window -> release`
   を 1 シナリオで実行する
 - `evals/safety/substrate_neutrality_rotation.yaml` で rotation 強制
 - `evals/continuity/substrate_broker_attestation_chain.yaml` で
   standby readiness と attestation bridge window を固定する
 - `evals/continuity/substrate_broker_dual_allocation_window.yaml` で
   Method B shadow-sync overlap、hot-handoff destination binding、cleanup release を固定する
+- `evals/continuity/substrate_broker_attestation_stream.yaml` で
+  sealed keepalive stream、handoff digest binding、hot-handoff 前提化を固定する
 
 ## 思兼神メタファー
 

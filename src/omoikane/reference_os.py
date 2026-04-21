@@ -4445,6 +4445,17 @@ json.dump(response, sys.stdout)
             },
         )
         opened_dual_allocation_window = asdict(dual_allocation_window)
+        handoff_state = {
+            "identity_id": identity.identity_id,
+            "lineage_id": identity.lineage_id,
+            "checkpoint": "reference-connectome-v1",
+            "shadow_stage": "authority-handoff",
+            "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
+        }
+        attestation_stream = self.broker.seal_attestation_stream(
+            identity.identity_id,
+            state=handoff_state,
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="substrate.broker.standby_probed",
@@ -4475,15 +4486,19 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate=dual_allocation_window.shadow_allocation.substrate,
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.attestation_stream.sealed",
+            payload=asdict(attestation_stream),
+            actor="SubstrateBroker",
+            category="attestation",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate=attestation_stream.shadow_substrate_id,
+        )
         transfer = self.broker.migrate(
             identity.identity_id,
-            state={
-                "identity_id": identity.identity_id,
-                "lineage_id": identity.lineage_id,
-                "checkpoint": "reference-connectome-v1",
-                "shadow_stage": "authority-handoff",
-                "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
-            },
+            state=handoff_state,
             continuity_mode="hot-handoff",
         )
         closed_dual_allocation_window = self.broker.close_dual_allocation_window(
@@ -4543,6 +4558,7 @@ json.dump(response, sys.stdout)
                 "attestation": asdict(attestation),
                 "attestation_chain": asdict(attestation_chain),
                 "dual_allocation_window": opened_dual_allocation_window,
+                "attestation_stream": asdict(attestation_stream),
                 "closed_dual_allocation_window": closed_dual_allocation_window_snapshot,
                 "migration": asdict(transfer),
                 "release": release,
@@ -4564,6 +4580,11 @@ json.dump(response, sys.stdout)
                     and attestation_chain.handoff_ready
                     and opened_dual_allocation_window["dual_active"]
                     and opened_dual_allocation_window["window_status"] == "shadow-active"
+                    and attestation_stream.handoff_ready
+                    and attestation_stream.stream_status == "sealed-handoff-ready"
+                    and attestation_stream.expected_destination_substrate == standby["substrate_id"]
+                    and attestation_stream.expected_state_digest
+                    != opened_dual_allocation_window["state_digest"]
                     and closed_dual_allocation_window_snapshot["window_status"] == "closed"
                     and closed_dual_allocation_window_snapshot["shadow_release"] is not None
                     and attestation_chain.expected_destination_substrate == standby["substrate_id"]
@@ -4598,6 +4619,13 @@ json.dump(response, sys.stdout)
                     opened_dual_allocation_window["sync_observations"]
                 )
                 == 3,
+                "attestation_stream_ready": attestation_stream.handoff_ready,
+                "attestation_stream_window_complete": len(attestation_stream.observations)
+                == attestation_stream.beat_count,
+                "attestation_stream_binds_selected_standby": bool(
+                    standby
+                    and attestation_stream.expected_destination_substrate == standby["substrate_id"]
+                ),
                 "dual_allocation_closed": closed_dual_allocation_window_snapshot["window_status"]
                 == "closed",
                 "dual_allocation_cleanup_released": bool(
@@ -4607,6 +4635,11 @@ json.dump(response, sys.stdout)
                 ),
                 "migration_binds_selected_standby": bool(
                     standby and transfer.destination_substrate == standby["substrate_id"]
+                ),
+                "migration_binds_streamed_state": (
+                    transfer.continuity_mode == "hot-handoff"
+                    and attestation_stream.expected_state_digest
+                    != opened_dual_allocation_window["state_digest"]
                 ),
                 "release_completes_source_lease": release["status"] == "released",
             },

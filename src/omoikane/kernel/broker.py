@@ -19,6 +19,7 @@ BROKER_POLICY_ID = "deterministic-substrate-neutrality-broker-v1"
 STANDBY_PROBE_POLICY_ID = "deterministic-standby-health-probe-v1"
 ATTESTATION_CHAIN_POLICY_ID = "bounded-cross-substrate-attestation-window-v1"
 DUAL_ALLOCATION_POLICY_ID = "bounded-live-dual-allocation-window-v1"
+ATTESTATION_STREAM_POLICY_ID = "bounded-cross-substrate-attestation-stream-v1"
 MINIMUM_HEALTH_SCORE = 0.6
 CRITICAL_HEALTH_SCORE = 0.4
 NEUTRALITY_WINDOW = 2
@@ -28,6 +29,8 @@ DUAL_ALLOCATION_WINDOW_SECONDS = 45
 DUAL_ALLOCATION_MIRROR_CADENCE_MS = 250
 DUAL_ALLOCATION_SYNC_WINDOW = 3
 MAX_DUAL_ALLOCATION_DRIFT_SCORE = 0.08
+ATTESTATION_STREAM_BEAT_COUNT = 5
+ATTESTATION_STREAM_MIN_HEALTHY_BEATS = 5
 
 
 @dataclass(frozen=True)
@@ -140,6 +143,38 @@ class SubstrateDualAllocationWindow:
     schema_version: str = "1.0.0"
 
 
+@dataclass(frozen=True)
+class SubstrateAttestationStream:
+    """Sealed keepalive session that extends attestation continuity through handoff."""
+
+    stream_id: str
+    identity_id: str
+    source_allocation_id: str
+    shadow_allocation_id: str
+    source_substrate_id: str
+    shadow_substrate_id: str
+    source_attestation_id: str
+    attestation_chain_id: str
+    dual_allocation_window_id: str
+    continuity_mode: str
+    policy_id: str
+    cadence_ms: int
+    beat_count: int
+    minimum_healthy_beats: int
+    max_state_drift_score: float
+    expected_state_digest: str
+    expected_destination_substrate: str
+    stream_status: str
+    handoff_ready: bool
+    observations: List[Dict[str, Any]]
+    blocking_reasons: List[str]
+    stream_digest: str
+    opened_at: str
+    sealed_at: str
+    kind: str = "substrate_attestation_stream"
+    schema_version: str = "1.0.0"
+
+
 class SubstrateBrokerService:
     """Select, lease, and migrate substrates while preserving neutrality rotation."""
 
@@ -224,6 +259,7 @@ class SubstrateBrokerService:
                 "attest",
                 "bridge-attestation-chain",
                 "open-dual-allocation-window",
+                "seal-attestation-stream",
                 "migrate",
                 "close-dual-allocation-window",
                 "release",
@@ -248,6 +284,15 @@ class SubstrateBrokerService:
                 "overlap_window_seconds": DUAL_ALLOCATION_WINDOW_SECONDS,
                 "mirror_cadence_ms": DUAL_ALLOCATION_MIRROR_CADENCE_MS,
                 "sync_observation_count": DUAL_ALLOCATION_SYNC_WINDOW,
+                "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+            },
+            "attestation_stream_policy": {
+                "policy_id": ATTESTATION_STREAM_POLICY_ID,
+                "required_window_status": "shadow-active",
+                "continuity_mode": "hot-handoff",
+                "cadence_ms": DUAL_ALLOCATION_MIRROR_CADENCE_MS,
+                "beat_count": ATTESTATION_STREAM_BEAT_COUNT,
+                "minimum_healthy_beats": ATTESTATION_STREAM_MIN_HEALTHY_BEATS,
                 "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
             },
         }
@@ -361,6 +406,7 @@ class SubstrateBrokerService:
             "last_standby_probe": None,
             "last_attestation_chain": None,
             "last_dual_allocation_window": None,
+            "last_attestation_stream": None,
             "transfer": None,
             "release": None,
         }
@@ -523,6 +569,11 @@ class SubstrateBrokerService:
                 )
             if not dual_window.handoff_ready:
                 raise PermissionError("dual allocation window must be handoff-ready before migrate")
+            attestation_stream = lease["last_attestation_stream"]
+            if attestation_stream is None or not attestation_stream.handoff_ready:
+                raise PermissionError(
+                    "sealed attestation stream required before hot-handoff migrate"
+                )
         target_substrate = destination_substrate or lease["standby_substrate_id"]
         if not isinstance(target_substrate, str) or not target_substrate.strip():
             raise ValueError("destination_substrate must resolve to a non-empty standby target")
@@ -531,6 +582,13 @@ class SubstrateBrokerService:
                 raise ValueError(
                     "open dual allocation window must migrate to the shadow allocation substrate"
                 )
+        if continuity_mode == "hot-handoff":
+            attestation_stream = lease["last_attestation_stream"]
+            expected_state_digest = sha256_text(canonical_json(dict(state)))
+            if attestation_stream.expected_destination_substrate != target_substrate:
+                raise PermissionError("attestation stream must bind the migration destination")
+            if attestation_stream.expected_state_digest != expected_state_digest:
+                raise PermissionError("attestation stream must bind the migration state digest")
         transfer = self._adapters[lease["active_substrate_id"]].transfer(
             lease["allocation"].allocation_id,
             dict(state),
@@ -671,7 +729,121 @@ class SubstrateBrokerService:
             opened_at=utc_now_iso(),
         )
         lease["last_dual_allocation_window"] = window
+        lease["last_attestation_stream"] = None
         return window
+
+    def seal_attestation_stream(
+        self,
+        identity_id: str,
+        *,
+        state: Mapping[str, Any],
+        continuity_mode: str = "hot-handoff",
+    ) -> SubstrateAttestationStream:
+        lease = self._require_open_lease(identity_id)
+        if not state:
+            raise ValueError("state must not be empty")
+        if continuity_mode != "hot-handoff":
+            raise ValueError("attestation stream continuity_mode must be hot-handoff")
+        attestation = lease["last_attestation"]
+        if attestation is None or attestation.status != "healthy":
+            raise PermissionError("healthy attestation required before sealing attestation stream")
+        chain = lease["last_attestation_chain"]
+        if chain is None or not chain.handoff_ready:
+            raise PermissionError(
+                "handoff-ready attestation chain required before sealing attestation stream"
+            )
+        window = lease["last_dual_allocation_window"]
+        if window is None or window.window_status != "shadow-active":
+            raise PermissionError(
+                "shadow-active dual allocation window required before sealing attestation stream"
+            )
+
+        expected_state_digest = sha256_text(canonical_json(dict(state)))
+        blocking_reasons: List[str] = []
+        if window.shadow_allocation.status != "allocated":
+            blocking_reasons.append("shadow allocation must remain allocated during attestation stream")
+        if chain.expected_destination_substrate != window.shadow_allocation.substrate:
+            blocking_reasons.append("attestation chain destination must match the shadow allocation")
+
+        observations: List[Dict[str, Any]] = []
+        for sequence, drift_score in enumerate((0.012, 0.018, 0.011, 0.017, 0.013), start=1):
+            keepalive_status = (
+                "healthy"
+                if (
+                    attestation.status == "healthy"
+                    and window.window_status == "shadow-active"
+                    and drift_score <= MAX_DUAL_ALLOCATION_DRIFT_SCORE
+                )
+                else "blocked"
+            )
+            observations.append(
+                {
+                    "sequence": sequence,
+                    "source_attestation_id": attestation.attestation_id,
+                    "shadow_allocation_id": window.shadow_allocation.allocation_id,
+                    "source_state_digest": expected_state_digest,
+                    "shadow_state_digest": expected_state_digest,
+                    "source_status": attestation.status,
+                    "shadow_status": window.window_status,
+                    "drift_score": drift_score,
+                    "keepalive_status": keepalive_status,
+                    "expected_destination_substrate": window.shadow_allocation.substrate,
+                    "observed_at": utc_now_iso(),
+                }
+            )
+        healthy_beats = sum(1 for observation in observations if observation["keepalive_status"] == "healthy")
+        handoff_ready = not blocking_reasons and healthy_beats >= ATTESTATION_STREAM_MIN_HEALTHY_BEATS
+        stream_status = "sealed-handoff-ready" if handoff_ready else "blocked"
+        payload = {
+            "identity_id": identity_id,
+            "source_allocation_id": lease["allocation"].allocation_id,
+            "shadow_allocation_id": window.shadow_allocation.allocation_id,
+            "source_substrate_id": lease["active_substrate_id"],
+            "shadow_substrate_id": window.shadow_allocation.substrate,
+            "source_attestation_id": attestation.attestation_id,
+            "attestation_chain_id": chain.chain_id,
+            "dual_allocation_window_id": window.window_id,
+            "continuity_mode": continuity_mode,
+            "policy_id": ATTESTATION_STREAM_POLICY_ID,
+            "cadence_ms": DUAL_ALLOCATION_MIRROR_CADENCE_MS,
+            "beat_count": ATTESTATION_STREAM_BEAT_COUNT,
+            "minimum_healthy_beats": ATTESTATION_STREAM_MIN_HEALTHY_BEATS,
+            "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+            "expected_state_digest": expected_state_digest,
+            "expected_destination_substrate": window.shadow_allocation.substrate,
+            "stream_status": stream_status,
+            "handoff_ready": handoff_ready,
+            "observations": observations,
+            "blocking_reasons": list(blocking_reasons),
+        }
+        stream = SubstrateAttestationStream(
+            stream_id=new_id("attestation-stream"),
+            identity_id=identity_id,
+            source_allocation_id=lease["allocation"].allocation_id,
+            shadow_allocation_id=window.shadow_allocation.allocation_id,
+            source_substrate_id=str(lease["active_substrate_id"]),
+            shadow_substrate_id=window.shadow_allocation.substrate,
+            source_attestation_id=attestation.attestation_id,
+            attestation_chain_id=chain.chain_id,
+            dual_allocation_window_id=window.window_id,
+            continuity_mode=continuity_mode,
+            policy_id=ATTESTATION_STREAM_POLICY_ID,
+            cadence_ms=DUAL_ALLOCATION_MIRROR_CADENCE_MS,
+            beat_count=ATTESTATION_STREAM_BEAT_COUNT,
+            minimum_healthy_beats=ATTESTATION_STREAM_MIN_HEALTHY_BEATS,
+            max_state_drift_score=MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+            expected_state_digest=expected_state_digest,
+            expected_destination_substrate=window.shadow_allocation.substrate,
+            stream_status=stream_status,
+            handoff_ready=handoff_ready,
+            observations=observations,
+            blocking_reasons=list(blocking_reasons),
+            stream_digest=sha256_text(canonical_json(payload)),
+            opened_at=window.opened_at,
+            sealed_at=utc_now_iso(),
+        )
+        lease["last_attestation_stream"] = stream
+        return stream
 
     def close_dual_allocation_window(
         self,
@@ -724,6 +896,11 @@ class SubstrateBrokerService:
             "last_dual_allocation_window": (
                 asdict(lease["last_dual_allocation_window"])
                 if lease["last_dual_allocation_window"] is not None
+                else None
+            ),
+            "last_attestation_stream": (
+                asdict(lease["last_attestation_stream"])
+                if lease["last_attestation_stream"] is not None
                 else None
             ),
             "transfer": asdict(lease["transfer"]) if lease["transfer"] is not None else None,

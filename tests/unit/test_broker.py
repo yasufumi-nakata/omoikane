@@ -246,6 +246,103 @@ class SubstrateBrokerServiceTests(unittest.TestCase):
         self.assertEqual("released", closed.shadow_allocation.status)
         self.assertEqual("released", closed.shadow_release["status"])
 
+    def test_hot_handoff_migrate_requires_sealed_attestation_stream(self) -> None:
+        broker = SubstrateBrokerService.reference_service()
+        allocation = broker.lease(
+            identity_id="identity://lambda",
+            units=64,
+            purpose="attestation-stream-migrate-gate",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        broker.probe_standby("identity://lambda")
+        broker.attest(
+            "identity://lambda",
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+            },
+        )
+        broker.bridge_attestation_chain(
+            "identity://lambda",
+            state={"identity_id": "identity://lambda", "checkpoint": "connectome://lambda"},
+        )
+        broker.open_dual_allocation_window(
+            "identity://lambda",
+            state={
+                "identity_id": "identity://lambda",
+                "checkpoint": "connectome://lambda",
+                "stage": "shadow-sync",
+            },
+        )
+
+        with self.assertRaisesRegex(PermissionError, "sealed attestation stream"):
+            broker.migrate(
+                "identity://lambda",
+                state={
+                    "identity_id": "identity://lambda",
+                    "checkpoint": "connectome://lambda",
+                    "stage": "authority-handoff",
+                },
+                continuity_mode="hot-handoff",
+            )
+
+    def test_attestation_stream_binds_dual_window_and_handoff_digest(self) -> None:
+        broker = SubstrateBrokerService.reference_service()
+        allocation = broker.lease(
+            identity_id="identity://mu",
+            units=64,
+            purpose="attestation-stream-seal",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        probe = broker.probe_standby("identity://mu")
+        attestation = broker.attest(
+            "identity://mu",
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+            },
+        )
+        chain = broker.bridge_attestation_chain(
+            "identity://mu",
+            state={"identity_id": "identity://mu", "checkpoint": "connectome://mu"},
+        )
+        window = broker.open_dual_allocation_window(
+            "identity://mu",
+            state={
+                "identity_id": "identity://mu",
+                "checkpoint": "connectome://mu",
+                "stage": "shadow-sync",
+            },
+        )
+        handoff_state = {
+            "identity_id": "identity://mu",
+            "checkpoint": "connectome://mu",
+            "stage": "authority-handoff",
+        }
+
+        stream = broker.seal_attestation_stream("identity://mu", state=handoff_state)
+        transfer = broker.migrate(
+            "identity://mu",
+            state=handoff_state,
+            continuity_mode="hot-handoff",
+        )
+
+        self.assertEqual(probe.standby_substrate_id, stream.expected_destination_substrate)
+        self.assertEqual(attestation.attestation_id, stream.source_attestation_id)
+        self.assertEqual(chain.chain_id, stream.attestation_chain_id)
+        self.assertEqual(window.window_id, stream.dual_allocation_window_id)
+        self.assertEqual("sealed-handoff-ready", stream.stream_status)
+        self.assertTrue(stream.handoff_ready)
+        self.assertEqual(5, len(stream.observations))
+        self.assertEqual(5, stream.minimum_healthy_beats)
+        self.assertEqual(window.shadow_allocation.substrate, transfer.destination_substrate)
+
 
 if __name__ == "__main__":
     unittest.main()

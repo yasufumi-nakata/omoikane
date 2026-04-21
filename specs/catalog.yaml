@@ -317,13 +317,22 @@ entries:
       - reference-runtime
     rationale: Required to serialize one Method B shadow-sync dual-allocation overlap window with fixed sync budget and cleanup receipt.
   - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_attestation_stream.schema
+    consumers:
+      - specs/interfaces/kernel.broker.v0.idl
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - evals/continuity/substrate_broker_attestation_stream.yaml
+      - reference-runtime
+    rationale: Required to serialize one sealed cross-substrate keepalive stream that binds the final hot-handoff state digest before broker migrate.
+  - priority: P1
     kind: idl
     file: specs/interfaces/kernel.broker.v0.idl
     consumers:
       - docs/02-subsystems/kernel/substrate-broker.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make deterministic substrate selection, standby probing, attestation bridging, bounded dual-allocation overlap, standby-bound migration, and energy-floor signals machine-readable.
+    rationale: Required to make deterministic substrate selection, standby probing, attestation bridging, sealed keepalive streaming, bounded dual-allocation overlap, standby-bound migration, and energy-floor signals machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.consensus_bus.v0.idl
@@ -1163,6 +1172,15 @@ entries:
       - docs/02-subsystems/kernel/substrate-broker.md
       - docs/07-reference-implementation/README.md
     rationale: Protects Method B shadow-sync overlap, second allocation binding to the standby substrate, hot-handoff migrate, and cleanup release.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/substrate_broker_attestation_stream.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects sealed cross-substrate keepalive streaming, final handoff digest binding, and hot-handoff migrate gating while the shadow allocation remains active.
   - priority: P1
     kind: eval
     file: evals/continuity/scheduler_stage_rollback.yaml

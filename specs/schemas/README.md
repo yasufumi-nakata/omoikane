@@ -84,10 +84,10 @@
 - `standby_health_probe.schema`
 - `substrate_attestation_chain.schema`
 - `substrate_dual_allocation_window.schema`
+- `substrate_attestation_stream.schema`
 
 ## 次段階
 
-- continuous cross-substrate attestation streaming beyond the bounded dual-allocation window
 - cross-host authority routing
 
 ## 形式

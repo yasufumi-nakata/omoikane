@@ -1,0 +1,268 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_attestation_stream.schema"
+title: SubstrateAttestationStream
+description: >
+  Bounded cross-substrate keepalive stream sealed during a Method B shadow-sync
+  window before hot-handoff migrate.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - stream_id
+  - identity_id
+  - source_allocation_id
+  - shadow_allocation_id
+  - source_substrate_id
+  - shadow_substrate_id
+  - source_attestation_id
+  - attestation_chain_id
+  - dual_allocation_window_id
+  - continuity_mode
+  - policy_id
+  - cadence_ms
+  - beat_count
+  - minimum_healthy_beats
+  - max_state_drift_score
+  - expected_state_digest
+  - expected_destination_substrate
+  - stream_status
+  - handoff_ready
+  - observations
+  - blocking_reasons
+  - stream_digest
+  - opened_at
+  - sealed_at
+properties:
+  kind:
+    const: substrate_attestation_stream
+  schema_version:
+    const: "1.0.0"
+  stream_id:
+    type: string
+    pattern: "^attestation-stream-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  source_allocation_id:
+    type: string
+    pattern: "^alloc-[a-f0-9]{12}$"
+  shadow_allocation_id:
+    type: string
+    pattern: "^alloc-[a-f0-9]{12}$"
+  source_substrate_id:
+    type: string
+    minLength: 1
+  shadow_substrate_id:
+    type: string
+    minLength: 1
+  source_attestation_id:
+    type: string
+    pattern: "^attest-[a-f0-9]{12}$"
+  attestation_chain_id:
+    type: string
+    pattern: "^attestation-chain-[a-f0-9]{12}$"
+  dual_allocation_window_id:
+    type: string
+    pattern: "^dual-window-[a-f0-9]{12}$"
+  continuity_mode:
+    const: hot-handoff
+  policy_id:
+    const: bounded-cross-substrate-attestation-stream-v1
+  cadence_ms:
+    const: 250
+  beat_count:
+    const: 5
+  minimum_healthy_beats:
+    const: 5
+  max_state_drift_score:
+    type: number
+    const: 0.08
+  expected_state_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  expected_destination_substrate:
+    type: string
+    minLength: 1
+  stream_status:
+    type: string
+    enum:
+      - sealed-handoff-ready
+      - blocked
+  handoff_ready:
+    type: boolean
+  observations:
+    type: array
+    minItems: 5
+    maxItems: 5
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - source_attestation_id
+        - shadow_allocation_id
+        - source_state_digest
+        - shadow_state_digest
+        - source_status
+        - shadow_status
+        - drift_score
+        - keepalive_status
+        - expected_destination_substrate
+        - observed_at
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 5
+        source_attestation_id:
+          type: string
+          pattern: "^attest-[a-f0-9]{12}$"
+        shadow_allocation_id:
+          type: string
+          pattern: "^alloc-[a-f0-9]{12}$"
+        source_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        shadow_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        source_status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - compromised
+        shadow_status:
+          type: string
+          enum:
+            - shadow-active
+            - closed
+        drift_score:
+          type: number
+          minimum: 0
+          maximum: 0.08
+        keepalive_status:
+          type: string
+          enum:
+            - healthy
+            - blocked
+        expected_destination_substrate:
+          type: string
+          minLength: 1
+        observed_at:
+          type: string
+          format: date-time
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  stream_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  opened_at:
+    type: string
+    format: date-time
+  sealed_at:
+    type: string
+    format: date-time
+allOf:
+  - if:
+      properties:
+        stream_status:
+          const: sealed-handoff-ready
+    then:
+      properties:
+        handoff_ready:
+          const: true
+  - if:
+      properties:
+        stream_status:
+          const: blocked
+    then:
+      properties:
+        handoff_ready:
+          const: false
+examples:
+  - kind: substrate_attestation_stream
+    schema_version: "1.0.0"
+    stream_id: attestation-stream-0123456789ab
+    identity_id: identity-0123456789ab
+    source_allocation_id: alloc-aaaaaaaaaaaa
+    shadow_allocation_id: alloc-bbbbbbbbbbbb
+    source_substrate_id: classical_silicon
+    shadow_substrate_id: neuromorphic_mesh.alpha
+    source_attestation_id: attest-0123456789ab
+    attestation_chain_id: attestation-chain-0123456789ab
+    dual_allocation_window_id: dual-window-0123456789ab
+    continuity_mode: hot-handoff
+    policy_id: bounded-cross-substrate-attestation-stream-v1
+    cadence_ms: 250
+    beat_count: 5
+    minimum_healthy_beats: 5
+    max_state_drift_score: 0.08
+    expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    expected_destination_substrate: neuromorphic_mesh.alpha
+    stream_status: sealed-handoff-ready
+    handoff_ready: true
+    observations:
+      - sequence: 1
+        source_attestation_id: attest-0123456789ab
+        shadow_allocation_id: alloc-bbbbbbbbbbbb
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_status: healthy
+        shadow_status: shadow-active
+        drift_score: 0.012
+        keepalive_status: healthy
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        observed_at: "2026-04-21T12:00:00Z"
+      - sequence: 2
+        source_attestation_id: attest-0123456789ab
+        shadow_allocation_id: alloc-bbbbbbbbbbbb
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_status: healthy
+        shadow_status: shadow-active
+        drift_score: 0.018
+        keepalive_status: healthy
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        observed_at: "2026-04-21T12:00:00Z"
+      - sequence: 3
+        source_attestation_id: attest-0123456789ab
+        shadow_allocation_id: alloc-bbbbbbbbbbbb
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_status: healthy
+        shadow_status: shadow-active
+        drift_score: 0.011
+        keepalive_status: healthy
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        observed_at: "2026-04-21T12:00:01Z"
+      - sequence: 4
+        source_attestation_id: attest-0123456789ab
+        shadow_allocation_id: alloc-bbbbbbbbbbbb
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_status: healthy
+        shadow_status: shadow-active
+        drift_score: 0.017
+        keepalive_status: healthy
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        observed_at: "2026-04-21T12:00:01Z"
+      - sequence: 5
+        source_attestation_id: attest-0123456789ab
+        shadow_allocation_id: alloc-bbbbbbbbbbbb
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_status: healthy
+        shadow_status: shadow-active
+        drift_score: 0.013
+        keepalive_status: healthy
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        observed_at: "2026-04-21T12:00:01Z"
+    blocking_reasons: []
+    stream_digest: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    opened_at: "2026-04-21T12:00:00Z"
+    sealed_at: "2026-04-21T12:00:01Z"

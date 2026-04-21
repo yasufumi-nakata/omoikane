@@ -1,0 +1,25 @@
+eval_id: substrate_broker_attestation_stream
+target: kernel.broker
+level: L1
+description: >
+  SubstrateBroker が Method B shadow-sync 中に sealed keepalive stream を生成し、
+  final hot-handoff state digest と destination binding を migrate 前に固定できること。
+fixtures:
+  - scenario: method_b_keepalive_stream
+    method: B
+    workload_class: migration
+    required_capability: 0.92
+    expected:
+      continuity_mode: hot-handoff
+      stream_status: sealed-handoff-ready
+      beat_count: 5
+      cadence_ms: 250
+      minimum_healthy_beats: 5
+assertions:
+  - seal_attestation_stream must require a healthy source attestation, a handoff-ready attestation chain, and a shadow-active dual allocation window
+  - keepalive observations must retain one expected_state_digest and destination binding across all beats before migrate
+  - sealed-handoff-ready status must require all fixed keepalive beats to remain healthy with drift_score <= 0.08
+  - hot-handoff migrate must fail closed unless the latest attestation stream matches the requested destination and state digest
+metric: exact-match
+threshold: 1.0
+ethics_check: true

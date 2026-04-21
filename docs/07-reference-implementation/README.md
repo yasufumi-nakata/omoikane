@@ -84,7 +84,7 @@ Method B candidate selection が
 直近 2 回の `substrate_kind_neutrality_index` で tie-break すること、
 default の 1 active lease + 1 standby candidate に加えて
 `shadow-sync` で bounded dual allocation window を開き、
-lease → standby probe → attest → attestation-chain bridge → open_dual_allocation_window → migrate → close_dual_allocation_window → release
+lease → standby probe → attest → attestation-chain bridge → open_dual_allocation_window → seal_attestation_stream → migrate → close_dual_allocation_window → release
 を実行すること、
 さらに energy floor violation が `critical + migrate-standby` の
 scheduler-compatible signal を返し、
@@ -92,6 +92,9 @@ standby probe が health / attestation / energy headroom を満たして
 `ready_for_migrate` を返すこと、
 attestation chain が fixed 3-beat window で
 `expected_state_digest` と `expected_destination_substrate` を migrate 前に束縛すること、
+attestation stream が shadow-active dual allocation window 上で
+fixed 5-beat keepalive を sealed し、
+handoff-ready digest と destination binding を `hot-handoff` migrate 前に固定すること、
 dual allocation window が pre-bound standby 上の second active allocation、
 `45s / 250ms / drift<=0.08` の overlap receipt、
 `hot-handoff` destination binding、cleanup release を返すこと、

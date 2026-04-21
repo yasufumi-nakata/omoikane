@@ -9,6 +9,7 @@ imports:
   standby_health_probe: ../schemas/standby_health_probe.schema
   substrate_attestation_chain: ../schemas/substrate_attestation_chain.schema
   substrate_dual_allocation_window: ../schemas/substrate_dual_allocation_window.schema
+  substrate_attestation_stream: ../schemas/substrate_attestation_stream.schema
   substrate_transfer: ../schemas/substrate_transfer.schema
   substrate_release: ../schemas/substrate_release.schema
   energy_floor: ../schemas/energy_floor.schema
@@ -327,6 +328,31 @@ operations:
     guarantees:
       - close_dual_allocation_window must fail closed unless a shadow-active window exists
       - close_dual_allocation_window must release the shadow allocation and emit a closed receipt before source release completes
+  seal_attestation_stream:
+    summary: Seal one bounded cross-substrate keepalive stream while the Method B shadow-sync window remains open.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - state
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          state:
+            type: object
+            minProperties: 1
+          continuity_mode:
+            type: string
+            enum:
+              - hot-handoff
+    output:
+      schema_ref: substrate_attestation_stream
+    guarantees:
+      - seal_attestation_stream must require a healthy source attestation, a handoff-ready attestation chain, and a shadow-active dual-allocation window
+      - the stream must keep one expected_state_digest and destination binding across all keepalive beats before migrate
+      - sealed-handoff-ready status must require the fixed keepalive beat count to remain healthy with drift at or below the dual-allocation ceiling
   migrate:
     summary: Migrate one attested active lease onto its standby target or an explicitly supplied safe destination.
     input:
@@ -356,7 +382,8 @@ operations:
     guarantees:
       - migrate must fail closed when the latest attestation is missing or unhealthy
       - destination_substrate must default to the bound standby candidate when omitted
-      - hot-handoff migrate must require an open dual-allocation window and bind the shadow allocation substrate as the destination
+      - hot-handoff migrate must require an open dual-allocation window, a sealed-handoff-ready attestation stream, and the shadow allocation substrate as the destination
+      - hot-handoff migrate must fail closed when the attestation stream state digest or destination binding differs from the pending migrate request
       - transfer output must reuse the canonical substrate_transfer schema
   release:
     summary: Release the source lease after a successful migrate or explicit broker teardown.
@@ -484,6 +511,9 @@ events:
   substrate.attestation_chain.bound:
     payload:
       schema_ref: substrate_attestation_chain
+  substrate.attestation_stream.sealed:
+    payload:
+      schema_ref: substrate_attestation_stream
   broker.dual_allocation_window.opened:
     payload:
       schema_ref: substrate_dual_allocation_window
@@ -501,4 +531,5 @@ compatibility:
   notes:
     - The reference runtime defaults to one active lease plus one standby candidate, then allows only one Method B shadow allocation window as the bounded exception.
     - The shadow allocation window is fixed to one standby-backed second allocation, 45s overlap, 250ms mirror cadence, and 3 sync observations before authority handoff.
-    - Continuous cross-substrate attestation streaming and cross-host dual allocation remain future work beyond the bounded broker contract.
+    - The attestation stream is fixed to 5 healthy keepalive beats at the same 250ms cadence and must be sealed before hot-handoff migrate.
+    - Cross-host dual allocation remains future work beyond the bounded broker contract.
