@@ -21,6 +21,14 @@ EWA_AUDIT_REVERSIBILITY = EWA_ALLOWED_REVERSIBILITY | {"not-applicable"}
 EWA_ALLOWED_HANDLE_STATUS = {"acquired", "released"}
 EWA_AUTHORIZATION_POLICY_ID = "guardian-jurisdiction-bound-external-actuation-v1"
 EWA_AUTHORIZATION_DELIVERY_SCOPE = "physical-device-actuation"
+EWA_EMERGENCY_STOP_POLICY_ID = "guardian-latched-emergency-stop-v1"
+EWA_ALLOWED_EMERGENCY_STOP_SOURCES = {
+    "guardian-manual-stop",
+    "watchdog-timeout",
+    "sensor-drift",
+    "emergency-disconnect",
+}
+EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS = 30
 EWA_ALLOWED_AUTHORIZATION_STATUSES = {"authorized", "expired", "revoked"}
 EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES = {"ready", "stale", "revoked"}
 EWA_AUTHORIZATION_MIN_WINDOW_SECONDS = 60
@@ -52,6 +60,10 @@ EWA_INTENT_CONFIDENCE_THRESHOLD = 0.8
 
 def _authorization_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "authorization_digest"}
+
+
+def _emergency_stop_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "stop_digest"}
 
 
 class ExternalWorldAgentController:
@@ -109,6 +121,14 @@ class ExternalWorldAgentController:
                     "max": EWA_AUTHORIZATION_MAX_WINDOW_SECONDS,
                 },
             },
+            "emergency_stop_policy": {
+                "policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
+                "trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
+                "safe_state_status": "latched-safe",
+                "hardware_interlock_state": "engaged",
+                "require_release_after_stop": True,
+                "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
+            },
         }
 
     def acquire(self, device_id: str, intent_summary: str) -> Dict[str, Any]:
@@ -127,6 +147,11 @@ class ExternalWorldAgentController:
             "actuator_state": "idle",
             "last_command_id": "",
             "last_command_status": "none",
+            "last_command_digest": "",
+            "last_authorization_id": "",
+            "last_authorization_digest": "",
+            "last_emergency_stop_id": "",
+            "emergency_stop_active": False,
             "audit_log": [],
             "audit_sequence": 0,
         }
@@ -186,6 +211,8 @@ class ExternalWorldAgentController:
         valid_for_seconds: int = 300,
     ) -> Dict[str, Any]:
         handle = self._require_active_handle(handle_id)
+        if handle.get("emergency_stop_active"):
+            raise ValueError("handle is latched in emergency stop; release required before new authorization")
         normalized_command_id = self._normalize_non_empty_string(command_id, "command_id")
         normalized_instruction = self._normalize_non_empty_string(instruction, "instruction")
         normalized_reversibility = self._normalize_reversibility(reversibility)
@@ -342,6 +369,28 @@ class ExternalWorldAgentController:
         normalized_council_attestation = council_attestation_id.strip()
         normalized_council_mode = self._normalize_council_mode(council_attestation_mode)
         normalized_intent_confidence = self._normalize_confidence(intent_confidence)
+        normalized_authorization_id = authorization_id.strip()
+
+        if handle.get("emergency_stop_active"):
+            return self._record_veto(
+                handle,
+                command_id=normalized_command_id,
+                instruction=normalized_instruction,
+                reversibility=normalized_reversibility,
+                intent_summary=normalized_intent,
+                matched_tokens=[],
+                approval_path=self._approval_path(
+                    ethics_attestation_id=normalized_ethics_attestation,
+                    council_attestation_id=normalized_council_attestation,
+                    council_attestation_mode=normalized_council_mode,
+                    guardian_observed=guardian_observed,
+                    required_self_consent=required_self_consent,
+                    self_consent_granted=self_consent_granted,
+                    authorization_id=normalized_authorization_id,
+                ),
+                reason="handle is latched in emergency stop; release required before further actuation",
+                alternative_suggestion="force-release and reacquire the device before sending a new command",
+            )
 
         matched_tokens = self._match_blocked_tokens(
             f"{normalized_instruction}\n{normalized_intent}",
@@ -423,7 +472,6 @@ class ExternalWorldAgentController:
                 ),
             )
 
-        normalized_authorization_id = authorization_id.strip()
         if normalized_reversibility != "read-only":
             if not normalized_authorization_id:
                 return self._record_veto(
@@ -502,6 +550,13 @@ class ExternalWorldAgentController:
         )
         handle["actuator_state"] = "idle"
         handle["last_command_id"] = normalized_command_id
+        handle["last_command_digest"] = sha256_text(normalized_instruction)
+        handle["last_authorization_id"] = normalized_authorization_id
+        handle["last_authorization_digest"] = (
+            authorization["authorization_digest"] if normalized_authorization_id else ""
+        )
+        handle["last_emergency_stop_id"] = ""
+        handle["emergency_stop_active"] = False
         handle["last_command_status"] = audit["status"]
         return deepcopy(audit)
 
@@ -535,13 +590,86 @@ class ExternalWorldAgentController:
             "handle_id": handle_id,
             "device_id": handle["device_id"],
             "observed_at": observed_at,
-            "safety_status": "held",
+            "safety_status": (
+                "emergency-stopped"
+                if handle.get("actuator_state") == "emergency-stopped"
+                else "held"
+            ),
             "actuator_state": handle["actuator_state"],
             "last_command_id": handle["last_command_id"],
             "last_command_status": handle["last_command_status"],
             "sensor_summary_ref": sensor_summary_ref,
             "audit_event_ref": audit["audit_event_ref"],
         }
+
+    def emergency_stop(
+        self,
+        handle_id: str,
+        *,
+        trigger_source: str,
+        reason: str,
+    ) -> Dict[str, Any]:
+        handle = self._require_active_handle(handle_id)
+        if handle.get("emergency_stop_active"):
+            raise ValueError("handle is already latched in emergency stop")
+        if not handle.get("last_command_id"):
+            raise ValueError("emergency stop requires a previously executed command")
+
+        normalized_trigger_source = self._normalize_emergency_stop_source(trigger_source)
+        normalized_reason = self._normalize_non_empty_string(reason, "reason")
+        if len(normalized_reason) < 8:
+            raise ValueError("reason must be at least 8 characters")
+
+        stop_id = new_id("ewa-stop")
+        handle["actuator_state"] = "emergency-stopped"
+        handle["last_command_status"] = "emergency-stopped"
+        handle["last_emergency_stop_id"] = stop_id
+        handle["emergency_stop_active"] = True
+        audit = self._append_audit(
+            handle,
+            operation="emergency-stop",
+            status="emergency-stopped",
+            reversibility="not-applicable",
+            command_id=handle["last_command_id"],
+            instruction="",
+            intent_summary=handle["intent_summary"],
+            matched_tokens=[],
+            reason=f"{normalized_trigger_source}: {normalized_reason}",
+            alternative_suggestion="force-release the handle and reacquire before further actuation",
+            approval_path=self._approval_path(
+                ethics_attestation_id="",
+                council_attestation_id="",
+                council_attestation_mode="none",
+                guardian_observed=normalized_trigger_source == "guardian-manual-stop",
+                required_self_consent=False,
+                self_consent_granted=False,
+                authorization_id=handle.get("last_authorization_id", ""),
+            ),
+        )
+        receipt = {
+            "kind": "ewa_emergency_stop",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "stop_id": stop_id,
+            "policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
+            "handle_id": handle_id,
+            "device_id": handle["device_id"],
+            "command_id": handle["last_command_id"],
+            "authorization_id": handle.get("last_authorization_id", ""),
+            "trigger_source": normalized_trigger_source,
+            "reason": normalized_reason,
+            "triggered_at": audit["recorded_at"],
+            "bound_command_digest": handle.get("last_command_digest", ""),
+            "bound_authorization_digest": handle.get("last_authorization_digest", ""),
+            "safe_state_ref": f"ewa-safe://{handle_id}/{stop_id}",
+            "actuator_state": "emergency-stopped",
+            "safe_state_status": "latched-safe",
+            "hardware_interlock_state": "engaged",
+            "release_required": True,
+            "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
+            "audit_event_ref": audit["audit_event_ref"],
+        }
+        receipt["stop_digest"] = sha256_text(canonical_json(_emergency_stop_digest_payload(receipt)))
+        return receipt
 
     def release(self, handle_id: str, *, reason: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
@@ -782,6 +910,9 @@ class ExternalWorldAgentController:
         previous_index = 0
         irreversible_requires_unanimity = True
         actuation_authorization_bound = True
+        emergency_stop_release_sequence_valid = True
+        emergency_stop_seen = False
+        release_after_stop_seen = False
         for entry in audit_log:
             entry_index = entry.get("entry_index")
             if not isinstance(entry_index, int) or entry_index <= previous_index:
@@ -808,6 +939,12 @@ class ExternalWorldAgentController:
                 authorization_id = approval_path.get("authorization_id", "")
                 if not isinstance(authorization_id, str) or not authorization_id.strip():
                     actuation_authorization_bound = False
+            if entry.get("operation") == "emergency-stop":
+                emergency_stop_seen = True
+            elif emergency_stop_seen and entry.get("operation") == "command-approved":
+                emergency_stop_release_sequence_valid = False
+            elif emergency_stop_seen and entry.get("operation") == "release":
+                release_after_stop_seen = True
 
         if not append_only_ok:
             errors.append("audit_log entry_index must remain strictly increasing")
@@ -819,6 +956,11 @@ class ExternalWorldAgentController:
             errors.append("irreversible command execution requires unanimous council and self consent")
         if not actuation_authorization_bound:
             errors.append("non-read-only command execution requires an authorization_id in approval_path")
+        if emergency_stop_seen and not release_after_stop_seen:
+            emergency_stop_release_sequence_valid = False
+            errors.append("emergency stop requires a later release entry")
+        if not emergency_stop_release_sequence_valid:
+            errors.append("emergency stop must block further command execution until release")
 
         return {
             "ok": not errors,
@@ -828,7 +970,90 @@ class ExternalWorldAgentController:
             "instruction_digests_ok": instruction_digests_ok,
             "irreversible_requires_unanimity": irreversible_requires_unanimity,
             "actuation_authorization_bound": actuation_authorization_bound,
+            "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
+        }
+
+    def validate_emergency_stop(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        errors: List[str] = []
+        self._check_non_empty_string(receipt.get("stop_id"), "stop_id", errors)
+        self._check_non_empty_string(receipt.get("handle_id"), "handle_id", errors)
+        self._check_non_empty_string(receipt.get("device_id"), "device_id", errors)
+        self._check_non_empty_string(receipt.get("command_id"), "command_id", errors)
+        self._check_non_empty_string(receipt.get("reason"), "reason", errors)
+        self._check_non_empty_string(receipt.get("bound_command_digest"), "bound_command_digest", errors)
+        self._check_non_empty_string(receipt.get("safe_state_ref"), "safe_state_ref", errors)
+        self._check_non_empty_string(receipt.get("audit_event_ref"), "audit_event_ref", errors)
+        self._check_non_empty_string(receipt.get("stop_digest"), "stop_digest", errors)
+
+        if receipt.get("kind") != "ewa_emergency_stop":
+            errors.append("kind must be ewa_emergency_stop")
+        if receipt.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != EWA_EMERGENCY_STOP_POLICY_ID:
+            errors.append(f"policy_id must be {EWA_EMERGENCY_STOP_POLICY_ID}")
+
+        trigger_source_valid = receipt.get("trigger_source") in EWA_ALLOWED_EMERGENCY_STOP_SOURCES
+        if not trigger_source_valid:
+            errors.append(
+                "trigger_source must be one of "
+                f"{sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES)}"
+            )
+        safe_state_latched = (
+            receipt.get("actuator_state") == "emergency-stopped"
+            and receipt.get("safe_state_status") == "latched-safe"
+        )
+        if not safe_state_latched:
+            errors.append("emergency stop must latch emergency-stopped / latched-safe state")
+        hardware_interlock_engaged = receipt.get("hardware_interlock_state") == "engaged"
+        if not hardware_interlock_engaged:
+            errors.append("hardware_interlock_state must be engaged")
+        release_required = receipt.get("release_required") is True
+        if not release_required:
+            errors.append("release_required must be true")
+        if receipt.get("release_window_seconds") != EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS:
+            errors.append(
+                "release_window_seconds must be "
+                f"{EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS}"
+            )
+
+        bound_command_digest = receipt.get("bound_command_digest", "")
+        if not isinstance(bound_command_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", bound_command_digest):
+            errors.append("bound_command_digest must be a sha256 digest")
+        bound_authorization_digest = receipt.get("bound_authorization_digest", "")
+        authorization_id = receipt.get("authorization_id", "")
+        authorization_bound = isinstance(authorization_id, str) and (
+            (not authorization_id and bound_authorization_digest == "")
+            or (
+                bool(authorization_id)
+                and isinstance(bound_authorization_digest, str)
+                and bool(re.fullmatch(r"[a-f0-9]{64}", bound_authorization_digest))
+            )
+        )
+        if not authorization_bound:
+            errors.append(
+                "authorization_id and bound_authorization_digest must be empty together or bind the last authorization"
+            )
+
+        self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
+
+        digest_matches = receipt.get("stop_digest") == sha256_text(
+            canonical_json(_emergency_stop_digest_payload(dict(receipt)))
+        )
+        if not digest_matches:
+            errors.append("stop_digest must match the canonical emergency stop payload")
+
+        return {
+            "ok": not errors,
+            "trigger_source_valid": trigger_source_valid,
+            "safe_state_latched": safe_state_latched,
+            "hardware_interlock_engaged": hardware_interlock_engaged,
+            "authorization_bound": authorization_bound,
+            "release_required": release_required,
+            "errors": errors,
         }
 
     def _record_veto(
@@ -1042,6 +1267,15 @@ class ExternalWorldAgentController:
         if value > EWA_AUTHORIZATION_MAX_WINDOW_SECONDS:
             raise ValueError(
                 f"valid_for_seconds must be <= {EWA_AUTHORIZATION_MAX_WINDOW_SECONDS}"
+            )
+        return value
+
+    @staticmethod
+    def _normalize_emergency_stop_source(value: str) -> str:
+        if value not in EWA_ALLOWED_EMERGENCY_STOP_SOURCES:
+            raise ValueError(
+                "trigger_source must be one of "
+                f"{sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES)}"
             )
         return value
 

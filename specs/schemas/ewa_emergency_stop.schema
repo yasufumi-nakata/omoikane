@@ -1,0 +1,96 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_emergency_stop.schema"
+title: EWAEmergencyStop
+description: >
+  Latched emergency-stop receipt for one active External World Agent handle,
+  binding the last actuation command, optional authorization artifact, safe-state
+  interlock, and forced-release requirement.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - stop_id
+  - policy_id
+  - handle_id
+  - device_id
+  - command_id
+  - authorization_id
+  - trigger_source
+  - reason
+  - triggered_at
+  - bound_command_digest
+  - bound_authorization_digest
+  - safe_state_ref
+  - actuator_state
+  - safe_state_status
+  - hardware_interlock_state
+  - release_required
+  - release_window_seconds
+  - audit_event_ref
+  - stop_digest
+properties:
+  kind:
+    const: ewa_emergency_stop
+  schema_version:
+    const: "1.0"
+  stop_id:
+    type: string
+    pattern: "^ewa-stop-[a-f0-9]{12}$"
+  policy_id:
+    type: string
+    const: guardian-latched-emergency-stop-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  authorization_id:
+    type: string
+    pattern: "^$|^ewa-authz-[a-f0-9]{12}$"
+  trigger_source:
+    type: string
+    enum:
+      - guardian-manual-stop
+      - watchdog-timeout
+      - sensor-drift
+      - emergency-disconnect
+  reason:
+    type: string
+    minLength: 8
+  triggered_at:
+    type: string
+    format: date-time
+  bound_command_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  bound_authorization_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  safe_state_ref:
+    type: string
+    minLength: 1
+  actuator_state:
+    type: string
+    const: emergency-stopped
+  safe_state_status:
+    type: string
+    const: latched-safe
+  hardware_interlock_state:
+    type: string
+    const: engaged
+  release_required:
+    const: true
+  release_window_seconds:
+    type: integer
+    const: 30
+  audit_event_ref:
+    type: string
+    minLength: 1
+  stop_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

@@ -420,8 +420,12 @@ guardian-reviewed jurisdiction evidence に束縛された
 `instruction_digest` / `intent_summary_digest` / `legal_basis_ref` /
 `guardian_verification_ref` / `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
-blocked token を含む irreversible command を
-fail-closed で veto し、digest-only audit と forced release を確認する。
+`watchdog-timeout` emergency stop が
+`command_id` / `bound_command_digest` / `bound_authorization_digest` /
+`hardware_interlock_state=engaged` / `release_required=true` を返し、
+その後 forced release が実行されること、
+さらに別 handle 上で blocked token を含む irreversible command を
+fail-closed で veto し、digest-only audit を維持することを確認する。
 
 `wms-demo` は L6 World Model Sync の reference contract
 (`interface.wms.v0`) を JSON で可視化し、

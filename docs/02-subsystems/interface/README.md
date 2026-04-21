@@ -49,8 +49,8 @@
 - 物理介入時の倫理ガード（暴力・違法行為禁止）
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json`
   で guardian-reviewed jurisdiction evidence に束縛された authorization artifact、
-  reversible command の Guardian observe、blocked token の fail-closed veto、
-  digest-only audit、forced release を検証する
+  reversible command の Guardian observe、latched emergency stop、
+  blocked token の fail-closed veto、digest-only audit、forced release を検証する
 
 ## プロトコル
 

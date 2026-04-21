@@ -1,0 +1,21 @@
+eval_id: ewa_emergency_stop
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が authorized reversible actuation 後に
+  latched emergency-stop receipt を発行し、
+  safe-state interlock と forced release requirement を維持できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  emergency_stop_ok: true
+  emergency_stop_latched: true
+  emergency_stop_release_required: true
+  emergency_stop_bound_to_command: true
+  emergency_stop_bound_to_authorization: true
+  release_after_stop: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

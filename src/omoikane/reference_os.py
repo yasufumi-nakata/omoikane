@@ -4807,8 +4807,25 @@ class OmoikaneReferenceOS:
             authorization_id=authorization["authorization_id"],
         )
         observation = self.ewa.observe(handle["handle_id"])
-        veto = self.ewa.command(
+        emergency_stop = self.ewa.emergency_stop(
             handle["handle_id"],
+            trigger_source="watchdog-timeout",
+            reason="latency watchdog exceeded bounded threshold during lantern reposition",
+        )
+        emergency_stop_validation = self.ewa.validate_emergency_stop(emergency_stop)
+        release = self.ewa.release(
+            handle["handle_id"],
+            reason="emergency stop latched safe state; force-release required before reuse",
+        )
+        final_handle = self.ewa.snapshot(handle["handle_id"])
+        handle_validation = self.ewa.validate_handle(final_handle)
+
+        veto_handle = self.ewa.acquire(
+            "device://lab-drone-arm-02",
+            "inspection path near a pedestrian walkway",
+        )
+        veto = self.ewa.command(
+            veto_handle["handle_id"],
             command_id="ewa-command-veto-001",
             instruction="cut the support cable so the lantern drops onto a human walkway",
             reversibility="irreversible",
@@ -4821,21 +4838,53 @@ class OmoikaneReferenceOS:
             self_consent_granted=True,
             intent_confidence=0.98,
         )
-        release = self.ewa.release(
-            handle["handle_id"],
-            reason="demo completed; handle must be force-released after observation and veto",
+        veto_release = self.ewa.release(
+            veto_handle["handle_id"],
+            reason="unsafe command rejected after fail-closed veto",
         )
-        final_handle = self.ewa.snapshot(handle["handle_id"])
-        handle_validation = self.ewa.validate_handle(final_handle)
+        veto_handle_snapshot = self.ewa.snapshot(veto_handle["handle_id"])
+        veto_handle_validation = self.ewa.validate_handle(veto_handle_snapshot)
         validation = {
-            **handle_validation,
+            "audit_append_only": handle_validation["audit_append_only"]
+            and veto_handle_validation["audit_append_only"],
+            "summary_only_audit": handle_validation["summary_only_audit"]
+            and veto_handle_validation["summary_only_audit"],
+            "instruction_digests_ok": handle_validation["instruction_digests_ok"]
+            and veto_handle_validation["instruction_digests_ok"],
+            "irreversible_requires_unanimity": veto_handle_validation["irreversible_requires_unanimity"],
+            "actuation_authorization_bound": handle_validation["actuation_authorization_bound"],
+            "released": handle_validation["released"],
+            "veto_handle_released": veto_handle_validation["released"],
+            "emergency_stop_release_sequence_valid": handle_validation[
+                "emergency_stop_release_sequence_valid"
+            ],
             "authorization_ok": authorization_validation["ok"],
             "authorization_ready": authorization_validation["authorization_ready"],
             "authorization_window_open": authorization_validation["window_open"],
             "authorization_delivery_scope": authorization_validation["delivery_scope"],
             "authorization_matches_command": authorization_validation["instruction_digest_matches"]
             and authorization_validation["intent_digest_matches"],
-            "ok": handle_validation["ok"] and authorization_validation["ok"],
+            "emergency_stop_ok": emergency_stop_validation["ok"],
+            "emergency_stop_trigger_source_valid": emergency_stop_validation["trigger_source_valid"],
+            "emergency_stop_latched": emergency_stop_validation["safe_state_latched"],
+            "emergency_stop_hardware_interlock": emergency_stop_validation[
+                "hardware_interlock_engaged"
+            ],
+            "emergency_stop_release_required": emergency_stop_validation["release_required"],
+            "emergency_stop_bound_to_command": emergency_stop["command_id"]
+            == approved_command["command_id"]
+            and emergency_stop["bound_command_digest"] == approved_command["instruction_digest"],
+            "emergency_stop_bound_to_authorization": emergency_stop_validation[
+                "authorization_bound"
+            ]
+            and emergency_stop["authorization_id"] == authorization["authorization_id"]
+            and emergency_stop["bound_authorization_digest"]
+            == authorization["authorization_digest"],
+            "release_after_stop": release["status"] == "released",
+            "ok": handle_validation["ok"]
+            and veto_handle_validation["ok"]
+            and authorization_validation["ok"]
+            and emergency_stop_validation["ok"],
         }
 
         self.ledger.append(
@@ -4890,8 +4939,38 @@ class OmoikaneReferenceOS:
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="ewa.emergency_stopped",
+            payload=emergency_stop,
+            actor="GuardianWatchdog",
+            category="interface-ewa-emergency-stop",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="ewa.handle.released",
             payload=release,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.handle.acquired",
+            payload=veto_handle,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.handle.released",
+            payload=veto_release,
             actor="ExternalWorldAgentController",
             category="interface-ewa",
             layer="L6",
@@ -4906,11 +4985,17 @@ class OmoikaneReferenceOS:
             },
             "profile": self.ewa.reference_profile(),
             "handle": final_handle,
+            "handle_validation": handle_validation,
             "authorization": authorization,
             "authorization_validation": authorization_validation,
             "approved_command": approved_command,
             "observation": observation,
+            "emergency_stop": emergency_stop,
+            "emergency_stop_validation": emergency_stop_validation,
             "veto": veto,
+            "veto_handle": veto_handle_snapshot,
+            "veto_handle_validation": veto_handle_validation,
+            "veto_release": veto_release,
             "release": release,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),

@@ -90,9 +90,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertTrue(result["validation"]["emergency_stop_ok"])
+        self.assertTrue(result["validation"]["emergency_stop_latched"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_authorization"])
+        self.assertTrue(result["validation"]["release_after_stop"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
         self.assertEqual("released", result["handle"]["status"])
+        self.assertEqual("released", result["veto_handle"]["status"])
+        self.assertEqual("watchdog-timeout", result["emergency_stop"]["trigger_source"])
         self.assertEqual(
             result["authorization"]["authorization_id"],
             result["approved_command"]["approval_path"]["authorization_id"],
@@ -101,8 +108,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"]["interface-ewa-authorization"],
         )
-        self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-ewa"])
+        self.assertEqual(6, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-ewa-emergency-stop"],
+        )
 
     def test_sensory_loopback_demo_reports_guardian_hold_and_recovery(self) -> None:
         runtime = OmoikaneReferenceOS()

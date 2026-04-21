@@ -43,6 +43,7 @@ properties:
       - acquire
       - command-approved
       - command-vetoed
+      - emergency-stop
       - observe
       - release
   status:
@@ -51,6 +52,7 @@ properties:
       - acquired
       - executed
       - vetoed
+      - emergency-stopped
       - observed
       - released
   reversibility:

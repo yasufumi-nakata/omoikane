@@ -6,6 +6,7 @@ summary: Canonical L6 contract for ethics-first physical-world actuation through
 imports:
   ewa_command: ../schemas/ewa_command.schema
   ewa_audit: ../schemas/ewa_audit.schema
+  ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
 operations:
   acquire:
@@ -215,12 +216,15 @@ operations:
             format: date-time
           safety_status:
             type: string
-            const: held
+            enum:
+              - held
+              - emergency-stopped
           actuator_state:
             type: string
             enum:
               - idle
               - executing
+              - emergency-stopped
               - offline
           last_command_id:
             type: string
@@ -229,6 +233,7 @@ operations:
             enum:
               - none
               - executed
+              - emergency-stopped
               - vetoed
           sensor_summary_ref:
             type: string
@@ -236,6 +241,79 @@ operations:
           audit_event_ref:
             type: string
             minLength: 1
+  emergency_stop:
+    summary: Latch one active actuator into a safe halted state before forced release.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - handle_id
+          - trigger_source
+          - reason
+        properties:
+          handle_id:
+            type: string
+            minLength: 8
+          trigger_source:
+            type: string
+            enum:
+              - guardian-manual-stop
+              - watchdog-timeout
+              - sensor-drift
+              - emergency-disconnect
+          reason:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: ewa_emergency_stop
+    guarantees:
+      - emergency stop must latch actuator_state=emergency-stopped and safe_state_status=latched-safe before release
+      - emergency stop must bind the last command_id and bound_command_digest
+      - emergency stop must bind the last authorization artifact when one was active
+      - release_required must remain true until the handle is force-released
+      - further actuation commands must fail closed until release completes
+  validate_emergency_stop:
+    summary: Validate one latched emergency-stop receipt against the fixed safe-stop policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+        properties:
+          receipt:
+            schema_ref: ewa_emergency_stop
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - trigger_source_valid
+          - safe_state_latched
+          - hardware_interlock_engaged
+          - authorization_bound
+          - release_required
+          - errors
+        properties:
+          ok:
+            type: boolean
+          trigger_source_valid:
+            type: boolean
+          safe_state_latched:
+            type: boolean
+          hardware_interlock_engaged:
+            type: boolean
+          authorization_bound:
+            type: boolean
+          release_required:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   release:
     summary: Force-release one device handle after work completion, timeout, or emergency stop.
     input:
@@ -281,6 +359,9 @@ events:
   ewa.command_recorded:
     payload:
       schema_ref: ewa_audit
+  ewa.emergency_stopped:
+    payload:
+      schema_ref: ewa_emergency_stop
   ewa.handle_released:
     payload:
       schema_ref: ewa_audit

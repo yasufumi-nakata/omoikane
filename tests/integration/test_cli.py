@@ -106,13 +106,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertTrue(result["validation"]["emergency_stop_ok"])
+        self.assertTrue(result["validation"]["emergency_stop_latched"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_authorization"])
+        self.assertTrue(result["validation"]["release_after_stop"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
         self.assertEqual(
             result["authorization"]["authorization_id"],
             result["approved_command"]["approval_path"]["authorization_id"],
         )
+        self.assertEqual("watchdog-timeout", result["emergency_stop"]["trigger_source"])
         self.assertEqual("released", result["release"]["status"])
+        self.assertEqual("released", result["veto_release"]["status"])
 
     def test_sensory_loopback_demo_emits_guardian_hold_and_recovery(self) -> None:
         stdout = io.StringIO()

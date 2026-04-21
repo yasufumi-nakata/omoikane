@@ -129,6 +129,82 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             veto["reason"],
         )
 
+    def test_emergency_stop_latches_safe_state_and_blocks_further_actuation(self) -> None:
+        controller = ExternalWorldAgentController()
+        handle = controller.acquire(
+            "device://ewa-arm-04",
+            "reposition a lantern for bounded inspection",
+        )
+        authorization = controller.authorize(
+            handle["handle_id"],
+            command_id="ewa-command-stop-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for bounded inspection without permanent change",
+            ethics_attestation_id="ethics://ewa/approved-003",
+            guardian_observed=True,
+            jurisdiction="JP-13",
+            legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-002",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            jurisdiction_bundle_status="ready",
+            intent_confidence=0.95,
+        )
+        approved = controller.command(
+            handle["handle_id"],
+            command_id="ewa-command-stop-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for bounded inspection without permanent change",
+            ethics_attestation_id="ethics://ewa/approved-003",
+            guardian_observed=True,
+            intent_confidence=0.95,
+            authorization_id=authorization["authorization_id"],
+        )
+        stop = controller.emergency_stop(
+            handle["handle_id"],
+            trigger_source="watchdog-timeout",
+            reason="latency watchdog exceeded bounded threshold during lantern reposition",
+        )
+        stop_validation = controller.validate_emergency_stop(stop)
+        veto = controller.command(
+            handle["handle_id"],
+            command_id="ewa-command-after-stop-001",
+            instruction="move the inspection arm one centimeter to the right",
+            reversibility="reversible",
+            intent_summary="retry the bounded reposition after stop",
+            ethics_attestation_id="ethics://ewa/approved-003",
+            guardian_observed=True,
+            intent_confidence=0.95,
+            authorization_id=authorization["authorization_id"],
+        )
+        released = controller.release(
+            handle["handle_id"],
+            reason="emergency stop latched safe state; release before reuse",
+        )
+        snapshot = controller.snapshot(handle["handle_id"])
+        validation = controller.validate_handle(snapshot)
+
+        self.assertEqual("executed", approved["status"])
+        self.assertTrue(stop_validation["ok"])
+        self.assertTrue(stop_validation["safe_state_latched"])
+        self.assertTrue(stop_validation["hardware_interlock_engaged"])
+        self.assertTrue(stop_validation["authorization_bound"])
+        self.assertEqual("watchdog-timeout", stop["trigger_source"])
+        self.assertEqual(approved["command_id"], stop["command_id"])
+        self.assertEqual(approved["instruction_digest"], stop["bound_command_digest"])
+        self.assertEqual(authorization["authorization_id"], stop["authorization_id"])
+        self.assertEqual(authorization["authorization_digest"], stop["bound_authorization_digest"])
+        self.assertEqual("vetoed", veto["status"])
+        self.assertEqual(
+            "handle is latched in emergency stop; release required before further actuation",
+            veto["reason"],
+        )
+        self.assertEqual("released", released["status"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["emergency_stop_release_sequence_valid"])
+
 
 if __name__ == "__main__":
     unittest.main()
