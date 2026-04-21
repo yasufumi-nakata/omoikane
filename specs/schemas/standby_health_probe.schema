@@ -1,0 +1,93 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/standby_health_probe.schema"
+title: StandbyHealthProbe
+description: Deterministic readiness probe for one pre-bound broker standby candidate.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - probe_id
+  - identity_id
+  - active_substrate_id
+  - standby_substrate_id
+  - standby_class
+  - workload_class
+  - health_score
+  - attestation_valid
+  - observed_capacity_jps
+  - required_energy_floor_jps
+  - energy_headroom_jps
+  - probe_status
+  - ready_for_migrate
+  - observed_at
+properties:
+  kind:
+    const: standby_health_probe
+  schema_version:
+    const: "1.0.0"
+  probe_id:
+    type: string
+    pattern: "^standby-probe-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  active_substrate_id:
+    type: string
+    minLength: 1
+  standby_substrate_id:
+    type: string
+    minLength: 1
+  standby_class:
+    type: string
+    enum:
+      - hot-standby
+      - cold-standby
+  workload_class:
+    type: string
+    enum:
+      - baseline
+      - sandbox
+      - council
+      - migration
+  health_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  attestation_valid:
+    type: boolean
+  observed_capacity_jps:
+    type: integer
+    minimum: 1
+  required_energy_floor_jps:
+    type: integer
+    minimum: 1
+  energy_headroom_jps:
+    type: integer
+  probe_status:
+    type: string
+    enum:
+      - ready
+      - blocked
+  ready_for_migrate:
+    type: boolean
+  observed_at:
+    type: string
+    format: date-time
+examples:
+  - kind: standby_health_probe
+    schema_version: "1.0.0"
+    probe_id: standby-probe-0123456789ab
+    identity_id: identity-0123456789ab
+    active_substrate_id: classical_silicon
+    standby_substrate_id: neuromorphic_mesh.alpha
+    standby_class: hot-standby
+    workload_class: migration
+    health_score: 0.94
+    attestation_valid: true
+    observed_capacity_jps: 64
+    required_energy_floor_jps: 30
+    energy_headroom_jps: 34
+    probe_status: ready
+    ready_for_migrate: true
+    observed_at: "2026-04-21T12:00:00Z"

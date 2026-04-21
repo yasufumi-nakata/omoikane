@@ -6,6 +6,8 @@ summary: Deterministic L1 substrate broker contract for neutrality-aware selecti
 imports:
   substrate_allocation: ../schemas/substrate_allocation.schema
   substrate_attestation: ../schemas/substrate_attestation.schema
+  standby_health_probe: ../schemas/standby_health_probe.schema
+  substrate_attestation_chain: ../schemas/substrate_attestation_chain.schema
   substrate_transfer: ../schemas/substrate_transfer.schema
   substrate_release: ../schemas/substrate_release.schema
   energy_floor: ../schemas/energy_floor.schema
@@ -222,6 +224,57 @@ operations:
     guarantees:
       - attestation must bind the active allocation_id selected by the lease
       - attestation status other than healthy must block migrate
+  probe_standby:
+    summary: Probe the pre-bound standby candidate so migrate readiness remains machine-checkable before handoff.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          workload_class:
+            type: string
+            enum:
+              - baseline
+              - sandbox
+              - council
+              - migration
+    output:
+      schema_ref: standby_health_probe
+    guarantees:
+      - probe must resolve the same standby candidate selected by lease
+      - probe must expose standby_class, health_score, attestation_valid, and energy headroom against the required floor
+      - ready_for_migrate becomes true only when the standby candidate remains healthy, attested, and above the energy floor
+  bridge_attestation_chain:
+    summary: Bind a bounded cross-substrate attestation window between the healthy active lease and its standby target before migrate.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - state
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          state:
+            type: object
+            minProperties: 1
+          continuity_mode:
+            type: string
+            enum:
+              - cold-copy
+              - warm-standby
+              - hot-handoff
+    output:
+      schema_ref: substrate_attestation_chain
+    guarantees:
+      - bridge_attestation_chain must fail closed when the latest active attestation is missing or unhealthy
+      - bridge_attestation_chain must bind the latest standby probe and the expected destination substrate before migrate
+      - the fixed attestation window must expose sequence-ordered observations and one expected_state_digest for the pending handoff
   migrate:
     summary: Migrate one attested active lease onto its standby target or an explicitly supplied safe destination.
     input:
@@ -372,6 +425,12 @@ events:
   substrate.attested:
     payload:
       schema_ref: substrate_attestation
+  broker.standby_probed:
+    payload:
+      schema_ref: standby_health_probe
+  substrate.attestation_chain.bound:
+    payload:
+      schema_ref: substrate_attestation_chain
   substrate.migrated:
     payload:
       schema_ref: substrate_transfer
@@ -382,4 +441,5 @@ compatibility:
   stability: bootstrap
   notes:
     - The reference runtime keeps one active lease plus one standby candidate to avoid dual-active identity allocation while preserving a deterministic migrate target.
-    - Actual live dual allocation and continuous cross-substrate attestation streaming remain future work beyond the bounded broker contract.
+    - The reference runtime fixes a bounded standby probe and 3-beat attestation bridge window before migrate, but does not materialize a second active lease.
+    - Actual live dual allocation and unbounded cross-substrate attestation streaming remain future work beyond the bounded broker contract.

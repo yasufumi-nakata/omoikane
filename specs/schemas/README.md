@@ -76,11 +76,13 @@
 - `staged_rollout_session.schema`
 - `builder_rollback_session.schema`
 - `builder_live_enactment_session.schema`
+- `standby_health_probe.schema`
+- `substrate_attestation_chain.schema`
 
 ## 次段階
 
-cross-host authority routing + OS-native packet capture は
-reference runtime の対象が広がる段階で追加する。
+- live dual allocation beyond the bounded standby probe / attestation window
+- cross-host authority routing + OS-native packet capture
 
 ## 形式
 

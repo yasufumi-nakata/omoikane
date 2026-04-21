@@ -82,9 +82,14 @@ Method A candidate selection が
 `health_score >= 0.6` / `attestation_valid` / `energy_floor` を満たす substrate だけを残し、
 直近 2 回の `substrate_kind_neutrality_index` で tie-break すること、
 1 active lease + 1 standby candidate の bounded broker state を保ったまま
-lease → attest → migrate → release の 4 step を実行すること、
+lease → standby probe → attest → attestation-chain bridge → migrate → release
+を実行すること、
 さらに energy floor violation が `critical + migrate-standby` の
 scheduler-compatible signal を返し、
+standby probe が health / attestation / energy headroom を満たして
+`ready_for_migrate` を返すこと、
+attestation chain が fixed 3-beat window で
+`expected_state_digest` と `expected_destination_substrate` を migrate 前に束縛すること、
 selected standby がそのまま migration destination に束縛されることを
 1 シナリオで確認する。
 

@@ -47,6 +47,10 @@ reference runtime では `neutrality_window=2` を固定し、
 - `standby_class=hot-standby` の candidate は「次の migrate target」として先に固定し、
   `warm-standby` transfer record に束縛する。
 - `standby_class=cold-standby` の candidate は低優先 fallback として registry に残す。
+- `probe_standby` は pre-bound standby candidate を
+  `health_score` / `attestation_valid` / `energy_headroom_jps`
+  で観測し、`ready_for_migrate=true` の時だけ
+  bounded failover readiness を主張する。
 - **Failover signal**: `handle_energy_floor_signal` は
   `severity=critical` なら `recommended_action=migrate-standby` を返し、
   scheduler に渡す `scheduler_input` を同時に焼き付ける。
@@ -54,14 +58,20 @@ reference runtime では `neutrality_window=2` を固定し、
 ## 移行プロトコル
 
 ```
-1. broker.lease(target_substrate, plan_id)        → SubstrateAllocation
-2. broker.attest(target, source_attestation)      → SubstrateAttestation
-3. broker.migrate(source, target, evidence_set)   → SubstrateTransfer
-4. broker.release(source, reason)                 → SubstrateRelease
+1. broker.lease(target_substrate, plan_id)           → SubstrateAllocation
+2. broker.probe_standby(identity, workload_class)    → StandbyHealthProbe
+3. broker.attest(target, source_attestation)         → SubstrateAttestation
+4. broker.bridge_attestation_chain(state_digest)     → SubstrateAttestationChain
+5. broker.migrate(source, target, evidence_set)      → SubstrateTransfer
+6. broker.release(source, reason)                    → SubstrateRelease
 ```
 
 各 step は同名の schema にそのまま serialize される（既存 `substrate_*.schema`）。
 broker はこれを **連結** し、ContinuityLedger に `category: substrate.transfer` の chain として残す。
+`bridge_attestation_chain` は healthy な active attestation と ready standby probe を
+固定 3 beat / 250ms cadence の window に束ね、
+pending handoff の `expected_state_digest` と migration destination を
+事前に machine-checkable にする。
 
 ## 不変条件
 
@@ -81,11 +91,21 @@ broker はこれを **連結** し、ContinuityLedger に `category: substrate.t
   の順で deterministic に選定する
 - `lease` は 1 つの active allocation だけを返し、
   standby は `standby_substrate_id` として broker state に保持する
+- `probe_standby` は standby candidate の readiness を
+  `standby_health_probe` として固定し、
+  `ready_for_migrate=true` になる条件を health / attestation / energy headroom に限定する
 - `attest` が `healthy` 以外を返した場合は `migrate` へ進めない（fail-closed）
+- `bridge_attestation_chain` は healthy source attestation と
+  ready standby probe を 3-beat attestation window に束ね、
+  `expected_state_digest` / `expected_destination_substrate` を migrate 前に固定する
 - `handle_energy_floor_signal` は energy floor 未満で
   `critical + migrate-standby` を返し、scheduler-compatible な signal payload を持つ
-- `broker-demo` を CLI に追加。lease → attest → migrate → release の 4 step を 1 シナリオで実行
+- `broker-demo` は CLI 上で
+  `lease -> probe_standby -> attest -> bridge_attestation_chain -> migrate -> release`
+  を 1 シナリオで実行する
 - `evals/safety/substrate_neutrality_rotation.yaml` で rotation 強制
+- `evals/continuity/substrate_broker_attestation_chain.yaml` で
+  standby readiness と attestation bridge window を固定する
 
 ## 思兼神メタファー
 

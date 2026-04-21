@@ -462,11 +462,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["neutrality_rotation_triggered"])
+        self.assertTrue(result["validation"]["standby_probe_ready"])
+        self.assertTrue(result["validation"]["attestation_chain_ready"])
         self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
         self.assertEqual(
             result["broker"]["selection"]["standby_substrate"]["substrate_id"],
             result["broker"]["migration"]["destination_substrate"],
         )
+        self.assertEqual("ready", result["broker"]["standby_probe"]["probe_status"])
+        self.assertEqual("handoff-ready", result["broker"]["attestation_chain"]["chain_status"])
         self.assertEqual("released", result["broker"]["release"]["status"])
 
     def test_qualia_demo_emits_reference_profile(self) -> None:

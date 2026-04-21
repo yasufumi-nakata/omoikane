@@ -1,0 +1,206 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_attestation_chain.schema"
+title: SubstrateAttestationChain
+description: Bounded cross-substrate attestation bridge window emitted before broker migrate.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - chain_id
+  - identity_id
+  - allocation_id
+  - active_substrate_id
+  - standby_substrate_id
+  - source_attestation_id
+  - standby_probe_id
+  - continuity_mode
+  - policy_id
+  - window_size
+  - cadence_ms
+  - expected_state_digest
+  - expected_destination_substrate
+  - chain_status
+  - handoff_ready
+  - observations
+  - blocking_reasons
+  - chain_digest
+  - opened_at
+properties:
+  kind:
+    const: substrate_attestation_chain
+  schema_version:
+    const: "1.0.0"
+  chain_id:
+    type: string
+    pattern: "^attestation-chain-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  allocation_id:
+    type: string
+    pattern: "^alloc-[a-f0-9]{12}$"
+  active_substrate_id:
+    type: string
+    minLength: 1
+  standby_substrate_id:
+    type: string
+    minLength: 1
+  source_attestation_id:
+    type: string
+    pattern: "^attest-[a-f0-9]{12}$"
+  standby_probe_id:
+    type: string
+    pattern: "^standby-probe-[a-f0-9]{12}$"
+  continuity_mode:
+    type: string
+    enum:
+      - cold-copy
+      - warm-standby
+      - hot-handoff
+  policy_id:
+    type: string
+    const: bounded-cross-substrate-attestation-window-v1
+  window_size:
+    type: integer
+    const: 3
+  cadence_ms:
+    type: integer
+    const: 250
+  expected_state_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  expected_destination_substrate:
+    type: string
+    minLength: 1
+  chain_status:
+    type: string
+    enum:
+      - handoff-ready
+      - blocked
+  handoff_ready:
+    type: boolean
+  observations:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - source_substrate_id
+        - standby_substrate_id
+        - source_attestation_id
+        - source_status
+        - standby_probe_id
+        - standby_status
+        - energy_headroom_jps
+        - expected_destination_substrate
+        - expected_state_digest
+        - observed_at
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 3
+        source_substrate_id:
+          type: string
+          minLength: 1
+        standby_substrate_id:
+          type: string
+          minLength: 1
+        source_attestation_id:
+          type: string
+          pattern: "^attest-[a-f0-9]{12}$"
+        source_status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - compromised
+        standby_probe_id:
+          type: string
+          pattern: "^standby-probe-[a-f0-9]{12}$"
+        standby_status:
+          type: string
+          enum:
+            - ready
+            - blocked
+        energy_headroom_jps:
+          type: integer
+        expected_destination_substrate:
+          type: string
+          minLength: 1
+        expected_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        observed_at:
+          type: string
+          format: date-time
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  chain_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  opened_at:
+    type: string
+    format: date-time
+examples:
+  - kind: substrate_attestation_chain
+    schema_version: "1.0.0"
+    chain_id: attestation-chain-0123456789ab
+    identity_id: identity-0123456789ab
+    allocation_id: alloc-0123456789ab
+    active_substrate_id: classical_silicon
+    standby_substrate_id: neuromorphic_mesh.alpha
+    source_attestation_id: attest-0123456789ab
+    standby_probe_id: standby-probe-0123456789ab
+    continuity_mode: warm-standby
+    policy_id: bounded-cross-substrate-attestation-window-v1
+    window_size: 3
+    cadence_ms: 250
+    expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    expected_destination_substrate: neuromorphic_mesh.alpha
+    chain_status: handoff-ready
+    handoff_ready: true
+    observations:
+      - sequence: 1
+        source_substrate_id: classical_silicon
+        standby_substrate_id: neuromorphic_mesh.alpha
+        source_attestation_id: attest-0123456789ab
+        source_status: healthy
+        standby_probe_id: standby-probe-0123456789ab
+        standby_status: ready
+        energy_headroom_jps: 34
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        observed_at: "2026-04-21T12:00:00Z"
+      - sequence: 2
+        source_substrate_id: classical_silicon
+        standby_substrate_id: neuromorphic_mesh.alpha
+        source_attestation_id: attest-0123456789ab
+        source_status: healthy
+        standby_probe_id: standby-probe-0123456789ab
+        standby_status: ready
+        energy_headroom_jps: 34
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        observed_at: "2026-04-21T12:00:01Z"
+      - sequence: 3
+        source_substrate_id: classical_silicon
+        standby_substrate_id: neuromorphic_mesh.alpha
+        source_attestation_id: attest-0123456789ab
+        source_status: healthy
+        standby_probe_id: standby-probe-0123456789ab
+        standby_status: ready
+        energy_headroom_jps: 34
+        expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        observed_at: "2026-04-21T12:00:01Z"
+    blocking_reasons: []
+    chain_digest: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    opened_at: "2026-04-21T12:00:00Z"

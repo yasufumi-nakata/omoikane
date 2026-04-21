@@ -4212,6 +4212,7 @@ class OmoikaneReferenceOS:
             identity.identity_id,
             current_joules_per_second=leased_state["energy_floor"]["minimum_joules_per_second"] - 2,
         )
+        standby_probe = self.broker.probe_standby(identity.identity_id)
         attestation = self.broker.attest(
             identity.identity_id,
             {
@@ -4230,6 +4231,36 @@ class OmoikaneReferenceOS:
             layer="L1",
             signature_roles=["guardian"],
             substrate=attestation.substrate,
+        )
+        attestation_chain = self.broker.bridge_attestation_chain(
+            identity.identity_id,
+            state={
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "checkpoint": "reference-connectome-v1",
+                "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
+            },
+            continuity_mode="warm-standby",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.broker.standby_probed",
+            payload=asdict(standby_probe),
+            actor="SubstrateBroker",
+            category="attestation",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate=standby_probe.standby_substrate_id,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.attestation_chain.bound",
+            payload=asdict(attestation_chain),
+            actor="SubstrateBroker",
+            category="attestation",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate=attestation_chain.standby_substrate_id,
         )
         transfer = self.broker.migrate(
             identity.identity_id,
@@ -4279,7 +4310,9 @@ class OmoikaneReferenceOS:
                 "rotation_probe": rotation_probe,
                 "lease": asdict(allocation),
                 "energy_floor_signal": signal,
+                "standby_probe": asdict(standby_probe),
                 "attestation": asdict(attestation),
+                "attestation_chain": asdict(attestation_chain),
                 "migration": asdict(transfer),
                 "release": release,
                 "final_state": final_state,
@@ -4295,7 +4328,10 @@ class OmoikaneReferenceOS:
                     != selection["active_substrate"]["substrate_kind"]
                     and signal["severity"] == "critical"
                     and signal["standby_substrate"] == standby["substrate_id"]
+                    and standby_probe.ready_for_migrate
                     and attestation.status == "healthy"
+                    and attestation_chain.handoff_ready
+                    and attestation_chain.expected_destination_substrate == standby["substrate_id"]
                     and transfer.destination_substrate == standby["substrate_id"]
                     and transfer.continuity_mode == "warm-standby"
                     and release["status"] == "released"
@@ -4313,6 +4349,10 @@ class OmoikaneReferenceOS:
                     and signal["scheduler_input"]["severity"] == "critical"
                 ),
                 "healthy_attestation_required": attestation.status == "healthy",
+                "standby_probe_ready": standby_probe.ready_for_migrate,
+                "attestation_chain_ready": attestation_chain.handoff_ready,
+                "attestation_chain_window_complete": len(attestation_chain.observations)
+                == attestation_chain.window_size,
                 "migration_binds_selected_standby": bool(
                     standby and transfer.destination_substrate == standby["substrate_id"]
                 ),

@@ -46,6 +46,10 @@ QualiaBuffer の tick_id が単調増加か。
 ### Substrate Migration Continuity
 substrate 移行前後で連続性ログにギャップがないか。
 
+### Substrate Broker Attestation Chain
+standby probe が readiness を満たし、healthy active attestation と
+3-beat bridge window が migrate 前に同じ destination/state digest を固定するか。
+
 ### Scheduler Stage Rollback
 AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ戻せるか。
 

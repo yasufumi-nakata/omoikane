@@ -273,13 +273,30 @@ entries:
       - docs/02-subsystems/substrate/README.md
     rationale: Required to express the ethics-coupled minimum energy floor.
   - priority: P1
+    kind: schema
+    file: specs/schemas/standby_health_probe.schema
+    consumers:
+      - specs/interfaces/kernel.broker.v0.idl
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - reference-runtime
+    rationale: Required to serialize one standby readiness probe with health, attestation validity, and energy headroom before broker failover.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/substrate_attestation_chain.schema
+    consumers:
+      - specs/interfaces/kernel.broker.v0.idl
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - evals/continuity/substrate_broker_attestation_chain.yaml
+      - reference-runtime
+    rationale: Required to serialize one bounded cross-substrate attestation bridge window before migrate.
+  - priority: P1
     kind: idl
     file: specs/interfaces/kernel.broker.v0.idl
     consumers:
       - docs/02-subsystems/kernel/substrate-broker.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make deterministic substrate selection, neutrality rotation, standby-bound migration, and energy-floor signals machine-readable.
+    rationale: Required to make deterministic substrate selection, standby probing, attestation bridging, standby-bound migration, and energy-floor signals machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.consensus_bus.v0.idl
@@ -1053,6 +1070,15 @@ entries:
       - docs/02-subsystems/kernel/substrate-broker.md
       - docs/07-reference-implementation/README.md
     rationale: Protects deterministic substrate neutrality rotation, one-active-plus-standby broker state, healthy-attestation gating, and energy-floor failover signaling.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/substrate_broker_attestation_chain.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/substrate-broker.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects standby readiness probing, healthy active attestation, and the fixed 3-beat cross-substrate attestation bridge before migrate.
   - priority: P1
     kind: eval
     file: evals/continuity/scheduler_stage_rollback.yaml

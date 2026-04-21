@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from ..substrate.adapter import (
     ClassicalSiliconAdapter,
     EnergyFloor,
@@ -16,9 +16,13 @@ from ..substrate.adapter import (
 )
 
 BROKER_POLICY_ID = "deterministic-substrate-neutrality-broker-v1"
+STANDBY_PROBE_POLICY_ID = "deterministic-standby-health-probe-v1"
+ATTESTATION_CHAIN_POLICY_ID = "bounded-cross-substrate-attestation-window-v1"
 MINIMUM_HEALTH_SCORE = 0.6
 CRITICAL_HEALTH_SCORE = 0.4
 NEUTRALITY_WINDOW = 2
+ATTESTATION_CHAIN_WINDOW = 3
+ATTESTATION_CHAIN_CADENCE_MS = 250
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,55 @@ class BrokerRegistryEntry:
             "standby_class": self.standby_class,
             "substrate_kind_neutrality_index": neutrality_index,
         }
+
+
+@dataclass(frozen=True)
+class StandbyHealthProbe:
+    """Bounded readiness probe for the pre-bound standby candidate."""
+
+    probe_id: str
+    identity_id: str
+    active_substrate_id: str
+    standby_substrate_id: str
+    standby_class: str
+    workload_class: str
+    health_score: float
+    attestation_valid: bool
+    observed_capacity_jps: int
+    required_energy_floor_jps: int
+    energy_headroom_jps: int
+    probe_status: str
+    ready_for_migrate: bool
+    observed_at: str
+    kind: str = "standby_health_probe"
+    schema_version: str = "1.0.0"
+
+
+@dataclass(frozen=True)
+class SubstrateAttestationChain:
+    """Deterministic attestation bridge between active and standby substrates."""
+
+    chain_id: str
+    identity_id: str
+    allocation_id: str
+    active_substrate_id: str
+    standby_substrate_id: str
+    source_attestation_id: str
+    standby_probe_id: str
+    continuity_mode: str
+    policy_id: str
+    window_size: int
+    cadence_ms: int
+    expected_state_digest: str
+    expected_destination_substrate: str
+    chain_status: str
+    handoff_ready: bool
+    observations: List[Dict[str, Any]]
+    blocking_reasons: List[str]
+    chain_digest: str
+    opened_at: str
+    kind: str = "substrate_attestation_chain"
+    schema_version: str = "1.0.0"
 
 
 class SubstrateBrokerService:
@@ -118,8 +171,26 @@ class SubstrateBrokerService:
             "critical_health_score": CRITICAL_HEALTH_SCORE,
             "neutrality_window": NEUTRALITY_WINDOW,
             "rotation_tie_breaker": "substrate_kind_neutrality_index",
-            "required_steps": ["lease", "attest", "migrate", "release"],
+            "required_steps": [
+                "lease",
+                "probe-standby",
+                "attest",
+                "bridge-attestation-chain",
+                "migrate",
+                "release",
+            ],
             "energy_floor_failover_action": "migrate-standby",
+            "standby_probe_policy": {
+                "policy_id": STANDBY_PROBE_POLICY_ID,
+                "minimum_ready_health_score": MINIMUM_HEALTH_SCORE,
+                "required_attestation_valid": True,
+            },
+            "attestation_chain_policy": {
+                "policy_id": ATTESTATION_CHAIN_POLICY_ID,
+                "window_size": ATTESTATION_CHAIN_WINDOW,
+                "cadence_ms": ATTESTATION_CHAIN_CADENCE_MS,
+                "required_source_status": "healthy",
+            },
         }
 
     def registry_snapshot(self) -> List[Dict[str, Any]]:
@@ -228,6 +299,8 @@ class SubstrateBrokerService:
             "method": method,
             "workload_class": workload_class,
             "last_attestation": None,
+            "last_standby_probe": None,
+            "last_attestation_chain": None,
             "transfer": None,
             "release": None,
         }
@@ -245,6 +318,130 @@ class SubstrateBrokerService:
         )
         lease["last_attestation"] = attestation
         return attestation
+
+    def probe_standby(
+        self,
+        identity_id: str,
+        *,
+        workload_class: Optional[str] = None,
+    ) -> StandbyHealthProbe:
+        lease = self._require_open_lease(identity_id)
+        standby_substrate_id = lease["standby_substrate_id"]
+        if not isinstance(standby_substrate_id, str) or not standby_substrate_id.strip():
+            raise ValueError("standby probe requires a pre-bound standby candidate")
+        workload = workload_class or str(lease["workload_class"])
+        required_floor = ClassicalSiliconAdapter.minimum_energy_floor_for(workload)
+        standby_entry = self._registry[standby_substrate_id]
+        energy_headroom = int(standby_entry.energy_capacity_jps) - int(required_floor)
+        ready_for_migrate = bool(
+            standby_entry.health_score >= MINIMUM_HEALTH_SCORE
+            and standby_entry.attestation_valid
+            and energy_headroom >= 0
+        )
+        probe = StandbyHealthProbe(
+            probe_id=new_id("standby-probe"),
+            identity_id=identity_id,
+            active_substrate_id=str(lease["active_substrate_id"]),
+            standby_substrate_id=standby_substrate_id,
+            standby_class=standby_entry.standby_class,
+            workload_class=workload,
+            health_score=round(float(standby_entry.health_score), 3),
+            attestation_valid=bool(standby_entry.attestation_valid),
+            observed_capacity_jps=int(standby_entry.energy_capacity_jps),
+            required_energy_floor_jps=int(required_floor),
+            energy_headroom_jps=int(energy_headroom),
+            probe_status="ready" if ready_for_migrate else "blocked",
+            ready_for_migrate=ready_for_migrate,
+            observed_at=utc_now_iso(),
+        )
+        lease["last_standby_probe"] = probe
+        return probe
+
+    def bridge_attestation_chain(
+        self,
+        identity_id: str,
+        *,
+        state: Mapping[str, Any],
+        continuity_mode: str = "warm-standby",
+    ) -> SubstrateAttestationChain:
+        lease = self._require_open_lease(identity_id)
+        if not state:
+            raise ValueError("state must not be empty")
+        attestation = lease["last_attestation"]
+        if attestation is None or attestation.status != "healthy":
+            raise PermissionError("healthy attestation required before bridging attestation chain")
+        probe = lease["last_standby_probe"]
+        if probe is None:
+            probe = self.probe_standby(identity_id)
+
+        blocking_reasons: List[str] = []
+        if not probe.ready_for_migrate:
+            blocking_reasons.append("standby probe must be ready before attestation chain bridging")
+        if continuity_mode == "warm-standby" and probe.standby_class == "cold-standby":
+            blocking_reasons.append("warm-standby continuity requires a hot-standby candidate")
+
+        expected_state_digest = sha256_text(canonical_json(dict(state)))
+        observations: List[Dict[str, Any]] = []
+        for sequence in range(1, ATTESTATION_CHAIN_WINDOW + 1):
+            observations.append(
+                {
+                    "sequence": sequence,
+                    "source_substrate_id": str(lease["active_substrate_id"]),
+                    "standby_substrate_id": probe.standby_substrate_id,
+                    "source_attestation_id": attestation.attestation_id,
+                    "source_status": attestation.status,
+                    "standby_probe_id": probe.probe_id,
+                    "standby_status": probe.probe_status,
+                    "energy_headroom_jps": probe.energy_headroom_jps,
+                    "expected_destination_substrate": probe.standby_substrate_id,
+                    "expected_state_digest": expected_state_digest,
+                    "observed_at": utc_now_iso(),
+                }
+            )
+
+        handoff_ready = not blocking_reasons
+        chain_status = "handoff-ready" if handoff_ready else "blocked"
+        chain_payload = {
+            "identity_id": identity_id,
+            "allocation_id": lease["allocation"].allocation_id,
+            "active_substrate_id": lease["active_substrate_id"],
+            "standby_substrate_id": probe.standby_substrate_id,
+            "source_attestation_id": attestation.attestation_id,
+            "standby_probe_id": probe.probe_id,
+            "continuity_mode": continuity_mode,
+            "policy_id": ATTESTATION_CHAIN_POLICY_ID,
+            "window_size": ATTESTATION_CHAIN_WINDOW,
+            "cadence_ms": ATTESTATION_CHAIN_CADENCE_MS,
+            "expected_state_digest": expected_state_digest,
+            "expected_destination_substrate": probe.standby_substrate_id,
+            "chain_status": chain_status,
+            "handoff_ready": handoff_ready,
+            "observations": observations,
+            "blocking_reasons": list(blocking_reasons),
+        }
+        chain = SubstrateAttestationChain(
+            chain_id=new_id("attestation-chain"),
+            identity_id=identity_id,
+            allocation_id=lease["allocation"].allocation_id,
+            active_substrate_id=str(lease["active_substrate_id"]),
+            standby_substrate_id=probe.standby_substrate_id,
+            source_attestation_id=attestation.attestation_id,
+            standby_probe_id=probe.probe_id,
+            continuity_mode=continuity_mode,
+            policy_id=ATTESTATION_CHAIN_POLICY_ID,
+            window_size=ATTESTATION_CHAIN_WINDOW,
+            cadence_ms=ATTESTATION_CHAIN_CADENCE_MS,
+            expected_state_digest=expected_state_digest,
+            expected_destination_substrate=probe.standby_substrate_id,
+            chain_status=chain_status,
+            handoff_ready=handoff_ready,
+            observations=observations,
+            blocking_reasons=list(blocking_reasons),
+            chain_digest=sha256_text(canonical_json(chain_payload)),
+            opened_at=utc_now_iso(),
+        )
+        lease["last_attestation_chain"] = chain
+        return chain
 
     def migrate(
         self,
@@ -329,6 +526,16 @@ class SubstrateBrokerService:
             "standby_substrate_id": lease["standby_substrate_id"],
             "last_attestation": (
                 asdict(lease["last_attestation"]) if lease["last_attestation"] is not None else None
+            ),
+            "last_standby_probe": (
+                asdict(lease["last_standby_probe"])
+                if lease["last_standby_probe"] is not None
+                else None
+            ),
+            "last_attestation_chain": (
+                asdict(lease["last_attestation_chain"])
+                if lease["last_attestation_chain"] is not None
+                else None
             ),
             "transfer": asdict(lease["transfer"]) if lease["transfer"] is not None else None,
             "release": deepcopy(lease["release"]),

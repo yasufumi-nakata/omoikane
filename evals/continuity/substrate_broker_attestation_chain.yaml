@@ -1,0 +1,26 @@
+eval_id: substrate_broker_attestation_chain
+target: kernel.broker
+level: L1
+description: >
+  SubstrateBroker が pre-bound standby candidate の readiness を probe し、
+  healthy source attestation と固定 3-beat attestation bridge window を通じて
+  migrate 前に expected state digest と destination を固定できること。
+fixtures:
+  - scenario: method_a_attestation_bridge
+    method: A
+    workload_class: migration
+    required_capability: 0.92
+    expected:
+      standby_probe_status: ready
+      chain_status: handoff-ready
+      window_size: 3
+      cadence_ms: 250
+assertions:
+  - Standby probe must expose health_score, attestation_valid, and energy_headroom_jps against the required floor
+  - ready_for_migrate must be true only when the standby candidate remains healthy, attested, and above the energy floor
+  - bridge_attestation_chain must fail closed unless the active broker attestation is healthy
+  - The attestation bridge window must keep one expected_state_digest and expected_destination_substrate across all observations
+  - handoff-ready status must require a ready standby probe before migrate
+metric: exact-match
+threshold: 1.0
+ethics_check: true
