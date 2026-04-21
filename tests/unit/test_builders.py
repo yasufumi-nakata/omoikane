@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from omoikane.governance import OversightService
 from omoikane.self_construction import (
     DesignReaderService,
     DifferentialEvaluatorService,
@@ -54,6 +55,57 @@ def _design_backed_request(
         council_session_id=f"sess-{request_id}",
         guardian_gate="pass",
     )
+
+
+def _rollback_oversight_event(*, rollback_plan_ref: str) -> dict[str, object]:
+    oversight = OversightService()
+    for reviewer_id, display_name, challenge_digest, verified_at in (
+        (
+            "human-reviewer-rollback-alpha",
+            "Rollback Review Alpha",
+            "sha256:rollback-reviewer-alpha-20260421",
+            "2026-04-21T00:00:00+00:00",
+        ),
+        (
+            "human-reviewer-rollback-beta",
+            "Rollback Review Beta",
+            "sha256:rollback-reviewer-beta-20260421",
+            "2026-04-21T00:05:00+00:00",
+        ),
+    ):
+        oversight.register_reviewer(
+            reviewer_id=reviewer_id,
+            display_name=display_name,
+            credential_id=f"credential-{reviewer_id}",
+            attestation_type="institutional-badge",
+            proof_ref=f"proof://rollback/{reviewer_id}/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-21T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref=f"legal://rollback/{reviewer_id}/v1",
+            escalation_contact=f"mailto:{reviewer_id}@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        oversight.verify_reviewer_from_network(
+            reviewer_id,
+            verifier_ref=f"verifier://guardian-oversight.jp/{reviewer_id}",
+            challenge_ref=f"challenge://rollback/{reviewer_id}/2026-04-21T00:00:00Z",
+            challenge_digest=challenge_digest,
+            jurisdiction_bundle_ref="legal://jp-13/rollback-integrity/v1",
+            jurisdiction_bundle_digest="sha256:jp13-rollback-integrity-v1",
+            verified_at=verified_at,
+            valid_until="2026-10-21T00:00:00+00:00",
+        )
+    event = oversight.record(
+        guardian_role="integrity",
+        category="attest",
+        payload_ref=rollback_plan_ref,
+        escalation_path=["guardian-oversight.jp", "rollback-review-board"],
+    )
+    event = oversight.attest(event["event_id"], reviewer_id="human-reviewer-rollback-alpha")
+    event = oversight.attest(event["event_id"], reviewer_id="human-reviewer-rollback-beta")
+    return event
 
 
 class DesignReaderServiceTests(unittest.TestCase):
@@ -265,10 +317,13 @@ class RollbackEngineServiceTests(unittest.TestCase):
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
+            guardian_oversight_event=_rollback_oversight_event(
+                rollback_plan_ref="rollback://build-l5-rollback-0001"
+            ),
         )
 
         self.assertEqual("rolled-back", session["status"])
-        self.assertEqual("1.5", session["schema_version"])
+        self.assertEqual("1.6", session["schema_version"])
         self.assertEqual(
             live_enactment_session["enactment_session_id"],
             session["live_enactment_session_id"],
@@ -315,6 +370,27 @@ class RollbackEngineServiceTests(unittest.TestCase):
         )
         self.assertTrue(session["checkout_mutation_receipt"]["observer_stash_state_preserved"])
         self.assertEqual("removed", session["checkout_mutation_receipt"]["cleanup_status"])
+        self.assertEqual("attest", session["guardian_oversight_event"]["category"])
+        self.assertEqual("integrity", session["guardian_oversight_event"]["guardian_role"])
+        self.assertEqual(
+            "rollback://build-l5-rollback-0001",
+            session["guardian_oversight_event"]["payload_ref"],
+        )
+        self.assertEqual(
+            "satisfied",
+            session["guardian_oversight_event"]["human_attestation"]["status"],
+        )
+        self.assertEqual(
+            2,
+            session["guardian_oversight_event"]["human_attestation"]["received_quorum"],
+        )
+        self.assertEqual(2, len(session["guardian_oversight_event"]["reviewer_bindings"]))
+        self.assertTrue(
+            all(
+                binding["network_receipt_id"] and binding["trust_root_ref"]
+                for binding in session["guardian_oversight_event"]["reviewer_bindings"]
+            )
+        )
         self.assertEqual("rollback-approved", session["telemetry_gate"]["status"])
         self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["executed_command_count"])
@@ -336,6 +412,12 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertTrue(session["telemetry_gate"]["external_observer_restored"])
         self.assertTrue(session["telemetry_gate"]["external_observer_stash_preserved"])
         self.assertTrue(session["telemetry_gate"]["external_observer_mutation_detected"])
+        self.assertEqual("satisfied", session["telemetry_gate"]["reviewer_oversight_status"])
+        self.assertEqual(2, session["telemetry_gate"]["reviewer_quorum_required"])
+        self.assertEqual(2, session["telemetry_gate"]["reviewer_quorum_received"])
+        self.assertEqual(2, session["telemetry_gate"]["reviewer_binding_count"])
+        self.assertEqual(2, session["telemetry_gate"]["reviewer_network_receipt_count"])
+        self.assertTrue(session["telemetry_gate"]["reviewer_network_attested"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
 

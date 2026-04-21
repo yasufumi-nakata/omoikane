@@ -353,7 +353,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("rolled-back", result["validation"]["rollback_status"])
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
-        self.assertEqual(4, result["validation"]["selected_eval_count"])
+        self.assertEqual(5, result["validation"]["selected_eval_count"])
         self.assertEqual(2, result["validation"]["reverted_patch_count"])
         self.assertEqual(2, result["validation"]["reverse_apply_journal_count"])
         self.assertEqual(2, result["validation"]["reverse_apply_command_count"])
@@ -375,6 +375,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(5, result["validation"]["external_observer_receipt_count"])
         self.assertTrue(result["validation"]["external_observer_restored"])
         self.assertTrue(result["validation"]["external_observer_stash_preserved"])
+        self.assertEqual("satisfied", result["validation"]["reviewer_oversight_status"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_required"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_received"])
+        self.assertEqual(2, result["validation"]["reviewer_binding_count"])
+        self.assertEqual(2, result["validation"]["reviewer_network_receipt_count"])
+        self.assertTrue(result["validation"]["reviewer_network_attested"])
+        self.assertTrue(result["validation"]["rollback_payload_ref_bound"])
         self.assertEqual("removed", result["validation"]["reverse_apply_cleanup_status"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],

@@ -7,7 +7,7 @@ summary: >
   current checkout baseline に束縛された repo-bound verification receipt、
   actual current checkout 自体を mutate/restore する direct worktree receipt、
   detached git worktree 上の checkout-bound mutation receipt と repo-root external observer receipt、
-  telemetry gate を通したうえで、
+  integrity reviewer の verifier-network attestation で rollback plan を束縛した telemetry gate を通したうえで、
   self/council/guardian への通知付きで append-only continuity rollback を完了すること
 checks:
   - name: builder rollback demo smoke

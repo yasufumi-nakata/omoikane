@@ -28,6 +28,7 @@ required:
   - repo_binding_summary
   - checkout_mutation_receipt
   - current_worktree_mutation_receipt
+  - guardian_oversight_event
   - telemetry_gate
   - continuity_event_refs
   - notification_refs
@@ -37,7 +38,7 @@ properties:
   kind:
     const: builder_rollback_session
   schema_version:
-    const: "1.5"
+    const: "1.6"
   rollback_session_id:
     type: string
     pattern: "^rollback-session-[a-f0-9]{12}$"
@@ -59,6 +60,7 @@ properties:
     required:
       - policy_id
       - required_eval
+      - required_oversight_eval
       - require_append_only_continuity
       - require_pre_apply_snapshot
       - require_notifications
@@ -68,6 +70,10 @@ properties:
       - require_checkout_mutation_receipt
       - require_current_worktree_mutation_receipt
       - require_external_observer_receipts
+      - require_reviewer_network_attestation
+      - required_oversight_guardian_role
+      - required_oversight_category
+      - required_oversight_quorum
       - rollback_workspace_prefix
       - checkout_mutation_strategy
       - checkout_worktree_prefix
@@ -81,10 +87,13 @@ properties:
     properties:
       policy_id:
         type: string
-        const: continuity-bound-builder-rollback-v6
+        const: continuity-bound-builder-rollback-v7
       required_eval:
         type: string
         const: evals/continuity/builder_rollback_execution.yaml
+      required_oversight_eval:
+        type: string
+        const: evals/continuity/builder_rollback_oversight_network.yaml
       require_append_only_continuity:
         type: boolean
         const: true
@@ -112,6 +121,18 @@ properties:
       require_external_observer_receipts:
         type: boolean
         const: true
+      require_reviewer_network_attestation:
+        type: boolean
+        const: true
+      required_oversight_guardian_role:
+        type: string
+        const: integrity
+      required_oversight_category:
+        type: string
+        const: attest
+      required_oversight_quorum:
+        type: integer
+        const: 2
       rollback_workspace_prefix:
         type: string
         const: omoikane-builder-rollback-
@@ -674,6 +695,8 @@ properties:
           - removed
           - retained
           - not-started
+  guardian_oversight_event:
+    $ref: "guardian_oversight_event.schema"
   telemetry_gate:
     type: object
     additionalProperties: false
@@ -703,6 +726,12 @@ properties:
       - external_observer_restored
       - external_observer_stash_preserved
       - external_observer_mutation_detected
+      - reviewer_oversight_status
+      - reviewer_quorum_required
+      - reviewer_quorum_received
+      - reviewer_binding_count
+      - reviewer_network_receipt_count
+      - reviewer_network_attested
       - journal_entry_count
       - reverted_stage_count
       - decision_basis
@@ -797,6 +826,26 @@ properties:
         type: boolean
       external_observer_mutation_detected:
         type: boolean
+      reviewer_oversight_status:
+        type: string
+        enum:
+          - satisfied
+          - pending
+          - breached
+      reviewer_quorum_required:
+        type: integer
+        minimum: 0
+      reviewer_quorum_received:
+        type: integer
+        minimum: 0
+      reviewer_binding_count:
+        type: integer
+        minimum: 0
+      reviewer_network_receipt_count:
+        type: integer
+        minimum: 0
+      reviewer_network_attested:
+        type: boolean
       journal_entry_count:
         type: integer
         minimum: 0
@@ -806,8 +855,8 @@ properties:
         maximum: 4
       decision_basis:
         type: array
-        minItems: 6
-        maxItems: 6
+        minItems: 7
+        maxItems: 7
         prefixItems:
           - type: string
             const: temp-workspace-cleaned
@@ -821,6 +870,8 @@ properties:
             const: checkout-state-restored
           - type: string
             const: current-worktree-state-restored
+          - type: string
+            const: reviewer-network-attested
       blocking_reasons:
         type: array
         items:
@@ -841,8 +892,8 @@ properties:
       pattern: "^notify://"
   preserved_invariants:
     type: array
-    minItems: 8
-    maxItems: 8
+    minItems: 9
+    maxItems: 9
     prefixItems:
       - type: string
         const: append-only-continuity
@@ -860,6 +911,8 @@ properties:
         const: current-worktree-state-restored
       - type: string
         const: external-observer-evidence-bound
+      - type: string
+        const: reviewer-network-attested-rollback
   executed_at:
     type: string
     format: date-time
@@ -912,6 +965,28 @@ allOf:
             - cleanup_status
             - mutation_detected
             - restored_matches_baseline
+        guardian_oversight_event:
+          properties:
+            guardian_role:
+              const: integrity
+            category:
+              const: attest
+            human_attestation:
+              properties:
+                required_quorum:
+                  const: 2
+                received_quorum:
+                  minimum: 2
+                status:
+                  const: satisfied
+              required:
+                - required_quorum
+                - received_quorum
+                - status
+          required:
+            - guardian_role
+            - category
+            - human_attestation
         continuity_event_refs:
           minItems: 2
         notification_refs:
@@ -925,21 +1000,34 @@ allOf:
               const: removed
             reverse_cleanup_status:
               const: removed
+            reviewer_oversight_status:
+              const: satisfied
+            reviewer_quorum_required:
+              const: 2
+            reviewer_quorum_received:
+              minimum: 2
+            reviewer_network_attested:
+              const: true
           required:
             - status
             - cleanup_status
             - reverse_cleanup_status
+            - reviewer_oversight_status
+            - reviewer_quorum_required
+            - reviewer_quorum_received
+            - reviewer_network_attested
 examples:
   - kind: builder_rollback_session
-    schema_version: "1.5"
+    schema_version: "1.6"
     rollback_session_id: rollback-session-0123456789ab
     request_id: build-l5-rollback-0001
     artifact_id: artifact-0123456789ab
     apply_receipt_id: sandbox-apply-0123456789ab
     rollout_session_id: rollout-session-0123456789ab
     policy:
-      policy_id: continuity-bound-builder-rollback-v6
+      policy_id: continuity-bound-builder-rollback-v7
       required_eval: evals/continuity/builder_rollback_execution.yaml
+      required_oversight_eval: evals/continuity/builder_rollback_oversight_network.yaml
       require_append_only_continuity: true
       require_pre_apply_snapshot: true
       require_notifications: true
@@ -949,6 +1037,10 @@ examples:
       require_checkout_mutation_receipt: true
       require_current_worktree_mutation_receipt: true
       require_external_observer_receipts: true
+      require_reviewer_network_attestation: true
+      required_oversight_guardian_role: integrity
+      required_oversight_category: attest
+      required_oversight_quorum: 2
       rollback_workspace_prefix: omoikane-builder-rollback-
       checkout_mutation_strategy: detached-git-worktree-overlay-v1
       checkout_worktree_prefix: omoikane-builder-rollback-worktree-
@@ -1165,6 +1257,63 @@ examples:
       mutation_detected: true
       restored_matches_baseline: true
       cleanup_status: removed
+    guardian_oversight_event:
+      kind: guardian_oversight_event
+      schema_version: 1.0.0
+      event_id: oversight-event-0123456789ab
+      recorded_at: "2026-04-21T00:05:00Z"
+      guardian_role: integrity
+      category: attest
+      payload_ref: rollback://build-l5-rollback-0001
+      human_attestation:
+        required_quorum: 2
+        received_quorum: 2
+        reviewers:
+          - human-reviewer-rollback-alpha
+          - human-reviewer-rollback-beta
+        status: satisfied
+        escalation_window_seconds: 604800
+      reviewer_bindings:
+        - reviewer_id: human-reviewer-rollback-alpha
+          credential_id: credential-rollback-alpha
+          proof_ref: proof://rollback/reviewer-alpha/v1
+          liability_mode: joint
+          legal_ack_ref: legal://rollback/reviewer-alpha/v1
+          verification_id: reviewer-verification-0123456789ab
+          verifier_ref: verifier://guardian-oversight.jp/reviewer-rollback-alpha
+          challenge_digest: sha256:rollback-reviewer-alpha-20260421
+          transport_profile: reviewer-live-proof-bridge-v1
+          jurisdiction_bundle_ref: legal://jp-13/rollback-integrity/v1
+          jurisdiction_bundle_digest: sha256:jp13-rollback-integrity-v1
+          network_receipt_id: verifier-network-receipt-0123456789ab
+          authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+          trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+          trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+          guardian_role: integrity
+          category: attest
+          attested_at: "2026-04-21T00:05:00Z"
+        - reviewer_id: human-reviewer-rollback-beta
+          credential_id: credential-rollback-beta
+          proof_ref: proof://rollback/reviewer-beta/v1
+          liability_mode: joint
+          legal_ack_ref: legal://rollback/reviewer-beta/v1
+          verification_id: reviewer-verification-fedcba987654
+          verifier_ref: verifier://guardian-oversight.jp/reviewer-rollback-beta
+          challenge_digest: sha256:rollback-reviewer-beta-20260421
+          transport_profile: reviewer-live-proof-bridge-v1
+          jurisdiction_bundle_ref: legal://jp-13/rollback-integrity/v1
+          jurisdiction_bundle_digest: sha256:jp13-rollback-integrity-v1
+          network_receipt_id: verifier-network-receipt-fedcba987654
+          authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+          trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+          trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+          guardian_role: integrity
+          category: attest
+          attested_at: "2026-04-21T00:06:00Z"
+      escalation_path:
+        - guardian-oversight.jp
+        - rollback-review-board
+      pin_breach_propagated: false
     telemetry_gate:
       gate_id: telemetry-gate-0123456789ab
       source_enactment_session_id: enactment-session-0123456789ab
@@ -1191,6 +1340,12 @@ examples:
       external_observer_restored: true
       external_observer_stash_preserved: true
       external_observer_mutation_detected: true
+      reviewer_oversight_status: satisfied
+      reviewer_quorum_required: 2
+      reviewer_quorum_received: 2
+      reviewer_binding_count: 2
+      reviewer_network_receipt_count: 2
+      reviewer_network_attested: true
       journal_entry_count: 2
       reverted_stage_count: 2
       decision_basis:
@@ -1200,6 +1355,7 @@ examples:
         - reverse-commands-verified
         - checkout-state-restored
         - current-worktree-state-restored
+        - reviewer-network-attested
       blocking_reasons: []
     continuity_event_refs:
       - ledger://self-modify/build-l5-rollback-0001
@@ -1217,4 +1373,5 @@ examples:
       - checkout-bound-state-restored
       - current-worktree-state-restored
       - external-observer-evidence-bound
+      - reviewer-network-attested-rollback
     executed_at: "2026-04-20T03:00:00Z"

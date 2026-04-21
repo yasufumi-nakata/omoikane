@@ -276,6 +276,7 @@ current checkout baseline に束縛された repo verification receipt、
 detached git worktree 上の checkout-bound mutation receipt、
 actual current checkout 自体を baseline へ戻す direct worktree receipt、
 repo-root の `git worktree list --porcelain` / `git stash list` による external observer receipt、
+rollback plan を payload に持つ integrity reviewer 2 名の verifier-network attestation event、
 cleanup 済み telemetry gate、
 append-only continuity ref 2 本、
 self / council / guardian の 3 者通知を

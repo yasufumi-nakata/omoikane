@@ -8070,6 +8070,7 @@ class OmoikaneReferenceOS:
                 "evals/continuity/builder_live_enactment_execution.yaml",
                 "evals/continuity/builder_staged_rollout_execution.yaml",
                 "evals/continuity/builder_rollback_execution.yaml",
+                "evals/continuity/builder_rollback_oversight_network.yaml",
             ],
             council_session_id="sess-builder-rollback-0001",
             guardian_gate="pass",
@@ -8119,6 +8120,68 @@ class OmoikaneReferenceOS:
             guardian_gate_status=build_request["approval_context"]["guardian_gate"],
         )
         rollout_session_validation = self.rollout_planner.validate_session(rollout_session)
+        reviewer_alpha = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-rollback-alpha",
+            display_name="Rollback Review Alpha",
+            credential_id="credential-rollback-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://rollback/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-21T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://rollback/reviewer-alpha/v1",
+            escalation_contact="mailto:rollback-alpha@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_beta = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-rollback-beta",
+            display_name="Rollback Review Beta",
+            credential_id="credential-rollback-beta",
+            attestation_type="institutional-badge",
+            proof_ref="proof://rollback/reviewer-beta/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-21T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://rollback/reviewer-beta/v1",
+            escalation_contact="mailto:rollback-beta@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_alpha = self.oversight.verify_reviewer_from_network(
+            reviewer_alpha["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-rollback-alpha",
+            challenge_ref="challenge://rollback/reviewer-alpha/2026-04-21T00:00:00Z",
+            challenge_digest="sha256:rollback-reviewer-alpha-20260421",
+            jurisdiction_bundle_ref="legal://jp-13/rollback-integrity/v1",
+            jurisdiction_bundle_digest="sha256:jp13-rollback-integrity-v1",
+            verified_at="2026-04-21T00:00:00+00:00",
+            valid_until="2026-10-21T00:00:00+00:00",
+        )
+        reviewer_beta = self.oversight.verify_reviewer_from_network(
+            reviewer_beta["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-rollback-beta",
+            challenge_ref="challenge://rollback/reviewer-beta/2026-04-21T00:05:00Z",
+            challenge_digest="sha256:rollback-reviewer-beta-20260421",
+            jurisdiction_bundle_ref="legal://jp-13/rollback-integrity/v1",
+            jurisdiction_bundle_digest="sha256:jp13-rollback-integrity-v1",
+            verified_at="2026-04-21T00:05:00+00:00",
+            valid_until="2026-10-21T00:00:00+00:00",
+        )
+        rollback_oversight_event = self.oversight.record(
+            guardian_role="integrity",
+            category="attest",
+            payload_ref=sandbox_apply_receipt["rollback_plan_ref"],
+            escalation_path=["guardian-oversight.jp", "rollback-review-board"],
+        )
+        rollback_oversight_event = self.oversight.attest(
+            rollback_oversight_event["event_id"],
+            reviewer_id=reviewer_alpha["reviewer_id"],
+        )
+        rollback_oversight_event = self.oversight.attest(
+            rollback_oversight_event["event_id"],
+            reviewer_id=reviewer_beta["reviewer_id"],
+        )
         rollback_session = self.rollback_engine.execute_rollback(
             build_request=build_request,
             apply_receipt=sandbox_apply_receipt,
@@ -8128,6 +8191,7 @@ class OmoikaneReferenceOS:
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
+            guardian_oversight_event=rollback_oversight_event,
         )
         rollback_session_validation = self.rollback_engine.validate_session(rollback_session)
         council_output = {
@@ -8288,6 +8352,16 @@ class OmoikaneReferenceOS:
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="guardian.rollback.attestation.satisfied",
+            payload=rollback_oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="selfctor.rollback.executed",
             payload={
                 "policy": self.rollback_engine.policy(),
@@ -8323,6 +8397,7 @@ class OmoikaneReferenceOS:
                 "eval_reports": eval_reports,
                 "rollout": rollout,
                 "rollout_session": rollout_session,
+                "rollback_guardian_oversight_event": rollback_oversight_event,
                 "rollback_session": rollback_session,
             },
             "validation": {
@@ -8406,6 +8481,31 @@ class OmoikaneReferenceOS:
                 "external_observer_stash_preserved": rollback_session[
                     "checkout_mutation_receipt"
                 ]["observer_stash_state_preserved"],
+                "reviewer_oversight_status": rollback_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["status"],
+                "reviewer_quorum_required": rollback_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["required_quorum"],
+                "reviewer_quorum_received": rollback_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["received_quorum"],
+                "reviewer_binding_count": len(
+                    rollback_session["guardian_oversight_event"]["reviewer_bindings"]
+                ),
+                "reviewer_network_receipt_count": sum(
+                    bool(binding["network_receipt_id"])
+                    for binding in rollback_session["guardian_oversight_event"][
+                        "reviewer_bindings"
+                    ]
+                ),
+                "reviewer_network_attested": rollback_session["telemetry_gate"][
+                    "reviewer_network_attested"
+                ],
+                "rollback_payload_ref_bound": (
+                    rollback_session["guardian_oversight_event"]["payload_ref"]
+                    == rollback_session["rollback_plan_ref"]
+                ),
                 "reverse_apply_cleanup_status": rollback_session["telemetry_gate"][
                     "reverse_cleanup_status"
                 ],

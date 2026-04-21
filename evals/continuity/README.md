@@ -77,6 +77,11 @@ builder staged rollout で regression が検出された時に、
 RollbackEngine が pre-apply Mirage Self snapshot を復元し、
 self / council / guardian 通知付きで append-only rollback を完了するか。
 
+### Builder Rollback Oversight Network
+builder rollback が integrity Guardian の attestation event に
+reviewer verifier-network receipt を 2 名分束縛したまま
+rollback-approved へ到達するか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 

@@ -506,7 +506,7 @@ entries:
       - specs/interfaces/selfctor.rollback.v0.idl
       - docs/04-ai-governance/self-modification.md
       - reference-runtime
-    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot, binds reverse-apply journal and actual reverse command receipts to live enactment evidence, and records rollback telemetry approval.
+    rationale: Required to serialize one continuity-bound builder rollback session that restores the pre-apply Mirage Self snapshot, binds reverse-apply journal and actual reverse command receipts to live enactment evidence, and records rollback telemetry approval together with reviewer verifier-network attestation.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.rollback.v0.idl
@@ -515,7 +515,7 @@ entries:
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make regression-triggered builder rollback execution, reverse-apply command verification, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make regression-triggered builder rollback execution, reverse-apply command verification, reviewer verifier-network attestation, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
@@ -1418,6 +1418,7 @@ entries:
     file: specs/schemas/guardian_oversight_event.schema
     consumers:
       - specs/interfaces/governance.oversight.v0.idl
+      - specs/schemas/builder_rollback_session.schema
       - specs/schemas/guardian_oversight_snapshot.schema
       - docs/04-ai-governance/guardian-oversight.md
       - reference-runtime
@@ -1611,6 +1612,15 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/07-reference-implementation/README.md
     rationale: Protects regression-triggered builder rollback, pre-apply snapshot restoration, append-only continuity refs, and stakeholder notification bindings.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/builder_rollback_oversight_network.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects integrity reviewer quorum, verifier-network receipt binding, and rollback plan attestation before telemetry gate approval.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

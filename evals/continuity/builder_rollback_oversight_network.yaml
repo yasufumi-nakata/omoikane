@@ -1,0 +1,20 @@
+eval_id: builder_rollback_oversight_network
+target: selfctor.rollback
+summary: >
+  Builder rollback が rollback plan に束縛された integrity Guardian の oversight event を持ち、
+  verifier-network で live verification された reviewer 2 名の attestation と
+  network receipt binding を telemetry gate へ焼き付けたうえで
+  rollback-approved になること
+checks:
+  - name: builder rollback oversight network smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
+expect:
+  rollback_status: rolled-back
+  reviewer_oversight_status: satisfied
+  reviewer_quorum_required: 2
+  reviewer_quorum_received: 2
+  reviewer_binding_count: 2
+  reviewer_network_receipt_count: 2
+  reviewer_network_attested: true
+  rollback_payload_ref_bound: true
+  telemetry_gate_status: rollback-approved

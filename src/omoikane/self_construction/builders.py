@@ -18,6 +18,9 @@ IMMUTABLE_BOUNDARIES = ("L1.EthicsEnforcer", "L1.ContinuityLedger")
 MANDATORY_BUILD_PIPELINE_EVAL = "evals/continuity/council_output_build_request_pipeline.yaml"
 MANDATORY_STAGED_ROLLOUT_EVAL = "evals/continuity/builder_staged_rollout_execution.yaml"
 MANDATORY_ROLLBACK_EVAL = "evals/continuity/builder_rollback_execution.yaml"
+MANDATORY_ROLLBACK_OVERSIGHT_EVAL = (
+    "evals/continuity/builder_rollback_oversight_network.yaml"
+)
 MANDATORY_LIVE_ENACTMENT_EVAL = "evals/continuity/builder_live_enactment_execution.yaml"
 ROLLOUT_STAGE_ORDER = (
     ("dark-launch", 0, "shadow-only", "shadow-match"),
@@ -319,6 +322,7 @@ class DifferentialEvaluationPolicy:
                 MANDATORY_LIVE_ENACTMENT_EVAL,
                 MANDATORY_STAGED_ROLLOUT_EVAL,
                 MANDATORY_ROLLBACK_EVAL,
+                MANDATORY_ROLLBACK_OVERSIGHT_EVAL,
             ),
         }
     )
@@ -670,8 +674,9 @@ class RolloutPlannerService:
 class RollbackEnginePolicy:
     """Deterministic rollback policy for builder sessions."""
 
-    policy_id: str = "continuity-bound-builder-rollback-v6"
+    policy_id: str = "continuity-bound-builder-rollback-v7"
     required_eval: str = MANDATORY_ROLLBACK_EVAL
+    required_oversight_eval: str = MANDATORY_ROLLBACK_OVERSIGHT_EVAL
     require_append_only_continuity: bool = True
     require_pre_apply_snapshot: bool = True
     require_notifications: bool = True
@@ -681,6 +686,10 @@ class RollbackEnginePolicy:
     require_checkout_mutation_receipt: bool = True
     require_current_worktree_mutation_receipt: bool = True
     require_external_observer_receipts: bool = True
+    require_reviewer_network_attestation: bool = True
+    required_oversight_guardian_role: str = "integrity"
+    required_oversight_category: str = "attest"
+    required_oversight_quorum: int = 2
     rollback_workspace_prefix: str = "omoikane-builder-rollback-"
     checkout_mutation_strategy: str = "detached-git-worktree-overlay-v1"
     checkout_worktree_prefix: str = "omoikane-builder-rollback-worktree-"
@@ -696,6 +705,7 @@ class RollbackEnginePolicy:
         return {
             "policy_id": self.policy_id,
             "required_eval": self.required_eval,
+            "required_oversight_eval": self.required_oversight_eval,
             "require_append_only_continuity": self.require_append_only_continuity,
             "require_pre_apply_snapshot": self.require_pre_apply_snapshot,
             "require_notifications": self.require_notifications,
@@ -705,6 +715,10 @@ class RollbackEnginePolicy:
             "require_checkout_mutation_receipt": self.require_checkout_mutation_receipt,
             "require_current_worktree_mutation_receipt": self.require_current_worktree_mutation_receipt,
             "require_external_observer_receipts": self.require_external_observer_receipts,
+            "require_reviewer_network_attestation": self.require_reviewer_network_attestation,
+            "required_oversight_guardian_role": self.required_oversight_guardian_role,
+            "required_oversight_category": self.required_oversight_category,
+            "required_oversight_quorum": self.required_oversight_quorum,
             "rollback_workspace_prefix": self.rollback_workspace_prefix,
             "checkout_mutation_strategy": self.checkout_mutation_strategy,
             "checkout_worktree_prefix": self.checkout_worktree_prefix,
@@ -738,11 +752,17 @@ class RollbackEngineService:
         trigger: str,
         reason: str,
         initiator: str,
+        guardian_oversight_event: Mapping[str, Any],
     ) -> Dict[str, Any]:
         reverted_patch_ids = list(apply_receipt.get("applied_patch_ids", []))
         rollback_ready = bool(apply_receipt.get("validation", {}).get("rollback_ready"))
         continuity_ref = str(apply_receipt.get("continuity_log_ref", ""))
+        rollback_plan_ref = str(apply_receipt.get("rollback_plan_ref", ""))
         live_enactment_ok = live_enactment_session.get("status") == "passed"
+        oversight_summary = self._validate_guardian_oversight_event(
+            guardian_oversight_event=guardian_oversight_event,
+            rollback_plan_ref=rollback_plan_ref,
+        )
         reverse_apply_journal, reverse_cleanup_status = self._build_reverse_apply_journal(
             build_request=build_request,
             live_enactment_session=live_enactment_session,
@@ -787,6 +807,7 @@ class RollbackEngineService:
             reverse_cleanup_status=reverse_cleanup_status,
             checkout_mutation_receipt=checkout_mutation_receipt,
             current_worktree_mutation_receipt=current_worktree_mutation_receipt,
+            oversight_summary=oversight_summary,
         )
         allowed = (
             apply_receipt.get("status") == "applied"
@@ -799,12 +820,13 @@ class RollbackEngineService:
             and repo_binding_summary["verified_path_count"] == len(reverse_apply_journal)
             and checkout_mutation_receipt["status"] == "verified"
             and current_worktree_mutation_receipt["status"] == "verified"
+            and oversight_summary["network_attested"]
             and telemetry_gate["status"] == "rollback-approved"
         )
 
         return {
             "kind": "builder_rollback_session",
-            "schema_version": "1.5",
+            "schema_version": "1.6",
             "rollback_session_id": new_id("rollback-session"),
             "request_id": build_request["request_id"],
             "artifact_id": apply_receipt["artifact_id"],
@@ -821,7 +843,7 @@ class RollbackEngineService:
             "restored_snapshot_ref": (
                 f"mirage://{build_request['request_id']}/snapshot/pre-apply" if allowed else ""
             ),
-            "rollback_plan_ref": str(apply_receipt.get("rollback_plan_ref", "")),
+            "rollback_plan_ref": rollback_plan_ref,
             "reverted_patch_ids": reverted_patch_ids if allowed else [],
             "reverted_patch_count": len(reverted_patch_ids) if allowed else 0,
             "reverted_stage_ids": reverted_stage_ids if allowed else [],
@@ -830,6 +852,7 @@ class RollbackEngineService:
             "repo_binding_summary": repo_binding_summary,
             "checkout_mutation_receipt": checkout_mutation_receipt,
             "current_worktree_mutation_receipt": current_worktree_mutation_receipt,
+            "guardian_oversight_event": dict(guardian_oversight_event),
             "telemetry_gate": (
                 telemetry_gate if allowed else self._build_blocked_telemetry_gate(telemetry_gate)
             ),
@@ -844,6 +867,7 @@ class RollbackEngineService:
                 "checkout-bound-state-restored",
                 "current-worktree-state-restored",
                 "external-observer-evidence-bound",
+                "reviewer-network-attested-rollback",
             ],
             "executed_at": utc_now_iso(),
         }
@@ -852,12 +876,41 @@ class RollbackEngineService:
         errors: list[str] = []
         if session.get("kind") != "builder_rollback_session":
             errors.append("kind must equal builder_rollback_session")
-        if session.get("schema_version") != "1.5":
-            errors.append("schema_version must equal 1.5")
+        if session.get("schema_version") != "1.6":
+            errors.append("schema_version must equal 1.6")
         if session.get("status") not in {"rolled-back", "blocked"}:
             errors.append("status must be rolled-back or blocked")
         if session.get("trigger") not in {"eval-regression", "guardian-veto", "manual-review"}:
             errors.append("trigger must be eval-regression, guardian-veto, or manual-review")
+        policy = dict(session.get("policy", {}))
+        if policy.get("policy_id") != self._policy.policy_id:
+            errors.append(f"policy.policy_id must equal {self._policy.policy_id}")
+        if policy.get("required_eval") != self._policy.required_eval:
+            errors.append(f"policy.required_eval must equal {self._policy.required_eval}")
+        if policy.get("required_oversight_eval") != self._policy.required_oversight_eval:
+            errors.append(
+                f"policy.required_oversight_eval must equal {self._policy.required_oversight_eval}"
+            )
+        if (
+            policy.get("require_reviewer_network_attestation")
+            != self._policy.require_reviewer_network_attestation
+        ):
+            errors.append("policy.require_reviewer_network_attestation must equal true")
+        if policy.get("required_oversight_guardian_role") != self._policy.required_oversight_guardian_role:
+            errors.append(
+                "policy.required_oversight_guardian_role must equal "
+                f"{self._policy.required_oversight_guardian_role}"
+            )
+        if policy.get("required_oversight_category") != self._policy.required_oversight_category:
+            errors.append(
+                "policy.required_oversight_category must equal "
+                f"{self._policy.required_oversight_category}"
+            )
+        if policy.get("required_oversight_quorum") != self._policy.required_oversight_quorum:
+            errors.append(
+                "policy.required_oversight_quorum must equal "
+                f"{self._policy.required_oversight_quorum}"
+            )
         repo_binding_summary = dict(session.get("repo_binding_summary", {}))
         if repo_binding_summary.get("binding_scope") != self._policy.repo_binding_scope:
             errors.append(
@@ -940,6 +993,12 @@ class RollbackEngineService:
             errors.append(
                 "current_worktree_mutation_receipt.verified_path_count must match verified path_receipts"
             )
+        rollback_plan_ref = str(session.get("rollback_plan_ref", ""))
+        oversight_summary = self._validate_guardian_oversight_event(
+            guardian_oversight_event=session.get("guardian_oversight_event", {}),
+            rollback_plan_ref=rollback_plan_ref,
+        )
+        errors.extend(oversight_summary["errors"])
         telemetry_gate = dict(session.get("telemetry_gate", {}))
         if session.get("status") == "rolled-back":
             if not str(session.get("live_enactment_session_id", "")).startswith("enactment-session-"):
@@ -1043,6 +1102,8 @@ class RollbackEngineService:
                 errors.append("continuity_event_refs must include apply and rollback refs")
             if len(list(session.get("notification_refs", []))) != 3:
                 errors.append("notification_refs must notify self, council, and guardian")
+            if not oversight_summary["network_attested"]:
+                errors.append("guardian_oversight_event must bind satisfied network-reviewed attestation")
             if telemetry_gate.get("status") != "rollback-approved":
                 errors.append("telemetry_gate.status must equal rollback-approved")
             if telemetry_gate.get("cleanup_status") != "removed":
@@ -1119,7 +1180,127 @@ class RollbackEngineService:
                 errors.append(
                     "telemetry_gate.current_worktree_verified_path_count must match reverse_apply_journal"
                 )
+            if telemetry_gate.get("reviewer_oversight_status") != "satisfied":
+                errors.append("telemetry_gate.reviewer_oversight_status must equal satisfied")
+            if (
+                int(telemetry_gate.get("reviewer_quorum_required", 0))
+                != self._policy.required_oversight_quorum
+            ):
+                errors.append(
+                    "telemetry_gate.reviewer_quorum_required must equal "
+                    f"{self._policy.required_oversight_quorum}"
+                )
+            if int(telemetry_gate.get("reviewer_quorum_received", 0)) < self._policy.required_oversight_quorum:
+                errors.append(
+                    "telemetry_gate.reviewer_quorum_received must satisfy required oversight quorum"
+                )
+            if int(telemetry_gate.get("reviewer_binding_count", 0)) < self._policy.required_oversight_quorum:
+                errors.append(
+                    "telemetry_gate.reviewer_binding_count must satisfy required oversight quorum"
+                )
+            if (
+                int(telemetry_gate.get("reviewer_network_receipt_count", 0))
+                < self._policy.required_oversight_quorum
+            ):
+                errors.append(
+                    "telemetry_gate.reviewer_network_receipt_count must satisfy required oversight quorum"
+                )
+            if not bool(telemetry_gate.get("reviewer_network_attested")):
+                errors.append("telemetry_gate.reviewer_network_attested must be true")
         return {"ok": not errors, "errors": errors}
+
+    def _validate_guardian_oversight_event(
+        self,
+        *,
+        guardian_oversight_event: Mapping[str, Any],
+        rollback_plan_ref: str,
+    ) -> Dict[str, Any]:
+        event = dict(guardian_oversight_event)
+        human_attestation = dict(event.get("human_attestation", {}))
+        reviewer_bindings = list(event.get("reviewer_bindings", []))
+        errors: list[str] = []
+        if event.get("kind") != "guardian_oversight_event":
+            errors.append("guardian_oversight_event.kind must equal guardian_oversight_event")
+        if event.get("guardian_role") != self._policy.required_oversight_guardian_role:
+            errors.append(
+                "guardian_oversight_event.guardian_role must equal "
+                f"{self._policy.required_oversight_guardian_role}"
+            )
+        if event.get("category") != self._policy.required_oversight_category:
+            errors.append(
+                "guardian_oversight_event.category must equal "
+                f"{self._policy.required_oversight_category}"
+            )
+        if rollback_plan_ref and event.get("payload_ref") != rollback_plan_ref:
+            errors.append("guardian_oversight_event.payload_ref must match rollback_plan_ref")
+        required_quorum = int(human_attestation.get("required_quorum", 0) or 0)
+        received_quorum = int(human_attestation.get("received_quorum", 0) or 0)
+        if required_quorum != self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.human_attestation.required_quorum must equal "
+                f"{self._policy.required_oversight_quorum}"
+            )
+        if human_attestation.get("status") != "satisfied":
+            errors.append("guardian_oversight_event.human_attestation.status must equal satisfied")
+        if received_quorum < self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.human_attestation.received_quorum must satisfy "
+                "required oversight quorum"
+            )
+        if len(reviewer_bindings) < self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.reviewer_bindings must satisfy required oversight quorum"
+            )
+        reviewer_ids: list[str] = []
+        network_receipt_count = 0
+        for binding in reviewer_bindings:
+            reviewer_id = str(binding.get("reviewer_id", ""))
+            if reviewer_id:
+                reviewer_ids.append(reviewer_id)
+            if binding.get("guardian_role") != self._policy.required_oversight_guardian_role:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings guardian_role must match rollback policy"
+                )
+            if binding.get("category") != self._policy.required_oversight_category:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings category must match rollback policy"
+                )
+            if binding.get("transport_profile") != "reviewer-live-proof-bridge-v1":
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings transport_profile must equal "
+                    "reviewer-live-proof-bridge-v1"
+                )
+            network_fields = (
+                "network_receipt_id",
+                "authority_chain_ref",
+                "trust_root_ref",
+                "trust_root_digest",
+            )
+            if all(binding.get(field) for field in network_fields):
+                network_receipt_count += 1
+            else:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings must include network receipt bindings"
+                )
+        if len(set(reviewer_ids)) != len(reviewer_ids):
+            errors.append("guardian_oversight_event reviewer bindings must be unique")
+        network_attested = (
+            required_quorum == self._policy.required_oversight_quorum
+            and received_quorum >= self._policy.required_oversight_quorum
+            and human_attestation.get("status") == "satisfied"
+            and len(reviewer_bindings) >= self._policy.required_oversight_quorum
+            and network_receipt_count >= self._policy.required_oversight_quorum
+            and not errors
+        )
+        return {
+            "errors": errors,
+            "status": str(human_attestation.get("status", "pending")),
+            "required_quorum": required_quorum,
+            "received_quorum": received_quorum,
+            "reviewer_binding_count": len(reviewer_bindings),
+            "network_receipt_count": network_receipt_count,
+            "network_attested": network_attested,
+        }
 
     def _build_reverse_apply_journal(
         self,
@@ -1218,6 +1399,7 @@ class RollbackEngineService:
         reverse_cleanup_status: str,
         checkout_mutation_receipt: Mapping[str, Any],
         current_worktree_mutation_receipt: Mapping[str, Any],
+        oversight_summary: Mapping[str, Any],
     ) -> Dict[str, Any]:
         command_runs = list(live_enactment_session.get("command_runs", []))
         passed_command_count = sum(run.get("status") == "pass" for run in command_runs)
@@ -1271,6 +1453,12 @@ class RollbackEngineService:
         external_observer_mutation_detected = bool(
             checkout_mutation_receipt.get("observer_mutation_detected")
         )
+        reviewer_oversight_status = str(oversight_summary.get("status", "pending"))
+        reviewer_quorum_required = int(oversight_summary.get("required_quorum", 0))
+        reviewer_quorum_received = int(oversight_summary.get("received_quorum", 0))
+        reviewer_binding_count = int(oversight_summary.get("reviewer_binding_count", 0))
+        reviewer_network_receipt_count = int(oversight_summary.get("network_receipt_count", 0))
+        reviewer_network_attested = bool(oversight_summary.get("network_attested"))
         blocking_reasons: list[str] = []
         if live_enactment_session.get("status") != "passed":
             blocking_reasons.append("live enactment must pass before rollback telemetry can approve")
@@ -1328,6 +1516,30 @@ class RollbackEngineService:
             blocking_reasons.append(
                 "external observer receipts must detect detached worktree mutation"
             )
+        if reviewer_oversight_status != "satisfied":
+            blocking_reasons.append(
+                "reviewer oversight attestation must satisfy rollback approval quorum"
+            )
+        if reviewer_quorum_required != self._policy.required_oversight_quorum:
+            blocking_reasons.append(
+                "reviewer oversight attestation must declare the fixed rollback quorum"
+            )
+        if reviewer_quorum_received < self._policy.required_oversight_quorum:
+            blocking_reasons.append(
+                "reviewer oversight attestation must meet the fixed rollback quorum"
+            )
+        if reviewer_binding_count < self._policy.required_oversight_quorum:
+            blocking_reasons.append(
+                "reviewer oversight attestation must bind every required rollback reviewer"
+            )
+        if reviewer_network_receipt_count < self._policy.required_oversight_quorum:
+            blocking_reasons.append(
+                "reviewer oversight attestation must bind verifier-network receipts"
+            )
+        if not reviewer_network_attested:
+            blocking_reasons.append(
+                "reviewer oversight attestation must remain network-attested"
+            )
         if checkout_cleanup_status != "removed":
             blocking_reasons.append("checkout-bound worktree cleanup must complete before approval")
         if checkout_mutation_status != "verified":
@@ -1373,6 +1585,12 @@ class RollbackEngineService:
             "external_observer_restored": external_observer_restored,
             "external_observer_stash_preserved": external_observer_stash_preserved,
             "external_observer_mutation_detected": external_observer_mutation_detected,
+            "reviewer_oversight_status": reviewer_oversight_status,
+            "reviewer_quorum_required": reviewer_quorum_required,
+            "reviewer_quorum_received": reviewer_quorum_received,
+            "reviewer_binding_count": reviewer_binding_count,
+            "reviewer_network_receipt_count": reviewer_network_receipt_count,
+            "reviewer_network_attested": reviewer_network_attested,
             "journal_entry_count": len(reverse_apply_journal),
             "reverted_stage_count": len(reverted_stage_ids),
             "decision_basis": [
@@ -1382,6 +1600,7 @@ class RollbackEngineService:
                 "reverse-commands-verified",
                 "checkout-state-restored",
                 "current-worktree-state-restored",
+                "reviewer-network-attested",
             ],
             "blocking_reasons": blocking_reasons,
         }

@@ -378,6 +378,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("rolled-back", result["validation"]["rollback_status"])
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
+        self.assertEqual(5, result["validation"]["selected_eval_count"])
         self.assertEqual(
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             result["validation"]["restored_snapshot_ref"],
@@ -403,6 +404,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(5, result["validation"]["external_observer_receipt_count"])
         self.assertTrue(result["validation"]["external_observer_restored"])
         self.assertTrue(result["validation"]["external_observer_stash_preserved"])
+        self.assertEqual("satisfied", result["validation"]["reviewer_oversight_status"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_required"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_received"])
+        self.assertEqual(2, result["validation"]["reviewer_binding_count"])
+        self.assertEqual(2, result["validation"]["reviewer_network_receipt_count"])
+        self.assertTrue(result["validation"]["reviewer_network_attested"])
+        self.assertTrue(result["validation"]["rollback_payload_ref_bound"])
         self.assertEqual("removed", result["validation"]["reverse_apply_cleanup_status"])
         self.assertEqual(
             ["dark-launch", "canary-5pct"],
@@ -414,6 +422,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["continuity_event_ref_count"])
         self.assertEqual(3, result["validation"]["notification_ref_count"])
         self.assertEqual("rolled-back", result["builder"]["rollback_session"]["status"])
+        self.assertEqual(
+            "satisfied",
+            result["builder"]["rollback_guardian_oversight_event"]["human_attestation"]["status"],
+        )
         self.assertEqual(9, result["ledger_verification"]["category_counts"]["self-modify"])
 
     def test_reasoning_demo_records_baseline_and_fallback(self) -> None:

@@ -80,6 +80,7 @@ reference runtime では `builder-demo` が
 `rollback-demo` は regression 検出時に
 `builder_rollback_session` を返し、canary rollback 後に
 pre-apply snapshot が復元されることに加え、
+rollback plan を payload にした integrity reviewer 2 名の verifier-network attestation event、
 live enactment receipt 由来の reverse-apply journal、
 temp rollback workspace での actual reverse-apply command receipt、
 current checkout baseline に照合した repo-bound verification receipt、
@@ -96,6 +97,7 @@ rollback を machine-checkable に承認することを確認する。
 - reference runtime では `RollbackEngineService` が
   `selfctor.rollback.v0` / `builder_rollback_session.schema` に従って
   self・Council・Guardian の 3 者通知、
+  rollback plan に束縛された reviewer verifier-network attestation event、
   reverse-apply journal、actual reverse-apply command receipt、
   repo-bound verification receipt、checkout-bound mutation receipt、
   current-worktree direct mutation receipt、live telemetry gate を必須にする

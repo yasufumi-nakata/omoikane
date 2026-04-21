@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.rollback.v0
 service: RollbackEngineService
-summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed, with actual reverse-apply commands, repo-bound verification, checkout-bound detached-worktree restoration, direct current-worktree mutation restoration, and repo-root external observer receipts executed before approval.
+summary: Restore the pre-apply Mirage Self snapshot when a staged builder rollout regresses or is vetoed, with actual reverse-apply commands, repo-bound verification, checkout-bound detached-worktree restoration, direct current-worktree mutation restoration, repo-root external observer receipts, and reviewer verifier-network attestation executed before approval.
 imports:
   build_request: ../schemas/build_request.yaml
   builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
@@ -20,6 +20,7 @@ operations:
           - apply_receipt_ref
           - rollout_session_ref
           - live_enactment_session_ref
+          - guardian_oversight_event_ref
           - trigger
           - reason
           - initiator
@@ -36,6 +37,9 @@ operations:
           live_enactment_session_ref:
             type: string
             pattern: "^enactment-session-[a-f0-9]{12}$"
+          guardian_oversight_event_ref:
+            type: string
+            pattern: "^oversight-event-[a-f0-9]{12}$"
           trigger:
             type: string
             enum:
@@ -54,6 +58,7 @@ operations:
       - sandbox apply receipt must be applied and rollback-ready
       - live enactment session must have passed and cleaned its temp workspace
       - staged rollout session must have decision=rollback
+      - guardian oversight event must attest the rollback plan with satisfied reviewer quorum
       - rollback plan must remain bound to the same build_request
     guarantees:
       - rollback restores the pre-apply Mirage Self snapshot
@@ -64,6 +69,7 @@ operations:
       - rollback replays the same mutation inside a detached git worktree checkout and requires the restored git status/diff digest to match the pre-mutation baseline
       - rollback replays the same mutation against the actual current checkout and requires the restored git status/diff digest to match the pre-mutation baseline
       - rollback binds repo-root git worktree/stash observer receipts that prove detached-worktree mutation and restored baseline visibility
+      - rollback binds an integrity-guardian oversight event whose reviewer bindings all carry verifier-network evidence
       - rollback telemetry gate binds live command receipts, reverse command receipts, cleanup, and verified journal coverage before approval
       - continuity evidence remains append-only
       - self, council, and guardian are all notified
