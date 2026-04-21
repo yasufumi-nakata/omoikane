@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_privileged_capture_acquisition.schema"
+title: DistributedTransportPrivilegedCaptureAcquisition
+description: >
+  Delegated privileged live-capture lease bound to one authenticated distributed
+  transport authority-route trace and one verified packet-capture export.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - acquisition_ref
+  - trace_ref
+  - trace_digest
+  - capture_ref
+  - capture_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - envelope_ref
+  - envelope_digest
+  - council_tier
+  - transport_profile
+  - acquisition_profile
+  - broker_profile
+  - privilege_mode
+  - lease_ref
+  - broker_attestation_ref
+  - interface_name
+  - local_ips
+  - capture_filter
+  - filter_digest
+  - route_binding_refs
+  - capture_command
+  - lease_duration_s
+  - lease_expires_at
+  - grant_status
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_transport_privileged_capture_acquisition
+  schema_version:
+    const: "1.0.0"
+  acquisition_ref:
+    type: string
+    pattern: "^authority-live-capture://"
+  trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  trace_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  capture_ref:
+    type: string
+    pattern: "^authority-packet-capture://"
+  capture_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  envelope_ref:
+    type: string
+    pattern: "^distributed-envelope-"
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  acquisition_profile:
+    const: bounded-live-interface-capture-acquisition-v1
+  broker_profile:
+    type: string
+    minLength: 1
+  privilege_mode:
+    const: delegated-broker
+  lease_ref:
+    type: string
+    pattern: "^capture-lease://"
+  broker_attestation_ref:
+    type: string
+    pattern: "^broker://"
+  interface_name:
+    type: string
+    minLength: 1
+  local_ips:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  capture_filter:
+    type: string
+    minLength: 1
+  filter_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  route_binding_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  capture_command:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  lease_duration_s:
+    type: integer
+    minimum: 1
+  lease_expires_at:
+    type: string
+    format: date-time
+  grant_status:
+    type: string
+    enum:
+      - granted
+      - rejected
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_privileged_capture_acquisition
+    schema_version: "1.0.0"
+    acquisition_ref: authority-live-capture://federation/route-nonce-abcdef123456
+    trace_ref: authority-route-trace://federation/route-nonce-abcdef123456
+    trace_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    capture_ref: authority-packet-capture://federation/route-nonce-abcdef123456
+    capture_digest: "1111111111111111111111111111111111111111111111111111111111111111"
+    authority_plane_ref: authority-plane://federation/route-nonce-abcdef123456
+    authority_plane_digest: "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567"
+    envelope_ref: distributed-envelope-0001
+    envelope_digest: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    acquisition_profile: bounded-live-interface-capture-acquisition-v1
+    broker_profile: delegated-privileged-capture-broker-v1
+    privilege_mode: delegated-broker
+    lease_ref: capture-lease://federation/route-nonce-abcdef123456
+    broker_attestation_ref: broker://authority-capture/route-nonce-abcdef123456
+    interface_name: en0
+    local_ips: [192.0.2.10]
+    capture_filter: >
+      tcp and ((src host 192.0.2.10 and src port 51000 and dst host 192.0.2.20 and dst port 443))
+    filter_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+    route_binding_refs:
+      - authority-route://federation/0011223344556677
+      - authority-route://federation/8899aabbccddeeff
+    capture_command:
+      - /usr/sbin/tcpdump
+      - -i
+      - en0
+      - -nn
+      - -U
+      - -w
+      - "{capture_output_path}"
+      - tcp and ((src host 192.0.2.10 and src port 51000 and dst host 192.0.2.20 and dst port 443))
+    lease_duration_s: 300
+    lease_expires_at: "2026-04-21T10:05:00Z"
+    grant_status: granted
+    recorded_at: "2026-04-21T10:00:00Z"
+    digest: "3333333333333333333333333333333333333333333333333333333333333333"

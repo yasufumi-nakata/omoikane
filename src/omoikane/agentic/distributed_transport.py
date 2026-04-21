@@ -57,6 +57,8 @@ AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
 AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
 AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
 AUTHORITY_ROUTE_PCAP_OS_NATIVE_PROFILE = "tcpdump-readback-v1"
+PRIVILEGED_CAPTURE_ACQUISITION_PROFILE = "bounded-live-interface-capture-acquisition-v1"
+PRIVILEGED_CAPTURE_PRIVILEGE_MODE = "delegated-broker"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -594,6 +596,72 @@ class DistributedTransportPacketCaptureExport:
             "os_native_readback_available": self.os_native_readback_available,
             "os_native_readback_ok": self.os_native_readback_ok,
             "export_status": self.export_status,
+            "recorded_at": self.recorded_at,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedTransportPrivilegedCaptureAcquisition:
+    """Delegated privileged live-capture lease bound to an authority route trace."""
+
+    acquisition_ref: str
+    trace_ref: str
+    trace_digest: str
+    capture_ref: str
+    capture_digest: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    envelope_ref: str
+    envelope_digest: str
+    council_tier: str
+    transport_profile: str
+    acquisition_profile: str
+    broker_profile: str
+    privilege_mode: str
+    lease_ref: str
+    broker_attestation_ref: str
+    interface_name: str
+    local_ips: List[str]
+    capture_filter: str
+    filter_digest: str
+    route_binding_refs: List[str]
+    capture_command: List[str]
+    lease_duration_s: int
+    lease_expires_at: str
+    grant_status: str
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_privileged_capture_acquisition",
+            "schema_version": "1.0.0",
+            "acquisition_ref": self.acquisition_ref,
+            "trace_ref": self.trace_ref,
+            "trace_digest": self.trace_digest,
+            "capture_ref": self.capture_ref,
+            "capture_digest": self.capture_digest,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "envelope_ref": self.envelope_ref,
+            "envelope_digest": self.envelope_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "acquisition_profile": self.acquisition_profile,
+            "broker_profile": self.broker_profile,
+            "privilege_mode": self.privilege_mode,
+            "lease_ref": self.lease_ref,
+            "broker_attestation_ref": self.broker_attestation_ref,
+            "interface_name": self.interface_name,
+            "local_ips": list(self.local_ips),
+            "capture_filter": self.capture_filter,
+            "filter_digest": self.filter_digest,
+            "route_binding_refs": list(self.route_binding_refs),
+            "capture_command": list(self.capture_command),
+            "lease_duration_s": self.lease_duration_s,
+            "lease_expires_at": self.lease_expires_at,
+            "grant_status": self.grant_status,
             "recorded_at": self.recorded_at,
             "digest": self.digest,
         }
@@ -1657,6 +1725,210 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def acquire_privileged_interface_capture(
+        self,
+        authority_route_trace: DistributedTransportAuthorityRouteTrace,
+        packet_capture_export: DistributedTransportPacketCaptureExport,
+        *,
+        broker_command: List[str],
+        lease_duration_s: int = 300,
+    ) -> DistributedTransportPrivilegedCaptureAcquisition:
+        if authority_route_trace.trace_status != "authenticated":
+            raise ValueError("privileged capture acquisition requires an authenticated authority route trace")
+        if packet_capture_export.export_status != "verified":
+            raise ValueError("privileged capture acquisition requires a verified packet capture export")
+        if packet_capture_export.trace_ref != authority_route_trace.trace_ref:
+            raise ValueError("privileged capture acquisition capture trace_ref must match authority route trace")
+        if packet_capture_export.trace_digest != authority_route_trace.digest:
+            raise ValueError("privileged capture acquisition capture trace_digest must match authority route trace")
+        if packet_capture_export.authority_plane_ref != authority_route_trace.authority_plane_ref:
+            raise ValueError(
+                "privileged capture acquisition capture authority_plane_ref must match authority route trace"
+            )
+        if packet_capture_export.authority_plane_digest != authority_route_trace.authority_plane_digest:
+            raise ValueError(
+                "privileged capture acquisition capture authority_plane_digest must match authority route trace"
+            )
+        if packet_capture_export.envelope_ref != authority_route_trace.envelope_ref:
+            raise ValueError("privileged capture acquisition capture envelope_ref must match authority route trace")
+        if packet_capture_export.envelope_digest != authority_route_trace.envelope_digest:
+            raise ValueError(
+                "privileged capture acquisition capture envelope_digest must match authority route trace"
+            )
+
+        broker_argv = self._normalize_string_sequence(broker_command, "broker_command")
+        lease_duration = self._require_positive_int(lease_duration_s, "lease_duration_s")
+        local_ips = sorted(
+            {
+                self._require_non_empty_string(binding["socket_trace"].get("local_ip"), "local_ip")
+                for binding in authority_route_trace.route_bindings
+            }
+        )
+        interface_names = sorted({self._discover_interface_for_ip(local_ip) for local_ip in local_ips})
+        if len(interface_names) != 1:
+            raise ValueError(
+                "privileged capture acquisition requires all traced local IPs to resolve to one interface"
+            )
+        interface_name = interface_names[0]
+        capture_filter = self._build_authority_route_capture_filter(authority_route_trace)
+        filter_digest = sha256_text(capture_filter)
+        route_binding_refs = sorted(
+            self._require_non_empty_string(binding.get("route_binding_ref"), "route_binding_ref")
+            for binding in authority_route_trace.route_bindings
+        )
+        tcpdump_path = shutil.which("tcpdump")
+        if not tcpdump_path:
+            raise ValueError("privileged capture acquisition requires tcpdump on PATH")
+        request_payload = {
+            "trace_ref": authority_route_trace.trace_ref,
+            "trace_digest": authority_route_trace.digest,
+            "capture_ref": packet_capture_export.capture_ref,
+            "capture_digest": packet_capture_export.digest,
+            "authority_plane_ref": authority_route_trace.authority_plane_ref,
+            "authority_plane_digest": authority_route_trace.authority_plane_digest,
+            "envelope_ref": authority_route_trace.envelope_ref,
+            "envelope_digest": authority_route_trace.envelope_digest,
+            "council_tier": authority_route_trace.council_tier,
+            "transport_profile": authority_route_trace.transport_profile,
+            "tcpdump_path": tcpdump_path,
+            "requested_interface": interface_name,
+            "local_ips": local_ips,
+            "capture_filter": capture_filter,
+            "filter_digest": filter_digest,
+            "route_binding_refs": route_binding_refs,
+            "lease_duration_s": lease_duration,
+        }
+        broker_result = subprocess.run(
+            broker_argv,
+            input=canonical_json(request_payload),
+            capture_output=True,
+            text=True,
+            check=False,
+            errors="replace",
+        )
+        if broker_result.returncode != 0:
+            raise ValueError("privileged capture acquisition broker command failed")
+        try:
+            broker_payload = json.loads(broker_result.stdout)
+        except json.JSONDecodeError as exc:
+            raise ValueError("privileged capture acquisition broker must return JSON") from exc
+        if not isinstance(broker_payload, Mapping):
+            raise ValueError("privileged capture acquisition broker payload must be a mapping")
+
+        broker_profile = self._require_non_empty_string(
+            broker_payload.get("broker_profile"),
+            "broker_profile",
+        )
+        privilege_mode = self._require_non_empty_string(
+            broker_payload.get("privilege_mode"),
+            "privilege_mode",
+        )
+        lease_ref = self._require_non_empty_string(broker_payload.get("lease_ref"), "lease_ref")
+        broker_attestation_ref = self._require_non_empty_string(
+            broker_payload.get("broker_attestation_ref"),
+            "broker_attestation_ref",
+        )
+        approved_interface = self._require_non_empty_string(
+            broker_payload.get("approved_interface"),
+            "approved_interface",
+        )
+        if approved_interface != interface_name:
+            raise ValueError("privileged capture acquisition broker must echo the resolved interface")
+        approved_filter_digest = self._require_sha256_hex(
+            broker_payload.get("approved_filter_digest"),
+            "approved_filter_digest",
+        )
+        if approved_filter_digest != filter_digest:
+            raise ValueError("privileged capture acquisition broker must echo the capture filter digest")
+        approved_route_binding_refs = sorted(
+            self._normalize_string_list(
+                broker_payload.get("route_binding_refs"),
+                "route_binding_refs",
+            )
+        )
+        if approved_route_binding_refs != route_binding_refs:
+            raise ValueError("privileged capture acquisition broker must bind every traced route")
+        capture_command = self._normalize_string_sequence(
+            broker_payload.get("capture_command"),
+            "capture_command",
+        )
+        if capture_command[0] != tcpdump_path:
+            raise ValueError("privileged capture acquisition capture_command must start with tcpdump")
+        if interface_name not in capture_command:
+            raise ValueError("privileged capture acquisition capture_command must bind the resolved interface")
+        if capture_filter not in capture_command:
+            raise ValueError("privileged capture acquisition capture_command must bind the capture filter")
+        grant_status = self._require_non_empty_string(broker_payload.get("grant_status"), "grant_status")
+        if grant_status not in {"granted", "rejected"}:
+            raise ValueError("grant_status must be granted or rejected")
+        lease_expires_at = self._require_non_empty_string(
+            broker_payload.get("lease_expires_at"),
+            "lease_expires_at",
+        )
+
+        recorded_at = utc_now_iso()
+        payload = {
+            "acquisition_ref": (
+                "authority-live-capture://"
+                f"{authority_route_trace.council_tier}/{authority_route_trace.trace_ref.split('/')[-1]}"
+            ),
+            "trace_ref": authority_route_trace.trace_ref,
+            "trace_digest": authority_route_trace.digest,
+            "capture_ref": packet_capture_export.capture_ref,
+            "capture_digest": packet_capture_export.digest,
+            "authority_plane_ref": authority_route_trace.authority_plane_ref,
+            "authority_plane_digest": authority_route_trace.authority_plane_digest,
+            "envelope_ref": authority_route_trace.envelope_ref,
+            "envelope_digest": authority_route_trace.envelope_digest,
+            "council_tier": authority_route_trace.council_tier,
+            "transport_profile": authority_route_trace.transport_profile,
+            "acquisition_profile": PRIVILEGED_CAPTURE_ACQUISITION_PROFILE,
+            "broker_profile": broker_profile,
+            "privilege_mode": privilege_mode,
+            "lease_ref": lease_ref,
+            "broker_attestation_ref": broker_attestation_ref,
+            "interface_name": interface_name,
+            "local_ips": local_ips,
+            "capture_filter": capture_filter,
+            "filter_digest": filter_digest,
+            "route_binding_refs": route_binding_refs,
+            "capture_command": capture_command,
+            "lease_duration_s": lease_duration,
+            "lease_expires_at": lease_expires_at,
+            "grant_status": grant_status,
+            "recorded_at": recorded_at,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportPrivilegedCaptureAcquisition(
+            acquisition_ref=payload["acquisition_ref"],
+            trace_ref=authority_route_trace.trace_ref,
+            trace_digest=authority_route_trace.digest,
+            capture_ref=packet_capture_export.capture_ref,
+            capture_digest=packet_capture_export.digest,
+            authority_plane_ref=authority_route_trace.authority_plane_ref,
+            authority_plane_digest=authority_route_trace.authority_plane_digest,
+            envelope_ref=authority_route_trace.envelope_ref,
+            envelope_digest=authority_route_trace.envelope_digest,
+            council_tier=authority_route_trace.council_tier,
+            transport_profile=authority_route_trace.transport_profile,
+            acquisition_profile=PRIVILEGED_CAPTURE_ACQUISITION_PROFILE,
+            broker_profile=broker_profile,
+            privilege_mode=privilege_mode,
+            lease_ref=lease_ref,
+            broker_attestation_ref=broker_attestation_ref,
+            interface_name=interface_name,
+            local_ips=local_ips,
+            capture_filter=capture_filter,
+            filter_digest=filter_digest,
+            route_binding_refs=route_binding_refs,
+            capture_command=capture_command,
+            lease_duration_s=lease_duration,
+            lease_expires_at=lease_expires_at,
+            grant_status=grant_status,
+            recorded_at=recorded_at,
+            digest=digest,
+        )
+
     def _capture_os_observer_receipt(
         self,
         *,
@@ -2480,6 +2752,15 @@ class DistributedTransportService:
                 normalized.append(text)
         return normalized
 
+    @classmethod
+    def _normalize_string_sequence(cls, values: Any, field_name: str) -> List[str]:
+        if not isinstance(values, list) or not values:
+            raise ValueError(f"{field_name} must be a non-empty list")
+        return [
+            cls._require_non_empty_string(value, f"{field_name}[{index}]")
+            for index, value in enumerate(values)
+        ]
+
     @staticmethod
     def _require_positive_float(value: Any, field_name: str) -> float:
         try:
@@ -2561,3 +2842,86 @@ class DistributedTransportService:
         if not isinstance(payload, Mapping):
             raise ValueError("authority route trace response payload must be a mapping")
         return http_status, dict(payload)
+
+    @classmethod
+    def _build_authority_route_capture_filter(
+        cls,
+        authority_route_trace: DistributedTransportAuthorityRouteTrace,
+    ) -> str:
+        clauses: List[str] = []
+        for binding in authority_route_trace.route_bindings:
+            socket_trace = binding.get("socket_trace")
+            if not isinstance(socket_trace, Mapping):
+                raise ValueError("authority route trace socket_trace must be a mapping")
+            local_ip = cls._require_non_empty_string(socket_trace.get("local_ip"), "local_ip")
+            remote_ip = cls._require_non_empty_string(socket_trace.get("remote_ip"), "remote_ip")
+            local_port = cls._require_positive_int(socket_trace.get("local_port"), "local_port")
+            remote_port = cls._require_positive_int(socket_trace.get("remote_port"), "remote_port")
+            clauses.append(
+                "("
+                f"src host {local_ip} and src port {local_port} and "
+                f"dst host {remote_ip} and dst port {remote_port}"
+                ")"
+            )
+            clauses.append(
+                "("
+                f"src host {remote_ip} and src port {remote_port} and "
+                f"dst host {local_ip} and dst port {local_port}"
+                ")"
+            )
+        if not clauses:
+            raise ValueError("authority route capture filter requires at least 1 traced route")
+        return "tcp and (" + " or ".join(clauses) + ")"
+
+    @classmethod
+    def _discover_interface_for_ip(cls, local_ip: str) -> str:
+        normalized_ip = cls._require_non_empty_string(local_ip, "local_ip")
+        for _, interface_name in socket.if_nameindex():
+            if cls._interface_has_ipv4(interface_name, normalized_ip):
+                return interface_name
+        raise ValueError(f"could not resolve a network interface for local_ip {normalized_ip}")
+
+    @staticmethod
+    def _interface_has_ipv4(interface_name: str, local_ip: str) -> bool:
+        ipconfig_path = shutil.which("ipconfig")
+        if ipconfig_path:
+            result = subprocess.run(
+                [ipconfig_path, "getifaddr", interface_name],
+                capture_output=True,
+                text=True,
+                check=False,
+                errors="replace",
+            )
+            if result.returncode == 0 and result.stdout.strip() == local_ip:
+                return True
+        ifconfig_path = shutil.which("ifconfig")
+        if ifconfig_path:
+            result = subprocess.run(
+                [ifconfig_path, interface_name],
+                capture_output=True,
+                text=True,
+                check=False,
+                errors="replace",
+            )
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 2 and parts[0] == "inet" and parts[1] == local_ip:
+                        return True
+        ip_path = shutil.which("ip")
+        if ip_path:
+            result = subprocess.run(
+                [ip_path, "-o", "-4", "addr", "show", "dev", interface_name],
+                capture_output=True,
+                text=True,
+                check=False,
+                errors="replace",
+            )
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    if " inet " not in line:
+                        continue
+                    inet_part = line.split(" inet ", 1)[1].split("/", 1)[0].strip()
+                    if inet_part == local_ip:
+                        return True
+        return False

@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import socket
 import ssl
+import sys
 import tempfile
 import threading
 import unittest
@@ -573,6 +574,52 @@ class DistributedTransportServiceTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join(timeout=1.0)
+
+    @contextmanager
+    def _privileged_capture_broker(self):
+        with tempfile.TemporaryDirectory(prefix="omoikane-capture-broker-test-") as broker_dir:
+            broker_script = f"{broker_dir}/capture_broker.py"
+            with open(broker_script, "w", encoding="utf-8") as handle:
+                handle.write(
+                    """from __future__ import annotations
+
+import datetime
+import json
+import sys
+
+payload = json.load(sys.stdin)
+lease_expires_at = (
+    datetime.datetime.now(datetime.timezone.utc)
+    + datetime.timedelta(seconds=int(payload["lease_duration_s"]))
+).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+trace_suffix = payload["trace_ref"].split("/")[-1]
+json.dump(
+    {
+        "broker_profile": "delegated-privileged-capture-broker-v1",
+        "privilege_mode": "delegated-broker",
+        "lease_ref": f"capture-lease://{payload['council_tier']}/{trace_suffix}",
+        "broker_attestation_ref": f"broker://authority-capture/{trace_suffix}",
+        "approved_interface": payload["requested_interface"],
+        "approved_filter_digest": payload["filter_digest"],
+        "route_binding_refs": payload["route_binding_refs"],
+        "capture_command": [
+            payload["tcpdump_path"],
+            "-i",
+            payload["requested_interface"],
+            "-nn",
+            "-U",
+            "-w",
+            "{capture_output_path}",
+            payload["capture_filter"],
+        ],
+        "grant_status": "granted",
+        "lease_expires_at": lease_expires_at,
+    },
+    sys.stdout,
+)
+""",
+                )
+            yield [sys.executable, broker_script]
 
     def test_federation_handoff_binds_liaison_quorum_and_guardian(self) -> None:
         service = DistributedTransportService()
@@ -1479,6 +1526,34 @@ class DistributedTransportServiceTests(unittest.TestCase):
         )
         if packet_capture_export.os_native_readback_available:
             self.assertTrue(packet_capture_export.os_native_readback_ok)
+        with self._privileged_capture_broker() as broker_command:
+            acquisition = service.acquire_privileged_interface_capture(
+                trace,
+                packet_capture_export,
+                broker_command=broker_command,
+                lease_duration_s=300,
+            )
+        self.assertEqual("granted", acquisition.grant_status)
+        self.assertEqual(
+            "bounded-live-interface-capture-acquisition-v1",
+            acquisition.acquisition_profile,
+        )
+        self.assertEqual("delegated-broker", acquisition.privilege_mode)
+        self.assertTrue(acquisition.interface_name)
+        self.assertEqual(
+            sorted(binding["route_binding_ref"] for binding in trace.route_bindings),
+            sorted(acquisition.route_binding_refs),
+        )
+        self.assertEqual(
+            sorted({binding["socket_trace"]["local_ip"] for binding in trace.route_bindings}),
+            sorted(acquisition.local_ips),
+        )
+        self.assertTrue(acquisition.capture_filter.startswith("tcp and ("))
+        self.assertTrue(acquisition.capture_command[0].endswith("tcpdump"))
+        self.assertIn("-i", acquisition.capture_command)
+        self.assertIn(acquisition.interface_name, acquisition.capture_command)
+        self.assertIn(acquisition.capture_filter, acquisition.capture_command)
+        self.assertTrue(acquisition.lease_ref.startswith("capture-lease://federation/"))
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

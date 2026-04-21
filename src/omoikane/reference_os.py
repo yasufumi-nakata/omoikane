@@ -11,6 +11,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 from typing import Any, Dict, List
@@ -1724,6 +1725,55 @@ class OmoikaneReferenceOS:
         packet_capture_export = self.distributed_transport.export_authority_route_packet_capture(
             authority_route_trace,
         )
+        with tempfile.TemporaryDirectory(prefix="omoikane-capture-broker-") as broker_dir:
+            broker_script = Path(broker_dir) / "capture_broker.py"
+            broker_script.write_text(
+                """from __future__ import annotations
+
+import datetime
+import json
+import sys
+
+payload = json.load(sys.stdin)
+lease_expires_at = (
+    datetime.datetime.now(datetime.timezone.utc)
+    + datetime.timedelta(seconds=int(payload["lease_duration_s"]))
+).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+command = [
+    payload["tcpdump_path"],
+    "-i",
+    payload["requested_interface"],
+    "-nn",
+    "-U",
+    "-w",
+    "{capture_output_path}",
+    payload["capture_filter"],
+]
+trace_suffix = payload["trace_ref"].split("/")[-1]
+response = {
+    "broker_profile": "delegated-privileged-capture-broker-v1",
+    "privilege_mode": "delegated-broker",
+    "lease_ref": f"capture-lease://{payload['council_tier']}/{trace_suffix}",
+    "broker_attestation_ref": f"broker://authority-capture/{trace_suffix}",
+    "approved_interface": payload["requested_interface"],
+    "approved_filter_digest": payload["filter_digest"],
+    "route_binding_refs": payload["route_binding_refs"],
+    "capture_command": command,
+    "grant_status": "granted",
+    "lease_expires_at": lease_expires_at,
+}
+json.dump(response, sys.stdout)
+""",
+                encoding="utf-8",
+            )
+            privileged_capture_acquisition = (
+                self.distributed_transport.acquire_privileged_interface_capture(
+                    authority_route_trace,
+                    packet_capture_export,
+                    broker_command=[sys.executable, str(broker_script)],
+                    lease_duration_s=300,
+                )
+            )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_root_directory_bound",
@@ -1778,6 +1828,16 @@ class OmoikaneReferenceOS:
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_packet_capture_exported",
             payload=packet_capture_export.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_privileged_capture_acquired",
+            payload=privileged_capture_acquisition.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -2030,6 +2090,9 @@ class OmoikaneReferenceOS:
             "packet_capture_export": {
                 "federation_rotated": packet_capture_export.to_dict(),
             },
+            "privileged_capture_acquisition": {
+                "federation_rotated": privileged_capture_acquisition.to_dict(),
+            },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
                 "federation_rotated": rotated_receipt.to_dict(),
@@ -2171,6 +2234,33 @@ class OmoikaneReferenceOS:
                 "authority_packet_capture_os_native_readback": (
                     not packet_capture_export.os_native_readback_available
                     or packet_capture_export.os_native_readback_ok
+                ),
+                "authority_privileged_capture_granted": (
+                    privileged_capture_acquisition.grant_status == "granted"
+                    and privileged_capture_acquisition.acquisition_profile
+                    == "bounded-live-interface-capture-acquisition-v1"
+                    and privileged_capture_acquisition.privilege_mode == "delegated-broker"
+                    and privileged_capture_acquisition.capture_command[0].endswith("tcpdump")
+                ),
+                "authority_privileged_capture_filter_bound": (
+                    privileged_capture_acquisition.trace_ref == authority_route_trace.trace_ref
+                    and privileged_capture_acquisition.capture_ref == packet_capture_export.capture_ref
+                    and privileged_capture_acquisition.filter_digest
+                    == sha256_text(privileged_capture_acquisition.capture_filter)
+                    and sorted(privileged_capture_acquisition.route_binding_refs)
+                    == sorted(
+                        binding["route_binding_ref"] for binding in authority_route_trace.route_bindings
+                    )
+                    and sorted(privileged_capture_acquisition.local_ips)
+                    == sorted(
+                        {
+                            binding["socket_trace"]["local_ip"]
+                            for binding in authority_route_trace.route_bindings
+                        }
+                    )
+                    and privileged_capture_acquisition.interface_name in privileged_capture_acquisition.capture_command
+                    and privileged_capture_acquisition.capture_filter
+                    in privileged_capture_acquisition.capture_command
                 ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"

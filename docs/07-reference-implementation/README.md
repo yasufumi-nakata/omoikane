@@ -172,6 +172,10 @@ authority plane の per-server digest と一致したときだけ `authenticated
 `trace-bound-pcap-export-v1` により PCAP artifact へ export され、
 in-process readback と `tcpdump` readback が
 tuple ごとの request/response byte count を再確認すること、
+さらに delegated broker 発行の
+`bounded-live-interface-capture-acquisition-v1` receipt が
+resolved interface / exact capture filter / route binding set / `tcpdump`
+command preview / lease ref / broker attestation ref を束縛すること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -481,5 +485,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- cross-host authority routing と privileged live interface capture acquisition
+- cross-host authority routing
 - automation による未実装ギャップの継続充填

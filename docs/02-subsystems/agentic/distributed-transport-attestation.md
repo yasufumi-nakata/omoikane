@@ -184,8 +184,30 @@ route tuple と payload length を packet-capture surface へ束縛する。
   tuple ごとの line match が揃った時だけ `os_native_readback_ok=true` にする
 - export は live privileged sniffing ではなく、
   authenticated route trace を packet-capture artifact へ落とし直す bounded contract である
-- そのため residual future work は broad な packet export 一般論ではなく、
-  cross-host route と privileged interface capture acquisition へ絞られる
+
+## Privileged capture acquisition
+
+verified な packet export に対しては
+`acquire_privileged_interface_capture` により、
+delegated broker が発行した live capture lease と command preview を
+route trace / packet export / resolved interface へ束縛する。
+
+| 項目 | 固定値 |
+|---|---|
+| acquisition profile | `bounded-live-interface-capture-acquisition-v1` |
+| privilege mode | `delegated-broker` |
+| capture tool preview | `tcpdump` |
+
+- acquisition は traced route の `local_ip` 群を 1 つの host interface へ解決し、
+  その interface 名を receipt に固定する
+- capture filter は traced route の双方向 tuple を全て束縛し、
+  `filter_digest` と `route_binding_refs` が broker lease に immutable binding される
+- delegated broker は `approved_interface` / `approved_filter_digest` /
+  `route_binding_refs` を echo しつつ `lease_ref` と `broker_attestation_ref` を返す
+- `capture_command` は `tcpdump` / resolved interface / exact filter を含む preview として固定し、
+  actual live capture 自体は repo 外の broker 実行面へ委譲する
+- residual future work は broad な packet capture 一般論ではなく、
+  cross-host authority routing へ絞られる
 
 ## Relay telemetry
 
@@ -220,6 +242,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_os_observer_receipt.schema`
 - schema: `specs/schemas/distributed_transport_authority_route_trace.schema`
 - schema: `specs/schemas/distributed_transport_packet_capture_export.schema`
+- schema: `specs/schemas/distributed_transport_privileged_capture_acquisition.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
@@ -229,6 +252,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - eval: `evals/agentic/distributed_transport_authority_churn.yaml`
 - eval: `evals/agentic/distributed_transport_authority_route_trace.yaml`
 - eval: `evals/agentic/distributed_transport_packet_capture_export.yaml`
+- eval: `evals/agentic/distributed_transport_privileged_capture_acquisition.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
@@ -238,3 +262,4 @@ receipt に束縛された bounded relay observability surface も返す。
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-os-observer-receipt.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-pcap-export.md`
+- decision log: `meta/decision-log/2026-04-21_distributed-transport-privileged-capture-acquisition.md`

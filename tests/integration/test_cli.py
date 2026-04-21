@@ -917,6 +917,20 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["authority_packet_capture_exported"])
         self.assertTrue(result["validation"]["authority_packet_capture_os_native_readback"])
+        self.assertEqual(
+            "granted",
+            result["privileged_capture_acquisition"]["federation_rotated"]["grant_status"],
+        )
+        self.assertEqual(
+            "bounded-live-interface-capture-acquisition-v1",
+            result["privileged_capture_acquisition"]["federation_rotated"]["acquisition_profile"],
+        )
+        self.assertEqual(
+            "delegated-broker",
+            result["privileged_capture_acquisition"]["federation_rotated"]["privilege_mode"],
+        )
+        self.assertTrue(result["validation"]["authority_privileged_capture_granted"])
+        self.assertTrue(result["validation"]["authority_privileged_capture_filter_bound"])
         self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
         self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])
         self.assertEqual(2, result["relay_telemetry"]["federation_rotated"]["hop_count"])

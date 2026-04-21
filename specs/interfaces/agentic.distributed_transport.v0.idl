@@ -14,6 +14,7 @@ imports:
   distributed_transport_os_observer_receipt: ../schemas/distributed_transport_os_observer_receipt.schema
   distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
   distributed_transport_packet_capture_export: ../schemas/distributed_transport_packet_capture_export.schema
+  distributed_transport_privileged_capture_acquisition: ../schemas/distributed_transport_privileged_capture_acquisition.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -336,6 +337,57 @@ operations:
       - exported PCAP must contain one outbound request packet and one inbound response packet per traced authority member
       - in-process readback must recover the same TCP tuples and payload lengths recorded by the route trace
       - tcpdump readback is optional, but when available it must confirm every exported route tuple
+  acquire_privileged_interface_capture:
+    summary: >
+      Acquire one delegated privileged live-capture lease for an authenticated authority-route trace
+      by binding the resolved host interface, exact route filter, and broker-issued command preview.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - trace_ref
+          - trace_digest
+          - capture_ref
+          - capture_digest
+          - authority_plane_ref
+          - authority_plane_digest
+          - broker_command
+        properties:
+          trace_ref:
+            type: string
+            pattern: "^authority-route-trace://"
+          trace_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          capture_ref:
+            type: string
+            pattern: "^authority-packet-capture://"
+          capture_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          broker_command:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          lease_duration_s:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_privileged_capture_acquisition
+    guarantees:
+      - privileged capture acquisition requires an authenticated authority-route trace and a verified packet-capture export
+      - all traced local IPs must resolve to exactly 1 host interface before a lease can be granted
+      - the capture filter must bind every traced route in both directions
+      - the delegated broker must echo the resolved interface, filter digest, and full route binding set
+      - the capture command preview must bind tcpdump, the resolved interface, and the exact capture filter
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -492,8 +544,11 @@ events:
   distributed.transport_packet_capture_exported:
     payload:
       schema_ref: distributed_transport_packet_capture_export
+  distributed.transport_privileged_capture_acquired:
+    payload:
+      schema_ref: distributed_transport_privileged_capture_acquisition
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, trace-bound PCAP export, multi-hop anti-replay, and bounded relay telemetry.
-    - Cross-host authority routing beyond the local machine and privileged live interface capture acquisition remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
+    - Cross-host authority routing beyond the local machine remains future work.

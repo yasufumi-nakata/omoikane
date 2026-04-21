@@ -58,6 +58,7 @@
 - `distributed_transport_authority_churn_window.schema`
 - `distributed_transport_authority_route_trace.schema`
 - `distributed_transport_packet_capture_export.schema`
+- `distributed_transport_privileged_capture_acquisition.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
@@ -87,7 +88,7 @@
 ## 次段階
 
 - continuous cross-substrate attestation streaming beyond the bounded dual-allocation window
-- cross-host authority routing + privileged live interface capture acquisition
+- cross-host authority routing
 
 ## 形式
 

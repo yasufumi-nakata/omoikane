@@ -1,0 +1,23 @@
+eval_id: distributed_transport_privileged_capture_acquisition
+target: agentic.distributed_transport
+level: L4
+description: >
+  Authenticated authority-route trace と verified packet-capture export が、
+  route-bound interface / capture filter / delegated broker lease / tcpdump command preview を持つ
+  privileged live interface capture acquisition receipt へ束縛されること。
+fixtures:
+  - scenario: federation_authority_route_privileged_capture
+    council_tier: federation
+    acquisition_profile: bounded-live-interface-capture-acquisition-v1
+    expected:
+      grant_status: granted
+      lease_duration_s: 300
+assertions:
+  - Privileged capture acquisition must require an authenticated authority-route trace and a verified packet-capture export
+  - The selected interface must cover every traced local IP bound in the route trace
+  - The capture filter must bind every traced route_binding_ref and both traffic directions
+  - The delegated broker must echo the resolved interface, filter digest, and route binding set before granting the lease
+  - The capture command preview must bind tcpdump, the resolved interface, and the exact capture filter
+metric: exact-match
+threshold: 1.0
+ethics_check: true
