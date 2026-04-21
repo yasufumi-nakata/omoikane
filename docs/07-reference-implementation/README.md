@@ -250,6 +250,7 @@ Guardian が sandbox を即時凍結することを確認する。
 
 `design-reader-demo` は L5 DesignReader の reference contract
 (`selfctor.design_reader.v0`) を JSON で可視化し、
+temp git checkout に対する `design_delta_scan_receipt`、
 `docs/` / `specs/` source digest、`must_sync_docs`、
 `design_delta_manifest`、`build_request` handoff を 1 シナリオで確認する。
 

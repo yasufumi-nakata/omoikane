@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 from omoikane.governance import OversightService
@@ -13,6 +17,54 @@ from omoikane.self_construction import (
     RolloutPlannerService,
     SandboxApplyService,
 )
+
+
+@contextmanager
+def _design_reader_demo_repo(
+    *,
+    design_refs: list[str],
+    spec_refs: list[str],
+):
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory(prefix="omoikane-design-reader-test-") as temp_dir:
+        fixture_root = Path(temp_dir)
+        refs = design_refs + spec_refs
+        for ref in refs:
+            source_path = repo_root / ref
+            target_path = fixture_root / ref
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, target_path)
+
+        for argv in (
+            ["git", "init", "-q"],
+            ["git", "config", "user.name", "Codex Builder"],
+            ["git", "config", "user.email", "codex@example.invalid"],
+            ["git", "add", *refs],
+            ["git", "commit", "-q", "-m", "baseline"],
+        ):
+            completed = subprocess.run(
+                argv,
+                cwd=fixture_root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(f"fixture command failed: {' '.join(argv)} :: {completed.stderr}")
+
+        design_path = fixture_root / design_refs[0]
+        design_path.write_text(
+            design_path.read_text(encoding="utf-8")
+            + "\n- delta-scan note: builder handoff narrowed before emission\n",
+            encoding="utf-8",
+        )
+        spec_path = fixture_root / spec_refs[0]
+        spec_path.write_text(
+            spec_path.read_text(encoding="utf-8")
+            + "\n# delta-scan note: git-bound receipt required when available\n",
+            encoding="utf-8",
+        )
+        yield fixture_root
 
 
 def _design_backed_request(
@@ -109,6 +161,44 @@ def _rollback_oversight_event(*, rollback_plan_ref: str) -> dict[str, object]:
 
 
 class DesignReaderServiceTests(unittest.TestCase):
+    def test_scan_repo_delta_detects_modified_design_and_spec_refs(self) -> None:
+        reader = DesignReaderService()
+        design_refs = [
+            "docs/02-subsystems/self-construction/README.md",
+            "docs/04-ai-governance/codex-as-builder.md",
+        ]
+        spec_refs = [
+            "specs/interfaces/selfctor.design_reader.v0.idl",
+            "specs/schemas/design_delta_manifest.schema",
+        ]
+
+        with _design_reader_demo_repo(design_refs=design_refs, spec_refs=spec_refs) as fixture_root:
+            receipt = reader.scan_repo_delta(
+                design_refs=design_refs,
+                spec_refs=spec_refs,
+                repo_root=fixture_root,
+            )
+
+        self.assertEqual("delta-detected", receipt["status"])
+        self.assertEqual(4, receipt["ref_count"])
+        self.assertEqual(2, receipt["changed_ref_count"])
+        self.assertEqual(1, receipt["changed_design_ref_count"])
+        self.assertEqual(1, receipt["changed_spec_ref_count"])
+        self.assertEqual(2, len(receipt["command_receipts"]))
+        self.assertTrue(str(receipt["receipt_ref"]).startswith("design-scan://"))
+        changed_refs = {
+            entry["ref"]: entry["change_status"]
+            for entry in receipt["entries"]
+            if entry["change_status"] != "unchanged"
+        }
+        self.assertEqual(
+            {
+                "docs/02-subsystems/self-construction/README.md": "modified",
+                "specs/interfaces/selfctor.design_reader.v0.idl": "modified",
+            },
+            changed_refs,
+        )
+
     def test_prepare_build_request_binds_design_delta_manifest(self) -> None:
         request = _design_backed_request(
             target_subsystem="L5.DesignReader",

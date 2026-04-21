@@ -4,9 +4,43 @@ namespace: selfctor.design_reader.v0
 service: DesignReaderService
 summary: Reduce docs/spec references into a bounded design-delta handoff before build_request emission.
 imports:
+  design_delta_scan_receipt: ../schemas/design_delta_scan_receipt.schema
   design_delta_manifest: ../schemas/design_delta_manifest.schema
   build_request: ../schemas/build_request.yaml
 operations:
+  scan_repo_delta:
+    summary: Scan one git checkout and emit a machine-checkable delta receipt for the referenced docs/spec files.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - repo_root_ref
+          - design_refs
+          - spec_refs
+        properties:
+          repo_root_ref:
+            type: string
+            minLength: 1
+          design_refs:
+            type: array
+            items:
+              type: string
+              pattern: "^docs/"
+          spec_refs:
+            type: array
+            items:
+              type: string
+              pattern: "^specs/"
+    output:
+      schema_ref: design_delta_scan_receipt
+    preconditions:
+      - repo_root_ref must resolve to a git checkout the runtime can read
+      - every design_ref must stay under docs/
+      - every spec_ref must stay under specs/
+    guarantees:
+      - the receipt must bind the resolved HEAD commit and per-ref baseline/current digests
+      - changed_ref_count must count modified, added, and removed refs relative to HEAD
+      - command receipts must expose the git HEAD and git status probes used for the scan
   read_design_delta:
     summary: Read docs/spec references, compute source digests, and emit a design-delta manifest.
     input:
@@ -56,6 +90,7 @@ operations:
       - output_paths must remain inside workspace_scope
     guarantees:
       - ready manifests include digests for every referenced design/spec file
+      - when paired with scan_repo_delta, ready manifests may bind the optional source_delta_receipt
       - immutable safety boundaries are bound into the downstream handoff
       - must_sync_docs remains a subset of design_refs
   validate_manifest:
@@ -112,6 +147,9 @@ operations:
 compatibility:
   stability: bootstrap
 events:
+  - name: selfctor.design.delta_scanned
+    payload:
+      schema_ref: design_delta_scan_receipt
   - name: selfctor.design.read
     payload:
       schema_ref: design_delta_manifest

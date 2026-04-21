@@ -7,8 +7,10 @@ from dataclasses import asdict
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import shutil
 import socket
 import ssl
+import subprocess
 import tempfile
 import threading
 from typing import Any, Dict, List
@@ -293,6 +295,7 @@ class OmoikaneReferenceOS:
         must_pass: List[str],
         council_session_id: str,
         guardian_gate: str,
+        source_delta_receipt: Dict[str, Any] | None = None,
     ) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         design_packet = self._builder_design_packet(
             target_subsystem=target_subsystem,
@@ -310,6 +313,7 @@ class OmoikaneReferenceOS:
                 output_paths=design_packet["output_paths"],
                 must_sync_docs=design_packet["must_sync_docs"],
                 repo_root=self.repo_root,
+                source_delta_receipt=source_delta_receipt,
             )
         )
         design_validation = self.design_reader.validate_manifest(design_manifest)
@@ -322,6 +326,56 @@ class OmoikaneReferenceOS:
             guardian_gate=guardian_gate,
         )
         return design_manifest, design_validation, build_request
+
+    @contextmanager
+    def _design_reader_demo_repo(
+        self,
+        *,
+        design_refs: List[str],
+        spec_refs: List[str],
+    ):
+        with tempfile.TemporaryDirectory(prefix="omoikane-design-reader-demo-") as temp_dir:
+            repo_root = Path(temp_dir)
+            refs = design_refs + spec_refs
+            for ref in refs:
+                source_path = self.repo_root / ref
+                target_path = repo_root / ref
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, target_path)
+
+            self._run_repo_command(repo_root, ["git", "init", "-q"])
+            self._run_repo_command(repo_root, ["git", "config", "user.name", "Codex Builder"])
+            self._run_repo_command(repo_root, ["git", "config", "user.email", "codex@example.invalid"])
+            self._run_repo_command(repo_root, ["git", "add", *refs])
+            self._run_repo_command(repo_root, ["git", "commit", "-q", "-m", "baseline"])
+
+            design_mutation_path = repo_root / design_refs[0]
+            design_mutation_path.write_text(
+                design_mutation_path.read_text(encoding="utf-8")
+                + "\n- delta-scan note: builder handoff narrowed before emission\n",
+                encoding="utf-8",
+            )
+            spec_mutation_path = repo_root / spec_refs[0]
+            spec_mutation_path.write_text(
+                spec_mutation_path.read_text(encoding="utf-8")
+                + "\n# delta-scan note: git-bound receipt required when available\n",
+                encoding="utf-8",
+            )
+            yield repo_root
+
+    @staticmethod
+    def _run_repo_command(repo_root: Path, argv: List[str]) -> None:
+        completed = subprocess.run(
+            argv,
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"repo fixture command failed: {' '.join(argv)} :: {completed.stderr.strip()}"
+            )
 
     def _bootstrap_trust(self) -> None:
         self.trust.register_agent(
@@ -7720,31 +7774,77 @@ class OmoikaneReferenceOS:
             human_consent_proof="consent://design-reader-demo/v1",
             metadata={"display_name": "Design Reader Sandbox"},
         )
-        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
-            target_subsystem="L5.DesignReader",
-            change_summary=(
-                "Materialize docs/specs-derived builder handoff planning before patch generation."
-            ),
-            spec_refs=[
-                "specs/interfaces/selfctor.design_reader.v0.idl",
-                "specs/interfaces/selfctor.patch_generator.v0.idl",
-                "specs/schemas/design_delta_manifest.schema",
-                "specs/schemas/build_request.yaml",
-            ],
-            output_paths=[
-                "src/omoikane/self_construction/",
-                "tests/unit/",
-                "tests/integration/",
-                "docs/02-subsystems/self-construction/",
-                "docs/04-ai-governance/",
-                "evals/continuity/",
-                "meta/decision-log/",
-            ],
-            request_id="build-l5-design-reader-0001",
-            change_class="feature-addition",
-            must_pass=["evals/continuity/design_reader_handoff.yaml"],
-            council_session_id="sess-design-reader-0001",
-            guardian_gate="pass",
+        design_refs = [
+            "docs/02-subsystems/self-construction/README.md",
+            "docs/04-ai-governance/codex-as-builder.md",
+            "docs/04-ai-governance/self-modification.md",
+        ]
+        spec_refs = [
+            "specs/interfaces/selfctor.design_reader.v0.idl",
+            "specs/interfaces/selfctor.patch_generator.v0.idl",
+            "specs/schemas/design_delta_manifest.schema",
+            "specs/schemas/build_request.yaml",
+        ]
+        with self._design_reader_demo_repo(
+            design_refs=design_refs,
+            spec_refs=spec_refs,
+        ) as demo_repo_root:
+            delta_scan = self.design_reader.scan_repo_delta(
+                design_refs=design_refs,
+                spec_refs=spec_refs,
+                repo_root=demo_repo_root,
+            )
+            design_manifest = self.design_reader.finalize_manifest(
+                self.design_reader.read_design_delta(
+                    target_subsystem="L5.DesignReader",
+                    change_summary=(
+                        "Materialize docs/specs-derived builder handoff planning before patch generation."
+                    ),
+                    design_refs=design_refs,
+                    spec_refs=spec_refs,
+                    workspace_scope=[
+                        "src/",
+                        "tests/",
+                        "specs/",
+                        "evals/",
+                        "docs/",
+                        "meta/decision-log/",
+                    ],
+                    output_paths=[
+                        "src/omoikane/self_construction/",
+                        "tests/unit/",
+                        "tests/integration/",
+                        "docs/02-subsystems/self-construction/",
+                        "docs/04-ai-governance/",
+                        "evals/continuity/",
+                        "meta/decision-log/",
+                    ],
+                    must_sync_docs=design_refs,
+                    repo_root=demo_repo_root,
+                    source_delta_receipt=delta_scan,
+                )
+            )
+            design_validation = self.design_reader.validate_manifest(design_manifest)
+            build_request = self.design_reader.prepare_build_request(
+                manifest=design_manifest,
+                request_id="build-l5-design-reader-0001",
+                change_class="feature-addition",
+                must_pass=[
+                    "evals/continuity/design_reader_handoff.yaml",
+                    "evals/continuity/design_reader_git_delta_scan.yaml",
+                ],
+                council_session_id="sess-design-reader-0001",
+                guardian_gate="pass",
+            )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.delta_scanned",
+            payload=delta_scan,
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7752,6 +7852,7 @@ class OmoikaneReferenceOS:
             payload={
                 "policy": self.design_reader.policy(),
                 "manifest": design_manifest,
+                "source_delta_receipt": delta_scan,
                 "validation": design_validation,
             },
             actor="DesignReaderService",
@@ -7767,6 +7868,7 @@ class OmoikaneReferenceOS:
             },
             "design_reader": {
                 "policy": self.design_reader.policy(),
+                "source_delta_receipt": delta_scan,
                 "manifest": design_manifest,
                 "build_request": build_request,
             },
@@ -7775,6 +7877,15 @@ class OmoikaneReferenceOS:
                 "manifest_status": design_manifest["status"],
                 "source_digest_count": len(design_manifest["source_digests"]),
                 "must_sync_docs_count": len(build_request["must_sync_docs"]),
+                "delta_scan_status": delta_scan["status"],
+                "delta_scan_changed_ref_count": delta_scan["changed_ref_count"],
+                "delta_scan_changed_design_ref_count": delta_scan["changed_design_ref_count"],
+                "delta_scan_changed_spec_ref_count": delta_scan["changed_spec_ref_count"],
+                "delta_scan_command_receipt_count": len(delta_scan["command_receipts"]),
+                "delta_scan_bound_to_manifest": design_manifest.get("source_delta_receipt", {}).get(
+                    "receipt_digest"
+                )
+                == delta_scan["receipt_digest"],
                 "council_review_required": design_manifest["council_review_required"],
                 "guardian_review_required": design_manifest["guardian_review_required"],
                 "build_request_has_design_delta_ref": build_request["design_delta_ref"]

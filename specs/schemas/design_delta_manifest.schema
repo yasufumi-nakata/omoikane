@@ -144,6 +144,8 @@ properties:
   design_delta_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  source_delta_receipt:
+    $ref: "design_delta_scan_receipt.schema"
   blocking_rules:
     type: array
     items:
@@ -210,7 +212,67 @@ examples:
         error: ""
     recommended_evals:
       - evals/continuity/design_reader_handoff.yaml
+      - evals/continuity/design_reader_git_delta_scan.yaml
     council_review_required: true
     guardian_review_required: true
     design_delta_ref: design://design-delta-0001
     design_delta_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    source_delta_receipt:
+      kind: design_delta_scan_receipt
+      schema_version: 1.0.0
+      receipt_id: design-delta-scan-0123456789ab
+      receipt_ref: design-scan://design-delta-scan-0123456789ab
+      profile_id: git-head-design-delta-v1
+      repo_root: /tmp/omoikane-design-reader-demo
+      head_commit: 0123456789abcdef0123456789abcdef01234567
+      status: delta-detected
+      scanned_at: "2026-04-21T07:00:00Z"
+      ref_count: 3
+      changed_ref_count: 2
+      changed_design_ref_count: 1
+      changed_spec_ref_count: 1
+      entries:
+        - ref: docs/02-subsystems/self-construction/README.md
+          kind: design
+          working_tree_state: modified
+          change_status: modified
+          baseline_present: true
+          current_present: true
+          baseline_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+          baseline_bytes: 2048
+          current_bytes: 2088
+        - ref: specs/interfaces/selfctor.design_reader.v0.idl
+          kind: spec
+          working_tree_state: modified
+          change_status: modified
+          baseline_present: true
+          current_present: true
+          baseline_digest: 1111111111111111111111111111111111111111111111111111111111111111
+          current_digest: 2222222222222222222222222222222222222222222222222222222222222222
+          baseline_bytes: 1024
+          current_bytes: 1060
+        - ref: specs/schemas/design_delta_manifest.schema
+          kind: spec
+          working_tree_state: clean
+          change_status: unchanged
+          baseline_present: true
+          current_present: true
+          baseline_digest: 3333333333333333333333333333333333333333333333333333333333333333
+          current_digest: 3333333333333333333333333333333333333333333333333333333333333333
+          baseline_bytes: 4096
+          current_bytes: 4096
+      command_receipts:
+        - command_label: git-rev-parse-head
+          command: git -C /tmp/omoikane-design-reader-demo rev-parse HEAD
+          exit_code: 0
+          status: pass
+          stdout_excerpt: 0123456789abcdef0123456789abcdef01234567
+          stderr_excerpt: ""
+        - command_label: git-status-short
+          command: git -C /tmp/omoikane-design-reader-demo status --short -- docs/... specs/...
+          exit_code: 0
+          status: pass
+          stdout_excerpt: " M docs/02-subsystems/self-construction/README.md"
+          stderr_excerpt: ""
+      receipt_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210

@@ -451,6 +451,16 @@ entries:
     rationale: Required to make the L1 termination gate machine-readable before scheduler cancellation and richer lifecycle orchestration land.
   - priority: P1
     kind: schema
+    file: specs/schemas/design_delta_scan_receipt.schema
+    consumers:
+      - specs/interfaces/selfctor.design_reader.v0.idl
+      - specs/schemas/design_delta_manifest.schema
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - reference-runtime
+    rationale: Required to serialize one git-bound docs/spec delta receipt before DesignReader emits a builder handoff manifest.
+  - priority: P1
+    kind: schema
     file: specs/schemas/design_delta_manifest.schema
     consumers:
       - specs/interfaces/selfctor.design_reader.v0.idl
@@ -550,6 +560,13 @@ entries:
       - reference-runtime
       - agents/builders/doc-sync-builder.yaml
     rationale: Protects DesignReader digest binding, must-sync docs coverage, and build_request handoff readiness.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/design_reader_git_delta_scan.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/doc-sync-builder.yaml
+    rationale: Protects git-bound DesignReader delta scan receipts, changed-ref accounting, and HEAD-bound command evidence before build_request emission.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.task_graph.v0.idl

@@ -33,6 +33,7 @@ reference runtime には `design-reader-demo` / `builder-demo` があり、
 `selfctor.design_reader.v0` / `selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0` /
 `selfctor.rollback.v0`
 の contract に沿って
+`design_delta_scan_receipt` による git-bound docs/spec delta scan、
 `design_delta_manifest` handoff、`build_request` emit、patch descriptor 生成、Mirage Self への sandbox apply、
 A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。

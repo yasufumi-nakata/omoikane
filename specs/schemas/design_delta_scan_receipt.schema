@@ -1,0 +1,233 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/design_delta_scan_receipt.schema"
+title: DesignDeltaScanReceipt
+description: Git-bound design/spec delta scan receipt produced by DesignReader before manifest emission.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - receipt_ref
+  - profile_id
+  - repo_root
+  - head_commit
+  - status
+  - scanned_at
+  - ref_count
+  - changed_ref_count
+  - changed_design_ref_count
+  - changed_spec_ref_count
+  - entries
+  - command_receipts
+  - receipt_digest
+properties:
+  kind:
+    const: design_delta_scan_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    pattern: "^design-delta-scan-[a-f0-9]{12}$"
+  receipt_ref:
+    type: string
+    pattern: "^design-scan://design-delta-scan-[a-f0-9]{12}$"
+  profile_id:
+    const: git-head-design-delta-v1
+  repo_root:
+    type: string
+    minLength: 1
+  head_commit:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  status:
+    type: string
+    enum:
+      - clean
+      - delta-detected
+      - blocked
+  scanned_at:
+    type: string
+    format: date-time
+  ref_count:
+    type: integer
+    minimum: 1
+  changed_ref_count:
+    type: integer
+    minimum: 0
+  changed_design_ref_count:
+    type: integer
+    minimum: 0
+  changed_spec_ref_count:
+    type: integer
+    minimum: 0
+  entries:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - ref
+        - kind
+        - working_tree_state
+        - change_status
+        - baseline_present
+        - current_present
+        - baseline_digest
+        - current_digest
+        - baseline_bytes
+        - current_bytes
+      properties:
+        ref:
+          type: string
+          minLength: 1
+        kind:
+          type: string
+          enum:
+            - design
+            - spec
+        working_tree_state:
+          type: string
+          enum:
+            - clean
+            - modified
+            - added
+            - removed
+        change_status:
+          type: string
+          enum:
+            - unchanged
+            - modified
+            - added
+            - removed
+            - missing
+        baseline_present:
+          type: boolean
+        current_present:
+          type: boolean
+        baseline_digest:
+          type: string
+        current_digest:
+          type: string
+        baseline_bytes:
+          type: integer
+          minimum: 0
+        current_bytes:
+          type: integer
+          minimum: 0
+  command_receipts:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - command_label
+        - command
+        - exit_code
+        - status
+        - stdout_excerpt
+        - stderr_excerpt
+      properties:
+        command_label:
+          type: string
+          enum:
+            - git-rev-parse-head
+            - git-status-short
+        command:
+          type: string
+          minLength: 1
+        exit_code:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        stdout_excerpt:
+          type: string
+        stderr_excerpt:
+          type: string
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+allOf:
+  - if:
+      properties:
+        status:
+          const: clean
+    then:
+      properties:
+        changed_ref_count:
+          const: 0
+        changed_design_ref_count:
+          const: 0
+        changed_spec_ref_count:
+          const: 0
+  - if:
+      properties:
+        status:
+          const: blocked
+    then:
+      required:
+        - blocking_reasons
+      properties:
+        blocking_reasons:
+          minItems: 1
+examples:
+  - kind: design_delta_scan_receipt
+    schema_version: 1.0.0
+    receipt_id: design-delta-scan-0123456789ab
+    receipt_ref: design-scan://design-delta-scan-0123456789ab
+    profile_id: git-head-design-delta-v1
+    repo_root: /tmp/omoikane-design-reader-demo
+    head_commit: 0123456789abcdef0123456789abcdef01234567
+    status: delta-detected
+    scanned_at: "2026-04-21T07:00:00Z"
+    ref_count: 4
+    changed_ref_count: 2
+    changed_design_ref_count: 1
+    changed_spec_ref_count: 1
+    entries:
+      - ref: docs/02-subsystems/self-construction/README.md
+        kind: design
+        working_tree_state: modified
+        change_status: modified
+        baseline_present: true
+        current_present: true
+        baseline_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+        baseline_bytes: 2048
+        current_bytes: 2088
+      - ref: specs/interfaces/selfctor.design_reader.v0.idl
+        kind: spec
+        working_tree_state: modified
+        change_status: modified
+        baseline_present: true
+        current_present: true
+        baseline_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        current_digest: 2222222222222222222222222222222222222222222222222222222222222222
+        baseline_bytes: 1024
+        current_bytes: 1060
+    command_receipts:
+      - command_label: git-rev-parse-head
+        command: git -C /tmp/omoikane-design-reader-demo rev-parse HEAD
+        exit_code: 0
+        status: pass
+        stdout_excerpt: 0123456789abcdef0123456789abcdef01234567
+        stderr_excerpt: ""
+      - command_label: git-status-short
+        command: git -C /tmp/omoikane-design-reader-demo status --short -- docs/... specs/...
+        exit_code: 0
+        status: pass
+        stdout_excerpt: " M docs/02-subsystems/self-construction/README.md"
+        stderr_excerpt: ""
+    receipt_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210

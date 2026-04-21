@@ -78,6 +78,7 @@
 - `staged_rollout_session.schema`
 - `builder_rollback_session.schema`
 - `builder_live_enactment_session.schema`
+- `design_delta_scan_receipt.schema`
 - `standby_health_probe.schema`
 - `substrate_attestation_chain.schema`
 

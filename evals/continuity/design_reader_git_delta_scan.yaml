@@ -1,0 +1,15 @@
+eval_id: design_reader_git_delta_scan
+target: selfctor.design_reader
+summary: >
+  DesignReader が git HEAD に束縛された docs/spec delta scan receipt を生成し、
+  design-reader-demo で changed ref accounting を machine-checkable に保てること
+checks:
+  - name: design reader git delta scan smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
+expect:
+  delta_scan_status: delta-detected
+  delta_scan_changed_ref_count: 2
+  delta_scan_changed_design_ref_count: 1
+  delta_scan_changed_spec_ref_count: 1
+  delta_scan_command_receipt_count: 2
+  delta_scan_bound_to_manifest: true
