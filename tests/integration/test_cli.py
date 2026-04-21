@@ -723,11 +723,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["live_verifier_sync_accepted"])
         self.assertTrue(result["validation"]["artifact_refresh_paused"])
         self.assertTrue(result["validation"]["artifact_refresh_recovered"])
+        self.assertTrue(result["validation"]["method_b_broker_handoff_gate_blocked"])
+        self.assertTrue(result["validation"]["method_b_broker_handoff_prepared"])
         self.assertTrue(result["validation"]["artifact_revocation_fail_closed"])
         self.assertTrue(result["validation"]["verifier_rotation_overlap_paused"])
         self.assertTrue(result["validation"]["verifier_rotation_cutover_recovered"])
         self.assertTrue(result["validation"]["verifier_rotation_dual_attested"])
         self.assertTrue(result["validation"]["verifier_revocation_fail_closed"])
+        self.assertTrue(result["validation"]["method_b_broker_confirmation_gate_blocked"])
+        self.assertTrue(result["validation"]["method_b_broker_handoff_confirmed"])
+        self.assertTrue(result["validation"]["method_b_broker_cleanup_bound"])
         self.assertTrue(result["validation"]["witness_quorum_bound"])
         self.assertTrue(result["validation"]["legal_attestation_bound"])
         self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
@@ -747,6 +752,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "dual-channel-review",
             result["scenarios"]["method_b"]["signal_rollback"]["rollback_target"],
+        )
+        self.assertEqual(
+            "confirmed",
+            result["method_b_final_handle"]["broker_handoff_receipt"]["status"],
         )
         self.assertEqual("fail", result["scenarios"]["method_c"]["signal_fail"]["action"])
         self.assertEqual(

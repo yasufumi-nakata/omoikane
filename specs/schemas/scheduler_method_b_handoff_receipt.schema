@@ -1,0 +1,245 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/scheduler_method_b_handoff_receipt.schema"
+title: SchedulerMethodBHandoffReceipt
+description: Scheduler-bound Method B broker orchestration receipt that fixes cross-host handoff evidence before authority-bearing stages open.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - handle_id
+  - plan_ref
+  - identity_id
+  - method
+  - review_stage_id
+  - handoff_stage_id
+  - retirement_stage_id
+  - policy_id
+  - status
+  - source_substrate
+  - destination_substrate
+  - source_host_ref
+  - source_host_attestation_ref
+  - source_jurisdiction
+  - source_network_zone
+  - destination_host_ref
+  - destination_host_attestation_ref
+  - destination_jurisdiction
+  - destination_network_zone
+  - substrate_cluster_ref
+  - cross_host_binding_profile
+  - distinct_host_count
+  - host_binding_digest
+  - broker_signal_id
+  - broker_signal_severity
+  - recommended_action
+  - scheduler_signal
+  - standby_probe_id
+  - source_attestation_id
+  - attestation_chain_id
+  - dual_allocation_window_id
+  - attestation_stream_id
+  - allocation_pair_digest
+  - handoff_state_digest
+  - prepared_at
+  - confirmed_at
+  - migration_transfer_id
+  - migration_state_digest
+  - dual_allocation_close_id
+  - cleanup_release_status
+properties:
+  kind:
+    const: scheduler_method_b_handoff_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    minLength: 8
+  handle_id:
+    type: string
+    minLength: 8
+  plan_ref:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  method:
+    const: B
+  review_stage_id:
+    const: dual-channel-review
+  handoff_stage_id:
+    const: authority-handoff
+  retirement_stage_id:
+    const: bio-retirement
+  policy_id:
+    const: method-b-host-bound-broker-orchestration-v1
+  status:
+    type: string
+    enum:
+      - prepared
+      - confirmed
+  source_substrate:
+    type: string
+    minLength: 1
+  destination_substrate:
+    type: string
+    minLength: 1
+  source_host_ref:
+    type: string
+    pattern: "^host://"
+  source_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  source_jurisdiction:
+    type: string
+    minLength: 1
+  source_network_zone:
+    type: string
+    minLength: 1
+  destination_host_ref:
+    type: string
+    pattern: "^host://"
+  destination_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  destination_jurisdiction:
+    type: string
+    minLength: 1
+  destination_network_zone:
+    type: string
+    minLength: 1
+  substrate_cluster_ref:
+    type: string
+    pattern: "^substrate-cluster://"
+  cross_host_binding_profile:
+    const: attested-cross-host-substrate-handoff-v1
+  distinct_host_count:
+    type: integer
+    minimum: 2
+  host_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  broker_signal_id:
+    type: string
+    minLength: 8
+  broker_signal_severity:
+    const: critical
+  recommended_action:
+    const: migrate-standby
+  scheduler_signal:
+    type: object
+    additionalProperties: false
+    required:
+      - severity
+      - source_substrate
+      - reason
+    properties:
+      severity:
+        const: critical
+      source_substrate:
+        type: string
+        minLength: 1
+      reason:
+        type: string
+        minLength: 1
+  standby_probe_id:
+    type: string
+    minLength: 8
+  source_attestation_id:
+    type: string
+    minLength: 8
+  attestation_chain_id:
+    type: string
+    minLength: 8
+  dual_allocation_window_id:
+    type: string
+    minLength: 8
+  attestation_stream_id:
+    type: string
+    minLength: 8
+  allocation_pair_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  handoff_state_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  prepared_at:
+    type: string
+    format: date-time
+  confirmed_at:
+    type:
+      - string
+      - "null"
+    format: date-time
+  migration_transfer_id:
+    type:
+      - string
+      - "null"
+    minLength: 8
+  migration_state_digest:
+    type:
+      - string
+      - "null"
+    pattern: "^[a-f0-9]{64}$"
+  dual_allocation_close_id:
+    type:
+      - string
+      - "null"
+    minLength: 8
+  cleanup_release_status:
+    type:
+      - string
+      - "null"
+    enum:
+      - released
+      - null
+examples:
+  - kind: scheduler_method_b_handoff_receipt
+    schema_version: 1.0.0
+    receipt_id: scheduler-method-b-handoff-001
+    handle_id: schedule-handle-method-b-001
+    plan_ref: plan-method-b-001
+    identity_id: identity://parallel-run-sandbox
+    method: B
+    review_stage_id: dual-channel-review
+    handoff_stage_id: authority-handoff
+    retirement_stage_id: bio-retirement
+    policy_id: method-b-host-bound-broker-orchestration-v1
+    status: confirmed
+    source_substrate: classical_silicon
+    destination_substrate: photonic_array.standby
+    source_host_ref: host://substrate/classical-silicon-a
+    source_host_attestation_ref: host-attestation://substrate/classical-silicon-a/reference-v1
+    source_jurisdiction: JP-13
+    source_network_zone: tokyo-a
+    destination_host_ref: host://substrate/photonic-edge-c
+    destination_host_attestation_ref: host-attestation://substrate/photonic-edge-c/reference-v1
+    destination_jurisdiction: JP-27
+    destination_network_zone: osaka-a
+    substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+    cross_host_binding_profile: attested-cross-host-substrate-handoff-v1
+    distinct_host_count: 2
+    host_binding_digest: 3d063b4cd585cd0f95f225f5e2c6b3f1962e6b6f7111c3c4a583360b6ad0d157
+    broker_signal_id: broker-signal-001
+    broker_signal_severity: critical
+    recommended_action: migrate-standby
+    scheduler_signal:
+      severity: critical
+      source_substrate: classical_silicon
+      reason: energy floor below minimum
+    standby_probe_id: probe-001
+    source_attestation_id: attest-001
+    attestation_chain_id: chain-001
+    dual_allocation_window_id: dual-allocation-window-001
+    attestation_stream_id: stream-001
+    allocation_pair_digest: 3ed6bf1db17545f816cb0dca1381b6f7b13cd0db1426578ab14a18a30e4242ea
+    handoff_state_digest: 17d66c33c97d3de42114884d99a5ac30f07152018af7a8c86b55ca0c5948548c
+    prepared_at: "2026-04-22T03:40:00Z"
+    confirmed_at: "2026-04-22T03:42:00Z"
+    migration_transfer_id: transfer-001
+    migration_state_digest: 17d66c33c97d3de42114884d99a5ac30f07152018af7a8c86b55ca0c5948548c
+    dual_allocation_close_id: dual-allocation-window-001
+    cleanup_release_status: released

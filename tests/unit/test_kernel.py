@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import threading
 import unittest
 
 from omoikane.common import canonical_json, sha256_text
+from omoikane.kernel.broker import SubstrateBrokerService
 from omoikane.kernel.continuity import ContinuityLedger
 from omoikane.kernel.ethics import ActionRequest, EthicsEnforcer
 from omoikane.kernel.identity import ForkApprovals, IdentityRegistry
@@ -148,6 +150,65 @@ class KernelTests(unittest.TestCase):
             "checked_at": checked_at,
             "artifacts": artifacts,
             "verifier_roster": verifier_roster_report(),
+        }
+
+    def _prepare_method_b_broker_bundle(self, identity_id: str) -> dict[str, object]:
+        broker = SubstrateBrokerService.reference_service()
+        allocation = broker.lease(
+            identity_id=identity_id,
+            units=72,
+            purpose="kernel-test-method-b-broker-orchestration",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        signal = broker.handle_energy_floor_signal(
+            identity_id,
+            current_joules_per_second=28,
+        )
+        standby_probe = broker.probe_standby(identity_id)
+        broker.attest(
+            identity_id,
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "kernel-test-broker-attestor-v1",
+                "status": "healthy",
+                "standby_substrate_id": signal["standby_substrate"],
+            },
+        )
+        attestation_chain = broker.bridge_attestation_chain(
+            identity_id,
+            state={
+                "identity_id": identity_id,
+                "checkpoint": "kernel-test-method-b-review-v1",
+                "shadow_stage": "dual-channel-review",
+            },
+            continuity_mode="warm-standby",
+        )
+        dual_allocation_window = broker.open_dual_allocation_window(
+            identity_id,
+            state={
+                "identity_id": identity_id,
+                "checkpoint": "kernel-test-method-b-shadow-v1",
+                "shadow_stage": "shadow-sync",
+            },
+        )
+        attestation_stream = broker.seal_attestation_stream(
+            identity_id,
+            state={
+                "identity_id": identity_id,
+                "checkpoint": "kernel-test-method-b-handoff-v1",
+                "shadow_stage": "authority-handoff",
+            },
+        )
+        return {
+            "broker": broker,
+            "allocation": allocation,
+            "signal": signal,
+            "standby_probe": asdict(standby_probe),
+            "attestation_chain": asdict(attestation_chain),
+            "dual_allocation_window": asdict(dual_allocation_window),
+            "attestation_stream": asdict(attestation_stream),
         }
 
     def test_continuity_ledger_detects_tamper(self) -> None:
@@ -594,6 +655,20 @@ class KernelTests(unittest.TestCase):
             ),
         )
         resumed_after_refresh = scheduler.resume(handle["handle_id"])
+        with self.assertRaisesRegex(
+            ValueError,
+            "broker handoff receipt must be prepared before entering authority-handoff",
+        ):
+            scheduler.advance(handle["handle_id"], "dual-channel-review")
+        broker_bundle = self._prepare_method_b_broker_bundle("identity://scheduler-method-b")
+        prepared = scheduler.prepare_method_b_handoff(
+            handle["handle_id"],
+            broker_signal=broker_bundle["signal"],
+            standby_probe=broker_bundle["standby_probe"],
+            attestation_chain=broker_bundle["attestation_chain"],
+            dual_allocation_window=broker_bundle["dual_allocation_window"],
+            attestation_stream=broker_bundle["attestation_stream"],
+        )
         scheduler.advance(handle["handle_id"], "dual-channel-review")
         rollback = scheduler.handle_substrate_signal(
             handle["handle_id"],
@@ -609,10 +684,79 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("pause", refresh_required["action"])
         self.assertEqual("current", refreshed["bundle_status"])
         self.assertEqual("advancing", resumed_after_refresh["status"])
+        self.assertEqual("prepared", prepared["status"])
         self.assertEqual("rollback", rollback["action"])
         self.assertEqual("dual-channel-review", rollback["rollback_target"])
         self.assertEqual("rolled-back", observed["status"])
         self.assertEqual("dual-channel-review", observed["current_stage"])
+        self.assertEqual("prepared", observed["broker_handoff_receipt"]["status"])
+        self.assertTrue(scheduler.validate_handle(observed)["ok"])
+        self.assertTrue(ledger.verify()["ok"])
+
+    def test_ascension_scheduler_method_b_requires_confirmed_broker_handoff_before_retirement(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_b_plan("identity://scheduler-method-b-confirm")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "shadow-sync")
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:08:00Z",
+                sync_token="method-b-confirm",
+            ),
+        )
+        broker_bundle = self._prepare_method_b_broker_bundle("identity://scheduler-method-b-confirm")
+        broker = broker_bundle["broker"]
+        prepared = scheduler.prepare_method_b_handoff(
+            handle["handle_id"],
+            broker_signal=broker_bundle["signal"],
+            standby_probe=broker_bundle["standby_probe"],
+            attestation_chain=broker_bundle["attestation_chain"],
+            dual_allocation_window=broker_bundle["dual_allocation_window"],
+            attestation_stream=broker_bundle["attestation_stream"],
+        )
+        review = scheduler.advance(handle["handle_id"], "dual-channel-review")
+        with self.assertRaisesRegex(
+            ValueError,
+            "broker handoff receipt must be confirmed before entering bio-retirement",
+        ):
+            scheduler.advance(handle["handle_id"], "authority-handoff")
+        migration = broker.migrate(
+            "identity://scheduler-method-b-confirm",
+            state={
+                "identity_id": "identity://scheduler-method-b-confirm",
+                "checkpoint": "kernel-test-method-b-handoff-v1",
+                "shadow_stage": "authority-handoff",
+            },
+            continuity_mode="hot-handoff",
+        )
+        closed_window = broker.close_dual_allocation_window(
+            "identity://scheduler-method-b-confirm",
+            reason="kernel-test-method-b-handoff-confirmed",
+        )
+        confirmed = scheduler.confirm_method_b_handoff(
+            handle["handle_id"],
+            migration=asdict(migration),
+            closed_dual_allocation_window=asdict(closed_window),
+        )
+        handoff = scheduler.advance(handle["handle_id"], "authority-handoff")
+        broker.release(
+            "identity://scheduler-method-b-confirm",
+            reason="kernel-test-method-b-bio-retirement",
+        )
+        retirement = scheduler.advance(handle["handle_id"], "bio-retirement")
+        observed = scheduler.observe(handle["handle_id"])
+
+        self.assertEqual("prepared", prepared["status"])
+        self.assertEqual("authority-handoff", review["next_stage"])
+        self.assertEqual("confirmed", confirmed["status"])
+        self.assertEqual(migration.transfer_id, confirmed["migration_transfer_id"])
+        self.assertEqual("bio-retirement", handoff["next_stage"])
+        self.assertEqual("completed", retirement["status"])
+        self.assertEqual("confirmed", observed["broker_handoff_receipt"]["status"])
+        self.assertEqual("released", observed["broker_handoff_receipt"]["cleanup_release_status"])
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
 

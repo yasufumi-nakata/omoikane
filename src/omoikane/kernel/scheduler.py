@@ -51,6 +51,11 @@ SCHEDULER_VERIFIER_ROOT_STATUSES = {"active", "candidate", "retired"}
 SCHEDULER_VERIFIER_CONNECTIVITY_TRANSPORT_PROFILE = "live-http-json-roster-v1"
 SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES = {"reachable", "rejected"}
 SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS = 2
+SCHEDULER_METHOD_B_HANDOFF_POLICY_ID = "method-b-host-bound-broker-orchestration-v1"
+SCHEDULER_METHOD_B_HANDOFF_STATUSES = {"prepared", "confirmed"}
+SCHEDULER_METHOD_B_PREPARE_STAGE = "dual-channel-review"
+SCHEDULER_METHOD_B_HANDOFF_STAGE = "authority-handoff"
+SCHEDULER_METHOD_B_RETIRE_STAGE = "bio-retirement"
 SCHEDULER_SYNC_REQUIRED_STAGE_BY_METHOD = {
     "A": "active-handoff",
     "B": "authority-handoff",
@@ -182,6 +187,17 @@ class AscensionScheduler:
                 "revoked_action": "fail-closed",
                 "max_tracked_roots": SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS,
             },
+            "method_b_handoff_policy": {
+                "policy_id": SCHEDULER_METHOD_B_HANDOFF_POLICY_ID,
+                "prepare_stage": SCHEDULER_METHOD_B_PREPARE_STAGE,
+                "handoff_stage": SCHEDULER_METHOD_B_HANDOFF_STAGE,
+                "retirement_stage": SCHEDULER_METHOD_B_RETIRE_STAGE,
+                "required_recommended_action": "migrate-standby",
+                "required_scheduler_signal_severity": "critical",
+                "required_distinct_host_count": 2,
+                "authority_handoff_requires": "prepared broker handoff receipt",
+                "bio_retirement_requires": "confirmed broker handoff receipt",
+            },
             "method_profiles": {
                 "A": {
                     "stages": self._method_stages("A"),
@@ -190,6 +206,8 @@ class AscensionScheduler:
                 "B": {
                     "stages": self._method_stages("B"),
                     "reversibility": "reversible until authority handoff completes",
+                    "broker_handoff_required_before_stage": SCHEDULER_METHOD_B_HANDOFF_STAGE,
+                    "broker_confirmation_required_before_stage": SCHEDULER_METHOD_B_RETIRE_STAGE,
                 },
                 "C": {
                     "stages": self._method_stages("C"),
@@ -276,6 +294,7 @@ class AscensionScheduler:
             "verifier_roster": self._initial_verifier_roster(
                 normalized_plan["governance_artifacts"]
             ),
+            "broker_handoff_receipt": None,
             "current_stage": first_stage,
             "status": "scheduled",
             "history": [],
@@ -400,6 +419,7 @@ class AscensionScheduler:
 
         next_stage = plan["stages"][stage_index + 1]["stage_id"]
         self._ensure_artifact_sync_for_stage(handle, plan, next_stage)
+        self._ensure_method_b_handoff_for_stage(handle, plan, next_stage)
         handle["current_stage"] = next_stage
         handle["status"] = "advancing"
         entered_ref = self._append_history(
@@ -702,6 +722,103 @@ class AscensionScheduler:
             "handle": deepcopy(handle),
         }
 
+    def prepare_method_b_handoff(
+        self,
+        handle_id: str,
+        *,
+        broker_signal: Mapping[str, Any],
+        standby_probe: Mapping[str, Any],
+        attestation_chain: Mapping[str, Any],
+        dual_allocation_window: Mapping[str, Any],
+        attestation_stream: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        if handle["status"] in {"completed", "cancelled", "failed"}:
+            raise ValueError(
+                f"cannot prepare broker handoff in status {handle['status']}"
+            )
+        if handle["status"] == "paused":
+            raise ValueError("cannot prepare broker handoff while paused")
+        plan = self._require_plan(handle["plan_ref"])
+        if plan["method"] != "B":
+            raise ValueError("broker handoff receipt is only supported for Method B")
+        if handle["current_stage"] != SCHEDULER_METHOD_B_PREPARE_STAGE:
+            raise ValueError(
+                "broker handoff receipt must be prepared during dual-channel-review"
+            )
+
+        receipt = self._normalize_method_b_handoff_receipt(
+            handle=handle,
+            broker_signal=broker_signal,
+            standby_probe=standby_probe,
+            attestation_chain=attestation_chain,
+            dual_allocation_window=dual_allocation_window,
+            attestation_stream=attestation_stream,
+        )
+        handle["broker_handoff_receipt"] = receipt
+        self._append_history(
+            handle,
+            stage_id=handle["current_stage"],
+            transition="sync",
+            reason=(
+                "Method B broker handoff prepared with cross-host standby probe, "
+                "attestation chain, dual allocation window, and sealed stream"
+            ),
+        )
+        return deepcopy(receipt)
+
+    def confirm_method_b_handoff(
+        self,
+        handle_id: str,
+        *,
+        migration: Mapping[str, Any],
+        closed_dual_allocation_window: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        if handle["status"] in {"completed", "cancelled", "failed"}:
+            raise ValueError(
+                f"cannot confirm broker handoff in status {handle['status']}"
+            )
+        if handle["status"] == "paused":
+            raise ValueError("cannot confirm broker handoff while paused")
+        plan = self._require_plan(handle["plan_ref"])
+        if plan["method"] != "B":
+            raise ValueError("broker handoff receipt is only supported for Method B")
+        if handle["current_stage"] != SCHEDULER_METHOD_B_HANDOFF_STAGE:
+            raise ValueError(
+                "broker handoff receipt must be confirmed during authority-handoff"
+            )
+
+        receipt = handle.get("broker_handoff_receipt")
+        if not isinstance(receipt, Mapping):
+            raise ValueError("broker handoff receipt must be prepared before confirmation")
+        if receipt.get("status") == "confirmed":
+            raise ValueError("broker handoff receipt is already confirmed")
+
+        migration_snapshot, closed_window_snapshot = self._normalize_method_b_handoff_confirmation(
+            receipt=receipt,
+            migration=migration,
+            closed_dual_allocation_window=closed_dual_allocation_window,
+        )
+        confirmed_receipt = dict(receipt)
+        confirmed_receipt["status"] = "confirmed"
+        confirmed_receipt["confirmed_at"] = migration_snapshot["transferred_at"]
+        confirmed_receipt["migration_transfer_id"] = migration_snapshot["transfer_id"]
+        confirmed_receipt["migration_state_digest"] = migration_snapshot["state_digest"]
+        confirmed_receipt["dual_allocation_close_id"] = closed_window_snapshot["window_id"]
+        confirmed_receipt["cleanup_release_status"] = closed_window_snapshot["release_status"]
+        handle["broker_handoff_receipt"] = confirmed_receipt
+        self._append_history(
+            handle,
+            stage_id=handle["current_stage"],
+            transition="sync",
+            reason=(
+                "Method B broker handoff confirmed with hot-handoff migration "
+                "and closed dual allocation cleanup"
+            ),
+        )
+        return deepcopy(confirmed_receipt)
+
     def cancel(self, handle_id: str, reason: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)
         if handle["status"] in {"completed", "cancelled", "failed"}:
@@ -792,6 +909,12 @@ class AscensionScheduler:
             errors.append("verifier_roster must be a mapping")
         else:
             errors.extend(self._check_verifier_roster(verifier_roster, governance_artifacts))
+        broker_handoff_receipt = handle.get("broker_handoff_receipt")
+        if broker_handoff_receipt is not None:
+            if not isinstance(broker_handoff_receipt, Mapping):
+                errors.append("broker_handoff_receipt must be a mapping or null")
+            else:
+                errors.extend(self._check_broker_handoff_receipt(broker_handoff_receipt, handle))
         self._check_non_empty_string(handle.get("current_stage"), "current_stage", errors)
 
         status = handle.get("status")
@@ -1581,6 +1704,138 @@ class AscensionScheduler:
             )
         return errors
 
+    def _check_broker_handoff_receipt(
+        self,
+        value: Mapping[str, Any],
+        handle: Mapping[str, Any],
+    ) -> List[str]:
+        errors: List[str] = []
+        if value.get("kind") != "scheduler_method_b_handoff_receipt":
+            errors.append("broker_handoff_receipt.kind must be scheduler_method_b_handoff_receipt")
+        if value.get("schema_version") != SCHEDULER_SCHEMA_VERSION:
+            errors.append(
+                f"broker_handoff_receipt.schema_version must be {SCHEDULER_SCHEMA_VERSION}"
+            )
+        if value.get("handle_id") != handle.get("handle_id"):
+            errors.append("broker_handoff_receipt.handle_id must match handle.handle_id")
+        if value.get("plan_ref") != handle.get("plan_ref"):
+            errors.append("broker_handoff_receipt.plan_ref must match handle.plan_ref")
+        if value.get("identity_id") != handle.get("identity_id"):
+            errors.append("broker_handoff_receipt.identity_id must match handle.identity_id")
+        if value.get("method") != "B":
+            errors.append("broker_handoff_receipt.method must be B")
+        if value.get("policy_id") != SCHEDULER_METHOD_B_HANDOFF_POLICY_ID:
+            errors.append(
+                "broker_handoff_receipt.policy_id must be "
+                f"{SCHEDULER_METHOD_B_HANDOFF_POLICY_ID}"
+            )
+        if value.get("review_stage_id") != SCHEDULER_METHOD_B_PREPARE_STAGE:
+            errors.append(
+                "broker_handoff_receipt.review_stage_id must be dual-channel-review"
+            )
+        if value.get("handoff_stage_id") != SCHEDULER_METHOD_B_HANDOFF_STAGE:
+            errors.append(
+                "broker_handoff_receipt.handoff_stage_id must be authority-handoff"
+            )
+        if value.get("retirement_stage_id") != SCHEDULER_METHOD_B_RETIRE_STAGE:
+            errors.append(
+                "broker_handoff_receipt.retirement_stage_id must be bio-retirement"
+            )
+        status = value.get("status")
+        if status not in SCHEDULER_METHOD_B_HANDOFF_STATUSES:
+            errors.append(
+                "broker_handoff_receipt.status must be one of "
+                f"{sorted(SCHEDULER_METHOD_B_HANDOFF_STATUSES)}"
+            )
+        for field_name in (
+            "receipt_id",
+            "source_substrate",
+            "destination_substrate",
+            "source_host_ref",
+            "source_host_attestation_ref",
+            "source_jurisdiction",
+            "source_network_zone",
+            "destination_host_ref",
+            "destination_host_attestation_ref",
+            "destination_jurisdiction",
+            "destination_network_zone",
+            "substrate_cluster_ref",
+            "cross_host_binding_profile",
+            "host_binding_digest",
+            "broker_signal_id",
+            "standby_probe_id",
+            "source_attestation_id",
+            "attestation_chain_id",
+            "dual_allocation_window_id",
+            "attestation_stream_id",
+            "allocation_pair_digest",
+            "handoff_state_digest",
+            "prepared_at",
+        ):
+            self._check_non_empty_string(value.get(field_name), f"broker_handoff_receipt.{field_name}", errors)
+        distinct_host_count = value.get("distinct_host_count")
+        if not isinstance(distinct_host_count, int) or distinct_host_count < 2:
+            errors.append("broker_handoff_receipt.distinct_host_count must be an integer >= 2")
+        if value.get("broker_signal_severity") != "critical":
+            errors.append("broker_handoff_receipt.broker_signal_severity must be critical")
+        if value.get("recommended_action") != "migrate-standby":
+            errors.append(
+                "broker_handoff_receipt.recommended_action must be migrate-standby"
+            )
+        scheduler_signal = value.get("scheduler_signal")
+        if not isinstance(scheduler_signal, Mapping):
+            errors.append("broker_handoff_receipt.scheduler_signal must be a mapping")
+        else:
+            if scheduler_signal.get("severity") != "critical":
+                errors.append("broker_handoff_receipt.scheduler_signal.severity must be critical")
+            if scheduler_signal.get("source_substrate") != value.get("source_substrate"):
+                errors.append(
+                    "broker_handoff_receipt.scheduler_signal.source_substrate must match source_substrate"
+                )
+            self._check_non_empty_string(
+                scheduler_signal.get("reason"),
+                "broker_handoff_receipt.scheduler_signal.reason",
+                errors,
+            )
+        confirmed_at = value.get("confirmed_at")
+        if status == "prepared":
+            if confirmed_at is not None:
+                errors.append("broker_handoff_receipt.confirmed_at must be null while prepared")
+            for field_name in (
+                "migration_transfer_id",
+                "migration_state_digest",
+                "dual_allocation_close_id",
+                "cleanup_release_status",
+            ):
+                if value.get(field_name) is not None:
+                    errors.append(f"broker_handoff_receipt.{field_name} must be null while prepared")
+        elif status == "confirmed":
+            self._check_non_empty_string(
+                confirmed_at,
+                "broker_handoff_receipt.confirmed_at",
+                errors,
+            )
+            self._check_non_empty_string(
+                value.get("migration_transfer_id"),
+                "broker_handoff_receipt.migration_transfer_id",
+                errors,
+            )
+            self._check_non_empty_string(
+                value.get("migration_state_digest"),
+                "broker_handoff_receipt.migration_state_digest",
+                errors,
+            )
+            self._check_non_empty_string(
+                value.get("dual_allocation_close_id"),
+                "broker_handoff_receipt.dual_allocation_close_id",
+                errors,
+            )
+            if value.get("cleanup_release_status") != "released":
+                errors.append(
+                    "broker_handoff_receipt.cleanup_release_status must be released when confirmed"
+                )
+        return errors
+
     def _check_connectivity_receipt(
         self,
         value: Mapping[str, Any],
@@ -1761,6 +2016,34 @@ class AscensionScheduler:
                 f"verifier root rotation must be stable before entering {next_stage}"
             )
 
+    def _ensure_method_b_handoff_for_stage(
+        self,
+        handle: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        next_stage: str,
+    ) -> None:
+        if plan["method"] != "B":
+            return
+        if next_stage not in {
+            SCHEDULER_METHOD_B_HANDOFF_STAGE,
+            SCHEDULER_METHOD_B_RETIRE_STAGE,
+        }:
+            return
+        receipt = handle.get("broker_handoff_receipt")
+        if not isinstance(receipt, Mapping):
+            raise ValueError(
+                f"broker handoff receipt must be prepared before entering {next_stage}"
+            )
+        status = receipt.get("status")
+        if next_stage == SCHEDULER_METHOD_B_HANDOFF_STAGE and status not in {"prepared", "confirmed"}:
+            raise ValueError(
+                "broker handoff receipt must be prepared before entering authority-handoff"
+            )
+        if next_stage == SCHEDULER_METHOD_B_RETIRE_STAGE and status != "confirmed":
+            raise ValueError(
+                "broker handoff receipt must be confirmed before entering bio-retirement"
+            )
+
     def _normalize_non_empty_string(self, value: Any, field_name: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field_name} must be a non-empty string")
@@ -1812,6 +2095,548 @@ class AscensionScheduler:
         if value < 0:
             raise ValueError(f"{field_name} must be >= 0")
         return value
+
+    def _normalize_method_b_handoff_receipt(
+        self,
+        *,
+        handle: Mapping[str, Any],
+        broker_signal: Mapping[str, Any],
+        standby_probe: Mapping[str, Any],
+        attestation_chain: Mapping[str, Any],
+        dual_allocation_window: Mapping[str, Any],
+        attestation_stream: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(broker_signal, Mapping):
+            raise ValueError("broker_signal must be a mapping")
+        if not isinstance(standby_probe, Mapping):
+            raise ValueError("standby_probe must be a mapping")
+        if not isinstance(attestation_chain, Mapping):
+            raise ValueError("attestation_chain must be a mapping")
+        if not isinstance(dual_allocation_window, Mapping):
+            raise ValueError("dual_allocation_window must be a mapping")
+        if not isinstance(attestation_stream, Mapping):
+            raise ValueError("attestation_stream must be a mapping")
+
+        identity_id = self._normalize_non_empty_string(handle["identity_id"], "handle.identity_id")
+        signal_identity = self._normalize_non_empty_string(
+            broker_signal.get("identity_id"),
+            "broker_signal.identity_id",
+        )
+        if signal_identity != identity_id:
+            raise ValueError("broker_signal.identity_id must match the schedule identity")
+        signal_id = self._normalize_non_empty_string(broker_signal.get("signal_id"), "broker_signal.signal_id")
+        signal_source = self._normalize_non_empty_string(
+            broker_signal.get("source_substrate"),
+            "broker_signal.source_substrate",
+        )
+        signal_destination = self._normalize_non_empty_string(
+            broker_signal.get("standby_substrate"),
+            "broker_signal.standby_substrate",
+        )
+        signal_severity = self._normalize_non_empty_string(
+            broker_signal.get("severity"),
+            "broker_signal.severity",
+        )
+        if signal_severity != "critical":
+            raise ValueError("broker_signal.severity must be critical")
+        recommended_action = self._normalize_non_empty_string(
+            broker_signal.get("recommended_action"),
+            "broker_signal.recommended_action",
+        )
+        if recommended_action != "migrate-standby":
+            raise ValueError("broker_signal.recommended_action must be migrate-standby")
+        scheduler_input = broker_signal.get("scheduler_input")
+        if not isinstance(scheduler_input, Mapping):
+            raise ValueError("broker_signal.scheduler_input must be a mapping")
+        scheduler_severity = self._normalize_non_empty_string(
+            scheduler_input.get("severity"),
+            "broker_signal.scheduler_input.severity",
+        )
+        if scheduler_severity != "critical":
+            raise ValueError("broker_signal.scheduler_input.severity must be critical")
+        scheduler_source = self._normalize_non_empty_string(
+            scheduler_input.get("source_substrate"),
+            "broker_signal.scheduler_input.source_substrate",
+        )
+        if scheduler_source != signal_source:
+            raise ValueError(
+                "broker_signal.scheduler_input.source_substrate must match broker_signal.source_substrate"
+            )
+        scheduler_reason = self._normalize_non_empty_string(
+            scheduler_input.get("reason"),
+            "broker_signal.scheduler_input.reason",
+        )
+
+        probe_identity = self._normalize_non_empty_string(
+            standby_probe.get("identity_id"),
+            "standby_probe.identity_id",
+        )
+        if probe_identity != identity_id:
+            raise ValueError("standby_probe.identity_id must match the schedule identity")
+        standby_substrate_id = self._normalize_non_empty_string(
+            standby_probe.get("standby_substrate_id"),
+            "standby_probe.standby_substrate_id",
+        )
+        if standby_substrate_id != signal_destination:
+            raise ValueError(
+                "standby_probe.standby_substrate_id must match broker_signal.standby_substrate"
+            )
+        if not self._normalize_bool(
+            standby_probe.get("ready_for_migrate"),
+            "standby_probe.ready_for_migrate",
+        ):
+            raise ValueError("standby_probe.ready_for_migrate must be true")
+        if self._normalize_non_empty_string(
+            standby_probe.get("probe_status"),
+            "standby_probe.probe_status",
+        ) != "ready":
+            raise ValueError("standby_probe.probe_status must be ready")
+        source_substrate_id = self._normalize_non_empty_string(
+            standby_probe.get("active_substrate_id"),
+            "standby_probe.active_substrate_id",
+        )
+        if source_substrate_id != signal_source:
+            raise ValueError(
+                "standby_probe.active_substrate_id must match broker_signal.source_substrate"
+            )
+        attestation_chain_id = self._normalize_non_empty_string(
+            attestation_chain.get("chain_id"),
+            "attestation_chain.chain_id",
+        )
+        if self._normalize_non_empty_string(
+            attestation_chain.get("identity_id"),
+            "attestation_chain.identity_id",
+        ) != identity_id:
+            raise ValueError("attestation_chain.identity_id must match the schedule identity")
+        if self._normalize_non_empty_string(
+            attestation_chain.get("active_substrate_id"),
+            "attestation_chain.active_substrate_id",
+        ) != source_substrate_id:
+            raise ValueError(
+                "attestation_chain.active_substrate_id must match standby_probe.active_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            attestation_chain.get("standby_substrate_id"),
+            "attestation_chain.standby_substrate_id",
+        ) != standby_substrate_id:
+            raise ValueError(
+                "attestation_chain.standby_substrate_id must match standby_probe.standby_substrate_id"
+            )
+        if not self._normalize_bool(
+            attestation_chain.get("handoff_ready"),
+            "attestation_chain.handoff_ready",
+        ):
+            raise ValueError("attestation_chain.handoff_ready must be true")
+        if not self._normalize_bool(
+            attestation_chain.get("cross_host_verified"),
+            "attestation_chain.cross_host_verified",
+        ):
+            raise ValueError("attestation_chain.cross_host_verified must be true")
+        if self._normalize_non_empty_string(
+            attestation_chain.get("chain_status"),
+            "attestation_chain.chain_status",
+        ) != "handoff-ready":
+            raise ValueError("attestation_chain.chain_status must be handoff-ready")
+        source_host_ref = self._normalize_non_empty_string(
+            attestation_chain.get("source_host_ref"),
+            "attestation_chain.source_host_ref",
+        )
+        source_host_attestation_ref = self._normalize_non_empty_string(
+            attestation_chain.get("source_host_attestation_ref"),
+            "attestation_chain.source_host_attestation_ref",
+        )
+        destination_host_ref = self._normalize_non_empty_string(
+            attestation_chain.get("expected_destination_host_ref"),
+            "attestation_chain.expected_destination_host_ref",
+        )
+        destination_host_attestation_ref = self._normalize_non_empty_string(
+            attestation_chain.get("standby_host_attestation_ref"),
+            "attestation_chain.standby_host_attestation_ref",
+        )
+        substrate_cluster_ref = self._normalize_non_empty_string(
+            attestation_chain.get("substrate_cluster_ref"),
+            "attestation_chain.substrate_cluster_ref",
+        )
+        cross_host_binding_profile = self._normalize_non_empty_string(
+            attestation_chain.get("cross_host_binding_profile"),
+            "attestation_chain.cross_host_binding_profile",
+        )
+        distinct_host_count = self._normalize_non_negative_int(
+            attestation_chain.get("distinct_host_count"),
+            "attestation_chain.distinct_host_count",
+        )
+        if distinct_host_count < 2:
+            raise ValueError("attestation_chain.distinct_host_count must be >= 2")
+        host_binding_digest = self._normalize_non_empty_string(
+            attestation_chain.get("host_binding_digest"),
+            "attestation_chain.host_binding_digest",
+        )
+        source_attestation_id = self._normalize_non_empty_string(
+            attestation_chain.get("source_attestation_id"),
+            "attestation_chain.source_attestation_id",
+        )
+
+        shadow_allocation = dual_allocation_window.get("shadow_allocation")
+        if not isinstance(shadow_allocation, Mapping):
+            raise ValueError("dual_allocation_window.shadow_allocation must be a mapping")
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("method"),
+            "dual_allocation_window.method",
+        ) != "B":
+            raise ValueError("dual_allocation_window.method must be B")
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("window_status"),
+            "dual_allocation_window.window_status",
+        ) != "shadow-active":
+            raise ValueError("dual_allocation_window.window_status must be shadow-active")
+        if not self._normalize_bool(
+            dual_allocation_window.get("handoff_ready"),
+            "dual_allocation_window.handoff_ready",
+        ):
+            raise ValueError("dual_allocation_window.handoff_ready must be true")
+        if not self._normalize_bool(
+            dual_allocation_window.get("cross_host_verified"),
+            "dual_allocation_window.cross_host_verified",
+        ):
+            raise ValueError("dual_allocation_window.cross_host_verified must be true")
+        dual_allocation_window_id = self._normalize_non_empty_string(
+            dual_allocation_window.get("window_id"),
+            "dual_allocation_window.window_id",
+        )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("source_substrate_id"),
+            "dual_allocation_window.source_substrate_id",
+        ) != source_substrate_id:
+            raise ValueError(
+                "dual_allocation_window.source_substrate_id must match standby_probe.active_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            shadow_allocation.get("substrate"),
+            "dual_allocation_window.shadow_allocation.substrate",
+        ) != standby_substrate_id:
+            raise ValueError(
+                "dual_allocation_window.shadow_allocation.substrate must match standby_probe.standby_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("source_host_ref"),
+            "dual_allocation_window.source_host_ref",
+        ) != source_host_ref:
+            raise ValueError(
+                "dual_allocation_window.source_host_ref must match attestation_chain.source_host_ref"
+            )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("shadow_host_ref"),
+            "dual_allocation_window.shadow_host_ref",
+        ) != destination_host_ref:
+            raise ValueError(
+                "dual_allocation_window.shadow_host_ref must match attestation_chain.expected_destination_host_ref"
+            )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("substrate_cluster_ref"),
+            "dual_allocation_window.substrate_cluster_ref",
+        ) != substrate_cluster_ref:
+            raise ValueError(
+                "dual_allocation_window.substrate_cluster_ref must match attestation_chain.substrate_cluster_ref"
+            )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("cross_host_binding_profile"),
+            "dual_allocation_window.cross_host_binding_profile",
+        ) != cross_host_binding_profile:
+            raise ValueError(
+                "dual_allocation_window.cross_host_binding_profile must match attestation_chain.cross_host_binding_profile"
+            )
+        if self._normalize_non_negative_int(
+            dual_allocation_window.get("distinct_host_count"),
+            "dual_allocation_window.distinct_host_count",
+        ) != distinct_host_count:
+            raise ValueError(
+                "dual_allocation_window.distinct_host_count must match attestation_chain.distinct_host_count"
+            )
+        if self._normalize_non_empty_string(
+            dual_allocation_window.get("host_binding_digest"),
+            "dual_allocation_window.host_binding_digest",
+        ) != host_binding_digest:
+            raise ValueError(
+                "dual_allocation_window.host_binding_digest must match attestation_chain.host_binding_digest"
+            )
+        allocation_pair_digest = self._normalize_non_empty_string(
+            dual_allocation_window.get("allocation_pair_digest"),
+            "dual_allocation_window.allocation_pair_digest",
+        )
+        source_jurisdiction = self._normalize_non_empty_string(
+            dual_allocation_window.get("source_jurisdiction"),
+            "dual_allocation_window.source_jurisdiction",
+        )
+        source_network_zone = self._normalize_non_empty_string(
+            dual_allocation_window.get("source_network_zone"),
+            "dual_allocation_window.source_network_zone",
+        )
+        destination_jurisdiction = self._normalize_non_empty_string(
+            dual_allocation_window.get("shadow_jurisdiction"),
+            "dual_allocation_window.shadow_jurisdiction",
+        )
+        destination_network_zone = self._normalize_non_empty_string(
+            dual_allocation_window.get("shadow_network_zone"),
+            "dual_allocation_window.shadow_network_zone",
+        )
+
+        if self._normalize_non_empty_string(
+            attestation_stream.get("source_substrate_id"),
+            "attestation_stream.source_substrate_id",
+        ) != source_substrate_id:
+            raise ValueError(
+                "attestation_stream.source_substrate_id must match standby_probe.active_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("shadow_substrate_id"),
+            "attestation_stream.shadow_substrate_id",
+        ) != standby_substrate_id:
+            raise ValueError(
+                "attestation_stream.shadow_substrate_id must match standby_probe.standby_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("stream_status"),
+            "attestation_stream.stream_status",
+        ) != "sealed-handoff-ready":
+            raise ValueError("attestation_stream.stream_status must be sealed-handoff-ready")
+        if not self._normalize_bool(
+            attestation_stream.get("handoff_ready"),
+            "attestation_stream.handoff_ready",
+        ):
+            raise ValueError("attestation_stream.handoff_ready must be true")
+        if not self._normalize_bool(
+            attestation_stream.get("cross_host_verified"),
+            "attestation_stream.cross_host_verified",
+        ):
+            raise ValueError("attestation_stream.cross_host_verified must be true")
+        if self._normalize_non_empty_string(
+            attestation_stream.get("expected_destination_substrate"),
+            "attestation_stream.expected_destination_substrate",
+        ) != standby_substrate_id:
+            raise ValueError(
+                "attestation_stream.expected_destination_substrate must match standby_probe.standby_substrate_id"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("expected_destination_host_ref"),
+            "attestation_stream.expected_destination_host_ref",
+        ) != destination_host_ref:
+            raise ValueError(
+                "attestation_stream.expected_destination_host_ref must match attestation_chain.expected_destination_host_ref"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("substrate_cluster_ref"),
+            "attestation_stream.substrate_cluster_ref",
+        ) != substrate_cluster_ref:
+            raise ValueError(
+                "attestation_stream.substrate_cluster_ref must match attestation_chain.substrate_cluster_ref"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("cross_host_binding_profile"),
+            "attestation_stream.cross_host_binding_profile",
+        ) != cross_host_binding_profile:
+            raise ValueError(
+                "attestation_stream.cross_host_binding_profile must match attestation_chain.cross_host_binding_profile"
+            )
+        if self._normalize_non_negative_int(
+            attestation_stream.get("distinct_host_count"),
+            "attestation_stream.distinct_host_count",
+        ) != distinct_host_count:
+            raise ValueError(
+                "attestation_stream.distinct_host_count must match attestation_chain.distinct_host_count"
+            )
+        if self._normalize_non_empty_string(
+            attestation_stream.get("host_binding_digest"),
+            "attestation_stream.host_binding_digest",
+        ) != host_binding_digest:
+            raise ValueError(
+                "attestation_stream.host_binding_digest must match attestation_chain.host_binding_digest"
+            )
+        attestation_stream_id = self._normalize_non_empty_string(
+            attestation_stream.get("stream_id"),
+            "attestation_stream.stream_id",
+        )
+        handoff_state_digest = self._normalize_non_empty_string(
+            attestation_stream.get("expected_state_digest"),
+            "attestation_stream.expected_state_digest",
+        )
+
+        return {
+            "kind": "scheduler_method_b_handoff_receipt",
+            "schema_version": SCHEDULER_SCHEMA_VERSION,
+            "receipt_id": new_id("scheduler-method-b-handoff"),
+            "handle_id": handle["handle_id"],
+            "plan_ref": handle["plan_ref"],
+            "identity_id": identity_id,
+            "method": "B",
+            "review_stage_id": SCHEDULER_METHOD_B_PREPARE_STAGE,
+            "handoff_stage_id": SCHEDULER_METHOD_B_HANDOFF_STAGE,
+            "retirement_stage_id": SCHEDULER_METHOD_B_RETIRE_STAGE,
+            "policy_id": SCHEDULER_METHOD_B_HANDOFF_POLICY_ID,
+            "status": "prepared",
+            "source_substrate": source_substrate_id,
+            "destination_substrate": standby_substrate_id,
+            "source_host_ref": source_host_ref,
+            "source_host_attestation_ref": source_host_attestation_ref,
+            "source_jurisdiction": source_jurisdiction,
+            "source_network_zone": source_network_zone,
+            "destination_host_ref": destination_host_ref,
+            "destination_host_attestation_ref": destination_host_attestation_ref,
+            "destination_jurisdiction": destination_jurisdiction,
+            "destination_network_zone": destination_network_zone,
+            "substrate_cluster_ref": substrate_cluster_ref,
+            "cross_host_binding_profile": cross_host_binding_profile,
+            "distinct_host_count": distinct_host_count,
+            "host_binding_digest": host_binding_digest,
+            "broker_signal_id": signal_id,
+            "broker_signal_severity": signal_severity,
+            "recommended_action": recommended_action,
+            "scheduler_signal": {
+                "severity": scheduler_severity,
+                "source_substrate": scheduler_source,
+                "reason": scheduler_reason,
+            },
+            "standby_probe_id": self._normalize_non_empty_string(
+                standby_probe.get("probe_id"),
+                "standby_probe.probe_id",
+            ),
+            "source_attestation_id": source_attestation_id,
+            "attestation_chain_id": attestation_chain_id,
+            "dual_allocation_window_id": dual_allocation_window_id,
+            "attestation_stream_id": attestation_stream_id,
+            "allocation_pair_digest": allocation_pair_digest,
+            "handoff_state_digest": handoff_state_digest,
+            "prepared_at": utc_now_iso(),
+            "confirmed_at": None,
+            "migration_transfer_id": None,
+            "migration_state_digest": None,
+            "dual_allocation_close_id": None,
+            "cleanup_release_status": None,
+        }
+
+    def _normalize_method_b_handoff_confirmation(
+        self,
+        *,
+        receipt: Mapping[str, Any],
+        migration: Mapping[str, Any],
+        closed_dual_allocation_window: Mapping[str, Any],
+    ) -> tuple[Dict[str, str], Dict[str, str]]:
+        if not isinstance(migration, Mapping):
+            raise ValueError("migration must be a mapping")
+        if not isinstance(closed_dual_allocation_window, Mapping):
+            raise ValueError("closed_dual_allocation_window must be a mapping")
+        if self._normalize_non_empty_string(
+            migration.get("source_substrate"),
+            "migration.source_substrate",
+        ) != receipt["source_substrate"]:
+            raise ValueError("migration.source_substrate must match the prepared broker receipt")
+        if self._normalize_non_empty_string(
+            migration.get("destination_substrate"),
+            "migration.destination_substrate",
+        ) != receipt["destination_substrate"]:
+            raise ValueError(
+                "migration.destination_substrate must match the prepared broker receipt"
+            )
+        if self._normalize_non_empty_string(
+            migration.get("source_host_ref"),
+            "migration.source_host_ref",
+        ) != receipt["source_host_ref"]:
+            raise ValueError("migration.source_host_ref must match the prepared broker receipt")
+        if self._normalize_non_empty_string(
+            migration.get("destination_host_ref"),
+            "migration.destination_host_ref",
+        ) != receipt["destination_host_ref"]:
+            raise ValueError(
+                "migration.destination_host_ref must match the prepared broker receipt"
+            )
+        if self._normalize_non_empty_string(
+            migration.get("substrate_cluster_ref"),
+            "migration.substrate_cluster_ref",
+        ) != receipt["substrate_cluster_ref"]:
+            raise ValueError(
+                "migration.substrate_cluster_ref must match the prepared broker receipt"
+            )
+        if self._normalize_non_empty_string(
+            migration.get("cross_host_binding_profile"),
+            "migration.cross_host_binding_profile",
+        ) != receipt["cross_host_binding_profile"]:
+            raise ValueError(
+                "migration.cross_host_binding_profile must match the prepared broker receipt"
+            )
+        if self._normalize_non_empty_string(
+            migration.get("host_binding_digest"),
+            "migration.host_binding_digest",
+        ) != receipt["host_binding_digest"]:
+            raise ValueError(
+                "migration.host_binding_digest must match the prepared broker receipt"
+            )
+        if not self._normalize_bool(
+            migration.get("cross_host_verified"),
+            "migration.cross_host_verified",
+        ):
+            raise ValueError("migration.cross_host_verified must be true")
+        if self._normalize_non_empty_string(
+            migration.get("continuity_mode"),
+            "migration.continuity_mode",
+        ) != "hot-handoff":
+            raise ValueError("migration.continuity_mode must be hot-handoff")
+        migration_transfer_id = self._normalize_non_empty_string(
+            migration.get("transfer_id"),
+            "migration.transfer_id",
+        )
+        migration_state_digest = self._normalize_non_empty_string(
+            migration.get("state_digest"),
+            "migration.state_digest",
+        )
+        if migration_state_digest != receipt["handoff_state_digest"]:
+            raise ValueError(
+                "migration.state_digest must match the prepared broker handoff_state_digest"
+            )
+
+        closed_window_id = self._normalize_non_empty_string(
+            closed_dual_allocation_window.get("window_id"),
+            "closed_dual_allocation_window.window_id",
+        )
+        if closed_window_id != receipt["dual_allocation_window_id"]:
+            raise ValueError(
+                "closed_dual_allocation_window.window_id must match the prepared broker receipt"
+            )
+        if self._normalize_non_empty_string(
+            closed_dual_allocation_window.get("window_status"),
+            "closed_dual_allocation_window.window_status",
+        ) != "closed":
+            raise ValueError("closed_dual_allocation_window.window_status must be closed")
+        if self._normalize_non_empty_string(
+            closed_dual_allocation_window.get("host_binding_digest"),
+            "closed_dual_allocation_window.host_binding_digest",
+        ) != receipt["host_binding_digest"]:
+            raise ValueError(
+                "closed_dual_allocation_window.host_binding_digest must match the prepared broker receipt"
+            )
+        shadow_release = closed_dual_allocation_window.get("shadow_release")
+        if not isinstance(shadow_release, Mapping):
+            raise ValueError("closed_dual_allocation_window.shadow_release must be a mapping")
+        release_status = self._normalize_non_empty_string(
+            shadow_release.get("status"),
+            "closed_dual_allocation_window.shadow_release.status",
+        )
+        if release_status != "released":
+            raise ValueError(
+                "closed_dual_allocation_window.shadow_release.status must be released"
+            )
+        return (
+            {
+                "transfer_id": migration_transfer_id,
+                "transferred_at": self._normalize_non_empty_string(
+                    migration.get("transferred_at"),
+                    "migration.transferred_at",
+                ),
+                "state_digest": migration_state_digest,
+            },
+            {
+                "window_id": closed_window_id,
+                "release_status": release_status,
+            },
+        )
 
     def _normalize_verifier_rotation_state(self, value: Any) -> str:
         state = self._normalize_non_empty_string(value, "verifier_roster.rotation_state")

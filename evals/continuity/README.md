@@ -62,6 +62,12 @@ AscensionScheduler が Method A の固定順序を守り、timeout 超過時に�
 AscensionScheduler が Method B では substrate signal で pause / rollback し、
 Method C では destructive scan 開始後に fail-closed するか。
 
+### Scheduler Method B Broker Handoff
+AscensionScheduler が Method B の `authority-handoff` を
+prepared broker receipt で gate し、
+`bio-retirement` を hot-handoff migration + cleanup release で
+confirmed になった receipt だけに開くか。
+
 ### Scheduler Governance Artifact Sync
 AscensionScheduler が external proof snapshot を `artifact_sync` に保持し、
 stale artifact で pause、revoked artifact で fail-closed し、

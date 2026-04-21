@@ -440,7 +440,18 @@ entries:
       - evals/continuity/scheduler_stage_rollback.yaml
       - evals/continuity/scheduler_artifact_sync.yaml
       - evals/continuity/scheduler_root_rotation.yaml
-    rationale: Required to persist mutable scheduler state, continuity refs, rollback history, artifact sync snapshots, and verifier root rotation state.
+      - evals/continuity/scheduler_method_b_broker_handoff.yaml
+    rationale: Required to persist mutable scheduler state, continuity refs, rollback history, artifact sync snapshots, verifier root rotation state, and Method B broker handoff binding.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/scheduler_method_b_handoff_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - specs/schemas/schedule_handle.schema
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - reference-runtime
+      - evals/continuity/scheduler_method_b_broker_handoff.yaml
+    rationale: Required to serialize one Method B broker orchestration receipt that binds standby evidence, cross-host host metadata, hot-handoff migration, and cleanup release to scheduler stage gates.
   - priority: P1
     kind: schema
     file: specs/schemas/governance_artifact_sync.schema
@@ -477,7 +488,7 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, artifact sync gate, and verifier root rotation machine-readable.
+    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, Method B broker handoff gate, artifact sync gate, and verifier root rotation machine-readable.
   - priority: P1
     kind: schema
     file: specs/schemas/termination_request.schema
@@ -1243,6 +1254,15 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
     rationale: Protects current-sync gating, stale pause, and revoked fail-closed behavior for scheduler governance artifacts.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_method_b_broker_handoff.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+    rationale: Protects Method B authority-handoff prepare gating, confirmation gating, hot-handoff migration binding, and dual-allocation cleanup release before bio-retirement.
   - priority: P1
     kind: eval
     file: evals/continuity/scheduler_root_rotation.yaml

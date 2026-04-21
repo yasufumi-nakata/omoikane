@@ -32,6 +32,7 @@
 - `external_actuation_authorization.schema`
 - `governance_verifier_roster.schema`
 - `governance_verifier_connectivity_receipt.schema`
+- `scheduler_method_b_handoff_receipt.schema`
 - `world_state.schema`
 - `wms_reconcile.schema`
 - `substrate_allocation.schema`

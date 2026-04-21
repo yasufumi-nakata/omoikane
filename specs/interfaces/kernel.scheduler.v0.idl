@@ -6,6 +6,7 @@ summary: Method A/B/C ascension stage machine and substrate failover contract fo
 imports:
   ascension_plan: ../schemas/ascension_plan.schema
   schedule_handle: ../schemas/schedule_handle.schema
+  scheduler_method_b_handoff_receipt: ../schemas/scheduler_method_b_handoff_receipt.schema
   governance_artifact_sync: ../schemas/governance_artifact_sync.schema
   governance_verifier_roster: ../schemas/governance_verifier_roster.schema
   governance_verifier_connectivity_receipt: ../schemas/governance_verifier_connectivity_receipt.schema
@@ -223,6 +224,51 @@ operations:
             minItems: 1
             items:
               type: string
+  prepare_method_b_handoff:
+    summary: Bind one Method B cross-host broker handoff proof bundle to dual-channel-review before authority-handoff can open.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - broker_signal
+          - standby_probe
+          - attestation_chain
+          - dual_allocation_window
+          - attestation_stream
+        properties:
+          handle_id:
+            type: string
+          broker_signal:
+            type: object
+          standby_probe:
+            type: object
+          attestation_chain:
+            type: object
+          dual_allocation_window:
+            type: object
+          attestation_stream:
+            type: object
+    output:
+      schema_ref: scheduler_method_b_handoff_receipt
+  confirm_method_b_handoff:
+    summary: Confirm one prepared Method B broker handoff with hot-handoff migration and dual-allocation cleanup before bio-retirement can open.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+          - migration
+          - closed_dual_allocation_window
+        properties:
+          handle_id:
+            type: string
+          migration:
+            type: object
+          closed_dual_allocation_window:
+            type: object
+    output:
+      schema_ref: scheduler_method_b_handoff_receipt
   cancel:
     summary: Cancel the current schedule and close the handle before external termination orchestration.
     input:
@@ -370,6 +416,7 @@ compatibility:
     - Timeout and substrate-signal handling always append continuity evidence before exposing completed state.
     - Clinical/legal attestation authenticity stays external to this repo, but every plan and handle must carry stable artifact refs and a bundle digest.
     - Protected handoff stages require one current governance artifact sync snapshot before they can open.
+    - Method B authority-handoff requires one prepared broker handoff receipt, and bio-retirement requires the same receipt to be confirmed with hot-handoff migration plus cleanup release.
     - probe_live_verifier_roster materializes a bounded connectivity receipt and stores only endpoint, digest, latency, and roster summary fields.
     - Stale snapshots pause the active schedule, verifier overlap snapshots pause until cutover, and revoked snapshots fail-closed before destructive or authority-bearing handoff.
 events:

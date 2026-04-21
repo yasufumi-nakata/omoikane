@@ -3923,10 +3923,73 @@ json.dump(response, sys.stdout)
             ),
         )
         method_b_resume_after_refresh = self.scheduler.resume(method_b_scheduled["handle_id"])
-        method_b_review = self.scheduler.advance(
-            method_b_scheduled["handle_id"],
-            "dual-channel-review",
+        method_b_handoff_gate_message = ""
+        try:
+            self.scheduler.advance(
+                method_b_scheduled["handle_id"],
+                "dual-channel-review",
+            )
+        except ValueError as exc:
+            method_b_handoff_gate_message = str(exc)
+        method_b_broker_allocation = self.broker.lease(
+            identity_id=method_b_identity.identity_id,
+            units=72,
+            purpose="scheduler-method-b-broker-orchestration",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
         )
+        method_b_broker_signal = self.broker.handle_energy_floor_signal(
+            method_b_identity.identity_id,
+            current_joules_per_second=28,
+        )
+        method_b_broker_standby_probe = self.broker.probe_standby(method_b_identity.identity_id)
+        method_b_broker_attestation = self.broker.attest(
+            method_b_identity.identity_id,
+            {
+                "allocation_id": method_b_broker_allocation.allocation_id,
+                "tee": "scheduler-broker-attestor-v1",
+                "status": "healthy",
+                "standby_substrate_id": method_b_broker_signal["standby_substrate"],
+            },
+        )
+        method_b_broker_attestation_chain = self.broker.bridge_attestation_chain(
+            method_b_identity.identity_id,
+            state={
+                "identity_id": method_b_identity.identity_id,
+                "lineage_id": method_b_identity.lineage_id,
+                "checkpoint": "scheduler-method-b-review-v1",
+                "shadow_stage": "dual-channel-review",
+            },
+            continuity_mode="warm-standby",
+        )
+        method_b_broker_dual_allocation_window = self.broker.open_dual_allocation_window(
+            method_b_identity.identity_id,
+            state={
+                "identity_id": method_b_identity.identity_id,
+                "lineage_id": method_b_identity.lineage_id,
+                "checkpoint": "scheduler-method-b-shadow-v1",
+                "shadow_stage": "shadow-sync",
+            },
+        )
+        method_b_broker_attestation_stream = self.broker.seal_attestation_stream(
+            method_b_identity.identity_id,
+            state={
+                "identity_id": method_b_identity.identity_id,
+                "lineage_id": method_b_identity.lineage_id,
+                "checkpoint": "scheduler-method-b-handoff-v1",
+                "shadow_stage": "authority-handoff",
+            },
+        )
+        method_b_broker_prepare = self.scheduler.prepare_method_b_handoff(
+            method_b_scheduled["handle_id"],
+            broker_signal=method_b_broker_signal,
+            standby_probe=asdict(method_b_broker_standby_probe),
+            attestation_chain=asdict(method_b_broker_attestation_chain),
+            dual_allocation_window=asdict(method_b_broker_dual_allocation_window),
+            attestation_stream=asdict(method_b_broker_attestation_stream),
+        )
+        method_b_review = self.scheduler.advance(method_b_scheduled["handle_id"], "dual-channel-review")
         method_b_signal_rollback = self.scheduler.handle_substrate_signal(
             method_b_scheduled["handle_id"],
             severity="critical",
@@ -3938,9 +4001,37 @@ json.dump(response, sys.stdout)
             method_b_scheduled["handle_id"],
             "dual-channel-review",
         )
-        method_b_handoff = self.scheduler.advance(
+        method_b_retirement_gate_message = ""
+        try:
+            self.scheduler.advance(
+                method_b_scheduled["handle_id"],
+                "authority-handoff",
+            )
+        except ValueError as exc:
+            method_b_retirement_gate_message = str(exc)
+        method_b_broker_transfer = self.broker.migrate(
+            method_b_identity.identity_id,
+            state={
+                "identity_id": method_b_identity.identity_id,
+                "lineage_id": method_b_identity.lineage_id,
+                "checkpoint": "scheduler-method-b-handoff-v1",
+                "shadow_stage": "authority-handoff",
+            },
+            continuity_mode="hot-handoff",
+        )
+        method_b_broker_closed_window = self.broker.close_dual_allocation_window(
+            method_b_identity.identity_id,
+            reason="scheduler-method-b-handoff-confirmed",
+        )
+        method_b_broker_confirm = self.scheduler.confirm_method_b_handoff(
             method_b_scheduled["handle_id"],
-            "authority-handoff",
+            migration=asdict(method_b_broker_transfer),
+            closed_dual_allocation_window=asdict(method_b_broker_closed_window),
+        )
+        method_b_handoff = self.scheduler.advance(method_b_scheduled["handle_id"], "authority-handoff")
+        method_b_broker_release = self.broker.release(
+            method_b_identity.identity_id,
+            reason="scheduler-method-b-bio-retirement",
         )
         method_b_retirement = self.scheduler.advance(
             method_b_scheduled["handle_id"],
@@ -4087,11 +4178,33 @@ json.dump(response, sys.stdout)
                     "after_refresh_required": method_b_after_refresh_required,
                     "artifact_refresh_current": method_b_artifact_refresh_current,
                     "resume_after_refresh": method_b_resume_after_refresh,
+                    "handoff_gate": {
+                        "blocked": bool(method_b_handoff_gate_message),
+                        "message": method_b_handoff_gate_message,
+                    },
+                    "broker_prepare": method_b_broker_prepare,
                     "dual_channel_review": method_b_review,
                     "signal_rollback": method_b_signal_rollback,
                     "after_signal": method_b_after_signal,
                     "dual_channel_review_retry": method_b_review_retry,
+                    "retirement_gate": {
+                        "blocked": bool(method_b_retirement_gate_message),
+                        "message": method_b_retirement_gate_message,
+                    },
+                    "broker_confirm": method_b_broker_confirm,
                     "authority_handoff": method_b_handoff,
+                    "broker_runtime": {
+                        "allocation": asdict(method_b_broker_allocation),
+                        "signal": method_b_broker_signal,
+                        "standby_probe": asdict(method_b_broker_standby_probe),
+                        "attestation": asdict(method_b_broker_attestation),
+                        "attestation_chain": asdict(method_b_broker_attestation_chain),
+                        "dual_allocation_window": asdict(method_b_broker_dual_allocation_window),
+                        "attestation_stream": asdict(method_b_broker_attestation_stream),
+                        "transfer": asdict(method_b_broker_transfer),
+                        "closed_dual_allocation_window": asdict(method_b_broker_closed_window),
+                        "release": method_b_broker_release,
+                    },
                     "bio_retirement": method_b_retirement,
                 },
                 "method_c": {
@@ -4226,6 +4339,16 @@ json.dump(response, sys.stdout)
                     and method_b_artifact_refresh_current["bundle_status"] == "current"
                     and method_b_resume_after_refresh["status"] == "advancing"
                 ),
+                "method_b_broker_handoff_gate_blocked": (
+                    "broker handoff receipt must be prepared before entering authority-handoff"
+                    in method_b_handoff_gate_message
+                ),
+                "method_b_broker_handoff_prepared": (
+                    method_b_broker_prepare["status"] == "prepared"
+                    and method_b_broker_prepare["destination_substrate"]
+                    == method_b_broker_signal["standby_substrate"]
+                    and method_b_review["next_stage"] == "authority-handoff"
+                ),
                 "artifact_revocation_fail_closed": (
                     method_c_revoked_sync["action"] == "fail"
                     and method_c_revoked_sync["bundle_status"] == "revoked"
@@ -4267,8 +4390,24 @@ json.dump(response, sys.stdout)
                 "method_b_signal_rolled_back": method_b_signal_rollback["action"] == "rollback"
                 and method_b_signal_rollback["rollback_target"] == "dual-channel-review"
                 and method_b_after_signal["current_stage"] == "dual-channel-review",
+                "method_b_broker_confirmation_gate_blocked": (
+                    "broker handoff receipt must be confirmed before entering bio-retirement"
+                    in method_b_retirement_gate_message
+                ),
+                "method_b_broker_handoff_confirmed": (
+                    method_b_broker_confirm["status"] == "confirmed"
+                    and method_b_handoff["next_stage"] == "bio-retirement"
+                    and method_b_final["broker_handoff_receipt"]["status"] == "confirmed"
+                ),
+                "method_b_broker_cleanup_bound": (
+                    method_b_broker_confirm["cleanup_release_status"] == "released"
+                    and method_b_final["broker_handoff_receipt"]["migration_transfer_id"]
+                    == method_b_broker_transfer.transfer_id
+                    and method_b_broker_release["status"] == "released"
+                ),
                 "method_b_completed": method_b_retirement["status"] == "completed"
-                and method_b_final["status"] == "completed",
+                and method_b_final["status"] == "completed"
+                and method_b_broker_release["status"] == "released",
                 "method_c_fail_closed": method_c_signal_fail["action"] == "fail"
                 and method_c_signal_fail["stage_id"] == "scan-commit"
                 and method_c_final["status"] == "failed",

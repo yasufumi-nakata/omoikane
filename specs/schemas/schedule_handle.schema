@@ -14,6 +14,7 @@ required:
   - governance_artifact_digest
   - artifact_sync
   - verifier_roster
+  - broker_handoff_receipt
   - current_stage
   - status
   - history
@@ -144,6 +145,10 @@ properties:
               type: boolean
   verifier_roster:
     $ref: ./governance_verifier_roster.schema
+  broker_handoff_receipt:
+    anyOf:
+      - $ref: ./scheduler_method_b_handoff_receipt.schema
+      - type: "null"
   current_stage:
     type: string
     minLength: 1
@@ -272,6 +277,7 @@ examples:
       external_sync_ref: sync://scheduler-demo/method-a-current/verifier-roster
       dual_attestation_required: false
       dual_attested: false
+    broker_handoff_receipt: null
     current_stage: bdb-bridge
     status: paused
     history:

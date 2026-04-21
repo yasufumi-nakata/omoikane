@@ -1,0 +1,20 @@
+eval_id: scheduler_method_b_broker_handoff
+target: kernel.scheduler
+level: L1
+description: >
+  AscensionScheduler が Method B の protected handoff を actual broker の
+  cross-host handoff receipt に束縛し、
+  authority-handoff 前の prepare gate と
+  bio-retirement 前の confirm + cleanup gate を守ること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
+expected:
+  method_b_broker_handoff_gate_blocked: true
+  method_b_broker_handoff_prepared: true
+  method_b_broker_confirmation_gate_blocked: true
+  method_b_broker_handoff_confirmed: true
+  method_b_broker_cleanup_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true
