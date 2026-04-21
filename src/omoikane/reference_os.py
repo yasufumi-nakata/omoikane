@@ -5140,11 +5140,6 @@ class OmoikaneReferenceOS:
             reason="guardian realigned the avatar body anchor and resumed the safe loopback baseline",
             restored_body_anchor_ref="avatar://atrium/self-body/core",
         )
-        final_session = self.sensory_loopback.snapshot(session["session_id"])
-        session_validation = self.sensory_loopback.validate_session(final_session)
-        coherent_validation = self.sensory_loopback.validate_receipt(coherent)
-        degraded_validation = self.sensory_loopback.validate_receipt(degraded)
-        stabilized_validation = self.sensory_loopback.validate_receipt(stabilized)
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="sensory_loopback.session.stabilized",
@@ -5155,6 +5150,27 @@ class OmoikaneReferenceOS:
             signature_roles=["guardian"],
             substrate="virtual-sensory-plane",
         )
+        artifact_family = self.sensory_loopback.capture_artifact_family(
+            session["session_id"],
+            family_label="atrium-realignment-family",
+            receipts=[coherent, degraded, stabilized],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.artifact_family.recorded",
+            payload=artifact_family,
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback-family",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="virtual-sensory-plane",
+        )
+        final_session = self.sensory_loopback.snapshot(session["session_id"])
+        session_validation = self.sensory_loopback.validate_session(final_session)
+        coherent_validation = self.sensory_loopback.validate_receipt(coherent)
+        degraded_validation = self.sensory_loopback.validate_receipt(degraded)
+        stabilized_validation = self.sensory_loopback.validate_receipt(stabilized)
+        artifact_family_validation = self.sensory_loopback.validate_artifact_family(artifact_family)
 
         return {
             "identity": {
@@ -5169,6 +5185,7 @@ class OmoikaneReferenceOS:
                 "degraded": degraded,
                 "stabilized": stabilized,
             },
+            "artifact_family": artifact_family,
             "qualia": {
                 "profile": self.qualia.profile(),
                 "recent": self.qualia.recent(2),
@@ -5184,6 +5201,11 @@ class OmoikaneReferenceOS:
                 and degraded["requires_council_review"],
                 "stabilized_active": stabilized["delivery_status"] == "stabilized"
                 and final_session["status"] == "active",
+                "artifact_family_ok": artifact_family_validation["ok"],
+                "artifact_family_multi_scene": artifact_family_validation["multi_scene"]
+                and artifact_family["scene_count"] == 3,
+                "artifact_family_bound": final_session["last_artifact_family_ref"]
+                == artifact_family["family_ref"],
                 "qualia_binding_bound": coherent["qualia_binding_ref"].startswith("qualia://tick/")
                 and degraded["qualia_binding_ref"].startswith("qualia://tick/")
                 and stabilized["qualia_binding_ref"].startswith("qualia://loopback-stabilize/"),

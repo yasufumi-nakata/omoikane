@@ -27,6 +27,9 @@ required:
   - last_delivery_id
   - last_delivery_status
   - last_guardian_action
+  - artifact_family_count
+  - last_artifact_family_id
+  - last_artifact_family_ref
   - last_audit_event_ref
 properties:
   schema_version:
@@ -89,6 +92,13 @@ properties:
   last_delivery_status:
     type: string
   last_guardian_action:
+    type: string
+  artifact_family_count:
+    type: integer
+    minimum: 0
+  last_artifact_family_id:
+    type: string
+  last_artifact_family_ref:
     type: string
   last_audit_event_ref:
     type: string

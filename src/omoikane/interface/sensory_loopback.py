@@ -33,6 +33,9 @@ SENSORY_LOOPBACK_LATENCY_BUDGET_MS = 90.0
 SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS = 140.0
 SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD = 0.20
 SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD = 0.35
+SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY = "multi-scene-artifact-family-v1"
+SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY = "family-digest+scene-summary-ref-only"
+SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES = 4
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -50,6 +53,7 @@ class SensoryLoopbackService:
 
     def __init__(self) -> None:
         self.sessions: Dict[str, Dict[str, Any]] = {}
+        self.artifact_families: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -63,6 +67,9 @@ class SensoryLoopbackService:
             "body_schema_mode": "virtual-self-anchor-v1",
             "artifact_storage_policy": "artifact-digest+summary-ref-only",
             "qualia_binding_policy": "surrogate-tick-ref",
+            "artifact_family_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
+            "artifact_family_storage_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY,
+            "artifact_family_max_scenes": SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES,
             "guardian_recovery_required": True,
         }
 
@@ -102,6 +109,9 @@ class SensoryLoopbackService:
             "last_delivery_id": "",
             "last_delivery_status": "none",
             "last_guardian_action": "none",
+            "artifact_family_count": 0,
+            "last_artifact_family_id": "",
+            "last_artifact_family_ref": "",
             "last_audit_event_ref": "",
         }
         self.sessions[session_id] = session
@@ -265,8 +275,126 @@ class SensoryLoopbackService:
         session["last_audit_event_ref"] = receipt["audit_event_ref"]
         return deepcopy(receipt)
 
+    def capture_artifact_family(
+        self,
+        session_id: str,
+        *,
+        family_label: str,
+        receipts: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        normalized_label = self._normalize_non_empty_string(family_label, "family_label")
+        if not isinstance(receipts, Sequence) or isinstance(receipts, (str, bytes)):
+            raise ValueError("receipts must be a sequence of sensory loopback receipts")
+        if len(receipts) < 2:
+            raise ValueError("artifact families require at least 2 receipts")
+        if len(receipts) > SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES:
+            raise ValueError(
+                "artifact families may not exceed "
+                f"{SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES} receipts",
+            )
+
+        scene_summaries: List[Dict[str, Any]] = []
+        delivery_ids: List[str] = []
+        channels_observed: List[str] = []
+        for index, receipt in enumerate(receipts):
+            validation = self.validate_receipt(receipt)
+            if not validation["ok"]:
+                raise ValueError(
+                    f"receipt at index {index} must satisfy sensory loopback receipt validation",
+                )
+            if receipt.get("session_id") != session_id:
+                raise ValueError("all receipts must belong to the same sensory loopback session")
+            delivery_id = self._normalize_non_empty_string(receipt.get("delivery_id"), "delivery_id")
+            if delivery_id in delivery_ids:
+                raise ValueError("artifact family receipts must have unique delivery_id values")
+
+            delivered_channels = receipt.get("delivered_channels")
+            if not isinstance(delivered_channels, list):
+                raise ValueError("receipt.delivered_channels must be a list")
+            normalized_channels = self._normalize_family_channels(delivered_channels)
+            channels_observed.extend(normalized_channels)
+            delivery_ids.append(delivery_id)
+            scene_summaries.append(
+                {
+                    "delivery_id": delivery_id,
+                    "scene_summary": self._normalize_non_empty_string(
+                        receipt.get("scene_summary"),
+                        "scene_summary",
+                    ),
+                    "delivered_channels": normalized_channels,
+                    "classification": receipt["classification"],
+                    "delivery_status": receipt["delivery_status"],
+                    "guardian_action": receipt["guardian_action"],
+                    "artifact_digest": self._normalize_non_empty_string(
+                        receipt.get("artifact_digest"),
+                        "artifact_digest",
+                    ),
+                    "qualia_binding_ref": self._normalize_non_empty_string(
+                        receipt.get("qualia_binding_ref"),
+                        "qualia_binding_ref",
+                    ),
+                    "attention_target": self._normalize_non_empty_string(
+                        receipt.get("attention_target"),
+                        "attention_target",
+                    ),
+                    "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
+                    "requires_council_review": bool(receipt.get("requires_council_review")),
+                }
+            )
+
+        family_id = new_id("sl-family")
+        recorded_at = utc_now_iso()
+        family_digest = self._artifact_family_digest(
+            session_id=session_id,
+            family_label=normalized_label,
+            scene_summaries=scene_summaries,
+            final_session_status=session["status"],
+        )
+        artifact_family = {
+            "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+            "family_id": family_id,
+            "family_ref": f"loopback-family://{family_id}",
+            "session_id": session_id,
+            "recorded_at": recorded_at,
+            "family_label": normalized_label,
+            "policy_id": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
+            "scene_count": len(scene_summaries),
+            "delivery_ids": delivery_ids,
+            "channels_observed": _dedupe_preserve_order(channels_observed),
+            "scene_summaries": scene_summaries,
+            "guardian_intervention_count": sum(
+                1 for scene in scene_summaries if scene["guardian_action"] != "continue-loopback"
+            ),
+            "stabilization_delivery_ids": [
+                scene["delivery_id"]
+                for scene in scene_summaries
+                if scene["delivery_status"] == "stabilized"
+            ],
+            "final_session_status": session["status"],
+            "artifact_storage_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY,
+            "family_digest": family_digest,
+            "audit_event_ref": f"ledger://sensory-loopback-family/{family_id}",
+        }
+        self.artifact_families[family_id] = artifact_family
+        session["updated_at"] = recorded_at
+        session["artifact_family_count"] += 1
+        session["last_artifact_family_id"] = family_id
+        session["last_artifact_family_ref"] = artifact_family["family_ref"]
+        session["last_audit_event_ref"] = artifact_family["audit_event_ref"]
+        return deepcopy(artifact_family)
+
     def snapshot(self, session_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_session(session_id))
+
+    def snapshot_artifact_family(self, family_id: str) -> Dict[str, Any]:
+        normalized_family_id = self._normalize_non_empty_string(family_id, "family_id")
+        try:
+            return deepcopy(self.artifact_families[normalized_family_id])
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown sensory loopback artifact family: {normalized_family_id}",
+            ) from exc
 
     def validate_session(self, session: Mapping[str, Any]) -> Dict[str, Any]:
         if not isinstance(session, Mapping):
@@ -320,6 +448,13 @@ class SensoryLoopbackService:
         delivery_count = session.get("delivery_count")
         if not isinstance(delivery_count, int) or delivery_count < 0:
             errors.append("delivery_count must be a non-negative integer")
+        artifact_family_count = session.get("artifact_family_count")
+        if not isinstance(artifact_family_count, int) or artifact_family_count < 0:
+            errors.append("artifact_family_count must be a non-negative integer")
+        if not isinstance(session.get("last_artifact_family_id"), str):
+            errors.append("last_artifact_family_id must be a string")
+        if not isinstance(session.get("last_artifact_family_ref"), str):
+            errors.append("last_artifact_family_ref must be a string")
 
         return {
             "ok": not errors,
@@ -330,6 +465,7 @@ class SensoryLoopbackService:
             "supports_body_stabilization": session.get("hold_drift_threshold")
             == SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
             "world_anchor_bound": bool(session.get("world_state_ref")),
+            "artifact_family_tracking_enabled": isinstance(session.get("last_artifact_family_ref"), str),
         }
 
     def validate_receipt(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
@@ -391,6 +527,173 @@ class SensoryLoopbackService:
             "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
         }
 
+    def validate_artifact_family(self, artifact_family: Mapping[str, Any]) -> Dict[str, Any]:
+        if not isinstance(artifact_family, Mapping):
+            raise ValueError("artifact_family must be a mapping")
+
+        errors: List[str] = []
+        self._check_non_empty_string(artifact_family.get("family_id"), "family_id", errors)
+        self._check_non_empty_string(artifact_family.get("family_ref"), "family_ref", errors)
+        self._check_non_empty_string(artifact_family.get("session_id"), "session_id", errors)
+        self._check_non_empty_string(artifact_family.get("recorded_at"), "recorded_at", errors)
+        self._check_non_empty_string(artifact_family.get("family_label"), "family_label", errors)
+        self._check_non_empty_string(artifact_family.get("family_digest"), "family_digest", errors)
+        self._check_non_empty_string(artifact_family.get("audit_event_ref"), "audit_event_ref", errors)
+        if artifact_family.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        if artifact_family.get("policy_id") != SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY:
+            errors.append(
+                f"policy_id must be {SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY}",
+            )
+        if (
+            artifact_family.get("artifact_storage_policy")
+            != SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY
+        ):
+            errors.append(
+                "artifact_storage_policy must be "
+                f"{SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY}",
+            )
+
+        scene_count = artifact_family.get("scene_count")
+        if (
+            not isinstance(scene_count, int)
+            or scene_count < 2
+            or scene_count > SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES
+        ):
+            errors.append(
+                "scene_count must be an integer between 2 and "
+                f"{SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES}",
+            )
+
+        delivery_ids = artifact_family.get("delivery_ids")
+        if not isinstance(delivery_ids, list) or len(delivery_ids) != len(set(delivery_ids)):
+            errors.append("delivery_ids must be a unique list")
+
+        channels_observed = artifact_family.get("channels_observed")
+        if not isinstance(channels_observed, list):
+            errors.append("channels_observed must be a list")
+        else:
+            invalid = sorted(set(channels_observed) - SENSORY_LOOPBACK_ALLOWED_CHANNELS)
+            if invalid:
+                errors.append(f"channels_observed contains unsupported values: {invalid}")
+
+        scene_summaries = artifact_family.get("scene_summaries")
+        if not isinstance(scene_summaries, list):
+            errors.append("scene_summaries must be a list")
+            scene_summaries = []
+        else:
+            for index, scene in enumerate(scene_summaries):
+                if not isinstance(scene, Mapping):
+                    errors.append(f"scene_summaries[{index}] must be a mapping")
+                    continue
+                self._check_non_empty_string(scene.get("delivery_id"), f"scene_summaries[{index}].delivery_id", errors)
+                self._check_non_empty_string(
+                    scene.get("scene_summary"),
+                    f"scene_summaries[{index}].scene_summary",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    scene.get("artifact_digest"),
+                    f"scene_summaries[{index}].artifact_digest",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    scene.get("qualia_binding_ref"),
+                    f"scene_summaries[{index}].qualia_binding_ref",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    scene.get("attention_target"),
+                    f"scene_summaries[{index}].attention_target",
+                    errors,
+                )
+                if scene.get("classification") not in SENSORY_LOOPBACK_ALLOWED_CLASSIFICATIONS:
+                    errors.append(
+                        f"scene_summaries[{index}].classification must be one of "
+                        f"{sorted(SENSORY_LOOPBACK_ALLOWED_CLASSIFICATIONS)}",
+                    )
+                if scene.get("delivery_status") not in SENSORY_LOOPBACK_ALLOWED_DELIVERY_STATUS:
+                    errors.append(
+                        f"scene_summaries[{index}].delivery_status must be one of "
+                        f"{sorted(SENSORY_LOOPBACK_ALLOWED_DELIVERY_STATUS)}",
+                    )
+                if scene.get("guardian_action") not in SENSORY_LOOPBACK_ALLOWED_GUARDIAN_ACTIONS:
+                    errors.append(
+                        f"scene_summaries[{index}].guardian_action must be one of "
+                        f"{sorted(SENSORY_LOOPBACK_ALLOWED_GUARDIAN_ACTIONS)}",
+                    )
+                delivered_channels = scene.get("delivered_channels")
+                if not isinstance(delivered_channels, list):
+                    errors.append(f"scene_summaries[{index}].delivered_channels must be a list")
+                else:
+                    invalid = sorted(set(delivered_channels) - SENSORY_LOOPBACK_ALLOWED_CHANNELS)
+                    if invalid:
+                        errors.append(
+                            f"scene_summaries[{index}].delivered_channels contains unsupported values: {invalid}",
+                        )
+                if not isinstance(scene.get("safe_baseline_applied"), bool):
+                    errors.append(
+                        f"scene_summaries[{index}].safe_baseline_applied must be a boolean",
+                    )
+                if not isinstance(scene.get("requires_council_review"), bool):
+                    errors.append(
+                        f"scene_summaries[{index}].requires_council_review must be a boolean",
+                    )
+
+        if isinstance(scene_count, int) and isinstance(scene_summaries, list) and scene_count != len(scene_summaries):
+            errors.append("scene_count must equal len(scene_summaries)")
+        if isinstance(scene_count, int) and isinstance(delivery_ids, list) and scene_count != len(delivery_ids):
+            errors.append("scene_count must equal len(delivery_ids)")
+
+        guardian_intervention_count = artifact_family.get("guardian_intervention_count")
+        if not isinstance(guardian_intervention_count, int) or guardian_intervention_count < 0:
+            errors.append("guardian_intervention_count must be a non-negative integer")
+        elif isinstance(scene_summaries, list):
+            expected_guardian_interventions = sum(
+                1
+                for scene in scene_summaries
+                if isinstance(scene, Mapping) and scene.get("guardian_action") != "continue-loopback"
+            )
+            if guardian_intervention_count != expected_guardian_interventions:
+                errors.append(
+                    "guardian_intervention_count must match non-continue guardian actions",
+                )
+
+        stabilization_delivery_ids = artifact_family.get("stabilization_delivery_ids")
+        if not isinstance(stabilization_delivery_ids, list):
+            errors.append("stabilization_delivery_ids must be a list")
+        elif isinstance(delivery_ids, list):
+            missing = sorted(set(stabilization_delivery_ids) - set(delivery_ids))
+            if missing:
+                errors.append(
+                    f"stabilization_delivery_ids must reference existing delivery_ids: {missing}",
+                )
+
+        final_session_status = artifact_family.get("final_session_status")
+        if final_session_status not in SENSORY_LOOPBACK_ALLOWED_SESSION_STATUS:
+            errors.append(
+                "final_session_status must be one of "
+                f"{sorted(SENSORY_LOOPBACK_ALLOWED_SESSION_STATUS)}",
+            )
+
+        expected_digest = self._artifact_family_digest(
+            session_id=artifact_family.get("session_id"),
+            family_label=artifact_family.get("family_label"),
+            scene_summaries=scene_summaries if isinstance(scene_summaries, list) else [],
+            final_session_status=artifact_family.get("final_session_status"),
+        )
+        if artifact_family.get("family_digest") != expected_digest:
+            errors.append("family_digest must match the artifact family payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "multi_scene": isinstance(scene_summaries, list) and len(scene_summaries) >= 2,
+            "family_digest_bound": artifact_family.get("family_digest") == expected_digest,
+            "guardian_recovery_tracked": isinstance(stabilization_delivery_ids, list)
+            and bool(stabilization_delivery_ids),
+        }
+
     def _require_session(self, session_id: str) -> Dict[str, Any]:
         normalized_session_id = self._normalize_non_empty_string(session_id, "session_id")
         try:
@@ -444,6 +747,39 @@ class SensoryLoopbackService:
             for channel in allowed_channels
             if channel in normalized
         }
+
+    def _normalize_family_channels(self, channels: Sequence[str]) -> List[str]:
+        if not isinstance(channels, Sequence) or isinstance(channels, (str, bytes)):
+            raise ValueError("delivered_channels must be a sequence")
+        normalized = [
+            self._normalize_non_empty_string(channel, "delivered_channel")
+            for channel in channels
+        ]
+        normalized = _dedupe_preserve_order(normalized)
+        invalid = sorted(set(normalized) - SENSORY_LOOPBACK_ALLOWED_CHANNELS)
+        if invalid:
+            raise ValueError(f"delivered_channels contains unsupported values: {invalid}")
+        return normalized
+
+    @staticmethod
+    def _artifact_family_digest(
+        *,
+        session_id: Any,
+        family_label: Any,
+        scene_summaries: Sequence[Mapping[str, Any]],
+        final_session_status: Any,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "session_id": session_id,
+                    "family_label": family_label,
+                    "policy_id": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
+                    "scene_summaries": list(scene_summaries),
+                    "final_session_status": final_session_status,
+                }
+            )
+        )
 
     @staticmethod
     def _normalize_non_negative_number(value: Any, name: str) -> float:

@@ -1,0 +1,20 @@
+eval_id: sensory_loopback_artifact_family
+target: interface.sensory_loopback
+level: L6
+description: >
+  Sensory Loopback が coherent delivery、guardian hold、stabilize recovery を
+  1 つの bounded artifact family に束ね、scene 順序と final session status を
+  digest-only で追跡できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
+expected:
+  validation_ok: true
+  artifact_family_ok: true
+  artifact_family_scene_count: 3
+  artifact_family_guardian_intervention_count: 2
+  artifact_family_final_session_status: active
+  artifact_family_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

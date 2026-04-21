@@ -9,6 +9,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 - `WMS` の `world_state_ref` と `body_anchor_ref` に束縛し、
   avatar body の drift を検出する
 - artifact 本体は保持せず、`artifact_ref` と digest と summary のみを監査へ残す
+- coherent / guardian-hold / stabilize の複数 scene を
+  bounded な artifact family として束ね、回復経路を digest-only で再監査できる
 - drift や latency overshoot 時は Guardian が safe baseline へ attenuate / hold する
 - `QualiaBuffer` へは raw stream ではなく `qualia_binding_ref` だけを返し、
   surrogate tick と結び直す
@@ -25,6 +27,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | body_schema_mode | `virtual-self-anchor-v1` |
 | artifact_storage_policy | `artifact-digest+summary-ref-only` |
 | qualia_binding_policy | `surrogate-tick-ref` |
+| artifact_family_policy | `multi-scene-artifact-family-v1` |
+| artifact_family_max_scenes | `4` |
 
 reference runtime では raw retinal/audio/haptic stream は扱わず、
 **artifact ref + digest + body coherence score** に限定した contract を固定する。
@@ -61,6 +65,13 @@ sensory_loopback.stabilize:
     reason: <text>
     restored_body_anchor_ref: <avatar body anchor>
   output: sensory_loopback_receipt
+
+sensory_loopback.capture_artifact_family:
+  input:
+    session_id: <loopback session>
+    family_label: <bounded family label>
+    delivery_ids: [<delivery ref>, <delivery ref>, ...]
+  output: sensory_loopback_artifact_family
 ```
 
 ## 判定規則
@@ -80,17 +91,21 @@ degraded bundle は Guardian observe が無い限り reject する。
 3. **guardian recovery 必須** ── `guardian-hold` からの再開は `stabilize` 経由のみ
 4. **2 channel 以上** ── body-coherent delivery を名乗るには最低 2 modality が必要
 5. **qualia は ref のみ** ── loopback receipt は surrogate tick 参照だけを返す
+6. **artifact family は同一 session 内限定** ── multi-scene family は 2-4 receipt を同一 session に束縛する
 
 ## reference runtime の扱い
 
 - `interface.sensory_loopback.v0.idl` を追加し、
-  `open_session / deliver_bundle / stabilize / snapshot` を定義
+  `open_session / deliver_bundle / stabilize / snapshot / capture_artifact_family / snapshot_artifact_family` を定義
 - `sensory_loopback_session.schema` /
-  `sensory_loopback_receipt.schema` を追加
+  `sensory_loopback_receipt.schema` /
+  `sensory_loopback_artifact_family.schema` を追加
 - `sensory-loopback-demo --json` で coherent delivery、
-  guardian hold、stabilize 復帰を 1 シナリオで可視化
+  guardian hold、stabilize 復帰、multi-scene artifact family capture を 1 シナリオで可視化
 - `evals/interface/sensory_loopback_guard.yaml` で
   body coherence guard と qualia binding を固定
+- `evals/interface/sensory_loopback_artifact_family.yaml` で
+  family scene 順序、guardian intervention 数、final session binding を固定
 
 ## 未解決
 

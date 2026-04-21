@@ -6,6 +6,7 @@ summary: Canonical L6 contract for bounded visual/audio/haptic self-feedback wit
 imports:
   sensory_loopback_session: ../schemas/sensory_loopback_session.schema
   sensory_loopback_receipt: ../schemas/sensory_loopback_receipt.schema
+  sensory_loopback_artifact_family: ../schemas/sensory_loopback_artifact_family.schema
 operations:
   open_session:
     summary: Bind one loopback session to a world-state anchor and a virtual body anchor before delivery begins.
@@ -135,6 +136,49 @@ operations:
             minLength: 8
     output:
       schema_ref: sensory_loopback_session
+  capture_artifact_family:
+    summary: Bind 2-4 loopback receipts from one session into a digest-only multi-scene artifact family.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - family_label
+          - delivery_ids
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          family_label:
+            type: string
+            minLength: 1
+          delivery_ids:
+            type: array
+            minItems: 2
+            maxItems: 4
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 8
+    output:
+      schema_ref: sensory_loopback_artifact_family
+    guarantees:
+      - artifact families must only group receipts from the same loopback session
+      - artifact families must preserve per-scene digest, guardian action, and recovery state without raw payload retention
+      - artifact family capture must expose the final session status at record time
+  snapshot_artifact_family:
+    summary: Read one recorded multi-scene loopback artifact family.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - family_id
+        properties:
+          family_id:
+            type: string
+            minLength: 8
+    output:
+      schema_ref: sensory_loopback_artifact_family
 events:
   sensory_loopback.bundle_recorded:
     payload:
@@ -142,8 +186,11 @@ events:
   sensory_loopback.session_stabilized:
     payload:
       schema_ref: sensory_loopback_receipt
+  sensory_loopback.artifact_family_recorded:
+    payload:
+      schema_ref: sensory_loopback_artifact_family
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves digest-only, body-coherent loopback handling inside the reference runtime.
+    - This contract proves digest-only, body-coherent loopback handling and bounded multi-scene artifact family capture inside the reference runtime.
     - Raw retinal/audio/haptic streams, richer avatar-body maps, and hardware-specific actuator timing remain future work.

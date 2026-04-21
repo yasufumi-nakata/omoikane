@@ -125,6 +125,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("delivered", result["receipts"]["coherent"]["delivery_status"])
         self.assertEqual("guardian-hold", result["receipts"]["degraded"]["delivery_status"])
         self.assertEqual("stabilized", result["receipts"]["stabilized"]["delivery_status"])
+        self.assertTrue(result["validation"]["artifact_family_ok"])
+        self.assertEqual(3, result["artifact_family"]["scene_count"])
+        self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
 
     def test_connectome_demo_emits_valid_json(self) -> None:

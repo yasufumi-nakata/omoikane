@@ -113,13 +113,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["coherent_delivery"])
         self.assertTrue(result["validation"]["guardian_hold_triggered"])
         self.assertTrue(result["validation"]["stabilized_active"])
+        self.assertTrue(result["validation"]["artifact_family_ok"])
+        self.assertTrue(result["validation"]["artifact_family_multi_scene"])
+        self.assertTrue(result["validation"]["artifact_family_bound"])
         self.assertTrue(result["validation"]["qualia_binding_bound"])
         self.assertEqual("active", result["session"]["status"])
+        self.assertEqual(3, result["artifact_family"]["scene_count"])
+        self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
+        self.assertEqual("active", result["artifact_family"]["final_session_status"])
         self.assertEqual("guardian-hold", result["receipts"]["degraded"]["delivery_status"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
         self.assertEqual(
             1,
             result["ledger_verification"]["category_counts"]["interface-sensory-loopback-guardian"],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-sensory-loopback-family"],
         )
 
     def test_reference_scenario_runs(self) -> None:

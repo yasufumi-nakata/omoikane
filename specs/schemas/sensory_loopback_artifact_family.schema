@@ -1,0 +1,226 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sensory_loopback_artifact_family.schema"
+title: SensoryLoopbackArtifactFamily
+description: >
+  Bounded multi-scene family summary for one sensory loopback session that keeps
+  digest-only artifact evidence while linking coherent delivery, guardian hold,
+  and stabilization recovery across scenes.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - family_id
+  - family_ref
+  - session_id
+  - recorded_at
+  - family_label
+  - policy_id
+  - scene_count
+  - delivery_ids
+  - channels_observed
+  - scene_summaries
+  - guardian_intervention_count
+  - stabilization_delivery_ids
+  - final_session_status
+  - artifact_storage_policy
+  - family_digest
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  family_id:
+    type: string
+    minLength: 8
+  family_ref:
+    type: string
+    pattern: "^loopback-family://sl-family-[a-f0-9]{12}$"
+  session_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  family_label:
+    type: string
+    minLength: 1
+  policy_id:
+    const: multi-scene-artifact-family-v1
+  scene_count:
+    type: integer
+    minimum: 2
+    maximum: 4
+  delivery_ids:
+    type: array
+    minItems: 2
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 8
+  channels_observed:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - visual
+        - auditory
+        - haptic
+  scene_summaries:
+    type: array
+    minItems: 2
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - delivery_id
+        - scene_summary
+        - delivered_channels
+        - classification
+        - delivery_status
+        - guardian_action
+        - artifact_digest
+        - qualia_binding_ref
+        - attention_target
+        - safe_baseline_applied
+        - requires_council_review
+      properties:
+        delivery_id:
+          type: string
+          minLength: 8
+        scene_summary:
+          type: string
+          minLength: 1
+        delivered_channels:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - visual
+              - auditory
+              - haptic
+        classification:
+          type: string
+          enum:
+            - coherent
+            - attenuated
+            - held
+            - stabilized
+        delivery_status:
+          type: string
+          enum:
+            - delivered
+            - attenuate-to-safe-baseline
+            - guardian-hold
+            - stabilized
+        guardian_action:
+          type: string
+          enum:
+            - continue-loopback
+            - stabilize-session
+            - freeze-loopback
+            - resume-loopback
+        artifact_digest:
+          type: string
+          minLength: 32
+        qualia_binding_ref:
+          type: string
+          minLength: 1
+        attention_target:
+          type: string
+          minLength: 1
+        safe_baseline_applied:
+          type: boolean
+        requires_council_review:
+          type: boolean
+  guardian_intervention_count:
+    type: integer
+    minimum: 0
+  stabilization_delivery_ids:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 8
+  final_session_status:
+    type: string
+    enum:
+      - active
+      - stabilizing
+      - held
+      - closed
+  artifact_storage_policy:
+    const: family-digest+scene-summary-ref-only
+  family_digest:
+    type: string
+    minLength: 32
+  audit_event_ref:
+    type: string
+    pattern: "^ledger://sensory-loopback-family/sl-family-[a-f0-9]{12}$"
+examples:
+  - schema_version: "1.0"
+    family_id: sl-family-0123456789ab
+    family_ref: loopback-family://sl-family-0123456789ab
+    session_id: sl-112233445566
+    recorded_at: "2026-04-21T08:00:00Z"
+    family_label: atrium-realignment-family
+    policy_id: multi-scene-artifact-family-v1
+    scene_count: 3
+    delivery_ids:
+      - sl-delivery-aaaa1111bbbb
+      - sl-delivery-cccc2222dddd
+      - sl-delivery-eeee3333ffff
+    channels_observed:
+      - visual
+      - auditory
+      - haptic
+    scene_summaries:
+      - delivery_id: sl-delivery-aaaa1111bbbb
+        scene_summary: coherent avatar mirror bundle
+        delivered_channels:
+          - visual
+          - auditory
+          - haptic
+        classification: coherent
+        delivery_status: delivered
+        guardian_action: continue-loopback
+        artifact_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+        qualia_binding_ref: qualia://tick/tick-1111
+        attention_target: avatar://atrium/self-body/core
+        safe_baseline_applied: false
+        requires_council_review: false
+      - delivery_id: sl-delivery-cccc2222dddd
+        scene_summary: drifted avatar echo triggers guardian hold
+        delivered_channels:
+          - visual
+          - auditory
+          - haptic
+        classification: held
+        delivery_status: guardian-hold
+        guardian_action: freeze-loopback
+        artifact_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+        qualia_binding_ref: qualia://tick/tick-2222
+        attention_target: guardian-review
+        safe_baseline_applied: true
+        requires_council_review: true
+      - delivery_id: sl-delivery-eeee3333ffff
+        scene_summary: guardian realigned the body anchor
+        delivered_channels: []
+        classification: stabilized
+        delivery_status: stabilized
+        guardian_action: resume-loopback
+        artifact_digest: 99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa
+        qualia_binding_ref: qualia://loopback-stabilize/sl-delivery-eeee3333ffff
+        attention_target: avatar://atrium/self-body/core
+        safe_baseline_applied: true
+        requires_council_review: false
+    guardian_intervention_count: 2
+    stabilization_delivery_ids:
+      - sl-delivery-eeee3333ffff
+    final_session_status: active
+    artifact_storage_policy: family-digest+scene-summary-ref-only
+    family_digest: ffeeddccbbaa00998877665544332211ffeeddccbbaa00998877665544332211
+    audit_event_ref: ledger://sensory-loopback-family/sl-family-0123456789ab

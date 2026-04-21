@@ -23,6 +23,7 @@
 - `bdb_cycle.schema`
 - `sensory_loopback_session.schema`
 - `sensory_loopback_receipt.schema`
+- `sensory_loopback_artifact_family.schema`
 - `ewa_command.schema`
 - `ewa_audit.schema`
 - `external_actuation_authorization.schema`
@@ -78,7 +79,6 @@
 ## 次段階
 
 current-worktree direct rollback mutation /
-multi-scene sensory loopback artifact families /
 cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。
 
