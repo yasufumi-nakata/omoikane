@@ -334,6 +334,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["sandbox_apply_patch_count"])
         self.assertEqual(2, result["validation"]["selected_eval_count"])
         self.assertEqual("promote", result["validation"]["rollout_decision"])
+        self.assertTrue(result["validation"]["eval_report_evidence_bound"])
         self.assertTrue(result["validation"]["rollout_session_ok"])
         self.assertEqual("promoted", result["validation"]["rollout_status"])
         self.assertEqual(4, result["validation"]["rollout_completed_stage_count"])
@@ -344,12 +345,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["rollback_ready"])
         self.assertEqual("ready", result["builder"]["artifact"]["status"])
         self.assertEqual(
+            "src/omoikane/self_construction/builders.py",
+            result["builder"]["patches"][0]["target_path"],
+        )
+        self.assertEqual(
             [
                 "evals/continuity/council_output_build_request_pipeline.yaml",
                 "evals/continuity/builder_staged_rollout_execution.yaml",
             ],
             result["builder"]["suite_selection"]["selected_evals"],
         )
+        self.assertEqual(
+            "builder-handoff-ab-evidence-v1",
+            result["builder"]["eval_reports"][0]["profile_id"],
+        )
+        self.assertEqual(64, len(result["builder"]["eval_reports"][0]["comparison_digest"]))
         self.assertTrue(
             result["builder"]["build_request"]["design_delta_ref"].startswith("design://")
         )
@@ -396,6 +406,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
         self.assertEqual(5, result["validation"]["selected_eval_count"])
+        self.assertTrue(result["validation"]["eval_report_evidence_bound"])
         self.assertEqual(
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             result["validation"]["restored_snapshot_ref"],
@@ -438,6 +449,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["telemetry_gate_command_count"])
         self.assertEqual(2, result["validation"]["continuity_event_ref_count"])
         self.assertEqual(3, result["validation"]["notification_ref_count"])
+        rollback_report = next(
+            report
+            for report in result["builder"]["eval_reports"]
+            if report["eval_ref"] == "evals/continuity/builder_rollback_execution.yaml"
+        )
+        self.assertEqual("builder-rollback-trigger-evidence-v1", rollback_report["profile_id"])
+        self.assertEqual("regression", rollback_report["outcome"])
         self.assertEqual("rolled-back", result["builder"]["rollback_session"]["status"])
         self.assertEqual(
             "satisfied",

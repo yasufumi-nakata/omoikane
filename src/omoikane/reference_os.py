@@ -8348,6 +8348,13 @@ class OmoikaneReferenceOS:
                 "sandbox_apply_patch_count": sandbox_apply_receipt["applied_patch_count"],
                 "selected_eval_count": len(suite_selection["selected_evals"]),
                 "all_evals_passed": all_evals_passed,
+                "eval_report_evidence_bound": all(
+                    len(str(report.get("comparison_digest", ""))) == 64
+                    and bool(report.get("profile_id"))
+                    and bool(report.get("baseline_observation", {}).get("binding_digest"))
+                    and bool(report.get("sandbox_observation", {}).get("binding_digest"))
+                    for report in eval_reports
+                ),
                 "rollout_decision": rollout["decision"],
                 "rollout_session_ok": rollout_session_validation["ok"],
                 "rollout_status": rollout_session["status"],
@@ -8947,6 +8954,13 @@ class OmoikaneReferenceOS:
                 "live_enactment_ok": enactment_validation["ok"],
                 "live_enactment_status": enactment_session["status"],
                 "regression_detected": regression_detected,
+                "eval_report_evidence_bound": all(
+                    len(str(report.get("comparison_digest", ""))) == 64
+                    and bool(report.get("profile_id"))
+                    and bool(report.get("baseline_observation", {}).get("binding_digest"))
+                    and bool(report.get("sandbox_observation", {}).get("binding_digest"))
+                    for report in eval_reports
+                ),
                 "rollback_trigger": rollback_session["trigger"],
                 "rollout_decision": rollout["decision"],
                 "rollout_status": rollout_session["status"],

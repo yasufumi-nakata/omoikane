@@ -253,10 +253,36 @@ class PatchGeneratorServiceTests(unittest.TestCase):
 
         self.assertEqual("ready", result["status"])
         self.assertEqual(2, len(result["patches"]))
+        self.assertEqual(
+            "src/omoikane/self_construction/builders.py",
+            result["patches"][0]["target_path"],
+        )
+        self.assertIn("L5.DifferentialEvaluator", result["patches"][0]["summary"])
         self.assertEqual("pass", result["test_results"]["build_status"])
         self.assertEqual(
             "ledger://self-modify/build-l5-0001",
             result["continuity_log_ref"],
+        )
+
+    def test_generate_patch_set_uses_design_reader_target_when_requested(self) -> None:
+        service = PatchGeneratorService()
+        request = _design_backed_request(
+            target_subsystem="L5.DesignReader",
+            request_id="build-l5-design-reader-0002",
+            must_pass=["evals/continuity/design_reader_handoff.yaml"],
+        )
+
+        result = service.generate_patch_set(request)
+
+        self.assertEqual("ready", result["status"])
+        self.assertEqual(
+            "src/omoikane/self_construction/design_reader.py",
+            result["patches"][0]["target_path"],
+        )
+        self.assertIn("L5.DesignReader", result["patches"][0]["summary"])
+        self.assertEqual(
+            "tests/unit/test_builders.py",
+            result["patches"][1]["target_path"],
         )
 
 
@@ -273,6 +299,38 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
             ["evals/continuity/council_output_build_request_pipeline.yaml"],
             result["selected_evals"],
         )
+
+    def test_run_ab_eval_emits_structured_evidence_for_pass(self) -> None:
+        service = DifferentialEvaluatorService()
+
+        result = service.run_ab_eval(
+            eval_ref="evals/continuity/council_output_build_request_pipeline.yaml",
+            baseline_ref="runtime://baseline/current",
+            sandbox_ref="mirage://build-l5-0001/snapshot/current",
+        )
+
+        self.assertEqual("pass", result["outcome"])
+        self.assertEqual("builder-handoff-ab-evidence-v1", result["profile_id"])
+        self.assertEqual("runtime", result["baseline_observation"]["scheme"])
+        self.assertEqual("mirage", result["sandbox_observation"]["scheme"])
+        self.assertEqual("current", result["sandbox_observation"]["state"])
+        self.assertIn("sandbox-state-pass:current", result["triggered_rules"])
+        self.assertEqual(64, len(result["comparison_digest"]))
+
+    def test_run_ab_eval_marks_rollback_breach_as_regression(self) -> None:
+        service = DifferentialEvaluatorService()
+
+        result = service.run_ab_eval(
+            eval_ref="evals/continuity/builder_rollback_execution.yaml",
+            baseline_ref="runtime://baseline/current",
+            sandbox_ref="mirage://build-l5-rollback-0001/snapshot/rollback-breach",
+        )
+
+        self.assertEqual("regression", result["outcome"])
+        self.assertEqual("builder-rollback-trigger-evidence-v1", result["profile_id"])
+        self.assertIn("rollback", result["sandbox_observation"]["state_tokens"])
+        self.assertIn("breach", result["sandbox_observation"]["state_tokens"])
+        self.assertIn("sandbox-regression-tokens:breach+rollback", result["triggered_rules"])
 
     def test_classify_rollout_uses_regression_as_hard_stop(self) -> None:
         service = DifferentialEvaluatorService()

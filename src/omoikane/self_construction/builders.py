@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import shutil
 import subprocess
@@ -10,6 +11,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Mapping, Sequence
+from urllib.parse import urlparse
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -28,6 +30,51 @@ ROLLOUT_STAGE_ORDER = (
     ("broad-50pct", 50, "shared-visible", "continuity-stable"),
     ("full-100pct", 100, "primary-visible", "promotion-complete"),
 )
+PATCH_TARGET_FILE_HINTS = (
+    ("L5.DesignReader", "src/omoikane/self_construction/design_reader.py"),
+    ("L5.PatchGenerator", "src/omoikane/self_construction/builders.py"),
+    ("L5.DifferentialEvaluator", "src/omoikane/self_construction/builders.py"),
+    ("L5.LiveEnactment", "src/omoikane/self_construction/builders.py"),
+    ("L5.RollbackEngine", "src/omoikane/self_construction/builders.py"),
+)
+DIFF_EVAL_EXECUTION_PROFILES: Dict[str, Dict[str, Any]] = {
+    "evals/continuity/council_output_build_request_pipeline.yaml": {
+        "profile_id": "builder-handoff-ab-evidence-v1",
+        "allowed_baseline_schemes": ("runtime", "workspace", "mirage"),
+        "allowed_sandbox_schemes": ("mirage", "workspace", "runtime"),
+        "pass_states": ("current", "shadow-match"),
+        "fail_tokens": ("fail", "mismatch", "blocked", "hold"),
+        "regression_tokens": ("regression", "rollback", "breach"),
+        "compared_dimensions": ("scheme", "subject", "resource_kind", "state_tokens"),
+    },
+    "evals/continuity/builder_staged_rollout_execution.yaml": {
+        "profile_id": "builder-rollout-ab-evidence-v1",
+        "allowed_baseline_schemes": ("runtime", "workspace", "mirage"),
+        "allowed_sandbox_schemes": ("mirage", "workspace", "runtime"),
+        "pass_states": ("current", "shadow-match"),
+        "fail_tokens": ("fail", "mismatch", "blocked", "hold"),
+        "regression_tokens": ("regression", "rollback", "breach"),
+        "compared_dimensions": ("scheme", "subject", "resource_kind", "state_tokens"),
+    },
+    "evals/continuity/builder_rollback_execution.yaml": {
+        "profile_id": "builder-rollback-trigger-evidence-v1",
+        "allowed_baseline_schemes": ("runtime", "workspace", "mirage"),
+        "allowed_sandbox_schemes": ("mirage", "workspace", "runtime"),
+        "pass_states": ("restored", "rollback-ready"),
+        "fail_tokens": ("fail", "mismatch", "blocked", "hold"),
+        "regression_tokens": ("regression", "rollback", "breach"),
+        "compared_dimensions": ("scheme", "subject", "resource_kind", "state_tokens"),
+    },
+    "evals/continuity/builder_rollback_oversight_network.yaml": {
+        "profile_id": "builder-rollback-oversight-evidence-v1",
+        "allowed_baseline_schemes": ("runtime", "workspace", "mirage"),
+        "allowed_sandbox_schemes": ("mirage", "workspace", "runtime"),
+        "pass_states": ("current", "reviewer-network"),
+        "fail_tokens": ("fail", "mismatch", "blocked", "hold"),
+        "regression_tokens": ("regression", "rollback", "breach"),
+        "compared_dimensions": ("scheme", "subject", "resource_kind", "state_tokens"),
+    },
+}
 
 
 def _is_within_scope(candidate: str, scope_roots: Sequence[str]) -> bool:
@@ -53,6 +100,10 @@ def _tail_text(text: str, *, limit: int = 160) -> str:
     if len(normalized) <= limit:
         return normalized
     return normalized[-limit:]
+
+
+def _split_state_tokens(text: str) -> tuple[str, ...]:
+    return tuple(token for token in re.split(r"[^a-z0-9]+", text.lower()) if token)
 
 
 def _run_shell_command(
@@ -134,6 +185,7 @@ class PatchGeneratorPolicy:
     patch_format: str = "structured_patch"
     prohibited_targets: tuple[str, ...] = ("src/omoikane/kernel/",)
     requires_build_log: bool = True
+    require_target_alignment: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -142,6 +194,7 @@ class PatchGeneratorPolicy:
             "patch_format": self.patch_format,
             "prohibited_targets": list(self.prohibited_targets),
             "requires_build_log": self.requires_build_log,
+            "require_target_alignment": self.require_target_alignment,
         }
 
 
@@ -194,6 +247,7 @@ class PatchGeneratorService:
     def generate_patch_set(self, request: Mapping[str, Any]) -> Dict[str, Any]:
         validation = self.validate_scope(request)
         artifact_id = new_id("artifact")
+        target_plan = self._plan_patch_targets(request)
         build_artifact: Dict[str, Any] = {
             "kind": "build_artifact",
             "schema_version": "1.0.0",
@@ -222,20 +276,15 @@ class PatchGeneratorService:
             }
             return build_artifact
 
-        output_paths = list(request.get("output_paths", []))
-        source_dir = _first_matching_prefix(output_paths, "src/", "src/omoikane/self_construction/")
-        test_dir = _first_matching_prefix(output_paths, "tests/", "tests/unit/")
-        source_target = str(PurePosixPath(source_dir) / "builders.py")
-        test_target = str(PurePosixPath(test_dir) / "test_builders.py")
         requested_evals = list(request.get("constraints", {}).get("must_pass", []))
 
         patches = [
             {
                 "patch_id": new_id("patch"),
-                "target_path": source_target,
+                "target_path": target_plan["source_target"],
                 "action": "modify",
                 "format": self._policy.patch_format,
-                "summary": "Add deterministic patch generation and differential evaluation helpers.",
+                "summary": target_plan["source_summary"],
                 "safety_impact": "medium",
                 "rationale_refs": list(request.get("spec_refs", [])),
                 "forbidden_patterns": list(self._policy.immutable_boundaries),
@@ -244,10 +293,10 @@ class PatchGeneratorService:
             },
             {
                 "patch_id": new_id("patch"),
-                "target_path": test_target,
+                "target_path": target_plan["test_target"],
                 "action": "create",
                 "format": self._policy.patch_format,
-                "summary": "Add bounded builder pipeline coverage for scope validation and rollout classification.",
+                "summary": target_plan["test_summary"],
                 "safety_impact": "low",
                 "rationale_refs": requested_evals or list(request.get("design_refs", [])),
                 "forbidden_patterns": list(self._policy.immutable_boundaries),
@@ -256,8 +305,8 @@ class PatchGeneratorService:
             },
         ]
         build_artifact["summary"] = (
-            "Patch descriptors, doc-sync handoff, and regression plan emitted for sandbox-only "
-            "builder execution."
+            f"Target-aware patch descriptors and regression plan emitted for "
+            f"{request['target_subsystem']} with doc-sync obligations."
         )
         build_artifact["artifacts"] = [
             {
@@ -304,6 +353,42 @@ class PatchGeneratorService:
     def describe_patch(descriptor: Mapping[str, Any]) -> Dict[str, Any]:
         return dict(descriptor)
 
+    def _plan_patch_targets(self, request: Mapping[str, Any]) -> Dict[str, str]:
+        target_subsystem = str(request.get("target_subsystem", "L5.PatchGenerator"))
+        output_paths = list(request.get("output_paths", []))
+        hinted_source = "src/omoikane/self_construction/builders.py"
+        for subsystem_prefix, candidate in PATCH_TARGET_FILE_HINTS:
+            if target_subsystem.startswith(subsystem_prefix):
+                hinted_source = candidate
+                break
+
+        source_target = hinted_source
+        if not _is_within_scope(source_target, output_paths):
+            source_dir = _first_matching_prefix(
+                output_paths,
+                "src/",
+                "src/omoikane/self_construction/",
+            )
+            source_target = str(PurePosixPath(source_dir) / PurePosixPath(hinted_source).name)
+
+        hinted_test = "tests/unit/test_builders.py"
+        test_target = hinted_test
+        if not _is_within_scope(test_target, output_paths):
+            test_dir = _first_matching_prefix(output_paths, "tests/", "tests/unit/")
+            test_target = str(PurePosixPath(test_dir) / "test_builders.py")
+
+        normalized_summary = str(request.get("change_summary", "")).strip().rstrip(".")
+        if not normalized_summary:
+            normalized_summary = f"Implement approved {target_subsystem} updates"
+        source_summary = f"{normalized_summary} [{target_subsystem} runtime surface]."
+        test_summary = f"Add {target_subsystem} contract coverage and rollout guard assertions."
+        return {
+            "source_target": source_target,
+            "test_target": test_target,
+            "source_summary": source_summary,
+            "test_summary": test_summary,
+        }
+
 
 @dataclass(frozen=True)
 class DifferentialEvaluationPolicy:
@@ -313,6 +398,8 @@ class DifferentialEvaluationPolicy:
     mandatory_eval: str = MANDATORY_BUILD_PIPELINE_EVAL
     rollback_on_regression: bool = True
     hold_on_fail: bool = True
+    ref_observation_profile: str = "parsed-runtime-variant-ref-v1"
+    default_execution_profile: str = "generic-builder-ab-evidence-v1"
     target_eval_map: Dict[str, tuple[str, ...]] = field(
         default_factory=lambda: {
             "L5.PatchGenerator": (MANDATORY_BUILD_PIPELINE_EVAL,),
@@ -333,7 +420,12 @@ class DifferentialEvaluationPolicy:
             "mandatory_eval": self.mandatory_eval,
             "rollback_on_regression": self.rollback_on_regression,
             "hold_on_fail": self.hold_on_fail,
+            "ref_observation_profile": self.ref_observation_profile,
+            "default_execution_profile": self.default_execution_profile,
             "target_eval_map": {key: list(value) for key, value in self.target_eval_map.items()},
+            "execution_profiles": {
+                key: value["profile_id"] for key, value in DIFF_EVAL_EXECUTION_PROFILES.items()
+            },
         }
 
 
@@ -363,25 +455,50 @@ class DifferentialEvaluatorService:
                         selected.append(eval_ref)
         return {"selected_evals": selected}
 
-    @staticmethod
     def run_ab_eval(
+        self,
         *,
         eval_ref: str,
         baseline_ref: str,
         sandbox_ref: str,
     ) -> Dict[str, Any]:
-        sandbox_lower = sandbox_ref.lower()
-        baseline_lower = baseline_ref.lower()
-        if "regression" in sandbox_lower or "rollback-breach" in sandbox_lower:
-            outcome = "regression"
-        elif "fail" in sandbox_lower or "mismatch" in sandbox_lower or "fail" in baseline_lower:
-            outcome = "fail"
-        else:
-            outcome = "pass"
+        profile = self._execution_profile(eval_ref)
+        baseline_observation = self._observe_variant_ref(baseline_ref)
+        sandbox_observation = self._observe_variant_ref(sandbox_ref)
+        outcome, triggered_rules = self._classify_eval_outcome(
+            profile=profile,
+            baseline_observation=baseline_observation,
+            sandbox_observation=sandbox_observation,
+        )
+        comparison_summary = self._build_comparison_summary(
+            outcome=outcome,
+            profile_id=profile["profile_id"],
+            baseline_observation=baseline_observation,
+            sandbox_observation=sandbox_observation,
+        )
+        comparison_digest = sha256_text(
+            canonical_json(
+                {
+                    "eval_ref": eval_ref,
+                    "profile_id": profile["profile_id"],
+                    "baseline_observation": baseline_observation,
+                    "sandbox_observation": sandbox_observation,
+                    "outcome": outcome,
+                    "triggered_rules": triggered_rules,
+                }
+            )
+        )
         return {
             "eval_ref": eval_ref,
             "outcome": outcome,
             "report_ref": f"report://{eval_ref.replace('/', ':')}",
+            "profile_id": profile["profile_id"],
+            "compared_dimensions": list(profile["compared_dimensions"]),
+            "baseline_observation": baseline_observation,
+            "sandbox_observation": sandbox_observation,
+            "triggered_rules": triggered_rules,
+            "comparison_summary": comparison_summary,
+            "comparison_digest": comparison_digest,
         }
 
     @staticmethod
@@ -393,6 +510,107 @@ class DifferentialEvaluatorService:
         else:
             decision = "promote"
         return {"decision": decision}
+
+    def _execution_profile(self, eval_ref: str) -> Dict[str, Any]:
+        profile = DIFF_EVAL_EXECUTION_PROFILES.get(eval_ref)
+        if profile is None:
+            return {
+                "profile_id": self._policy.default_execution_profile,
+                "allowed_baseline_schemes": ("runtime", "workspace", "mirage", "literal"),
+                "allowed_sandbox_schemes": ("mirage", "workspace", "runtime", "literal"),
+                "pass_states": ("current", "shadow-match"),
+                "fail_tokens": ("fail", "mismatch", "blocked", "hold"),
+                "regression_tokens": ("regression", "rollback", "breach"),
+                "compared_dimensions": ("scheme", "subject", "resource_kind", "state_tokens"),
+            }
+        return profile
+
+    def _observe_variant_ref(self, ref: str) -> Dict[str, Any]:
+        if "://" in ref:
+            parsed = urlparse(ref)
+            scheme = parsed.scheme or "literal"
+            subject = parsed.netloc or "local"
+            segments = [segment for segment in parsed.path.split("/") if segment]
+        else:
+            scheme = "literal"
+            subject = "local"
+            segments = [segment for segment in ref.split("/") if segment]
+        resource_kind = segments[0] if len(segments) >= 2 else "state"
+        state = segments[-1] if segments else subject
+        state_tokens = list(_split_state_tokens(state))
+        observation = {
+            "ref": ref,
+            "scheme": scheme,
+            "subject": subject,
+            "resource_kind": resource_kind,
+            "state": state,
+            "state_tokens": state_tokens,
+        }
+        observation["binding_digest"] = sha256_text(canonical_json(observation))
+        return observation
+
+    def _classify_eval_outcome(
+        self,
+        *,
+        profile: Mapping[str, Any],
+        baseline_observation: Mapping[str, Any],
+        sandbox_observation: Mapping[str, Any],
+    ) -> tuple[str, list[str]]:
+        triggered_rules: list[str] = []
+        baseline_scheme = str(baseline_observation.get("scheme", ""))
+        sandbox_scheme = str(sandbox_observation.get("scheme", ""))
+        allowed_baseline_schemes = set(profile.get("allowed_baseline_schemes", ()))
+        allowed_sandbox_schemes = set(profile.get("allowed_sandbox_schemes", ()))
+        if baseline_scheme not in allowed_baseline_schemes:
+            triggered_rules.append(f"baseline-scheme-blocked:{baseline_scheme}")
+            return "fail", triggered_rules
+        if sandbox_scheme not in allowed_sandbox_schemes:
+            triggered_rules.append(f"sandbox-scheme-blocked:{sandbox_scheme}")
+            return "fail", triggered_rules
+
+        baseline_tokens = set(baseline_observation.get("state_tokens", []))
+        sandbox_tokens = set(sandbox_observation.get("state_tokens", []))
+        regression_tokens = set(profile.get("regression_tokens", ()))
+        fail_tokens = set(profile.get("fail_tokens", ()))
+        pass_states = set(profile.get("pass_states", ()))
+
+        regression_hit = sandbox_tokens & regression_tokens
+        if regression_hit:
+            triggered_rules.append(
+                f"sandbox-regression-tokens:{'+'.join(sorted(regression_hit))}"
+            )
+            return "regression", triggered_rules
+        baseline_regression_hit = baseline_tokens & regression_tokens
+        if baseline_regression_hit:
+            triggered_rules.append(
+                f"baseline-regression-tokens:{'+'.join(sorted(baseline_regression_hit))}"
+            )
+            return "regression", triggered_rules
+        fail_hit = (sandbox_tokens | baseline_tokens) & fail_tokens
+        if fail_hit:
+            triggered_rules.append(f"failure-tokens:{'+'.join(sorted(fail_hit))}")
+            return "fail", triggered_rules
+
+        sandbox_state = str(sandbox_observation.get("state", ""))
+        if pass_states and sandbox_state in pass_states:
+            triggered_rules.append(f"sandbox-state-pass:{sandbox_state}")
+        else:
+            triggered_rules.append(f"sandbox-state-default-pass:{sandbox_state}")
+        return "pass", triggered_rules
+
+    @staticmethod
+    def _build_comparison_summary(
+        *,
+        outcome: str,
+        profile_id: str,
+        baseline_observation: Mapping[str, Any],
+        sandbox_observation: Mapping[str, Any],
+    ) -> str:
+        return (
+            f"{profile_id} compared {baseline_observation.get('scheme')} baseline "
+            f"{baseline_observation.get('state')} to {sandbox_observation.get('scheme')} "
+            f"sandbox {sandbox_observation.get('state')} and classified the eval as {outcome}."
+        )
 
 
 @dataclass(frozen=True)

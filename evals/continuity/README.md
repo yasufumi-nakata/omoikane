@@ -70,7 +70,7 @@ protected handoff 前に current bundle を要求するか。
 ### Council Output Build Request Pipeline
 Council が `emit_build_request` で発行した builder handoff が
 immutable boundary を保ったまま patch descriptor 生成、
-differential eval、promote/hold/rollback 分類まで到達するか。
+parsed evidence 付き differential eval、promote/hold/rollback 分類まで到達するか。
 
 ### Design Reader Handoff
 DesignReader が docs/specs から source digest と must-sync docs を束ねた

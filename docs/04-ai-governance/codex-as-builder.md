@@ -34,8 +34,8 @@ reference runtime には `design-reader-demo` / `builder-demo` があり、
 `selfctor.rollback.v0`
 の contract に沿って
 `design_delta_scan_receipt` による git-bound docs/spec delta scan、
-`design_delta_manifest` handoff、`build_request` emit、patch descriptor 生成、Mirage Self への sandbox apply、
-A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
+`design_delta_manifest` handoff、`build_request` emit、target-aware patch descriptor 生成、Mirage Self への sandbox apply、
+parsed baseline/sandbox observation と comparison digest を持つ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
 rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
 temp rollback workspace 上の actual reverse-apply command receipt、

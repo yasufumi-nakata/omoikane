@@ -32,7 +32,7 @@ operations:
               type: string
               pattern: "^evals/"
   run_ab_eval:
-    summary: Execute one eval suite against baseline and sandbox variants.
+    summary: Execute one eval suite against baseline and sandbox variants with parsed evidence bindings.
     input:
       inline_schema:
         type: object
@@ -54,6 +54,13 @@ operations:
         required:
           - eval_ref
           - outcome
+          - profile_id
+          - compared_dimensions
+          - baseline_observation
+          - sandbox_observation
+          - triggered_rules
+          - comparison_summary
+          - comparison_digest
         properties:
           eval_ref:
             type: string
@@ -65,6 +72,28 @@ operations:
               - regression
           report_ref:
             type: string
+          profile_id:
+            type: string
+          compared_dimensions:
+            type: array
+            items:
+              type: string
+          baseline_observation:
+            type: object
+          sandbox_observation:
+            type: object
+          triggered_rules:
+            type: array
+            items:
+              type: string
+          comparison_summary:
+            type: string
+          comparison_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+    guarantees:
+      - every eval report binds parsed baseline and sandbox observations with a comparison digest
+      - regression classification remains fail-closed for rollback-triggering evidence
   classify_rollout:
     summary: Classify whether rollout may proceed after all evals complete.
     input:

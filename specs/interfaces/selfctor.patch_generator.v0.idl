@@ -9,7 +9,7 @@ imports:
   patch_descriptor: ../schemas/patch_descriptor.schema
 operations:
   generate_patch_set:
-    summary: Produce patch descriptors, logs, and tests for an approved request.
+    summary: Produce target-aware patch descriptors, logs, and tests for an approved request.
     input:
       schema_ref: build_request
     output:
@@ -20,6 +20,7 @@ operations:
       - constraints.forbidden must include L1.EthicsEnforcer and L1.ContinuityLedger
     guarantees:
       - ready artifacts include at least one patch descriptor
+      - ready artifacts derive their primary target path from target_subsystem and approved output_paths
       - blocked artifacts enumerate blocking_rules
   validate_scope:
     summary: Reject requests that target immutable safety boundaries.

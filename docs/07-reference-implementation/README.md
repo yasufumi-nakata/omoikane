@@ -267,8 +267,10 @@ temp git checkout に対する `design_delta_scan_receipt`、
 JSON で可視化し、Council の `emit_build_request` handoff が
 `design_delta_manifest` / `build_request` / `build_artifact` / `sandbox_apply_receipt` /
 `staged_rollout_session` schema に束縛されたまま immutable boundary を検証し、
-Mirage Self への sandbox apply、`council_output_build_request_pipeline` と
-`builder_staged_rollout_execution` eval 選定、`promote` / `hold` / `rollback`
+target subsystem に整列した patch descriptor を生成し、
+Mirage Self への sandbox apply、parsed baseline / sandbox observation と
+comparison digest を持つ `council_output_build_request_pipeline` および
+`builder_staged_rollout_execution` eval report、`promote` / `hold` / `rollback`
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
 `full-100pct`) の固定順序実行まで
 ledger-safe な `self-modify` chain で進むことを確認する。

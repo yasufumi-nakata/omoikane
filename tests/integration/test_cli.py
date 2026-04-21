@@ -312,6 +312,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("promote", result["validation"]["rollout_decision"])
         self.assertEqual("promoted", result["validation"]["rollout_status"])
         self.assertEqual(4, result["validation"]["rollout_completed_stage_count"])
+        self.assertTrue(result["validation"]["eval_report_evidence_bound"])
         self.assertEqual("ready", result["builder"]["artifact"]["status"])
         self.assertEqual(
             [
@@ -319,6 +320,10 @@ class CliIntegrationTests(unittest.TestCase):
                 "evals/continuity/builder_staged_rollout_execution.yaml",
             ],
             result["builder"]["suite_selection"]["selected_evals"],
+        )
+        self.assertEqual(
+            "builder-handoff-ab-evidence-v1",
+            result["builder"]["eval_reports"][0]["profile_id"],
         )
         self.assertEqual(
             "emit_build_request",
@@ -367,6 +372,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
         self.assertEqual(5, result["validation"]["selected_eval_count"])
+        self.assertTrue(result["validation"]["eval_report_evidence_bound"])
         self.assertEqual(2, result["validation"]["reverted_patch_count"])
         self.assertEqual(2, result["validation"]["reverse_apply_journal_count"])
         self.assertEqual(2, result["validation"]["reverse_apply_command_count"])
@@ -407,6 +413,13 @@ class CliIntegrationTests(unittest.TestCase):
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             result["validation"]["restored_snapshot_ref"],
         )
+        rollback_report = next(
+            report
+            for report in result["builder"]["eval_reports"]
+            if report["eval_ref"] == "evals/continuity/builder_rollback_execution.yaml"
+        )
+        self.assertEqual("builder-rollback-trigger-evidence-v1", rollback_report["profile_id"])
+        self.assertEqual("regression", rollback_report["outcome"])
         self.assertEqual("rolled-back", result["builder"]["rollback_session"]["status"])
 
     def test_episodic_demo_emits_valid_handoff_json(self) -> None:
