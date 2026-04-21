@@ -18,6 +18,7 @@ required:
   - transport_profile
   - trace_profile
   - socket_trace_profile
+  - os_observer_profile
   - ca_bundle_ref
   - client_certificate_ref
   - server_name
@@ -28,6 +29,7 @@ required:
   - authority_plane_bound
   - response_digest_bound
   - socket_trace_complete
+  - os_observer_complete
   - route_bindings
   - trace_status
   - recorded_at
@@ -67,6 +69,8 @@ properties:
     const: non-loopback-mtls-authority-route-v1
   socket_trace_profile:
     const: mtls-socket-trace-v1
+  os_observer_profile:
+    const: os-native-tcp-observer-v1
   ca_bundle_ref:
     type: string
     minLength: 1
@@ -97,6 +101,8 @@ properties:
     type: boolean
   socket_trace_complete:
     type: boolean
+  os_observer_complete:
+    type: boolean
   route_bindings:
     type: array
     minItems: 1
@@ -113,6 +119,7 @@ properties:
         - matched_root_refs
         - mtls_status
         - response_digest_bound
+        - os_observer_receipt
         - socket_trace
       properties:
         key_server_ref:
@@ -151,6 +158,8 @@ properties:
             - rejected
         response_digest_bound:
           type: boolean
+        os_observer_receipt:
+          $ref: distributed_transport_os_observer_receipt.schema
         socket_trace:
           type: object
           additionalProperties: false
@@ -257,6 +266,7 @@ examples:
     transport_profile: federation-mtls-quorum-v1
     trace_profile: non-loopback-mtls-authority-route-v1
     socket_trace_profile: mtls-socket-trace-v1
+    os_observer_profile: os-native-tcp-observer-v1
     ca_bundle_ref: cert://distributed-transport/authority-ca/v1
     client_certificate_ref: cert://distributed-transport/authority-client/v1
     server_name: authority.local
@@ -269,6 +279,7 @@ examples:
     authority_plane_bound: true
     response_digest_bound: true
     socket_trace_complete: true
+    os_observer_complete: true
     route_bindings:
       - key_server_ref: keyserver://federation/notary-a
         server_role: quorum-notary
@@ -280,6 +291,24 @@ examples:
           - root://federation/pki-a
         mtls_status: authenticated
         response_digest_bound: true
+        os_observer_receipt:
+          kind: distributed_transport_os_observer_receipt
+          schema_version: "1.0.0"
+          receipt_id: authority-os-observer://5f9bece84e1db59e
+          observer_profile: os-native-tcp-observer-v1
+          observed_at: "2026-04-21T00:00:00Z"
+          local_ip: 192.168.1.4
+          local_port: 44301
+          remote_ip: 192.168.1.4
+          remote_port: 44300
+          owning_pid: 41234
+          observed_sources:
+            - lsof
+            - netstat
+          connection_states:
+            - ESTABLISHED
+          tuple_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+          receipt_status: observed
         socket_trace:
           local_ip: 192.168.1.4
           local_port: 44301

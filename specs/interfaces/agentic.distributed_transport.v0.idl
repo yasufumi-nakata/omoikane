@@ -11,6 +11,7 @@ imports:
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
+  distributed_transport_os_observer_receipt: ../schemas/distributed_transport_os_observer_receipt.schema
   distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
 operations:
   issue_federation_handoff:
@@ -238,8 +239,8 @@ operations:
   trace_non_loopback_authority_routes:
     summary: >
       Establish actual non-loopback mTLS routes to the currently reachable authority-plane members
-      and bind socket-level trace evidence, certificate fingerprints, and response digests
-      to the rotated distributed transport envelope.
+      and bind socket-level trace evidence, OS-native TCP observer receipts, certificate
+      fingerprints, and response digests to the rotated distributed transport envelope.
     input:
       inline_schema:
         type: object
@@ -301,6 +302,7 @@ operations:
       - remote socket endpoints must be non-loopback before the trace can authenticate
       - every traced response digest must match the currently bound authority-plane member payload
       - socket trace must capture local/remote endpoint tuple, tls version, cipher suite, and byte counts
+      - OS observer receipts must capture the same TCP tuple from at least 1 OS source such as netstat or lsof while the route is live
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,

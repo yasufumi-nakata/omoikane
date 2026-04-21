@@ -1,0 +1,95 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_os_observer_receipt.schema"
+title: DistributedTransportOsObserverReceipt
+description: >
+  OS-native TCP observer receipt bound to one live authority-route socket tuple
+  during non-loopback distributed transport tracing.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - observer_profile
+  - observed_at
+  - local_ip
+  - local_port
+  - remote_ip
+  - remote_port
+  - owning_pid
+  - observed_sources
+  - connection_states
+  - tuple_digest
+  - receipt_status
+properties:
+  kind:
+    const: distributed_transport_os_observer_receipt
+  schema_version:
+    const: "1.0.0"
+  receipt_id:
+    type: string
+    pattern: "^authority-os-observer://"
+  observer_profile:
+    const: os-native-tcp-observer-v1
+  observed_at:
+    type: string
+    format: date-time
+  local_ip:
+    type: string
+    minLength: 1
+  local_port:
+    type: integer
+    minimum: 1
+    maximum: 65535
+  remote_ip:
+    type: string
+    minLength: 1
+  remote_port:
+    type: integer
+    minimum: 1
+    maximum: 65535
+  owning_pid:
+    type: integer
+    minimum: 1
+  observed_sources:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - lsof
+        - netstat
+  connection_states:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  tuple_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_status:
+    type: string
+    enum:
+      - observed
+      - missing
+examples:
+  - kind: distributed_transport_os_observer_receipt
+    schema_version: "1.0.0"
+    receipt_id: authority-os-observer://5f9bece84e1db59e
+    observer_profile: os-native-tcp-observer-v1
+    observed_at: "2026-04-21T00:00:00Z"
+    local_ip: 192.168.1.4
+    local_port: 44301
+    remote_ip: 192.168.1.4
+    remote_port: 44300
+    owning_pid: 41234
+    observed_sources:
+      - lsof
+      - netstat
+    connection_states:
+      - ESTABLISHED
+    tuple_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    receipt_status: observed

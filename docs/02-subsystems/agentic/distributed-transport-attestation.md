@@ -151,6 +151,9 @@ current authority snapshot へ束縛する。
   client_certificate_fingerprint / request_bytes / response_bytes /
   http_status / response_digest / connect_latency_ms /
   tls_handshake_latency_ms / round_trip_latency_ms` を保持する
+- `os_observer_receipt` は `netstat` / `lsof` が live TCP tuple を観測した証跡として
+  `observed_sources / connection_states / owning_pid / tuple_digest` を保持し、
+  少なくとも 1 source で tuple が観測された時だけ route trace を `authenticated` に進める
 - `response_digest` は authority-plane snapshot の per-server digest と一致しなければ fail-closed
 - remote endpoint が loopback だった場合や mTLS が成立しない場合、
   trace 全体は `authenticated` にならない
@@ -188,6 +191,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
 - schema: `specs/schemas/distributed_transport_authority_plane.schema`
 - schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
+- schema: `specs/schemas/distributed_transport_os_observer_receipt.schema`
 - schema: `specs/schemas/distributed_transport_authority_route_trace.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
@@ -204,3 +208,4 @@ receipt に束縛された bounded relay observability surface も返す。
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`
+- decision log: `meta/decision-log/2026-04-21_distributed-transport-os-observer-receipt.md`

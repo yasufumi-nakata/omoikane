@@ -803,6 +803,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authority_churn_requires_draining_exit"])
         self.assertTrue(result["validation"]["authority_route_mtls_authenticated"])
         self.assertTrue(result["validation"]["authority_route_socket_trace_bound"])
+        self.assertTrue(result["validation"]["authority_route_os_observer_bound"])
         self.assertEqual(
             2,
             result["live_root_directory"]["federation_rotated"]["connectivity_receipt"][
@@ -879,12 +880,28 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "authority.local",
             result["authority_route_trace"]["federation_rotated"]["server_name"],
         )
+        self.assertEqual(
+            "os-native-tcp-observer-v1",
+            result["authority_route_trace"]["federation_rotated"]["os_observer_profile"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["os_observer_complete"],
+        )
         self.assertTrue(
             all(
                 binding["mtls_status"] == "authenticated"
                 and binding["socket_trace"]["transport_profile"] == "mtls-socket-trace-v1"
                 and binding["socket_trace"]["tls_version"].startswith("TLS")
                 and not binding["socket_trace"]["remote_ip"].startswith("127.")
+                for binding in result["authority_route_trace"]["federation_rotated"]["route_bindings"]
+            )
+        )
+        self.assertTrue(
+            all(
+                binding["os_observer_receipt"]["receipt_status"] == "observed"
+                and binding["os_observer_receipt"]["observed_sources"]
+                and binding["os_observer_receipt"]["connection_states"]
+                and binding["os_observer_receipt"]["owning_pid"] > 0
                 for binding in result["authority_route_trace"]["federation_rotated"]["route_bindings"]
             )
         )

@@ -181,13 +181,23 @@ entries:
     rationale: Required to serialize one authority-plane churn window with overlap retention, draining-only removal, and preserved trust-root quorum across snapshots.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_os_observer_receipt.schema
+    consumers:
+      - specs/schemas/distributed_transport_authority_route_trace.schema
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_route_trace.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize OS-native TCP tuple observations from netstat/lsof while a live authority route remains open.
+  - priority: P1
+    kind: schema
     file: specs/schemas/distributed_transport_authority_route_trace.schema
     consumers:
       - specs/interfaces/agentic.distributed_transport.v0.idl
       - reference-runtime
       - evals/agentic/distributed_transport_authority_route_trace.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, and digest binding for reachable authority-plane members.
+    rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, OS observer receipts, and digest binding for reachable authority-plane members.
   - priority: P1
     kind: schema
     file: specs/schemas/cognitive_audit_record.schema
@@ -1164,7 +1174,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, and authority-plane response-digest matching.
+    rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, OS observer receipts, and authority-plane response-digest matching.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

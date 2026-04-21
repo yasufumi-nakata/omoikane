@@ -1436,6 +1436,8 @@ class DistributedTransportServiceTests(unittest.TestCase):
         self.assertTrue(trace.authority_plane_bound)
         self.assertTrue(trace.response_digest_bound)
         self.assertTrue(trace.socket_trace_complete)
+        self.assertEqual("os-native-tcp-observer-v1", trace.os_observer_profile)
+        self.assertTrue(trace.os_observer_complete)
         self.assertEqual(authority_plane.digest, trace.authority_plane_digest)
         self.assertEqual(
             ["root://federation/pki-a", "root://federation/pki-b"],
@@ -1450,6 +1452,9 @@ class DistributedTransportServiceTests(unittest.TestCase):
                 and binding["socket_trace"]["cipher_suite"]
                 and binding["socket_trace"]["request_bytes"] > 0
                 and binding["socket_trace"]["response_bytes"] > 0
+                and binding["os_observer_receipt"]["receipt_status"] == "observed"
+                and binding["os_observer_receipt"]["observed_sources"]
+                and binding["os_observer_receipt"]["connection_states"]
                 for binding in trace.route_bindings
             )
         )

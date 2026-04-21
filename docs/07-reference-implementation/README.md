@@ -155,8 +155,9 @@ draining exit を `bounded-key-server-churn-window-v1` で証明すること、
 さらに stable authority plane に対する actual non-loopback mTLS route trace が
 `peer_certificate_fingerprint` / `client_certificate_fingerprint` /
 `tls_version` / `cipher_suite` / `local_ip` / `remote_ip` / `response_digest`
-を socket trace として返し、authority plane の per-server digest と
-一致したときだけ `authenticated` になること、
+を socket trace として返し、同時に `netstat` / `lsof` ベースの
+`os_observer_receipt` が同じ TCP tuple と connection state を束縛し、
+authority plane の per-server digest と一致したときだけ `authenticated` になること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -451,5 +452,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- cross-host authority routing と OS-native packet capture
+- cross-host authority routing と privileged raw packet capture export
 - automation による未実装ギャップの継続充填

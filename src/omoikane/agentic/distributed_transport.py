@@ -7,9 +7,12 @@ from dataclasses import dataclass
 import hashlib
 import ipaddress
 import json
+import os
 from pathlib import Path
+import shutil
 import socket
 import ssl
+import subprocess
 import time
 from typing import Any, Dict, List, Mapping
 from urllib.parse import urlsplit
@@ -47,6 +50,7 @@ AUTHORITY_PLANE_PROFILE = "bounded-key-server-fleet-v1"
 AUTHORITY_CHURN_PROFILE = "bounded-key-server-churn-window-v1"
 AUTHORITY_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
 AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
+AUTHORITY_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -474,6 +478,7 @@ class DistributedTransportAuthorityRouteTrace:
     transport_profile: str
     trace_profile: str
     socket_trace_profile: str
+    os_observer_profile: str
     ca_bundle_ref: str
     client_certificate_ref: str
     server_name: str
@@ -484,6 +489,7 @@ class DistributedTransportAuthorityRouteTrace:
     authority_plane_bound: bool
     response_digest_bound: bool
     socket_trace_complete: bool
+    os_observer_complete: bool
     route_bindings: List[Dict[str, Any]]
     trace_status: str
     recorded_at: str
@@ -505,6 +511,7 @@ class DistributedTransportAuthorityRouteTrace:
             "transport_profile": self.transport_profile,
             "trace_profile": self.trace_profile,
             "socket_trace_profile": self.socket_trace_profile,
+            "os_observer_profile": self.os_observer_profile,
             "ca_bundle_ref": self.ca_bundle_ref,
             "client_certificate_ref": self.client_certificate_ref,
             "server_name": self.server_name,
@@ -515,6 +522,7 @@ class DistributedTransportAuthorityRouteTrace:
             "authority_plane_bound": self.authority_plane_bound,
             "response_digest_bound": self.response_digest_bound,
             "socket_trace_complete": self.socket_trace_complete,
+            "os_observer_complete": self.os_observer_complete,
             "route_bindings": [dict(binding) for binding in self.route_bindings],
             "trace_status": self.trace_status,
             "recorded_at": self.recorded_at,
@@ -1304,6 +1312,12 @@ class DistributedTransportService:
                 "utf-8"
             )
             tls_socket.sendall(request_bytes)
+            os_observer_receipt = self._capture_os_observer_receipt(
+                local_ip=local_ip,
+                local_port=local_port,
+                remote_ip=remote_ip,
+                remote_port=remote_port,
+            )
             response_bytes = b""
             while True:
                 chunk = tls_socket.recv(4096)
@@ -1343,6 +1357,7 @@ class DistributedTransportService:
                     "matched_root_refs": list(authority_server["matched_root_refs"]),
                     "mtls_status": mtls_status,
                     "response_digest_bound": response_digest_bound,
+                    "os_observer_receipt": os_observer_receipt,
                     "socket_trace": {
                         "local_ip": local_ip,
                         "local_port": local_port,
@@ -1393,6 +1408,12 @@ class DistributedTransportService:
             and binding["socket_trace"]["http_status"] == 200
             for binding in route_bindings
         )
+        os_observer_complete = all(
+            binding["os_observer_receipt"]["receipt_status"] == "observed"
+            and binding["os_observer_receipt"]["observed_sources"]
+            and binding["os_observer_receipt"]["connection_states"]
+            for binding in route_bindings
+        )
         trace_status = (
             "authenticated"
             if route_count == len(authority_plane.key_servers)
@@ -1401,6 +1422,7 @@ class DistributedTransportService:
             and authority_plane_bound
             and response_digest_bound
             and socket_trace_complete
+            and os_observer_complete
             else "rejected"
         )
         payload = {
@@ -1413,6 +1435,7 @@ class DistributedTransportService:
             "transport_profile": envelope.transport_profile,
             "trace_profile": AUTHORITY_ROUTE_TRACE_PROFILE,
             "socket_trace_profile": AUTHORITY_ROUTE_SOCKET_PROFILE,
+            "os_observer_profile": AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
             "ca_bundle_ref": normalized_ca_ref,
             "client_certificate_ref": normalized_client_ref,
             "server_name": route_bindings[0]["server_name"],
@@ -1423,6 +1446,7 @@ class DistributedTransportService:
             "authority_plane_bound": authority_plane_bound,
             "response_digest_bound": response_digest_bound,
             "socket_trace_complete": socket_trace_complete,
+            "os_observer_complete": os_observer_complete,
             "route_bindings": route_bindings,
             "trace_status": trace_status,
             "recorded_at": recorded_at,
@@ -1441,6 +1465,7 @@ class DistributedTransportService:
             transport_profile=envelope.transport_profile,
             trace_profile=AUTHORITY_ROUTE_TRACE_PROFILE,
             socket_trace_profile=AUTHORITY_ROUTE_SOCKET_PROFILE,
+            os_observer_profile=AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
             ca_bundle_ref=normalized_ca_ref,
             client_certificate_ref=normalized_client_ref,
             server_name=payload["server_name"],
@@ -1451,6 +1476,7 @@ class DistributedTransportService:
             authority_plane_bound=authority_plane_bound,
             response_digest_bound=response_digest_bound,
             socket_trace_complete=socket_trace_complete,
+            os_observer_complete=os_observer_complete,
             route_bindings=route_bindings,
             trace_status=trace_status,
             recorded_at=recorded_at,
@@ -1459,6 +1485,122 @@ class DistributedTransportService:
             total_round_trip_latency_ms=payload["total_round_trip_latency_ms"],
             digest=digest,
         )
+
+    def _capture_os_observer_receipt(
+        self,
+        *,
+        local_ip: str,
+        local_port: int,
+        remote_ip: str,
+        remote_port: int,
+    ) -> Dict[str, Any]:
+        observed_sources: set[str] = set()
+        connection_states: set[str] = set()
+        local_netstat = f"{local_ip}.{local_port}"
+        remote_netstat = f"{remote_ip}.{remote_port}"
+        local_lsof = f"{local_ip}:{local_port}"
+        remote_lsof = f"{remote_ip}:{remote_port}"
+        owning_pid = os.getpid()
+
+        netstat_path = shutil.which("netstat")
+        if netstat_path:
+            observed, states = self._capture_netstat_observer(
+                netstat_path=netstat_path,
+                local_endpoint=local_netstat,
+                remote_endpoint=remote_netstat,
+            )
+            if observed:
+                observed_sources.add("netstat")
+                connection_states.update(states)
+
+        lsof_path = shutil.which("lsof")
+        if lsof_path:
+            observed, states = self._capture_lsof_observer(
+                lsof_path=lsof_path,
+                local_endpoint=local_lsof,
+                remote_endpoint=remote_lsof,
+                owning_pid=owning_pid,
+            )
+            if observed:
+                observed_sources.add("lsof")
+                connection_states.update(states)
+
+        receipt_status = "observed" if observed_sources else "missing"
+        tuple_payload = f"{local_ip}:{local_port}->{remote_ip}:{remote_port}"
+        return {
+            "kind": "distributed_transport_os_observer_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": (
+                "authority-os-observer://"
+                f"{sha256_text(tuple_payload)[:16]}"
+            ),
+            "observer_profile": AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
+            "observed_at": utc_now_iso(),
+            "local_ip": local_ip,
+            "local_port": local_port,
+            "remote_ip": remote_ip,
+            "remote_port": remote_port,
+            "owning_pid": owning_pid,
+            "observed_sources": sorted(observed_sources),
+            "connection_states": sorted(connection_states),
+            "tuple_digest": sha256_text(tuple_payload),
+            "receipt_status": receipt_status,
+        }
+
+    def _capture_netstat_observer(
+        self,
+        *,
+        netstat_path: str,
+        local_endpoint: str,
+        remote_endpoint: str,
+    ) -> tuple[bool, List[str]]:
+        result = subprocess.run(
+            [netstat_path, "-anv", "-p", "tcp"],
+            capture_output=True,
+            text=True,
+            check=False,
+            errors="replace",
+        )
+        if result.returncode != 0:
+            return False, []
+        states = {
+            parts[-1]
+            for line in result.stdout.splitlines()
+            if local_endpoint in line
+            and remote_endpoint in line
+            and (parts := line.split())
+            and parts[-1].isupper()
+        }
+        return bool(states), sorted(states)
+
+    def _capture_lsof_observer(
+        self,
+        *,
+        lsof_path: str,
+        local_endpoint: str,
+        remote_endpoint: str,
+        owning_pid: int,
+    ) -> tuple[bool, List[str]]:
+        result = subprocess.run(
+            [lsof_path, "-nP", "-iTCP"],
+            capture_output=True,
+            text=True,
+            check=False,
+            errors="replace",
+        )
+        if result.returncode not in {0, 1}:
+            return False, []
+        states: set[str] = set()
+        for line in result.stdout.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) < 9 or parts[1] != str(owning_pid):
+                continue
+            name_field = " ".join(parts[8:])
+            if local_endpoint not in name_field or remote_endpoint not in name_field:
+                continue
+            if "(" in name_field and name_field.endswith(")"):
+                states.add(name_field.rsplit("(", 1)[-1][:-1])
+        return bool(states), sorted(states)
 
     def _normalize_key_server_report(
         self,

@@ -2059,6 +2059,17 @@ class OmoikaneReferenceOS:
                         for binding in authority_route_trace.route_bindings
                     )
                 ),
+                "authority_route_os_observer_bound": (
+                    authority_route_trace.os_observer_profile == "os-native-tcp-observer-v1"
+                    and authority_route_trace.os_observer_complete
+                    and all(
+                        binding["os_observer_receipt"]["receipt_status"] == "observed"
+                        and binding["os_observer_receipt"]["observed_sources"]
+                        and binding["os_observer_receipt"]["owning_pid"] > 0
+                        and binding["os_observer_receipt"]["connection_states"]
+                        for binding in authority_route_trace.route_bindings
+                    )
+                ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"
                 and rotated_telemetry.anti_replay_status == "accepted"
