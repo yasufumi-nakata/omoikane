@@ -841,6 +841,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authority_plane_churn_safe"])
         self.assertTrue(result["validation"]["authority_churn_overlap_bound"])
         self.assertTrue(result["validation"]["authority_churn_requires_draining_exit"])
+        self.assertTrue(result["validation"]["authority_route_targets_discovered"])
         self.assertTrue(result["validation"]["authority_route_mtls_authenticated"])
         self.assertTrue(result["validation"]["authority_route_socket_trace_bound"])
         self.assertTrue(result["validation"]["authority_route_os_observer_bound"])
@@ -883,6 +884,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             [],
             result["authority_churn"]["federation_rotated"]["added_server_refs"],
+        )
+        self.assertEqual(
+            "discovered",
+            result["authority_route_target_discovery"]["federation_rotated"]["discovery_status"],
+        )
+        self.assertEqual(
+            "bounded-authority-route-target-discovery-v1",
+            result["authority_route_target_discovery"]["federation_rotated"]["discovery_profile"],
+        )
+        self.assertEqual(
+            2,
+            result["authority_route_target_discovery"]["federation_rotated"]["route_target_count"],
+        )
+        self.assertTrue(
+            result["authority_route_target_discovery"]["federation_rotated"][
+                "all_active_members_targeted"
+            ],
         )
         self.assertEqual(
             ["keyserver://federation/mirror-b-draining"],
@@ -929,6 +947,10 @@ class CliIntegrationTests(unittest.TestCase):
             result["authority_route_trace"]["federation_rotated"]["cross_host_binding_profile"],
         )
         self.assertEqual(
+            "bounded-authority-route-target-discovery-v1",
+            result["authority_route_trace"]["federation_rotated"]["route_target_discovery_profile"],
+        )
+        self.assertEqual(
             "authority-cluster://federation/review-window",
             result["authority_route_trace"]["federation_rotated"]["authority_cluster_ref"],
         )
@@ -938,6 +960,9 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(
             result["authority_route_trace"]["federation_rotated"]["os_observer_complete"],
+        )
+        self.assertTrue(
+            result["authority_route_trace"]["federation_rotated"]["route_target_discovery_bound"],
         )
         self.assertTrue(result["authority_route_trace"]["federation_rotated"]["cross_host_verified"])
         self.assertTrue(

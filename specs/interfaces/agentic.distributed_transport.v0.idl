@@ -10,6 +10,7 @@ imports:
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
+  distributed_transport_authority_route_target_discovery: ../schemas/distributed_transport_authority_route_target_discovery.schema
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
   distributed_transport_os_observer_receipt: ../schemas/distributed_transport_os_observer_receipt.schema
   distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
@@ -238,37 +239,26 @@ operations:
       - removed key servers must have been previously marked draining
       - quorum_requirement and trusted_root_refs must remain sufficient after churn
       - churn_profile must equal bounded-key-server-churn-window-v1
-  trace_non_loopback_authority_routes:
+  discover_authority_route_targets:
     summary: >
-      Establish actual non-loopback mTLS routes to the currently reachable authority-plane members
-      and bind socket-level trace evidence, OS-native TCP observer receipts, certificate
-      fingerprints, response digests, and attested remote host/cluster identity to the
-      rotated distributed transport envelope.
+      Bind one bounded reviewed route catalog to the currently reachable active authority-plane
+      members so non-loopback mTLS tracing is driven by a first-class discovery receipt rather
+      than a raw ad hoc route_targets list.
     input:
       inline_schema:
         type: object
         required:
-          - envelope_ref
-          - envelope_digest
           - authority_plane_ref
           - authority_plane_digest
-          - route_targets
-          - ca_bundle_ref
-          - client_certificate_ref
+          - route_catalog
         properties:
-          envelope_ref:
-            type: string
-            pattern: "^distributed-envelope-"
-          envelope_digest:
-            type: string
-            pattern: "^[a-f0-9]{64}$"
           authority_plane_ref:
             type: string
             pattern: "^authority-plane://"
           authority_plane_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
-          route_targets:
+          route_catalog:
             type: array
             minItems: 1
             uniqueItems: true
@@ -308,6 +298,50 @@ operations:
                 remote_network_zone:
                   type: string
                   minLength: 1
+    output:
+      schema_ref: distributed_transport_authority_route_target_discovery
+    guarantees:
+      - discovery must cover every reachable active authority-plane member
+      - every discovered target must bind server_endpoint, server_name, remote_host_ref, and remote_host_attestation_ref
+      - authority_cluster_ref must remain identical across the bounded discovery set
+      - discovery must retain authority-plane server_role, authority_status, and matched_root_refs for every route target
+  trace_non_loopback_authority_routes:
+    summary: >
+      Establish actual non-loopback mTLS routes to the currently reachable authority-plane members
+      and bind socket-level trace evidence, OS-native TCP observer receipts, certificate
+      fingerprints, response digests, and attested remote host/cluster identity to the
+      rotated distributed transport envelope.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - envelope_ref
+          - envelope_digest
+          - authority_plane_ref
+          - authority_plane_digest
+          - route_target_discovery_ref
+          - route_target_discovery_digest
+          - ca_bundle_ref
+          - client_certificate_ref
+        properties:
+          envelope_ref:
+            type: string
+            pattern: "^distributed-envelope-"
+          envelope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          route_target_discovery_ref:
+            type: string
+            pattern: "^authority-route-targets://"
+          route_target_discovery_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
           ca_bundle_ref:
             type: string
             minLength: 1
@@ -326,7 +360,7 @@ operations:
       - every traced response digest must match the currently bound authority-plane member payload
       - socket trace must capture local/remote endpoint tuple, tls version, cipher suite, and byte counts
       - OS observer receipts must capture the same TCP tuple from at least 1 OS source such as netstat or lsof while the route is live
-      - every route target must bind one remote_host_ref and remote_host_attestation_ref under exactly 1 authority_cluster_ref
+      - route_target_discovery must cover every active authority-plane member and remain bound to exactly 1 authority_cluster_ref
       - cross_host_verified may become true only when every traced authority-plane member binds a distinct remote_host_ref
   export_authority_route_packet_capture:
     summary: >
@@ -561,6 +595,9 @@ events:
   distributed.transport_telemetry_captured:
     payload:
       schema_ref: distributed_transport_relay_telemetry
+  distributed.transport_authority_route_targets_discovered:
+    payload:
+      schema_ref: distributed_transport_authority_route_target_discovery
   distributed.transport_authority_route_traced:
     payload:
       schema_ref: distributed_transport_authority_route_trace
@@ -574,4 +611,4 @@ compatibility:
   stability: bootstrap
   notes:
     - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, cross-host host/cluster binding, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
-    - Unbounded remote authority-cluster discovery outside the fixed route_targets set remains future work.
+    - Unbounded remote authority-cluster discovery outside a bounded reviewed route catalog remains future work.

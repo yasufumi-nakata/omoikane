@@ -175,12 +175,23 @@ draining member と replacement member の overlap を
 rotated receipt verification に最終的に束縛されること、
 さらに `authority_churn` が overlap snapshot から stable snapshot への
 draining exit を `bounded-key-server-churn-window-v1` で証明すること、
+さらに reviewed `route_catalog` から生成した
+`distributed_transport_authority_route_target_discovery` が
+stable authority plane の active member 全件を
+`bounded-authority-route-target-discovery-v1` で覆い、
+`server_endpoint` / `server_name` / `remote_host_ref` /
+`remote_host_attestation_ref` / `authority_cluster_ref` を
+trace 前の discovery receipt として固定すること、
 さらに stable authority plane に対する actual non-loopback mTLS route trace が
 `peer_certificate_fingerprint` / `client_certificate_fingerprint` /
 `tls_version` / `cipher_suite` / `local_ip` / `remote_ip` / `response_digest`
 を socket trace として返し、同時に `netstat` / `lsof` ベースの
 `os_observer_receipt` が同じ TCP tuple と connection state を束縛し、
 authority plane の per-server digest と一致したときだけ `authenticated` になること、
+さらに route trace 自体が `route_target_discovery_ref` /
+`route_target_discovery_digest` /
+`route_target_discovery_profile=bounded-authority-route-target-discovery-v1`
+に束縛されること、
 さらに各 traced route が `remote_host_ref` /
 `remote_host_attestation_ref` / `authority_cluster_ref` を保持し、
 `os_observer_receipt.host_binding_digest` がその host binding と tuple を同時に固定しつつ、

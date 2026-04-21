@@ -55,6 +55,7 @@
 - `distributed_transport_root_connectivity_receipt.schema`
 - `distributed_transport_root_directory.schema`
 - `distributed_transport_authority_plane.schema`
+- `distributed_transport_authority_route_target_discovery.schema`
 - `distributed_transport_authority_churn_window.schema`
 - `distributed_transport_authority_route_trace.schema`
 - `distributed_transport_packet_capture_export.schema`

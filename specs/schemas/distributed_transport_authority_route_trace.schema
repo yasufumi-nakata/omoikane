@@ -12,6 +12,8 @@ required:
   - trace_ref
   - authority_plane_ref
   - authority_plane_digest
+  - route_target_discovery_ref
+  - route_target_discovery_digest
   - envelope_ref
   - envelope_digest
   - council_tier
@@ -20,6 +22,7 @@ required:
   - socket_trace_profile
   - os_observer_profile
   - cross_host_binding_profile
+  - route_target_discovery_profile
   - ca_bundle_ref
   - client_certificate_ref
   - server_name
@@ -33,6 +36,7 @@ required:
   - response_digest_bound
   - socket_trace_complete
   - os_observer_complete
+  - route_target_discovery_bound
   - cross_host_verified
   - route_bindings
   - trace_status
@@ -53,6 +57,12 @@ properties:
     type: string
     pattern: "^authority-plane://"
   authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  route_target_discovery_ref:
+    type: string
+    pattern: "^authority-route-targets://"
+  route_target_discovery_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
   envelope_ref:
@@ -77,6 +87,8 @@ properties:
     const: os-native-tcp-observer-v1
   cross_host_binding_profile:
     const: attested-cross-host-authority-binding-v1
+  route_target_discovery_profile:
+    const: bounded-authority-route-target-discovery-v1
   ca_bundle_ref:
     type: string
     minLength: 1
@@ -114,6 +126,8 @@ properties:
   socket_trace_complete:
     type: boolean
   os_observer_complete:
+    type: boolean
+  route_target_discovery_bound:
     type: boolean
   cross_host_verified:
     type: boolean
@@ -294,6 +308,8 @@ examples:
     trace_ref: authority-route-trace://federation/route-nonce-abcdef123456
     authority_plane_ref: authority-plane://federation/route-nonce-abcdef123456
     authority_plane_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    route_target_discovery_ref: authority-route-targets://federation/route-nonce-abcdef123456
+    route_target_discovery_digest: 9b39c3ad66bf817cddb33734ca3f2b9bb965bd4081301cb746411b4a1b9d4f40
     envelope_ref: distributed-envelope-0123456789ab
     envelope_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
     council_tier: federation
@@ -302,6 +318,7 @@ examples:
     socket_trace_profile: mtls-socket-trace-v1
     os_observer_profile: os-native-tcp-observer-v1
     cross_host_binding_profile: attested-cross-host-authority-binding-v1
+    route_target_discovery_profile: bounded-authority-route-target-discovery-v1
     ca_bundle_ref: cert://distributed-transport/authority-ca/v1
     client_certificate_ref: cert://distributed-transport/authority-client/v1
     server_name: authority.local
@@ -317,6 +334,7 @@ examples:
     response_digest_bound: true
     socket_trace_complete: true
     os_observer_complete: true
+    route_target_discovery_bound: true
     cross_host_verified: true
     route_bindings:
       - key_server_ref: keyserver://federation/notary-a

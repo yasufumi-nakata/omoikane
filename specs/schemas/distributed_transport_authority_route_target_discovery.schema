@@ -1,0 +1,190 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_route_target_discovery.schema"
+title: DistributedTransportAuthorityRouteTargetDiscovery
+description: >
+  Bounded authority-plane route-target discovery receipt that binds a reviewed route catalog
+  to the currently reachable active authority-plane members before non-loopback mTLS tracing.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - discovery_ref
+  - authority_plane_ref
+  - authority_plane_digest
+  - council_tier
+  - transport_profile
+  - discovery_profile
+  - authority_cluster_ref
+  - target_scope
+  - route_target_count
+  - active_route_target_count
+  - draining_route_target_count
+  - distinct_remote_host_count
+  - trusted_root_refs
+  - all_active_members_targeted
+  - route_targets
+  - discovery_status
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_transport_authority_route_target_discovery
+  schema_version:
+    const: "1.0.0"
+  discovery_ref:
+    type: string
+    pattern: "^authority-route-targets://"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  discovery_profile:
+    const: bounded-authority-route-target-discovery-v1
+  authority_cluster_ref:
+    type: string
+    pattern: "^authority-cluster://"
+  target_scope:
+    const: active-only
+  route_target_count:
+    type: integer
+    minimum: 1
+  active_route_target_count:
+    type: integer
+    minimum: 1
+  draining_route_target_count:
+    const: 0
+  distinct_remote_host_count:
+    type: integer
+    minimum: 1
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  all_active_members_targeted:
+    const: true
+  route_targets:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - key_server_ref
+        - server_role
+        - authority_status
+        - server_endpoint
+        - server_name
+        - remote_host_ref
+        - remote_host_attestation_ref
+        - authority_cluster_ref
+        - remote_jurisdiction
+        - remote_network_zone
+        - matched_root_refs
+      properties:
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        server_role:
+          type: string
+          enum:
+            - quorum-notary
+            - directory-mirror
+        authority_status:
+          const: active
+        server_endpoint:
+          type: string
+          pattern: "^https://"
+        server_name:
+          type: string
+          minLength: 1
+        remote_host_ref:
+          type: string
+          pattern: "^host://"
+        remote_host_attestation_ref:
+          type: string
+          pattern: "^host-attestation://"
+        authority_cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        remote_jurisdiction:
+          type: string
+          minLength: 1
+        remote_network_zone:
+          type: string
+          minLength: 1
+        matched_root_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+  discovery_status:
+    const: discovered
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_authority_route_target_discovery
+    schema_version: "1.0.0"
+    discovery_ref: authority-route-targets://federation/route-nonce-0123456789ab
+    authority_plane_ref: authority-plane://federation/route-nonce-0123456789ab
+    authority_plane_digest: d4e0e62d6600dc44440f7aa84279ad42c7a1086ea7973d24828f00b7fcbfbe8a
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    discovery_profile: bounded-authority-route-target-discovery-v1
+    authority_cluster_ref: authority-cluster://federation/review-window
+    target_scope: active-only
+    route_target_count: 2
+    active_route_target_count: 2
+    draining_route_target_count: 0
+    distinct_remote_host_count: 2
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    all_active_members_targeted: true
+    route_targets:
+      - key_server_ref: keyserver://federation/notary-a
+        server_role: quorum-notary
+        authority_status: active
+        server_endpoint: https://198.51.100.10:4443/authority-route-1
+        server_name: authority.local
+        remote_host_ref: host://federation/authority-edge-a
+        remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+        authority_cluster_ref: authority-cluster://federation/review-window
+        remote_jurisdiction: JP-13
+        remote_network_zone: apne1
+        matched_root_refs:
+          - root://federation/pki-a
+      - key_server_ref: keyserver://federation/mirror-c-active
+        server_role: directory-mirror
+        authority_status: active
+        server_endpoint: https://198.51.100.11:4443/authority-route-2
+        server_name: authority.local
+        remote_host_ref: host://federation/authority-edge-b
+        remote_host_attestation_ref: host-attestation://federation/authority-edge-b/2026-04-22
+        authority_cluster_ref: authority-cluster://federation/review-window
+        remote_jurisdiction: US-CA
+        remote_network_zone: usw2
+        matched_root_refs:
+          - root://federation/pki-b
+    discovery_status: discovered
+    recorded_at: "2026-04-22T06:15:00Z"
+    digest: 6a4b39331d2e741cf7fecc321674b8998bd2e57ded5728437417310fcc771a41

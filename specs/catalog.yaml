@@ -180,6 +180,16 @@ entries:
     rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, trusted-root coverage, and draining-overlap churn safety for rotated transport envelopes.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_authority_route_target_discovery.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_route_target_discovery.yaml
+      - specs/schemas/distributed_transport_authority_route_trace.schema
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one bounded route-target discovery receipt that binds a reviewed route catalog to the currently reachable active authority-plane members before non-loopback mTLS tracing.
+  - priority: P1
+    kind: schema
     file: specs/schemas/distributed_transport_authority_churn_window.schema
     consumers:
       - specs/interfaces/agentic.distributed_transport.v0.idl

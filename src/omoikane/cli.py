@@ -271,7 +271,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     distributed_transport_parser = subparsers.add_parser(
         "distributed-transport-demo",
-        help="Run the L4 distributed participant attestation, cross-host authority routing, privileged capture acquisition, and replay-guard scenario",
+        help="Run the L4 distributed participant attestation, authority route target discovery, cross-host authority routing, privileged capture acquisition, and replay-guard scenario",
     )
     distributed_transport_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

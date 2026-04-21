@@ -54,6 +54,7 @@ AUTHORITY_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
 AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 AUTHORITY_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
 AUTHORITY_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
+AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE = "bounded-authority-route-target-discovery-v1"
 AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
 AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
 AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
@@ -475,12 +476,62 @@ class DistributedTransportAuthorityChurnWindow:
 
 
 @dataclass
+class DistributedTransportAuthorityRouteTargetDiscovery:
+    """Authority-plane-bound discovery receipt for bounded route targets."""
+
+    discovery_ref: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    council_tier: str
+    transport_profile: str
+    discovery_profile: str
+    authority_cluster_ref: str
+    target_scope: str
+    route_target_count: int
+    active_route_target_count: int
+    draining_route_target_count: int
+    distinct_remote_host_count: int
+    trusted_root_refs: List[str]
+    all_active_members_targeted: bool
+    route_targets: List[Dict[str, Any]]
+    discovery_status: str
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_route_target_discovery",
+            "schema_version": "1.0.0",
+            "discovery_ref": self.discovery_ref,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "discovery_profile": self.discovery_profile,
+            "authority_cluster_ref": self.authority_cluster_ref,
+            "target_scope": self.target_scope,
+            "route_target_count": self.route_target_count,
+            "active_route_target_count": self.active_route_target_count,
+            "draining_route_target_count": self.draining_route_target_count,
+            "distinct_remote_host_count": self.distinct_remote_host_count,
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "all_active_members_targeted": self.all_active_members_targeted,
+            "route_targets": [dict(target) for target in self.route_targets],
+            "discovery_status": self.discovery_status,
+            "recorded_at": self.recorded_at,
+            "digest": self.digest,
+        }
+
+
+@dataclass
 class DistributedTransportAuthorityRouteTrace:
     """Machine-checkable non-loopback mTLS route trace for authority-plane members."""
 
     trace_ref: str
     authority_plane_ref: str
     authority_plane_digest: str
+    route_target_discovery_ref: str
+    route_target_discovery_digest: str
     envelope_ref: str
     envelope_digest: str
     council_tier: str
@@ -489,6 +540,7 @@ class DistributedTransportAuthorityRouteTrace:
     socket_trace_profile: str
     os_observer_profile: str
     cross_host_binding_profile: str
+    route_target_discovery_profile: str
     ca_bundle_ref: str
     client_certificate_ref: str
     server_name: str
@@ -502,6 +554,7 @@ class DistributedTransportAuthorityRouteTrace:
     response_digest_bound: bool
     socket_trace_complete: bool
     os_observer_complete: bool
+    route_target_discovery_bound: bool
     cross_host_verified: bool
     route_bindings: List[Dict[str, Any]]
     trace_status: str
@@ -518,6 +571,8 @@ class DistributedTransportAuthorityRouteTrace:
             "trace_ref": self.trace_ref,
             "authority_plane_ref": self.authority_plane_ref,
             "authority_plane_digest": self.authority_plane_digest,
+            "route_target_discovery_ref": self.route_target_discovery_ref,
+            "route_target_discovery_digest": self.route_target_discovery_digest,
             "envelope_ref": self.envelope_ref,
             "envelope_digest": self.envelope_digest,
             "council_tier": self.council_tier,
@@ -526,6 +581,7 @@ class DistributedTransportAuthorityRouteTrace:
             "socket_trace_profile": self.socket_trace_profile,
             "os_observer_profile": self.os_observer_profile,
             "cross_host_binding_profile": self.cross_host_binding_profile,
+            "route_target_discovery_profile": self.route_target_discovery_profile,
             "ca_bundle_ref": self.ca_bundle_ref,
             "client_certificate_ref": self.client_certificate_ref,
             "server_name": self.server_name,
@@ -539,6 +595,7 @@ class DistributedTransportAuthorityRouteTrace:
             "response_digest_bound": self.response_digest_bound,
             "socket_trace_complete": self.socket_trace_complete,
             "os_observer_complete": self.os_observer_complete,
+            "route_target_discovery_bound": self.route_target_discovery_bound,
             "cross_host_verified": self.cross_host_verified,
             "route_bindings": [dict(binding) for binding in self.route_bindings],
             "trace_status": self.trace_status,
@@ -1129,6 +1186,103 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def discover_authority_route_targets(
+        self,
+        authority_plane: DistributedTransportAuthorityPlane,
+        *,
+        route_catalog: List[Dict[str, Any]],
+    ) -> DistributedTransportAuthorityRouteTargetDiscovery:
+        normalized_targets = self._normalize_route_targets(route_catalog)
+        active_authority_servers = {
+            server["key_server_ref"]: dict(server)
+            for server in authority_plane.key_servers
+            if server["authority_status"] == "active"
+        }
+        if not active_authority_servers:
+            raise ValueError(
+                "authority route target discovery requires at least 1 active authority-plane member"
+            )
+        if sorted(normalized_targets) != sorted(active_authority_servers):
+            raise ValueError(
+                "authority route target discovery must cover every reachable active authority-plane key server"
+            )
+
+        authority_cluster_refs = sorted(
+            {target["authority_cluster_ref"] for target in normalized_targets.values()}
+        )
+        if len(authority_cluster_refs) != 1:
+            raise ValueError(
+                "authority route target discovery route_catalog must belong to exactly 1 authority_cluster_ref"
+            )
+        authority_cluster_ref = authority_cluster_refs[0]
+
+        route_targets: List[Dict[str, Any]] = []
+        for key_server_ref in sorted(normalized_targets):
+            authority_server = active_authority_servers[key_server_ref]
+            target = normalized_targets[key_server_ref]
+            route_targets.append(
+                {
+                    "key_server_ref": key_server_ref,
+                    "server_role": authority_server["server_role"],
+                    "authority_status": authority_server["authority_status"],
+                    "server_endpoint": target["server_endpoint"],
+                    "server_name": target["server_name"],
+                    "remote_host_ref": target["remote_host_ref"],
+                    "remote_host_attestation_ref": target["remote_host_attestation_ref"],
+                    "authority_cluster_ref": authority_cluster_ref,
+                    "remote_jurisdiction": target["remote_jurisdiction"],
+                    "remote_network_zone": target["remote_network_zone"],
+                    "matched_root_refs": list(authority_server["matched_root_refs"]),
+                }
+            )
+
+        recorded_at = utc_now_iso()
+        payload = {
+            "discovery_ref": (
+                f"authority-route-targets://{authority_plane.council_tier}/"
+                f"{authority_plane.authority_plane_ref.split('/')[-1]}"
+            ),
+            "authority_plane_ref": authority_plane.authority_plane_ref,
+            "authority_plane_digest": authority_plane.digest,
+            "council_tier": authority_plane.council_tier,
+            "transport_profile": authority_plane.transport_profile,
+            "discovery_profile": AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE,
+            "authority_cluster_ref": authority_cluster_ref,
+            "target_scope": "active-only",
+            "route_target_count": len(route_targets),
+            "active_route_target_count": len(route_targets),
+            "draining_route_target_count": 0,
+            "distinct_remote_host_count": len(
+                {target["remote_host_ref"] for target in route_targets}
+            ),
+            "trusted_root_refs": list(authority_plane.trusted_root_refs),
+            "all_active_members_targeted": True,
+            "route_targets": route_targets,
+            "discovery_status": "discovered",
+            "recorded_at": recorded_at,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthorityRouteTargetDiscovery(
+            discovery_ref=payload["discovery_ref"],
+            authority_plane_ref=authority_plane.authority_plane_ref,
+            authority_plane_digest=authority_plane.digest,
+            council_tier=authority_plane.council_tier,
+            transport_profile=authority_plane.transport_profile,
+            discovery_profile=AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE,
+            authority_cluster_ref=authority_cluster_ref,
+            target_scope="active-only",
+            route_target_count=len(route_targets),
+            active_route_target_count=len(route_targets),
+            draining_route_target_count=0,
+            distinct_remote_host_count=payload["distinct_remote_host_count"],
+            trusted_root_refs=list(authority_plane.trusted_root_refs),
+            all_active_members_targeted=True,
+            route_targets=route_targets,
+            discovery_status="discovered",
+            recorded_at=recorded_at,
+            digest=digest,
+        )
+
     def record_receipt(
         self,
         envelope: DistributedTransportEnvelope,
@@ -1387,7 +1541,7 @@ class DistributedTransportService:
         envelope: DistributedTransportEnvelope,
         authority_plane: DistributedTransportAuthorityPlane,
         *,
-        route_targets: List[Dict[str, Any]],
+        route_target_discovery: DistributedTransportAuthorityRouteTargetDiscovery,
         ca_cert_path: str,
         ca_bundle_ref: str,
         client_cert_path: str,
@@ -1399,21 +1553,42 @@ class DistributedTransportService:
             raise ValueError("authority route trace authority_plane council_tier must match envelope")
         if authority_plane.transport_profile != envelope.transport_profile:
             raise ValueError("authority route trace authority_plane transport_profile must match envelope")
-
-        normalized_targets = self._normalize_route_targets(route_targets)
-        authority_server_map = {
-            server["key_server_ref"]: dict(server) for server in authority_plane.key_servers
-        }
-        if sorted(normalized_targets) != sorted(authority_server_map):
-            raise ValueError("authority route trace must cover every reachable authority-plane key server")
-        authority_cluster_refs = sorted(
-            {target["authority_cluster_ref"] for target in normalized_targets.values()}
-        )
-        if len(authority_cluster_refs) != 1:
+        if route_target_discovery.authority_plane_ref != authority_plane.authority_plane_ref:
             raise ValueError(
-                "authority route trace route_targets must belong to exactly 1 authority_cluster_ref"
+                "authority route trace route_target_discovery authority_plane_ref must match authority_plane"
             )
-        authority_cluster_ref = authority_cluster_refs[0]
+        if route_target_discovery.authority_plane_digest != authority_plane.digest:
+            raise ValueError(
+                "authority route trace route_target_discovery authority_plane_digest must match authority_plane"
+            )
+        if route_target_discovery.council_tier != envelope.council_tier:
+            raise ValueError(
+                "authority route trace route_target_discovery council_tier must match envelope"
+            )
+        if route_target_discovery.transport_profile != envelope.transport_profile:
+            raise ValueError(
+                "authority route trace route_target_discovery transport_profile must match envelope"
+            )
+        if route_target_discovery.discovery_status != "discovered":
+            raise ValueError("authority route trace requires a discovered route_target_discovery receipt")
+        if not route_target_discovery.all_active_members_targeted:
+            raise ValueError(
+                "authority route trace requires route_target_discovery to target every active authority-plane member"
+            )
+
+        normalized_targets = {
+            target["key_server_ref"]: dict(target) for target in route_target_discovery.route_targets
+        }
+        active_authority_server_map = {
+            server["key_server_ref"]: dict(server)
+            for server in authority_plane.key_servers
+            if server["authority_status"] == "active"
+        }
+        if sorted(normalized_targets) != sorted(active_authority_server_map):
+            raise ValueError(
+                "authority route trace must cover every reachable active authority-plane key server"
+            )
+        authority_cluster_ref = route_target_discovery.authority_cluster_ref
 
         timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
         ca_path = self._require_non_empty_string(ca_cert_path, "ca_cert_path")
@@ -1434,7 +1609,7 @@ class DistributedTransportService:
         round_trip_total = 0.0
 
         for key_server_ref, target in normalized_targets.items():
-            authority_server = authority_server_map[key_server_ref]
+            authority_server = active_authority_server_map[key_server_ref]
             server_endpoint = target["server_endpoint"]
             server_name = target["server_name"]
             remote_host_ref = target["remote_host_ref"]
@@ -1558,11 +1733,12 @@ class DistributedTransportService:
         )
         non_loopback_verified = all(binding["socket_trace"]["non_loopback"] for binding in route_bindings)
         authority_plane_bound = all(
-            binding["server_role"] == authority_server_map[binding["key_server_ref"]]["server_role"]
+            binding["server_role"]
+            == active_authority_server_map[binding["key_server_ref"]]["server_role"]
             and binding["authority_status"]
-            == authority_server_map[binding["key_server_ref"]]["authority_status"]
+            == active_authority_server_map[binding["key_server_ref"]]["authority_status"]
             and binding["matched_root_refs"]
-            == authority_server_map[binding["key_server_ref"]]["matched_root_refs"]
+            == active_authority_server_map[binding["key_server_ref"]]["matched_root_refs"]
             for binding in route_bindings
         )
         response_digest_bound = all(binding["response_digest_bound"] for binding in route_bindings)
@@ -1585,6 +1761,15 @@ class DistributedTransportService:
             == binding["authority_cluster_ref"]
             for binding in route_bindings
         )
+        route_target_discovery_bound = (
+            route_target_discovery.discovery_profile == AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE
+            and route_target_discovery.target_scope == "active-only"
+            and route_target_discovery.route_target_count == route_count
+            and route_target_discovery.active_route_target_count == route_count
+            and route_target_discovery.draining_route_target_count == 0
+            and route_target_discovery.distinct_remote_host_count == distinct_remote_host_count
+            and route_target_discovery.trusted_root_refs == list(authority_plane.trusted_root_refs)
+        )
         cross_host_verified = (
             distinct_remote_host_count == route_count
             and route_count >= 2
@@ -1592,19 +1777,22 @@ class DistributedTransportService:
         )
         trace_status = (
             "authenticated"
-            if route_count == len(authority_plane.key_servers)
+            if route_count == len(active_authority_server_map)
             and mtls_authenticated_count == route_count
             and non_loopback_verified
             and authority_plane_bound
             and response_digest_bound
             and socket_trace_complete
             and os_observer_complete
+            and route_target_discovery_bound
             else "rejected"
         )
         payload = {
             "trace_ref": f"authority-route-trace://{authority_plane.council_tier}/{authority_plane.authority_plane_ref.split('/')[-1]}",
             "authority_plane_ref": authority_plane.authority_plane_ref,
             "authority_plane_digest": authority_plane.digest,
+            "route_target_discovery_ref": route_target_discovery.discovery_ref,
+            "route_target_discovery_digest": route_target_discovery.digest,
             "envelope_ref": envelope.envelope_id,
             "envelope_digest": envelope.envelope_digest,
             "council_tier": envelope.council_tier,
@@ -1613,6 +1801,7 @@ class DistributedTransportService:
             "socket_trace_profile": AUTHORITY_ROUTE_SOCKET_PROFILE,
             "os_observer_profile": AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
             "cross_host_binding_profile": AUTHORITY_ROUTE_CROSS_HOST_PROFILE,
+            "route_target_discovery_profile": route_target_discovery.discovery_profile,
             "ca_bundle_ref": normalized_ca_ref,
             "client_certificate_ref": normalized_client_ref,
             "server_name": route_bindings[0]["server_name"],
@@ -1626,6 +1815,7 @@ class DistributedTransportService:
             "response_digest_bound": response_digest_bound,
             "socket_trace_complete": socket_trace_complete,
             "os_observer_complete": os_observer_complete,
+            "route_target_discovery_bound": route_target_discovery_bound,
             "cross_host_verified": cross_host_verified,
             "route_bindings": route_bindings,
             "trace_status": trace_status,
@@ -1639,6 +1829,8 @@ class DistributedTransportService:
             trace_ref=payload["trace_ref"],
             authority_plane_ref=authority_plane.authority_plane_ref,
             authority_plane_digest=authority_plane.digest,
+            route_target_discovery_ref=route_target_discovery.discovery_ref,
+            route_target_discovery_digest=route_target_discovery.digest,
             envelope_ref=envelope.envelope_id,
             envelope_digest=envelope.envelope_digest,
             council_tier=envelope.council_tier,
@@ -1647,6 +1839,7 @@ class DistributedTransportService:
             socket_trace_profile=AUTHORITY_ROUTE_SOCKET_PROFILE,
             os_observer_profile=AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
             cross_host_binding_profile=AUTHORITY_ROUTE_CROSS_HOST_PROFILE,
+            route_target_discovery_profile=route_target_discovery.discovery_profile,
             ca_bundle_ref=normalized_ca_ref,
             client_certificate_ref=normalized_client_ref,
             server_name=payload["server_name"],
@@ -1660,6 +1853,7 @@ class DistributedTransportService:
             response_digest_bound=response_digest_bound,
             socket_trace_complete=socket_trace_complete,
             os_observer_complete=os_observer_complete,
+            route_target_discovery_bound=route_target_discovery_bound,
             cross_host_verified=cross_host_verified,
             route_bindings=route_bindings,
             trace_status=trace_status,

@@ -1478,10 +1478,14 @@ json.dump(
                 server_cert_path=cert_bundle["server_cert_path"],
                 server_key_path=cert_bundle["server_key_path"],
             ) as route_targets:
+                discovery = service.discover_authority_route_targets(
+                    authority_plane,
+                    route_catalog=route_targets,
+                )
                 trace = service.trace_non_loopback_authority_routes(
                     rotated,
                     authority_plane,
-                    route_targets=route_targets,
+                    route_target_discovery=discovery,
                     ca_cert_path=cert_bundle["ca_cert_path"],
                     ca_bundle_ref=CA_BUNDLE_REF,
                     client_cert_path=cert_bundle["client_cert_path"],
@@ -1490,6 +1494,19 @@ json.dump(
                     request_timeout_ms=500,
                 )
 
+        self.assertEqual("discovered", discovery.discovery_status)
+        self.assertEqual(
+            "bounded-authority-route-target-discovery-v1",
+            discovery.discovery_profile,
+        )
+        self.assertEqual("active-only", discovery.target_scope)
+        self.assertEqual(2, discovery.route_target_count)
+        self.assertEqual(2, discovery.active_route_target_count)
+        self.assertEqual(0, discovery.draining_route_target_count)
+        self.assertEqual(2, discovery.distinct_remote_host_count)
+        self.assertTrue(discovery.all_active_members_targeted)
+        self.assertEqual(authority_plane.authority_plane_ref, discovery.authority_plane_ref)
+        self.assertEqual(authority_plane.digest, discovery.authority_plane_digest)
         self.assertEqual("authenticated", trace.trace_status)
         self.assertEqual(2, trace.route_count)
         self.assertEqual(2, trace.mtls_authenticated_count)
@@ -1499,6 +1516,10 @@ json.dump(
         self.assertEqual(
             "attested-cross-host-authority-binding-v1",
             trace.cross_host_binding_profile,
+        )
+        self.assertEqual(
+            "bounded-authority-route-target-discovery-v1",
+            trace.route_target_discovery_profile,
         )
         self.assertEqual(
             "authority-cluster://federation/review-window",
@@ -1511,8 +1532,11 @@ json.dump(
         self.assertTrue(trace.socket_trace_complete)
         self.assertEqual("os-native-tcp-observer-v1", trace.os_observer_profile)
         self.assertTrue(trace.os_observer_complete)
+        self.assertTrue(trace.route_target_discovery_bound)
         self.assertTrue(trace.cross_host_verified)
         self.assertEqual(authority_plane.digest, trace.authority_plane_digest)
+        self.assertEqual(discovery.discovery_ref, trace.route_target_discovery_ref)
+        self.assertEqual(discovery.digest, trace.route_target_discovery_digest)
         self.assertEqual(
             ["root://federation/pki-a", "root://federation/pki-b"],
             trace.trusted_root_refs,
@@ -1695,10 +1719,14 @@ json.dump(
                 route_targets[1]["remote_host_attestation_ref"] = route_targets[0][
                     "remote_host_attestation_ref"
                 ]
+                discovery = service.discover_authority_route_targets(
+                    authority_plane,
+                    route_catalog=route_targets,
+                )
                 trace = service.trace_non_loopback_authority_routes(
                     rotated,
                     authority_plane,
-                    route_targets=route_targets,
+                    route_target_discovery=discovery,
                     ca_cert_path=cert_bundle["ca_cert_path"],
                     ca_bundle_ref=CA_BUNDLE_REF,
                     client_cert_path=cert_bundle["client_cert_path"],
@@ -1709,6 +1737,7 @@ json.dump(
 
         self.assertEqual("authenticated", trace.trace_status)
         self.assertEqual(1, trace.distinct_remote_host_count)
+        self.assertTrue(trace.route_target_discovery_bound)
         self.assertFalse(trace.cross_host_verified)
 
 

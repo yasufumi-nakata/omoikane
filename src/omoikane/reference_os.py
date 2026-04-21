@@ -1740,11 +1740,17 @@ class OmoikaneReferenceOS:
                 ca_cert_path=cert_bundle["ca_cert_path"],
                 server_cert_path=cert_bundle["server_cert_path"],
                 server_key_path=cert_bundle["server_key_path"],
-            ) as authority_route_targets:
+            ) as authority_route_catalog:
+                authority_route_target_discovery = (
+                    self.distributed_transport.discover_authority_route_targets(
+                        authority_plane,
+                        route_catalog=authority_route_catalog,
+                    )
+                )
                 authority_route_trace = self.distributed_transport.trace_non_loopback_authority_routes(
                     rotated_federation_envelope,
                     authority_plane,
-                    route_targets=authority_route_targets,
+                    route_target_discovery=authority_route_target_discovery,
                     ca_cert_path=cert_bundle["ca_cert_path"],
                     ca_bundle_ref=CA_BUNDLE_REF,
                     client_cert_path=cert_bundle["client_cert_path"],
@@ -1838,6 +1844,16 @@ json.dump(response, sys.stdout)
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_churn_reconciled",
             payload=authority_churn.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_route_targets_discovered",
+            payload=authority_route_target_discovery.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -2114,6 +2130,9 @@ json.dump(response, sys.stdout)
             "authority_churn": {
                 "federation_rotated": authority_churn.to_dict(),
             },
+            "authority_route_target_discovery": {
+                "federation_rotated": authority_route_target_discovery.to_dict(),
+            },
             "authority_route_trace": {
                 "federation_rotated": authority_route_trace.to_dict(),
             },
@@ -2215,6 +2234,21 @@ json.dump(response, sys.stdout)
                     == ["keyserver://federation/mirror-b-draining"]
                     and authority_churn.added_server_refs == []
                 ),
+                "authority_route_targets_discovered": (
+                    authority_route_target_discovery.discovery_profile
+                    == "bounded-authority-route-target-discovery-v1"
+                    and authority_route_target_discovery.target_scope == "active-only"
+                    and authority_route_target_discovery.discovery_status == "discovered"
+                    and authority_route_target_discovery.route_target_count == 2
+                    and authority_route_target_discovery.active_route_target_count == 2
+                    and authority_route_target_discovery.draining_route_target_count == 0
+                    and authority_route_target_discovery.all_active_members_targeted
+                    and authority_route_target_discovery.authority_plane_ref
+                    == authority_plane.authority_plane_ref
+                    and authority_route_target_discovery.authority_plane_digest
+                    == authority_plane.digest
+                    and authority_route_target_discovery.distinct_remote_host_count == 2
+                ),
                 "authority_route_mtls_authenticated": (
                     authority_route_trace.trace_status == "authenticated"
                     and authority_route_trace.route_count == 2
@@ -2251,6 +2285,13 @@ json.dump(response, sys.stdout)
                 "authority_route_cross_host_bound": (
                     authority_route_trace.cross_host_binding_profile
                     == "attested-cross-host-authority-binding-v1"
+                    and authority_route_trace.route_target_discovery_profile
+                    == "bounded-authority-route-target-discovery-v1"
+                    and authority_route_trace.route_target_discovery_ref
+                    == authority_route_target_discovery.discovery_ref
+                    and authority_route_trace.route_target_discovery_digest
+                    == authority_route_target_discovery.digest
+                    and authority_route_trace.route_target_discovery_bound
                     and authority_route_trace.authority_cluster_ref
                     == "authority-cluster://federation/review-window"
                     and authority_route_trace.distinct_remote_host_count == 2

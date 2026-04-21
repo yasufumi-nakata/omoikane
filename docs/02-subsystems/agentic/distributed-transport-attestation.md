@@ -68,6 +68,7 @@ reference runtime では `distributed-transport-demo` が
 Federation handoff / rotated federation handoff / Heritage handoff /
 route nonce replay block / multi-hop replay block / live root directory probe /
 bounded authority-plane fleet probe / authority-plane churn reconciliation /
+bounded authority route target discovery /
 non-loopback mTLS authority route trace を出力する。
 
 ## Live Root Directory Federation
@@ -130,6 +131,31 @@ overlap snapshot と post-churn snapshot を
 - `continuity_guard` は overlap count / draining removal / quorum maintained を固定し、
   `status=quorum-maintained` だけを rotated receipt 前段の valid churn outcome とする
 
+## Authority route target discovery
+
+stable な authority plane に対しては
+`discover_authority_route_targets` により、
+reviewed `route_catalog` を active authority-plane member へ束縛し、
+trace 前段の discovery receipt を固定する。
+
+| 項目 | 固定値 |
+|---|---|
+| discovery profile | `bounded-authority-route-target-discovery-v1` |
+| target scope | `active-only` |
+| authority cluster scope | single `authority_cluster_ref` |
+| source of truth | stable authority plane + reviewed route catalog |
+
+- discovery は `authority_plane` の active member 全件を `key_server_ref` 単位で覆わなければ fail-closed
+- 各 discovered target は `server_endpoint / server_name / remote_host_ref /
+  remote_host_attestation_ref / authority_cluster_ref / remote_jurisdiction /
+  remote_network_zone` を持ち、さらに authority plane 由来の
+  `server_role / authority_status / matched_root_refs` を retain する
+- `authority_cluster_ref` は discovery receipt 全体で 1 種類に固定し、
+  `distinct_remote_host_count` は cross-host binding の前提観測として保持する
+- route trace は raw `route_targets` ではなく
+  `route_target_discovery_ref / route_target_discovery_digest` に束縛され、
+  discovery receipt が `all_active_members_targeted=true` の時だけ進める
+
 ## Non-loopback mTLS authority route trace
 
 stable な authority plane に対しては
@@ -161,6 +187,9 @@ current authority snapshot へ束縛する。
   remote_host_ref / remote_host_attestation_ref / authority_cluster_ref /
   host_binding_digest` を保持し、
   少なくとも 1 source で tuple が観測された時だけ route trace を `authenticated` に進める
+- trace receipt 自体は `route_target_discovery_ref / route_target_discovery_digest /
+  route_target_discovery_profile=bounded-authority-route-target-discovery-v1` を保持し、
+  discovery receipt と authority plane の provenance を同時に固定する
 - `cross_host_verified` は traced authority-plane member ごとに distinct な
   `remote_host_ref` が同一 `authority_cluster_ref` の下で束縛された時だけ true になる
 - `response_digest` は authority-plane snapshot の per-server digest と一致しなければ fail-closed
@@ -217,7 +246,7 @@ route trace / packet export / resolved interface へ束縛する。
 - `capture_command` は `tcpdump` / resolved interface / exact filter を含む preview として固定し、
   actual live capture 自体は repo 外の broker 実行面へ委譲する
 - residual future work は broad な cross-host authority routing 不在ではなく、
-  fixed `route_targets` の外側にある unbounded remote authority-cluster discovery へ絞られる
+  bounded reviewed route catalog の外側にある unbounded remote authority-cluster discovery へ絞られる
 
 ## Relay telemetry
 
@@ -248,6 +277,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_root_connectivity_receipt.schema`
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
 - schema: `specs/schemas/distributed_transport_authority_plane.schema`
+- schema: `specs/schemas/distributed_transport_authority_route_target_discovery.schema`
 - schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
 - schema: `specs/schemas/distributed_transport_os_observer_receipt.schema`
 - schema: `specs/schemas/distributed_transport_authority_route_trace.schema`
@@ -259,6 +289,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
 - eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
 - eval: `evals/agentic/distributed_transport_authority_plane.yaml`
+- eval: `evals/agentic/distributed_transport_authority_route_target_discovery.yaml`
 - eval: `evals/agentic/distributed_transport_authority_churn.yaml`
 - eval: `evals/agentic/distributed_transport_authority_route_trace.yaml`
 - eval: `evals/agentic/distributed_transport_packet_capture_export.yaml`
@@ -269,6 +300,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-live-root-directory.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`
+- decision log: `meta/decision-log/2026-04-22_distributed-transport-route-target-discovery.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-os-observer-receipt.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-pcap-export.md`
