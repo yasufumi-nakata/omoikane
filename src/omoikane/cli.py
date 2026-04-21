@@ -229,7 +229,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     broker_parser = subparsers.add_parser(
         "broker-demo",
-        help="Run the L1 substrate broker selection/rotation/migration scenario",
+        help="Run the L1 substrate broker selection, shadow-sync dual allocation, and migration scenario",
     )
     broker_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

@@ -4250,8 +4250,8 @@ class OmoikaneReferenceOS:
         allocation = self.broker.lease(
             identity_id=identity.identity_id,
             units=72,
-            purpose="broker-rotation-and-migration-eval",
-            method="A",
+            purpose="broker-method-b-shadow-sync-eval",
+            method="B",
             required_capability=0.92,
             workload_class="migration",
         )
@@ -4311,6 +4311,17 @@ class OmoikaneReferenceOS:
             },
             continuity_mode="warm-standby",
         )
+        dual_allocation_window = self.broker.open_dual_allocation_window(
+            identity.identity_id,
+            state={
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+                "checkpoint": "reference-connectome-v1",
+                "shadow_stage": "shadow-sync",
+                "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
+            },
+        )
+        opened_dual_allocation_window = asdict(dual_allocation_window)
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="substrate.broker.standby_probed",
@@ -4331,16 +4342,32 @@ class OmoikaneReferenceOS:
             signature_roles=["self", "guardian"],
             substrate=attestation_chain.standby_substrate_id,
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.dual_allocation.opened",
+            payload=opened_dual_allocation_window,
+            actor="SubstrateBroker",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self", "council", "guardian"],
+            substrate=dual_allocation_window.shadow_allocation.substrate,
+        )
         transfer = self.broker.migrate(
             identity.identity_id,
             state={
                 "identity_id": identity.identity_id,
                 "lineage_id": identity.lineage_id,
                 "checkpoint": "reference-connectome-v1",
+                "shadow_stage": "authority-handoff",
                 "rotation_probe_kind": rotation_probe["active_substrate"]["substrate_kind"],
             },
-            continuity_mode="warm-standby",
+            continuity_mode="hot-handoff",
         )
+        closed_dual_allocation_window = self.broker.close_dual_allocation_window(
+            identity.identity_id,
+            reason="authority-handoff-complete-demo-cleanup",
+        )
+        closed_dual_allocation_window_snapshot = asdict(closed_dual_allocation_window)
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="substrate.migrated",
@@ -4350,6 +4377,16 @@ class OmoikaneReferenceOS:
             layer="L1",
             signature_roles=["self", "council", "guardian"],
             substrate=transfer.destination_substrate,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="substrate.dual_allocation.closed",
+            payload=closed_dual_allocation_window_snapshot,
+            actor="SubstrateBroker",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate=closed_dual_allocation_window.shadow_allocation.substrate,
         )
         release = self.broker.release(
             identity.identity_id,
@@ -4382,6 +4419,8 @@ class OmoikaneReferenceOS:
                 "standby_probe": asdict(standby_probe),
                 "attestation": asdict(attestation),
                 "attestation_chain": asdict(attestation_chain),
+                "dual_allocation_window": opened_dual_allocation_window,
+                "closed_dual_allocation_window": closed_dual_allocation_window_snapshot,
                 "migration": asdict(transfer),
                 "release": release,
                 "final_state": final_state,
@@ -4400,9 +4439,13 @@ class OmoikaneReferenceOS:
                     and standby_probe.ready_for_migrate
                     and attestation.status == "healthy"
                     and attestation_chain.handoff_ready
+                    and opened_dual_allocation_window["dual_active"]
+                    and opened_dual_allocation_window["window_status"] == "shadow-active"
+                    and closed_dual_allocation_window_snapshot["window_status"] == "closed"
+                    and closed_dual_allocation_window_snapshot["shadow_release"] is not None
                     and attestation_chain.expected_destination_substrate == standby["substrate_id"]
                     and transfer.destination_substrate == standby["substrate_id"]
-                    and transfer.continuity_mode == "warm-standby"
+                    and transfer.continuity_mode == "hot-handoff"
                     and release["status"] == "released"
                     and final_state["release"]["status"] == "released"
                 ),
@@ -4422,6 +4465,23 @@ class OmoikaneReferenceOS:
                 "attestation_chain_ready": attestation_chain.handoff_ready,
                 "attestation_chain_window_complete": len(attestation_chain.observations)
                 == attestation_chain.window_size,
+                "dual_allocation_window_opened": opened_dual_allocation_window["window_status"]
+                == "shadow-active",
+                "dual_allocation_shadow_allocated": opened_dual_allocation_window[
+                    "shadow_allocation"
+                ]["status"]
+                == "allocated",
+                "dual_allocation_sync_complete": len(
+                    opened_dual_allocation_window["sync_observations"]
+                )
+                == 3,
+                "dual_allocation_closed": closed_dual_allocation_window_snapshot["window_status"]
+                == "closed",
+                "dual_allocation_cleanup_released": bool(
+                    closed_dual_allocation_window_snapshot["shadow_release"]
+                    and closed_dual_allocation_window_snapshot["shadow_release"]["status"]
+                    == "released"
+                ),
                 "migration_binds_selected_standby": bool(
                     standby and transfer.destination_substrate == standby["substrate_id"]
                 ),

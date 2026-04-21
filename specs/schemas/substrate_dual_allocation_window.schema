@@ -1,0 +1,211 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/substrate_dual_allocation_window.schema"
+title: SubstrateDualAllocationWindow
+description: >
+  Bounded Method B shadow-sync overlap window that materializes one second live
+  allocation on the pre-bound standby substrate before authority handoff.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - window_id
+  - identity_id
+  - method
+  - source_allocation_id
+  - source_substrate_id
+  - shadow_allocation
+  - standby_probe_id
+  - source_attestation_id
+  - attestation_chain_id
+  - continuity_mode
+  - policy_id
+  - activation_stage
+  - close_stage
+  - overlap_window_seconds
+  - mirror_cadence_ms
+  - max_state_drift_score
+  - state_digest
+  - allocation_pair_digest
+  - sync_observations
+  - dual_active
+  - handoff_ready
+  - window_status
+  - opened_at
+properties:
+  kind:
+    const: substrate_dual_allocation_window
+  schema_version:
+    const: "1.0.0"
+  window_id:
+    type: string
+    pattern: "^dual-window-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  method:
+    const: B
+  source_allocation_id:
+    type: string
+    pattern: "^alloc-[a-f0-9]{12}$"
+  source_substrate_id:
+    type: string
+    minLength: 1
+  shadow_allocation:
+    $ref: "./substrate_allocation.schema"
+  standby_probe_id:
+    type: string
+    pattern: "^standby-probe-[a-f0-9]{12}$"
+  source_attestation_id:
+    type: string
+    pattern: "^attest-[a-f0-9]{12}$"
+  attestation_chain_id:
+    type: string
+    pattern: "^attestation-chain-[a-f0-9]{12}$"
+  continuity_mode:
+    const: hot-handoff
+  policy_id:
+    const: bounded-live-dual-allocation-window-v1
+  activation_stage:
+    const: shadow-sync
+  close_stage:
+    const: authority-handoff
+  overlap_window_seconds:
+    const: 45
+  mirror_cadence_ms:
+    const: 250
+  max_state_drift_score:
+    type: number
+    const: 0.08
+  state_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  allocation_pair_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  sync_observations:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - source_state_digest
+        - shadow_state_digest
+        - drift_score
+        - synchronization_status
+        - observed_at
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          maximum: 3
+        source_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        shadow_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        drift_score:
+          type: number
+          minimum: 0
+          maximum: 0.08
+        synchronization_status:
+          const: in-sync
+        observed_at:
+          type: string
+          format: date-time
+  dual_active:
+    type: boolean
+  handoff_ready:
+    type: boolean
+  window_status:
+    type: string
+    enum:
+      - shadow-active
+      - closed
+  opened_at:
+    type: string
+    format: date-time
+  closed_at:
+    type: string
+    format: date-time
+  close_reason:
+    type: string
+    minLength: 1
+  shadow_release:
+    $ref: "./substrate_release.schema"
+allOf:
+  - if:
+      properties:
+        window_status:
+          const: shadow-active
+    then:
+      properties:
+        dual_active:
+          const: true
+  - if:
+      properties:
+        window_status:
+          const: closed
+    then:
+      required:
+        - closed_at
+        - close_reason
+        - shadow_release
+      properties:
+        dual_active:
+          const: false
+examples:
+  - kind: substrate_dual_allocation_window
+    schema_version: "1.0.0"
+    window_id: dual-window-0123456789ab
+    identity_id: identity-0123456789ab
+    method: B
+    source_allocation_id: alloc-aaaaaaaaaaaa
+    source_substrate_id: classical_silicon
+    shadow_allocation:
+      allocation_id: alloc-bbbbbbbbbbbb
+      identity_id: identity-0123456789ab
+      substrate: neuromorphic_mesh.alpha
+      units: 72
+      purpose: method-b-shadow-sync-overlap
+      created_at: "2026-04-21T12:00:00Z"
+      status: allocated
+    standby_probe_id: standby-probe-0123456789ab
+    source_attestation_id: attest-0123456789ab
+    attestation_chain_id: attestation-chain-0123456789ab
+    continuity_mode: hot-handoff
+    policy_id: bounded-live-dual-allocation-window-v1
+    activation_stage: shadow-sync
+    close_stage: authority-handoff
+    overlap_window_seconds: 45
+    mirror_cadence_ms: 250
+    max_state_drift_score: 0.08
+    state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    allocation_pair_digest: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    sync_observations:
+      - sequence: 1
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        drift_score: 0.01
+        synchronization_status: in-sync
+        observed_at: "2026-04-21T12:00:00Z"
+      - sequence: 2
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        drift_score: 0.02
+        synchronization_status: in-sync
+        observed_at: "2026-04-21T12:00:00Z"
+      - sequence: 3
+        source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        drift_score: 0.015
+        synchronization_status: in-sync
+        observed_at: "2026-04-21T12:00:01Z"
+    dual_active: true
+    handoff_ready: true
+    window_status: shadow-active
+    opened_at: "2026-04-21T12:00:00Z"

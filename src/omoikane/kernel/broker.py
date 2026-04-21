@@ -18,11 +18,16 @@ from ..substrate.adapter import (
 BROKER_POLICY_ID = "deterministic-substrate-neutrality-broker-v1"
 STANDBY_PROBE_POLICY_ID = "deterministic-standby-health-probe-v1"
 ATTESTATION_CHAIN_POLICY_ID = "bounded-cross-substrate-attestation-window-v1"
+DUAL_ALLOCATION_POLICY_ID = "bounded-live-dual-allocation-window-v1"
 MINIMUM_HEALTH_SCORE = 0.6
 CRITICAL_HEALTH_SCORE = 0.4
 NEUTRALITY_WINDOW = 2
 ATTESTATION_CHAIN_WINDOW = 3
 ATTESTATION_CHAIN_CADENCE_MS = 250
+DUAL_ALLOCATION_WINDOW_SECONDS = 45
+DUAL_ALLOCATION_MIRROR_CADENCE_MS = 250
+DUAL_ALLOCATION_SYNC_WINDOW = 3
+MAX_DUAL_ALLOCATION_DRIFT_SCORE = 0.08
 
 
 @dataclass(frozen=True)
@@ -98,6 +103,40 @@ class SubstrateAttestationChain:
     chain_digest: str
     opened_at: str
     kind: str = "substrate_attestation_chain"
+    schema_version: str = "1.0.0"
+
+
+@dataclass
+class SubstrateDualAllocationWindow:
+    """Bounded Method B shadow-sync window with two live substrate allocations."""
+
+    window_id: str
+    identity_id: str
+    method: str
+    source_allocation_id: str
+    source_substrate_id: str
+    shadow_allocation: SubstrateAllocation
+    standby_probe_id: str
+    source_attestation_id: str
+    attestation_chain_id: str
+    continuity_mode: str
+    policy_id: str
+    activation_stage: str
+    close_stage: str
+    overlap_window_seconds: int
+    mirror_cadence_ms: int
+    max_state_drift_score: float
+    state_digest: str
+    allocation_pair_digest: str
+    sync_observations: List[Dict[str, Any]]
+    dual_active: bool
+    handoff_ready: bool
+    window_status: str
+    opened_at: str
+    closed_at: Optional[str] = None
+    close_reason: Optional[str] = None
+    shadow_release: Optional[Dict[str, Any]] = None
+    kind: str = "substrate_dual_allocation_window"
     schema_version: str = "1.0.0"
 
 
@@ -179,6 +218,16 @@ class SubstrateBrokerService:
                 "migrate",
                 "release",
             ],
+            "method_b_required_steps": [
+                "lease",
+                "probe-standby",
+                "attest",
+                "bridge-attestation-chain",
+                "open-dual-allocation-window",
+                "migrate",
+                "close-dual-allocation-window",
+                "release",
+            ],
             "energy_floor_failover_action": "migrate-standby",
             "standby_probe_policy": {
                 "policy_id": STANDBY_PROBE_POLICY_ID,
@@ -190,6 +239,16 @@ class SubstrateBrokerService:
                 "window_size": ATTESTATION_CHAIN_WINDOW,
                 "cadence_ms": ATTESTATION_CHAIN_CADENCE_MS,
                 "required_source_status": "healthy",
+            },
+            "dual_allocation_policy": {
+                "policy_id": DUAL_ALLOCATION_POLICY_ID,
+                "supported_method": "B",
+                "activation_stage": "shadow-sync",
+                "close_stage": "authority-handoff",
+                "overlap_window_seconds": DUAL_ALLOCATION_WINDOW_SECONDS,
+                "mirror_cadence_ms": DUAL_ALLOCATION_MIRROR_CADENCE_MS,
+                "sync_observation_count": DUAL_ALLOCATION_SYNC_WINDOW,
+                "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
             },
         }
 
@@ -301,6 +360,7 @@ class SubstrateBrokerService:
             "last_attestation": None,
             "last_standby_probe": None,
             "last_attestation_chain": None,
+            "last_dual_allocation_window": None,
             "transfer": None,
             "release": None,
         }
@@ -455,9 +515,22 @@ class SubstrateBrokerService:
         attestation = lease["last_attestation"]
         if attestation is None or attestation.status != "healthy":
             raise PermissionError("healthy attestation required before migrate")
+        dual_window = lease["last_dual_allocation_window"]
+        if continuity_mode == "hot-handoff":
+            if dual_window is None or dual_window.window_status != "shadow-active":
+                raise PermissionError(
+                    "hot-handoff migrate requires an open dual allocation window"
+                )
+            if not dual_window.handoff_ready:
+                raise PermissionError("dual allocation window must be handoff-ready before migrate")
         target_substrate = destination_substrate or lease["standby_substrate_id"]
         if not isinstance(target_substrate, str) or not target_substrate.strip():
             raise ValueError("destination_substrate must resolve to a non-empty standby target")
+        if dual_window is not None and dual_window.window_status == "shadow-active":
+            if target_substrate != dual_window.shadow_allocation.substrate:
+                raise ValueError(
+                    "open dual allocation window must migrate to the shadow allocation substrate"
+                )
         transfer = self._adapters[lease["active_substrate_id"]].transfer(
             lease["allocation"].allocation_id,
             dict(state),
@@ -512,6 +585,117 @@ class SubstrateBrokerService:
             "recorded_at": utc_now_iso(),
         }
 
+    def open_dual_allocation_window(
+        self,
+        identity_id: str,
+        *,
+        state: Mapping[str, Any],
+        units: Optional[int] = None,
+        purpose: Optional[str] = None,
+        continuity_mode: str = "hot-handoff",
+    ) -> SubstrateDualAllocationWindow:
+        lease = self._require_open_lease(identity_id)
+        if str(lease["method"]) != "B":
+            raise PermissionError("dual allocation window is only supported for Method B")
+        if continuity_mode != "hot-handoff":
+            raise ValueError("dual allocation window continuity_mode must be hot-handoff")
+        if not state:
+            raise ValueError("state must not be empty")
+        existing_window = lease["last_dual_allocation_window"]
+        if existing_window is not None and existing_window.window_status == "shadow-active":
+            raise ValueError("dual allocation window is already active")
+        probe = lease["last_standby_probe"]
+        if probe is None or not probe.ready_for_migrate:
+            raise PermissionError("ready standby probe required before dual allocation window")
+        attestation = lease["last_attestation"]
+        if attestation is None or attestation.status != "healthy":
+            raise PermissionError("healthy attestation required before dual allocation window")
+        chain = lease["last_attestation_chain"]
+        if chain is None or not chain.handoff_ready:
+            raise PermissionError("handoff-ready attestation chain required before dual allocation window")
+
+        shadow_substrate_id = probe.standby_substrate_id
+        standby_adapter = self._adapters[shadow_substrate_id]
+        shadow_units = int(units or lease["allocation"].units)
+        shadow_allocation = standby_adapter.allocate(
+            units=shadow_units,
+            purpose=purpose or "method-b-shadow-sync-overlap",
+            identity_id=identity_id,
+        )
+        state_digest = sha256_text(canonical_json(dict(state)))
+        sync_observations: List[Dict[str, Any]] = []
+        for sequence, drift_score in enumerate((0.01, 0.02, 0.015), start=1):
+            sync_observations.append(
+                {
+                    "sequence": sequence,
+                    "source_state_digest": state_digest,
+                    "shadow_state_digest": state_digest,
+                    "drift_score": drift_score,
+                    "synchronization_status": "in-sync",
+                    "observed_at": utc_now_iso(),
+                }
+            )
+        pair_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "source_allocation_id": lease["allocation"].allocation_id,
+                    "shadow_allocation_id": shadow_allocation.allocation_id,
+                    "state_digest": state_digest,
+                }
+            )
+        )
+        window = SubstrateDualAllocationWindow(
+            window_id=new_id("dual-window"),
+            identity_id=identity_id,
+            method="B",
+            source_allocation_id=lease["allocation"].allocation_id,
+            source_substrate_id=str(lease["active_substrate_id"]),
+            shadow_allocation=shadow_allocation,
+            standby_probe_id=probe.probe_id,
+            source_attestation_id=attestation.attestation_id,
+            attestation_chain_id=chain.chain_id,
+            continuity_mode=continuity_mode,
+            policy_id=DUAL_ALLOCATION_POLICY_ID,
+            activation_stage="shadow-sync",
+            close_stage="authority-handoff",
+            overlap_window_seconds=DUAL_ALLOCATION_WINDOW_SECONDS,
+            mirror_cadence_ms=DUAL_ALLOCATION_MIRROR_CADENCE_MS,
+            max_state_drift_score=MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+            state_digest=state_digest,
+            allocation_pair_digest=pair_digest,
+            sync_observations=sync_observations,
+            dual_active=True,
+            handoff_ready=True,
+            window_status="shadow-active",
+            opened_at=utc_now_iso(),
+        )
+        lease["last_dual_allocation_window"] = window
+        return window
+
+    def close_dual_allocation_window(
+        self,
+        identity_id: str,
+        *,
+        reason: str,
+    ) -> SubstrateDualAllocationWindow:
+        lease = self._require_open_lease(identity_id)
+        window = lease["last_dual_allocation_window"]
+        if window is None:
+            raise ValueError("dual allocation window has not been opened")
+        if window.window_status != "shadow-active":
+            raise ValueError("dual allocation window is already closed")
+        shadow_release = self._adapters[window.shadow_allocation.substrate].release(
+            window.shadow_allocation.allocation_id,
+            reason=reason,
+        )
+        window.shadow_release = shadow_release
+        window.dual_active = False
+        window.window_status = "closed"
+        window.close_reason = reason
+        window.closed_at = utc_now_iso()
+        return window
+
     def observe(self, identity_id: str) -> Dict[str, Any]:
         lease = self._leases.get(identity_id)
         if lease is None:
@@ -535,6 +719,11 @@ class SubstrateBrokerService:
             "last_attestation_chain": (
                 asdict(lease["last_attestation_chain"])
                 if lease["last_attestation_chain"] is not None
+                else None
+            ),
+            "last_dual_allocation_window": (
+                asdict(lease["last_dual_allocation_window"])
+                if lease["last_dual_allocation_window"] is not None
                 else None
             ),
             "transfer": asdict(lease["transfer"]) if lease["transfer"] is not None else None,

@@ -8,6 +8,7 @@ imports:
   substrate_attestation: ../schemas/substrate_attestation.schema
   standby_health_probe: ../schemas/standby_health_probe.schema
   substrate_attestation_chain: ../schemas/substrate_attestation_chain.schema
+  substrate_dual_allocation_window: ../schemas/substrate_dual_allocation_window.schema
   substrate_transfer: ../schemas/substrate_transfer.schema
   substrate_release: ../schemas/substrate_release.schema
   energy_floor: ../schemas/energy_floor.schema
@@ -201,9 +202,9 @@ operations:
     output:
       schema_ref: substrate_allocation
     guarantees:
-      - same identity may not hold two active leases at once
+      - lease must fail closed when the same identity already holds an open source lease
       - lease output must remain one SubstrateAllocation bound to the selected active substrate
-      - standby target must be recorded without creating a second active lease in the reference runtime
+      - standby target must be recorded without materializing a second active allocation until open_dual_allocation_window is called
   attest:
     summary: Emit one broker-bound attestation for the active lease before migrate.
     input:
@@ -275,6 +276,57 @@ operations:
       - bridge_attestation_chain must fail closed when the latest active attestation is missing or unhealthy
       - bridge_attestation_chain must bind the latest standby probe and the expected destination substrate before migrate
       - the fixed attestation window must expose sequence-ordered observations and one expected_state_digest for the pending handoff
+  open_dual_allocation_window:
+    summary: Materialize one bounded Method B shadow-sync overlap window on the pre-bound standby substrate.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - state
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          state:
+            type: object
+            minProperties: 1
+          units:
+            type: integer
+            minimum: 1
+          purpose:
+            type: string
+            minLength: 1
+          continuity_mode:
+            type: string
+            enum:
+              - hot-handoff
+    output:
+      schema_ref: substrate_dual_allocation_window
+    guarantees:
+      - open_dual_allocation_window must require Method B, a ready standby probe, a healthy source attestation, and a handoff-ready attestation chain
+      - the shadow allocation must materialize on the pre-bound standby substrate and remain the only second live allocation in the reference runtime
+      - the overlap window must bind one source state digest, fixed mirror cadence, and bounded drift before authority handoff
+  close_dual_allocation_window:
+    summary: Close one bounded Method B dual-allocation window and release its shadow allocation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - reason
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: substrate_dual_allocation_window
+    guarantees:
+      - close_dual_allocation_window must fail closed unless a shadow-active window exists
+      - close_dual_allocation_window must release the shadow allocation and emit a closed receipt before source release completes
   migrate:
     summary: Migrate one attested active lease onto its standby target or an explicitly supplied safe destination.
     input:
@@ -304,6 +356,7 @@ operations:
     guarantees:
       - migrate must fail closed when the latest attestation is missing or unhealthy
       - destination_substrate must default to the bound standby candidate when omitted
+      - hot-handoff migrate must require an open dual-allocation window and bind the shadow allocation substrate as the destination
       - transfer output must reuse the canonical substrate_transfer schema
   release:
     summary: Release the source lease after a successful migrate or explicit broker teardown.
@@ -431,6 +484,12 @@ events:
   substrate.attestation_chain.bound:
     payload:
       schema_ref: substrate_attestation_chain
+  broker.dual_allocation_window.opened:
+    payload:
+      schema_ref: substrate_dual_allocation_window
+  broker.dual_allocation_window.closed:
+    payload:
+      schema_ref: substrate_dual_allocation_window
   substrate.migrated:
     payload:
       schema_ref: substrate_transfer
@@ -440,6 +499,6 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - The reference runtime keeps one active lease plus one standby candidate to avoid dual-active identity allocation while preserving a deterministic migrate target.
-    - The reference runtime fixes a bounded standby probe and 3-beat attestation bridge window before migrate, but does not materialize a second active lease.
-    - Actual live dual allocation and unbounded cross-substrate attestation streaming remain future work beyond the bounded broker contract.
+    - The reference runtime defaults to one active lease plus one standby candidate, then allows only one Method B shadow allocation window as the bounded exception.
+    - The shadow allocation window is fixed to one standby-backed second allocation, 45s overlap, 250ms mirror cadence, and 3 sync observations before authority handoff.
+    - Continuous cross-substrate attestation streaming and cross-host dual allocation remain future work beyond the bounded broker contract.

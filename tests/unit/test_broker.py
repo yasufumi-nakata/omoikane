@@ -165,6 +165,87 @@ class SubstrateBrokerServiceTests(unittest.TestCase):
         self.assertEqual(probe.standby_substrate_id, chain.expected_destination_substrate)
         self.assertEqual(3, len(chain.observations))
 
+    def test_dual_allocation_window_requires_method_b(self) -> None:
+        broker = SubstrateBrokerService.reference_service()
+        allocation = broker.lease(
+            identity_id="identity://iota",
+            units=64,
+            purpose="dual-allocation-method-gate",
+            method="A",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        broker.probe_standby("identity://iota")
+        broker.attest(
+            "identity://iota",
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+            },
+        )
+        broker.bridge_attestation_chain(
+            "identity://iota",
+            state={"identity_id": "identity://iota", "checkpoint": "connectome://iota"},
+        )
+
+        with self.assertRaisesRegex(PermissionError, "Method B"):
+            broker.open_dual_allocation_window(
+                "identity://iota",
+                state={"identity_id": "identity://iota", "checkpoint": "connectome://iota"},
+            )
+
+    def test_dual_allocation_window_materializes_and_closes_shadow_allocation(self) -> None:
+        broker = SubstrateBrokerService.reference_service()
+        allocation = broker.lease(
+            identity_id="identity://kappa",
+            units=64,
+            purpose="dual-allocation-shadow-sync",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        probe = broker.probe_standby("identity://kappa")
+        attestation = broker.attest(
+            "identity://kappa",
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+            },
+        )
+        chain = broker.bridge_attestation_chain(
+            "identity://kappa",
+            state={"identity_id": "identity://kappa", "checkpoint": "connectome://kappa"},
+        )
+
+        window = broker.open_dual_allocation_window(
+            "identity://kappa",
+            state={
+                "identity_id": "identity://kappa",
+                "checkpoint": "connectome://kappa",
+                "stage": "shadow-sync",
+            },
+        )
+
+        self.assertEqual("B", window.method)
+        self.assertEqual("shadow-active", window.window_status)
+        self.assertEqual("allocated", window.shadow_allocation.status)
+        self.assertEqual(probe.probe_id, window.standby_probe_id)
+        self.assertEqual(attestation.attestation_id, window.source_attestation_id)
+        self.assertEqual(chain.chain_id, window.attestation_chain_id)
+        self.assertEqual(3, len(window.sync_observations))
+
+        closed = broker.close_dual_allocation_window(
+            "identity://kappa",
+            reason="authority-handoff-complete-demo-cleanup",
+        )
+
+        self.assertEqual("closed", closed.window_status)
+        self.assertFalse(closed.dual_active)
+        self.assertEqual("released", closed.shadow_allocation.status)
+        self.assertEqual("released", closed.shadow_release["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -81,10 +81,11 @@
 - `design_delta_scan_receipt.schema`
 - `standby_health_probe.schema`
 - `substrate_attestation_chain.schema`
+- `substrate_dual_allocation_window.schema`
 
 ## 次段階
 
-- live dual allocation beyond the bounded standby probe / attestation window
+- continuous cross-substrate attestation streaming beyond the bounded dual-allocation window
 - cross-host authority routing + OS-native packet capture
 
 ## 形式

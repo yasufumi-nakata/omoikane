@@ -79,11 +79,12 @@ python3 -m unittest discover -s tests -t .
 
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、
-Method A candidate selection が
+Method B candidate selection が
 `health_score >= 0.6` / `attestation_valid` / `energy_floor` を満たす substrate だけを残し、
 直近 2 回の `substrate_kind_neutrality_index` で tie-break すること、
-1 active lease + 1 standby candidate の bounded broker state を保ったまま
-lease → standby probe → attest → attestation-chain bridge → migrate → release
+default の 1 active lease + 1 standby candidate に加えて
+`shadow-sync` で bounded dual allocation window を開き、
+lease → standby probe → attest → attestation-chain bridge → open_dual_allocation_window → migrate → close_dual_allocation_window → release
 を実行すること、
 さらに energy floor violation が `critical + migrate-standby` の
 scheduler-compatible signal を返し、
@@ -91,6 +92,9 @@ standby probe が health / attestation / energy headroom を満たして
 `ready_for_migrate` を返すこと、
 attestation chain が fixed 3-beat window で
 `expected_state_digest` と `expected_destination_substrate` を migrate 前に束縛すること、
+dual allocation window が pre-bound standby 上の second active allocation、
+`45s / 250ms / drift<=0.08` の overlap receipt、
+`hot-handoff` destination binding、cleanup release を返すこと、
 selected standby がそのまま migration destination に束縛されることを
 1 シナリオで確認する。
 

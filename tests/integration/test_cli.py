@@ -470,6 +470,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["neutrality_rotation_triggered"])
         self.assertTrue(result["validation"]["standby_probe_ready"])
         self.assertTrue(result["validation"]["attestation_chain_ready"])
+        self.assertTrue(result["validation"]["dual_allocation_window_opened"])
+        self.assertTrue(result["validation"]["dual_allocation_closed"])
+        self.assertTrue(result["validation"]["dual_allocation_cleanup_released"])
         self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
         self.assertEqual(
             result["broker"]["selection"]["standby_substrate"]["substrate_id"],
@@ -477,6 +480,9 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("ready", result["broker"]["standby_probe"]["probe_status"])
         self.assertEqual("handoff-ready", result["broker"]["attestation_chain"]["chain_status"])
+        self.assertEqual("shadow-active", result["broker"]["dual_allocation_window"]["window_status"])
+        self.assertEqual("closed", result["broker"]["closed_dual_allocation_window"]["window_status"])
+        self.assertEqual("hot-handoff", result["broker"]["migration"]["continuity_mode"])
         self.assertEqual("released", result["broker"]["release"]["status"])
 
     def test_qualia_demo_emits_reference_profile(self) -> None:

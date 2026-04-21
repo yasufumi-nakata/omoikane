@@ -67,6 +67,7 @@ status: decided | superseded
 - [2026-04-21_external-actuation-authorization-artifact.md](2026-04-21_external-actuation-authorization-artifact.md)
 - [2026-04-21_ewa-emergency-stop-protocol.md](2026-04-21_ewa-emergency-stop-protocol.md)
 - [2026-04-21_design-reader-git-delta-scan.md](2026-04-21_design-reader-git-delta-scan.md)
+- [2026-04-21_broker-dual-allocation-window.md](2026-04-21_broker-dual-allocation-window.md)
 - [2026-04-21_builder-rollback-external-observer-receipts.md](2026-04-21_builder-rollback-external-observer-receipts.md)
 - [2026-04-21_builder-rollback-current-worktree-direct-mutation.md](2026-04-21_builder-rollback-current-worktree-direct-mutation.md)
 - [2026-04-20_builder-sandbox-apply-rollout.md](2026-04-20_builder-sandbox-apply-rollout.md)

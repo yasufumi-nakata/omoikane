@@ -1,0 +1,28 @@
+eval_id: substrate_broker_dual_allocation_window
+target: kernel.broker
+level: L1
+description: >
+  SubstrateBroker が Method B の shadow-sync で bounded dual allocation window を
+  materialize し、pre-bound standby 上の second active allocation を fixed overlap
+  window 内で同期・cleanup できること。
+fixtures:
+  - scenario: method_b_shadow_sync_window
+    method: B
+    workload_class: migration
+    required_capability: 0.92
+    expected:
+      continuity_mode: hot-handoff
+      window_status: shadow-active
+      close_status: closed
+      overlap_window_seconds: 45
+      mirror_cadence_ms: 250
+      sync_observation_count: 3
+assertions:
+  - open_dual_allocation_window must require Method B, a ready standby probe, a healthy source attestation, and a handoff-ready attestation chain
+  - the shadow allocation must materialize on the pre-bound standby candidate without introducing any third live allocation
+  - sync_observations must keep identical source/shadow state digests with drift_score <= 0.08 across the fixed overlap window
+  - hot-handoff migrate must bind the same standby substrate that backs the shadow allocation while the window is active
+  - close_dual_allocation_window must release the shadow allocation and emit a closed machine-checkable receipt before the source lease is finally released
+metric: exact-match
+threshold: 1.0
+ethics_check: true

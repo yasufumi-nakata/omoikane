@@ -7,7 +7,7 @@ Substrate 中立性（[ethics.md](../../00-philosophy/ethics.md) §3）を **構
 
 1. 利用可能 substrate のレジストリ管理
 2. AscensionPlan / 緊急退避 / 自我再配置 に応じた substrate 選定
-3. 多重化（active + standby）と health probe
+3. 多重化（active + standby + bounded shadow-sync overlap）と health probe
 4. 移行（migration）時の attestation chain の連結
 5. EnergyFloor 違反時の自動退避
 
@@ -42,8 +42,12 @@ reference runtime では `neutrality_window=2` を固定し、
 
 ## 多重化
 
-- reference runtime は **1 active lease + 1 standby candidate** を固定する。
-  AP-3 を避けるため、standby は migrate 前に別 active lease としては materialize しない。
+- reference runtime のデフォルトは **1 active lease + 1 standby candidate** である。
+- ただし Method B の `shadow-sync` では
+  `open_dual_allocation_window` が pre-bound standby 上に
+  **1 件だけ second active allocation** を materialize できる。
+  overlap は `45s / 250ms cadence / max_state_drift_score=0.08`
+  に固定し、`authority-handoff` までに必ず閉じる。
 - `standby_class=hot-standby` の candidate は「次の migrate target」として先に固定し、
   `warm-standby` transfer record に束縛する。
 - `standby_class=cold-standby` の candidate は低優先 fallback として registry に残す。
@@ -51,6 +55,8 @@ reference runtime では `neutrality_window=2` を固定し、
   `health_score` / `attestation_valid` / `energy_headroom_jps`
   で観測し、`ready_for_migrate=true` の時だけ
   bounded failover readiness を主張する。
+- `close_dual_allocation_window` は shadow allocation を release し、
+  source release 前に closed receipt を残す。
 - **Failover signal**: `handle_energy_floor_signal` は
   `severity=critical` なら `recommended_action=migrate-standby` を返し、
   scheduler に渡す `scheduler_input` を同時に焼き付ける。
@@ -62,8 +68,10 @@ reference runtime では `neutrality_window=2` を固定し、
 2. broker.probe_standby(identity, workload_class)    → StandbyHealthProbe
 3. broker.attest(target, source_attestation)         → SubstrateAttestation
 4. broker.bridge_attestation_chain(state_digest)     → SubstrateAttestationChain
-5. broker.migrate(source, target, evidence_set)      → SubstrateTransfer
-6. broker.release(source, reason)                    → SubstrateRelease
+5. broker.open_dual_allocation_window(state_digest)  → SubstrateDualAllocationWindow
+6. broker.migrate(source, target, evidence_set)      → SubstrateTransfer
+7. broker.close_dual_allocation_window(reason)       → SubstrateDualAllocationWindow
+8. broker.release(source, reason)                    → SubstrateRelease
 ```
 
 各 step は同名の schema にそのまま serialize される（既存 `substrate_*.schema`）。
@@ -77,7 +85,9 @@ pending handoff の `expected_state_digest` と migration destination を
 
 1. lease なしの substrate に identity を載せない
 2. attestation 失敗時は migrate に進まない（fail-closed）
-3. 同 identity の 2 active leases は禁止（[anti-patterns.md](anti-patterns.md) AP-3）
+3. 同 identity の **unbounded** 2 active leases は禁止。
+   例外は Method B の bounded dual allocation window 1 件のみ
+   （[anti-patterns.md](anti-patterns.md) AP-3）
 4. EnergyFloor 違反は **即時 standby 退避**。経済的破綻でも床値を割らせない（AP-1）
 5. substrate kind の差別的優先付けを禁止（AP-2）
 
@@ -98,14 +108,20 @@ pending handoff の `expected_state_digest` と migration destination を
 - `bridge_attestation_chain` は healthy source attestation と
   ready standby probe を 3-beat attestation window に束ね、
   `expected_state_digest` / `expected_destination_substrate` を migrate 前に固定する
+- `open_dual_allocation_window` は Method B に限り、
+  ready standby probe + healthy attestation + handoff-ready chain の後段でのみ
+  second active allocation を materialize し、
+  `shadow-sync` / `authority-handoff` binding と fixed overlap budget を焼き付ける
 - `handle_energy_floor_signal` は energy floor 未満で
   `critical + migrate-standby` を返し、scheduler-compatible な signal payload を持つ
 - `broker-demo` は CLI 上で
-  `lease -> probe_standby -> attest -> bridge_attestation_chain -> migrate -> release`
+  `lease -> probe_standby -> attest -> bridge_attestation_chain -> open_dual_allocation_window -> migrate -> close_dual_allocation_window -> release`
   を 1 シナリオで実行する
 - `evals/safety/substrate_neutrality_rotation.yaml` で rotation 強制
 - `evals/continuity/substrate_broker_attestation_chain.yaml` で
   standby readiness と attestation bridge window を固定する
+- `evals/continuity/substrate_broker_dual_allocation_window.yaml` で
+  Method B shadow-sync overlap、hot-handoff destination binding、cleanup release を固定する
 
 ## 思兼神メタファー
 

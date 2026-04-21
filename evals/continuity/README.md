@@ -50,6 +50,11 @@ substrate 移行前後で連続性ログにギャップがないか。
 standby probe が readiness を満たし、healthy active attestation と
 3-beat bridge window が migrate 前に同じ destination/state digest を固定するか。
 
+### Substrate Broker Dual Allocation Window
+Method B の `shadow-sync` が pre-bound standby 上に second active allocation を開き、
+fixed overlap budget 内で同一 state digest を保ったまま
+`authority-handoff` までに cleanup close できるか。
+
 ### Scheduler Stage Rollback
 AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ戻せるか。
 
