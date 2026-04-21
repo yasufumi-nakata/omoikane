@@ -22,6 +22,7 @@ required:
   - invariants
   - source_digests
   - recommended_evals
+  - planning_cues
   - council_review_required
   - guardian_review_required
   - design_delta_ref
@@ -134,6 +135,53 @@ properties:
     items:
       type: string
       pattern: "^evals/"
+  planning_cues:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - cue_kind
+        - summary
+        - priority
+        - source_refs
+        - section_labels
+        - target_subsystem
+      properties:
+        cue_id:
+          type: string
+          pattern: "^planning-cue-[a-f0-9]{12}$"
+        cue_kind:
+          type: string
+          enum:
+            - runtime-source
+            - test-coverage
+            - docs-sync
+            - meta-decision-log
+            - eval-sync
+        summary:
+          type: string
+          minLength: 1
+        priority:
+          type: integer
+          minimum: 0
+        source_refs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        section_labels:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        target_subsystem:
+          type: string
+          minLength: 1
   council_review_required:
     type: boolean
   guardian_review_required:
@@ -195,9 +243,13 @@ examples:
       - specs/
       - evals/
       - docs/
+      - meta/decision-log/
     output_paths:
       - src/omoikane/self_construction/
       - tests/unit/
+      - evals/continuity/
+      - docs/02-subsystems/self-construction/
+      - meta/decision-log/
     immutable_boundaries:
       - L1.EthicsEnforcer
       - L1.ContinuityLedger
@@ -213,6 +265,47 @@ examples:
     recommended_evals:
       - evals/continuity/design_reader_handoff.yaml
       - evals/continuity/design_reader_git_delta_scan.yaml
+    planning_cues:
+      - cue_id: planning-cue-0123456789ab
+        cue_kind: runtime-source
+        summary: Align L5.DesignReader runtime surface with the changed design/spec sections.
+        priority: 0
+        source_refs:
+          - specs/interfaces/selfctor.design_reader.v0.idl
+          - docs/02-subsystems/self-construction/README.md
+        section_labels:
+          - 思兼神メタファー
+          - events
+        target_subsystem: L5.DesignReader
+      - cue_id: planning-cue-111111111111
+        cue_kind: test-coverage
+        summary: Refresh regression coverage for L5.DesignReader against the new handoff.
+        priority: 1
+        source_refs:
+          - specs/interfaces/selfctor.design_reader.v0.idl
+        section_labels:
+          - events
+        target_subsystem: L5.DesignReader
+      - cue_id: planning-cue-222222222222
+        cue_kind: docs-sync
+        summary: Keep must_sync_docs aligned with the approved builder handoff semantics.
+        priority: 3
+        source_refs:
+          - docs/02-subsystems/self-construction/README.md
+        section_labels:
+          - 思兼神メタファー
+        target_subsystem: L5.DesignReader
+      - cue_id: planning-cue-333333333333
+        cue_kind: meta-decision-log
+        summary: Record the L5.DesignReader builder decision in meta/decision-log.
+        priority: 4
+        source_refs:
+          - docs/02-subsystems/self-construction/README.md
+          - specs/interfaces/selfctor.design_reader.v0.idl
+        section_labels:
+          - 思兼神メタファー
+          - events
+        target_subsystem: L5.DesignReader
     council_review_required: true
     guardian_review_required: true
     design_delta_ref: design://design-delta-0001
@@ -231,6 +324,7 @@ examples:
       changed_ref_count: 2
       changed_design_ref_count: 1
       changed_spec_ref_count: 1
+      changed_section_count: 2
       entries:
         - ref: docs/02-subsystems/self-construction/README.md
           kind: design
@@ -242,6 +336,15 @@ examples:
           current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
           baseline_bytes: 2048
           current_bytes: 2088
+          changed_section_count: 1
+          section_changes:
+            - section_label: 思兼神メタファー
+              section_kind: markdown-heading
+              change_status: modified
+              baseline_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+              current_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+              baseline_bytes: 128
+              current_bytes: 168
         - ref: specs/interfaces/selfctor.design_reader.v0.idl
           kind: spec
           working_tree_state: modified
@@ -252,12 +355,23 @@ examples:
           current_digest: 2222222222222222222222222222222222222222222222222222222222222222
           baseline_bytes: 1024
           current_bytes: 1060
+          changed_section_count: 1
+          section_changes:
+            - section_label: compatibility
+              section_kind: top-level-key
+              change_status: modified
+              baseline_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+              current_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+              baseline_bytes: 160
+              current_bytes: 196
         - ref: specs/schemas/design_delta_manifest.schema
           kind: spec
           working_tree_state: clean
           change_status: unchanged
           baseline_present: true
           current_present: true
+          changed_section_count: 0
+          section_changes: []
           baseline_digest: 3333333333333333333333333333333333333333333333333333333333333333
           current_digest: 3333333333333333333333333333333333333333333333333333333333333333
           baseline_bytes: 4096

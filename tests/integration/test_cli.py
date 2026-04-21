@@ -288,8 +288,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["delta_scan_changed_ref_count"])
         self.assertEqual(1, result["validation"]["delta_scan_changed_design_ref_count"])
         self.assertEqual(1, result["validation"]["delta_scan_changed_spec_ref_count"])
+        self.assertEqual(2, result["validation"]["delta_scan_changed_section_count"])
         self.assertEqual(2, result["validation"]["delta_scan_command_receipt_count"])
         self.assertTrue(result["validation"]["delta_scan_bound_to_manifest"])
+        self.assertEqual(4, result["validation"]["manifest_planning_cue_count"])
+        self.assertEqual(5, result["validation"]["build_request_planning_cue_count"])
         self.assertTrue(result["validation"]["build_request_has_design_delta_ref"])
         self.assertTrue(result["validation"]["build_request_has_design_delta_digest"])
         self.assertEqual(7, result["validation"]["output_path_count"])
@@ -307,7 +310,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(12, result["validation"]["design_source_digest_count"])
         self.assertEqual(3, result["validation"]["must_sync_docs_count"])
         self.assertTrue(result["validation"]["scope_allowed"])
-        self.assertEqual(2, result["validation"]["patch_count"])
+        self.assertEqual(5, result["validation"]["patch_count"])
         self.assertEqual("applied", result["validation"]["sandbox_apply_status"])
         self.assertTrue(result["validation"]["eval_execution_ok"])
         self.assertEqual("passed", result["validation"]["eval_execution_status"])
@@ -319,6 +322,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["eval_report_evidence_bound"])
         self.assertTrue(result["validation"]["eval_execution_evidence_bound"])
         self.assertEqual("ready", result["builder"]["artifact"]["status"])
+        self.assertEqual(
+            [
+                "runtime-source",
+                "test-coverage",
+                "eval-sync",
+                "docs-sync",
+                "meta-decision-log",
+            ],
+            [patch["cue_kind"] for patch in result["builder"]["patches"]],
+        )
         self.assertEqual(
             [
                 "evals/continuity/council_output_build_request_pipeline.yaml",
@@ -358,7 +371,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("ready", result["validation"]["design_manifest_status"])
         self.assertTrue(result["validation"]["enactment_ok"])
         self.assertEqual("passed", result["validation"]["enactment_status"])
-        self.assertEqual(2, result["validation"]["mutated_file_count"])
+        self.assertEqual(5, result["validation"]["mutated_file_count"])
         self.assertEqual(2, result["validation"]["executed_command_count"])
         self.assertTrue(result["validation"]["all_commands_passed"])
         self.assertEqual("removed", result["validation"]["cleanup_status"])
@@ -390,19 +403,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["eval_execution_evidence_bound"])
         self.assertEqual(2, result["validation"]["eval_execution_command_count"])
         self.assertEqual("removed", result["validation"]["eval_execution_cleanup_status"])
-        self.assertEqual(2, result["validation"]["reverted_patch_count"])
-        self.assertEqual(2, result["validation"]["reverse_apply_journal_count"])
-        self.assertEqual(2, result["validation"]["reverse_apply_command_count"])
-        self.assertEqual(2, result["validation"]["reverse_apply_verified_count"])
-        self.assertEqual(2, result["validation"]["repo_bound_verified_count"])
+        self.assertEqual(5, result["validation"]["reverted_patch_count"])
+        self.assertEqual(5, result["validation"]["reverse_apply_journal_count"])
+        self.assertEqual(5, result["validation"]["reverse_apply_command_count"])
+        self.assertEqual(5, result["validation"]["reverse_apply_verified_count"])
+        self.assertEqual(5, result["validation"]["repo_bound_verified_count"])
         self.assertEqual("current-checkout-subtree", result["validation"]["repo_binding_scope"])
-        self.assertEqual(2, result["validation"]["repo_binding_path_count"])
+        self.assertEqual(5, result["validation"]["repo_binding_path_count"])
         self.assertEqual("verified", result["validation"]["checkout_mutation_status"])
-        self.assertEqual(2, result["validation"]["checkout_mutation_path_count"])
+        self.assertEqual(5, result["validation"]["checkout_mutation_path_count"])
         self.assertEqual("removed", result["validation"]["checkout_mutation_cleanup_status"])
         self.assertTrue(result["validation"]["checkout_mutation_restored"])
         self.assertEqual("verified", result["validation"]["current_worktree_mutation_status"])
-        self.assertEqual(2, result["validation"]["current_worktree_mutation_path_count"])
+        self.assertEqual(5, result["validation"]["current_worktree_mutation_path_count"])
         self.assertEqual(
             "removed", result["validation"]["current_worktree_mutation_cleanup_status"]
         )

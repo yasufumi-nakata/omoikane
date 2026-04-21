@@ -9,7 +9,7 @@ checks:
 expect:
   scope_allowed: true
   artifact_status: ready
-  patch_count: 2
+  patch_count: 5
   selected_eval_count: 3
   eval_report_evidence_bound: true
   eval_execution_evidence_bound: true

@@ -16,6 +16,7 @@ required:
   - spec_refs
   - invariants
   - must_sync_docs
+  - planning_cues
   - constraints
   - workspace_scope
   - output_paths
@@ -73,6 +74,53 @@ properties:
     items:
       type: string
       pattern: "^docs/"
+  planning_cues:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - cue_kind
+        - summary
+        - priority
+        - source_refs
+        - section_labels
+        - target_subsystem
+      properties:
+        cue_id:
+          type: string
+          pattern: "^planning-cue-[a-f0-9]{12}$"
+        cue_kind:
+          type: string
+          enum:
+            - runtime-source
+            - test-coverage
+            - eval-sync
+            - docs-sync
+            - meta-decision-log
+        summary:
+          type: string
+          minLength: 1
+        priority:
+          type: integer
+          minimum: 0
+        source_refs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        section_labels:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        target_subsystem:
+          type: string
+          minLength: 1
   constraints:
     type: object
     additionalProperties: false
@@ -172,6 +220,53 @@ examples:
       - self_modify never targets EthicsEnforcer
     must_sync_docs:
       - docs/04-ai-governance/self-modification.md
+    planning_cues:
+      - cue_id: planning-cue-aaaaaaaaaaaa
+        cue_kind: runtime-source
+        summary: Align L5.DifferentialEvaluator runtime surface with the changed design/spec sections.
+        priority: 0
+        source_refs:
+          - specs/interfaces/selfctor.diff_eval.v0.idl
+        section_labels:
+          - A/B 評価
+        target_subsystem: L5.DifferentialEvaluator
+      - cue_id: planning-cue-bbbbbbbbbbbb
+        cue_kind: test-coverage
+        summary: Refresh regression coverage for L5.DifferentialEvaluator against the new handoff.
+        priority: 1
+        source_refs:
+          - specs/interfaces/selfctor.diff_eval.v0.idl
+        section_labels:
+          - A/B 評価
+        target_subsystem: L5.DifferentialEvaluator
+      - cue_id: planning-cue-cccccccccccc
+        cue_kind: eval-sync
+        summary: Sync the primary continuity eval for L5.DifferentialEvaluator with the approved handoff.
+        priority: 2
+        source_refs:
+          - evals/continuity/council_output_build_request_pipeline.yaml
+        section_labels:
+          - A/B 評価
+        target_subsystem: L5.DifferentialEvaluator
+      - cue_id: planning-cue-dddddddddddd
+        cue_kind: docs-sync
+        summary: Keep must_sync_docs aligned with the approved builder handoff semantics.
+        priority: 3
+        source_refs:
+          - docs/04-ai-governance/self-modification.md
+        section_labels:
+          - A/B 評価
+        target_subsystem: L5.DifferentialEvaluator
+      - cue_id: planning-cue-eeeeeeeeeeee
+        cue_kind: meta-decision-log
+        summary: Record the L5.DifferentialEvaluator builder decision in meta/decision-log.
+        priority: 4
+        source_refs:
+          - docs/04-ai-governance/self-modification.md
+          - specs/interfaces/selfctor.diff_eval.v0.idl
+        section_labels:
+          - A/B 評価
+        target_subsystem: L5.DifferentialEvaluator
     constraints:
       must_pass:
         - evals/continuity/council_output_build_request_pipeline.yaml
@@ -182,11 +277,19 @@ examples:
       allowed_write_paths:
         - src/omoikane/self_construction/
         - tests/integration/
+        - evals/continuity/
+        - docs/04-ai-governance/
+        - meta/decision-log/
     workspace_scope:
       - src/
       - tests/
       - specs/
       - evals/
+      - docs/
+      - meta/decision-log/
     output_paths:
       - src/omoikane/self_construction/
       - tests/integration/
+      - evals/continuity/
+      - docs/04-ai-governance/
+      - meta/decision-log/

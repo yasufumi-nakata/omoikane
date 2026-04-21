@@ -56,7 +56,7 @@ properties:
         const: omoikane-builder-live-
       max_materialized_files:
         type: integer
-        const: 4
+        const: 5
       command_timeout_seconds:
         type: integer
         const: 15
@@ -90,7 +90,7 @@ properties:
         pattern: "^mirage://"
   materialized_files:
     type: array
-    maxItems: 4
+    maxItems: 5
     items:
       type: object
       additionalProperties: false
@@ -102,7 +102,7 @@ properties:
       properties:
         path:
           type: string
-          pattern: "^(src|tests)/"
+          pattern: "^(src|tests|docs|evals|meta/decision-log)/"
         patch_id:
           type: string
           pattern: "^patch-[a-f0-9]{12}$"
@@ -117,7 +117,7 @@ properties:
   mutated_file_count:
     type: integer
     minimum: 0
-    maximum: 4
+    maximum: 5
   eval_refs:
     type: array
     minItems: 1
@@ -216,7 +216,7 @@ examples:
     policy:
       policy_id: builder-live-enactment-v1
       workspace_prefix: omoikane-builder-live-
-      max_materialized_files: 4
+      max_materialized_files: 5
       command_timeout_seconds: 15
       cleanup_after_run: true
       mandatory_eval: evals/continuity/builder_live_enactment_execution.yaml
@@ -234,7 +234,19 @@ examples:
         patch_id: patch-222222222222
         source_state: copied
         marker: "# workspace-enacted: patch-222222222222 target=tests/unit/test_builders.py"
-    mutated_file_count: 2
+      - path: evals/continuity/council_output_build_request_pipeline.yaml
+        patch_id: patch-333333333333
+        source_state: copied
+        marker: "# workspace-enacted: patch-333333333333 target=evals/continuity/council_output_build_request_pipeline.yaml"
+      - path: docs/02-subsystems/self-construction/README.md
+        patch_id: patch-444444444444
+        source_state: copied
+        marker: "# workspace-enacted: patch-444444444444 target=docs/02-subsystems/self-construction/README.md"
+      - path: meta/decision-log/build-l5-live-0001.md
+        patch_id: patch-555555555555
+        source_state: created
+        marker: "# workspace-enacted: patch-555555555555 target=meta/decision-log/build-l5-live-0001.md"
+    mutated_file_count: 5
     eval_refs:
       - evals/continuity/builder_live_enactment_execution.yaml
     command_runs:

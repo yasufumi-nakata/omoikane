@@ -11,5 +11,6 @@ expect:
   delta_scan_changed_ref_count: 2
   delta_scan_changed_design_ref_count: 1
   delta_scan_changed_spec_ref_count: 1
+  delta_scan_changed_section_count: 2
   delta_scan_command_receipt_count: 2
   delta_scan_bound_to_manifest: true

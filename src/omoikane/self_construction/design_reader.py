@@ -4,13 +4,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any, Dict, Mapping, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
-from .builders import IMMUTABLE_BOUNDARIES, _is_within_scope, _run_argv_command
+from .builders import (
+    IMMUTABLE_BOUNDARIES,
+    _is_within_scope,
+    _run_argv_command,
+)
 
 
 DESIGN_DELTA_SCAN_PROFILE = "git-head-design-delta-v1"
+MARKDOWN_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+TOP_LEVEL_KEY_RE = re.compile(r"^([A-Za-z0-9_.-]+):(?:\s.*)?$")
+PLANNING_CUE_ORDER = (
+    ("runtime-source", 0),
+    ("test-coverage", 1),
+    ("eval-sync", 2),
+    ("docs-sync", 3),
+    ("meta-decision-log", 4),
+)
+
+
+def _dedupe_strings(values: Sequence[str]) -> list[str]:
+    ordered: list[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if normalized and normalized not in ordered:
+            ordered.append(normalized)
+    return ordered
 
 
 def _normalize_paths(paths: Sequence[str]) -> list[str]:
@@ -122,6 +145,14 @@ class DesignReaderService:
         recommended_evals = ["evals/continuity/design_reader_handoff.yaml"]
         if normalized_source_delta_receipt is not None:
             recommended_evals.append("evals/continuity/design_reader_git_delta_scan.yaml")
+        planning_cues = self._derive_planning_cues(
+            target_subsystem=target_subsystem,
+            design_refs=normalized_design_refs,
+            spec_refs=normalized_spec_refs,
+            must_sync_docs=normalized_must_sync_docs,
+            output_paths=normalized_output_paths,
+            source_delta_receipt=normalized_source_delta_receipt,
+        )
         digest_material = {
             "target_subsystem": target_subsystem,
             "design_refs": normalized_design_refs,
@@ -142,6 +173,7 @@ class DesignReaderService:
                 "status": normalized_source_delta_receipt.get("status", ""),
                 "changed_ref_count": normalized_source_delta_receipt.get("changed_ref_count", 0),
             }
+        digest_material["planning_cues"] = planning_cues
         design_delta_digest = sha256_text(canonical_json(digest_material))
         ready = not blocking_rules
 
@@ -167,6 +199,7 @@ class DesignReaderService:
             "invariants": invariants,
             "source_digests": source_digests,
             "recommended_evals": recommended_evals,
+            "planning_cues": planning_cues,
             "council_review_required": True,
             "guardian_review_required": True,
             "design_delta_ref": "",
@@ -261,6 +294,9 @@ class DesignReaderService:
             "changed_ref_count": changed_ref_count,
             "changed_design_ref_count": changed_design_ref_count,
             "changed_spec_ref_count": changed_spec_ref_count,
+            "changed_section_count": sum(
+                int(entry.get("changed_section_count", 0)) for entry in entries
+            ),
         }
         receipt_digest = sha256_text(canonical_json(digest_material))
         receipt = {
@@ -277,6 +313,7 @@ class DesignReaderService:
             "changed_ref_count": changed_ref_count,
             "changed_design_ref_count": changed_design_ref_count,
             "changed_spec_ref_count": changed_spec_ref_count,
+            "changed_section_count": digest_material["changed_section_count"],
             "entries": entries,
             "command_receipts": command_receipts,
             "receipt_digest": receipt_digest,
@@ -309,6 +346,8 @@ class DesignReaderService:
             errors.append("design_refs must not be empty")
         if not list(manifest.get("spec_refs", [])):
             errors.append("spec_refs must not be empty")
+        if not list(manifest.get("planning_cues", [])):
+            errors.append("planning_cues must not be empty")
         source_delta_receipt = dict(manifest.get("source_delta_receipt", {}))
         if source_delta_receipt:
             if source_delta_receipt.get("kind") != "design_delta_scan_receipt":
@@ -338,6 +377,26 @@ class DesignReaderService:
         council_session_id: str,
         guardian_gate: str,
     ) -> Dict[str, Any]:
+        validation = self.validate_manifest(manifest)
+        if not validation["ok"] or manifest.get("status") != "ready":
+            raise ValueError(
+                "design_delta_manifest must validate and stay ready before build_request emission"
+            )
+        normalized_must_pass = _normalize_paths(must_pass)
+        if not normalized_must_pass:
+            raise ValueError("must_pass must not be empty")
+        if not str(council_session_id).strip():
+            raise ValueError("council_session_id must not be empty")
+        if guardian_gate not in {"pass", "veto", "escalate"}:
+            raise ValueError("guardian_gate must be pass, veto, or escalate")
+        planning_cues = list(manifest.get("planning_cues", []))
+        eval_sync_cue = self._build_eval_sync_cue(
+            target_subsystem=str(manifest.get("target_subsystem", "")),
+            must_pass=normalized_must_pass,
+            planning_cues=planning_cues,
+        )
+        if eval_sync_cue is not None:
+            planning_cues.append(eval_sync_cue)
         return {
             "kind": "build_request",
             "schema_version": "1.0.0",
@@ -351,8 +410,9 @@ class DesignReaderService:
             "spec_refs": list(manifest["spec_refs"]),
             "invariants": list(manifest["invariants"]),
             "must_sync_docs": list(manifest["must_sync_docs"]),
+            "planning_cues": planning_cues,
             "constraints": {
-                "must_pass": list(_normalize_paths(must_pass)),
+                "must_pass": normalized_must_pass,
                 "forbidden": list(manifest["immutable_boundaries"]),
                 "sandbox_profile": self._policy.sandbox_profile,
                 "allowed_write_paths": list(manifest["output_paths"]),
@@ -505,6 +565,11 @@ class DesignReaderService:
         else:
             change_status = "missing"
             entry_error = entry_error or f"ref missing from HEAD and working tree: {ref}"
+        section_changes = self._compare_section_changes(
+            ref=ref,
+            baseline_text=baseline_text,
+            current_text=current_text,
+        )
 
         return (
             {
@@ -518,6 +583,8 @@ class DesignReaderService:
                 "current_digest": current_digest,
                 "baseline_bytes": baseline_bytes,
                 "current_bytes": current_bytes,
+                "changed_section_count": len(section_changes),
+                "section_changes": section_changes,
             },
             entry_error,
         )
@@ -530,3 +597,271 @@ class DesignReaderService:
             "self_modify never targets EthicsEnforcer",
             "self_modify never weakens ContinuityLedger append-only guarantees",
         ]
+
+    def _derive_planning_cues(
+        self,
+        *,
+        target_subsystem: str,
+        design_refs: Sequence[str],
+        spec_refs: Sequence[str],
+        must_sync_docs: Sequence[str],
+        output_paths: Sequence[str],
+        source_delta_receipt: Mapping[str, Any] | None,
+    ) -> list[Dict[str, Any]]:
+        available_paths = list(output_paths)
+        all_labels = self._section_labels_for_refs(
+            source_delta_receipt=source_delta_receipt,
+            refs=list(design_refs) + list(spec_refs),
+        )
+        docs_labels = self._section_labels_for_refs(
+            source_delta_receipt=source_delta_receipt,
+            refs=must_sync_docs,
+        )
+        planning_cues: list[Dict[str, Any]] = []
+        if any(path.startswith("src/") for path in available_paths):
+            planning_cues.append(
+                self._make_planning_cue(
+                    cue_kind="runtime-source",
+                    target_subsystem=target_subsystem,
+                    summary=(
+                        f"Align {target_subsystem} runtime surface with the changed design/spec sections."
+                    ),
+                    source_refs=list(spec_refs) + list(design_refs),
+                    section_labels=all_labels,
+                )
+            )
+        if any(path.startswith("tests/") for path in available_paths):
+            planning_cues.append(
+                self._make_planning_cue(
+                    cue_kind="test-coverage",
+                    target_subsystem=target_subsystem,
+                    summary=f"Refresh regression coverage for {target_subsystem} against the new handoff.",
+                    source_refs=list(spec_refs),
+                    section_labels=all_labels,
+                )
+            )
+        if any(_is_within_scope(ref, available_paths) for ref in must_sync_docs):
+            planning_cues.append(
+                self._make_planning_cue(
+                    cue_kind="docs-sync",
+                    target_subsystem=target_subsystem,
+                    summary="Keep must_sync_docs aligned with the approved builder handoff semantics.",
+                    source_refs=list(must_sync_docs),
+                    section_labels=docs_labels,
+                )
+            )
+        if any(path.startswith("meta/decision-log/") for path in available_paths):
+            planning_cues.append(
+                self._make_planning_cue(
+                    cue_kind="meta-decision-log",
+                    target_subsystem=target_subsystem,
+                    summary=f"Record the {target_subsystem} builder decision in meta/decision-log.",
+                    source_refs=list(design_refs) + list(spec_refs),
+                    section_labels=all_labels,
+                )
+            )
+        return planning_cues
+
+    def _build_eval_sync_cue(
+        self,
+        *,
+        target_subsystem: str,
+        must_pass: Sequence[str],
+        planning_cues: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any] | None:
+        if not must_pass:
+            return None
+        section_labels = _dedupe_strings(
+            label
+            for cue in planning_cues
+            for label in cue.get("section_labels", [])
+        ) or ["document-body"]
+        return self._make_planning_cue(
+            cue_kind="eval-sync",
+            target_subsystem=target_subsystem,
+            summary=f"Sync the primary continuity eval for {target_subsystem} with the approved handoff.",
+            source_refs=list(must_pass),
+            section_labels=section_labels,
+        )
+
+    @staticmethod
+    def _make_planning_cue(
+        *,
+        cue_kind: str,
+        target_subsystem: str,
+        summary: str,
+        source_refs: Sequence[str],
+        section_labels: Sequence[str],
+    ) -> Dict[str, Any]:
+        priority = dict(PLANNING_CUE_ORDER)[cue_kind]
+        payload = {
+            "cue_kind": cue_kind,
+            "target_subsystem": target_subsystem,
+            "source_refs": _normalize_paths(source_refs),
+            "section_labels": _dedupe_strings(section_labels) or ["document-body"],
+            "priority": priority,
+        }
+        cue_id = f"planning-cue-{sha256_text(canonical_json(payload))[:12]}"
+        return {
+            "cue_id": cue_id,
+            "cue_kind": cue_kind,
+            "summary": summary,
+            "priority": priority,
+            "source_refs": payload["source_refs"],
+            "section_labels": payload["section_labels"],
+            "target_subsystem": target_subsystem,
+        }
+
+    @staticmethod
+    def _section_labels_for_refs(
+        *,
+        source_delta_receipt: Mapping[str, Any] | None,
+        refs: Sequence[str],
+    ) -> list[str]:
+        if source_delta_receipt is None:
+            return ["document-body"]
+        labels: list[str] = []
+        receipt_entries = {
+            str(entry.get("ref", "")): entry for entry in source_delta_receipt.get("entries", [])
+        }
+        for ref in refs:
+            entry = receipt_entries.get(ref)
+            if entry is None:
+                continue
+            labels.extend(
+                str(change.get("section_label", ""))
+                for change in entry.get("section_changes", [])
+                if str(change.get("section_label", "")).strip()
+            )
+        return _dedupe_strings(labels) or ["document-body"]
+
+    @staticmethod
+    def _extract_sections(*, ref: str, text: str) -> list[Dict[str, Any]]:
+        if not text:
+            return []
+        if ref.endswith(".md"):
+            section_seeds = DesignReaderService._extract_markdown_sections(text)
+        else:
+            section_seeds = DesignReaderService._extract_structured_sections(text)
+        if not section_seeds:
+            section_seeds = [("document-body", "document-body", text)]
+        seen: Dict[str, int] = {}
+        sections: list[Dict[str, Any]] = []
+        for label, section_kind, section_text in section_seeds:
+            normalized_label = label.strip() or "document-body"
+            count = seen.get(normalized_label, 0)
+            seen[normalized_label] = count + 1
+            if count:
+                normalized_label = f"{normalized_label} ({count + 1})"
+            section_bytes = len(section_text.encode("utf-8"))
+            sections.append(
+                {
+                    "section_label": normalized_label,
+                    "section_kind": section_kind,
+                    "digest": sha256_text(section_text),
+                    "bytes": section_bytes,
+                }
+            )
+        return sections
+
+    @staticmethod
+    def _extract_markdown_sections(text: str) -> list[tuple[str, str, str]]:
+        sections: list[tuple[str, str, str]] = []
+        current_label = "document-body"
+        current_kind = "document-body"
+        current_lines: list[str] = []
+        for line in text.splitlines():
+            match = MARKDOWN_HEADING_RE.match(line)
+            if match:
+                if current_lines:
+                    sections.append((current_label, current_kind, "\n".join(current_lines)))
+                current_label = match.group(2).strip()
+                current_kind = "markdown-heading"
+                current_lines = [line]
+                continue
+            current_lines.append(line)
+        if current_lines:
+            sections.append((current_label, current_kind, "\n".join(current_lines)))
+        return sections
+
+    @staticmethod
+    def _extract_structured_sections(text: str) -> list[tuple[str, str, str]]:
+        sections: list[tuple[str, str, str]] = []
+        current_label = "document-body"
+        current_kind = "document-body"
+        current_lines: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            is_top_level = line == stripped and not stripped.startswith(("#", "-"))
+            match = TOP_LEVEL_KEY_RE.match(stripped) if is_top_level else None
+            if match:
+                if current_lines:
+                    sections.append((current_label, current_kind, "\n".join(current_lines)))
+                current_label = match.group(1).strip()
+                current_kind = "top-level-key"
+                current_lines = [line]
+                continue
+            current_lines.append(line)
+        if current_lines:
+            sections.append((current_label, current_kind, "\n".join(current_lines)))
+        return sections
+
+    @classmethod
+    def _compare_section_changes(
+        cls,
+        *,
+        ref: str,
+        baseline_text: str,
+        current_text: str,
+    ) -> list[Dict[str, Any]]:
+        baseline_sections = {
+            section["section_label"]: section
+            for section in cls._extract_sections(ref=ref, text=baseline_text)
+        }
+        current_sections = {
+            section["section_label"]: section
+            for section in cls._extract_sections(ref=ref, text=current_text)
+        }
+        ordered_labels = list(baseline_sections)
+        ordered_labels.extend(label for label in current_sections if label not in ordered_labels)
+        changes: list[Dict[str, Any]] = []
+        for label in ordered_labels:
+            baseline_section = baseline_sections.get(label)
+            current_section = current_sections.get(label)
+            if baseline_section is not None and current_section is not None:
+                change_status = (
+                    "unchanged"
+                    if baseline_section["digest"] == current_section["digest"]
+                    else "modified"
+                )
+            elif baseline_section is not None:
+                change_status = "removed"
+            else:
+                change_status = "added"
+            if change_status == "unchanged":
+                continue
+            section_kind = (
+                str(current_section.get("section_kind"))
+                if current_section is not None
+                else str(baseline_section.get("section_kind"))
+            )
+            changes.append(
+                {
+                    "section_label": label,
+                    "section_kind": section_kind,
+                    "change_status": change_status,
+                    "baseline_digest": (
+                        str(baseline_section.get("digest", "")) if baseline_section is not None else ""
+                    ),
+                    "current_digest": (
+                        str(current_section.get("digest", "")) if current_section is not None else ""
+                    ),
+                    "baseline_bytes": (
+                        int(baseline_section.get("bytes", 0)) if baseline_section is not None else 0
+                    ),
+                    "current_bytes": (
+                        int(current_section.get("bytes", 0)) if current_section is not None else 0
+                    ),
+                }
+            )
+        return changes

@@ -2,7 +2,7 @@ eval_id: design_reader_handoff
 target: selfctor.design_reader
 summary: >
   DesignReader が docs/specs から design delta manifest を組み立て、
-  Council emit 前の build_request handoff へ安全に接続できること
+  changed section と planning cue を保持したまま Council emit 前の build_request handoff へ安全に接続できること
 checks:
   - name: design reader handoff smoke
     command: PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
@@ -10,6 +10,9 @@ expect:
   manifest_status: ready
   source_digest_count: 7
   must_sync_docs_count: 3
+  delta_scan_changed_section_count: 2
+  manifest_planning_cue_count: 4
+  build_request_planning_cue_count: 5
   council_review_required: true
   guardian_review_required: true
   build_request_has_design_delta_ref: true

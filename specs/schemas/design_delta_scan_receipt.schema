@@ -18,6 +18,7 @@ required:
   - changed_ref_count
   - changed_design_ref_count
   - changed_spec_ref_count
+  - changed_section_count
   - entries
   - command_receipts
   - receipt_digest
@@ -62,6 +63,9 @@ properties:
   changed_spec_ref_count:
     type: integer
     minimum: 0
+  changed_section_count:
+    type: integer
+    minimum: 0
   entries:
     type: array
     minItems: 1
@@ -79,6 +83,8 @@ properties:
         - current_digest
         - baseline_bytes
         - current_bytes
+        - changed_section_count
+        - section_changes
       properties:
         ref:
           type: string
@@ -117,6 +123,48 @@ properties:
         current_bytes:
           type: integer
           minimum: 0
+        changed_section_count:
+          type: integer
+          minimum: 0
+        section_changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - section_label
+              - section_kind
+              - change_status
+              - baseline_digest
+              - current_digest
+              - baseline_bytes
+              - current_bytes
+            properties:
+              section_label:
+                type: string
+                minLength: 1
+              section_kind:
+                type: string
+                enum:
+                  - markdown-heading
+                  - top-level-key
+                  - document-body
+              change_status:
+                type: string
+                enum:
+                  - modified
+                  - added
+                  - removed
+              baseline_digest:
+                type: string
+              current_digest:
+                type: string
+              baseline_bytes:
+                type: integer
+                minimum: 0
+              current_bytes:
+                type: integer
+                minimum: 0
   command_receipts:
     type: array
     minItems: 1
@@ -196,6 +244,7 @@ examples:
     changed_ref_count: 2
     changed_design_ref_count: 1
     changed_spec_ref_count: 1
+    changed_section_count: 2
     entries:
       - ref: docs/02-subsystems/self-construction/README.md
         kind: design
@@ -207,6 +256,15 @@ examples:
         current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
         baseline_bytes: 2048
         current_bytes: 2088
+        changed_section_count: 1
+        section_changes:
+          - section_label: 思兼神メタファー
+            section_kind: markdown-heading
+            change_status: modified
+            baseline_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            current_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            baseline_bytes: 128
+            current_bytes: 168
       - ref: specs/interfaces/selfctor.design_reader.v0.idl
         kind: spec
         working_tree_state: modified
@@ -217,6 +275,15 @@ examples:
         current_digest: 2222222222222222222222222222222222222222222222222222222222222222
         baseline_bytes: 1024
         current_bytes: 1060
+        changed_section_count: 1
+        section_changes:
+          - section_label: compatibility
+            section_kind: top-level-key
+            change_status: modified
+            baseline_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+            current_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+            baseline_bytes: 160
+            current_bytes: 196
     command_receipts:
       - command_label: git-rev-parse-head
         command: git -C /tmp/omoikane-design-reader-demo rev-parse HEAD

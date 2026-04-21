@@ -10,7 +10,7 @@ checks:
     command: python3 -c "from pathlib import Path; text = Path('tests/unit/test_builders.py').read_text(encoding='utf-8'); assert 'workspace-enacted:' in text; print('tests marker ok')"
 expect:
   enactment_status: passed
-  mutated_file_count: 2
+  mutated_file_count: 5
   executed_command_count: 2
   all_commands_passed: true
   cleanup_status: removed

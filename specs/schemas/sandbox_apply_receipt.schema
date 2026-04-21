@@ -61,7 +61,7 @@ properties:
         const: true
       max_patch_count:
         type: integer
-        const: 4
+        const: 5
       external_effects_allowed:
         type: boolean
         const: false
@@ -81,7 +81,7 @@ properties:
   applied_patch_count:
     type: integer
     minimum: 0
-    maximum: 4
+    maximum: 5
   rollback_plan_ref:
     type: string
     pattern: "^rollback://"
@@ -164,7 +164,10 @@ examples:
     applied_patch_ids:
       - patch-111111111111
       - patch-222222222222
-    applied_patch_count: 2
+      - patch-333333333333
+      - patch-444444444444
+      - patch-555555555555
+    applied_patch_count: 5
     rollback_plan_ref: rollback://build-l5-0001
     build_log_ref: log://artifact-0123456789ab
     continuity_log_ref: ledger://self-modify/build-l5-0001

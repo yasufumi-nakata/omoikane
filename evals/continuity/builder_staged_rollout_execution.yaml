@@ -9,7 +9,7 @@ checks:
     command: PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
 expect:
   sandbox_apply_status: applied
-  sandbox_apply_patch_count: 2
+  sandbox_apply_patch_count: 5
   eval_report_evidence_bound: true
   eval_execution_evidence_bound: true
   eval_execution_command_count: 2

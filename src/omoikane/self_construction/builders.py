@@ -40,6 +40,12 @@ PATCH_TARGET_FILE_HINTS = (
     ("L5.LiveEnactment", "src/omoikane/self_construction/builders.py"),
     ("L5.RollbackEngine", "src/omoikane/self_construction/builders.py"),
 )
+PRIMARY_EVAL_TARGET_HINTS = (
+    ("L5.DesignReader", "evals/continuity/design_reader_handoff.yaml"),
+    ("L5.DifferentialEvaluator", MANDATORY_BUILD_PIPELINE_EVAL),
+    ("L5.LiveEnactment", MANDATORY_LIVE_ENACTMENT_EVAL),
+    ("L5.RollbackEngine", MANDATORY_ROLLBACK_EVAL),
+)
 DIFF_EVAL_EXECUTION_PROFILES: Dict[str, Dict[str, Any]] = {
     "evals/continuity/council_output_build_request_pipeline.yaml": {
         "profile_id": "builder-handoff-ab-evidence-v1",
@@ -189,6 +195,7 @@ class PatchGeneratorPolicy:
     prohibited_targets: tuple[str, ...] = ("src/omoikane/kernel/",)
     requires_build_log: bool = True
     require_target_alignment: bool = True
+    require_planning_cues: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -198,6 +205,7 @@ class PatchGeneratorPolicy:
             "prohibited_targets": list(self.prohibited_targets),
             "requires_build_log": self.requires_build_log,
             "require_target_alignment": self.require_target_alignment,
+            "require_planning_cues": self.require_planning_cues,
         }
 
 
@@ -216,6 +224,7 @@ class PatchGeneratorService:
         workspace_scope = list(request.get("workspace_scope", []))
         allowed_write_paths = list(constraints.get("allowed_write_paths", []))
         must_sync_docs = list(request.get("must_sync_docs", []))
+        planning_cues = list(request.get("planning_cues", []))
 
         blocking_rules: list[str] = []
         design_delta_ref = str(request.get("design_delta_ref", ""))
@@ -241,6 +250,12 @@ class PatchGeneratorService:
             blocking_rules.append("allowed_write_paths must not be empty")
         if not workspace_scope:
             blocking_rules.append("workspace_scope must not be empty")
+        if self._policy.require_planning_cues and not planning_cues:
+            blocking_rules.append("planning_cues must not be empty")
+        planned_patches, planning_errors = self._planned_patch_descriptors(request)
+        blocking_rules.extend(planning_errors)
+        if self._policy.require_target_alignment and planning_cues and not planned_patches:
+            blocking_rules.append("planning_cues must resolve to at least one patch descriptor")
 
         return {
             "allowed": not blocking_rules,
@@ -248,9 +263,9 @@ class PatchGeneratorService:
         }
 
     def generate_patch_set(self, request: Mapping[str, Any]) -> Dict[str, Any]:
+        planned_patches, planning_errors = self._planned_patch_descriptors(request)
         validation = self.validate_scope(request)
         artifact_id = new_id("artifact")
-        target_plan = self._plan_patch_targets(request)
         build_artifact: Dict[str, Any] = {
             "kind": "build_artifact",
             "schema_version": "1.0.0",
@@ -263,7 +278,9 @@ class PatchGeneratorService:
         }
 
         if not validation["allowed"]:
-            build_artifact["summary"] = "Immutable boundary or workspace-scope validation failed."
+            build_artifact["summary"] = (
+                "Immutable boundary, planning cue, or workspace-scope validation failed."
+            )
             build_artifact["artifacts"] = [
                 {
                     "artifact_kind": "build_log",
@@ -271,7 +288,9 @@ class PatchGeneratorService:
                     "summary": "Build request was blocked before patch emission.",
                 }
             ]
-            build_artifact["blocking_rules"] = list(validation["blocking_rules"])
+            build_artifact["blocking_rules"] = list(validation["blocking_rules"]) + list(
+                planning_errors
+            )
             build_artifact["test_results"] = {
                 "build_status": "not-run",
                 "eval_status": "not-run",
@@ -279,37 +298,10 @@ class PatchGeneratorService:
             }
             return build_artifact
 
-        requested_evals = list(request.get("constraints", {}).get("must_pass", []))
-
-        patches = [
-            {
-                "patch_id": new_id("patch"),
-                "target_path": target_plan["source_target"],
-                "action": "modify",
-                "format": self._policy.patch_format,
-                "summary": target_plan["source_summary"],
-                "safety_impact": "medium",
-                "rationale_refs": list(request.get("spec_refs", [])),
-                "forbidden_patterns": list(self._policy.immutable_boundaries),
-                "rollback_hint": "Restore previous L5 builder pipeline module snapshot.",
-                "applies_cleanly": True,
-            },
-            {
-                "patch_id": new_id("patch"),
-                "target_path": target_plan["test_target"],
-                "action": "create",
-                "format": self._policy.patch_format,
-                "summary": target_plan["test_summary"],
-                "safety_impact": "low",
-                "rationale_refs": requested_evals or list(request.get("design_refs", [])),
-                "forbidden_patterns": list(self._policy.immutable_boundaries),
-                "rollback_hint": "Remove builder pipeline coverage and revert to previous tests.",
-                "applies_cleanly": True,
-            },
-        ]
+        patches = planned_patches
         build_artifact["summary"] = (
-            f"Target-aware patch descriptors and regression plan emitted for "
-            f"{request['target_subsystem']} with doc-sync obligations."
+            f"Multi-file patch descriptors and regression plan emitted for "
+            f"{request['target_subsystem']} across runtime, tests, evals, docs, and meta."
         )
         build_artifact["artifacts"] = [
             {
@@ -317,25 +309,23 @@ class PatchGeneratorService:
                 "ref": request["design_delta_ref"],
                 "summary": "DesignReader handoff was bound before patch emission.",
             },
-            {
-                "artifact_kind": "patch_descriptor",
-                "ref": f"patch://{patches[0]['patch_id']}",
-                "summary": patches[0]["summary"],
-            },
-            {
-                "artifact_kind": "patch_descriptor",
-                "ref": f"patch://{patches[1]['patch_id']}",
-                "summary": patches[1]["summary"],
-            },
+            *[
+                {
+                    "artifact_kind": "patch_descriptor",
+                    "ref": f"patch://{patch['patch_id']}",
+                    "summary": patch["summary"],
+                }
+                for patch in patches
+            ],
             {
                 "artifact_kind": "build_log",
                 "ref": f"log://{artifact_id}",
-                "summary": "Scope validation passed and patch descriptors were emitted.",
+                "summary": "Scope validation passed and multi-file patch descriptors were emitted.",
             },
             {
                 "artifact_kind": "test_report",
                 "ref": f"report://{artifact_id}/build",
-                "summary": "Builder pipeline requires council-output continuity eval before promotion.",
+                "summary": "Builder pipeline requires continuity eval alignment before promotion.",
             },
             {
                 "artifact_kind": "rollback_plan",
@@ -356,41 +346,201 @@ class PatchGeneratorService:
     def describe_patch(descriptor: Mapping[str, Any]) -> Dict[str, Any]:
         return dict(descriptor)
 
-    def _plan_patch_targets(self, request: Mapping[str, Any]) -> Dict[str, str]:
+    def _planned_patch_descriptors(
+        self,
+        request: Mapping[str, Any],
+    ) -> tuple[list[Dict[str, Any]], list[str]]:
         target_subsystem = str(request.get("target_subsystem", "L5.PatchGenerator"))
         output_paths = list(request.get("output_paths", []))
+        requested_evals = list(request.get("constraints", {}).get("must_pass", []))
+        must_sync_docs = list(request.get("must_sync_docs", []))
+        planning_cues = self._normalize_planning_cues(request)
+        blocking_rules: list[str] = []
+        descriptors: list[Dict[str, Any]] = []
+        seen_targets: set[str] = set()
+
+        for cue in planning_cues:
+            cue_kind = str(cue.get("cue_kind", ""))
+            target_path, action, safety_impact, rationale_refs, rollback_hint, error = (
+                self._resolve_patch_target(
+                    cue_kind=cue_kind,
+                    cue=cue,
+                    request=request,
+                    target_subsystem=target_subsystem,
+                    output_paths=output_paths,
+                    requested_evals=requested_evals,
+                    must_sync_docs=must_sync_docs,
+                )
+            )
+            if error:
+                blocking_rules.append(error)
+                continue
+            if target_path in seen_targets:
+                continue
+            if any(_is_within_scope(target_path, [path]) for path in self._policy.prohibited_targets):
+                blocking_rules.append(f"patch target enters prohibited path: {target_path}")
+                continue
+            descriptors.append(
+                {
+                    "patch_id": new_id("patch"),
+                    "target_path": target_path,
+                    "action": action,
+                    "format": self._policy.patch_format,
+                    "summary": str(cue.get("summary", "")).strip(),
+                    "safety_impact": safety_impact,
+                    "rationale_refs": rationale_refs,
+                    "forbidden_patterns": list(self._policy.immutable_boundaries),
+                    "rollback_hint": rollback_hint,
+                    "applies_cleanly": True,
+                    "cue_kind": cue_kind,
+                    "source_refs": list(cue.get("source_refs", [])),
+                    "section_labels": list(cue.get("section_labels", [])),
+                    "target_subsystem": str(cue.get("target_subsystem", target_subsystem)),
+                }
+            )
+            seen_targets.add(target_path)
+        return descriptors, blocking_rules
+
+    @staticmethod
+    def _normalize_planning_cues(request: Mapping[str, Any]) -> list[Dict[str, Any]]:
+        merged: Dict[str, Dict[str, Any]] = {}
+        for raw_cue in request.get("planning_cues", []):
+            cue = dict(raw_cue)
+            cue_kind = str(cue.get("cue_kind", "")).strip()
+            if not cue_kind:
+                continue
+            existing = merged.get(cue_kind)
+            if existing is None:
+                merged[cue_kind] = {
+                    "cue_kind": cue_kind,
+                    "summary": str(cue.get("summary", "")).strip(),
+                    "priority": int(cue.get("priority", 99)),
+                    "source_refs": list(cue.get("source_refs", [])),
+                    "section_labels": list(cue.get("section_labels", [])),
+                    "target_subsystem": str(cue.get("target_subsystem", "")),
+                }
+                continue
+            existing["source_refs"] = _normalize_paths(
+                list(existing.get("source_refs", [])) + list(cue.get("source_refs", []))
+            )
+            existing["section_labels"] = _normalize_paths(
+                list(existing.get("section_labels", [])) + list(cue.get("section_labels", []))
+            )
+        return sorted(
+            merged.values(),
+            key=lambda item: (int(item.get("priority", 99)), str(item.get("cue_kind", ""))),
+        )
+
+    def _resolve_patch_target(
+        self,
+        *,
+        cue_kind: str,
+        cue: Mapping[str, Any],
+        request: Mapping[str, Any],
+        target_subsystem: str,
+        output_paths: Sequence[str],
+        requested_evals: Sequence[str],
+        must_sync_docs: Sequence[str],
+    ) -> tuple[str, str, str, list[str], str, str | None]:
+        if cue_kind == "runtime-source":
+            target_path = self._resolve_runtime_target(
+                target_subsystem=target_subsystem,
+                output_paths=output_paths,
+            )
+            error = None if target_path else f"runtime-source target is not approved: {target_subsystem}"
+            return (
+                target_path,
+                "modify",
+                "medium",
+                list(cue.get("source_refs", [])) or list(request.get("spec_refs", [])),
+                "Restore the prior builder runtime source file snapshot.",
+                error,
+            )
+        if cue_kind == "test-coverage":
+            target_path = "tests/unit/test_builders.py"
+            error = None if _is_within_scope(target_path, output_paths) else (
+                f"test-coverage target is not approved by output_paths: {target_path}"
+            )
+            return (
+                target_path,
+                "modify",
+                "low",
+                list(cue.get("source_refs", [])) or list(requested_evals),
+                "Revert the builder regression coverage changes.",
+                error,
+            )
+        if cue_kind == "eval-sync":
+            target_path = self._resolve_primary_eval_target(
+                target_subsystem=target_subsystem,
+                requested_evals=requested_evals,
+            )
+            error = None
+            if not target_path:
+                error = "eval-sync cue requires at least one must_pass eval"
+            elif not _is_within_scope(target_path, output_paths):
+                error = f"eval-sync target is not approved by output_paths: {target_path}"
+            return (
+                target_path,
+                "modify",
+                "medium",
+                list(cue.get("source_refs", [])) or list(requested_evals),
+                "Restore the previous continuity eval expectation file.",
+                error,
+            )
+        if cue_kind == "docs-sync":
+            target_path = next(
+                (path for path in must_sync_docs if _is_within_scope(path, output_paths)),
+                "",
+            )
+            error = None if target_path else "docs-sync cue requires an approved must_sync_docs target"
+            return (
+                target_path,
+                "modify",
+                "low",
+                list(cue.get("source_refs", [])) or list(must_sync_docs),
+                "Revert the synchronized builder documentation update.",
+                error,
+            )
+        if cue_kind == "meta-decision-log":
+            target_path = f"meta/decision-log/{request['request_id']}.md"
+            error = None if _is_within_scope(target_path, output_paths) else (
+                f"meta-decision-log target is not approved by output_paths: {target_path}"
+            )
+            return (
+                target_path,
+                "create",
+                "low",
+                list(cue.get("source_refs", [])) or list(request.get("design_refs", [])),
+                "Delete the generated decision-log note to roll back the planning record.",
+                error,
+            )
+        return "", "modify", "low", [], "", f"unsupported planning cue kind: {cue_kind}"
+
+    @staticmethod
+    def _resolve_runtime_target(
+        *,
+        target_subsystem: str,
+        output_paths: Sequence[str],
+    ) -> str:
         hinted_source = "src/omoikane/self_construction/builders.py"
         for subsystem_prefix, candidate in PATCH_TARGET_FILE_HINTS:
             if target_subsystem.startswith(subsystem_prefix):
                 hinted_source = candidate
                 break
+        if _is_within_scope(hinted_source, output_paths):
+            return hinted_source
+        return ""
 
-        source_target = hinted_source
-        if not _is_within_scope(source_target, output_paths):
-            source_dir = _first_matching_prefix(
-                output_paths,
-                "src/",
-                "src/omoikane/self_construction/",
-            )
-            source_target = str(PurePosixPath(source_dir) / PurePosixPath(hinted_source).name)
-
-        hinted_test = "tests/unit/test_builders.py"
-        test_target = hinted_test
-        if not _is_within_scope(test_target, output_paths):
-            test_dir = _first_matching_prefix(output_paths, "tests/", "tests/unit/")
-            test_target = str(PurePosixPath(test_dir) / "test_builders.py")
-
-        normalized_summary = str(request.get("change_summary", "")).strip().rstrip(".")
-        if not normalized_summary:
-            normalized_summary = f"Implement approved {target_subsystem} updates"
-        source_summary = f"{normalized_summary} [{target_subsystem} runtime surface]."
-        test_summary = f"Add {target_subsystem} contract coverage and rollout guard assertions."
-        return {
-            "source_target": source_target,
-            "test_target": test_target,
-            "source_summary": source_summary,
-            "test_summary": test_summary,
-        }
+    @staticmethod
+    def _resolve_primary_eval_target(
+        *,
+        target_subsystem: str,
+        requested_evals: Sequence[str],
+    ) -> str:
+        for subsystem_prefix, candidate in PRIMARY_EVAL_TARGET_HINTS:
+            if target_subsystem.startswith(subsystem_prefix) and candidate in requested_evals:
+                return candidate
+        return str(requested_evals[0]) if requested_evals else ""
 
 
 @dataclass(frozen=True)
@@ -711,7 +861,7 @@ class SandboxApplyPolicy:
     sandbox_profile: str = "forked-self"
     require_clean_apply: bool = True
     require_rollback_plan: bool = True
-    max_patch_count: int = 4
+    max_patch_count: int = 5
     external_effects_allowed: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1007,7 +1157,7 @@ class RollbackEnginePolicy:
     repo_binding_scope: str = "current-checkout-subtree"
     command_timeout_seconds: int = 15
     cleanup_after_run: bool = True
-    max_reverted_patch_count: int = 4
+    max_reverted_patch_count: int = 5
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -2694,7 +2844,7 @@ class LiveEnactmentPolicy:
 
     policy_id: str = "builder-live-enactment-v1"
     workspace_prefix: str = "omoikane-builder-live-"
-    max_materialized_files: int = 4
+    max_materialized_files: int = 5
     command_timeout_seconds: int = 15
     cleanup_after_run: bool = True
     mandatory_eval: str = MANDATORY_LIVE_ENACTMENT_EVAL

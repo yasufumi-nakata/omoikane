@@ -39,7 +39,7 @@ entries:
     file: specs/schemas/build_request.yaml
     consumers:
       - agents/builders/codex-builder.yaml
-    rationale: Builder input already referenced by agent config.
+    rationale: Builder input already referenced by agent config and now carries planning cues plus approved multi-file write scope.
   - priority: P0
     kind: schema
     file: specs/schemas/build_artifact.yaml
@@ -80,7 +80,7 @@ entries:
     file: specs/schemas/patch_descriptor.schema
     consumers:
       - specs/schemas/build_artifact.yaml
-    rationale: Required to describe generated patch units safely.
+    rationale: Required to describe planning-cue aligned generated patch units safely.
   - priority: P1
     kind: schema
     file: specs/schemas/consensus_message.schema

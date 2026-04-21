@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.design_reader.v0
 service: DesignReaderService
-summary: Reduce docs/spec references into a bounded design-delta handoff before build_request emission.
+summary: Reduce docs/spec references into a bounded design-delta handoff with section-level planning cues before build_request emission.
 imports:
   design_delta_scan_receipt: ../schemas/design_delta_scan_receipt.schema
   design_delta_manifest: ../schemas/design_delta_manifest.schema
@@ -40,6 +40,8 @@ operations:
     guarantees:
       - the receipt must bind the resolved HEAD commit and per-ref baseline/current digests
       - changed_ref_count must count modified, added, and removed refs relative to HEAD
+      - changed_section_count must summarize section-level deltas across changed refs
+      - changed entries expose per-section digests so downstream planning can bind the exact changed sections
       - command receipts must expose the git HEAD and git status probes used for the scan
   read_design_delta:
     summary: Read docs/spec references, compute source digests, and emit a design-delta manifest.
@@ -91,6 +93,7 @@ operations:
     guarantees:
       - ready manifests include digests for every referenced design/spec file
       - when paired with scan_repo_delta, ready manifests may bind the optional source_delta_receipt
+      - ready manifests emit planning_cues derived from changed sections or document-body fallbacks
       - immutable safety boundaries are bound into the downstream handoff
       - must_sync_docs remains a subset of design_refs
   validate_manifest:
@@ -110,7 +113,7 @@ operations:
             items:
               type: string
   prepare_build_request:
-    summary: Convert a validated design-delta manifest into a build_request.
+    summary: Convert a validated design-delta manifest into a fail-closed build_request.
     input:
       inline_schema:
         type: object
@@ -144,6 +147,10 @@ operations:
               - escalate
     output:
       schema_ref: build_request
+    guarantees:
+      - blocked or invalid manifests must not emit a build_request
+      - emitted build_requests preserve planning_cues and bind a primary eval-sync cue before Council handoff
+      - must_pass, council_session_id, and guardian_gate remain non-empty and machine-checkable in the emitted request
 compatibility:
   stability: bootstrap
 events:

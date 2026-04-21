@@ -47,6 +47,27 @@ properties:
     items:
       type: string
       minLength: 1
+  cue_kind:
+    type: string
+    enum:
+      - runtime-source
+      - test-coverage
+      - eval-sync
+      - docs-sync
+      - meta-decision-log
+  source_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  section_labels:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  target_subsystem:
+    type: string
+    minLength: 1
   forbidden_patterns:
     type: array
     items:

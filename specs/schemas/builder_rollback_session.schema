@@ -197,7 +197,7 @@ properties:
   reverted_patch_count:
     type: integer
     minimum: 0
-    maximum: 4
+    maximum: 5
   reverted_stage_ids:
     type: array
     items:
@@ -243,7 +243,7 @@ properties:
           pattern: "^journal://"
         path:
           type: string
-          pattern: "^(src|tests)/"
+          pattern: "^(src|tests|docs|evals|meta/decision-log)/"
         patch_id:
           type: string
           pattern: "^patch-[a-f0-9]{12}$"
@@ -325,16 +325,16 @@ properties:
       bound_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       verified_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       bound_paths:
         type: array
         items:
           type: string
-          pattern: "^(src|tests)/"
+          pattern: "^(src|tests|docs|evals|meta/decision-log)/"
       binding_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
@@ -394,15 +394,15 @@ properties:
         type: array
         items:
           type: string
-          pattern: "^(src|tests)/"
+          pattern: "^(src|tests|docs|evals|meta/decision-log)/"
       observed_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       verified_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       path_receipts:
         type: array
         items:
@@ -421,7 +421,7 @@ properties:
           properties:
             path:
               type: string
-              pattern: "^(src|tests)/"
+              pattern: "^(src|tests|docs|evals|meta/decision-log)/"
             source_state:
               type: string
               enum:
@@ -604,15 +604,15 @@ properties:
         type: array
         items:
           type: string
-          pattern: "^(src|tests)/"
+          pattern: "^(src|tests|docs|evals|meta/decision-log)/"
       observed_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       verified_path_count:
         type: integer
         minimum: 0
-        maximum: 4
+        maximum: 5
       path_receipts:
         type: array
         items:
@@ -631,7 +631,7 @@ properties:
           properties:
             path:
               type: string
-              pattern: "^(src|tests)/"
+              pattern: "^(src|tests|docs|evals|meta/decision-log)/"
             source_state:
               type: string
               enum:
@@ -1050,7 +1050,7 @@ examples:
       repo_binding_scope: current-checkout-subtree
       command_timeout_seconds: 15
       cleanup_after_run: true
-      max_reverted_patch_count: 4
+      max_reverted_patch_count: 5
     trigger: eval-regression
     initiator: IntegrityGuardian
     reason: Regression detected during canary rollout.

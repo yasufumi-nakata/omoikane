@@ -2,7 +2,7 @@
 
 OmoikaneOS では **人間は意図と研究課題を与え、AI が設計と reference 実装を進める**。
 Codex（または同等の Builder LLM）は docs/ と specs/ を読み取り、
-同一 repo 内の `src/`, `tests/`, `specs/`, `evals/` を更新する。
+同一 repo 内の `src/`, `tests/`, `specs/`, `evals/`, `docs/`, `meta/decision-log/` を更新する。
 このドキュメントはその運用規約。
 
 ## 役割分担
@@ -34,7 +34,8 @@ reference runtime には `design-reader-demo` / `builder-demo` があり、
 `selfctor.rollback.v0`
 の contract に沿って
 `design_delta_scan_receipt` による git-bound docs/spec delta scan、
-`design_delta_manifest` handoff、`build_request` emit、target-aware patch descriptor 生成、Mirage Self への sandbox apply、
+section-level `section_changes` と `planning_cues` を含む `design_delta_manifest` handoff、
+fail-closed `build_request` emit、runtime/tests/evals/docs/meta にまたがる target-aware patch descriptor 生成、Mirage Self への sandbox apply、
 parsed baseline/sandbox observation と comparison digest に加え temp workspace command evidence も持つ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
 rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
@@ -61,23 +62,45 @@ build_request:
   must_sync_docs:
     - docs/02-subsystems/cognitive/README.md
     - docs/02-subsystems/mind-substrate/qualia-buffer.md
+  planning_cues:
+    - cue_kind: runtime-source
+      source_refs:
+        - specs/interfaces/mind.qualia.v0.idl
+    - cue_kind: test-coverage
+      source_refs:
+        - specs/interfaces/mind.qualia.v0.idl
+    - cue_kind: eval-sync
+      source_refs:
+        - evals/cognitive/qualia_contract.yaml
+    - cue_kind: docs-sync
+      source_refs:
+        - docs/02-subsystems/cognitive/README.md
+    - cue_kind: meta-decision-log
+      source_refs:
+        - docs/02-subsystems/cognitive/README.md
+        - specs/interfaces/mind.qualia.v0.idl
   constraints:
     must_pass: [evals/cognitive/qualia_contract.yaml]
-    forbidden: [docs/02-subsystems/kernel/anti-patterns.md]
+    forbidden: [L1.EthicsEnforcer, L1.ContinuityLedger]
   workspace_scope:
     - src/
     - tests/
     - specs/
     - evals/
+    - docs/
+    - meta/decision-log/
   output_paths:
     - src/omoikane/...
     - tests/...
+    - evals/...
+    - docs/...
+    - meta/decision-log/...
 ```
 
 ## Builder の禁止事項
 
 - docs/specs/evals と整合しない独断コードを書くこと
-- `src/` / `tests/` 以外へ reference runtime を散らすこと
+- Council が承認した `output_paths` 以外へ reference runtime を散らすこと
 - 設計と異なる実装を独断で行うこと（必ず Council 経由で docs を更新してから実装）
 - 倫理規約を緩めること（[ethics.md](../00-philosophy/ethics.md)）
 - EthicsEnforcer を改修すること（不可能領域）
@@ -88,8 +111,8 @@ build_request:
 Claude (Council役) ── docs 整備
     │
     ├──► Researcher Agent ── 文献調査・実験提案 (research/)
-    ├──► Codex (Builder)   ── reference runtime 実装 (src/, tests/)
-    ├──► Eval Agent        ── 評価コード生成 (evals/)
+    ├──► Codex (Builder)   ── reference runtime 実装 (src/, tests/, specs/, evals/, docs/, meta/decision-log/)
+    ├──► Eval Agent        ── 評価コード生成 (evals/, docs/, meta/decision-log/)
     └──► Guardian          ── 倫理監査
 ```
 

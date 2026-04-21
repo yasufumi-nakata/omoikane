@@ -20,19 +20,19 @@ expect:
   eval_execution_cleanup_status: removed
   rollback_trigger: eval-regression
   restored_snapshot_prefix: mirage://build-l5-rollback-0001/snapshot/pre-apply
-  reverted_patch_count: 2
-  reverse_apply_journal_count: 2
-  reverse_apply_command_count: 2
-  reverse_apply_verified_count: 2
-  repo_bound_verified_count: 2
+  reverted_patch_count: 5
+  reverse_apply_journal_count: 5
+  reverse_apply_command_count: 5
+  reverse_apply_verified_count: 5
+  repo_bound_verified_count: 5
   repo_binding_scope: current-checkout-subtree
-  repo_binding_path_count: 2
+  repo_binding_path_count: 5
   checkout_mutation_status: verified
-  checkout_mutation_path_count: 2
+  checkout_mutation_path_count: 5
   checkout_mutation_cleanup_status: removed
   checkout_mutation_restored: true
   current_worktree_mutation_status: verified
-  current_worktree_mutation_path_count: 2
+  current_worktree_mutation_path_count: 5
   current_worktree_mutation_cleanup_status: removed
   current_worktree_mutation_restored: true
   external_observer_status: verified

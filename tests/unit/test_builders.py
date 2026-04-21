@@ -91,7 +91,15 @@ def _design_backed_request(
                 "specs/schemas/build_request.yaml",
             ],
             workspace_scope=["src/", "tests/", "specs/", "evals/", "docs/", "meta/decision-log/"],
-            output_paths=output_paths or ["src/omoikane/self_construction/", "tests/unit/"],
+            output_paths=output_paths
+            or [
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
+            ],
             must_sync_docs=[
                 "docs/02-subsystems/self-construction/README.md",
                 "docs/04-ai-governance/codex-as-builder.md",
@@ -184,6 +192,7 @@ class DesignReaderServiceTests(unittest.TestCase):
         self.assertEqual(2, receipt["changed_ref_count"])
         self.assertEqual(1, receipt["changed_design_ref_count"])
         self.assertEqual(1, receipt["changed_spec_ref_count"])
+        self.assertEqual(2, receipt["changed_section_count"])
         self.assertEqual(2, len(receipt["command_receipts"]))
         self.assertTrue(str(receipt["receipt_ref"]).startswith("design-scan://"))
         changed_refs = {
@@ -198,6 +207,18 @@ class DesignReaderServiceTests(unittest.TestCase):
             },
             changed_refs,
         )
+        changed_sections = {
+            entry["ref"]: entry["changed_section_count"]
+            for entry in receipt["entries"]
+            if entry["change_status"] != "unchanged"
+        }
+        self.assertEqual(
+            {
+                "docs/02-subsystems/self-construction/README.md": 1,
+                "specs/interfaces/selfctor.design_reader.v0.idl": 1,
+            },
+            changed_sections,
+        )
 
     def test_prepare_build_request_binds_design_delta_manifest(self) -> None:
         request = _design_backed_request(
@@ -209,6 +230,7 @@ class DesignReaderServiceTests(unittest.TestCase):
                 "tests/unit/",
                 "docs/02-subsystems/self-construction/",
                 "evals/continuity/",
+                "meta/decision-log/",
             ],
         )
 
@@ -222,6 +244,43 @@ class DesignReaderServiceTests(unittest.TestCase):
             request["must_sync_docs"],
         )
         self.assertIn("evals/continuity/design_reader_handoff.yaml", request["constraints"]["must_pass"])
+        self.assertEqual(
+            [
+                "runtime-source",
+                "test-coverage",
+                "docs-sync",
+                "meta-decision-log",
+                "eval-sync",
+            ],
+            [cue["cue_kind"] for cue in request["planning_cues"]],
+        )
+
+    def test_prepare_build_request_rejects_blocked_manifest(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        reader = DesignReaderService()
+        blocked_manifest = reader.finalize_manifest(
+            reader.read_design_delta(
+                target_subsystem="L5.DesignReader",
+                change_summary="Blocked manifest",
+                design_refs=["docs/02-subsystems/self-construction/README.md"],
+                spec_refs=["specs/interfaces/selfctor.design_reader.v0.idl"],
+                workspace_scope=["src/", "tests/", "specs/", "evals/", "docs/", "meta/decision-log/"],
+                output_paths=["src/omoikane/self_construction/"],
+                must_sync_docs=["docs/04-ai-governance/codex-as-builder.md"],
+                repo_root=repo_root,
+            )
+        )
+
+        self.assertEqual("blocked", blocked_manifest["status"])
+        with self.assertRaises(ValueError):
+            reader.prepare_build_request(
+                manifest=blocked_manifest,
+                request_id="build-l5-design-reader-blocked",
+                change_class="feature-improvement",
+                must_pass=["evals/continuity/design_reader_handoff.yaml"],
+                council_session_id="sess-build-l5-design-reader-blocked",
+                guardian_gate="pass",
+            )
 
 
 class PatchGeneratorServiceTests(unittest.TestCase):
@@ -252,12 +311,27 @@ class PatchGeneratorServiceTests(unittest.TestCase):
         result = service.generate_patch_set(self.request)
 
         self.assertEqual("ready", result["status"])
-        self.assertEqual(2, len(result["patches"]))
+        self.assertEqual(5, len(result["patches"]))
         self.assertEqual(
-            "src/omoikane/self_construction/builders.py",
-            result["patches"][0]["target_path"],
+            [
+                "runtime-source",
+                "test-coverage",
+                "eval-sync",
+                "docs-sync",
+                "meta-decision-log",
+            ],
+            [patch["cue_kind"] for patch in result["patches"]],
         )
-        self.assertIn("L5.DifferentialEvaluator", result["patches"][0]["summary"])
+        self.assertEqual(
+            [
+                "src/omoikane/self_construction/builders.py",
+                "tests/unit/test_builders.py",
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "docs/02-subsystems/self-construction/README.md",
+                "meta/decision-log/build-l5-0001.md",
+            ],
+            [patch["target_path"] for patch in result["patches"]],
+        )
         self.assertEqual("pass", result["test_results"]["build_status"])
         self.assertEqual(
             "ledger://self-modify/build-l5-0001",
@@ -283,6 +357,10 @@ class PatchGeneratorServiceTests(unittest.TestCase):
         self.assertEqual(
             "tests/unit/test_builders.py",
             result["patches"][1]["target_path"],
+        )
+        self.assertEqual(
+            "evals/continuity/design_reader_handoff.yaml",
+            result["patches"][2]["target_path"],
         )
 
 
@@ -394,7 +472,7 @@ class SandboxApplyServiceTests(unittest.TestCase):
         self.assertEqual("applied", receipt["status"])
         self.assertTrue(receipt["validation"]["rollback_ready"])
         self.assertEqual([], receipt["external_effects"])
-        self.assertEqual(2, receipt["applied_patch_count"])
+        self.assertEqual(5, receipt["applied_patch_count"])
 
 
 class RolloutPlannerServiceTests(unittest.TestCase):
@@ -483,7 +561,13 @@ class RollbackEngineServiceTests(unittest.TestCase):
                 "rollback_plan_ref": "rollback://build-l5-rollback-0001",
                 "continuity_log_ref": "ledger://self-modify/build-l5-rollback-0001",
                 "status": "applied",
-                "applied_patch_ids": ["patch-111111111111", "patch-222222222222"],
+                "applied_patch_ids": [
+                    "patch-111111111111",
+                    "patch-222222222222",
+                    "patch-333333333333",
+                    "patch-444444444444",
+                    "patch-555555555555",
+                ],
                 "validation": {"rollback_ready": True},
             },
             rollout_session={
@@ -517,31 +601,34 @@ class RollbackEngineServiceTests(unittest.TestCase):
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             session["restored_snapshot_ref"],
         )
-        self.assertEqual(2, session["reverted_patch_count"])
+        self.assertEqual(5, session["reverted_patch_count"])
         self.assertEqual(["dark-launch", "canary-5pct"], session["reverted_stage_ids"])
-        self.assertEqual(2, len(session["reverse_apply_journal"]))
+        self.assertEqual(5, len(session["reverse_apply_journal"]))
         self.assertTrue(all(entry["status"] == "pass" for entry in session["reverse_apply_journal"]))
         self.assertTrue(
-            all(entry["result_state"] == "restored" for entry in session["reverse_apply_journal"])
+            all(
+                entry["result_state"] in {"restored", "deleted"}
+                for entry in session["reverse_apply_journal"]
+            )
         )
         self.assertTrue(
             all(entry["verification_status"] == "pass" for entry in session["reverse_apply_journal"])
         )
         self.assertEqual("current-checkout-subtree", session["repo_binding_summary"]["binding_scope"])
-        self.assertEqual(2, session["repo_binding_summary"]["bound_path_count"])
-        self.assertEqual(2, session["repo_binding_summary"]["verified_path_count"])
+        self.assertEqual(5, session["repo_binding_summary"]["bound_path_count"])
+        self.assertEqual(5, session["repo_binding_summary"]["verified_path_count"])
         self.assertEqual("verified", session["checkout_mutation_receipt"]["status"])
         self.assertTrue(session["checkout_mutation_receipt"]["mutation_detected"])
         self.assertTrue(session["checkout_mutation_receipt"]["restored_matches_baseline"])
-        self.assertEqual(2, session["checkout_mutation_receipt"]["observed_path_count"])
-        self.assertEqual(2, session["checkout_mutation_receipt"]["verified_path_count"])
+        self.assertEqual(5, session["checkout_mutation_receipt"]["observed_path_count"])
+        self.assertEqual(5, session["checkout_mutation_receipt"]["verified_path_count"])
         self.assertEqual("verified", session["current_worktree_mutation_receipt"]["status"])
         self.assertTrue(session["current_worktree_mutation_receipt"]["mutation_detected"])
         self.assertTrue(
             session["current_worktree_mutation_receipt"]["restored_matches_baseline"]
         )
-        self.assertEqual(2, session["current_worktree_mutation_receipt"]["observed_path_count"])
-        self.assertEqual(2, session["current_worktree_mutation_receipt"]["verified_path_count"])
+        self.assertEqual(5, session["current_worktree_mutation_receipt"]["observed_path_count"])
+        self.assertEqual(5, session["current_worktree_mutation_receipt"]["verified_path_count"])
         self.assertEqual("removed", session["current_worktree_mutation_receipt"]["cleanup_status"])
         self.assertEqual(
             "repo-root-git-observer-v1",
@@ -580,16 +667,16 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual("removed", session["telemetry_gate"]["cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["executed_command_count"])
         self.assertEqual("removed", session["telemetry_gate"]["reverse_cleanup_status"])
-        self.assertEqual(2, session["telemetry_gate"]["executed_reverse_command_count"])
-        self.assertEqual(2, session["telemetry_gate"]["verified_reverse_command_count"])
-        self.assertEqual(2, session["telemetry_gate"]["repo_bound_verified_command_count"])
+        self.assertEqual(5, session["telemetry_gate"]["executed_reverse_command_count"])
+        self.assertEqual(5, session["telemetry_gate"]["verified_reverse_command_count"])
+        self.assertEqual(5, session["telemetry_gate"]["repo_bound_verified_command_count"])
         self.assertEqual("verified", session["telemetry_gate"]["checkout_mutation_status"])
         self.assertEqual("removed", session["telemetry_gate"]["checkout_cleanup_status"])
-        self.assertEqual(2, session["telemetry_gate"]["checkout_verified_path_count"])
+        self.assertEqual(5, session["telemetry_gate"]["checkout_verified_path_count"])
         self.assertTrue(session["telemetry_gate"]["checkout_status_restored"])
         self.assertEqual("verified", session["telemetry_gate"]["current_worktree_mutation_status"])
         self.assertEqual("removed", session["telemetry_gate"]["current_worktree_cleanup_status"])
-        self.assertEqual(2, session["telemetry_gate"]["current_worktree_verified_path_count"])
+        self.assertEqual(5, session["telemetry_gate"]["current_worktree_verified_path_count"])
         self.assertTrue(session["telemetry_gate"]["current_worktree_status_restored"])
         self.assertTrue(session["telemetry_gate"]["current_worktree_mutation_detected"])
         self.assertEqual("verified", session["telemetry_gate"]["external_observer_status"])
@@ -625,7 +712,7 @@ class LiveEnactmentServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("passed", session["status"])
-        self.assertEqual(2, session["mutated_file_count"])
+        self.assertEqual(5, session["mutated_file_count"])
         self.assertEqual(2, session["executed_command_count"])
         self.assertTrue(session["all_commands_passed"])
         self.assertEqual("removed", session["cleanup_status"])

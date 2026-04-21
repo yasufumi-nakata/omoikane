@@ -8346,11 +8346,14 @@ json.dump(response, sys.stdout)
                 "delta_scan_changed_ref_count": delta_scan["changed_ref_count"],
                 "delta_scan_changed_design_ref_count": delta_scan["changed_design_ref_count"],
                 "delta_scan_changed_spec_ref_count": delta_scan["changed_spec_ref_count"],
+                "delta_scan_changed_section_count": delta_scan["changed_section_count"],
                 "delta_scan_command_receipt_count": len(delta_scan["command_receipts"]),
                 "delta_scan_bound_to_manifest": design_manifest.get("source_delta_receipt", {}).get(
                     "receipt_digest"
                 )
                 == delta_scan["receipt_digest"],
+                "manifest_planning_cue_count": len(design_manifest["planning_cues"]),
+                "build_request_planning_cue_count": len(build_request["planning_cues"]),
                 "council_review_required": design_manifest["council_review_required"],
                 "guardian_review_required": design_manifest["guardian_review_required"],
                 "build_request_has_design_delta_ref": build_request["design_delta_ref"]
@@ -8820,6 +8823,10 @@ json.dump(response, sys.stdout)
             output_paths=[
                 "src/omoikane/self_construction/",
                 "tests/unit/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
             ],
             request_id="build-l5-live-0001",
             change_class="feature-improvement",

@@ -2,14 +2,14 @@ idl_version: 1
 kind: service
 namespace: selfctor.patch_generator.v0
 service: PatchGeneratorService
-summary: Generate sandbox-only implementation artifacts from approved build requests.
+summary: Generate planning-cue aligned sandbox-only implementation artifacts from approved build requests.
 imports:
   build_request: ../schemas/build_request.yaml
   build_artifact: ../schemas/build_artifact.yaml
   patch_descriptor: ../schemas/patch_descriptor.schema
 operations:
   generate_patch_set:
-    summary: Produce target-aware patch descriptors, logs, and tests for an approved request.
+    summary: Produce planning-cue aligned patch descriptors, logs, and tests for an approved request.
     input:
       schema_ref: build_request
     output:
@@ -21,9 +21,10 @@ operations:
     guarantees:
       - ready artifacts include at least one patch descriptor
       - ready artifacts derive their primary target path from target_subsystem and approved output_paths
-      - blocked artifacts enumerate blocking_rules
+      - ready artifacts cover runtime, tests, evals, docs, and meta/decision-log targets when the planning cues require them
+      - blocked artifacts enumerate scope or planning blocking_rules
   validate_scope:
-    summary: Reject requests that target immutable safety boundaries.
+    summary: Reject requests that target immutable safety boundaries or cannot resolve their planning cues into approved output paths.
     input:
       schema_ref: build_request
     output:
@@ -39,7 +40,7 @@ operations:
             items:
               type: string
   describe_patch:
-    summary: Materialize one patch descriptor for downstream inspection.
+    summary: Materialize one planning-cue aligned patch descriptor for downstream inspection.
     input:
       schema_ref: patch_descriptor
     output:
