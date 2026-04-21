@@ -211,7 +211,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     rollback_parser = subparsers.add_parser(
         "rollback-demo",
-        help="Run the L5 regression-triggered rollback and pre-apply snapshot restoration scenario",
+        help="Run the L5 regression-triggered rollback, direct current-checkout restoration, and pre-apply snapshot recovery scenario",
     )
     rollback_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 

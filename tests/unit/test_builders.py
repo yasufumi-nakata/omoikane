@@ -268,7 +268,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
         )
 
         self.assertEqual("rolled-back", session["status"])
-        self.assertEqual("1.4", session["schema_version"])
+        self.assertEqual("1.5", session["schema_version"])
         self.assertEqual(
             live_enactment_session["enactment_session_id"],
             session["live_enactment_session_id"],
@@ -295,6 +295,14 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertTrue(session["checkout_mutation_receipt"]["restored_matches_baseline"])
         self.assertEqual(2, session["checkout_mutation_receipt"]["observed_path_count"])
         self.assertEqual(2, session["checkout_mutation_receipt"]["verified_path_count"])
+        self.assertEqual("verified", session["current_worktree_mutation_receipt"]["status"])
+        self.assertTrue(session["current_worktree_mutation_receipt"]["mutation_detected"])
+        self.assertTrue(
+            session["current_worktree_mutation_receipt"]["restored_matches_baseline"]
+        )
+        self.assertEqual(2, session["current_worktree_mutation_receipt"]["observed_path_count"])
+        self.assertEqual(2, session["current_worktree_mutation_receipt"]["verified_path_count"])
+        self.assertEqual("removed", session["current_worktree_mutation_receipt"]["cleanup_status"])
         self.assertEqual(
             "repo-root-git-observer-v1",
             session["checkout_mutation_receipt"]["observer_profile"],
@@ -318,6 +326,11 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertEqual("removed", session["telemetry_gate"]["checkout_cleanup_status"])
         self.assertEqual(2, session["telemetry_gate"]["checkout_verified_path_count"])
         self.assertTrue(session["telemetry_gate"]["checkout_status_restored"])
+        self.assertEqual("verified", session["telemetry_gate"]["current_worktree_mutation_status"])
+        self.assertEqual("removed", session["telemetry_gate"]["current_worktree_cleanup_status"])
+        self.assertEqual(2, session["telemetry_gate"]["current_worktree_verified_path_count"])
+        self.assertTrue(session["telemetry_gate"]["current_worktree_status_restored"])
+        self.assertTrue(session["telemetry_gate"]["current_worktree_mutation_detected"])
         self.assertEqual("verified", session["telemetry_gate"]["external_observer_status"])
         self.assertEqual(5, session["telemetry_gate"]["external_observer_receipt_count"])
         self.assertTrue(session["telemetry_gate"]["external_observer_restored"])

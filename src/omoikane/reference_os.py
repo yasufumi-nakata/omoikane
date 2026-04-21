@@ -8382,6 +8382,18 @@ class OmoikaneReferenceOS:
                 "checkout_mutation_restored": rollback_session["checkout_mutation_receipt"][
                     "restored_matches_baseline"
                 ],
+                "current_worktree_mutation_status": rollback_session[
+                    "current_worktree_mutation_receipt"
+                ]["status"],
+                "current_worktree_mutation_path_count": rollback_session[
+                    "current_worktree_mutation_receipt"
+                ]["observed_path_count"],
+                "current_worktree_mutation_cleanup_status": rollback_session[
+                    "current_worktree_mutation_receipt"
+                ]["cleanup_status"],
+                "current_worktree_mutation_restored": rollback_session[
+                    "current_worktree_mutation_receipt"
+                ]["restored_matches_baseline"],
                 "external_observer_status": rollback_session["checkout_mutation_receipt"][
                     "observer_status"
                 ],

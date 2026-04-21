@@ -78,7 +78,6 @@
 
 ## 次段階
 
-current-worktree direct rollback mutation /
 cross-host authority routing + OS-native packet capture は
 reference runtime の対象が広がる段階で追加する。
 
