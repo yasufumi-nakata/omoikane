@@ -178,6 +178,11 @@ draining exit を `bounded-key-server-churn-window-v1` で証明すること、
 を socket trace として返し、同時に `netstat` / `lsof` ベースの
 `os_observer_receipt` が同じ TCP tuple と connection state を束縛し、
 authority plane の per-server digest と一致したときだけ `authenticated` になること、
+さらに各 traced route が `remote_host_ref` /
+`remote_host_attestation_ref` / `authority_cluster_ref` を保持し、
+`os_observer_receipt.host_binding_digest` がその host binding と tuple を同時に固定しつつ、
+stable authority plane の全 member が distinct remote host として束縛された時だけ
+`cross_host_verified=true` になること、
 さらに authenticated route trace が
 `trace-bound-pcap-export-v1` により PCAP artifact へ export され、
 in-process readback と `tcpdump` readback が
@@ -496,5 +501,4 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- cross-host authority routing
 - automation による未実装ギャップの継続充填

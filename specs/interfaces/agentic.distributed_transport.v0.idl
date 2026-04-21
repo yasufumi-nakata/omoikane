@@ -242,7 +242,8 @@ operations:
     summary: >
       Establish actual non-loopback mTLS routes to the currently reachable authority-plane members
       and bind socket-level trace evidence, OS-native TCP observer receipts, certificate
-      fingerprints, and response digests to the rotated distributed transport envelope.
+      fingerprints, response digests, and attested remote host/cluster identity to the
+      rotated distributed transport envelope.
     input:
       inline_schema:
         type: object
@@ -277,6 +278,11 @@ operations:
                 - key_server_ref
                 - server_endpoint
                 - server_name
+                - remote_host_ref
+                - remote_host_attestation_ref
+                - authority_cluster_ref
+                - remote_jurisdiction
+                - remote_network_zone
               properties:
                 key_server_ref:
                   type: string
@@ -285,6 +291,21 @@ operations:
                   type: string
                   pattern: "^https://"
                 server_name:
+                  type: string
+                  minLength: 1
+                remote_host_ref:
+                  type: string
+                  pattern: "^host://"
+                remote_host_attestation_ref:
+                  type: string
+                  pattern: "^host-attestation://"
+                authority_cluster_ref:
+                  type: string
+                  pattern: "^authority-cluster://"
+                remote_jurisdiction:
+                  type: string
+                  minLength: 1
+                remote_network_zone:
                   type: string
                   minLength: 1
           ca_bundle_ref:
@@ -305,6 +326,8 @@ operations:
       - every traced response digest must match the currently bound authority-plane member payload
       - socket trace must capture local/remote endpoint tuple, tls version, cipher suite, and byte counts
       - OS observer receipts must capture the same TCP tuple from at least 1 OS source such as netstat or lsof while the route is live
+      - every route target must bind one remote_host_ref and remote_host_attestation_ref under exactly 1 authority_cluster_ref
+      - cross_host_verified may become true only when every traced authority-plane member binds a distinct remote_host_ref
   export_authority_route_packet_capture:
     summary: >
       Export one authenticated authority-route trace into a trace-bound PCAP artifact,
@@ -550,5 +573,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
-    - Cross-host authority routing beyond the local machine remains future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, cross-host host/cluster binding, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
+    - Unbounded remote authority-cluster discovery outside the fixed route_targets set remains future work.

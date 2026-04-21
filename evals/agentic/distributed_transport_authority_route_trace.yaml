@@ -4,7 +4,8 @@ level: L4
 description: >
   Rotated distributed transport handoff が actual non-loopback mTLS authority routing を通じて
   reachable authority-plane membersへ接続し、socket-level trace、OS-native TCP observer receipt、
-  peer/client certificate fingerprint、response-digest binding を authority plane に束縛できること。
+  peer/client certificate fingerprint、response-digest binding、attested remote host/cluster binding
+  を authority plane に束縛できること。
 fixtures:
   - scenario: federation_authority_route_trace
     council_tier: federation
@@ -12,8 +13,10 @@ fixtures:
     authority_plane_ref: authority-plane://federation/route-nonce-example
     expected:
       route_count: 2
+      distinct_remote_host_count: 2
       mtls_authenticated_count: 2
       non_loopback_verified: true
+      cross_host_verified: true
       trace_status: authenticated
 assertions:
   - Route trace must cover every reachable stable authority-plane member
@@ -22,6 +25,8 @@ assertions:
   - Every traced response digest must match the currently bound authority-plane member payload
   - Socket trace must capture local/remote tuple, tls version, cipher suite, and byte counts
   - OS observer receipts must capture the same live TCP tuple from at least 1 OS source such as netstat or lsof
+  - Route targets must bind remote_host_ref, remote_host_attestation_ref, and one authority_cluster_ref into the trace
+  - cross_host_verified must require distinct remote_host_ref values across the reachable authority-plane members
 metric: exact-match
 threshold: 1.0
 ethics_check: true

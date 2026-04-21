@@ -89,7 +89,7 @@
 
 ## 次段階
 
-- cross-host authority routing
+- 現時点で catalog 上の immediate schema backlog はありません
 
 ## 形式
 

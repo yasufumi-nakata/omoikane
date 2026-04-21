@@ -16,10 +16,14 @@ required:
   - local_port
   - remote_ip
   - remote_port
+  - remote_host_ref
+  - remote_host_attestation_ref
+  - authority_cluster_ref
   - owning_pid
   - observed_sources
   - connection_states
   - tuple_digest
+  - host_binding_digest
   - receipt_status
 properties:
   kind:
@@ -48,6 +52,15 @@ properties:
     type: integer
     minimum: 1
     maximum: 65535
+  remote_host_ref:
+    type: string
+    pattern: "^host://"
+  remote_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  authority_cluster_ref:
+    type: string
+    pattern: "^authority-cluster://"
   owning_pid:
     type: integer
     minimum: 1
@@ -70,6 +83,9 @@ properties:
   tuple_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  host_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   receipt_status:
     type: string
     enum:
@@ -85,6 +101,9 @@ examples:
     local_port: 44301
     remote_ip: 192.168.1.4
     remote_port: 44300
+    remote_host_ref: host://federation/authority-edge-a
+    remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+    authority_cluster_ref: authority-cluster://federation/review-window
     owning_pid: 41234
     observed_sources:
       - lsof
@@ -92,4 +111,5 @@ examples:
     connection_states:
       - ESTABLISHED
     tuple_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    host_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
     receipt_status: observed

@@ -141,10 +141,15 @@ current authority snapshot へ束縛する。
 |---|---|
 | trace profile | `non-loopback-mtls-authority-route-v1` |
 | socket trace profile | `mtls-socket-trace-v1` |
+| cross-host binding profile | `attested-cross-host-authority-binding-v1` |
 | tls server name | `authority.local` |
 | route coverage | stable authority plane の全 reachable member |
 
+- 各 route target は `remote_host_ref / remote_host_attestation_ref /
+  authority_cluster_ref / remote_jurisdiction / remote_network_zone` を必須にし、
+  各 route binding へ同じ binding を焼き付ける
 - 各 route binding は `key_server_ref / server_endpoint / server_name /
+  remote_host_ref / remote_host_attestation_ref / authority_cluster_ref /
   route_binding_ref / matched_root_refs / mtls_status` を保持する
 - `socket_trace` は `local_ip / local_port / remote_ip / remote_port /
   non_loopback / tls_version / cipher_suite / peer_certificate_fingerprint /
@@ -152,14 +157,19 @@ current authority snapshot へ束縛する。
   http_status / response_digest / connect_latency_ms /
   tls_handshake_latency_ms / round_trip_latency_ms` を保持する
 - `os_observer_receipt` は `netstat` / `lsof` が live TCP tuple を観測した証跡として
-  `observed_sources / connection_states / owning_pid / tuple_digest` を保持し、
+  `observed_sources / connection_states / owning_pid / tuple_digest /
+  remote_host_ref / remote_host_attestation_ref / authority_cluster_ref /
+  host_binding_digest` を保持し、
   少なくとも 1 source で tuple が観測された時だけ route trace を `authenticated` に進める
+- `cross_host_verified` は traced authority-plane member ごとに distinct な
+  `remote_host_ref` が同一 `authority_cluster_ref` の下で束縛された時だけ true になる
 - `response_digest` は authority-plane snapshot の per-server digest と一致しなければ fail-closed
 - remote endpoint が loopback だった場合や mTLS が成立しない場合、
   trace 全体は `authenticated` にならない
 - reference runtime は local machine 上の non-loopback address に bind した
-  mTLS server を使い、cross-host cluster を持ち込まずに
-  actual route trace を machine-checkable にする
+  mTLS server を使い、actual route trace 自体は same host 上で再現しつつ、
+  route target の host/cluster binding を通じて bounded な cross-host authority routing まで
+  machine-checkable にする
 
 ## Packet capture export
 
@@ -206,8 +216,8 @@ route trace / packet export / resolved interface へ束縛する。
   `route_binding_refs` を echo しつつ `lease_ref` と `broker_attestation_ref` を返す
 - `capture_command` は `tcpdump` / resolved interface / exact filter を含む preview として固定し、
   actual live capture 自体は repo 外の broker 実行面へ委譲する
-- residual future work は broad な packet capture 一般論ではなく、
-  cross-host authority routing へ絞られる
+- residual future work は broad な cross-host authority routing 不在ではなく、
+  fixed `route_targets` の外側にある unbounded remote authority-cluster discovery へ絞られる
 
 ## Relay telemetry
 

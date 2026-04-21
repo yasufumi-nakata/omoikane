@@ -520,6 +520,22 @@ class DistributedTransportServiceTests(unittest.TestCase):
             f"/authority-route-{index}": payload
             for index, payload in enumerate(payloads, start=1)
         }
+        route_target_metadata = [
+            {
+                "remote_host_ref": "host://federation/authority-edge-a",
+                "remote_host_attestation_ref": "host-attestation://federation/authority-edge-a/2026-04-22",
+                "authority_cluster_ref": "authority-cluster://federation/review-window",
+                "remote_jurisdiction": "JP-13",
+                "remote_network_zone": "apne1",
+            },
+            {
+                "remote_host_ref": "host://federation/authority-edge-b",
+                "remote_host_attestation_ref": "host-attestation://federation/authority-edge-b/2026-04-22",
+                "authority_cluster_ref": "authority-cluster://federation/review-window",
+                "remote_jurisdiction": "US-CA",
+                "remote_network_zone": "usw2",
+            },
+        ]
 
         class LocalThreadingHTTPServer(ThreadingHTTPServer):
             def server_bind(self) -> None:
@@ -567,8 +583,9 @@ class DistributedTransportServiceTests(unittest.TestCase):
                     "key_server_ref": payload["key_server_ref"],
                     "server_endpoint": f"{base_url}{path}",
                     "server_name": MTLS_SERVER_NAME,
+                    **route_target_metadata[index],
                 }
-                for path, payload in payload_by_path.items()
+                for index, (path, payload) in enumerate(payload_by_path.items())
             ]
         finally:
             server.shutdown()
@@ -1479,12 +1496,22 @@ json.dump(
         self.assertEqual(CA_BUNDLE_REF, trace.ca_bundle_ref)
         self.assertEqual(CLIENT_CERTIFICATE_REF, trace.client_certificate_ref)
         self.assertEqual(MTLS_SERVER_NAME, trace.server_name)
+        self.assertEqual(
+            "attested-cross-host-authority-binding-v1",
+            trace.cross_host_binding_profile,
+        )
+        self.assertEqual(
+            "authority-cluster://federation/review-window",
+            trace.authority_cluster_ref,
+        )
+        self.assertEqual(2, trace.distinct_remote_host_count)
         self.assertTrue(trace.non_loopback_verified)
         self.assertTrue(trace.authority_plane_bound)
         self.assertTrue(trace.response_digest_bound)
         self.assertTrue(trace.socket_trace_complete)
         self.assertEqual("os-native-tcp-observer-v1", trace.os_observer_profile)
         self.assertTrue(trace.os_observer_complete)
+        self.assertTrue(trace.cross_host_verified)
         self.assertEqual(authority_plane.digest, trace.authority_plane_digest)
         self.assertEqual(
             ["root://federation/pki-a", "root://federation/pki-b"],
@@ -1494,12 +1521,23 @@ json.dump(
             all(
                 binding["server_name"] == MTLS_SERVER_NAME
                 and binding["mtls_status"] == "authenticated"
+                and binding["remote_host_ref"].startswith("host://federation/authority-edge-")
+                and binding["remote_host_attestation_ref"].startswith(
+                    "host-attestation://federation/authority-edge-"
+                )
+                and binding["authority_cluster_ref"] == "authority-cluster://federation/review-window"
                 and not binding["socket_trace"]["remote_ip"].startswith("127.")
                 and binding["socket_trace"]["tls_version"].startswith("TLS")
                 and binding["socket_trace"]["cipher_suite"]
                 and binding["socket_trace"]["request_bytes"] > 0
                 and binding["socket_trace"]["response_bytes"] > 0
                 and binding["os_observer_receipt"]["receipt_status"] == "observed"
+                and binding["os_observer_receipt"]["remote_host_ref"] == binding["remote_host_ref"]
+                and binding["os_observer_receipt"]["remote_host_attestation_ref"]
+                == binding["remote_host_attestation_ref"]
+                and binding["os_observer_receipt"]["authority_cluster_ref"]
+                == binding["authority_cluster_ref"]
+                and binding["os_observer_receipt"]["host_binding_digest"]
                 and binding["os_observer_receipt"]["observed_sources"]
                 and binding["os_observer_receipt"]["connection_states"]
                 for binding in trace.route_bindings
@@ -1554,6 +1592,124 @@ json.dump(
         self.assertIn(acquisition.interface_name, acquisition.capture_command)
         self.assertIn(acquisition.capture_filter, acquisition.capture_command)
         self.assertTrue(acquisition.lease_ref.startswith("capture-lease://federation/"))
+
+    def test_non_loopback_authority_route_trace_marks_duplicate_remote_hosts_not_cross_host_verified(
+        self,
+    ) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-route-duplicate-host-001",
+            proposal_ref="proposal-transport-authority-route-duplicate-host-001",
+            payload_ref="cas://sha256/test-authority-route-duplicate-host",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "duplicate-host"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-route-window-duplicate-host",
+            "checked_at": "2026-04-22T00:10:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-route-duplicate-host"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-route-duplicate-host"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-route-duplicate-host"),
+        }
+        stable_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-22T00:10:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-route-duplicate-host"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-22T00:10:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-route-duplicate-host"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(stable_payloads) as authority_endpoints:
+            authority_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-authority-route-duplicate-host-") as cert_dir:
+            cert_bundle = write_fixture_bundle(cert_dir)
+            bind_host = self._discover_non_loopback_ipv4()
+            with self._authority_route_servers(
+                stable_payloads,
+                bind_host=bind_host,
+                ca_cert_path=cert_bundle["ca_cert_path"],
+                server_cert_path=cert_bundle["server_cert_path"],
+                server_key_path=cert_bundle["server_key_path"],
+            ) as route_targets:
+                route_targets[1]["remote_host_ref"] = route_targets[0]["remote_host_ref"]
+                route_targets[1]["remote_host_attestation_ref"] = route_targets[0][
+                    "remote_host_attestation_ref"
+                ]
+                trace = service.trace_non_loopback_authority_routes(
+                    rotated,
+                    authority_plane,
+                    route_targets=route_targets,
+                    ca_cert_path=cert_bundle["ca_cert_path"],
+                    ca_bundle_ref=CA_BUNDLE_REF,
+                    client_cert_path=cert_bundle["client_cert_path"],
+                    client_key_path=cert_bundle["client_key_path"],
+                    client_certificate_ref=CLIENT_CERTIFICATE_REF,
+                    request_timeout_ms=500,
+                )
+
+        self.assertEqual("authenticated", trace.trace_status)
+        self.assertEqual(1, trace.distinct_remote_host_count)
+        self.assertFalse(trace.cross_host_verified)
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

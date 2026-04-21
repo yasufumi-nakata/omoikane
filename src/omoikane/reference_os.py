@@ -1345,6 +1345,22 @@ class OmoikaneReferenceOS:
                 f"/authority-route-{index}": payload
                 for index, payload in enumerate(authority_payloads, start=1)
             }
+            route_target_metadata = [
+                {
+                    "remote_host_ref": "host://federation/authority-edge-a",
+                    "remote_host_attestation_ref": "host-attestation://federation/authority-edge-a/2026-04-22",
+                    "authority_cluster_ref": "authority-cluster://federation/review-window",
+                    "remote_jurisdiction": "JP-13",
+                    "remote_network_zone": "apne1",
+                },
+                {
+                    "remote_host_ref": "host://federation/authority-edge-b",
+                    "remote_host_attestation_ref": "host-attestation://federation/authority-edge-b/2026-04-22",
+                    "authority_cluster_ref": "authority-cluster://federation/review-window",
+                    "remote_jurisdiction": "US-CA",
+                    "remote_network_zone": "usw2",
+                },
+            ]
 
             class LocalThreadingHTTPServer(ThreadingHTTPServer):
                 def server_bind(self) -> None:
@@ -1392,8 +1408,9 @@ class OmoikaneReferenceOS:
                         "key_server_ref": payload["key_server_ref"],
                         "server_endpoint": f"{base_url}{path}",
                         "server_name": MTLS_SERVER_NAME,
+                        **route_target_metadata[index],
                     }
-                    for path, payload in payload_by_path.items()
+                    for index, (path, payload) in enumerate(payload_by_path.items())
                 ]
             finally:
                 server.shutdown()
@@ -2228,6 +2245,28 @@ json.dump(response, sys.stdout)
                         and binding["os_observer_receipt"]["observed_sources"]
                         and binding["os_observer_receipt"]["owning_pid"] > 0
                         and binding["os_observer_receipt"]["connection_states"]
+                        for binding in authority_route_trace.route_bindings
+                    )
+                ),
+                "authority_route_cross_host_bound": (
+                    authority_route_trace.cross_host_binding_profile
+                    == "attested-cross-host-authority-binding-v1"
+                    and authority_route_trace.authority_cluster_ref
+                    == "authority-cluster://federation/review-window"
+                    and authority_route_trace.distinct_remote_host_count == 2
+                    and authority_route_trace.cross_host_verified
+                    and all(
+                        binding["remote_host_ref"].startswith("host://federation/authority-edge-")
+                        and binding["remote_host_attestation_ref"].startswith(
+                            "host-attestation://federation/authority-edge-"
+                        )
+                        and binding["authority_cluster_ref"]
+                        == authority_route_trace.authority_cluster_ref
+                        and binding["os_observer_receipt"]["remote_host_ref"]
+                        == binding["remote_host_ref"]
+                        and binding["os_observer_receipt"]["authority_cluster_ref"]
+                        == binding["authority_cluster_ref"]
+                        and binding["os_observer_receipt"]["host_binding_digest"]
                         for binding in authority_route_trace.route_bindings
                     )
                 ),

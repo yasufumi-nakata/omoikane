@@ -19,10 +19,13 @@ required:
   - trace_profile
   - socket_trace_profile
   - os_observer_profile
+  - cross_host_binding_profile
   - ca_bundle_ref
   - client_certificate_ref
   - server_name
+  - authority_cluster_ref
   - route_count
+  - distinct_remote_host_count
   - mtls_authenticated_count
   - trusted_root_refs
   - non_loopback_verified
@@ -30,6 +33,7 @@ required:
   - response_digest_bound
   - socket_trace_complete
   - os_observer_complete
+  - cross_host_verified
   - route_bindings
   - trace_status
   - recorded_at
@@ -71,6 +75,8 @@ properties:
     const: mtls-socket-trace-v1
   os_observer_profile:
     const: os-native-tcp-observer-v1
+  cross_host_binding_profile:
+    const: attested-cross-host-authority-binding-v1
   ca_bundle_ref:
     type: string
     minLength: 1
@@ -80,7 +86,13 @@ properties:
   server_name:
     type: string
     minLength: 1
+  authority_cluster_ref:
+    type: string
+    pattern: "^authority-cluster://"
   route_count:
+    type: integer
+    minimum: 1
+  distinct_remote_host_count:
     type: integer
     minimum: 1
   mtls_authenticated_count:
@@ -103,6 +115,8 @@ properties:
     type: boolean
   os_observer_complete:
     type: boolean
+  cross_host_verified:
+    type: boolean
   route_bindings:
     type: array
     minItems: 1
@@ -115,6 +129,11 @@ properties:
         - authority_status
         - server_endpoint
         - server_name
+        - remote_host_ref
+        - remote_host_attestation_ref
+        - authority_cluster_ref
+        - remote_jurisdiction
+        - remote_network_zone
         - route_binding_ref
         - matched_root_refs
         - mtls_status
@@ -139,6 +158,21 @@ properties:
           type: string
           pattern: "^https://"
         server_name:
+          type: string
+          minLength: 1
+        remote_host_ref:
+          type: string
+          pattern: "^host://"
+        remote_host_attestation_ref:
+          type: string
+          pattern: "^host-attestation://"
+        authority_cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        remote_jurisdiction:
+          type: string
+          minLength: 1
+        remote_network_zone:
           type: string
           minLength: 1
         route_binding_ref:
@@ -267,10 +301,13 @@ examples:
     trace_profile: non-loopback-mtls-authority-route-v1
     socket_trace_profile: mtls-socket-trace-v1
     os_observer_profile: os-native-tcp-observer-v1
+    cross_host_binding_profile: attested-cross-host-authority-binding-v1
     ca_bundle_ref: cert://distributed-transport/authority-ca/v1
     client_certificate_ref: cert://distributed-transport/authority-client/v1
     server_name: authority.local
+    authority_cluster_ref: authority-cluster://federation/review-window
     route_count: 2
+    distinct_remote_host_count: 2
     mtls_authenticated_count: 2
     trusted_root_refs:
       - root://federation/pki-a
@@ -280,12 +317,18 @@ examples:
     response_digest_bound: true
     socket_trace_complete: true
     os_observer_complete: true
+    cross_host_verified: true
     route_bindings:
       - key_server_ref: keyserver://federation/notary-a
         server_role: quorum-notary
         authority_status: active
         server_endpoint: https://192.168.1.4:44300/authority-route-1
         server_name: authority.local
+        remote_host_ref: host://federation/authority-edge-a
+        remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+        authority_cluster_ref: authority-cluster://federation/review-window
+        remote_jurisdiction: JP-13
+        remote_network_zone: apne1
         route_binding_ref: authority-route://federation/5f9bece84e1db59e
         matched_root_refs:
           - root://federation/pki-a
@@ -301,6 +344,9 @@ examples:
           local_port: 44301
           remote_ip: 192.168.1.4
           remote_port: 44300
+          remote_host_ref: host://federation/authority-edge-a
+          remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+          authority_cluster_ref: authority-cluster://federation/review-window
           owning_pid: 41234
           observed_sources:
             - lsof
@@ -308,6 +354,7 @@ examples:
           connection_states:
             - ESTABLISHED
           tuple_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+          host_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
           receipt_status: observed
         socket_trace:
           local_ip: 192.168.1.4

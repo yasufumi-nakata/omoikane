@@ -196,7 +196,7 @@ entries:
       - reference-runtime
       - evals/agentic/distributed_transport_authority_route_trace.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize OS-native TCP tuple observations from netstat/lsof while a live authority route remains open.
+    rationale: Required to serialize OS-native TCP tuple observations from netstat/lsof while one live authority route remains bound to the same remote host and authority-cluster identity.
   - priority: P1
     kind: schema
     file: specs/schemas/distributed_transport_authority_route_trace.schema
@@ -205,7 +205,7 @@ entries:
       - reference-runtime
       - evals/agentic/distributed_transport_authority_route_trace.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, OS observer receipts, and digest binding for reachable authority-plane members.
+    rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, OS observer receipts, remote host/cluster identity, and digest binding for reachable authority-plane members.
   - priority: P1
     kind: schema
     file: specs/schemas/distributed_transport_packet_capture_export.schema
@@ -362,7 +362,7 @@ entries:
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make distributed participant attestation, key rotation overlap, live root-directory federation, replay guard, and relay telemetry machine-readable.
+    rationale: Required to make distributed participant attestation, key rotation overlap, live root-directory federation, cross-host authority binding, replay guard, and relay telemetry machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -1335,7 +1335,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, OS observer receipts, and authority-plane response-digest matching.
+    rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, OS observer receipts, remote host/cluster binding, and authority-plane response-digest matching.
   - priority: P1
     kind: eval
     file: evals/agentic/distributed_transport_packet_capture_export.yaml

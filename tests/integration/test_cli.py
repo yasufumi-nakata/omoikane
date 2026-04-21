@@ -919,12 +919,28 @@ class CliIntegrationTests(unittest.TestCase):
             "os-native-tcp-observer-v1",
             result["authority_route_trace"]["federation_rotated"]["os_observer_profile"],
         )
+        self.assertEqual(
+            "attested-cross-host-authority-binding-v1",
+            result["authority_route_trace"]["federation_rotated"]["cross_host_binding_profile"],
+        )
+        self.assertEqual(
+            "authority-cluster://federation/review-window",
+            result["authority_route_trace"]["federation_rotated"]["authority_cluster_ref"],
+        )
+        self.assertEqual(
+            2,
+            result["authority_route_trace"]["federation_rotated"]["distinct_remote_host_count"],
+        )
         self.assertTrue(
             result["authority_route_trace"]["federation_rotated"]["os_observer_complete"],
         )
+        self.assertTrue(result["authority_route_trace"]["federation_rotated"]["cross_host_verified"])
         self.assertTrue(
             all(
                 binding["mtls_status"] == "authenticated"
+                and binding["remote_host_ref"].startswith("host://federation/authority-edge-")
+                and binding["authority_cluster_ref"]
+                == "authority-cluster://federation/review-window"
                 and binding["socket_trace"]["transport_profile"] == "mtls-socket-trace-v1"
                 and binding["socket_trace"]["tls_version"].startswith("TLS")
                 and not binding["socket_trace"]["remote_ip"].startswith("127.")
@@ -937,9 +953,14 @@ class CliIntegrationTests(unittest.TestCase):
                 and binding["os_observer_receipt"]["observed_sources"]
                 and binding["os_observer_receipt"]["connection_states"]
                 and binding["os_observer_receipt"]["owning_pid"] > 0
+                and binding["os_observer_receipt"]["remote_host_ref"] == binding["remote_host_ref"]
+                and binding["os_observer_receipt"]["authority_cluster_ref"]
+                == binding["authority_cluster_ref"]
+                and binding["os_observer_receipt"]["host_binding_digest"]
                 for binding in result["authority_route_trace"]["federation_rotated"]["route_bindings"]
             )
         )
+        self.assertTrue(result["validation"]["authority_route_cross_host_bound"])
         self.assertEqual(
             "verified",
             result["packet_capture_export"]["federation_rotated"]["export_status"],

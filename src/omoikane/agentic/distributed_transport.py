@@ -53,6 +53,7 @@ AUTHORITY_CHURN_PROFILE = "bounded-key-server-churn-window-v1"
 AUTHORITY_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
 AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 AUTHORITY_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
+AUTHORITY_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
 AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
 AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
 AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
@@ -487,10 +488,13 @@ class DistributedTransportAuthorityRouteTrace:
     trace_profile: str
     socket_trace_profile: str
     os_observer_profile: str
+    cross_host_binding_profile: str
     ca_bundle_ref: str
     client_certificate_ref: str
     server_name: str
+    authority_cluster_ref: str
     route_count: int
+    distinct_remote_host_count: int
     mtls_authenticated_count: int
     trusted_root_refs: List[str]
     non_loopback_verified: bool
@@ -498,6 +502,7 @@ class DistributedTransportAuthorityRouteTrace:
     response_digest_bound: bool
     socket_trace_complete: bool
     os_observer_complete: bool
+    cross_host_verified: bool
     route_bindings: List[Dict[str, Any]]
     trace_status: str
     recorded_at: str
@@ -520,10 +525,13 @@ class DistributedTransportAuthorityRouteTrace:
             "trace_profile": self.trace_profile,
             "socket_trace_profile": self.socket_trace_profile,
             "os_observer_profile": self.os_observer_profile,
+            "cross_host_binding_profile": self.cross_host_binding_profile,
             "ca_bundle_ref": self.ca_bundle_ref,
             "client_certificate_ref": self.client_certificate_ref,
             "server_name": self.server_name,
+            "authority_cluster_ref": self.authority_cluster_ref,
             "route_count": self.route_count,
+            "distinct_remote_host_count": self.distinct_remote_host_count,
             "mtls_authenticated_count": self.mtls_authenticated_count,
             "trusted_root_refs": list(self.trusted_root_refs),
             "non_loopback_verified": self.non_loopback_verified,
@@ -531,6 +539,7 @@ class DistributedTransportAuthorityRouteTrace:
             "response_digest_bound": self.response_digest_bound,
             "socket_trace_complete": self.socket_trace_complete,
             "os_observer_complete": self.os_observer_complete,
+            "cross_host_verified": self.cross_host_verified,
             "route_bindings": [dict(binding) for binding in self.route_bindings],
             "trace_status": self.trace_status,
             "recorded_at": self.recorded_at,
@@ -1397,6 +1406,14 @@ class DistributedTransportService:
         }
         if sorted(normalized_targets) != sorted(authority_server_map):
             raise ValueError("authority route trace must cover every reachable authority-plane key server")
+        authority_cluster_refs = sorted(
+            {target["authority_cluster_ref"] for target in normalized_targets.values()}
+        )
+        if len(authority_cluster_refs) != 1:
+            raise ValueError(
+                "authority route trace route_targets must belong to exactly 1 authority_cluster_ref"
+            )
+        authority_cluster_ref = authority_cluster_refs[0]
 
         timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
         ca_path = self._require_non_empty_string(ca_cert_path, "ca_cert_path")
@@ -1420,6 +1437,10 @@ class DistributedTransportService:
             authority_server = authority_server_map[key_server_ref]
             server_endpoint = target["server_endpoint"]
             server_name = target["server_name"]
+            remote_host_ref = target["remote_host_ref"]
+            remote_host_attestation_ref = target["remote_host_attestation_ref"]
+            remote_jurisdiction = target["remote_jurisdiction"]
+            remote_network_zone = target["remote_network_zone"]
             parsed_endpoint = urlsplit(server_endpoint)
             if parsed_endpoint.scheme != "https":
                 raise ValueError("authority route trace endpoints must use https://")
@@ -1451,6 +1472,9 @@ class DistributedTransportService:
                 local_port=local_port,
                 remote_ip=remote_ip,
                 remote_port=remote_port,
+                remote_host_ref=remote_host_ref,
+                remote_host_attestation_ref=remote_host_attestation_ref,
+                authority_cluster_ref=authority_cluster_ref,
             )
             response_bytes = b""
             while True:
@@ -1487,6 +1511,11 @@ class DistributedTransportService:
                     "authority_status": authority_server["authority_status"],
                     "server_endpoint": server_endpoint,
                     "server_name": server_name,
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": remote_host_attestation_ref,
+                    "authority_cluster_ref": authority_cluster_ref,
+                    "remote_jurisdiction": remote_jurisdiction,
+                    "remote_network_zone": remote_network_zone,
                     "route_binding_ref": route_binding_ref,
                     "matched_root_refs": list(authority_server["matched_root_refs"]),
                     "mtls_status": mtls_status,
@@ -1521,6 +1550,9 @@ class DistributedTransportService:
 
         recorded_at = utc_now_iso()
         route_count = len(route_bindings)
+        distinct_remote_host_count = len(
+            {binding["remote_host_ref"] for binding in route_bindings}
+        )
         mtls_authenticated_count = sum(
             1 for binding in route_bindings if binding["mtls_status"] == "authenticated"
         )
@@ -1546,7 +1578,17 @@ class DistributedTransportService:
             binding["os_observer_receipt"]["receipt_status"] == "observed"
             and binding["os_observer_receipt"]["observed_sources"]
             and binding["os_observer_receipt"]["connection_states"]
+            and binding["os_observer_receipt"]["remote_host_ref"] == binding["remote_host_ref"]
+            and binding["os_observer_receipt"]["remote_host_attestation_ref"]
+            == binding["remote_host_attestation_ref"]
+            and binding["os_observer_receipt"]["authority_cluster_ref"]
+            == binding["authority_cluster_ref"]
             for binding in route_bindings
+        )
+        cross_host_verified = (
+            distinct_remote_host_count == route_count
+            and route_count >= 2
+            and all(binding["remote_host_attestation_ref"] for binding in route_bindings)
         )
         trace_status = (
             "authenticated"
@@ -1570,10 +1612,13 @@ class DistributedTransportService:
             "trace_profile": AUTHORITY_ROUTE_TRACE_PROFILE,
             "socket_trace_profile": AUTHORITY_ROUTE_SOCKET_PROFILE,
             "os_observer_profile": AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
+            "cross_host_binding_profile": AUTHORITY_ROUTE_CROSS_HOST_PROFILE,
             "ca_bundle_ref": normalized_ca_ref,
             "client_certificate_ref": normalized_client_ref,
             "server_name": route_bindings[0]["server_name"],
+            "authority_cluster_ref": authority_cluster_ref,
             "route_count": route_count,
+            "distinct_remote_host_count": distinct_remote_host_count,
             "mtls_authenticated_count": mtls_authenticated_count,
             "trusted_root_refs": list(authority_plane.trusted_root_refs),
             "non_loopback_verified": non_loopback_verified,
@@ -1581,6 +1626,7 @@ class DistributedTransportService:
             "response_digest_bound": response_digest_bound,
             "socket_trace_complete": socket_trace_complete,
             "os_observer_complete": os_observer_complete,
+            "cross_host_verified": cross_host_verified,
             "route_bindings": route_bindings,
             "trace_status": trace_status,
             "recorded_at": recorded_at,
@@ -1600,10 +1646,13 @@ class DistributedTransportService:
             trace_profile=AUTHORITY_ROUTE_TRACE_PROFILE,
             socket_trace_profile=AUTHORITY_ROUTE_SOCKET_PROFILE,
             os_observer_profile=AUTHORITY_ROUTE_OS_OBSERVER_PROFILE,
+            cross_host_binding_profile=AUTHORITY_ROUTE_CROSS_HOST_PROFILE,
             ca_bundle_ref=normalized_ca_ref,
             client_certificate_ref=normalized_client_ref,
             server_name=payload["server_name"],
+            authority_cluster_ref=authority_cluster_ref,
             route_count=route_count,
+            distinct_remote_host_count=distinct_remote_host_count,
             mtls_authenticated_count=mtls_authenticated_count,
             trusted_root_refs=list(authority_plane.trusted_root_refs),
             non_loopback_verified=non_loopback_verified,
@@ -1611,6 +1660,7 @@ class DistributedTransportService:
             response_digest_bound=response_digest_bound,
             socket_trace_complete=socket_trace_complete,
             os_observer_complete=os_observer_complete,
+            cross_host_verified=cross_host_verified,
             route_bindings=route_bindings,
             trace_status=trace_status,
             recorded_at=recorded_at,
@@ -1936,6 +1986,9 @@ class DistributedTransportService:
         local_port: int,
         remote_ip: str,
         remote_port: int,
+        remote_host_ref: str,
+        remote_host_attestation_ref: str,
+        authority_cluster_ref: str,
     ) -> Dict[str, Any]:
         observed_sources: set[str] = set()
         connection_states: set[str] = set()
@@ -1970,6 +2023,16 @@ class DistributedTransportService:
 
         receipt_status = "observed" if observed_sources else "missing"
         tuple_payload = f"{local_ip}:{local_port}->{remote_ip}:{remote_port}"
+        host_binding_digest = sha256_text(
+            canonical_json(
+                {
+                    "authority_cluster_ref": authority_cluster_ref,
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": remote_host_attestation_ref,
+                    "tuple_digest": sha256_text(tuple_payload),
+                }
+            )
+        )
         return {
             "kind": "distributed_transport_os_observer_receipt",
             "schema_version": "1.0.0",
@@ -1983,10 +2046,14 @@ class DistributedTransportService:
             "local_port": local_port,
             "remote_ip": remote_ip,
             "remote_port": remote_port,
+            "remote_host_ref": remote_host_ref,
+            "remote_host_attestation_ref": remote_host_attestation_ref,
+            "authority_cluster_ref": authority_cluster_ref,
             "owning_pid": owning_pid,
             "observed_sources": sorted(observed_sources),
             "connection_states": sorted(connection_states),
             "tuple_digest": sha256_text(tuple_payload),
+            "host_binding_digest": host_binding_digest,
             "receipt_status": receipt_status,
         }
 
@@ -2810,6 +2877,26 @@ class DistributedTransportService:
                 "server_name": cls._require_non_empty_string(
                     value.get("server_name"),
                     f"route_targets[{index}].server_name",
+                ),
+                "remote_host_ref": cls._require_non_empty_string(
+                    value.get("remote_host_ref"),
+                    f"route_targets[{index}].remote_host_ref",
+                ),
+                "remote_host_attestation_ref": cls._require_non_empty_string(
+                    value.get("remote_host_attestation_ref"),
+                    f"route_targets[{index}].remote_host_attestation_ref",
+                ),
+                "authority_cluster_ref": cls._require_non_empty_string(
+                    value.get("authority_cluster_ref"),
+                    f"route_targets[{index}].authority_cluster_ref",
+                ),
+                "remote_jurisdiction": cls._require_non_empty_string(
+                    value.get("remote_jurisdiction"),
+                    f"route_targets[{index}].remote_jurisdiction",
+                ),
+                "remote_network_zone": cls._require_non_empty_string(
+                    value.get("remote_network_zone"),
+                    f"route_targets[{index}].remote_network_zone",
                 ),
             }
         return normalized

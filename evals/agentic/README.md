@@ -45,6 +45,10 @@ anti-replay verdict を receipt と一貫した shape で返すこと。
 rotated distributed transport handoff が live remote PKI root-directory から
 reachable endpoint と root quorum を取得し、response digest つき receipt に束縛できること。
 
+### Distributed Transport Cross-Host Authority Binding
+authority route trace が remote host / host attestation / authority cluster binding を
+OS observer receipt と同じ tuple evidence に束縛し、distinct remote host 条件を固定すること。
+
 ### Cognitive Audit Loop
 qualia checkpoint と self-model abrupt change と metacognition alert が
 bounded Council review に束ねられ、continuity-safe な follow-up を返すこと。
