@@ -1200,7 +1200,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["network_receipt_verified"])
         self.assertTrue(result["validation"]["network_endpoint_bound"])
         self.assertTrue(result["validation"]["binding_carries_receipt"])
+        self.assertTrue(result["validation"]["binding_carries_transport_exchange"])
+        self.assertTrue(result["validation"]["binding_carries_transport_exchange_digest"])
         self.assertTrue(result["validation"]["binding_carries_trust_root"])
+        self.assertTrue(result["validation"]["transport_exchange_bound"])
+        self.assertTrue(result["validation"]["transport_exchange_request_digest_bound"])
         self.assertEqual(
             "guardian-reviewer-remote-attestation-v1",
             result["reviewer"]["credential_verification"]["network_receipt"]["network_profile_id"],
@@ -1208,6 +1212,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "verifier://guardian-oversight.jp",
             result["reviewer"]["credential_verification"]["network_receipt"]["verifier_endpoint"],
+        )
+        self.assertEqual(
+            "digest-bound-reviewer-transport-exchange-v1",
+            result["reviewer"]["credential_verification"]["network_receipt"]["transport_exchange"]["exchange_profile_id"],
         )
 
     def test_ethics_demo_emits_rule_language_and_events(self) -> None:

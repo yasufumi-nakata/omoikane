@@ -136,6 +136,14 @@ properties:
           type:
             - string
             - "null"
+        transport_exchange_id:
+          type:
+            - string
+            - "null"
+        transport_exchange_digest:
+          type:
+            - string
+            - "null"
         authority_chain_ref:
           type:
             - string

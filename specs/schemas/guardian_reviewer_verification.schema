@@ -93,6 +93,27 @@ examples:
       authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
       trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
       trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+      transport_exchange:
+        kind: guardian_verifier_transport_exchange
+        schema_version: 1.0.0
+        exchange_id: verifier-transport-exchange-0123456789ab
+        verifier_endpoint: verifier://guardian-oversight.jp
+        verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+        jurisdiction: JP-13
+        transport_profile: reviewer-live-proof-bridge-v1
+        exchange_profile_id: digest-bound-reviewer-transport-exchange-v1
+        challenge_ref: challenge://guardian-oversight/reviewer-alpha/2026-04-19T13:00:00Z
+        challenge_digest: sha256:alpha-proof-bridge-20260419
+        request_payload_kind: reviewer-live-proof-request
+        request_payload_ref: sealed://guardian-oversight/human-reviewer-001/transport-request/4d53a5d8a2de
+        request_payload_digest: 7c79269773f611b957d314fe036e61988db080b46cc566c5349de8d5cdb44cf3
+        request_size_bytes: 296
+        response_payload_kind: reviewer-live-proof-response
+        response_payload_ref: sealed://guardian-oversight/human-reviewer-001/transport-response/4d53a5d8a2de
+        response_payload_digest: 81dd18781ff895d61c9a7b8d195ef53d6bb6c8e56f56ed982852216f3542f59d
+        response_size_bytes: 298
+        recorded_at: "2026-04-19T13:00:00Z"
+        digest: a0a91f8e9e985df49009b612c5e55ff145ce3bf9d768577575e95e667604c6c2
       freshness_window_seconds: 900
       observed_latency_ms: 48.6
       receipt_status: verified

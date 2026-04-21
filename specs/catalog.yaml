@@ -1676,7 +1676,16 @@ entries:
       - specs/interfaces/governance.oversight.v0.idl
       - docs/04-ai-governance/guardian-oversight.md
       - reference-runtime
-    rationale: Required to serialize one bounded verifier-network receipt with endpoint, authority-chain, and trust-root bindings for Guardian reviewer verification.
+    rationale: Required to serialize one bounded verifier-network receipt with endpoint, authority-chain, trust-root, and transport-exchange bindings for Guardian reviewer verification.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/guardian_verifier_transport_exchange.schema
+    consumers:
+      - specs/schemas/guardian_verifier_network_receipt.schema
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize one digest-bound verifier transport request/response exchange without storing raw reviewer payload bodies in repo.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_jurisdiction_evidence_bundle.schema
@@ -1700,7 +1709,7 @@ entries:
       - docs/04-ai-governance/guardian-oversight.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make reviewer registration, live verification, verifier-network receipt binding, scoped attestation, breach propagation, and snapshot behavior machine-readable.
+    rationale: Required to make reviewer registration, live verification, verifier-network receipt and transport-exchange binding, scoped attestation, breach propagation, and snapshot behavior machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.naming.v0.idl
@@ -1736,7 +1745,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects verifier endpoint resolution, authority-chain binding, trust-root binding, and latency budget for network-backed Guardian reviewer verification.
+    rationale: Protects verifier endpoint resolution, authority-chain binding, trust-root binding, transport-exchange digest binding, and latency budget for network-backed Guardian reviewer verification.
   - priority: P1
     kind: schema
     file: specs/schemas/amendment_proposal.schema

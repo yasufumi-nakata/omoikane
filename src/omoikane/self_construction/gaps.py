@@ -12,6 +12,16 @@ PLACEHOLDER_MARKERS = (
     "本体記述",
     "未生成",
 )
+TRUTH_SOURCE_FUTURE_WORK_GLOBS = (
+    "README.md",
+    "docs/07-reference-implementation/README.md",
+    "specs/interfaces/**/*.idl",
+    "specs/schemas/README.md",
+)
+FUTURE_WORK_IGNORED_SNIPPETS = (
+    "deferred surface",
+    "deferred surfaces",
+)
 
 
 class GapScanner:
@@ -24,6 +34,7 @@ class GapScanner:
         empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
         catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
+        future_work_hits = self._future_work_hits(repo_root)
 
         prioritized_tasks: List[Dict[str, str]] = []
         for filename in missing_specs:
@@ -50,6 +61,14 @@ class GapScanner:
                     "summary": f"catalog の次優先ファイルが未実装です: {filename}",
                 }
             )
+        for hit in future_work_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "future-work",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for item in open_questions[:10]:
             prioritized_tasks.append(
                 {
@@ -73,12 +92,14 @@ class GapScanner:
             "missing_expected_file_count": len(missing_specs),
             "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
+            "future_work_hit_count": len(future_work_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
             "empty_eval_surfaces": empty_eval_surfaces,
             "catalog_pending_count": len(catalog_pending),
             "catalog_pending_files": catalog_pending,
             "placeholder_hits": placeholder_hits,
+            "future_work_hits": future_work_hits,
             "prioritized_tasks": prioritized_tasks,
         }
 
@@ -185,4 +206,38 @@ class GapScanner:
                     continue
                 if any(marker in stripped for marker in PLACEHOLDER_MARKERS):
                     hits.append({"path": str(relative_path), "line": stripped})
+        return hits
+
+    def _future_work_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        hits: List[Dict[str, str]] = []
+        seen_paths = set()
+        candidates: List[Path] = []
+        for pattern in TRUTH_SOURCE_FUTURE_WORK_GLOBS:
+            for path in sorted(repo_root.glob(pattern)):
+                if not path.is_file():
+                    continue
+                relative = str(path.relative_to(repo_root))
+                if relative in seen_paths:
+                    continue
+                seen_paths.add(relative)
+                candidates.append(path)
+
+        for path in candidates:
+            relative_path = path.relative_to(repo_root)
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            for line in text.splitlines():
+                stripped = line.strip()
+                lowered = stripped.lower()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if not stripped.startswith("- "):
+                    continue
+                if "future work" not in lowered:
+                    continue
+                if any(snippet in lowered for snippet in FUTURE_WORK_IGNORED_SNIPPETS):
+                    continue
+                hits.append({"path": str(relative_path), "line": stripped})
         return hits

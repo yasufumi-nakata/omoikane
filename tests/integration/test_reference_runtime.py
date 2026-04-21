@@ -1257,8 +1257,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["network_profile_bound"])
         self.assertTrue(result["validation"]["latency_within_budget"])
         self.assertTrue(result["validation"]["binding_carries_receipt"])
+        self.assertTrue(result["validation"]["binding_carries_transport_exchange"])
+        self.assertTrue(result["validation"]["binding_carries_transport_exchange_digest"])
         self.assertTrue(result["validation"]["binding_carries_trust_root"])
         self.assertTrue(result["validation"]["binding_carries_authority_chain"])
+        self.assertTrue(result["validation"]["transport_exchange_bound"])
+        self.assertTrue(result["validation"]["transport_exchange_request_digest_bound"])
         self.assertEqual(
             "verifier://guardian-oversight.jp",
             result["reviewer"]["credential_verification"]["network_receipt"]["verifier_endpoint"],
@@ -1266,6 +1270,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "root://guardian-oversight.jp/reviewer-live-pki",
             result["event"]["reviewer_bindings"][0]["trust_root_ref"],
+        )
+        self.assertEqual(
+            result["event"]["reviewer_bindings"][0]["transport_exchange_digest"],
+            result["reviewer"]["credential_verification"]["network_receipt"]["transport_exchange"]["digest"],
         )
 
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:

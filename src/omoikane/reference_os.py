@@ -3422,6 +3422,7 @@ json.dump(response, sys.stdout)
         )
         policy = self.oversight.policy_snapshot()
         network_receipt = reviewer["credential_verification"]["network_receipt"]
+        transport_exchange = network_receipt["transport_exchange"]
         veto_entry = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="guardian.veto.network-verified",
@@ -3481,6 +3482,14 @@ json.dump(response, sys.stdout)
                 "binding_carries_receipt": bool(
                     veto_event["reviewer_bindings"][0]["network_receipt_id"]
                 ),
+                "binding_carries_transport_exchange": (
+                    veto_event["reviewer_bindings"][0]["transport_exchange_id"]
+                    == transport_exchange["exchange_id"]
+                ),
+                "binding_carries_transport_exchange_digest": (
+                    veto_event["reviewer_bindings"][0]["transport_exchange_digest"]
+                    == transport_exchange["digest"]
+                ),
                 "binding_carries_trust_root": (
                     veto_event["reviewer_bindings"][0]["trust_root_ref"]
                     == network_receipt["trust_root_ref"]
@@ -3489,6 +3498,15 @@ json.dump(response, sys.stdout)
                     veto_event["reviewer_bindings"][0]["authority_chain_ref"]
                     == network_receipt["authority_chain_ref"]
                 ),
+                "transport_exchange_bound": (
+                    transport_exchange["verifier_endpoint"] == network_receipt["verifier_endpoint"]
+                    and transport_exchange["challenge_digest"]
+                    == network_receipt["challenge_digest"]
+                ),
+                "transport_exchange_request_digest_bound": bool(
+                    transport_exchange["request_payload_digest"]
+                )
+                and bool(transport_exchange["response_payload_digest"]),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

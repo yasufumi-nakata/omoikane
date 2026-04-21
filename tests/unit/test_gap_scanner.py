@@ -62,6 +62,46 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "catalog-next-priority" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_truth_source_future_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            interface_path = repo_root / "specs" / "interfaces" / "governance.oversight.v0.idl"
+            interface_path.write_text(
+                "compatibility:\n"
+                "  notes:\n"
+                "    - Jurisdiction-specific legal execution remains future work.\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["future_work_hit_count"])
+            self.assertEqual(
+                "specs/interfaces/governance.oversight.v0.idl",
+                report["future_work_hits"][0]["path"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "future-work" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_ignores_deferred_surface_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            interface_path = repo_root / "specs" / "interfaces" / "mind.semantic.v0.idl"
+            interface_path.write_text(
+                "compatibility:\n"
+                "  notes:\n"
+                "    - procedural-memory must remain a deferred surface in v0\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["future_work_hit_count"])
+            self.assertEqual([], report["future_work_hits"])
+
     @staticmethod
     def _bootstrap_repo(repo_root: Path) -> None:
         (repo_root / "meta").mkdir(parents=True)

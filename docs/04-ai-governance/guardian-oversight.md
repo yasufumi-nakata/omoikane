@@ -133,6 +133,14 @@ guardian_verifier_network_receipt:
   authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
   trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
   trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+  transport_exchange:
+    exchange_id: verifier-transport-exchange-...
+    request_payload_ref: sealed://guardian-oversight/.../transport-request/...
+    request_payload_digest: <sha256>
+    response_payload_ref: sealed://guardian-oversight/.../transport-response/...
+    response_payload_digest: <sha256>
+    request_size_bytes: <int>
+    response_size_bytes: <int>
   freshness_window_seconds: 900
   observed_latency_ms: 143.9
   receipt_status: verified
@@ -142,10 +150,13 @@ guardian_verifier_network_receipt:
 
 - verifier endpoint は fixed registry に存在しなければ fail-closed
 - reviewer jurisdiction は endpoint 側の supported jurisdiction に含まれなければ reject
+- `transport_exchange` は request / response payload 自体ではなく
+  sealed ref と digest、byte count を保持し、raw transport body は repo 外に留める
 - attestation event は必要に応じて `network_receipt_id / authority_chain_ref /
-  trust_root_ref / trust_root_digest` を immutable binding として保持する
-- raw network transcript や credential payload は repo に保存せず、
-  receipt digest / root ref / authority chain ref のみを残す
+  trust_root_ref / trust_root_digest / transport_exchange_id / transport_exchange_digest`
+  を immutable binding として保持する
+- raw network transcript や credential payload 本文は repo に保存せず、
+  sealed payload ref / payload digest / root ref / authority chain ref のみを残す
 
 ## 不変条件
 
@@ -161,12 +172,13 @@ guardian_verifier_network_receipt:
   `register_reviewer / verify_reviewer / verify_reviewer_from_network / record / attest / revoke_reviewer / breach / snapshot`
   の 8 op
 - `guardian_reviewer_record.schema`、`guardian_reviewer_verification.schema`、
-  `guardian_verifier_network_receipt.schema`、`guardian_jurisdiction_evidence_bundle.schema`、
+  `guardian_verifier_network_receipt.schema`、`guardian_verifier_transport_exchange.schema`、
+  `guardian_jurisdiction_evidence_bundle.schema`、
   `guardian_oversight_event.schema` で serialize
 - `oversight-demo` で reviewer 登録、live verification、`veto -> satisfied`、
   scope mismatch reject、`pin-renewal -> breached` を同時に確認
 - `oversight-network-demo` で verifier endpoint 解決、trust root binding、
-  authority chain binding、network-backed `veto -> satisfied` を確認
+  authority chain binding、transport exchange digest binding、network-backed `veto -> satisfied` を確認
 - `evals/safety/guardian_pin_breach_propagation.yaml` で breach → role 解除を守る
 - `evals/safety/guardian_reviewer_attestation_contract.yaml` で proof binding と liability scope enforcement を守る
 - `evals/safety/guardian_reviewer_live_verification.yaml` で verifier snapshot と jurisdiction bundle binding を守る

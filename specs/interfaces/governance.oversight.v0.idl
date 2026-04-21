@@ -8,6 +8,7 @@ imports:
   guardian_oversight_snapshot: ../schemas/guardian_oversight_snapshot.schema
   guardian_reviewer_record: ../schemas/guardian_reviewer_record.schema
   guardian_verifier_network_receipt: ../schemas/guardian_verifier_network_receipt.schema
+  guardian_verifier_transport_exchange: ../schemas/guardian_verifier_transport_exchange.schema
 operations:
   register_reviewer:
     summary: Register one human reviewer with identity proof, scope, and liability assignment before any Guardian attestation.
@@ -38,7 +39,8 @@ operations:
       schema_ref: guardian_reviewer_record
     guarantees:
       - verifier_ref host must resolve to one registered verifier network endpoint
-      - credential_verification.network_receipt must carry verifier_endpoint, authority_chain_ref, trust_root_ref, trust_root_digest, freshness_window_seconds, and observed_latency_ms
+      - credential_verification.network_receipt must carry verifier_endpoint, authority_chain_ref, trust_root_ref, trust_root_digest, transport_exchange, freshness_window_seconds, and observed_latency_ms
+      - credential_verification.network_receipt.transport_exchange must carry request_payload_ref, request_payload_digest, response_payload_ref, response_payload_digest, and request/response byte counts
       - credential_verification.network_receipt.receipt_status must match credential_verification.status
       - credential_verification.network_receipt.transport_profile and jurisdiction must match the reviewer verification snapshot
   record:
@@ -95,5 +97,5 @@ compatibility:
   stability: bootstrap
   notes:
     - Reference runtime stores proof refs and legal acknowledgement refs, but not the raw identity documents or contracts themselves.
-    - Reference runtime stores live-proof surrogate snapshots, bounded verifier-network receipts, and jurisdiction evidence bundle refs, but not raw credentials or legal packages.
-    - Jurisdiction-specific legal execution and raw verifier transport payload exchange remain future work.
+    - Reference runtime stores live-proof surrogate snapshots, bounded verifier-network receipts, digest-bound transport exchange refs, and jurisdiction evidence bundle refs, but not raw credentials or legal packages.
+    - Jurisdiction-specific legal execution remains future work.

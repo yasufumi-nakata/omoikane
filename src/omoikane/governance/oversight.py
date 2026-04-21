@@ -29,6 +29,9 @@ REVIEWER_VERIFICATION_STATUSES = ("verified", "stale", "revoked")
 JURISDICTION_BUNDLE_STATUSES = ("ready", "stale", "revoked")
 VERIFICATION_TRANSPORT_PROFILES = ("reviewer-live-proof-bridge-v1",)
 VERIFIER_NETWORK_PROFILE_ID = "guardian-reviewer-remote-attestation-v1"
+VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID = "digest-bound-reviewer-transport-exchange-v1"
+VERIFIER_TRANSPORT_REQUEST_KIND = "reviewer-live-proof-request"
+VERIFIER_TRANSPORT_RESPONSE_KIND = "reviewer-live-proof-response"
 VERIFIER_NETWORK_ENDPOINTS = {
     "verifier://guardian-oversight.jp": {
         "supported_jurisdictions": ("JP-13",),
@@ -239,6 +242,7 @@ class GuardianVerifierNetworkReceipt:
     authority_chain_ref: str
     trust_root_ref: str
     trust_root_digest: str
+    transport_exchange: "GuardianVerifierTransportExchange"
     freshness_window_seconds: int
     observed_latency_ms: float
     receipt_status: str
@@ -262,12 +266,81 @@ class GuardianVerifierNetworkReceipt:
         _normalize_non_empty(self.authority_chain_ref, "authority_chain_ref")
         _normalize_non_empty(self.trust_root_ref, "trust_root_ref")
         _normalize_non_empty(self.trust_root_digest, "trust_root_digest")
+        if self.transport_exchange.transport_profile != self.transport_profile:
+            raise ValueError("transport_exchange transport_profile must match network receipt")
+        if self.transport_exchange.verifier_endpoint != self.verifier_endpoint:
+            raise ValueError("transport_exchange verifier_endpoint must match network receipt")
+        if self.transport_exchange.verifier_ref != self.verifier_ref:
+            raise ValueError("transport_exchange verifier_ref must match network receipt")
+        if self.transport_exchange.jurisdiction != self.jurisdiction:
+            raise ValueError("transport_exchange jurisdiction must match network receipt")
+        if self.transport_exchange.challenge_ref != self.challenge_ref:
+            raise ValueError("transport_exchange challenge_ref must match network receipt")
+        if self.transport_exchange.challenge_digest != self.challenge_digest:
+            raise ValueError("transport_exchange challenge_digest must match network receipt")
         if self.freshness_window_seconds < 1:
             raise ValueError("freshness_window_seconds must be >= 1")
         if self.observed_latency_ms < 0:
             raise ValueError("observed_latency_ms must be >= 0")
         if self.receipt_status not in REVIEWER_VERIFICATION_STATUSES:
             raise ValueError(f"unsupported receipt_status: {self.receipt_status}")
+        _parse_datetime(self.recorded_at, "recorded_at")
+        _normalize_non_empty(self.digest, "digest")
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        data["transport_exchange"] = self.transport_exchange.to_dict()
+        return data
+
+
+@dataclass(frozen=True)
+class GuardianVerifierTransportExchange:
+    """Digest-bound request/response exchange captured from the verifier transport."""
+
+    exchange_id: str
+    verifier_endpoint: str
+    verifier_ref: str
+    jurisdiction: str
+    transport_profile: str
+    exchange_profile_id: str
+    challenge_ref: str
+    challenge_digest: str
+    request_payload_kind: str
+    request_payload_ref: str
+    request_payload_digest: str
+    request_size_bytes: int
+    response_payload_kind: str
+    response_payload_ref: str
+    response_payload_digest: str
+    response_size_bytes: int
+    recorded_at: str
+    digest: str
+    kind: str = "guardian_verifier_transport_exchange"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.exchange_id, "exchange_id")
+        _normalize_non_empty(self.verifier_endpoint, "verifier_endpoint")
+        _normalize_non_empty(self.verifier_ref, "verifier_ref")
+        _normalize_non_empty(self.jurisdiction, "jurisdiction")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        if self.exchange_profile_id != VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID:
+            raise ValueError(f"unsupported exchange_profile_id: {self.exchange_profile_id}")
+        _normalize_non_empty(self.challenge_ref, "challenge_ref")
+        _normalize_non_empty(self.challenge_digest, "challenge_digest")
+        if self.request_payload_kind != VERIFIER_TRANSPORT_REQUEST_KIND:
+            raise ValueError(f"unsupported request_payload_kind: {self.request_payload_kind}")
+        if self.response_payload_kind != VERIFIER_TRANSPORT_RESPONSE_KIND:
+            raise ValueError(f"unsupported response_payload_kind: {self.response_payload_kind}")
+        _normalize_non_empty(self.request_payload_ref, "request_payload_ref")
+        _normalize_non_empty(self.request_payload_digest, "request_payload_digest")
+        _normalize_non_empty(self.response_payload_ref, "response_payload_ref")
+        _normalize_non_empty(self.response_payload_digest, "response_payload_digest")
+        if self.request_size_bytes < 1:
+            raise ValueError("request_size_bytes must be >= 1")
+        if self.response_size_bytes < 1:
+            raise ValueError("response_size_bytes must be >= 1")
         _parse_datetime(self.recorded_at, "recorded_at")
         _normalize_non_empty(self.digest, "digest")
 
@@ -382,6 +455,8 @@ class ReviewerBinding:
     guardian_role: str
     category: str
     network_receipt_id: Optional[str] = None
+    transport_exchange_id: Optional[str] = None
+    transport_exchange_digest: Optional[str] = None
     authority_chain_ref: Optional[str] = None
     trust_root_ref: Optional[str] = None
     trust_root_digest: Optional[str] = None
@@ -410,6 +485,14 @@ class ReviewerBinding:
         self.network_receipt_id = _normalize_optional_non_empty(
             self.network_receipt_id,
             "network_receipt_id",
+        )
+        self.transport_exchange_id = _normalize_optional_non_empty(
+            self.transport_exchange_id,
+            "transport_exchange_id",
+        )
+        self.transport_exchange_digest = _normalize_optional_non_empty(
+            self.transport_exchange_digest,
+            "transport_exchange_digest",
         )
         self.authority_chain_ref = _normalize_optional_non_empty(
             self.authority_chain_ref,
@@ -736,6 +819,8 @@ class OversightService:
                     "jurisdiction_bundle_ref",
                     "jurisdiction_bundle_digest",
                     "network_receipt_id",
+                    "transport_exchange_id",
+                    "transport_exchange_digest",
                     "authority_chain_ref",
                     "trust_root_ref",
                     "trust_root_digest",
@@ -756,9 +841,19 @@ class OversightService:
                     "authority_chain_ref",
                     "trust_root_ref",
                     "trust_root_digest",
+                    "transport_exchange",
                     "freshness_window_seconds",
                     "observed_latency_ms",
                     "receipt_status",
+                ],
+                "required_transport_exchange_fields": [
+                    "exchange_id",
+                    "request_payload_ref",
+                    "request_payload_digest",
+                    "response_payload_ref",
+                    "response_payload_digest",
+                    "request_size_bytes",
+                    "response_size_bytes",
                 ],
                 "freshness_window_seconds": min(
                     endpoint["freshness_window_seconds"]
@@ -888,6 +983,16 @@ class OversightService:
                 network_receipt_id=(
                     network_receipt.receipt_id if network_receipt is not None else None
                 ),
+                transport_exchange_id=(
+                    network_receipt.transport_exchange.exchange_id
+                    if network_receipt is not None
+                    else None
+                ),
+                transport_exchange_digest=(
+                    network_receipt.transport_exchange.digest
+                    if network_receipt is not None
+                    else None
+                ),
                 authority_chain_ref=(
                     network_receipt.authority_chain_ref if network_receipt is not None else None
                 ),
@@ -946,6 +1051,19 @@ class OversightService:
             challenge_digest,
             endpoint["max_observed_latency_ms"],
         )
+        transport_exchange = self._build_transport_exchange(
+            reviewer=reviewer,
+            verifier_endpoint=verifier_endpoint,
+            verifier_ref=verifier_ref,
+            challenge_ref=challenge_ref,
+            challenge_digest=challenge_digest,
+            transport_profile=transport_profile,
+            authority_chain_ref=endpoint["authority_chain_ref"],
+            trust_root_ref=endpoint["trust_root_ref"],
+            trust_root_digest=endpoint["trust_root_digest"],
+            receipt_status=receipt_status,
+            recorded_at=recorded_at,
+        )
         receipt_payload = {
             "receipt_id": new_id("verifier-network-receipt"),
             "reviewer_id": reviewer.reviewer_id,
@@ -959,6 +1077,7 @@ class OversightService:
             "authority_chain_ref": endpoint["authority_chain_ref"],
             "trust_root_ref": endpoint["trust_root_ref"],
             "trust_root_digest": endpoint["trust_root_digest"],
+            "transport_exchange": transport_exchange.to_dict(),
             "freshness_window_seconds": endpoint["freshness_window_seconds"],
             "observed_latency_ms": observed_latency_ms,
             "receipt_status": receipt_status,
@@ -966,8 +1085,78 @@ class OversightService:
         }
         digest = sha256_text(canonical_json(receipt_payload))
         return GuardianVerifierNetworkReceipt(
-            **receipt_payload,
+            **{**receipt_payload, "transport_exchange": transport_exchange},
             digest=digest,
+        )
+
+    def _build_transport_exchange(
+        self,
+        *,
+        reviewer: GuardianReviewerRecord,
+        verifier_endpoint: str,
+        verifier_ref: str,
+        challenge_ref: str,
+        challenge_digest: str,
+        transport_profile: str,
+        authority_chain_ref: str,
+        trust_root_ref: str,
+        trust_root_digest: str,
+        receipt_status: str,
+        recorded_at: str,
+    ) -> GuardianVerifierTransportExchange:
+        challenge_token = sha256_text(f"{verifier_ref}:{challenge_ref}")[:12]
+        request_payload = {
+            "reviewer_id": reviewer.reviewer_id,
+            "verifier_ref": verifier_ref,
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "transport_profile": transport_profile,
+            "requested_bindings": [
+                "identity-proof-digest",
+                "jurisdiction-bundle-digest",
+            ],
+        }
+        response_payload = {
+            "reviewer_id": reviewer.reviewer_id,
+            "verifier_ref": verifier_ref,
+            "challenge_digest": challenge_digest,
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "authority_chain_ref": authority_chain_ref,
+            "trust_root_ref": trust_root_ref,
+            "trust_root_digest": trust_root_digest,
+            "receipt_status": receipt_status,
+        }
+        request_payload_ref = (
+            f"sealed://guardian-oversight/{reviewer.reviewer_id}/transport-request/{challenge_token}"
+        )
+        response_payload_ref = (
+            f"sealed://guardian-oversight/{reviewer.reviewer_id}/transport-response/{challenge_token}"
+        )
+        request_payload_digest = sha256_text(canonical_json(request_payload))
+        response_payload_digest = sha256_text(canonical_json(response_payload))
+        exchange_payload = {
+            "exchange_id": new_id("verifier-transport-exchange"),
+            "verifier_endpoint": verifier_endpoint,
+            "verifier_ref": verifier_ref,
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "transport_profile": transport_profile,
+            "exchange_profile_id": VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID,
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "request_payload_kind": VERIFIER_TRANSPORT_REQUEST_KIND,
+            "request_payload_ref": request_payload_ref,
+            "request_payload_digest": request_payload_digest,
+            "request_size_bytes": len(canonical_json(request_payload).encode("utf-8")),
+            "response_payload_kind": VERIFIER_TRANSPORT_RESPONSE_KIND,
+            "response_payload_ref": response_payload_ref,
+            "response_payload_digest": response_payload_digest,
+            "response_size_bytes": len(canonical_json(response_payload).encode("utf-8")),
+            "recorded_at": recorded_at,
+        }
+        return GuardianVerifierTransportExchange(
+            **exchange_payload,
+            digest=sha256_text(canonical_json(exchange_payload)),
         )
 
     def _revoke_network_receipt(
@@ -989,12 +1178,13 @@ class OversightService:
             "authority_chain_ref": network_receipt.authority_chain_ref,
             "trust_root_ref": network_receipt.trust_root_ref,
             "trust_root_digest": network_receipt.trust_root_digest,
+            "transport_exchange": network_receipt.transport_exchange.to_dict(),
             "freshness_window_seconds": network_receipt.freshness_window_seconds,
             "observed_latency_ms": network_receipt.observed_latency_ms,
             "receipt_status": "revoked",
             "recorded_at": revoked_at,
         }
         return GuardianVerifierNetworkReceipt(
-            **receipt_payload,
+            **{**receipt_payload, "transport_exchange": network_receipt.transport_exchange},
             digest=sha256_text(canonical_json(receipt_payload)),
         )

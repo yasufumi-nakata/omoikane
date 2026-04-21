@@ -111,6 +111,12 @@ class OversightServiceTests(unittest.TestCase):
             "root://guardian-oversight.jp/reviewer-live-pki",
             network_receipt["trust_root_ref"],
         )
+        self.assertEqual(
+            "digest-bound-reviewer-transport-exchange-v1",
+            network_receipt["transport_exchange"]["exchange_profile_id"],
+        )
+        self.assertTrue(network_receipt["transport_exchange"]["request_payload_ref"].startswith("sealed://"))
+        self.assertTrue(network_receipt["transport_exchange"]["response_payload_digest"])
         self.assertLessEqual(network_receipt["observed_latency_ms"], 250.0)
 
     def test_network_verification_rejects_unknown_endpoint(self) -> None:

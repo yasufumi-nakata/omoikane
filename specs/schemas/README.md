@@ -73,6 +73,7 @@
 - `guardian_reviewer_record.schema`
 - `guardian_reviewer_verification.schema`
 - `guardian_verifier_network_receipt.schema`
+- `guardian_verifier_transport_exchange.schema`
 - `guardian_jurisdiction_evidence_bundle.schema`
 - `guardian_oversight_snapshot.schema`
 - `sandbox_signal.schema`

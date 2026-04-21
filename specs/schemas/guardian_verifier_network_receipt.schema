@@ -19,6 +19,7 @@ required:
   - authority_chain_ref
   - trust_root_ref
   - trust_root_digest
+  - transport_exchange
   - freshness_window_seconds
   - observed_latency_ms
   - receipt_status
@@ -66,6 +67,8 @@ properties:
   trust_root_digest:
     type: string
     minLength: 1
+  transport_exchange:
+    $ref: "guardian_verifier_transport_exchange.schema"
   freshness_window_seconds:
     type: integer
     minimum: 1
@@ -99,6 +102,27 @@ examples:
     authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
     trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
     trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+    transport_exchange:
+      kind: guardian_verifier_transport_exchange
+      schema_version: 1.0.0
+      exchange_id: verifier-transport-exchange-0123456789ab
+      verifier_endpoint: verifier://guardian-oversight.jp
+      verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+      jurisdiction: JP-13
+      transport_profile: reviewer-live-proof-bridge-v1
+      exchange_profile_id: digest-bound-reviewer-transport-exchange-v1
+      challenge_ref: challenge://guardian-oversight/reviewer-alpha/2026-04-20T02:00:00Z
+      challenge_digest: sha256:alpha-proof-bridge-20260420
+      request_payload_kind: reviewer-live-proof-request
+      request_payload_ref: sealed://guardian-oversight/human-reviewer-001/transport-request/2c4cc0d4f4b0
+      request_payload_digest: 0f79991493f28cc19d6962eb7ab11e6f6a7ecf958efab165f8d9ef05e7a90709
+      request_size_bytes: 296
+      response_payload_kind: reviewer-live-proof-response
+      response_payload_ref: sealed://guardian-oversight/human-reviewer-001/transport-response/2c4cc0d4f4b0
+      response_payload_digest: 4d867cda85a611c52c2e6425f5ef58316b7e36daf4b3377b93cfcca4237e85d7
+      response_size_bytes: 298
+      recorded_at: "2026-04-20T02:00:00Z"
+      digest: 5600b1c59519cd93f529a24cd90ded53a6ea2e787c1d460fa5b3ffd460c75fc3
     freshness_window_seconds: 900
     observed_latency_ms: 48.6
     receipt_status: verified

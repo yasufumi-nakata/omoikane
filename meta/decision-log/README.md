@@ -69,6 +69,8 @@ status: decided | superseded
 - [2026-04-21_design-reader-git-delta-scan.md](2026-04-21_design-reader-git-delta-scan.md)
 - [2026-04-21_broker-dual-allocation-window.md](2026-04-21_broker-dual-allocation-window.md)
 - [2026-04-22_broker-cross-host-dual-allocation.md](2026-04-22_broker-cross-host-dual-allocation.md)
+- [2026-04-22_gap-report-truth-source-future-work.md](2026-04-22_gap-report-truth-source-future-work.md)
+- [2026-04-22_guardian-verifier-transport-exchange.md](2026-04-22_guardian-verifier-transport-exchange.md)
 - [2026-04-21_builder-rollback-external-observer-receipts.md](2026-04-21_builder-rollback-external-observer-receipts.md)
 - [2026-04-21_builder-rollback-current-worktree-direct-mutation.md](2026-04-21_builder-rollback-current-worktree-direct-mutation.md)
 - [2026-04-20_builder-sandbox-apply-rollout.md](2026-04-20_builder-sandbox-apply-rollout.md)
