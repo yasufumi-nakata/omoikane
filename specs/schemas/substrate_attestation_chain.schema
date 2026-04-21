@@ -12,6 +12,12 @@ required:
   - allocation_id
   - active_substrate_id
   - standby_substrate_id
+  - source_host_ref
+  - source_host_attestation_ref
+  - standby_host_ref
+  - standby_host_attestation_ref
+  - substrate_cluster_ref
+  - cross_host_binding_profile
   - source_attestation_id
   - standby_probe_id
   - continuity_mode
@@ -20,6 +26,10 @@ required:
   - cadence_ms
   - expected_state_digest
   - expected_destination_substrate
+  - expected_destination_host_ref
+  - distinct_host_count
+  - host_binding_digest
+  - cross_host_verified
   - chain_status
   - handoff_ready
   - observations
@@ -46,6 +56,23 @@ properties:
   standby_substrate_id:
     type: string
     minLength: 1
+  source_host_ref:
+    type: string
+    pattern: "^host://"
+  source_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  standby_host_ref:
+    type: string
+    pattern: "^host://"
+  standby_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  substrate_cluster_ref:
+    type: string
+    pattern: "^substrate-cluster://"
+  cross_host_binding_profile:
+    const: attested-cross-host-substrate-handoff-v1
   source_attestation_id:
     type: string
     pattern: "^attest-[a-f0-9]{12}$"
@@ -73,6 +100,17 @@ properties:
   expected_destination_substrate:
     type: string
     minLength: 1
+  expected_destination_host_ref:
+    type: string
+    pattern: "^host://"
+  distinct_host_count:
+    type: integer
+    minimum: 1
+  host_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  cross_host_verified:
+    type: boolean
   chain_status:
     type: string
     enum:
@@ -91,12 +129,17 @@ properties:
         - sequence
         - source_substrate_id
         - standby_substrate_id
+        - source_host_ref
+        - standby_host_ref
         - source_attestation_id
         - source_status
         - standby_probe_id
         - standby_status
         - energy_headroom_jps
         - expected_destination_substrate
+        - expected_destination_host_ref
+        - substrate_cluster_ref
+        - host_binding_digest
         - expected_state_digest
         - observed_at
       properties:
@@ -110,6 +153,12 @@ properties:
         standby_substrate_id:
           type: string
           minLength: 1
+        source_host_ref:
+          type: string
+          pattern: "^host://"
+        standby_host_ref:
+          type: string
+          pattern: "^host://"
         source_attestation_id:
           type: string
           pattern: "^attest-[a-f0-9]{12}$"
@@ -132,6 +181,15 @@ properties:
         expected_destination_substrate:
           type: string
           minLength: 1
+        expected_destination_host_ref:
+          type: string
+          pattern: "^host://"
+        substrate_cluster_ref:
+          type: string
+          pattern: "^substrate-cluster://"
+        host_binding_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
         expected_state_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
@@ -157,6 +215,12 @@ examples:
     allocation_id: alloc-0123456789ab
     active_substrate_id: classical_silicon
     standby_substrate_id: neuromorphic_mesh.alpha
+    source_host_ref: host://substrate/classical-silicon
+    source_host_attestation_ref: host-attestation://substrate/classical-silicon/reference-v1
+    standby_host_ref: host://substrate/neuromorphic-edge-b
+    standby_host_attestation_ref: host-attestation://substrate/neuromorphic-edge-b/reference-v1
+    substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+    cross_host_binding_profile: attested-cross-host-substrate-handoff-v1
     source_attestation_id: attest-0123456789ab
     standby_probe_id: standby-probe-0123456789ab
     continuity_mode: warm-standby
@@ -165,40 +229,59 @@ examples:
     cadence_ms: 250
     expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     expected_destination_substrate: neuromorphic_mesh.alpha
+    expected_destination_host_ref: host://substrate/neuromorphic-edge-b
+    distinct_host_count: 2
+    host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+    cross_host_verified: true
     chain_status: handoff-ready
     handoff_ready: true
     observations:
       - sequence: 1
         source_substrate_id: classical_silicon
         standby_substrate_id: neuromorphic_mesh.alpha
+        source_host_ref: host://substrate/classical-silicon
+        standby_host_ref: host://substrate/neuromorphic-edge-b
         source_attestation_id: attest-0123456789ab
         source_status: healthy
         standby_probe_id: standby-probe-0123456789ab
         standby_status: ready
         energy_headroom_jps: 34
         expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_destination_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         observed_at: "2026-04-21T12:00:00Z"
       - sequence: 2
         source_substrate_id: classical_silicon
         standby_substrate_id: neuromorphic_mesh.alpha
+        source_host_ref: host://substrate/classical-silicon
+        standby_host_ref: host://substrate/neuromorphic-edge-b
         source_attestation_id: attest-0123456789ab
         source_status: healthy
         standby_probe_id: standby-probe-0123456789ab
         standby_status: ready
         energy_headroom_jps: 34
         expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_destination_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         observed_at: "2026-04-21T12:00:01Z"
       - sequence: 3
         source_substrate_id: classical_silicon
         standby_substrate_id: neuromorphic_mesh.alpha
+        source_host_ref: host://substrate/classical-silicon
+        standby_host_ref: host://substrate/neuromorphic-edge-b
         source_attestation_id: attest-0123456789ab
         source_status: healthy
         standby_probe_id: standby-probe-0123456789ab
         standby_status: ready
         energy_headroom_jps: 34
         expected_destination_substrate: neuromorphic_mesh.alpha
+        expected_destination_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         expected_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         observed_at: "2026-04-21T12:00:01Z"
     blocking_reasons: []

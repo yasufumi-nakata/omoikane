@@ -9,6 +9,18 @@ required:
   - allocation_id
   - source_substrate
   - destination_substrate
+  - source_host_ref
+  - source_host_attestation_ref
+  - source_jurisdiction
+  - source_network_zone
+  - destination_host_ref
+  - destination_host_attestation_ref
+  - destination_jurisdiction
+  - destination_network_zone
+  - substrate_cluster_ref
+  - cross_host_binding_profile
+  - host_binding_digest
+  - cross_host_verified
   - state_digest
   - continuity_mode
   - transferred_at
@@ -25,6 +37,40 @@ properties:
   destination_substrate:
     type: string
     minLength: 1
+  source_host_ref:
+    type: string
+    pattern: "^host://"
+  source_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  source_jurisdiction:
+    type: string
+    minLength: 1
+  source_network_zone:
+    type: string
+    minLength: 1
+  destination_host_ref:
+    type: string
+    pattern: "^host://"
+  destination_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  destination_jurisdiction:
+    type: string
+    minLength: 1
+  destination_network_zone:
+    type: string
+    minLength: 1
+  substrate_cluster_ref:
+    type: string
+    pattern: "^substrate-cluster://"
+  cross_host_binding_profile:
+    const: attested-cross-host-substrate-handoff-v1
+  host_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  cross_host_verified:
+    type: boolean
   state_digest:
     type: string
     minLength: 32

@@ -8,6 +8,11 @@ required:
   - allocation_id
   - identity_id
   - substrate
+  - host_ref
+  - host_attestation_ref
+  - jurisdiction
+  - network_zone
+  - substrate_cluster_ref
   - units
   - purpose
   - created_at
@@ -22,6 +27,21 @@ properties:
   substrate:
     type: string
     minLength: 1
+  host_ref:
+    type: string
+    pattern: "^host://"
+  host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  jurisdiction:
+    type: string
+    minLength: 1
+  network_zone:
+    type: string
+    minLength: 1
+  substrate_cluster_ref:
+    type: string
+    pattern: "^substrate-cluster://"
   units:
     type: integer
     minimum: 1

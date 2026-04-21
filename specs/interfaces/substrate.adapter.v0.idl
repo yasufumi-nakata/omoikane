@@ -49,7 +49,7 @@ operations:
     output:
       schema_ref: substrate_attestation
   transfer:
-    summary: Create continuity evidence for migration into another substrate.
+    summary: Create continuity evidence for migration into another substrate with source/destination host binding.
     input:
       inline_schema:
         type: object
@@ -73,6 +73,27 @@ operations:
               - cold-copy
               - warm-standby
               - hot-handoff
+          destination_host_ref:
+            type: string
+            pattern: "^host://"
+          destination_host_attestation_ref:
+            type: string
+            pattern: "^host-attestation://"
+          destination_jurisdiction:
+            type: string
+            minLength: 1
+          destination_network_zone:
+            type: string
+            minLength: 1
+          substrate_cluster_ref:
+            type: string
+            pattern: "^substrate-cluster://"
+          cross_host_binding_profile:
+            type: string
+            minLength: 1
+          host_binding_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
     output:
       schema_ref: substrate_transfer
   release:
@@ -124,3 +145,4 @@ compatibility:
   notes:
     - UnknownAdapter はこの contract を満たしてから専用実装へ昇格させる
     - energy_floor は L1 EthicsEnforcer が維持すべき hard floor を意味する
+    - SubstrateAllocation / SubstrateTransfer は host and cluster metadata を保持し、L1 broker の cross-host handoff binding を支える

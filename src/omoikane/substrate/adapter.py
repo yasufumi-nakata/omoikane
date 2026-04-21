@@ -15,6 +15,11 @@ class SubstrateAllocation:
     allocation_id: str
     identity_id: str
     substrate: str
+    host_ref: str
+    host_attestation_ref: str
+    jurisdiction: str
+    network_zone: str
+    substrate_cluster_ref: str
     units: int
     purpose: str
     created_at: str
@@ -42,6 +47,18 @@ class SubstrateTransferRecord:
     allocation_id: str
     source_substrate: str
     destination_substrate: str
+    source_host_ref: str
+    source_host_attestation_ref: str
+    source_jurisdiction: str
+    source_network_zone: str
+    destination_host_ref: str
+    destination_host_attestation_ref: str
+    destination_jurisdiction: str
+    destination_network_zone: str
+    substrate_cluster_ref: str
+    cross_host_binding_profile: str
+    host_binding_digest: str
+    cross_host_verified: bool
     state_digest: str
     continuity_mode: str
     transferred_at: str
@@ -67,8 +84,24 @@ class ClassicalSiliconAdapter:
         "migration": 30,
     }
 
-    def __init__(self, substrate_id: str = "classical_silicon") -> None:
+    def __init__(
+        self,
+        substrate_id: str = "classical_silicon",
+        *,
+        host_ref: Optional[str] = None,
+        host_attestation_ref: Optional[str] = None,
+        jurisdiction: str = "JP-13",
+        network_zone: Optional[str] = None,
+        substrate_cluster_ref: str = "substrate-cluster://reference-broker-fabric",
+    ) -> None:
         self.substrate_id = substrate_id
+        self.host_ref = host_ref or _default_host_ref(substrate_id)
+        self.host_attestation_ref = host_attestation_ref or _default_host_attestation_ref(
+            substrate_id
+        )
+        self.jurisdiction = jurisdiction
+        self.network_zone = network_zone or _default_network_zone(substrate_id)
+        self.substrate_cluster_ref = substrate_cluster_ref
         self.allocations: Dict[str, SubstrateAllocation] = {}
         self.transfers: List[SubstrateTransferRecord] = []
         self.releases: List[Dict[str, Any]] = []
@@ -85,6 +118,11 @@ class ClassicalSiliconAdapter:
             allocation_id=new_id("alloc"),
             identity_id=identity_id,
             substrate=self.substrate_id,
+            host_ref=self.host_ref,
+            host_attestation_ref=self.host_attestation_ref,
+            jurisdiction=self.jurisdiction,
+            network_zone=self.network_zone,
+            substrate_cluster_ref=self.substrate_cluster_ref,
             units=units,
             purpose=purpose,
             created_at=utc_now_iso(),
@@ -98,13 +136,55 @@ class ClassicalSiliconAdapter:
         state: Dict[str, Any],
         destination_substrate: str,
         continuity_mode: str = "warm-standby",
+        *,
+        destination_host_ref: Optional[str] = None,
+        destination_host_attestation_ref: Optional[str] = None,
+        destination_jurisdiction: Optional[str] = None,
+        destination_network_zone: Optional[str] = None,
+        substrate_cluster_ref: Optional[str] = None,
+        cross_host_binding_profile: str = "attested-cross-host-substrate-handoff-v1",
+        host_binding_digest: Optional[str] = None,
     ) -> SubstrateTransferRecord:
         allocation = self._require_active_allocation(allocation_id)
+        resolved_destination_host_ref = destination_host_ref or _default_host_ref(destination_substrate)
+        resolved_destination_host_attestation_ref = (
+            destination_host_attestation_ref
+            or _default_host_attestation_ref(destination_substrate)
+        )
+        resolved_destination_jurisdiction = destination_jurisdiction or self.jurisdiction
+        resolved_destination_network_zone = destination_network_zone or _default_network_zone(
+            destination_substrate
+        )
+        resolved_cluster_ref = substrate_cluster_ref or allocation.substrate_cluster_ref
+        cross_host_verified = allocation.host_ref != resolved_destination_host_ref
+        resolved_host_binding_digest = host_binding_digest or sha256_text(
+            canonical_json(
+                {
+                    "source_substrate_id": allocation.substrate,
+                    "source_host_ref": allocation.host_ref,
+                    "destination_substrate_id": destination_substrate,
+                    "destination_host_ref": resolved_destination_host_ref,
+                    "substrate_cluster_ref": resolved_cluster_ref,
+                }
+            )
+        )
         record = SubstrateTransferRecord(
             transfer_id=new_id("xfer"),
             allocation_id=allocation.allocation_id,
             source_substrate=allocation.substrate,
             destination_substrate=destination_substrate,
+            source_host_ref=allocation.host_ref,
+            source_host_attestation_ref=allocation.host_attestation_ref,
+            source_jurisdiction=allocation.jurisdiction,
+            source_network_zone=allocation.network_zone,
+            destination_host_ref=resolved_destination_host_ref,
+            destination_host_attestation_ref=resolved_destination_host_attestation_ref,
+            destination_jurisdiction=resolved_destination_jurisdiction,
+            destination_network_zone=resolved_destination_network_zone,
+            substrate_cluster_ref=resolved_cluster_ref,
+            cross_host_binding_profile=cross_host_binding_profile,
+            host_binding_digest=resolved_host_binding_digest,
+            cross_host_verified=cross_host_verified,
             state_digest=sha256_text(canonical_json(state)),
             continuity_mode=continuity_mode,
             transferred_at=utc_now_iso(),
@@ -164,3 +244,27 @@ class ClassicalSiliconAdapter:
         if allocation.status != "allocated":
             raise ValueError(f"allocation is not active: {allocation_id}")
         return allocation
+
+
+def _default_host_ref(substrate_id: str) -> str:
+    return f"host://substrate/{_substrate_slug(substrate_id)}"
+
+
+def _default_host_attestation_ref(substrate_id: str) -> str:
+    return f"host-attestation://substrate/{_substrate_slug(substrate_id)}/reference-v1"
+
+
+def _default_network_zone(substrate_id: str) -> str:
+    lowered = substrate_id.lower()
+    if "neuromorphic" in lowered:
+        return "tokyo-b"
+    if "photonic" in lowered:
+        return "osaka-a"
+    if "redundant" in lowered:
+        return "tokyo-c"
+    return "tokyo-a"
+
+
+def _substrate_slug(substrate_id: str) -> str:
+    slug = "".join(character if character.isalnum() else "-" for character in substrate_id.lower())
+    return slug.strip("-") or "substrate"

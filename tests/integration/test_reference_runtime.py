@@ -667,14 +667,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["standby_probe_ready"])
         self.assertTrue(result["validation"]["attestation_chain_ready"])
         self.assertTrue(result["validation"]["attestation_chain_window_complete"])
+        self.assertTrue(result["validation"]["attestation_chain_cross_host_verified"])
         self.assertTrue(result["validation"]["dual_allocation_window_opened"])
         self.assertTrue(result["validation"]["dual_allocation_shadow_allocated"])
         self.assertTrue(result["validation"]["dual_allocation_sync_complete"])
+        self.assertTrue(result["validation"]["dual_allocation_cross_host_verified"])
         self.assertTrue(result["validation"]["attestation_stream_ready"])
         self.assertTrue(result["validation"]["attestation_stream_window_complete"])
         self.assertTrue(result["validation"]["attestation_stream_binds_selected_standby"])
+        self.assertTrue(result["validation"]["attestation_stream_cross_host_verified"])
         self.assertTrue(result["validation"]["dual_allocation_closed"])
         self.assertTrue(result["validation"]["dual_allocation_cleanup_released"])
+        self.assertTrue(result["validation"]["migration_binds_selected_standby"])
         self.assertTrue(result["validation"]["migration_binds_streamed_state"])
         self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
         self.assertEqual(
@@ -683,12 +687,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual("ready", result["broker"]["standby_probe"]["probe_status"])
         self.assertEqual("handoff-ready", result["broker"]["attestation_chain"]["chain_status"])
+        self.assertTrue(result["broker"]["attestation_chain"]["cross_host_verified"])
         self.assertEqual("B", result["broker"]["dual_allocation_window"]["method"])
         self.assertEqual("shadow-active", result["broker"]["dual_allocation_window"]["window_status"])
+        self.assertTrue(result["broker"]["dual_allocation_window"]["cross_host_verified"])
         self.assertEqual(
             "sealed-handoff-ready",
             result["broker"]["attestation_stream"]["stream_status"],
         )
+        self.assertTrue(result["broker"]["attestation_stream"]["cross_host_verified"])
         self.assertEqual(5, len(result["broker"]["attestation_stream"]["observations"]))
         self.assertEqual(
             "allocated",
@@ -700,6 +707,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["broker"]["closed_dual_allocation_window"]["shadow_release"]["status"],
         )
         self.assertEqual("hot-handoff", result["broker"]["migration"]["continuity_mode"])
+        self.assertTrue(result["broker"]["migration"]["cross_host_verified"])
         self.assertEqual("released", result["broker"]["release"]["status"])
         self.assertEqual("released", result["broker"]["final_state"]["release"]["status"])
 

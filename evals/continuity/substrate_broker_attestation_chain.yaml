@@ -19,7 +19,8 @@ assertions:
   - Standby probe must expose health_score, attestation_valid, and energy_headroom_jps against the required floor
   - ready_for_migrate must be true only when the standby candidate remains healthy, attested, and above the energy floor
   - bridge_attestation_chain must fail closed unless the active broker attestation is healthy
-  - The attestation bridge window must keep one expected_state_digest and expected_destination_substrate across all observations
+  - The attestation bridge window must keep one expected_state_digest, expected_destination_substrate, and expected_destination_host_ref across all observations
+  - bridge_attestation_chain must bind one distinct-host pair and one substrate_cluster_ref before Method B shadow-sync can open
   - handoff-ready status must require a ready standby probe before migrate
 metric: exact-match
 threshold: 1.0

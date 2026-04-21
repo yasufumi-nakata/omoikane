@@ -27,6 +27,11 @@ class ClassicalSiliconAdapterTests(unittest.TestCase):
         release = adapter.release(allocation_id=allocation.allocation_id, reason="migration-complete")
 
         self.assertEqual("identity-1", allocation.identity_id)
+        self.assertEqual("host://substrate/classical-silicon", allocation.host_ref)
+        self.assertEqual(
+            "host-attestation://substrate/classical-silicon/reference-v1",
+            allocation.host_attestation_ref,
+        )
         self.assertEqual("migration", energy_floor.workload_class)
         self.assertEqual(30, energy_floor.minimum_joules_per_second)
         self.assertEqual(allocation.allocation_id, attestation.allocation_id)
@@ -34,6 +39,22 @@ class ClassicalSiliconAdapterTests(unittest.TestCase):
             sha256_text(canonical_json({"identity_id": "identity-1", "checkpoint": "connectome-v1"})),
             transfer.state_digest,
         )
+        self.assertEqual(
+            sha256_text(
+                canonical_json(
+                    {
+                        "source_substrate_id": "classical_silicon",
+                        "source_host_ref": "host://substrate/classical-silicon",
+                        "destination_substrate_id": "classical_silicon.redundant",
+                        "destination_host_ref": "host://substrate/classical-silicon-redundant",
+                        "substrate_cluster_ref": "substrate-cluster://reference-broker-fabric",
+                    }
+                )
+            ),
+            transfer.host_binding_digest,
+        )
+        self.assertTrue(transfer.cross_host_verified)
+        self.assertEqual("host://substrate/classical-silicon-redundant", transfer.destination_host_ref)
         self.assertEqual("released", release["status"])
         self.assertEqual("released", adapter.snapshot()["allocations"][0]["status"])
 

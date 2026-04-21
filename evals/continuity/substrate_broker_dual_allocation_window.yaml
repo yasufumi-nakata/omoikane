@@ -20,6 +20,7 @@ fixtures:
 assertions:
   - open_dual_allocation_window must require Method B, a ready standby probe, a healthy source attestation, and a handoff-ready attestation chain
   - the shadow allocation must materialize on the pre-bound standby candidate without introducing any third live allocation
+  - the shadow allocation must bind a distinct standby host within the same substrate_cluster_ref as the active lease
   - sync_observations must keep identical source/shadow state digests with drift_score <= 0.08 across the fixed overlap window
   - hot-handoff migrate must bind the same standby substrate that backs the shadow allocation while the window is active
   - close_dual_allocation_window must release the shadow allocation and emit a closed machine-checkable receipt before the source lease is finally released

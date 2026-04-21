@@ -51,6 +51,11 @@ operations:
                 - health_score
                 - attestation_valid
                 - energy_capacity_jps
+                - host_ref
+                - host_attestation_ref
+                - jurisdiction
+                - network_zone
+                - substrate_cluster_ref
                 - substrate_kind_neutrality_index
               properties:
                 substrate_id:
@@ -72,12 +77,28 @@ operations:
                 energy_capacity_jps:
                   type: integer
                   minimum: 1
+                host_ref:
+                  type: string
+                  pattern: "^host://"
+                host_attestation_ref:
+                  type: string
+                  pattern: "^host-attestation://"
+                jurisdiction:
+                  type: string
+                  minLength: 1
+                network_zone:
+                  type: string
+                  minLength: 1
+                substrate_cluster_ref:
+                  type: string
+                  pattern: "^substrate-cluster://"
                 substrate_kind_neutrality_index:
                   type: integer
                   minimum: 0
     guarantees:
       - registry must expose the substrate_kind_neutrality_index used for tie-breaking
       - registry entries must retain capability_score, health_score, and energy capacity for deterministic filtering
+      - registry entries must expose host and cluster metadata for cross-host Method B handoff binding
   select_substrate:
     summary: Select one active substrate and one standby candidate for one requested method and workload class.
     input:
@@ -131,6 +152,8 @@ operations:
               - substrate_id
               - substrate_kind
               - health_score
+              - host_ref
+              - substrate_cluster_ref
               - substrate_kind_neutrality_index
             properties:
               substrate_id:
@@ -143,6 +166,12 @@ operations:
                 type: number
                 minimum: 0
                 maximum: 1
+              host_ref:
+                type: string
+                pattern: "^host://"
+              substrate_cluster_ref:
+                type: string
+                pattern: "^substrate-cluster://"
               substrate_kind_neutrality_index:
                 type: integer
                 minimum: 0
@@ -161,6 +190,7 @@ operations:
       - candidates must satisfy capability, health, attestation validity, and energy floor filters before ranking
       - ties must be broken by substrate_kind_neutrality_index before stable substrate_id ordering
       - standby_substrate must prefer a different substrate_kind when an equally safe candidate exists
+      - Method B candidates must expose host bindings so a later shadow allocation can prove a distinct-host handoff
   lease:
     summary: Create one active lease on the selected substrate and bind one standby candidate for later migrate.
     input:
@@ -275,7 +305,8 @@ operations:
       schema_ref: substrate_attestation_chain
     guarantees:
       - bridge_attestation_chain must fail closed when the latest active attestation is missing or unhealthy
-      - bridge_attestation_chain must bind the latest standby probe and the expected destination substrate before migrate
+      - bridge_attestation_chain must bind the latest standby probe, expected destination substrate, and expected destination host before migrate
+      - bridge_attestation_chain must fail closed when the active and standby substrates do not form one distinct-host cluster pair
       - the fixed attestation window must expose sequence-ordered observations and one expected_state_digest for the pending handoff
   open_dual_allocation_window:
     summary: Materialize one bounded Method B shadow-sync overlap window on the pre-bound standby substrate.
@@ -307,6 +338,7 @@ operations:
     guarantees:
       - open_dual_allocation_window must require Method B, a ready standby probe, a healthy source attestation, and a handoff-ready attestation chain
       - the shadow allocation must materialize on the pre-bound standby substrate and remain the only second live allocation in the reference runtime
+      - the shadow allocation must bind a distinct standby host in the same substrate cluster as the active allocation
       - the overlap window must bind one source state digest, fixed mirror cadence, and bounded drift before authority handoff
   close_dual_allocation_window:
     summary: Close one bounded Method B dual-allocation window and release its shadow allocation.
@@ -351,7 +383,7 @@ operations:
       schema_ref: substrate_attestation_stream
     guarantees:
       - seal_attestation_stream must require a healthy source attestation, a handoff-ready attestation chain, and a shadow-active dual-allocation window
-      - the stream must keep one expected_state_digest and destination binding across all keepalive beats before migrate
+      - the stream must keep one expected_state_digest, destination substrate, and destination host binding across all keepalive beats before migrate
       - sealed-handoff-ready status must require the fixed keepalive beat count to remain healthy with drift at or below the dual-allocation ceiling
   migrate:
     summary: Migrate one attested active lease onto its standby target or an explicitly supplied safe destination.
@@ -383,7 +415,8 @@ operations:
       - migrate must fail closed when the latest attestation is missing or unhealthy
       - destination_substrate must default to the bound standby candidate when omitted
       - hot-handoff migrate must require an open dual-allocation window, a sealed-handoff-ready attestation stream, and the shadow allocation substrate as the destination
-      - hot-handoff migrate must fail closed when the attestation stream state digest or destination binding differs from the pending migrate request
+      - hot-handoff migrate must fail closed when the attestation stream state digest, destination substrate, or destination host binding differs from the pending migrate request
+      - transfer output must bind source/destination host metadata and one cross-host handoff digest
       - transfer output must reuse the canonical substrate_transfer schema
   release:
     summary: Release the source lease after a successful migrate or explicit broker teardown.
@@ -532,4 +565,4 @@ compatibility:
     - The reference runtime defaults to one active lease plus one standby candidate, then allows only one Method B shadow allocation window as the bounded exception.
     - The shadow allocation window is fixed to one standby-backed second allocation, 45s overlap, 250ms mirror cadence, and 3 sync observations before authority handoff.
     - The attestation stream is fixed to 5 healthy keepalive beats at the same 250ms cadence and must be sealed before hot-handoff migrate.
-    - Cross-host dual allocation remains future work beyond the bounded broker contract.
+    - Method B shadow-sync now requires a distinct-host pair inside one fixed substrate cluster and binds that host pair through chain, overlap window, keepalive stream, and transfer receipts.

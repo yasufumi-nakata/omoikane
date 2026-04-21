@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from omoikane.kernel.broker import SubstrateBrokerService
+from omoikane.kernel.broker import BrokerRegistryEntry, SubstrateBrokerService
+from omoikane.substrate.adapter import ClassicalSiliconAdapter
 
 
 class SubstrateBrokerServiceTests(unittest.TestCase):
@@ -163,6 +164,12 @@ class SubstrateBrokerServiceTests(unittest.TestCase):
         self.assertEqual(probe.probe_id, chain.standby_probe_id)
         self.assertEqual(attestation.attestation_id, chain.source_attestation_id)
         self.assertEqual(probe.standby_substrate_id, chain.expected_destination_substrate)
+        self.assertEqual(
+            broker.observe("identity://theta")["selection"]["standby_substrate"]["host_ref"],
+            chain.expected_destination_host_ref,
+        )
+        self.assertTrue(chain.cross_host_verified)
+        self.assertEqual(2, chain.distinct_host_count)
         self.assertEqual(3, len(chain.observations))
 
     def test_dual_allocation_window_requires_method_b(self) -> None:
@@ -231,6 +238,9 @@ class SubstrateBrokerServiceTests(unittest.TestCase):
         self.assertEqual("B", window.method)
         self.assertEqual("shadow-active", window.window_status)
         self.assertEqual("allocated", window.shadow_allocation.status)
+        self.assertTrue(window.cross_host_verified)
+        self.assertEqual(2, window.distinct_host_count)
+        self.assertNotEqual(window.source_host_ref, window.shadow_host_ref)
         self.assertEqual(probe.probe_id, window.standby_probe_id)
         self.assertEqual(attestation.attestation_id, window.source_attestation_id)
         self.assertEqual(chain.chain_id, window.attestation_chain_id)
@@ -339,9 +349,97 @@ class SubstrateBrokerServiceTests(unittest.TestCase):
         self.assertEqual(window.window_id, stream.dual_allocation_window_id)
         self.assertEqual("sealed-handoff-ready", stream.stream_status)
         self.assertTrue(stream.handoff_ready)
+        self.assertTrue(stream.cross_host_verified)
+        self.assertEqual(2, stream.distinct_host_count)
+        self.assertEqual(window.shadow_host_ref, stream.expected_destination_host_ref)
         self.assertEqual(5, len(stream.observations))
         self.assertEqual(5, stream.minimum_healthy_beats)
         self.assertEqual(window.shadow_allocation.substrate, transfer.destination_substrate)
+        self.assertEqual(window.shadow_host_ref, transfer.destination_host_ref)
+        self.assertTrue(transfer.cross_host_verified)
+
+    def test_attestation_chain_flags_same_host_pair_as_blocked(self) -> None:
+        active = ClassicalSiliconAdapter(
+            "classical_silicon",
+            host_ref="host://substrate/shared-edge-a",
+            host_attestation_ref="host-attestation://substrate/shared-edge-a/reference-v1",
+            network_zone="tokyo-a",
+            substrate_cluster_ref="substrate-cluster://shared-edge",
+        )
+        standby = ClassicalSiliconAdapter(
+            "neuromorphic_mesh.alpha",
+            host_ref="host://substrate/shared-edge-a",
+            host_attestation_ref="host-attestation://substrate/shared-edge-a/reference-v1",
+            network_zone="tokyo-a",
+            substrate_cluster_ref="substrate-cluster://shared-edge",
+        )
+        broker = SubstrateBrokerService(
+            adapters={
+                active.substrate_id: active,
+                standby.substrate_id: standby,
+            },
+            registry=[
+                BrokerRegistryEntry(
+                    substrate_id=active.substrate_id,
+                    substrate_kind="classical-silicon",
+                    capability_score=0.96,
+                    health_score=0.94,
+                    attestation_valid=True,
+                    energy_capacity_jps=64,
+                    method_priorities={"A": 0.96, "B": 0.91, "C": 0.72},
+                    standby_class="hot-standby",
+                    host_ref=active.host_ref,
+                    host_attestation_ref=active.host_attestation_ref,
+                    jurisdiction=active.jurisdiction,
+                    network_zone=active.network_zone,
+                    substrate_cluster_ref=active.substrate_cluster_ref,
+                ),
+                BrokerRegistryEntry(
+                    substrate_id=standby.substrate_id,
+                    substrate_kind="neuromorphic",
+                    capability_score=0.96,
+                    health_score=0.94,
+                    attestation_valid=True,
+                    energy_capacity_jps=64,
+                    method_priorities={"A": 0.96, "B": 0.91, "C": 0.72},
+                    standby_class="hot-standby",
+                    host_ref=standby.host_ref,
+                    host_attestation_ref=standby.host_attestation_ref,
+                    jurisdiction=standby.jurisdiction,
+                    network_zone=standby.network_zone,
+                    substrate_cluster_ref=standby.substrate_cluster_ref,
+                ),
+            ],
+        )
+        allocation = broker.lease(
+            identity_id="identity://same-host",
+            units=64,
+            purpose="same-host-cross-host-gate",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        broker.probe_standby("identity://same-host")
+        broker.attest(
+            "identity://same-host",
+            {
+                "allocation_id": allocation.allocation_id,
+                "tee": "reference-broker-attestor-v1",
+                "status": "healthy",
+            },
+        )
+
+        chain = broker.bridge_attestation_chain(
+            "identity://same-host",
+            state={"identity_id": "identity://same-host", "checkpoint": "connectome://same-host"},
+        )
+
+        self.assertFalse(chain.cross_host_verified)
+        self.assertFalse(chain.handoff_ready)
+        self.assertIn(
+            "cross-host handoff requires distinct source and standby hosts",
+            chain.blocking_reasons,
+        )
 
 
 if __name__ == "__main__":

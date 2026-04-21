@@ -15,6 +15,16 @@ required:
   - source_allocation_id
   - source_substrate_id
   - shadow_allocation
+  - source_host_ref
+  - source_host_attestation_ref
+  - source_jurisdiction
+  - source_network_zone
+  - shadow_host_ref
+  - shadow_host_attestation_ref
+  - shadow_jurisdiction
+  - shadow_network_zone
+  - substrate_cluster_ref
+  - cross_host_binding_profile
   - standby_probe_id
   - source_attestation_id
   - attestation_chain_id
@@ -27,6 +37,9 @@ required:
   - max_state_drift_score
   - state_digest
   - allocation_pair_digest
+  - distinct_host_count
+  - host_binding_digest
+  - cross_host_verified
   - sync_observations
   - dual_active
   - handoff_ready
@@ -53,6 +66,35 @@ properties:
     minLength: 1
   shadow_allocation:
     $ref: "./substrate_allocation.schema"
+  source_host_ref:
+    type: string
+    pattern: "^host://"
+  source_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  source_jurisdiction:
+    type: string
+    minLength: 1
+  source_network_zone:
+    type: string
+    minLength: 1
+  shadow_host_ref:
+    type: string
+    pattern: "^host://"
+  shadow_host_attestation_ref:
+    type: string
+    pattern: "^host-attestation://"
+  shadow_jurisdiction:
+    type: string
+    minLength: 1
+  shadow_network_zone:
+    type: string
+    minLength: 1
+  substrate_cluster_ref:
+    type: string
+    pattern: "^substrate-cluster://"
+  cross_host_binding_profile:
+    const: attested-cross-host-substrate-handoff-v1
   standby_probe_id:
     type: string
     pattern: "^standby-probe-[a-f0-9]{12}$"
@@ -83,6 +125,14 @@ properties:
   allocation_pair_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  distinct_host_count:
+    type: integer
+    minimum: 1
+  host_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  cross_host_verified:
+    type: boolean
   sync_observations:
     type: array
     minItems: 3
@@ -94,6 +144,10 @@ properties:
         - sequence
         - source_state_digest
         - shadow_state_digest
+        - source_host_ref
+        - shadow_host_ref
+        - substrate_cluster_ref
+        - host_binding_digest
         - drift_score
         - synchronization_status
         - observed_at
@@ -106,6 +160,18 @@ properties:
           type: string
           pattern: "^[a-f0-9]{64}$"
         shadow_state_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        source_host_ref:
+          type: string
+          pattern: "^host://"
+        shadow_host_ref:
+          type: string
+          pattern: "^host://"
+        substrate_cluster_ref:
+          type: string
+          pattern: "^substrate-cluster://"
+        host_binding_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
         drift_score:
@@ -166,14 +232,29 @@ examples:
     method: B
     source_allocation_id: alloc-aaaaaaaaaaaa
     source_substrate_id: classical_silicon
+    source_host_ref: host://substrate/classical-silicon
+    source_host_attestation_ref: host-attestation://substrate/classical-silicon/reference-v1
+    source_jurisdiction: JP-13
+    source_network_zone: tokyo-a
     shadow_allocation:
       allocation_id: alloc-bbbbbbbbbbbb
       identity_id: identity-0123456789ab
       substrate: neuromorphic_mesh.alpha
+      host_ref: host://substrate/neuromorphic-edge-b
+      host_attestation_ref: host-attestation://substrate/neuromorphic-edge-b/reference-v1
+      jurisdiction: JP-13
+      network_zone: tokyo-b
+      substrate_cluster_ref: substrate-cluster://reference-broker-fabric
       units: 72
       purpose: method-b-shadow-sync-overlap
       created_at: "2026-04-21T12:00:00Z"
       status: allocated
+    shadow_host_ref: host://substrate/neuromorphic-edge-b
+    shadow_host_attestation_ref: host-attestation://substrate/neuromorphic-edge-b/reference-v1
+    shadow_jurisdiction: JP-13
+    shadow_network_zone: tokyo-b
+    substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+    cross_host_binding_profile: attested-cross-host-substrate-handoff-v1
     standby_probe_id: standby-probe-0123456789ab
     source_attestation_id: attest-0123456789ab
     attestation_chain_id: attestation-chain-0123456789ab
@@ -186,22 +267,37 @@ examples:
     max_state_drift_score: 0.08
     state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     allocation_pair_digest: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    distinct_host_count: 2
+    host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+    cross_host_verified: true
     sync_observations:
       - sequence: 1
         source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_host_ref: host://substrate/classical-silicon
+        shadow_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         drift_score: 0.01
         synchronization_status: in-sync
         observed_at: "2026-04-21T12:00:00Z"
       - sequence: 2
         source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_host_ref: host://substrate/classical-silicon
+        shadow_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         drift_score: 0.02
         synchronization_status: in-sync
         observed_at: "2026-04-21T12:00:00Z"
       - sequence: 3
         source_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         shadow_state_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        source_host_ref: host://substrate/classical-silicon
+        shadow_host_ref: host://substrate/neuromorphic-edge-b
+        substrate_cluster_ref: substrate-cluster://reference-broker-fabric
+        host_binding_digest: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         drift_score: 0.015
         synchronization_status: in-sync
         observed_at: "2026-04-21T12:00:01Z"

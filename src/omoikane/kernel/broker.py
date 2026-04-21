@@ -20,6 +20,8 @@ STANDBY_PROBE_POLICY_ID = "deterministic-standby-health-probe-v1"
 ATTESTATION_CHAIN_POLICY_ID = "bounded-cross-substrate-attestation-window-v1"
 DUAL_ALLOCATION_POLICY_ID = "bounded-live-dual-allocation-window-v1"
 ATTESTATION_STREAM_POLICY_ID = "bounded-cross-substrate-attestation-stream-v1"
+BROKER_CLUSTER_REF = "substrate-cluster://reference-broker-fabric"
+BROKER_CROSS_HOST_BINDING_PROFILE = "attested-cross-host-substrate-handoff-v1"
 MINIMUM_HEALTH_SCORE = 0.6
 CRITICAL_HEALTH_SCORE = 0.4
 NEUTRALITY_WINDOW = 2
@@ -45,6 +47,11 @@ class BrokerRegistryEntry:
     energy_capacity_jps: int
     method_priorities: Dict[str, float]
     standby_class: str
+    host_ref: str
+    host_attestation_ref: str
+    jurisdiction: str
+    network_zone: str
+    substrate_cluster_ref: str
 
     def to_candidate(self, neutrality_index: int) -> Dict[str, Any]:
         return {
@@ -56,6 +63,11 @@ class BrokerRegistryEntry:
             "energy_capacity_jps": self.energy_capacity_jps,
             "method_priorities": dict(self.method_priorities),
             "standby_class": self.standby_class,
+            "host_ref": self.host_ref,
+            "host_attestation_ref": self.host_attestation_ref,
+            "jurisdiction": self.jurisdiction,
+            "network_zone": self.network_zone,
+            "substrate_cluster_ref": self.substrate_cluster_ref,
             "substrate_kind_neutrality_index": neutrality_index,
         }
 
@@ -91,6 +103,12 @@ class SubstrateAttestationChain:
     allocation_id: str
     active_substrate_id: str
     standby_substrate_id: str
+    source_host_ref: str
+    source_host_attestation_ref: str
+    standby_host_ref: str
+    standby_host_attestation_ref: str
+    substrate_cluster_ref: str
+    cross_host_binding_profile: str
     source_attestation_id: str
     standby_probe_id: str
     continuity_mode: str
@@ -99,6 +117,10 @@ class SubstrateAttestationChain:
     cadence_ms: int
     expected_state_digest: str
     expected_destination_substrate: str
+    expected_destination_host_ref: str
+    distinct_host_count: int
+    host_binding_digest: str
+    cross_host_verified: bool
     chain_status: str
     handoff_ready: bool
     observations: List[Dict[str, Any]]
@@ -119,6 +141,16 @@ class SubstrateDualAllocationWindow:
     source_allocation_id: str
     source_substrate_id: str
     shadow_allocation: SubstrateAllocation
+    source_host_ref: str
+    source_host_attestation_ref: str
+    source_jurisdiction: str
+    source_network_zone: str
+    shadow_host_ref: str
+    shadow_host_attestation_ref: str
+    shadow_jurisdiction: str
+    shadow_network_zone: str
+    substrate_cluster_ref: str
+    cross_host_binding_profile: str
     standby_probe_id: str
     source_attestation_id: str
     attestation_chain_id: str
@@ -131,6 +163,9 @@ class SubstrateDualAllocationWindow:
     max_state_drift_score: float
     state_digest: str
     allocation_pair_digest: str
+    distinct_host_count: int
+    host_binding_digest: str
+    cross_host_verified: bool
     sync_observations: List[Dict[str, Any]]
     dual_active: bool
     handoff_ready: bool
@@ -153,6 +188,16 @@ class SubstrateAttestationStream:
     shadow_allocation_id: str
     source_substrate_id: str
     shadow_substrate_id: str
+    source_host_ref: str
+    source_host_attestation_ref: str
+    source_jurisdiction: str
+    source_network_zone: str
+    shadow_host_ref: str
+    shadow_host_attestation_ref: str
+    shadow_jurisdiction: str
+    shadow_network_zone: str
+    substrate_cluster_ref: str
+    cross_host_binding_profile: str
     source_attestation_id: str
     attestation_chain_id: str
     dual_allocation_window_id: str
@@ -164,6 +209,10 @@ class SubstrateAttestationStream:
     max_state_drift_score: float
     expected_state_digest: str
     expected_destination_substrate: str
+    expected_destination_host_ref: str
+    distinct_host_count: int
+    host_binding_digest: str
+    cross_host_verified: bool
     stream_status: str
     handoff_ready: bool
     observations: List[Dict[str, Any]]
@@ -197,8 +246,20 @@ class SubstrateBrokerService:
         primary_adapter: Optional[ClassicalSiliconAdapter] = None,
     ) -> "SubstrateBrokerService":
         primary = primary_adapter or ClassicalSiliconAdapter("classical_silicon")
-        neuromorphic = ClassicalSiliconAdapter("neuromorphic_mesh.alpha")
-        photonic = ClassicalSiliconAdapter("photonic_array.standby")
+        neuromorphic = ClassicalSiliconAdapter(
+            "neuromorphic_mesh.alpha",
+            host_ref="host://substrate/neuromorphic-edge-b",
+            host_attestation_ref="host-attestation://substrate/neuromorphic-edge-b/reference-v1",
+            network_zone="tokyo-b",
+            substrate_cluster_ref=BROKER_CLUSTER_REF,
+        )
+        photonic = ClassicalSiliconAdapter(
+            "photonic_array.standby",
+            host_ref="host://substrate/photonic-edge-c",
+            host_attestation_ref="host-attestation://substrate/photonic-edge-c/reference-v1",
+            network_zone="osaka-a",
+            substrate_cluster_ref=BROKER_CLUSTER_REF,
+        )
         adapters = {
             primary.substrate_id: primary,
             neuromorphic.substrate_id: neuromorphic,
@@ -214,6 +275,11 @@ class SubstrateBrokerService:
                 energy_capacity_jps=64,
                 method_priorities={"A": 0.96, "B": 0.91, "C": 0.72},
                 standby_class="hot-standby",
+                host_ref=primary.host_ref,
+                host_attestation_ref=primary.host_attestation_ref,
+                jurisdiction=primary.jurisdiction,
+                network_zone=primary.network_zone,
+                substrate_cluster_ref=primary.substrate_cluster_ref,
             ),
             BrokerRegistryEntry(
                 substrate_id=neuromorphic.substrate_id,
@@ -224,6 +290,11 @@ class SubstrateBrokerService:
                 energy_capacity_jps=64,
                 method_priorities={"A": 0.96, "B": 0.91, "C": 0.72},
                 standby_class="hot-standby",
+                host_ref=neuromorphic.host_ref,
+                host_attestation_ref=neuromorphic.host_attestation_ref,
+                jurisdiction=neuromorphic.jurisdiction,
+                network_zone=neuromorphic.network_zone,
+                substrate_cluster_ref=neuromorphic.substrate_cluster_ref,
             ),
             BrokerRegistryEntry(
                 substrate_id=photonic.substrate_id,
@@ -234,6 +305,11 @@ class SubstrateBrokerService:
                 energy_capacity_jps=48,
                 method_priorities={"A": 0.82, "B": 0.86, "C": 0.77},
                 standby_class="cold-standby",
+                host_ref=photonic.host_ref,
+                host_attestation_ref=photonic.host_attestation_ref,
+                jurisdiction=photonic.jurisdiction,
+                network_zone=photonic.network_zone,
+                substrate_cluster_ref=photonic.substrate_cluster_ref,
             ),
         ]
         return cls(adapters=adapters, registry=registry)
@@ -285,6 +361,9 @@ class SubstrateBrokerService:
                 "mirror_cadence_ms": DUAL_ALLOCATION_MIRROR_CADENCE_MS,
                 "sync_observation_count": DUAL_ALLOCATION_SYNC_WINDOW,
                 "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+                "cross_host_binding_profile": BROKER_CROSS_HOST_BINDING_PROFILE,
+                "require_distinct_hosts": True,
+                "substrate_cluster_ref": BROKER_CLUSTER_REF,
             },
             "attestation_stream_policy": {
                 "policy_id": ATTESTATION_STREAM_POLICY_ID,
@@ -294,6 +373,8 @@ class SubstrateBrokerService:
                 "beat_count": ATTESTATION_STREAM_BEAT_COUNT,
                 "minimum_healthy_beats": ATTESTATION_STREAM_MIN_HEALTHY_BEATS,
                 "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
+                "cross_host_binding_profile": BROKER_CROSS_HOST_BINDING_PROFILE,
+                "require_distinct_hosts": True,
             },
         }
 
@@ -479,14 +560,32 @@ class SubstrateBrokerService:
         probe = lease["last_standby_probe"]
         if probe is None:
             probe = self.probe_standby(identity_id)
+        active_entry = self._registry[str(lease["active_substrate_id"])]
+        standby_entry = self._registry[probe.standby_substrate_id]
 
         blocking_reasons: List[str] = []
         if not probe.ready_for_migrate:
             blocking_reasons.append("standby probe must be ready before attestation chain bridging")
         if continuity_mode == "warm-standby" and probe.standby_class == "cold-standby":
             blocking_reasons.append("warm-standby continuity requires a hot-standby candidate")
+        if active_entry.substrate_cluster_ref != standby_entry.substrate_cluster_ref:
+            blocking_reasons.append("cross-host handoff requires source and standby substrates in one cluster")
+        distinct_host_count = self._distinct_host_count(
+            active_entry.host_ref,
+            standby_entry.host_ref,
+        )
+        cross_host_verified = distinct_host_count >= 2
+        if not cross_host_verified:
+            blocking_reasons.append("cross-host handoff requires distinct source and standby hosts")
 
         expected_state_digest = sha256_text(canonical_json(dict(state)))
+        host_binding_digest = self._host_binding_digest(
+            source_substrate_id=active_entry.substrate_id,
+            source_host_ref=active_entry.host_ref,
+            destination_substrate_id=standby_entry.substrate_id,
+            destination_host_ref=standby_entry.host_ref,
+            substrate_cluster_ref=standby_entry.substrate_cluster_ref,
+        )
         observations: List[Dict[str, Any]] = []
         for sequence in range(1, ATTESTATION_CHAIN_WINDOW + 1):
             observations.append(
@@ -494,12 +593,17 @@ class SubstrateBrokerService:
                     "sequence": sequence,
                     "source_substrate_id": str(lease["active_substrate_id"]),
                     "standby_substrate_id": probe.standby_substrate_id,
+                    "source_host_ref": active_entry.host_ref,
+                    "standby_host_ref": standby_entry.host_ref,
                     "source_attestation_id": attestation.attestation_id,
                     "source_status": attestation.status,
                     "standby_probe_id": probe.probe_id,
                     "standby_status": probe.probe_status,
                     "energy_headroom_jps": probe.energy_headroom_jps,
                     "expected_destination_substrate": probe.standby_substrate_id,
+                    "expected_destination_host_ref": standby_entry.host_ref,
+                    "substrate_cluster_ref": standby_entry.substrate_cluster_ref,
+                    "host_binding_digest": host_binding_digest,
                     "expected_state_digest": expected_state_digest,
                     "observed_at": utc_now_iso(),
                 }
@@ -512,6 +616,12 @@ class SubstrateBrokerService:
             "allocation_id": lease["allocation"].allocation_id,
             "active_substrate_id": lease["active_substrate_id"],
             "standby_substrate_id": probe.standby_substrate_id,
+            "source_host_ref": active_entry.host_ref,
+            "source_host_attestation_ref": active_entry.host_attestation_ref,
+            "standby_host_ref": standby_entry.host_ref,
+            "standby_host_attestation_ref": standby_entry.host_attestation_ref,
+            "substrate_cluster_ref": standby_entry.substrate_cluster_ref,
+            "cross_host_binding_profile": BROKER_CROSS_HOST_BINDING_PROFILE,
             "source_attestation_id": attestation.attestation_id,
             "standby_probe_id": probe.probe_id,
             "continuity_mode": continuity_mode,
@@ -520,6 +630,10 @@ class SubstrateBrokerService:
             "cadence_ms": ATTESTATION_CHAIN_CADENCE_MS,
             "expected_state_digest": expected_state_digest,
             "expected_destination_substrate": probe.standby_substrate_id,
+            "expected_destination_host_ref": standby_entry.host_ref,
+            "distinct_host_count": distinct_host_count,
+            "host_binding_digest": host_binding_digest,
+            "cross_host_verified": cross_host_verified,
             "chain_status": chain_status,
             "handoff_ready": handoff_ready,
             "observations": observations,
@@ -531,6 +645,12 @@ class SubstrateBrokerService:
             allocation_id=lease["allocation"].allocation_id,
             active_substrate_id=str(lease["active_substrate_id"]),
             standby_substrate_id=probe.standby_substrate_id,
+            source_host_ref=active_entry.host_ref,
+            source_host_attestation_ref=active_entry.host_attestation_ref,
+            standby_host_ref=standby_entry.host_ref,
+            standby_host_attestation_ref=standby_entry.host_attestation_ref,
+            substrate_cluster_ref=standby_entry.substrate_cluster_ref,
+            cross_host_binding_profile=BROKER_CROSS_HOST_BINDING_PROFILE,
             source_attestation_id=attestation.attestation_id,
             standby_probe_id=probe.probe_id,
             continuity_mode=continuity_mode,
@@ -539,6 +659,10 @@ class SubstrateBrokerService:
             cadence_ms=ATTESTATION_CHAIN_CADENCE_MS,
             expected_state_digest=expected_state_digest,
             expected_destination_substrate=probe.standby_substrate_id,
+            expected_destination_host_ref=standby_entry.host_ref,
+            distinct_host_count=distinct_host_count,
+            host_binding_digest=host_binding_digest,
+            cross_host_verified=cross_host_verified,
             chain_status=chain_status,
             handoff_ready=handoff_ready,
             observations=observations,
@@ -577,6 +701,8 @@ class SubstrateBrokerService:
         target_substrate = destination_substrate or lease["standby_substrate_id"]
         if not isinstance(target_substrate, str) or not target_substrate.strip():
             raise ValueError("destination_substrate must resolve to a non-empty standby target")
+        source_entry = self._registry[str(lease["active_substrate_id"])]
+        target_entry = self._registry[target_substrate]
         if dual_window is not None and dual_window.window_status == "shadow-active":
             if target_substrate != dual_window.shadow_allocation.substrate:
                 raise ValueError(
@@ -587,13 +713,41 @@ class SubstrateBrokerService:
             expected_state_digest = sha256_text(canonical_json(dict(state)))
             if attestation_stream.expected_destination_substrate != target_substrate:
                 raise PermissionError("attestation stream must bind the migration destination")
+            if attestation_stream.expected_destination_host_ref != target_entry.host_ref:
+                raise PermissionError("attestation stream must bind the destination host")
             if attestation_stream.expected_state_digest != expected_state_digest:
                 raise PermissionError("attestation stream must bind the migration state digest")
+            if not attestation_stream.cross_host_verified:
+                raise PermissionError("attestation stream must keep cross-host binding verified")
+            expected_host_binding_digest = self._host_binding_digest(
+                source_substrate_id=source_entry.substrate_id,
+                source_host_ref=source_entry.host_ref,
+                destination_substrate_id=target_entry.substrate_id,
+                destination_host_ref=target_entry.host_ref,
+                substrate_cluster_ref=target_entry.substrate_cluster_ref,
+            )
+            if attestation_stream.host_binding_digest != expected_host_binding_digest:
+                raise PermissionError("attestation stream must preserve the broker host binding digest")
+        else:
+            expected_host_binding_digest = self._host_binding_digest(
+                source_substrate_id=source_entry.substrate_id,
+                source_host_ref=source_entry.host_ref,
+                destination_substrate_id=target_entry.substrate_id,
+                destination_host_ref=target_entry.host_ref,
+                substrate_cluster_ref=target_entry.substrate_cluster_ref,
+            )
         transfer = self._adapters[lease["active_substrate_id"]].transfer(
             lease["allocation"].allocation_id,
             dict(state),
             destination_substrate=target_substrate,
             continuity_mode=continuity_mode,
+            destination_host_ref=target_entry.host_ref,
+            destination_host_attestation_ref=target_entry.host_attestation_ref,
+            destination_jurisdiction=target_entry.jurisdiction,
+            destination_network_zone=target_entry.network_zone,
+            substrate_cluster_ref=target_entry.substrate_cluster_ref,
+            cross_host_binding_profile=BROKER_CROSS_HOST_BINDING_PROFILE,
+            host_binding_digest=expected_host_binding_digest,
         )
         lease["transfer"] = transfer
         return transfer
@@ -673,6 +827,16 @@ class SubstrateBrokerService:
             raise PermissionError("handoff-ready attestation chain required before dual allocation window")
 
         shadow_substrate_id = probe.standby_substrate_id
+        active_entry = self._registry[str(lease["active_substrate_id"])]
+        standby_entry = self._registry[shadow_substrate_id]
+        if active_entry.substrate_cluster_ref != standby_entry.substrate_cluster_ref:
+            raise PermissionError(
+                "cross-host dual allocation requires a shared substrate cluster"
+            )
+        if active_entry.host_ref == standby_entry.host_ref:
+            raise PermissionError(
+                "cross-host dual allocation requires distinct source and standby hosts"
+            )
         standby_adapter = self._adapters[shadow_substrate_id]
         shadow_units = int(units or lease["allocation"].units)
         shadow_allocation = standby_adapter.allocate(
@@ -681,6 +845,18 @@ class SubstrateBrokerService:
             identity_id=identity_id,
         )
         state_digest = sha256_text(canonical_json(dict(state)))
+        distinct_host_count = self._distinct_host_count(
+            lease["allocation"].host_ref,
+            shadow_allocation.host_ref,
+        )
+        host_binding_digest = self._host_binding_digest(
+            source_substrate_id=lease["allocation"].substrate,
+            source_host_ref=lease["allocation"].host_ref,
+            destination_substrate_id=shadow_allocation.substrate,
+            destination_host_ref=shadow_allocation.host_ref,
+            substrate_cluster_ref=shadow_allocation.substrate_cluster_ref,
+        )
+        cross_host_verified = distinct_host_count >= 2
         sync_observations: List[Dict[str, Any]] = []
         for sequence, drift_score in enumerate((0.01, 0.02, 0.015), start=1):
             sync_observations.append(
@@ -688,6 +864,10 @@ class SubstrateBrokerService:
                     "sequence": sequence,
                     "source_state_digest": state_digest,
                     "shadow_state_digest": state_digest,
+                    "source_host_ref": lease["allocation"].host_ref,
+                    "shadow_host_ref": shadow_allocation.host_ref,
+                    "substrate_cluster_ref": shadow_allocation.substrate_cluster_ref,
+                    "host_binding_digest": host_binding_digest,
                     "drift_score": drift_score,
                     "synchronization_status": "in-sync",
                     "observed_at": utc_now_iso(),
@@ -700,6 +880,7 @@ class SubstrateBrokerService:
                     "source_allocation_id": lease["allocation"].allocation_id,
                     "shadow_allocation_id": shadow_allocation.allocation_id,
                     "state_digest": state_digest,
+                    "host_binding_digest": host_binding_digest,
                 }
             )
         )
@@ -710,6 +891,16 @@ class SubstrateBrokerService:
             source_allocation_id=lease["allocation"].allocation_id,
             source_substrate_id=str(lease["active_substrate_id"]),
             shadow_allocation=shadow_allocation,
+            source_host_ref=lease["allocation"].host_ref,
+            source_host_attestation_ref=lease["allocation"].host_attestation_ref,
+            source_jurisdiction=lease["allocation"].jurisdiction,
+            source_network_zone=lease["allocation"].network_zone,
+            shadow_host_ref=shadow_allocation.host_ref,
+            shadow_host_attestation_ref=shadow_allocation.host_attestation_ref,
+            shadow_jurisdiction=shadow_allocation.jurisdiction,
+            shadow_network_zone=shadow_allocation.network_zone,
+            substrate_cluster_ref=shadow_allocation.substrate_cluster_ref,
+            cross_host_binding_profile=BROKER_CROSS_HOST_BINDING_PROFILE,
             standby_probe_id=probe.probe_id,
             source_attestation_id=attestation.attestation_id,
             attestation_chain_id=chain.chain_id,
@@ -722,9 +913,12 @@ class SubstrateBrokerService:
             max_state_drift_score=MAX_DUAL_ALLOCATION_DRIFT_SCORE,
             state_digest=state_digest,
             allocation_pair_digest=pair_digest,
+            distinct_host_count=distinct_host_count,
+            host_binding_digest=host_binding_digest,
+            cross_host_verified=cross_host_verified,
             sync_observations=sync_observations,
             dual_active=True,
-            handoff_ready=True,
+            handoff_ready=cross_host_verified,
             window_status="shadow-active",
             opened_at=utc_now_iso(),
         )
@@ -764,6 +958,12 @@ class SubstrateBrokerService:
             blocking_reasons.append("shadow allocation must remain allocated during attestation stream")
         if chain.expected_destination_substrate != window.shadow_allocation.substrate:
             blocking_reasons.append("attestation chain destination must match the shadow allocation")
+        if chain.expected_destination_host_ref != window.shadow_host_ref:
+            blocking_reasons.append("attestation chain host binding must match the shadow allocation host")
+        if chain.host_binding_digest != window.host_binding_digest:
+            blocking_reasons.append("attestation chain and dual allocation window must share one host binding digest")
+        if not window.cross_host_verified:
+            blocking_reasons.append("dual allocation window must retain cross-host binding before stream sealing")
 
         observations: List[Dict[str, Any]] = []
         for sequence, drift_score in enumerate((0.012, 0.018, 0.011, 0.017, 0.013), start=1):
@@ -772,6 +972,7 @@ class SubstrateBrokerService:
                 if (
                     attestation.status == "healthy"
                     and window.window_status == "shadow-active"
+                    and window.cross_host_verified
                     and drift_score <= MAX_DUAL_ALLOCATION_DRIFT_SCORE
                 )
                 else "blocked"
@@ -783,11 +984,16 @@ class SubstrateBrokerService:
                     "shadow_allocation_id": window.shadow_allocation.allocation_id,
                     "source_state_digest": expected_state_digest,
                     "shadow_state_digest": expected_state_digest,
+                    "source_host_ref": window.source_host_ref,
+                    "shadow_host_ref": window.shadow_host_ref,
                     "source_status": attestation.status,
                     "shadow_status": window.window_status,
                     "drift_score": drift_score,
                     "keepalive_status": keepalive_status,
                     "expected_destination_substrate": window.shadow_allocation.substrate,
+                    "expected_destination_host_ref": window.shadow_host_ref,
+                    "substrate_cluster_ref": window.substrate_cluster_ref,
+                    "host_binding_digest": window.host_binding_digest,
                     "observed_at": utc_now_iso(),
                 }
             )
@@ -800,6 +1006,16 @@ class SubstrateBrokerService:
             "shadow_allocation_id": window.shadow_allocation.allocation_id,
             "source_substrate_id": lease["active_substrate_id"],
             "shadow_substrate_id": window.shadow_allocation.substrate,
+            "source_host_ref": window.source_host_ref,
+            "source_host_attestation_ref": window.source_host_attestation_ref,
+            "source_jurisdiction": window.source_jurisdiction,
+            "source_network_zone": window.source_network_zone,
+            "shadow_host_ref": window.shadow_host_ref,
+            "shadow_host_attestation_ref": window.shadow_host_attestation_ref,
+            "shadow_jurisdiction": window.shadow_jurisdiction,
+            "shadow_network_zone": window.shadow_network_zone,
+            "substrate_cluster_ref": window.substrate_cluster_ref,
+            "cross_host_binding_profile": window.cross_host_binding_profile,
             "source_attestation_id": attestation.attestation_id,
             "attestation_chain_id": chain.chain_id,
             "dual_allocation_window_id": window.window_id,
@@ -811,6 +1027,10 @@ class SubstrateBrokerService:
             "max_state_drift_score": MAX_DUAL_ALLOCATION_DRIFT_SCORE,
             "expected_state_digest": expected_state_digest,
             "expected_destination_substrate": window.shadow_allocation.substrate,
+            "expected_destination_host_ref": window.shadow_host_ref,
+            "distinct_host_count": window.distinct_host_count,
+            "host_binding_digest": window.host_binding_digest,
+            "cross_host_verified": window.cross_host_verified,
             "stream_status": stream_status,
             "handoff_ready": handoff_ready,
             "observations": observations,
@@ -823,6 +1043,16 @@ class SubstrateBrokerService:
             shadow_allocation_id=window.shadow_allocation.allocation_id,
             source_substrate_id=str(lease["active_substrate_id"]),
             shadow_substrate_id=window.shadow_allocation.substrate,
+            source_host_ref=window.source_host_ref,
+            source_host_attestation_ref=window.source_host_attestation_ref,
+            source_jurisdiction=window.source_jurisdiction,
+            source_network_zone=window.source_network_zone,
+            shadow_host_ref=window.shadow_host_ref,
+            shadow_host_attestation_ref=window.shadow_host_attestation_ref,
+            shadow_jurisdiction=window.shadow_jurisdiction,
+            shadow_network_zone=window.shadow_network_zone,
+            substrate_cluster_ref=window.substrate_cluster_ref,
+            cross_host_binding_profile=window.cross_host_binding_profile,
             source_attestation_id=attestation.attestation_id,
             attestation_chain_id=chain.chain_id,
             dual_allocation_window_id=window.window_id,
@@ -834,6 +1064,10 @@ class SubstrateBrokerService:
             max_state_drift_score=MAX_DUAL_ALLOCATION_DRIFT_SCORE,
             expected_state_digest=expected_state_digest,
             expected_destination_substrate=window.shadow_allocation.substrate,
+            expected_destination_host_ref=window.shadow_host_ref,
+            distinct_host_count=window.distinct_host_count,
+            host_binding_digest=window.host_binding_digest,
+            cross_host_verified=window.cross_host_verified,
             stream_status=stream_status,
             handoff_ready=handoff_ready,
             observations=observations,
@@ -933,6 +1167,31 @@ class SubstrateBrokerService:
             if candidate["substrate_kind"] != active["substrate_kind"]:
                 return dict(candidate)
         return dict(remaining[0])
+
+    @staticmethod
+    def _distinct_host_count(source_host_ref: str, destination_host_ref: str) -> int:
+        return len({source_host_ref, destination_host_ref})
+
+    @staticmethod
+    def _host_binding_digest(
+        *,
+        source_substrate_id: str,
+        source_host_ref: str,
+        destination_substrate_id: str,
+        destination_host_ref: str,
+        substrate_cluster_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "source_substrate_id": source_substrate_id,
+                    "source_host_ref": source_host_ref,
+                    "destination_substrate_id": destination_substrate_id,
+                    "destination_host_ref": destination_host_ref,
+                    "substrate_cluster_ref": substrate_cluster_ref,
+                }
+            )
+        )
 
     def _require_open_lease(self, identity_id: str) -> Dict[str, Any]:
         lease = self._leases.get(identity_id)

@@ -4630,17 +4630,24 @@ json.dump(response, sys.stdout)
                     and standby_probe.ready_for_migrate
                     and attestation.status == "healthy"
                     and attestation_chain.handoff_ready
+                    and attestation_chain.cross_host_verified
+                    and attestation_chain.expected_destination_host_ref == standby["host_ref"]
                     and opened_dual_allocation_window["dual_active"]
                     and opened_dual_allocation_window["window_status"] == "shadow-active"
+                    and opened_dual_allocation_window["cross_host_verified"]
                     and attestation_stream.handoff_ready
                     and attestation_stream.stream_status == "sealed-handoff-ready"
                     and attestation_stream.expected_destination_substrate == standby["substrate_id"]
+                    and attestation_stream.expected_destination_host_ref == standby["host_ref"]
+                    and attestation_stream.cross_host_verified
                     and attestation_stream.expected_state_digest
                     != opened_dual_allocation_window["state_digest"]
                     and closed_dual_allocation_window_snapshot["window_status"] == "closed"
                     and closed_dual_allocation_window_snapshot["shadow_release"] is not None
                     and attestation_chain.expected_destination_substrate == standby["substrate_id"]
                     and transfer.destination_substrate == standby["substrate_id"]
+                    and transfer.destination_host_ref == standby["host_ref"]
+                    and transfer.cross_host_verified
                     and transfer.continuity_mode == "hot-handoff"
                     and release["status"] == "released"
                     and final_state["release"]["status"] == "released"
@@ -4661,6 +4668,7 @@ json.dump(response, sys.stdout)
                 "attestation_chain_ready": attestation_chain.handoff_ready,
                 "attestation_chain_window_complete": len(attestation_chain.observations)
                 == attestation_chain.window_size,
+                "attestation_chain_cross_host_verified": attestation_chain.cross_host_verified,
                 "dual_allocation_window_opened": opened_dual_allocation_window["window_status"]
                 == "shadow-active",
                 "dual_allocation_shadow_allocated": opened_dual_allocation_window[
@@ -4671,13 +4679,18 @@ json.dump(response, sys.stdout)
                     opened_dual_allocation_window["sync_observations"]
                 )
                 == 3,
+                "dual_allocation_cross_host_verified": opened_dual_allocation_window[
+                    "cross_host_verified"
+                ],
                 "attestation_stream_ready": attestation_stream.handoff_ready,
                 "attestation_stream_window_complete": len(attestation_stream.observations)
                 == attestation_stream.beat_count,
                 "attestation_stream_binds_selected_standby": bool(
                     standby
                     and attestation_stream.expected_destination_substrate == standby["substrate_id"]
+                    and attestation_stream.expected_destination_host_ref == standby["host_ref"]
                 ),
+                "attestation_stream_cross_host_verified": attestation_stream.cross_host_verified,
                 "dual_allocation_closed": closed_dual_allocation_window_snapshot["window_status"]
                 == "closed",
                 "dual_allocation_cleanup_released": bool(
@@ -4686,12 +4699,16 @@ json.dump(response, sys.stdout)
                     == "released"
                 ),
                 "migration_binds_selected_standby": bool(
-                    standby and transfer.destination_substrate == standby["substrate_id"]
+                    standby
+                    and transfer.destination_substrate == standby["substrate_id"]
+                    and transfer.destination_host_ref == standby["host_ref"]
                 ),
                 "migration_binds_streamed_state": (
                     transfer.continuity_mode == "hot-handoff"
                     and attestation_stream.expected_state_digest
                     != opened_dual_allocation_window["state_digest"]
+                    and transfer.destination_host_ref == attestation_stream.expected_destination_host_ref
+                    and transfer.host_binding_digest == attestation_stream.host_binding_digest
                 ),
                 "release_completes_source_lease": release["status"] == "released",
             },

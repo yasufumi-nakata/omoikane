@@ -17,7 +17,8 @@ fixtures:
       minimum_healthy_beats: 5
 assertions:
   - seal_attestation_stream must require a healthy source attestation, a handoff-ready attestation chain, and a shadow-active dual allocation window
-  - keepalive observations must retain one expected_state_digest and destination binding across all beats before migrate
+  - keepalive observations must retain one expected_state_digest, expected_destination_substrate, and expected_destination_host_ref across all beats before migrate
+  - the sealed stream must preserve one host_binding_digest and cross_host_verified=true from the dual allocation window
   - sealed-handoff-ready status must require all fixed keepalive beats to remain healthy with drift_score <= 0.08
   - hot-handoff migrate must fail closed unless the latest attestation stream matches the requested destination and state digest
 metric: exact-match

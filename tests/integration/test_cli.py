@@ -500,11 +500,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["neutrality_rotation_triggered"])
         self.assertTrue(result["validation"]["standby_probe_ready"])
         self.assertTrue(result["validation"]["attestation_chain_ready"])
+        self.assertTrue(result["validation"]["attestation_chain_cross_host_verified"])
         self.assertTrue(result["validation"]["dual_allocation_window_opened"])
+        self.assertTrue(result["validation"]["dual_allocation_cross_host_verified"])
         self.assertTrue(result["validation"]["attestation_stream_ready"])
         self.assertTrue(result["validation"]["attestation_stream_window_complete"])
+        self.assertTrue(result["validation"]["attestation_stream_cross_host_verified"])
         self.assertTrue(result["validation"]["dual_allocation_closed"])
         self.assertTrue(result["validation"]["dual_allocation_cleanup_released"])
+        self.assertTrue(result["validation"]["migration_binds_selected_standby"])
         self.assertEqual("critical", result["broker"]["energy_floor_signal"]["severity"])
         self.assertEqual(
             result["broker"]["selection"]["standby_substrate"]["substrate_id"],
@@ -514,6 +518,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("handoff-ready", result["broker"]["attestation_chain"]["chain_status"])
         self.assertEqual("shadow-active", result["broker"]["dual_allocation_window"]["window_status"])
         self.assertEqual("sealed-handoff-ready", result["broker"]["attestation_stream"]["stream_status"])
+        self.assertTrue(result["broker"]["migration"]["cross_host_verified"])
         self.assertEqual("closed", result["broker"]["closed_dual_allocation_window"]["window_status"])
         self.assertEqual("hot-handoff", result["broker"]["migration"]["continuity_mode"])
         self.assertEqual("released", result["broker"]["release"]["status"])

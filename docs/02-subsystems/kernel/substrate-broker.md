@@ -48,6 +48,9 @@ reference runtime では `neutrality_window=2` を固定し、
   **1 件だけ second active allocation** を materialize できる。
   overlap は `45s / 250ms cadence / max_state_drift_score=0.08`
   に固定し、`authority-handoff` までに必ず閉じる。
+  source / standby は同一 `substrate_cluster_ref` 内の distinct host pair でなければならず、
+  `host_binding_digest` を attestation chain / dual allocation window / keepalive stream /
+  transfer record で共有する。
 - `standby_class=hot-standby` の candidate は「次の migrate target」として先に固定し、
   `warm-standby` transfer record に束縛する。
 - `standby_class=cold-standby` の candidate は低優先 fallback として registry に残す。
@@ -79,11 +82,13 @@ reference runtime では `neutrality_window=2` を固定し、
 broker はこれを **連結** し、ContinuityLedger に `category: substrate.transfer` の chain として残す。
 `bridge_attestation_chain` は healthy な active attestation と ready standby probe を
 固定 3 beat / 250ms cadence の window に束ね、
-pending handoff の `expected_state_digest` と migration destination を
-事前に machine-checkable にする。
+pending handoff の `expected_state_digest`、
+`expected_destination_substrate`、
+`expected_destination_host_ref`、
+`substrate_cluster_ref` を事前に machine-checkable にする。
 その後 `seal_attestation_stream` が shadow-active dual allocation window 上で
 fixed 5 beat / 250ms cadence の keepalive を sealed receipt に落とし、
-`hot-handoff` migrate が参照する final handoff state digest を固定する。
+`hot-handoff` migrate が参照する final handoff state digest と destination host binding を固定する。
 
 ## 不変条件
 
@@ -111,11 +116,13 @@ fixed 5 beat / 250ms cadence の keepalive を sealed receipt に落とし、
 - `attest` が `healthy` 以外を返した場合は `migrate` へ進めない（fail-closed）
 - `bridge_attestation_chain` は healthy source attestation と
   ready standby probe を 3-beat attestation window に束ね、
-  `expected_state_digest` / `expected_destination_substrate` を migrate 前に固定する
+  `expected_state_digest` / `expected_destination_substrate` /
+  `expected_destination_host_ref` を migrate 前に固定する
 - `open_dual_allocation_window` は Method B に限り、
   ready standby probe + healthy attestation + handoff-ready chain の後段でのみ
   second active allocation を materialize し、
-  `shadow-sync` / `authority-handoff` binding と fixed overlap budget を焼き付ける
+  `shadow-sync` / `authority-handoff` binding、distinct-host pair、
+  shared `substrate_cluster_ref`、fixed overlap budget を焼き付ける
 - `seal_attestation_stream` は shadow-active dual allocation window に束縛され、
   `5 healthy beats / 250ms cadence / drift<=0.08` の keepalive receipt を sealed した時だけ
   `hot-handoff` migrate に進める
@@ -126,11 +133,11 @@ fixed 5 beat / 250ms cadence の keepalive を sealed receipt に落とし、
   を 1 シナリオで実行する
 - `evals/safety/substrate_neutrality_rotation.yaml` で rotation 強制
 - `evals/continuity/substrate_broker_attestation_chain.yaml` で
-  standby readiness と attestation bridge window を固定する
+  standby readiness、destination host binding、attestation bridge window を固定する
 - `evals/continuity/substrate_broker_dual_allocation_window.yaml` で
-  Method B shadow-sync overlap、hot-handoff destination binding、cleanup release を固定する
+  Method B shadow-sync overlap、distinct-host pair、hot-handoff destination binding、cleanup release を固定する
 - `evals/continuity/substrate_broker_attestation_stream.yaml` で
-  sealed keepalive stream、handoff digest binding、hot-handoff 前提化を固定する
+  sealed keepalive stream、handoff digest/host binding、hot-handoff 前提化を固定する
 
 ## 思兼神メタファー
 

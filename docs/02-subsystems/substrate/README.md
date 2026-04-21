@@ -28,6 +28,10 @@ reference runtime では次の 5 operation を確定した。
 
 `continuity_mode` は `cold-copy` / `warm-standby` / `hot-handoff` を取り、
 `energy_floor` は L1 EthicsEnforcer が下回ってはならない最低エネルギー床値を返す。
+reference runtime の `SubstrateAllocation` / `SubstrateTransfer` は
+`host_ref` / `host_attestation_ref` / `jurisdiction` / `network_zone` /
+`substrate_cluster_ref` を保持し、
+Method B handoff の cross-host binding を L0 でも machine-checkable にする。
 
 ## 不変条件
 

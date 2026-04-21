@@ -98,12 +98,15 @@ scheduler-compatible signal を返し、
 standby probe が health / attestation / energy headroom を満たして
 `ready_for_migrate` を返すこと、
 attestation chain が fixed 3-beat window で
-`expected_state_digest` と `expected_destination_substrate` を migrate 前に束縛すること、
+`expected_state_digest` / `expected_destination_substrate` /
+`expected_destination_host_ref` / `substrate_cluster_ref` を migrate 前に束縛すること、
 attestation stream が shadow-active dual allocation window 上で
 fixed 5-beat keepalive を sealed し、
-handoff-ready digest と destination binding を `hot-handoff` migrate 前に固定すること、
+handoff-ready digest と destination substrate/host binding を `hot-handoff` migrate 前に固定すること、
 dual allocation window が pre-bound standby 上の second active allocation、
 `45s / 250ms / drift<=0.08` の overlap receipt、
+distinct-host pair、
+shared `substrate_cluster_ref`、
 `hot-handoff` destination binding、cleanup release を返すこと、
 selected standby がそのまま migration destination に束縛されることを
 1 シナリオで確認する。
