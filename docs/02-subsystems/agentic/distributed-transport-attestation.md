@@ -161,6 +161,32 @@ current authority snapshot へ束縛する。
   mTLS server を使い、cross-host cluster を持ち込まずに
   actual route trace を machine-checkable にする
 
+## Packet capture export
+
+authenticated な route trace に対しては
+`export_authority_route_packet_capture` により、
+trace-bound な PCAP artifact を export し、
+route tuple と payload length を packet-capture surface へ束縛する。
+
+| 項目 | 固定値 |
+|---|---|
+| capture profile | `trace-bound-pcap-export-v1` |
+| artifact format | `pcap` |
+| readback profile | `pcap-readback-v1` |
+| OS-native readback | `tcpdump-readback-v1` |
+
+- export は各 traced route ごとに `outbound-request` と `inbound-response` の
+  2 packet を持ち、`local_ip / local_port / remote_ip / remote_port` と
+  request/response byte count を保持する
+- in-process readback は PCAP から tuple と payload length を再構成し、
+  route trace の socket evidence と一致した時だけ `readback_verified=true` になる
+- `tcpdump` が利用可能な環境では readback を追加で走らせ、
+  tuple ごとの line match が揃った時だけ `os_native_readback_ok=true` にする
+- export は live privileged sniffing ではなく、
+  authenticated route trace を packet-capture artifact へ落とし直す bounded contract である
+- そのため residual future work は broad な packet export 一般論ではなく、
+  cross-host route と privileged interface capture acquisition へ絞られる
+
 ## Relay telemetry
 
 reference runtime は `capture_relay_telemetry` により、
@@ -193,6 +219,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
 - schema: `specs/schemas/distributed_transport_os_observer_receipt.schema`
 - schema: `specs/schemas/distributed_transport_authority_route_trace.schema`
+- schema: `specs/schemas/distributed_transport_packet_capture_export.schema`
 - IDL: `specs/interfaces/agentic.distributed_transport.v0.idl`
 - eval: `evals/agentic/distributed_transport_authenticity.yaml`
 - eval: `evals/agentic/distributed_transport_rotation.yaml`
@@ -201,6 +228,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - eval: `evals/agentic/distributed_transport_authority_plane.yaml`
 - eval: `evals/agentic/distributed_transport_authority_churn.yaml`
 - eval: `evals/agentic/distributed_transport_authority_route_trace.yaml`
+- eval: `evals/agentic/distributed_transport_packet_capture_export.yaml`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-attestation.md`
 - decision log: `meta/decision-log/2026-04-19_distributed-transport-key-rotation.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-relay-telemetry.md`
@@ -209,3 +237,4 @@ receipt に束縛された bounded relay observability surface も返す。
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-os-observer-receipt.md`
+- decision log: `meta/decision-log/2026-04-21_distributed-transport-pcap-export.md`

@@ -1,0 +1,24 @@
+eval_id: distributed_transport_packet_capture_export
+target: agentic.distributed_transport
+level: L4
+description: >
+  Authenticated distributed transport authority-route trace が trace-bound PCAP artifact へ
+  export され、tuple と request/response byte count を in-process readback で再構成し、
+  `tcpdump` が利用可能な環境では OS-native readback でも同じ route を再確認できること。
+fixtures:
+  - scenario: federation_authority_route_packet_capture
+    council_tier: federation
+    capture_profile: trace-bound-pcap-export-v1
+    authority_plane_ref: authority-plane://federation/route-nonce-example
+    expected:
+      route_count: 2
+      packet_count: 4
+      export_status: verified
+assertions:
+  - Packet capture export must require an authenticated authority-route trace
+  - Exported PCAP must contain one outbound request packet and one inbound response packet per traced authority member
+  - In-process readback must recover the same TCP tuples and payload lengths recorded by the route trace
+  - tcpdump readback, when available, must confirm every exported route tuple
+metric: exact-match
+threshold: 1.0
+ethics_check: true

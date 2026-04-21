@@ -200,6 +200,15 @@ entries:
     rationale: Required to serialize actual non-loopback mTLS authority routing, socket-level trace evidence, OS observer receipts, and digest binding for reachable authority-plane members.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_packet_capture_export.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_packet_capture_export.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize one trace-bound PCAP artifact, packet-level readback, and optional tcpdump verification for authenticated authority-route traces.
+  - priority: P1
+    kind: schema
     file: specs/schemas/cognitive_audit_record.schema
     consumers:
       - specs/interfaces/agentic.cognitive_audit.v0.idl
@@ -1283,6 +1292,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects non-loopback mTLS authority routing, certificate binding, socket trace completeness, OS observer receipts, and authority-plane response-digest matching.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_packet_capture_export.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects trace-bound PCAP export, tuple/byte-count readback, and optional tcpdump verification for authenticated authority-route traces.
   - priority: P1
     kind: eval
     file: evals/agentic/task_graph_complexity_guard.yaml

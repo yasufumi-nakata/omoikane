@@ -1721,6 +1721,9 @@ class OmoikaneReferenceOS:
                     client_certificate_ref=CLIENT_CERTIFICATE_REF,
                     request_timeout_ms=500,
                 )
+        packet_capture_export = self.distributed_transport.export_authority_route_packet_capture(
+            authority_route_trace,
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_root_directory_bound",
@@ -1765,6 +1768,16 @@ class OmoikaneReferenceOS:
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_route_traced",
             payload=authority_route_trace.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_packet_capture_exported",
+            payload=packet_capture_export.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -2014,6 +2027,9 @@ class OmoikaneReferenceOS:
             "authority_route_trace": {
                 "federation_rotated": authority_route_trace.to_dict(),
             },
+            "packet_capture_export": {
+                "federation_rotated": packet_capture_export.to_dict(),
+            },
             "receipts": {
                 "federation": federation_receipt.to_dict(),
                 "federation_rotated": rotated_receipt.to_dict(),
@@ -2138,6 +2154,23 @@ class OmoikaneReferenceOS:
                         and binding["os_observer_receipt"]["connection_states"]
                         for binding in authority_route_trace.route_bindings
                     )
+                ),
+                "authority_packet_capture_exported": (
+                    packet_capture_export.export_status == "verified"
+                    and packet_capture_export.capture_profile == "trace-bound-pcap-export-v1"
+                    and packet_capture_export.artifact_format == "pcap"
+                    and packet_capture_export.route_count == authority_route_trace.route_count
+                    and packet_capture_export.packet_count
+                    == authority_route_trace.route_count * 2
+                    and all(
+                        route_export["readback_verified"]
+                        and route_export["readback_packet_count"] == 2
+                        for route_export in packet_capture_export.route_exports
+                    )
+                ),
+                "authority_packet_capture_os_native_readback": (
+                    not packet_capture_export.os_native_readback_available
+                    or packet_capture_export.os_native_readback_ok
                 ),
                 "relay_telemetry_binds_rotated_path": rotated_telemetry.end_to_end_status
                 == "authenticated"

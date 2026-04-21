@@ -1,0 +1,225 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_packet_capture_export.schema"
+title: DistributedTransportPacketCaptureExport
+description: >
+  Trace-bound PCAP artifact exported from one authenticated distributed transport
+  authority-route trace, with in-process readback and optional tcpdump verification.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - capture_ref
+  - trace_ref
+  - trace_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - envelope_ref
+  - envelope_digest
+  - council_tier
+  - transport_profile
+  - capture_profile
+  - artifact_format
+  - readback_profile
+  - os_native_readback_profile
+  - route_count
+  - packet_count
+  - artifact_size_bytes
+  - artifact_digest
+  - readback_digest
+  - route_exports
+  - os_native_readback_available
+  - os_native_readback_ok
+  - export_status
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: distributed_transport_packet_capture_export
+  schema_version:
+    const: "1.0.0"
+  capture_ref:
+    type: string
+    pattern: "^authority-packet-capture://"
+  trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  trace_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  envelope_ref:
+    type: string
+    pattern: "^distributed-envelope-"
+  envelope_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  capture_profile:
+    const: trace-bound-pcap-export-v1
+  artifact_format:
+    const: pcap
+  readback_profile:
+    const: pcap-readback-v1
+  os_native_readback_profile:
+    const: tcpdump-readback-v1
+  route_count:
+    type: integer
+    minimum: 1
+  packet_count:
+    type: integer
+    minimum: 2
+  artifact_size_bytes:
+    type: integer
+    minimum: 1
+  artifact_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  readback_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  route_exports:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - key_server_ref
+        - route_binding_ref
+        - local_ip
+        - local_port
+        - remote_ip
+        - remote_port
+        - outbound_tuple_digest
+        - inbound_tuple_digest
+        - packet_order
+        - outbound_request_bytes
+        - inbound_response_bytes
+        - outbound_payload_digest
+        - inbound_payload_digest
+        - readback_packet_count
+        - readback_verified
+      properties:
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        route_binding_ref:
+          type: string
+          pattern: "^authority-route://"
+        local_ip:
+          type: string
+          minLength: 1
+        local_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        remote_ip:
+          type: string
+          minLength: 1
+        remote_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        outbound_tuple_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        inbound_tuple_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        packet_order:
+          type: array
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+            - const: outbound-request
+            - const: inbound-response
+        outbound_request_bytes:
+          type: integer
+          minimum: 1
+        inbound_response_bytes:
+          type: integer
+          minimum: 1
+        outbound_payload_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        inbound_payload_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        readback_packet_count:
+          type: integer
+          minimum: 0
+        readback_verified:
+          type: boolean
+        os_native_readback_verified:
+          type: boolean
+  os_native_readback_available:
+    type: boolean
+  os_native_readback_ok:
+    type: boolean
+  export_status:
+    type: string
+    enum:
+      - verified
+      - rejected
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_packet_capture_export
+    schema_version: "1.0.0"
+    capture_ref: authority-packet-capture://federation/route-nonce-abcdef123456
+    trace_ref: authority-route-trace://federation/route-nonce-abcdef123456
+    trace_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    authority_plane_ref: authority-plane://federation/route-nonce-abcdef123456
+    authority_plane_digest: "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567"
+    envelope_ref: distributed-envelope-0001
+    envelope_digest: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    capture_profile: trace-bound-pcap-export-v1
+    artifact_format: pcap
+    readback_profile: pcap-readback-v1
+    os_native_readback_profile: tcpdump-readback-v1
+    route_count: 2
+    packet_count: 4
+    artifact_size_bytes: 512
+    artifact_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    readback_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    route_exports:
+      - key_server_ref: keyserver://federation/notary-a
+        route_binding_ref: authority-route://federation/0011223344556677
+        local_ip: 192.0.2.10
+        local_port: 51000
+        remote_ip: 192.0.2.20
+        remote_port: 443
+        outbound_tuple_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        inbound_tuple_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        packet_order: [outbound-request, inbound-response]
+        outbound_request_bytes: 96
+        inbound_response_bytes: 320
+        outbound_payload_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        inbound_payload_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        readback_packet_count: 2
+        readback_verified: true
+        os_native_readback_verified: true
+    os_native_readback_available: true
+    os_native_readback_ok: true
+    export_status: verified
+    recorded_at: "2026-04-21T10:00:00Z"
+    digest: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

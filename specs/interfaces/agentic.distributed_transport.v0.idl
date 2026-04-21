@@ -13,6 +13,7 @@ imports:
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
   distributed_transport_os_observer_receipt: ../schemas/distributed_transport_os_observer_receipt.schema
   distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
+  distributed_transport_packet_capture_export: ../schemas/distributed_transport_packet_capture_export.schema
 operations:
   issue_federation_handoff:
     summary: >
@@ -303,6 +304,38 @@ operations:
       - every traced response digest must match the currently bound authority-plane member payload
       - socket trace must capture local/remote endpoint tuple, tls version, cipher suite, and byte counts
       - OS observer receipts must capture the same TCP tuple from at least 1 OS source such as netstat or lsof while the route is live
+  export_authority_route_packet_capture:
+    summary: >
+      Export one authenticated authority-route trace into a trace-bound PCAP artifact,
+      verify it with in-process readback, and optionally bind tcpdump readback when available.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - trace_ref
+          - trace_digest
+          - authority_plane_ref
+          - authority_plane_digest
+        properties:
+          trace_ref:
+            type: string
+            pattern: "^authority-route-trace://"
+          trace_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+    output:
+      schema_ref: distributed_transport_packet_capture_export
+    guarantees:
+      - packet capture export requires an authenticated authority-route trace
+      - exported PCAP must contain one outbound request packet and one inbound response packet per traced authority member
+      - in-process readback must recover the same TCP tuples and payload lengths recorded by the route trace
+      - tcpdump readback is optional, but when available it must confirm every exported route tuple
   record_receipt:
     summary: >
       Verify one returned remote receipt against its transport envelope, attested participant set,
@@ -456,8 +489,11 @@ events:
   distributed.transport_authority_route_traced:
     payload:
       schema_ref: distributed_transport_authority_route_trace
+  distributed.transport_packet_capture_exported:
+    payload:
+      schema_ref: distributed_transport_packet_capture_export
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, multi-hop anti-replay, and bounded relay telemetry.
-    - Cross-host authority routing beyond the local machine and OS-native packet capture remain future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, trace-bound PCAP export, multi-hop anti-replay, and bounded relay telemetry.
+    - Cross-host authority routing beyond the local machine and privileged live interface capture acquisition remain future work.

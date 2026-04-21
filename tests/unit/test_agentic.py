@@ -1458,6 +1458,27 @@ class DistributedTransportServiceTests(unittest.TestCase):
                 for binding in trace.route_bindings
             )
         )
+        packet_capture_export = service.export_authority_route_packet_capture(trace)
+        self.assertEqual("verified", packet_capture_export.export_status)
+        self.assertEqual("trace-bound-pcap-export-v1", packet_capture_export.capture_profile)
+        self.assertEqual("pcap", packet_capture_export.artifact_format)
+        self.assertEqual(2, packet_capture_export.route_count)
+        self.assertEqual(4, packet_capture_export.packet_count)
+        self.assertGreater(packet_capture_export.artifact_size_bytes, 0)
+        self.assertTrue(packet_capture_export.artifact_digest)
+        self.assertTrue(packet_capture_export.readback_digest)
+        self.assertTrue(
+            all(
+                route_export["readback_verified"]
+                and route_export["readback_packet_count"] == 2
+                and route_export["packet_order"] == ["outbound-request", "inbound-response"]
+                and route_export["outbound_request_bytes"] > 0
+                and route_export["inbound_response_bytes"] > 0
+                for route_export in packet_capture_export.route_exports
+            )
+        )
+        if packet_capture_export.os_native_readback_available:
+            self.assertTrue(packet_capture_export.os_native_readback_ok)
 
 
 class TaskGraphExecutionTests(unittest.TestCase):

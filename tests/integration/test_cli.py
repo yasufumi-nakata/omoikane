@@ -886,6 +886,24 @@ class CliIntegrationTests(unittest.TestCase):
                 for binding in result["authority_route_trace"]["federation_rotated"]["route_bindings"]
             )
         )
+        self.assertEqual(
+            "verified",
+            result["packet_capture_export"]["federation_rotated"]["export_status"],
+        )
+        self.assertEqual(
+            "trace-bound-pcap-export-v1",
+            result["packet_capture_export"]["federation_rotated"]["capture_profile"],
+        )
+        self.assertEqual(
+            "pcap",
+            result["packet_capture_export"]["federation_rotated"]["artifact_format"],
+        )
+        self.assertEqual(
+            4,
+            result["packet_capture_export"]["federation_rotated"]["packet_count"],
+        )
+        self.assertTrue(result["validation"]["authority_packet_capture_exported"])
+        self.assertTrue(result["validation"]["authority_packet_capture_os_native_readback"])
         self.assertTrue(result["validation"]["relay_telemetry_binds_rotated_path"])
         self.assertTrue(result["validation"]["relay_telemetry_surfaces_replay_block"])
         self.assertEqual(2, result["relay_telemetry"]["federation_rotated"]["hop_count"])

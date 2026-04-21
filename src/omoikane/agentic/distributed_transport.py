@@ -12,7 +12,9 @@ from pathlib import Path
 import shutil
 import socket
 import ssl
+import struct
 import subprocess
+import tempfile
 import time
 from typing import Any, Dict, List, Mapping
 from urllib.parse import urlsplit
@@ -51,6 +53,10 @@ AUTHORITY_CHURN_PROFILE = "bounded-key-server-churn-window-v1"
 AUTHORITY_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
 AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 AUTHORITY_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
+AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
+AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
+AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
+AUTHORITY_ROUTE_PCAP_OS_NATIVE_PROFILE = "tcpdump-readback-v1"
 RELAY_TRANSPORT_LAYER_BY_PROFILE = {
     "federation-mtls-quorum-v1": "mtls",
     "heritage-attested-review-v1": "attested-bridge",
@@ -529,6 +535,66 @@ class DistributedTransportAuthorityRouteTrace:
             "total_connect_latency_ms": self.total_connect_latency_ms,
             "total_handshake_latency_ms": self.total_handshake_latency_ms,
             "total_round_trip_latency_ms": self.total_round_trip_latency_ms,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedTransportPacketCaptureExport:
+    """Trace-bound packet-capture artifact exported from an authenticated authority route trace."""
+
+    capture_ref: str
+    trace_ref: str
+    trace_digest: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    envelope_ref: str
+    envelope_digest: str
+    council_tier: str
+    transport_profile: str
+    capture_profile: str
+    artifact_format: str
+    readback_profile: str
+    os_native_readback_profile: str
+    route_count: int
+    packet_count: int
+    artifact_size_bytes: int
+    artifact_digest: str
+    readback_digest: str
+    route_exports: List[Dict[str, Any]]
+    os_native_readback_available: bool
+    os_native_readback_ok: bool
+    export_status: str
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_packet_capture_export",
+            "schema_version": "1.0.0",
+            "capture_ref": self.capture_ref,
+            "trace_ref": self.trace_ref,
+            "trace_digest": self.trace_digest,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "envelope_ref": self.envelope_ref,
+            "envelope_digest": self.envelope_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "capture_profile": self.capture_profile,
+            "artifact_format": self.artifact_format,
+            "readback_profile": self.readback_profile,
+            "os_native_readback_profile": self.os_native_readback_profile,
+            "route_count": self.route_count,
+            "packet_count": self.packet_count,
+            "artifact_size_bytes": self.artifact_size_bytes,
+            "artifact_digest": self.artifact_digest,
+            "readback_digest": self.readback_digest,
+            "route_exports": [dict(route_export) for route_export in self.route_exports],
+            "os_native_readback_available": self.os_native_readback_available,
+            "os_native_readback_ok": self.os_native_readback_ok,
+            "export_status": self.export_status,
+            "recorded_at": self.recorded_at,
             "digest": self.digest,
         }
 
@@ -1486,6 +1552,111 @@ class DistributedTransportService:
             digest=digest,
         )
 
+    def export_authority_route_packet_capture(
+        self,
+        authority_route_trace: DistributedTransportAuthorityRouteTrace,
+    ) -> DistributedTransportPacketCaptureExport:
+        if authority_route_trace.trace_status != "authenticated":
+            raise ValueError("packet capture export requires an authenticated authority route trace")
+
+        pcap_bytes, route_exports = self._build_authority_route_pcap(authority_route_trace)
+        artifact_digest = hashlib.sha256(pcap_bytes).hexdigest()
+        artifact_size_bytes = len(pcap_bytes)
+        readback_packets = self._readback_authority_route_pcap(pcap_bytes)
+
+        for route_export in route_exports:
+            outbound = [
+                packet
+                for packet in readback_packets
+                if packet["tuple_digest"] == route_export["outbound_tuple_digest"]
+            ]
+            inbound = [
+                packet
+                for packet in readback_packets
+                if packet["tuple_digest"] == route_export["inbound_tuple_digest"]
+            ]
+            route_export["readback_packet_count"] = len(outbound) + len(inbound)
+            route_export["readback_verified"] = (
+                len(outbound) == 1
+                and len(inbound) == 1
+                and outbound[0]["payload_length"] == route_export["outbound_request_bytes"]
+                and inbound[0]["payload_length"] == route_export["inbound_response_bytes"]
+            )
+
+        os_native_readback = self._run_tcpdump_readback(
+            pcap_bytes=pcap_bytes,
+            route_exports=route_exports,
+        )
+        os_native_readback_ok = os_native_readback["available"] and os_native_readback["verified"]
+        readback_payload = {
+            "packets": readback_packets,
+            "route_exports": route_exports,
+            "os_native_readback": os_native_readback,
+        }
+        readback_digest = sha256_text(canonical_json(readback_payload))
+        export_status = (
+            "verified"
+            if all(route_export["readback_verified"] for route_export in route_exports)
+            and (not os_native_readback["available"] or os_native_readback["verified"])
+            else "rejected"
+        )
+        recorded_at = utc_now_iso()
+        payload = {
+            "capture_ref": (
+                "authority-packet-capture://"
+                f"{authority_route_trace.council_tier}/{authority_route_trace.trace_ref.split('/')[-1]}"
+            ),
+            "trace_ref": authority_route_trace.trace_ref,
+            "trace_digest": authority_route_trace.digest,
+            "authority_plane_ref": authority_route_trace.authority_plane_ref,
+            "authority_plane_digest": authority_route_trace.authority_plane_digest,
+            "envelope_ref": authority_route_trace.envelope_ref,
+            "envelope_digest": authority_route_trace.envelope_digest,
+            "council_tier": authority_route_trace.council_tier,
+            "transport_profile": authority_route_trace.transport_profile,
+            "capture_profile": AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE,
+            "artifact_format": AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT,
+            "readback_profile": AUTHORITY_ROUTE_PCAP_READBACK_PROFILE,
+            "os_native_readback_profile": AUTHORITY_ROUTE_PCAP_OS_NATIVE_PROFILE,
+            "route_count": authority_route_trace.route_count,
+            "packet_count": len(readback_packets),
+            "artifact_size_bytes": artifact_size_bytes,
+            "artifact_digest": artifact_digest,
+            "readback_digest": readback_digest,
+            "route_exports": route_exports,
+            "os_native_readback_available": os_native_readback["available"],
+            "os_native_readback_ok": os_native_readback_ok,
+            "export_status": export_status,
+            "recorded_at": recorded_at,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportPacketCaptureExport(
+            capture_ref=payload["capture_ref"],
+            trace_ref=authority_route_trace.trace_ref,
+            trace_digest=authority_route_trace.digest,
+            authority_plane_ref=authority_route_trace.authority_plane_ref,
+            authority_plane_digest=authority_route_trace.authority_plane_digest,
+            envelope_ref=authority_route_trace.envelope_ref,
+            envelope_digest=authority_route_trace.envelope_digest,
+            council_tier=authority_route_trace.council_tier,
+            transport_profile=authority_route_trace.transport_profile,
+            capture_profile=AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE,
+            artifact_format=AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT,
+            readback_profile=AUTHORITY_ROUTE_PCAP_READBACK_PROFILE,
+            os_native_readback_profile=AUTHORITY_ROUTE_PCAP_OS_NATIVE_PROFILE,
+            route_count=authority_route_trace.route_count,
+            packet_count=payload["packet_count"],
+            artifact_size_bytes=artifact_size_bytes,
+            artifact_digest=artifact_digest,
+            readback_digest=readback_digest,
+            route_exports=route_exports,
+            os_native_readback_available=os_native_readback["available"],
+            os_native_readback_ok=os_native_readback_ok,
+            export_status=export_status,
+            recorded_at=recorded_at,
+            digest=digest,
+        )
+
     def _capture_os_observer_receipt(
         self,
         *,
@@ -1545,6 +1716,374 @@ class DistributedTransportService:
             "connection_states": sorted(connection_states),
             "tuple_digest": sha256_text(tuple_payload),
             "receipt_status": receipt_status,
+        }
+
+    def _build_authority_route_pcap(
+        self,
+        authority_route_trace: DistributedTransportAuthorityRouteTrace,
+    ) -> tuple[bytes, List[Dict[str, Any]]]:
+        packet_records: List[bytes] = []
+        route_exports: List[Dict[str, Any]] = []
+        ts_sec = int(time.time())
+        ts_usec = 0
+        packet_index = 0
+
+        for binding in authority_route_trace.route_bindings:
+            socket_trace = dict(binding["socket_trace"])
+            local_ip = self._require_non_empty_string(socket_trace.get("local_ip"), "local_ip")
+            remote_ip = self._require_non_empty_string(socket_trace.get("remote_ip"), "remote_ip")
+            local_port = self._require_positive_int(socket_trace.get("local_port"), "local_port")
+            remote_port = self._require_positive_int(socket_trace.get("remote_port"), "remote_port")
+            request_length = self._require_positive_int(
+                socket_trace.get("request_bytes"),
+                "request_bytes",
+            )
+            response_length = self._require_positive_int(
+                socket_trace.get("response_bytes"),
+                "response_bytes",
+            )
+            route_binding_ref = self._require_non_empty_string(
+                binding.get("route_binding_ref"),
+                "route_binding_ref",
+            )
+            response_digest = self._require_sha256_hex(
+                socket_trace.get("response_digest"),
+                "response_digest",
+            )
+            outbound_tuple_digest = sha256_text(f"{local_ip}:{local_port}->{remote_ip}:{remote_port}")
+            inbound_tuple_digest = sha256_text(f"{remote_ip}:{remote_port}->{local_ip}:{local_port}")
+            outbound_payload = self._deterministic_packet_payload(
+                seed=f"{route_binding_ref}:request",
+                length=request_length,
+            )
+            inbound_payload = self._deterministic_packet_payload(
+                seed=f"{response_digest}:response",
+                length=response_length,
+            )
+            outbound_packet = self._build_ipv4_tcp_packet(
+                src_ip=local_ip,
+                dst_ip=remote_ip,
+                src_port=local_port,
+                dst_port=remote_port,
+                payload=outbound_payload,
+                sequence_number=1,
+                acknowledgement_number=1,
+                packet_id=packet_index + 1,
+            )
+            packet_records.append(
+                self._build_pcap_record(
+                    packet=outbound_packet,
+                    ts_sec=ts_sec,
+                    ts_usec=ts_usec,
+                )
+            )
+            packet_index += 1
+            ts_usec += 1
+            inbound_packet = self._build_ipv4_tcp_packet(
+                src_ip=remote_ip,
+                dst_ip=local_ip,
+                src_port=remote_port,
+                dst_port=local_port,
+                payload=inbound_payload,
+                sequence_number=1,
+                acknowledgement_number=request_length + 1,
+                packet_id=packet_index + 1,
+            )
+            packet_records.append(
+                self._build_pcap_record(
+                    packet=inbound_packet,
+                    ts_sec=ts_sec,
+                    ts_usec=ts_usec,
+                )
+            )
+            packet_index += 1
+            ts_usec += 1
+            route_exports.append(
+                {
+                    "key_server_ref": binding["key_server_ref"],
+                    "route_binding_ref": route_binding_ref,
+                    "local_ip": local_ip,
+                    "local_port": local_port,
+                    "remote_ip": remote_ip,
+                    "remote_port": remote_port,
+                    "outbound_tuple_digest": outbound_tuple_digest,
+                    "inbound_tuple_digest": inbound_tuple_digest,
+                    "packet_order": ["outbound-request", "inbound-response"],
+                    "outbound_request_bytes": request_length,
+                    "inbound_response_bytes": response_length,
+                    "outbound_payload_digest": hashlib.sha256(outbound_payload).hexdigest(),
+                    "inbound_payload_digest": hashlib.sha256(inbound_payload).hexdigest(),
+                    "readback_packet_count": 0,
+                    "readback_verified": False,
+                }
+            )
+
+        global_header = struct.pack(
+            "<IHHIIII",
+            0xA1B2C3D4,
+            2,
+            4,
+            0,
+            0,
+            65535,
+            101,
+        )
+        return global_header + b"".join(packet_records), route_exports
+
+    @staticmethod
+    def _deterministic_packet_payload(*, seed: str, length: int) -> bytes:
+        digest = hashlib.sha256(seed.encode("utf-8")).digest()
+        repeats = (length // len(digest)) + 1
+        return (digest * repeats)[:length]
+
+    @staticmethod
+    def _build_pcap_record(*, packet: bytes, ts_sec: int, ts_usec: int) -> bytes:
+        header = struct.pack("<IIII", ts_sec, ts_usec, len(packet), len(packet))
+        return header + packet
+
+    @classmethod
+    def _build_ipv4_tcp_packet(
+        cls,
+        *,
+        src_ip: str,
+        dst_ip: str,
+        src_port: int,
+        dst_port: int,
+        payload: bytes,
+        sequence_number: int,
+        acknowledgement_number: int,
+        packet_id: int,
+    ) -> bytes:
+        src_ip_bytes = socket.inet_aton(src_ip)
+        dst_ip_bytes = socket.inet_aton(dst_ip)
+        tcp_header = cls._build_tcp_header(
+            src_ip_bytes=src_ip_bytes,
+            dst_ip_bytes=dst_ip_bytes,
+            src_port=src_port,
+            dst_port=dst_port,
+            sequence_number=sequence_number,
+            acknowledgement_number=acknowledgement_number,
+            payload=payload,
+        )
+        total_length = 20 + len(tcp_header) + len(payload)
+        version_ihl = (4 << 4) | 5
+        ip_header_without_checksum = struct.pack(
+            "!BBHHHBBH4s4s",
+            version_ihl,
+            0,
+            total_length,
+            packet_id & 0xFFFF,
+            0,
+            64,
+            socket.IPPROTO_TCP,
+            0,
+            src_ip_bytes,
+            dst_ip_bytes,
+        )
+        ip_checksum = cls._internet_checksum(ip_header_without_checksum)
+        ip_header = struct.pack(
+            "!BBHHHBBH4s4s",
+            version_ihl,
+            0,
+            total_length,
+            packet_id & 0xFFFF,
+            0,
+            64,
+            socket.IPPROTO_TCP,
+            ip_checksum,
+            src_ip_bytes,
+            dst_ip_bytes,
+        )
+        return ip_header + tcp_header + payload
+
+    @classmethod
+    def _build_tcp_header(
+        cls,
+        *,
+        src_ip_bytes: bytes,
+        dst_ip_bytes: bytes,
+        src_port: int,
+        dst_port: int,
+        sequence_number: int,
+        acknowledgement_number: int,
+        payload: bytes,
+    ) -> bytes:
+        data_offset = 5
+        offset_reserved_flags = (data_offset << 12) | 0x018
+        window_size = 65535
+        urgent_pointer = 0
+        tcp_header_without_checksum = struct.pack(
+            "!HHIIHHHH",
+            src_port,
+            dst_port,
+            sequence_number,
+            acknowledgement_number,
+            offset_reserved_flags,
+            window_size,
+            0,
+            urgent_pointer,
+        )
+        tcp_length = len(tcp_header_without_checksum) + len(payload)
+        pseudo_header = struct.pack(
+            "!4s4sBBH",
+            src_ip_bytes,
+            dst_ip_bytes,
+            0,
+            socket.IPPROTO_TCP,
+            tcp_length,
+        )
+        checksum = cls._internet_checksum(pseudo_header + tcp_header_without_checksum + payload)
+        return struct.pack(
+            "!HHIIHHHH",
+            src_port,
+            dst_port,
+            sequence_number,
+            acknowledgement_number,
+            offset_reserved_flags,
+            window_size,
+            checksum,
+            urgent_pointer,
+        )
+
+    @staticmethod
+    def _internet_checksum(data: bytes) -> int:
+        if len(data) % 2 == 1:
+            data += b"\x00"
+        total = 0
+        for index in range(0, len(data), 2):
+            total += (data[index] << 8) + data[index + 1]
+        while total > 0xFFFF:
+            total = (total & 0xFFFF) + (total >> 16)
+        return (~total) & 0xFFFF
+
+    @classmethod
+    def _readback_authority_route_pcap(cls, pcap_bytes: bytes) -> List[Dict[str, Any]]:
+        if len(pcap_bytes) < 24:
+            raise ValueError("pcap export must include a global header")
+        magic_number = struct.unpack_from("<I", pcap_bytes, 0)[0]
+        if magic_number != 0xA1B2C3D4:
+            raise ValueError("pcap export must use little-endian libpcap format")
+        linktype = struct.unpack_from("<I", pcap_bytes, 20)[0]
+        if linktype != 101:
+            raise ValueError("pcap export must use raw IPv4 linktype")
+
+        packets: List[Dict[str, Any]] = []
+        offset = 24
+        while offset < len(pcap_bytes):
+            if offset + 16 > len(pcap_bytes):
+                raise ValueError("pcap record header is truncated")
+            _, _, included_length, original_length = struct.unpack_from("<IIII", pcap_bytes, offset)
+            offset += 16
+            packet_bytes = pcap_bytes[offset : offset + included_length]
+            if len(packet_bytes) != included_length or included_length != original_length:
+                raise ValueError("pcap packet payload is truncated")
+            packets.append(cls._parse_ipv4_tcp_packet(packet_bytes))
+            offset += included_length
+        return packets
+
+    @staticmethod
+    def _parse_ipv4_tcp_packet(packet: bytes) -> Dict[str, Any]:
+        if len(packet) < 40:
+            raise ValueError("pcap packet must contain IPv4 and TCP headers")
+        version_ihl = packet[0]
+        version = version_ihl >> 4
+        ihl = (version_ihl & 0x0F) * 4
+        if version != 4 or ihl < 20:
+            raise ValueError("pcap packet must be IPv4")
+        total_length = struct.unpack("!H", packet[2:4])[0]
+        protocol = packet[9]
+        if protocol != socket.IPPROTO_TCP:
+            raise ValueError("pcap packet must use TCP")
+        src_ip = socket.inet_ntoa(packet[12:16])
+        dst_ip = socket.inet_ntoa(packet[16:20])
+        tcp_offset = ihl
+        src_port, dst_port, _, _, offset_reserved_flags = struct.unpack(
+            "!HHIIH",
+            packet[tcp_offset : tcp_offset + 14],
+        )
+        data_offset = ((offset_reserved_flags >> 12) & 0xF) * 4
+        payload_start = tcp_offset + data_offset
+        payload_length = max(total_length - payload_start, 0)
+        tuple_digest = sha256_text(f"{src_ip}:{src_port}->{dst_ip}:{dst_port}")
+        return {
+            "src_ip": src_ip,
+            "dst_ip": dst_ip,
+            "src_port": src_port,
+            "dst_port": dst_port,
+            "payload_length": payload_length,
+            "tuple_digest": tuple_digest,
+        }
+
+    @classmethod
+    def _run_tcpdump_readback(
+        cls,
+        *,
+        pcap_bytes: bytes,
+        route_exports: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        tcpdump_path = shutil.which("tcpdump")
+        if not tcpdump_path:
+            return {
+                "available": False,
+                "verified": False,
+                "output_digest": sha256_text(""),
+                "matched_line_count": 0,
+            }
+
+        with tempfile.NamedTemporaryFile(prefix="omoikane-route-capture-", suffix=".pcap") as handle:
+            handle.write(pcap_bytes)
+            handle.flush()
+            result = subprocess.run(
+                [tcpdump_path, "-nn", "-r", handle.name],
+                capture_output=True,
+                text=True,
+                check=False,
+                errors="replace",
+            )
+        if result.returncode != 0:
+            return {
+                "available": True,
+                "verified": False,
+                "output_digest": sha256_text(result.stdout + result.stderr),
+                "matched_line_count": 0,
+            }
+
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        matched_line_count = 0
+        for route_export in route_exports:
+            outbound_pattern = (
+                f"{route_export['local_ip']}.{route_export['local_port']} > "
+                f"{route_export['remote_ip']}.{route_export['remote_port']}"
+            )
+            inbound_pattern = (
+                f"{route_export['remote_ip']}.{route_export['remote_port']} > "
+                f"{route_export['local_ip']}.{route_export['local_port']}"
+            )
+            outbound_length = route_export["outbound_request_bytes"]
+            inbound_length = route_export["inbound_response_bytes"]
+            outbound_matches = [
+                line
+                for line in lines
+                if outbound_pattern in line and f"length {outbound_length}" in line
+            ]
+            inbound_matches = [
+                line
+                for line in lines
+                if inbound_pattern in line and f"length {inbound_length}" in line
+            ]
+            route_export["os_native_readback_verified"] = (
+                len(outbound_matches) == 1 and len(inbound_matches) == 1
+            )
+            if route_export["os_native_readback_verified"]:
+                matched_line_count += 2
+        return {
+            "available": True,
+            "verified": all(
+                route_export.get("os_native_readback_verified", False)
+                for route_export in route_exports
+            ),
+            "output_digest": sha256_text("\n".join(lines)),
+            "matched_line_count": matched_line_count,
         }
 
     def _capture_netstat_observer(

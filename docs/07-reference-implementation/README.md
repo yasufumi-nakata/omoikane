@@ -168,6 +168,10 @@ draining exit を `bounded-key-server-churn-window-v1` で証明すること、
 を socket trace として返し、同時に `netstat` / `lsof` ベースの
 `os_observer_receipt` が同じ TCP tuple と connection state を束縛し、
 authority plane の per-server digest と一致したときだけ `authenticated` になること、
+さらに authenticated route trace が
+`trace-bound-pcap-export-v1` により PCAP artifact へ export され、
+in-process readback と `tcpdump` readback が
+tuple ごとの request/response byte count を再確認すること、
 Heritage handoff が fixed reviewer roles を満たした receipt だけを
 `authenticated` にすること、
 同一 `route_nonce` と `hop_nonce_chain` の再利用が `replay-blocked` になること、
@@ -475,5 +479,5 @@ runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許
 
 ## 今後広げる面
 
-- cross-host authority routing と privileged raw packet capture export
+- cross-host authority routing と privileged live interface capture acquisition
 - automation による未実装ギャップの継続充填
