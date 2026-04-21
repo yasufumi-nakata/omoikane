@@ -1,0 +1,91 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/perception_shift.schema"
+title: PerceptionShift
+description: Ledger-safe L3 perception failover summary emitted by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - shift_id
+  - policy_id
+  - frame_ref
+  - selected_backend
+  - attempted_backends
+  - degraded
+  - previous_frame_id
+  - previous_scene_label
+  - scene_label
+  - dominant_modality
+  - affect_guard
+  - qualia_binding_ref
+  - body_coherence_preserved
+  - safe_summary_only
+  - failures
+  - recorded_at
+  - digest
+properties:
+  kind:
+    const: perception_shift
+  schema_version:
+    const: 1.0.0
+  shift_id:
+    type: string
+    pattern: "^perception-shift-[a-f0-9]{12}$"
+  policy_id:
+    const: bounded-perception-failover-v1
+  frame_ref:
+    type: string
+    pattern: "^perception-frame-[a-f0-9]{12}$"
+  selected_backend:
+    type: string
+    minLength: 1
+  attempted_backends:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  degraded:
+    type: boolean
+  previous_frame_id:
+    type:
+      - string
+      - "null"
+  previous_scene_label:
+    type:
+      - string
+      - "null"
+  scene_label:
+    type: string
+    minLength: 1
+  dominant_modality:
+    type: string
+    enum:
+      - visual
+      - auditory
+      - somatic
+      - interoceptive
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  qualia_binding_ref:
+    type: string
+    pattern: "^qualia://tick/[0-9]+$"
+  body_coherence_preserved:
+    type: boolean
+  safe_summary_only:
+    const: true
+  failures:
+    type: array
+    items:
+      type: string
+  recorded_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

@@ -526,6 +526,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
+    def test_perception_demo_emits_qualia_bound_safe_scene_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "perception-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["baseline_primary"])
+        self.assertEqual("continuity_projection_v1", result["validation"]["selected_backend"])
+        self.assertTrue(result["validation"]["guard_aligned"])
+        self.assertTrue(result["validation"]["safe_scene_selected"])
+        self.assertTrue(result["validation"]["qualia_bound"])
+        self.assertEqual("guardian-review-scene", result["perception"]["frame"]["scene_label"])
+        self.assertEqual("guardian-review", result["validation"]["perception_gate"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+
     def test_volition_demo_emits_guard_aligned_failover_json(self) -> None:
         stdout = io.StringIO()
 

@@ -1,0 +1,178 @@
+idl_version: 1
+kind: service
+namespace: cognitive.perception.v0
+service: PerceptionService
+summary: Deterministic perception failover and qualia-bound scene encoding contract for the L3 reference runtime.
+imports:
+  perception_frame: ../schemas/perception_frame.schema
+  perception_shift: ../schemas/perception_shift.schema
+operations:
+  encode_scene:
+    summary: Encode one bounded sensory stream snapshot into a qualia-bound perception frame.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - tick_id
+          - summary
+          - sensory_stream_ref
+          - world_state_ref
+          - body_anchor_ref
+          - modality_salience
+          - drift_score
+          - affect_guard
+          - detected_entities
+          - memory_cues
+        properties:
+          tick_id:
+            type: integer
+            minimum: 0
+          summary:
+            type: string
+          sensory_stream_ref:
+            type: string
+            pattern: "^sensory://"
+          world_state_ref:
+            type: string
+            pattern: "^world://"
+          body_anchor_ref:
+            type: string
+            pattern: "^body-anchor://"
+          modality_salience:
+            type: object
+            required:
+              - visual
+              - auditory
+              - somatic
+              - interoceptive
+            properties:
+              visual:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              auditory:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              somatic:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+              interoceptive:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+          drift_score:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          affect_guard:
+            type: string
+            enum:
+              - nominal
+              - observe
+              - sandbox-notify
+          detected_entities:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          memory_cues:
+            type: array
+            items:
+              type: object
+              required:
+                - cue_id
+                - target
+                - weight
+              properties:
+                cue_id:
+                  type: string
+                target:
+                  type: string
+                weight:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+    output:
+      schema_ref: perception_frame
+    invariants:
+      - fallback may switch at most once per request in the reference runtime
+      - qualia_binding_ref must bind the encoded scene to one L2 qualia tick
+      - non-nominal affect_guard must move scene_label into the fixed safe scene set
+      - ledger output must use perception_shift and avoid raw sensory embeddings or payload bodies
+  validate_frame:
+    summary: Validate one perception frame snapshot against the fixed failover policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - snapshot
+        properties:
+          snapshot:
+            schema_ref: perception_frame
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - scene_label
+          - guard_aligned
+          - body_coherence_preserved
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          scene_label:
+            type: string
+          guard_aligned:
+            type: boolean
+          body_coherence_preserved:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+  validate_shift:
+    summary: Validate one ledger-safe perception shift record.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - shift
+        properties:
+          shift:
+            schema_ref: perception_shift
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - selected_backend
+          - scene_label
+          - guard_aligned
+          - body_coherence_preserved
+          - errors
+        properties:
+          ok:
+            type: boolean
+          selected_backend:
+            type: string
+          scene_label:
+            type: string
+          guard_aligned:
+            type: boolean
+          body_coherence_preserved:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  - name: cognitive.perception.failover
+    payload:
+      schema_ref: perception_shift

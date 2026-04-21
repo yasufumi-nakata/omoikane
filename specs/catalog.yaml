@@ -732,6 +732,30 @@ entries:
     rationale: Protects bounded merge windows, private-reality escape, and post-disconnect member recovery before dissolution.
   - priority: P1
     kind: schema
+    file: specs/schemas/perception_frame.schema
+    consumers:
+      - specs/interfaces/cognitive.perception.v0.idl
+      - docs/02-subsystems/cognitive/perception.md
+      - reference-runtime
+    rationale: Required to serialize one bounded perception frame with qualia binding, safe-scene routing, and body coherence state.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/perception_shift.schema
+    consumers:
+      - specs/interfaces/cognitive.perception.v0.idl
+      - evals/cognitive/perception_failover.yaml
+      - reference-runtime
+    rationale: Required to emit a ledger-safe summary of perception failover without raw sensory payload leakage.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/cognitive.perception.v0.idl
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/cognitive/perception.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to fix the L3 perception failover and qualia-bound scene encoding contract across docs, CLI, and runtime.
+  - priority: P1
+    kind: schema
     file: specs/schemas/affect_state.schema
     consumers:
       - specs/interfaces/cognitive.affect.v0.idl
@@ -888,6 +912,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects abrupt self-model takeover detection before richer cognitive backends land.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/perception_failover.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects qualia-bound scene encoding, single-switch perception fallback, and safe-scene alignment under elevated guards.
   - priority: P1
     kind: eval
     file: evals/cognitive/backend_failover.yaml

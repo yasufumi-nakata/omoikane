@@ -125,6 +125,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     episodic_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    perception_parser = subparsers.add_parser(
+        "perception-demo",
+        help="Run the L3 perception backend failover and qualia-bound scene encoding scenario",
+    )
+    perception_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     reasoning_parser = subparsers.add_parser(
         "reasoning-demo",
         help="Run the L3 reasoning backend failover and ledger-safe trace scenario",
@@ -420,6 +426,10 @@ def main() -> None:
 
     if args.command == "episodic-demo":
         _print_result(runtime.run_episodic_demo(), args.json)
+        return
+
+    if args.command == "perception-demo":
+        _print_result(runtime.run_perception_demo(), args.json)
         return
 
     if args.command == "reasoning-demo":

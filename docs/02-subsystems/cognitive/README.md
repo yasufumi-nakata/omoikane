@@ -98,6 +98,16 @@ bounded self-monitor report を持つ。
 `sandbox-notify` guard 時は `sandbox-hold` / `sandbox-stabilization` へ
 縮退する。
 
+`Perception` は最小の `bounded-perception-failover-v1` を採用し、
+`salience_encoder_v1 -> continuity_projection_v1` の単純 failover と
+qualia-bound scene encoding を持つ。
+`sensory stream`、`world_state_ref`、`body_anchor_ref`、`drift_score` を起点に
+1 つの bounded `scene_summary` を生成し、
+`qualia://tick/<id>` handoff を必須にする。
+`observe` / `sandbox-notify` guard 時は
+`guardian-review-scene` / `sandbox-stabilization` へ縮退し、
+raw sensory payload は `perception_shift` に書かない。
+
 ## 多実装結果の調停
 
 複数 backend が同時に走る場合（A/B 検証や信頼度向上目的）、調停は L4 Council が行う。
@@ -119,22 +129,23 @@ bounded self-monitor report を持つ。
 
 ## Reference runtime の現在地
 
-現行の reference runtime は L3 全面実装ではないが、`Reasoning` は
-`cognitive.reasoning.v0` と health-based failover / ledger-safe shift を持つ。
-`Affect` は bounded failover と smoothing を持ち、
+現行の reference runtime は L3 全面実装ではないが、`Perception` は
+`cognitive.perception.v0` と qualia-bound scene handoff / safe-scene failover を持つ。
+`Reasoning` は `cognitive.reasoning.v0` と health-based failover /
+ledger-safe shift を持ち、`Affect` は bounded failover と smoothing を持つ。
 `Attention`、`Volition`、`Imagination` も guard-aware / handoff-aware な
 single-switch failover を持つ。`Language` も disclosure floor 付きの
 thought-to-text bridge を持ち、`Metacognition` も SelfModel/Qualia 由来の
-bounded self-monitor report と escalation gate を持つが、その他の cognitive surface は引き続き
-`QualiaBuffer` と `SelfModelMonitor` を gateway として固定している。
+bounded self-monitor report と escalation gate を持つ。
 そのため [evals/cognitive/](../../../evals/cognitive/) では
-qualia/self-model baseline に加え、reasoning failover、affect failover、
-attention failover、volition failover、imagination failover、
-language failover、metacognition failover を
+qualia/self-model baseline に加え、perception failover、reasoning failover、
+affect failover、attention failover、volition failover、
+imagination failover、language failover、metacognition failover を
 最小の L3 eval として扱う。
 
 ## サブドキュメント
 
+- [perception.md](perception.md) ── L3 perception failover と qualia-bound scene summary
 - [reasoning.md](reasoning.md) ── L3 reasoning failover と ledger-safe shift summary
 - [affect.md](affect.md) ── L3 affect failover と continuity smoothing
 - [attention.md](attention.md) ── L3 attention failover と affect-aware safe target routing

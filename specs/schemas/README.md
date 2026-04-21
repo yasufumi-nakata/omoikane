@@ -7,6 +7,8 @@
 - `ethics_rule.schema`
 - `identity_record.schema`
 - `qualia_tick.schema`
+- `perception_frame.schema`
+- `perception_shift.schema`
 - `affect_state.schema`
 - `affect_transition.schema`
 - `self_model.schema`

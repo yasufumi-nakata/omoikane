@@ -7,6 +7,13 @@ from .attention import (
     ContinuityAnchorAttentionBackend,
     SalienceRoutingAttentionBackend,
 )
+from .perception import (
+    ContinuityProjectionPerceptionBackend,
+    PerceptionCue,
+    PerceptionRequest,
+    PerceptionService,
+    SalienceEncoderPerceptionBackend,
+)
 from .affect import (
     AffectCue,
     AffectRequest,
@@ -76,12 +83,17 @@ __all__ = [
     "MetacognitionRequest",
     "MetacognitionService",
     "NarrativeReasoningBackend",
+    "PerceptionCue",
+    "PerceptionRequest",
+    "PerceptionService",
     "ReasoningRequest",
     "ReflectiveLoopBackend",
     "ReasoningService",
     "SalienceRoutingAttentionBackend",
+    "SalienceEncoderPerceptionBackend",
     "StabilityGuardAffectBackend",
     "SymbolicReasoningBackend",
+    "ContinuityProjectionPerceptionBackend",
     "GuardianBiasVolitionBackend",
     "UtilityPolicyVolitionBackend",
     "VolitionCandidate",

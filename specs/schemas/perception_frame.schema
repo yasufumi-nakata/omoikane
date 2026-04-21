@@ -1,0 +1,283 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/perception_frame.schema"
+title: PerceptionFrame
+description: Deterministic L3 perception snapshot produced by the reference runtime.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - policy
+  - frame_id
+  - generated_at
+  - backend_id
+  - source_tick
+  - sensory_stream_ref
+  - world_state_ref
+  - body_anchor_ref
+  - affect_guard
+  - detected_entities
+  - salient_cues
+  - scene_label
+  - scene_summary
+  - dominant_modality
+  - salience_map
+  - qualia_binding_ref
+  - body_coherence_score
+  - perception_gate
+  - degraded
+  - continuity_guard
+  - digest
+properties:
+  kind:
+    const: perception_frame
+  schema_version:
+    const: 1.0.0
+  policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - primary
+      - fallback
+      - safe_scenes
+      - qualia_handoff_required
+      - body_coherence_floor
+      - failover_mode
+    properties:
+      schema_version:
+        const: 1.0.0
+      policy_id:
+        const: bounded-perception-failover-v1
+      primary:
+        type: string
+        minLength: 1
+      fallback:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      safe_scenes:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          enum:
+            - guardian-review-scene
+            - continuity-hold
+            - sandbox-stabilization
+      qualia_handoff_required:
+        const: true
+      body_coherence_floor:
+        const: 0.6
+      failover_mode:
+        const: single-switch
+  frame_id:
+    type: string
+    pattern: "^perception-frame-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  backend_id:
+    type: string
+    minLength: 1
+  source_tick:
+    type: object
+    additionalProperties: false
+    required:
+      - tick_id
+      - summary
+      - sensory_stream_ref
+      - world_state_ref
+      - body_anchor_ref
+      - modality_salience
+      - drift_score
+    properties:
+      tick_id:
+        type: integer
+        minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      sensory_stream_ref:
+        type: string
+        minLength: 1
+      world_state_ref:
+        type: string
+        minLength: 1
+      body_anchor_ref:
+        type: string
+        minLength: 1
+      modality_salience:
+        type: object
+        additionalProperties: false
+        required:
+          - visual
+          - auditory
+          - somatic
+          - interoceptive
+        properties:
+          visual:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          auditory:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          somatic:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+          interoceptive:
+            type: number
+            minimum: 0.0
+            maximum: 1.0
+      drift_score:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  sensory_stream_ref:
+    type: string
+    pattern: "^sensory://"
+  world_state_ref:
+    type: string
+    pattern: "^world://"
+  body_anchor_ref:
+    type: string
+    pattern: "^body-anchor://"
+  affect_guard:
+    type: string
+    enum:
+      - nominal
+      - observe
+      - sandbox-notify
+  detected_entities:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  salient_cues:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cue_id
+        - target
+        - weight
+      properties:
+        cue_id:
+          type: string
+          minLength: 1
+        target:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+  scene_label:
+    type: string
+    minLength: 1
+  scene_summary:
+    type: string
+    minLength: 1
+  dominant_modality:
+    type: string
+    enum:
+      - visual
+      - auditory
+      - somatic
+      - interoceptive
+  salience_map:
+    type: object
+    additionalProperties: false
+    required:
+      - visual
+      - auditory
+      - somatic
+      - interoceptive
+    properties:
+      visual:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      auditory:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      somatic:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+      interoceptive:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+  qualia_binding_ref:
+    type: string
+    pattern: "^qualia://tick/[0-9]+$"
+  body_coherence_score:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  perception_gate:
+    type: string
+    enum:
+      - open
+      - guardian-review
+      - private-buffer
+  degraded:
+    type: boolean
+  continuity_guard:
+    type: object
+    additionalProperties: false
+    required:
+      - previous_frame_id
+      - previous_backend_id
+      - previous_scene_label
+      - attempted_backends
+      - failures
+      - body_coherence_preserved
+      - shifted
+      - rationale
+    properties:
+      previous_frame_id:
+        type:
+          - string
+          - "null"
+      previous_backend_id:
+        type:
+          - string
+          - "null"
+      previous_scene_label:
+        type:
+          - string
+          - "null"
+      attempted_backends:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      failures:
+        type: array
+        items:
+          type: string
+      body_coherence_preserved:
+        type: boolean
+      shifted:
+        type: boolean
+      rationale:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

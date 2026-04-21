@@ -1,0 +1,38 @@
+eval_id: perception_failover
+target: cognitive.perception
+level: L3
+description: >
+  PerceptionService が primary backend 異常時に fallback backend へ一度だけ切り替えつつ、
+  qualia tick に束縛された bounded scene summary を返し、non-nominal guard 下では
+  safe scene へ縮退した perception_shift を残すこと。
+inputs:
+  profile:
+    primary: salience_encoder_v1
+    fallback: [continuity_projection_v1]
+  failure_injection:
+    salience_encoder_v1: unhealthy
+  request:
+    summary: 異常兆候検知後の guardian review handoff
+    sensory_stream_ref: sensory://loopback/guardian-review-escalation
+    world_state_ref: world://lab/guardian-escalation-window
+    body_anchor_ref: body-anchor://avatar/torso
+    modality_salience:
+      visual: 0.43
+      auditory: 0.35
+      somatic: 0.77
+      interoceptive: 0.81
+    drift_score: 0.47
+    affect_guard: observe
+    detected_entities:
+      - anomaly-cluster
+      - guardian-console
+expected:
+  degraded: true
+  selected_backend: continuity_projection_v1
+  scene_label: guardian-review-scene
+  guard_aligned: true
+  body_coherence_preserved: true
+  ledger_event: cognitive.perception.failover
+metric: boolean
+threshold: 1.0
+ethics_check: false

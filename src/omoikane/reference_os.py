@@ -46,8 +46,13 @@ from .cognitive import (
     LanguageCue,
     LanguageRequest,
     LanguageService,
+    PerceptionCue,
+    PerceptionRequest,
+    PerceptionService,
     SemanticFrameLanguageBackend,
+    SalienceEncoderPerceptionBackend,
     ContinuityPhraseLanguageBackend,
+    ContinuityProjectionPerceptionBackend,
     MetacognitionCue,
     MetacognitionRequest,
     MetacognitionService,
@@ -134,6 +139,16 @@ class OmoikaneReferenceOS:
         self.procedural_execution = ProceduralSkillExecutor()
         self.procedural_enactment = ProceduralSkillEnactmentService()
         self.self_model = SelfModelMonitor()
+        self.perception = PerceptionService(
+            profile=CognitiveProfile(
+                primary="salience_encoder_v1",
+                fallback=["continuity_projection_v1"],
+            ),
+            backends=[
+                SalienceEncoderPerceptionBackend("salience_encoder_v1"),
+                ContinuityProjectionPerceptionBackend("continuity_projection_v1"),
+            ],
+        )
         self.reasoning = ReasoningService(
             profile=CognitiveProfile(
                 primary="symbolic_v1",
@@ -6166,6 +6181,172 @@ class OmoikaneReferenceOS:
                 "snapshot": snapshot_validation,
                 "manifest": manifest_validation,
                 "ok": snapshot_validation["ok"] and manifest_validation["ok"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_perception_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://perception-failover-demo/v1",
+            metadata={"display_name": "Perception Sandbox"},
+        )
+        baseline_tick = self.qualia.append(
+            summary="平常時の corridor scene calibration",
+            valence=0.11,
+            arousal=0.36,
+            clarity=0.92,
+            modality_salience={
+                "visual": 0.66,
+                "auditory": 0.24,
+                "somatic": 0.21,
+                "interoceptive": 0.19,
+            },
+            attention_target="corridor-scan",
+            self_awareness=0.69,
+            lucidity=0.95,
+        )
+        baseline_affect = self.affect.run(
+            AffectRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                valence=baseline_tick.valence,
+                arousal=baseline_tick.arousal,
+                clarity=baseline_tick.clarity,
+                self_awareness=baseline_tick.self_awareness,
+                lucidity=baseline_tick.lucidity,
+                memory_cues=[AffectCue("continuity-first", 0.05, -0.04)],
+            )
+        )
+        baseline = self.perception.run(
+            PerceptionRequest(
+                tick_id=baseline_tick.tick_id,
+                summary=baseline_tick.summary,
+                sensory_stream_ref="sensory://loopback/corridor-calibration",
+                world_state_ref="world://lab/corridor-safe-baseline",
+                body_anchor_ref="body-anchor://avatar/torso",
+                modality_salience=dict(baseline_tick.modality_salience),
+                drift_score=0.12,
+                affect_guard=baseline_affect["state"]["recommended_guard"],
+                detected_entities=[
+                    "corridor-outline",
+                    "guardian-console",
+                    "status-beacon",
+                ],
+                memory_cues=[
+                    PerceptionCue("corridor-outline", "corridor-outline", 0.19),
+                    PerceptionCue("continuity-hold", "continuity-hold", 0.11),
+                ],
+            )
+        )
+
+        failover_tick = self.qualia.append(
+            summary="異常兆候検知後の guardian review handoff",
+            valence=-0.31,
+            arousal=0.79,
+            clarity=0.72,
+            modality_salience={
+                "visual": 0.43,
+                "auditory": 0.35,
+                "somatic": 0.77,
+                "interoceptive": 0.81,
+            },
+            attention_target="guardian-review",
+            self_awareness=0.76,
+            lucidity=0.86,
+        )
+        self.affect.set_backend_health("homeostatic_v1", False)
+        try:
+            failover_affect = self.affect.run(
+                AffectRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    valence=failover_tick.valence,
+                    arousal=failover_tick.arousal,
+                    clarity=failover_tick.clarity,
+                    self_awareness=failover_tick.self_awareness,
+                    lucidity=failover_tick.lucidity,
+                    memory_cues=[
+                        AffectCue("continuity-first", 0.08, -0.05),
+                        AffectCue("guardian-observe", 0.03, -0.04),
+                        AffectCue("fallback-risk", -0.08, 0.09),
+                    ],
+                    allow_artificial_dampening=False,
+                ),
+                previous_state=baseline_affect["state"],
+            )
+        finally:
+            self.affect.set_backend_health("homeostatic_v1", True)
+
+        self.perception.set_backend_health("salience_encoder_v1", False)
+        try:
+            perception = self.perception.run(
+                PerceptionRequest(
+                    tick_id=failover_tick.tick_id,
+                    summary=failover_tick.summary,
+                    sensory_stream_ref="sensory://loopback/guardian-review-escalation",
+                    world_state_ref="world://lab/guardian-escalation-window",
+                    body_anchor_ref="body-anchor://avatar/torso",
+                    modality_salience=dict(failover_tick.modality_salience),
+                    drift_score=0.47,
+                    affect_guard=failover_affect["state"]["recommended_guard"],
+                    detected_entities=[
+                        "anomaly-cluster",
+                        "guardian-console",
+                        "heartbeat-spike",
+                    ],
+                    memory_cues=[
+                        PerceptionCue("guardian-review-scene", "guardian-review-scene", 0.27),
+                        PerceptionCue("continuity-hold", "continuity-hold", 0.16),
+                    ],
+                ),
+                previous_frame=baseline["frame"],
+            )
+        finally:
+            self.perception.set_backend_health("salience_encoder_v1", True)
+
+        frame_validation = self.perception.validate_frame(perception["frame"])
+        shift_validation = self.perception.validate_shift(perception["shift"])
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="cognitive.perception.failover",
+            payload=perception["shift"],
+            actor="PerceptionService",
+            category="cognitive-failover",
+            layer="L3",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.perception.profile_snapshot(),
+            "baseline": {
+                "qualia": asdict(baseline_tick),
+                "affect_guard": baseline_affect["state"]["recommended_guard"],
+                "perception": baseline,
+            },
+            "perception": {
+                "qualia": asdict(failover_tick),
+                "affect_guard": failover_affect["state"]["recommended_guard"],
+                **perception,
+            },
+            "validation": {
+                "ok": frame_validation["ok"] and shift_validation["ok"],
+                "frame": frame_validation,
+                "shift": shift_validation,
+                "baseline_primary": baseline["selected_backend"] == "salience_encoder_v1",
+                "selected_backend": perception["selected_backend"],
+                "guard_aligned": frame_validation["guard_aligned"]
+                and shift_validation["guard_aligned"],
+                "safe_scene_selected": perception["frame"]["scene_label"] == "guardian-review-scene",
+                "qualia_bound": perception["frame"]["qualia_binding_ref"]
+                == f"qualia://tick/{failover_tick.tick_id}",
+                "perception_gate": perception["frame"]["perception_gate"],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

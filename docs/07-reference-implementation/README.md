@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB の bounded viability contract を扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 perception/reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -52,6 +52,7 @@ PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-enactment-demo --json
+PYTHONPATH=src python3 -m omoikane.cli perception-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
 PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
@@ -345,6 +346,14 @@ validated `skill-execution` receipt を `guardian-witnessed-procedural-skill-ena
 で temp workspace に materialize しつつ、
 actual command receipt、cleanup、rollback token carryover、
 sandbox-only delivery、`procedural-enactment` ledger event を確認する。
+
+`perception-demo` は L3 perception failover の reference contract
+(`cognitive.perception.v0`) を JSON で可視化し、
+`salience_encoder_v1` baseline から `continuity_projection_v1` fallback への
+single-switch failover、`qualia://tick/<id>` handoff、
+`body_coherence_floor=0.6` の continuity guard、
+`observe` guard 下での `guardian-review-scene` への縮退、
+`cognitive.perception.failover` ledger event を確認する。
 
 `reasoning-demo` は L3 reasoning failover の reference contract
 (`cognitive.reasoning.v0`) を JSON で可視化し、

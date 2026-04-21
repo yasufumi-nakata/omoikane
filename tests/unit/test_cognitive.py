@@ -27,6 +27,11 @@ from omoikane.cognitive import (
     MetacognitionRequest,
     MetacognitionService,
     NarrativeReasoningBackend,
+    PerceptionCue,
+    PerceptionRequest,
+    PerceptionService,
+    SalienceEncoderPerceptionBackend,
+    ContinuityProjectionPerceptionBackend,
     ReasoningRequest,
     ReflectiveLoopBackend,
     ReasoningService,
@@ -41,6 +46,119 @@ from omoikane.cognitive import (
     VolitionRequest,
     VolitionService,
 )
+
+
+class PerceptionServiceTests(unittest.TestCase):
+    def test_failover_routes_scene_to_guardian_review_under_observe_guard(self) -> None:
+        service = PerceptionService(
+            profile=CognitiveProfile(
+                primary="salience_encoder_v1",
+                fallback=["continuity_projection_v1"],
+            ),
+            backends=[
+                SalienceEncoderPerceptionBackend("salience_encoder_v1", healthy=False),
+                ContinuityProjectionPerceptionBackend("continuity_projection_v1"),
+            ],
+        )
+        healthy_service = PerceptionService(
+            profile=CognitiveProfile(
+                primary="salience_encoder_v1",
+                fallback=["continuity_projection_v1"],
+            ),
+            backends=[
+                SalienceEncoderPerceptionBackend("salience_encoder_v1"),
+                ContinuityProjectionPerceptionBackend("continuity_projection_v1"),
+            ],
+        )
+        baseline = healthy_service.run(
+            PerceptionRequest(
+                tick_id=0,
+                summary="baseline scene",
+                sensory_stream_ref="sensory://loopback/baseline",
+                world_state_ref="world://lab/baseline",
+                body_anchor_ref="body-anchor://avatar/torso",
+                modality_salience={
+                    "visual": 0.64,
+                    "auditory": 0.24,
+                    "somatic": 0.22,
+                    "interoceptive": 0.18,
+                },
+                drift_score=0.12,
+                affect_guard="nominal",
+                detected_entities=["corridor-outline", "guardian-console"],
+                memory_cues=[PerceptionCue("corridor-outline", "corridor-outline", 0.19)],
+            )
+        )["frame"]
+
+        result = service.run(
+            PerceptionRequest(
+                tick_id=1,
+                summary="guarded fallback scene",
+                sensory_stream_ref="sensory://loopback/guardian-review-escalation",
+                world_state_ref="world://lab/guardian-escalation-window",
+                body_anchor_ref="body-anchor://avatar/torso",
+                modality_salience={
+                    "visual": 0.43,
+                    "auditory": 0.35,
+                    "somatic": 0.77,
+                    "interoceptive": 0.81,
+                },
+                drift_score=0.47,
+                affect_guard="observe",
+                detected_entities=["anomaly-cluster", "guardian-console"],
+                memory_cues=[
+                    PerceptionCue("guardian-review-scene", "guardian-review-scene", 0.27),
+                    PerceptionCue("continuity-hold", "continuity-hold", 0.16),
+                ],
+            ),
+            previous_frame=baseline,
+        )
+
+        self.assertTrue(result["degraded"])
+        self.assertEqual("continuity_projection_v1", result["selected_backend"])
+        self.assertEqual("guardian-review-scene", result["frame"]["scene_label"])
+        self.assertEqual("qualia://tick/1", result["frame"]["qualia_binding_ref"])
+        self.assertTrue(service.validate_frame(result["frame"])["guard_aligned"])
+        self.assertTrue(service.validate_shift(result["shift"])["guard_aligned"])
+
+    def test_nominal_perception_keeps_primary_scene_binding(self) -> None:
+        service = PerceptionService(
+            profile=CognitiveProfile(
+                primary="salience_encoder_v1",
+                fallback=["continuity_projection_v1"],
+            ),
+            backends=[
+                SalienceEncoderPerceptionBackend("salience_encoder_v1"),
+                ContinuityProjectionPerceptionBackend("continuity_projection_v1"),
+            ],
+        )
+
+        result = service.run(
+            PerceptionRequest(
+                tick_id=2,
+                summary="steady corridor scan",
+                sensory_stream_ref="sensory://loopback/steady-corridor",
+                world_state_ref="world://lab/corridor-safe-baseline",
+                body_anchor_ref="body-anchor://avatar/torso",
+                modality_salience={
+                    "visual": 0.67,
+                    "auditory": 0.23,
+                    "somatic": 0.2,
+                    "interoceptive": 0.17,
+                },
+                drift_score=0.11,
+                affect_guard="nominal",
+                detected_entities=["corridor-outline", "status-beacon"],
+                memory_cues=[PerceptionCue("corridor-outline", "corridor-outline", 0.18)],
+            )
+        )
+
+        self.assertFalse(result["degraded"])
+        self.assertEqual("salience_encoder_v1", result["selected_backend"])
+        self.assertEqual("corridor-outline", result["frame"]["scene_label"])
+        self.assertEqual("open", result["frame"]["perception_gate"])
+        self.assertTrue(service.validate_frame(result["frame"])["ok"])
+        self.assertTrue(service.validate_shift(result["shift"])["ok"])
 
 
 class ReasoningServiceTests(unittest.TestCase):
