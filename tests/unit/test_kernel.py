@@ -945,6 +945,155 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("revoked", observed["verifier_roster"]["rotation_state"])
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
 
+    def test_ascension_scheduler_compiles_timeout_recovery_execution_receipt(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-execution-method-a")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        scheduler.enforce_timeout(handle["handle_id"], elapsed_ms=2_100_000)
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-22T02:00:00Z",
+                sync_token="scheduler-execution-method-a",
+            ),
+        )
+        scheduler.advance(handle["handle_id"], "identity-confirmation")
+        scheduler.advance(handle["handle_id"], "active-handoff")
+
+        receipt = scheduler.compile_execution_receipt(handle["handle_id"])
+        validation = scheduler.validate_execution_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("method-a-stage-execution-v1", receipt["execution_profile_id"])
+        self.assertTrue(receipt["outcome_summary"]["timeout_recovered"])
+        self.assertTrue(receipt["outcome_summary"]["completed"])
+        self.assertIn("timeout-recovery", receipt["scenario_labels"])
+        self.assertIn("completed", receipt["scenario_labels"])
+        self.assertIsNone(receipt["broker_handoff_status"])
+        self.assertTrue(receipt["protected_gate_summary"]["artifact_sync_current"])
+
+    def test_ascension_scheduler_compiles_method_b_execution_receipt(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_b_plan("identity://scheduler-execution-method-b")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "shadow-sync")
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-22T02:05:00Z",
+                sync_token="scheduler-execution-method-b",
+            ),
+        )
+        broker_bundle = self._prepare_method_b_broker_bundle(
+            "identity://scheduler-execution-method-b"
+        )
+        broker = broker_bundle["broker"]
+        scheduler.prepare_method_b_handoff(
+            handle["handle_id"],
+            broker_signal=broker_bundle["signal"],
+            standby_probe=broker_bundle["standby_probe"],
+            attestation_chain=broker_bundle["attestation_chain"],
+            dual_allocation_window=broker_bundle["dual_allocation_window"],
+            attestation_stream=broker_bundle["attestation_stream"],
+        )
+        scheduler.advance(handle["handle_id"], "dual-channel-review")
+        migration = broker.migrate(
+            "identity://scheduler-execution-method-b",
+            state={
+                "identity_id": "identity://scheduler-execution-method-b",
+                "checkpoint": "kernel-test-method-b-handoff-v1",
+                "shadow_stage": "authority-handoff",
+            },
+            continuity_mode="hot-handoff",
+        )
+        closed_window = broker.close_dual_allocation_window(
+            "identity://scheduler-execution-method-b",
+            reason="kernel-test-execution-method-b-handoff-confirmed",
+        )
+        scheduler.confirm_method_b_handoff(
+            handle["handle_id"],
+            migration=asdict(migration),
+            closed_dual_allocation_window=asdict(closed_window),
+        )
+        scheduler.advance(handle["handle_id"], "authority-handoff")
+        broker.release(
+            "identity://scheduler-execution-method-b",
+            reason="kernel-test-execution-method-b-bio-retirement",
+        )
+        scheduler.advance(handle["handle_id"], "bio-retirement")
+
+        receipt = scheduler.compile_execution_receipt(handle["handle_id"])
+        validation = scheduler.validate_execution_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(
+            "method-b-protected-handoff-execution-v1",
+            receipt["execution_profile_id"],
+        )
+        self.assertEqual("confirmed", receipt["broker_handoff_status"])
+        self.assertTrue(receipt["outcome_summary"]["method_b_broker_prepared"])
+        self.assertTrue(receipt["outcome_summary"]["method_b_broker_confirmed"])
+        self.assertIn("broker-handoff-prepared", receipt["scenario_labels"])
+        self.assertIn("broker-handoff-confirmed", receipt["scenario_labels"])
+        self.assertIn("completed", receipt["scenario_labels"])
+        self.assertTrue(receipt["protected_gate_summary"]["broker_handoff_confirmed"])
+
+    def test_ascension_scheduler_compiles_fail_closed_execution_receipt(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_c_plan("identity://scheduler-execution-method-c")
+        handle = scheduler.schedule(plan)
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-22T02:10:00Z",
+                sync_token="scheduler-execution-method-c",
+            ),
+        )
+        scheduler.advance(handle["handle_id"], "consent-lock")
+        scheduler.handle_substrate_signal(
+            handle["handle_id"],
+            severity="critical",
+            source_substrate="classical_silicon.scan-array",
+            reason="scan commit lost redundancy and must fail closed",
+        )
+
+        receipt = scheduler.compile_execution_receipt(handle["handle_id"])
+        validation = scheduler.validate_execution_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("method-c-fail-closed-stage-execution-v1", receipt["execution_profile_id"])
+        self.assertEqual("failed", receipt["final_status"])
+        self.assertTrue(receipt["outcome_summary"]["signal_fail_closed_observed"])
+        self.assertIn("signal-fail-closed", receipt["scenario_labels"])
+        self.assertIsNone(receipt["broker_handoff_status"])
+
+    def test_ascension_scheduler_execution_receipt_detects_digest_tampering(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-execution-digest")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+
+        receipt = scheduler.compile_execution_receipt(handle["handle_id"])
+        receipt["receipt_digest"] = "0" * 64
+
+        validation = scheduler.validate_execution_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "receipt_digest must match the canonical digest-less payload",
+            validation["errors"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

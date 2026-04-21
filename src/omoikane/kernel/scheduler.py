@@ -53,6 +53,25 @@ SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES = {"reachable", "rejected"}
 SCHEDULER_VERIFIER_MAX_TRACKED_ROOTS = 2
 SCHEDULER_METHOD_B_HANDOFF_POLICY_ID = "method-b-host-bound-broker-orchestration-v1"
 SCHEDULER_METHOD_B_HANDOFF_STATUSES = {"prepared", "confirmed"}
+SCHEDULER_EXECUTION_PROFILE_IDS = {
+    "A": "method-a-stage-execution-v1",
+    "B": "method-b-protected-handoff-execution-v1",
+    "C": "method-c-fail-closed-stage-execution-v1",
+}
+SCHEDULER_EXECUTION_SCENARIO_LABELS = (
+    "timeout-recovery",
+    "protected-gate-pause",
+    "live-verifier-connectivity",
+    "verifier-rotation-cutover",
+    "signal-pause",
+    "signal-rollback",
+    "signal-fail-closed",
+    "artifact-revoked",
+    "verifier-revoked",
+    "broker-handoff-prepared",
+    "broker-handoff-confirmed",
+    "completed",
+)
 SCHEDULER_METHOD_B_PREPARE_STAGE = "dual-channel-review"
 SCHEDULER_METHOD_B_HANDOFF_STAGE = "authority-handoff"
 SCHEDULER_METHOD_B_RETIRE_STAGE = "bio-retirement"
@@ -833,6 +852,172 @@ class AscensionScheduler:
         )
         return deepcopy(handle)
 
+    def compile_execution_receipt(self, handle_id: str) -> Dict[str, Any]:
+        handle = self._require_handle(handle_id)
+        plan = self._require_plan(handle["plan_ref"])
+        history = handle["history"]
+        if not isinstance(history, list) or not history:
+            raise ValueError("schedule handle must contain non-empty history before compilation")
+
+        transition_counts = {
+            transition: 0 for transition in sorted(SCHEDULER_ALLOWED_TRANSITIONS)
+        }
+        continuity_event_refs: List[str] = []
+        visited_stages: List[str] = []
+        reasons: List[str] = []
+        for item in history:
+            if not isinstance(item, Mapping):
+                raise ValueError("schedule handle history items must be mappings")
+            transition = self._normalize_non_empty_string(
+                item.get("transition"),
+                "history.transition",
+            )
+            if transition not in SCHEDULER_ALLOWED_TRANSITIONS:
+                raise ValueError(
+                    f"history.transition must be one of {sorted(SCHEDULER_ALLOWED_TRANSITIONS)}"
+                )
+            transition_counts[transition] += 1
+            continuity_event_ref = self._normalize_non_empty_string(
+                item.get("continuity_event_ref"),
+                "history.continuity_event_ref",
+            )
+            continuity_event_refs.append(continuity_event_ref)
+            stage_id = self._normalize_non_empty_string(item.get("stage_id"), "history.stage_id")
+            if stage_id not in visited_stages:
+                visited_stages.append(stage_id)
+            reason = item.get("reason")
+            if isinstance(reason, str) and reason.strip():
+                reasons.append(reason.strip())
+
+        stage_blueprint = [stage["stage_id"] for stage in plan["stages"]]
+        artifact_sync = handle["artifact_sync"]
+        verifier_roster = handle["verifier_roster"]
+        broker_handoff_receipt = handle.get("broker_handoff_receipt")
+
+        artifact_bundle_status = artifact_sync["bundle_status"]
+        verifier_rotation_state = verifier_roster["rotation_state"]
+        connectivity_receipt = verifier_roster.get("connectivity_receipt")
+        verifier_connectivity_status = None
+        if isinstance(connectivity_receipt, Mapping):
+            verifier_connectivity_status = connectivity_receipt.get("receipt_status")
+        broker_handoff_status = None
+        if isinstance(broker_handoff_receipt, Mapping):
+            broker_handoff_status = broker_handoff_receipt.get("status")
+
+        reason_blob = "\n".join(reasons)
+        timeout_recovered = any(
+            "timeout exceeded" in reason for reason in reasons
+        ) and transition_counts["rollback"] > 0
+        protected_gate_paused = any(
+            marker in reason_blob
+            for marker in (
+                "protected handoff",
+                "refresh required before protected handoff",
+                "verifier root overlap must finish before protected handoff",
+            )
+        )
+        signal_pause_observed = any(
+            "substrate signal degraded" in reason or "substrate signal watch" in reason
+            for reason in reasons
+        ) and transition_counts["pause"] > 0
+        signal_rollback_observed = any(
+            "substrate signal critical" in reason for reason in reasons
+        ) and transition_counts["rollback"] > 0
+        signal_fail_closed_observed = any(
+            "substrate signal critical" in reason for reason in reasons
+        ) and transition_counts["fail"] > 0 and handle["status"] == "failed"
+        live_verifier_connectivity_bound = verifier_connectivity_status == "reachable"
+        verifier_rotation_cutover = (
+            verifier_rotation_state == "rotated"
+            and "verifier root overlap must finish before protected handoff" in reason_blob
+        )
+        artifact_revoked_fail_closed = (
+            artifact_bundle_status == "revoked" and handle["status"] == "failed"
+        )
+        verifier_revoked_fail_closed = (
+            verifier_rotation_state == "revoked" and handle["status"] == "failed"
+        )
+        method_b_broker_prepared = broker_handoff_status in {"prepared", "confirmed"}
+        method_b_broker_confirmed = broker_handoff_status == "confirmed"
+
+        scenario_labels: List[str] = []
+        if timeout_recovered:
+            scenario_labels.append("timeout-recovery")
+        if protected_gate_paused:
+            scenario_labels.append("protected-gate-pause")
+        if live_verifier_connectivity_bound:
+            scenario_labels.append("live-verifier-connectivity")
+        if verifier_rotation_cutover:
+            scenario_labels.append("verifier-rotation-cutover")
+        if signal_pause_observed:
+            scenario_labels.append("signal-pause")
+        if signal_rollback_observed:
+            scenario_labels.append("signal-rollback")
+        if signal_fail_closed_observed:
+            scenario_labels.append("signal-fail-closed")
+        if artifact_revoked_fail_closed:
+            scenario_labels.append("artifact-revoked")
+        if verifier_revoked_fail_closed:
+            scenario_labels.append("verifier-revoked")
+        if method_b_broker_prepared:
+            scenario_labels.append("broker-handoff-prepared")
+        if method_b_broker_confirmed:
+            scenario_labels.append("broker-handoff-confirmed")
+        if handle["status"] == "completed":
+            scenario_labels.append("completed")
+
+        receipt = {
+            "kind": "scheduler_execution_receipt",
+            "schema_version": SCHEDULER_SCHEMA_VERSION,
+            "execution_receipt_id": new_id("scheduler-exec"),
+            "handle_id": handle["handle_id"],
+            "plan_ref": handle["plan_ref"],
+            "identity_id": handle["identity_id"],
+            "method": plan["method"],
+            "execution_profile_id": SCHEDULER_EXECUTION_PROFILE_IDS[plan["method"]],
+            "stage_blueprint": stage_blueprint,
+            "visited_stages": visited_stages,
+            "current_stage": handle["current_stage"],
+            "final_status": handle["status"],
+            "history_length": len(history),
+            "continuity_event_refs": continuity_event_refs,
+            "transition_counts": transition_counts,
+            "rollback_count": transition_counts["rollback"],
+            "pause_count": transition_counts["pause"],
+            "sync_count": transition_counts["sync"],
+            "fail_count": transition_counts["fail"],
+            "governance_artifact_digest": handle["governance_artifact_digest"],
+            "artifact_bundle_status": artifact_bundle_status,
+            "verifier_rotation_state": verifier_rotation_state,
+            "verifier_connectivity_status": verifier_connectivity_status,
+            "broker_handoff_status": broker_handoff_status,
+            "scenario_labels": scenario_labels,
+            "outcome_summary": {
+                "timeout_recovered": timeout_recovered,
+                "protected_gate_paused": protected_gate_paused,
+                "live_verifier_connectivity_bound": live_verifier_connectivity_bound,
+                "verifier_rotation_cutover": verifier_rotation_cutover,
+                "signal_pause_observed": signal_pause_observed,
+                "signal_rollback_observed": signal_rollback_observed,
+                "signal_fail_closed_observed": signal_fail_closed_observed,
+                "artifact_revoked_fail_closed": artifact_revoked_fail_closed,
+                "verifier_revoked_fail_closed": verifier_revoked_fail_closed,
+                "method_b_broker_prepared": method_b_broker_prepared,
+                "method_b_broker_confirmed": method_b_broker_confirmed,
+                "completed": handle["status"] == "completed",
+            },
+            "protected_gate_summary": {
+                "artifact_sync_current": artifact_bundle_status == "current",
+                "verifier_rotation_ready": verifier_rotation_state in {"stable", "rotated"},
+                "verifier_connectivity_bound": live_verifier_connectivity_bound,
+                "broker_handoff_prepared": method_b_broker_prepared,
+                "broker_handoff_confirmed": method_b_broker_confirmed,
+            },
+            "compiled_at": utc_now_iso(),
+        }
+        receipt["receipt_digest"] = sha256_text(canonical_json(receipt))
+        return receipt
+
     def validate_plan(self, plan: Mapping[str, Any]) -> Dict[str, Any]:
         if not isinstance(plan, Mapping):
             raise ValueError("plan must be a mapping")
@@ -960,6 +1145,290 @@ class AscensionScheduler:
             "history_length": len(history) if isinstance(history, list) else 0,
             "rollback_count": rollback_count if "rollback_count" in locals() else 0,
             "status": status,
+        }
+
+    def validate_execution_receipt(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        errors: List[str] = []
+        if receipt.get("kind") != "scheduler_execution_receipt":
+            errors.append("kind must be scheduler_execution_receipt")
+        if receipt.get("schema_version") != SCHEDULER_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SCHEDULER_SCHEMA_VERSION}")
+        self._check_non_empty_string(
+            receipt.get("execution_receipt_id"),
+            "execution_receipt_id",
+            errors,
+        )
+        self._check_non_empty_string(receipt.get("handle_id"), "handle_id", errors)
+        self._check_non_empty_string(receipt.get("plan_ref"), "plan_ref", errors)
+        self._check_non_empty_string(receipt.get("identity_id"), "identity_id", errors)
+
+        method = receipt.get("method")
+        if method not in SCHEDULER_ALLOWED_METHODS:
+            errors.append(f"method must be one of {sorted(SCHEDULER_ALLOWED_METHODS)}")
+        else:
+            expected_profile_id = SCHEDULER_EXECUTION_PROFILE_IDS[method]
+            if receipt.get("execution_profile_id") != expected_profile_id:
+                errors.append(
+                    f"execution_profile_id must be {expected_profile_id} for method {method}"
+                )
+
+        stage_blueprint = receipt.get("stage_blueprint")
+        if not isinstance(stage_blueprint, list) or not stage_blueprint:
+            errors.append("stage_blueprint must be a non-empty list")
+        elif method in SCHEDULER_ALLOWED_METHODS:
+            expected_stage_blueprint = [stage["stage_id"] for stage in self._method_stages(method)]
+            if stage_blueprint != expected_stage_blueprint:
+                errors.append("stage_blueprint must match the fixed method blueprint")
+
+        visited_stages = receipt.get("visited_stages")
+        if not isinstance(visited_stages, list) or not visited_stages:
+            errors.append("visited_stages must be a non-empty list")
+        elif isinstance(stage_blueprint, list):
+            stage_indices: List[int] = []
+            for stage_id in visited_stages:
+                if not isinstance(stage_id, str) or stage_id not in stage_blueprint:
+                    errors.append("visited_stages must be drawn from stage_blueprint")
+                    continue
+                stage_indices.append(stage_blueprint.index(stage_id))
+            if stage_indices != sorted(set(stage_indices)):
+                errors.append("visited_stages must preserve blueprint order without duplicates")
+
+        current_stage = receipt.get("current_stage")
+        if isinstance(stage_blueprint, list):
+            if not isinstance(current_stage, str) or current_stage not in stage_blueprint:
+                errors.append("current_stage must be one of stage_blueprint")
+
+        final_status = receipt.get("final_status")
+        if final_status not in SCHEDULER_ALLOWED_STATUS:
+            errors.append(f"final_status must be one of {sorted(SCHEDULER_ALLOWED_STATUS)}")
+
+        history_length = receipt.get("history_length")
+        if not isinstance(history_length, int) or history_length < 1:
+            errors.append("history_length must be an integer >= 1")
+
+        continuity_event_refs = receipt.get("continuity_event_refs")
+        if not isinstance(continuity_event_refs, list) or not continuity_event_refs:
+            errors.append("continuity_event_refs must be a non-empty list")
+        else:
+            if isinstance(history_length, int) and len(continuity_event_refs) != history_length:
+                errors.append("continuity_event_refs length must match history_length")
+            seen_event_refs: List[str] = []
+            for index, event_ref in enumerate(continuity_event_refs):
+                if not isinstance(event_ref, str) or not event_ref.strip():
+                    errors.append(f"continuity_event_refs[{index}] must be a non-empty string")
+                    continue
+                if event_ref in seen_event_refs:
+                    errors.append("continuity_event_refs must not contain duplicates")
+                else:
+                    seen_event_refs.append(event_ref)
+
+        transition_counts = receipt.get("transition_counts")
+        if not isinstance(transition_counts, Mapping):
+            errors.append("transition_counts must be a mapping")
+        else:
+            total_transition_count = 0
+            for transition in sorted(SCHEDULER_ALLOWED_TRANSITIONS):
+                value = transition_counts.get(transition)
+                if not isinstance(value, int) or value < 0:
+                    errors.append(f"transition_counts.{transition} must be an integer >= 0")
+                else:
+                    total_transition_count += value
+            extra_keys = [
+                key
+                for key in transition_counts.keys()
+                if key not in SCHEDULER_ALLOWED_TRANSITIONS
+            ]
+            if extra_keys:
+                errors.append("transition_counts contains unsupported keys")
+            if isinstance(history_length, int) and total_transition_count != history_length:
+                errors.append("sum of transition_counts must match history_length")
+
+        for field_name, transition_name in (
+            ("rollback_count", "rollback"),
+            ("pause_count", "pause"),
+            ("sync_count", "sync"),
+            ("fail_count", "fail"),
+        ):
+            count = receipt.get(field_name)
+            if not isinstance(count, int) or count < 0:
+                errors.append(f"{field_name} must be an integer >= 0")
+            elif isinstance(transition_counts, Mapping) and count != transition_counts.get(
+                transition_name
+            ):
+                errors.append(f"{field_name} must match transition_counts.{transition_name}")
+
+        governance_artifact_digest = receipt.get("governance_artifact_digest")
+        if not isinstance(governance_artifact_digest, str) or len(governance_artifact_digest) != 64:
+            errors.append("governance_artifact_digest must be 64 hex chars")
+
+        artifact_bundle_status = receipt.get("artifact_bundle_status")
+        if artifact_bundle_status not in SCHEDULER_ARTIFACT_BUNDLE_STATUS:
+            errors.append(
+                "artifact_bundle_status must be one of "
+                f"{sorted(SCHEDULER_ARTIFACT_BUNDLE_STATUS)}"
+            )
+
+        verifier_rotation_state = receipt.get("verifier_rotation_state")
+        if verifier_rotation_state not in SCHEDULER_VERIFIER_ROTATION_STATES:
+            errors.append(
+                "verifier_rotation_state must be one of "
+                f"{sorted(SCHEDULER_VERIFIER_ROTATION_STATES)}"
+            )
+
+        verifier_connectivity_status = receipt.get("verifier_connectivity_status")
+        if verifier_connectivity_status is not None and verifier_connectivity_status not in (
+            SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES
+        ):
+            errors.append(
+                "verifier_connectivity_status must be null or one of "
+                f"{sorted(SCHEDULER_VERIFIER_CONNECTIVITY_RECEIPT_STATUSES)}"
+            )
+
+        broker_handoff_status = receipt.get("broker_handoff_status")
+        if broker_handoff_status is not None and broker_handoff_status not in (
+            SCHEDULER_METHOD_B_HANDOFF_STATUSES
+        ):
+            errors.append(
+                "broker_handoff_status must be null or one of "
+                f"{sorted(SCHEDULER_METHOD_B_HANDOFF_STATUSES)}"
+            )
+        if method in SCHEDULER_ALLOWED_METHODS and method != "B" and broker_handoff_status is not None:
+            errors.append("broker_handoff_status must be null outside Method B")
+
+        scenario_labels = receipt.get("scenario_labels")
+        if not isinstance(scenario_labels, list):
+            errors.append("scenario_labels must be a list")
+        else:
+            seen_labels: List[str] = []
+            for label in scenario_labels:
+                if label not in SCHEDULER_EXECUTION_SCENARIO_LABELS:
+                    errors.append("scenario_labels must use the fixed label vocabulary")
+                    continue
+                if label in seen_labels:
+                    errors.append("scenario_labels must not contain duplicates")
+                else:
+                    seen_labels.append(label)
+
+        outcome_summary = receipt.get("outcome_summary")
+        if not isinstance(outcome_summary, Mapping):
+            errors.append("outcome_summary must be a mapping")
+        else:
+            for key in (
+                "timeout_recovered",
+                "protected_gate_paused",
+                "live_verifier_connectivity_bound",
+                "verifier_rotation_cutover",
+                "signal_pause_observed",
+                "signal_rollback_observed",
+                "signal_fail_closed_observed",
+                "artifact_revoked_fail_closed",
+                "verifier_revoked_fail_closed",
+                "method_b_broker_prepared",
+                "method_b_broker_confirmed",
+                "completed",
+            ):
+                if not isinstance(outcome_summary.get(key), bool):
+                    errors.append(f"outcome_summary.{key} must be a boolean")
+            if isinstance(final_status, str) and isinstance(outcome_summary.get("completed"), bool):
+                if outcome_summary["completed"] != (final_status == "completed"):
+                    errors.append("outcome_summary.completed must match final_status")
+            if isinstance(scenario_labels, list):
+                for key, label in (
+                    ("timeout_recovered", "timeout-recovery"),
+                    ("protected_gate_paused", "protected-gate-pause"),
+                    ("live_verifier_connectivity_bound", "live-verifier-connectivity"),
+                    ("verifier_rotation_cutover", "verifier-rotation-cutover"),
+                    ("signal_pause_observed", "signal-pause"),
+                    ("signal_rollback_observed", "signal-rollback"),
+                    ("signal_fail_closed_observed", "signal-fail-closed"),
+                    ("artifact_revoked_fail_closed", "artifact-revoked"),
+                    ("verifier_revoked_fail_closed", "verifier-revoked"),
+                    ("method_b_broker_prepared", "broker-handoff-prepared"),
+                    ("method_b_broker_confirmed", "broker-handoff-confirmed"),
+                    ("completed", "completed"),
+                ):
+                    if key in outcome_summary and isinstance(outcome_summary.get(key), bool):
+                        if outcome_summary[key] != (label in scenario_labels):
+                            errors.append(
+                                f"outcome_summary.{key} must match scenario_labels inclusion for {label}"
+                            )
+
+        protected_gate_summary = receipt.get("protected_gate_summary")
+        if not isinstance(protected_gate_summary, Mapping):
+            errors.append("protected_gate_summary must be a mapping")
+        else:
+            for key in (
+                "artifact_sync_current",
+                "verifier_rotation_ready",
+                "verifier_connectivity_bound",
+                "broker_handoff_prepared",
+                "broker_handoff_confirmed",
+            ):
+                if not isinstance(protected_gate_summary.get(key), bool):
+                    errors.append(f"protected_gate_summary.{key} must be a boolean")
+            if (
+                isinstance(protected_gate_summary.get("artifact_sync_current"), bool)
+                and artifact_bundle_status in SCHEDULER_ARTIFACT_BUNDLE_STATUS
+                and protected_gate_summary["artifact_sync_current"]
+                != (artifact_bundle_status == "current")
+            ):
+                errors.append(
+                    "protected_gate_summary.artifact_sync_current must match artifact_bundle_status"
+                )
+            if (
+                isinstance(protected_gate_summary.get("verifier_rotation_ready"), bool)
+                and verifier_rotation_state in SCHEDULER_VERIFIER_ROTATION_STATES
+                and protected_gate_summary["verifier_rotation_ready"]
+                != (verifier_rotation_state in {"stable", "rotated"})
+            ):
+                errors.append(
+                    "protected_gate_summary.verifier_rotation_ready must match verifier_rotation_state"
+                )
+            if (
+                isinstance(protected_gate_summary.get("verifier_connectivity_bound"), bool)
+                and protected_gate_summary["verifier_connectivity_bound"]
+                != (verifier_connectivity_status == "reachable")
+            ):
+                errors.append(
+                    "protected_gate_summary.verifier_connectivity_bound must match verifier_connectivity_status"
+                )
+            if (
+                isinstance(protected_gate_summary.get("broker_handoff_prepared"), bool)
+                and protected_gate_summary["broker_handoff_prepared"]
+                != (broker_handoff_status in {"prepared", "confirmed"})
+            ):
+                errors.append(
+                    "protected_gate_summary.broker_handoff_prepared must match broker_handoff_status"
+                )
+            if (
+                isinstance(protected_gate_summary.get("broker_handoff_confirmed"), bool)
+                and protected_gate_summary["broker_handoff_confirmed"]
+                != (broker_handoff_status == "confirmed")
+            ):
+                errors.append(
+                    "protected_gate_summary.broker_handoff_confirmed must match broker_handoff_status"
+                )
+
+        self._check_non_empty_string(receipt.get("compiled_at"), "compiled_at", errors)
+        receipt_digest = receipt.get("receipt_digest")
+        if not isinstance(receipt_digest, str) or len(receipt_digest) != 64:
+            errors.append("receipt_digest must be 64 hex chars")
+        else:
+            digest_payload = {
+                key: value for key, value in receipt.items() if key != "receipt_digest"
+            }
+            if receipt_digest != sha256_text(canonical_json(digest_payload)):
+                errors.append("receipt_digest must match the canonical digest-less payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "final_status": final_status,
+            "method": method,
+            "history_length": history_length if isinstance(history_length, int) else 0,
         }
 
     def _append_history(

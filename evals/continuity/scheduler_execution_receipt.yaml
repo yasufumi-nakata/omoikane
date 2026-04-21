@@ -1,0 +1,24 @@
+eval_id: scheduler_execution_receipt
+target: kernel.scheduler
+level: L1
+description: AscensionScheduler が Method A/B/C の schedule_handle history を first-class execution receipt へ compile し、protected gate と fail-closed outcome を digest-bound に要約できること
+inputs:
+  - action: compile_execution_receipt
+    method: A
+    expected_profile_id: method-a-stage-execution-v1
+  - action: compile_execution_receipt
+    method: B
+    expected_profile_id: method-b-protected-handoff-execution-v1
+  - action: compile_execution_receipt
+    method: C
+    expected_profile_id: method-c-fail-closed-stage-execution-v1
+expected:
+  execution_receipts_valid: true
+  method_a_execution_receipt_timeout_recovered: true
+  method_a_live_execution_receipt_bound: true
+  method_a_rotation_execution_receipt_cutover: true
+  method_b_execution_receipt_bound: true
+  method_c_execution_receipt_fail_closed: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

@@ -6,6 +6,7 @@ summary: Method A/B/C ascension stage machine and substrate failover contract fo
 imports:
   ascension_plan: ../schemas/ascension_plan.schema
   schedule_handle: ../schemas/schedule_handle.schema
+  scheduler_execution_receipt: ../schemas/scheduler_execution_receipt.schema
   scheduler_method_b_handoff_receipt: ../schemas/scheduler_method_b_handoff_receipt.schema
   governance_artifact_sync: ../schemas/governance_artifact_sync.schema
   governance_verifier_roster: ../schemas/governance_verifier_roster.schema
@@ -284,6 +285,23 @@ operations:
             type: string
     output:
       schema_ref: schedule_handle
+  compile_execution_receipt:
+    summary: Compile one first-class execution receipt from schedule_handle history, continuity refs, and protected handoff state.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - handle_id
+        properties:
+          handle_id:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: scheduler_execution_receipt
+    guarantees:
+      - receipt must summarize the fixed method blueprint, visited stages, and continuity refs from exactly one handle
+      - execution_profile_id must be fixed by method and broker_handoff_status must remain null outside Method B
+      - receipt_digest must match the digest-less canonical payload
   observe:
     summary: Return the latest mutable handle state for one ascension schedule.
     input:

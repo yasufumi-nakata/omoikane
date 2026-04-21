@@ -96,6 +96,7 @@ scheduler.confirm_method_b_handoff(handle, migration, closed_dual_allocation_win
 scheduler.probe_live_verifier_roster(handle, verifier_endpoint, request_timeout_ms?) → GovernanceVerifierRoster
 scheduler.sync_governance_artifacts(handle, checked_at, artifacts) → ArtifactSyncResult
 scheduler.cancel(handle, reason) → ScheduleHandle
+scheduler.compile_execution_receipt(handle) → SchedulerExecutionReceipt
 ```
 
 `sync_governance_artifacts` の入力は `artifacts` に加えて
@@ -112,6 +113,7 @@ external verifier roster を取得し、
 
 - `kernel.scheduler.v0.idl` で機械可読に
 - `ascension_plan.schema` / `schedule_handle.schema` /
+  `scheduler_execution_receipt.schema` /
   `scheduler_method_b_handoff_receipt.schema` /
   `governance_verifier_roster.schema` /
   `governance_verifier_connectivity_receipt.schema` を導入
@@ -120,6 +122,11 @@ external verifier roster を取得し、
   actual broker の cross-host host binding を `broker_handoff_receipt` に束縛した
   prepare / confirm gate、
   Method C の fail-closed destructive scan に加えて、
+  `compile_execution_receipt` が Method A/B/C handle を
+  `SchedulerExecutionReceipt` へ要約し、
+  timeout recovery / live verifier connectivity / root rotation cutover /
+  Method B broker handoff / Method C fail-closed を
+  digest-bound な first-class artifact として残すことを確認する
   governance artifact bundle の current / stale / revoked sync snapshot を
   ContinuityLedger に記録し、
   verifier root rotation の overlap pause / rotated cutover / revoked fail-closed と、
@@ -131,9 +138,11 @@ external verifier roster を取得し、
   `evals/continuity/scheduler_governance_artifacts.yaml`、
   `evals/continuity/scheduler_artifact_sync.yaml`、
   `evals/continuity/scheduler_root_rotation.yaml`、
-  `evals/continuity/scheduler_live_verifier_connectivity.yaml` で
+  `evals/continuity/scheduler_live_verifier_connectivity.yaml`、
+  `evals/continuity/scheduler_execution_receipt.yaml` で
   Method A/B/C の contract と Method B broker handoff gate /
   artifact binding / freshness gate / verifier cutover gate /
+  execution receipt digest / protected gate summary /
   live connectivity receipt binding を守る
 
 ## 思兼神メタファー

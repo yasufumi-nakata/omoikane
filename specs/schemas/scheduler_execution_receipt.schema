@@ -1,0 +1,353 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/scheduler_execution_receipt.schema"
+title: SchedulerExecutionReceipt
+description: >
+  First-class summary artifact for one AscensionScheduler execution path, derived
+  from a validated schedule_handle history and protected handoff state.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - execution_receipt_id
+  - handle_id
+  - plan_ref
+  - identity_id
+  - method
+  - execution_profile_id
+  - stage_blueprint
+  - visited_stages
+  - current_stage
+  - final_status
+  - history_length
+  - continuity_event_refs
+  - transition_counts
+  - rollback_count
+  - pause_count
+  - sync_count
+  - fail_count
+  - governance_artifact_digest
+  - artifact_bundle_status
+  - verifier_rotation_state
+  - verifier_connectivity_status
+  - broker_handoff_status
+  - scenario_labels
+  - outcome_summary
+  - protected_gate_summary
+  - receipt_digest
+  - compiled_at
+properties:
+  kind:
+    const: scheduler_execution_receipt
+  schema_version:
+    const: "1.0.0"
+  execution_receipt_id:
+    type: string
+    pattern: "^scheduler-exec-[a-f0-9]{12}$"
+  handle_id:
+    type: string
+    minLength: 8
+  plan_ref:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  method:
+    type: string
+    enum:
+      - A
+      - B
+      - C
+  execution_profile_id:
+    type: string
+    enum:
+      - method-a-stage-execution-v1
+      - method-b-protected-handoff-execution-v1
+      - method-c-fail-closed-stage-execution-v1
+  stage_blueprint:
+    type: array
+    minItems: 3
+    maxItems: 4
+    items:
+      type: string
+      minLength: 1
+  visited_stages:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  current_stage:
+    type: string
+    minLength: 1
+  final_status:
+    type: string
+    enum:
+      - scheduled
+      - advancing
+      - paused
+      - rolled-back
+      - completed
+      - cancelled
+      - failed
+  history_length:
+    type: integer
+    minimum: 1
+  continuity_event_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  transition_counts:
+    type: object
+    additionalProperties: false
+    required:
+      - cancel
+      - complete
+      - enter
+      - fail
+      - pause
+      - resume
+      - rollback
+      - sync
+    properties:
+      cancel:
+        type: integer
+        minimum: 0
+      complete:
+        type: integer
+        minimum: 0
+      enter:
+        type: integer
+        minimum: 0
+      fail:
+        type: integer
+        minimum: 0
+      pause:
+        type: integer
+        minimum: 0
+      resume:
+        type: integer
+        minimum: 0
+      rollback:
+        type: integer
+        minimum: 0
+      sync:
+        type: integer
+        minimum: 0
+  rollback_count:
+    type: integer
+    minimum: 0
+  pause_count:
+    type: integer
+    minimum: 0
+  sync_count:
+    type: integer
+    minimum: 0
+  fail_count:
+    type: integer
+    minimum: 0
+  governance_artifact_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  artifact_bundle_status:
+    type: string
+    enum:
+      - unsynced
+      - current
+      - refresh-required
+      - revoked
+  verifier_rotation_state:
+    type: string
+    enum:
+      - unverified
+      - stable
+      - overlap-required
+      - rotated
+      - revoked
+  verifier_connectivity_status:
+    type:
+      - string
+      - "null"
+    enum:
+      - reachable
+      - rejected
+      - "null"
+  broker_handoff_status:
+    type:
+      - string
+      - "null"
+    enum:
+      - prepared
+      - confirmed
+      - "null"
+  scenario_labels:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - timeout-recovery
+        - protected-gate-pause
+        - live-verifier-connectivity
+        - verifier-rotation-cutover
+        - signal-pause
+        - signal-rollback
+        - signal-fail-closed
+        - artifact-revoked
+        - verifier-revoked
+        - broker-handoff-prepared
+        - broker-handoff-confirmed
+        - completed
+  outcome_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - timeout_recovered
+      - protected_gate_paused
+      - live_verifier_connectivity_bound
+      - verifier_rotation_cutover
+      - signal_pause_observed
+      - signal_rollback_observed
+      - signal_fail_closed_observed
+      - artifact_revoked_fail_closed
+      - verifier_revoked_fail_closed
+      - method_b_broker_prepared
+      - method_b_broker_confirmed
+      - completed
+    properties:
+      timeout_recovered:
+        type: boolean
+      protected_gate_paused:
+        type: boolean
+      live_verifier_connectivity_bound:
+        type: boolean
+      verifier_rotation_cutover:
+        type: boolean
+      signal_pause_observed:
+        type: boolean
+      signal_rollback_observed:
+        type: boolean
+      signal_fail_closed_observed:
+        type: boolean
+      artifact_revoked_fail_closed:
+        type: boolean
+      verifier_revoked_fail_closed:
+        type: boolean
+      method_b_broker_prepared:
+        type: boolean
+      method_b_broker_confirmed:
+        type: boolean
+      completed:
+        type: boolean
+  protected_gate_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - artifact_sync_current
+      - verifier_rotation_ready
+      - verifier_connectivity_bound
+      - broker_handoff_prepared
+      - broker_handoff_confirmed
+    properties:
+      artifact_sync_current:
+        type: boolean
+      verifier_rotation_ready:
+        type: boolean
+      verifier_connectivity_bound:
+        type: boolean
+      broker_handoff_prepared:
+        type: boolean
+      broker_handoff_confirmed:
+        type: boolean
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  compiled_at:
+    type: string
+    format: date-time
+examples:
+  - kind: scheduler_execution_receipt
+    schema_version: "1.0.0"
+    execution_receipt_id: scheduler-exec-0123456789ab
+    handle_id: schedule-0123456789ab
+    plan_ref: plan-0123456789ab
+    identity_id: identity://scheduler-method-b-demo
+    method: B
+    execution_profile_id: method-b-protected-handoff-execution-v1
+    stage_blueprint:
+      - shadow-sync
+      - dual-channel-review
+      - authority-handoff
+      - bio-retirement
+    visited_stages:
+      - shadow-sync
+      - dual-channel-review
+      - authority-handoff
+      - bio-retirement
+    current_stage: bio-retirement
+    final_status: completed
+    history_length: 12
+    continuity_event_refs:
+      - continuity-0001
+      - continuity-0002
+      - continuity-0003
+      - continuity-0004
+      - continuity-0005
+      - continuity-0006
+      - continuity-0007
+      - continuity-0008
+      - continuity-0009
+      - continuity-0010
+      - continuity-0011
+      - continuity-0012
+    transition_counts:
+      cancel: 0
+      complete: 4
+      enter: 4
+      fail: 1
+      pause: 2
+      resume: 2
+      rollback: 1
+      sync: 2
+    rollback_count: 1
+    pause_count: 2
+    sync_count: 2
+    fail_count: 1
+    governance_artifact_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    artifact_bundle_status: current
+    verifier_rotation_state: stable
+    verifier_connectivity_status: null
+    broker_handoff_status: confirmed
+    scenario_labels:
+      - protected-gate-pause
+      - signal-pause
+      - signal-rollback
+      - broker-handoff-prepared
+      - broker-handoff-confirmed
+      - completed
+    outcome_summary:
+      timeout_recovered: false
+      protected_gate_paused: true
+      live_verifier_connectivity_bound: false
+      verifier_rotation_cutover: false
+      signal_pause_observed: true
+      signal_rollback_observed: true
+      signal_fail_closed_observed: false
+      artifact_revoked_fail_closed: false
+      verifier_revoked_fail_closed: false
+      method_b_broker_prepared: true
+      method_b_broker_confirmed: true
+      completed: true
+    protected_gate_summary:
+      artifact_sync_current: true
+      verifier_rotation_ready: true
+      verifier_connectivity_bound: false
+      broker_handoff_prepared: true
+      broker_handoff_confirmed: true
+    receipt_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    compiled_at: "2026-04-22T12:00:00Z"

@@ -444,6 +444,16 @@ entries:
     rationale: Required to persist mutable scheduler state, continuity refs, rollback history, artifact sync snapshots, verifier root rotation state, and Method B broker handoff binding.
   - priority: P1
     kind: schema
+    file: specs/schemas/scheduler_execution_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.scheduler.v0.idl
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+      - evals/continuity/scheduler_execution_receipt.yaml
+    rationale: Required to serialize one first-class scheduler execution summary that binds stage history, protected gate state, continuity refs, and digest validation for Method A/B/C runs.
+  - priority: P1
+    kind: schema
     file: specs/schemas/scheduler_method_b_handoff_receipt.schema
     consumers:
       - specs/interfaces/kernel.scheduler.v0.idl
@@ -488,7 +498,7 @@ entries:
       - docs/02-subsystems/kernel/ascension-scheduler.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, Method B broker handoff gate, artifact sync gate, and verifier root rotation machine-readable.
+    rationale: Required to make the L1 AscensionScheduler method profiles, timeout rollback, substrate failover, Method B broker handoff gate, artifact sync gate, verifier root rotation, and compiled execution receipt machine-readable.
   - priority: P1
     kind: schema
     file: specs/schemas/termination_request.schema

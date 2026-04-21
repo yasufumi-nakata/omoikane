@@ -4112,6 +4112,27 @@ json.dump(response, sys.stdout)
             "method_c_revoked": method_c_revoked_validation,
             "method_c_verifier_revoked": method_c_verifier_revoked_validation,
         }
+        execution_receipts = {
+            "method_a": self.scheduler.compile_execution_receipt(scheduled["handle_id"]),
+            "method_a_live": self.scheduler.compile_execution_receipt(
+                method_a_live_scheduled["handle_id"]
+            ),
+            "method_a_rotation": self.scheduler.compile_execution_receipt(
+                method_a_rotation_scheduled["handle_id"]
+            ),
+            "method_b": self.scheduler.compile_execution_receipt(method_b_scheduled["handle_id"]),
+            "method_c": self.scheduler.compile_execution_receipt(method_c_scheduled["handle_id"]),
+            "method_c_revoked": self.scheduler.compile_execution_receipt(
+                method_c_revoked_scheduled["handle_id"]
+            ),
+            "method_c_verifier_revoked": self.scheduler.compile_execution_receipt(
+                method_c_verifier_revoked_scheduled["handle_id"]
+            ),
+        }
+        execution_receipt_validations = {
+            label: self.scheduler.validate_execution_receipt(receipt)
+            for label, receipt in execution_receipts.items()
+        }
 
         return {
             "identity": {
@@ -4233,8 +4254,14 @@ json.dump(response, sys.stdout)
             "method_c_revoked_final_handle": method_c_revoked_final,
             "method_c_verifier_revoked_final_handle": method_c_verifier_revoked_final,
             "handle_validations": all_validations,
+            "execution_receipts": execution_receipts,
+            "execution_receipt_validations": execution_receipt_validations,
             "validation": {
-                "ok": all(item["ok"] for item in all_validations.values()),
+                "ok": all(item["ok"] for item in all_validations.values())
+                and all(item["ok"] for item in execution_receipt_validations.values()),
+                "execution_receipts_valid": all(
+                    item["ok"] for item in execution_receipt_validations.values()
+                ),
                 "errors": (
                     method_a_validation["errors"]
                     + method_a_live_validation["errors"]
@@ -4404,6 +4431,34 @@ json.dump(response, sys.stdout)
                     and method_b_final["broker_handoff_receipt"]["migration_transfer_id"]
                     == method_b_broker_transfer.transfer_id
                     and method_b_broker_release["status"] == "released"
+                ),
+                "method_a_execution_receipt_timeout_recovered": (
+                    execution_receipts["method_a"]["outcome_summary"]["timeout_recovered"]
+                    and execution_receipt_validations["method_a"]["ok"]
+                ),
+                "method_a_live_execution_receipt_bound": (
+                    execution_receipts["method_a_live"]["outcome_summary"][
+                        "live_verifier_connectivity_bound"
+                    ]
+                    and execution_receipt_validations["method_a_live"]["ok"]
+                ),
+                "method_a_rotation_execution_receipt_cutover": (
+                    execution_receipts["method_a_rotation"]["outcome_summary"][
+                        "verifier_rotation_cutover"
+                    ]
+                    and execution_receipt_validations["method_a_rotation"]["ok"]
+                ),
+                "method_b_execution_receipt_bound": (
+                    execution_receipts["method_b"]["outcome_summary"][
+                        "method_b_broker_confirmed"
+                    ]
+                    and execution_receipt_validations["method_b"]["ok"]
+                ),
+                "method_c_execution_receipt_fail_closed": (
+                    execution_receipts["method_c"]["outcome_summary"][
+                        "signal_fail_closed_observed"
+                    ]
+                    and execution_receipt_validations["method_c"]["ok"]
                 ),
                 "method_b_completed": method_b_retirement["status"] == "completed"
                 and method_b_final["status"] == "completed"

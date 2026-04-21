@@ -30,8 +30,12 @@
 - `ewa_emergency_stop.schema`
 - `ewa_audit.schema`
 - `external_actuation_authorization.schema`
+- `ascension_plan.schema`
+- `schedule_handle.schema`
+- `governance_artifact_sync.schema`
 - `governance_verifier_roster.schema`
 - `governance_verifier_connectivity_receipt.schema`
+- `scheduler_execution_receipt.schema`
 - `scheduler_method_b_handoff_receipt.schema`
 - `world_state.schema`
 - `wms_reconcile.schema`

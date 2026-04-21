@@ -784,6 +784,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["method_b_broker_confirmation_gate_blocked"])
         self.assertTrue(result["validation"]["method_b_broker_handoff_confirmed"])
         self.assertTrue(result["validation"]["method_b_broker_cleanup_bound"])
+        self.assertTrue(result["validation"]["execution_receipts_valid"])
+        self.assertTrue(result["validation"]["method_a_execution_receipt_timeout_recovered"])
+        self.assertTrue(result["validation"]["method_a_live_execution_receipt_bound"])
+        self.assertTrue(result["validation"]["method_a_rotation_execution_receipt_cutover"])
+        self.assertTrue(result["validation"]["method_b_execution_receipt_bound"])
+        self.assertTrue(result["validation"]["method_c_execution_receipt_fail_closed"])
         self.assertTrue(result["validation"]["witness_quorum_bound"])
         self.assertTrue(result["validation"]["legal_attestation_bound"])
         self.assertEqual("rollback", result["scenarios"]["timeout"]["action"])
@@ -798,6 +804,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "dual-channel-review",
             result["scenarios"]["method_b"]["signal_rollback"]["rollback_target"],
+        )
+        self.assertEqual(
+            "method-b-protected-handoff-execution-v1",
+            result["execution_receipts"]["method_b"]["execution_profile_id"],
+        )
+        self.assertEqual(
+            "confirmed",
+            result["execution_receipts"]["method_b"]["broker_handoff_status"],
+        )
+        self.assertIn(
+            "timeout-recovery",
+            result["execution_receipts"]["method_a"]["scenario_labels"],
+        )
+        self.assertEqual(
+            "reachable",
+            result["execution_receipts"]["method_a_live"]["verifier_connectivity_status"],
+        )
+        self.assertEqual(
+            "rotated",
+            result["execution_receipts"]["method_a_rotation"]["verifier_rotation_state"],
         )
         self.assertEqual(
             "confirmed",

@@ -132,6 +132,11 @@ loopback live verifier endpoint から取得した roster に
 `connectivity_receipt` (`verifier_endpoint` / `response_digest` /
 `observed_latency_ms` / `http_status`) が束縛されることを
 1 シナリオで確認する。
+さらに `compile_execution_receipt` が Method A/B/C の
+`schedule_handle` history を `scheduler_execution_receipt` へ要約し、
+timeout recovery、live verifier connectivity、verifier rotation cutover、
+Method B broker handoff、Method C fail-closed を
+digest-bound な first-class artifact として残すことを確認する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
