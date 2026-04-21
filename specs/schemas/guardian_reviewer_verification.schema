@@ -16,6 +16,7 @@ required:
   - challenge_digest
   - transport_profile
   - jurisdiction_bundle
+  - legal_execution
   - network_receipt
 properties:
   kind:
@@ -53,6 +54,8 @@ properties:
       - reviewer-live-proof-bridge-v1
   jurisdiction_bundle:
     $ref: "guardian_jurisdiction_evidence_bundle.schema"
+  legal_execution:
+    $ref: "guardian_jurisdiction_legal_execution.schema"
   network_receipt:
     oneOf:
       - type: "null"
@@ -78,6 +81,64 @@ examples:
       status: ready
       transport_profile: reviewer-live-proof-bridge-v1
       updated_at: "2026-04-19T13:00:00Z"
+    legal_execution:
+      kind: guardian_jurisdiction_legal_execution
+      schema_version: 1.0.0
+      execution_id: legal-execution-0123456789ab
+      reviewer_id: human-reviewer-001
+      verification_id: reviewer-verification-0123456789ab
+      jurisdiction: JP-13
+      transport_profile: reviewer-live-proof-bridge-v1
+      execution_profile_id: guardian-jurisdiction-legal-execution-v1
+      execution_scope: reviewer-attestation-preflight
+      policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+      policy_digest: 992764d85fe1888d1a5e72943382af5b37a1618a37bfc4213c3f278371045f51
+      notice_authority_ref: authority://guardian-oversight.jp/legal-desk
+      liability_mode: joint
+      legal_ack_ref: legal://oversight/reviewer-alpha/v1
+      escalation_contact: mailto:oversight-alpha@example.invalid
+      allowed_guardian_roles:
+        - integrity
+      allowed_categories:
+        - veto
+        - pin-renewal
+      jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+      jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
+      network_receipt_id: verifier-network-receipt-0123456789ab
+      authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+      trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+      required_control_count: 5
+      executed_control_count: 5
+      executed_controls:
+        - control_id: legal-execution-0123456789ab-control-1
+          control_type: bundle-ready-check
+          status: executed
+          evidence_ref: legal-execution://human-reviewer-001/legal-execution-0123456789ab/bundle-ready-check
+          evidence_digest: 1df32212b89cf2d1864950daf3849823c8cfa2df6f643fd8e8a2c4bea90fa2d1
+        - control_id: legal-execution-0123456789ab-control-2
+          control_type: liability-ack-bind
+          status: executed
+          evidence_ref: legal-execution://human-reviewer-001/legal-execution-0123456789ab/liability-ack-bind
+          evidence_digest: 6c5adca33f9973150b31163c1b0f5d5648d16b379f085d814a5d72d0d7682153
+        - control_id: legal-execution-0123456789ab-control-3
+          control_type: scope-manifest-bind
+          status: executed
+          evidence_ref: legal-execution://human-reviewer-001/legal-execution-0123456789ab/scope-manifest-bind
+          evidence_digest: 5a71f24d2507d5c6de7a26f9608dba72e2c214ec72d94f541ddab2f792a9f780
+        - control_id: legal-execution-0123456789ab-control-4
+          control_type: escalation-contact-bind
+          status: executed
+          evidence_ref: legal-execution://human-reviewer-001/legal-execution-0123456789ab/escalation-contact-bind
+          evidence_digest: 860645bb8b693d3e1cfdcc22e80622e85d922d0985d6312802dafaf84e1bc4a7
+        - control_id: legal-execution-0123456789ab-control-5
+          control_type: notice-authority-bind
+          status: executed
+          evidence_ref: legal-execution://human-reviewer-001/legal-execution-0123456789ab/notice-authority-bind
+          evidence_digest: f1b8ec53fa4ece04d3128dc2f971696c0d41e52c09c6a1f2d39f2fa90265711a
+      execution_status: executed
+      executed_at: "2026-04-19T13:00:00Z"
+      valid_until: "2026-10-19T00:00:00Z"
+      digest: 4d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6b
     network_receipt:
       kind: guardian_verifier_network_receipt
       schema_version: 1.0.0

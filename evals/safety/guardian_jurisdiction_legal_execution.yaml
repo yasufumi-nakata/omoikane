@@ -1,0 +1,28 @@
+eval_id: guardian_jurisdiction_legal_execution
+target: governance.oversight
+level: L4
+description: >
+  Guardian oversight reviewer verification must materialize one jurisdiction-specific
+  legal execution receipt before attestation so policy provenance, liability scope,
+  escalation contact, and notice authority remain machine-checkable.
+fixtures:
+  - scenario: guardian_reviewer_network_legal_execution
+    reviewer_id: human-reviewer-network-001
+    jurisdiction: JP-13
+    execution_profile_id: guardian-jurisdiction-legal-execution-v1
+    execution_scope: reviewer-attestation-preflight
+    expected:
+      execution_status: executed
+      required_control_count: 5
+      executed_control_count: 5
+      policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+      notice_authority_ref: authority://guardian-oversight.jp/legal-desk
+assertions:
+  - Legal execution must bind one ready jurisdiction bundle to one fixed policy_ref and policy_digest
+  - Legal execution must retain liability_mode, legal_ack_ref, escalation_contact, and reviewer scope without storing raw legal package bodies
+  - Legal execution must carry one executed control for bundle readiness, liability binding, scope manifest, escalation contact, and notice authority binding
+  - Network-backed verification must carry network_receipt_id, authority_chain_ref, and trust_root_ref into the legal execution receipt
+  - Reviewer attestation bindings must retain legal_execution_id, legal_execution_digest, and legal_policy_ref
+metric: exact-match
+threshold: 1.0
+ethics_check: true

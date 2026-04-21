@@ -3,6 +3,7 @@
 from .amendment import AmendmentProposal, AmendmentService, AmendmentSignatures
 from .naming import NamingService
 from .oversight import (
+    GuardianJurisdictionLegalExecution,
     GuardianOversightEvent,
     GuardianReviewerRecord,
     GuardianVerifierNetworkReceipt,
@@ -16,6 +17,7 @@ __all__ = [
     "AmendmentProposal",
     "AmendmentService",
     "AmendmentSignatures",
+    "GuardianJurisdictionLegalExecution",
     "GuardianReviewerRecord",
     "GuardianVerifierNetworkReceipt",
     "JurisdictionEvidenceBundle",

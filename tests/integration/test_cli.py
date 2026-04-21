@@ -1176,12 +1176,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["reviewer_registry_ready"])
         self.assertTrue(result["validation"]["live_verification_ready"])
         self.assertTrue(result["validation"]["jurisdiction_bundle_ready"])
+        self.assertTrue(result["validation"]["legal_execution_ready"])
+        self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
         self.assertEqual("joint", result["events"]["veto"]["reviewer_bindings"][0]["liability_mode"])
         self.assertEqual(
             "reviewer-live-proof-bridge-v1",
             result["events"]["veto"]["reviewer_bindings"][0]["transport_profile"],
+        )
+        self.assertEqual(
+            "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+            result["events"]["veto"]["reviewer_bindings"][0]["legal_policy_ref"],
         )
         self.assertFalse(result["trust"]["after_breach"]["pinned_by_human"])
         self.assertFalse(result["trust"]["after_breach"]["eligibility"]["guardian_role"])
@@ -1203,6 +1209,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["binding_carries_transport_exchange"])
         self.assertTrue(result["validation"]["binding_carries_transport_exchange_digest"])
         self.assertTrue(result["validation"]["binding_carries_trust_root"])
+        self.assertTrue(result["validation"]["legal_execution_executed"])
+        self.assertTrue(result["validation"]["legal_execution_network_bound"])
+        self.assertTrue(result["validation"]["binding_carries_legal_execution"])
+        self.assertTrue(result["validation"]["binding_carries_legal_policy"])
         self.assertTrue(result["validation"]["transport_exchange_bound"])
         self.assertTrue(result["validation"]["transport_exchange_request_digest_bound"])
         self.assertEqual(
@@ -1216,6 +1226,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "digest-bound-reviewer-transport-exchange-v1",
             result["reviewer"]["credential_verification"]["network_receipt"]["transport_exchange"]["exchange_profile_id"],
+        )
+        self.assertEqual(
+            "guardian-jurisdiction-legal-execution-v1",
+            result["reviewer"]["credential_verification"]["legal_execution"]["execution_profile_id"],
         )
 
     def test_ethics_demo_emits_rule_language_and_events(self) -> None:

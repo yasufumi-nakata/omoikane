@@ -158,6 +158,51 @@ guardian_verifier_network_receipt:
 - raw network transcript や credential payload 本文は repo に保存せず、
   sealed payload ref / payload digest / root ref / authority chain ref のみを残す
 
+## jurisdiction legal execution
+
+reviewer verification は verifier snapshot と jurisdiction bundle だけで止まらず、
+attestation 前に 1 件の deterministic legal execution receipt まで materialize する。
+
+```yaml
+guardian_jurisdiction_legal_execution:
+  execution_id: legal-execution-...
+  reviewer_id: human-reviewer-network-001
+  verification_id: reviewer-verification-...
+  jurisdiction: JP-13
+  transport_profile: reviewer-live-proof-bridge-v1
+  execution_profile_id: guardian-jurisdiction-legal-execution-v1
+  execution_scope: reviewer-attestation-preflight
+  policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+  policy_digest: <sha256>
+  notice_authority_ref: authority://guardian-oversight.jp/legal-desk
+  liability_mode: joint
+  legal_ack_ref: legal://oversight-network/reviewer-alpha/v1
+  escalation_contact: mailto:oversight-network-alpha@example.invalid
+  jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+  network_receipt_id: verifier-network-receipt-...
+  authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+  trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+  executed_controls:
+    - control_type: bundle-ready-check
+    - control_type: liability-ack-bind
+    - control_type: scope-manifest-bind
+    - control_type: escalation-contact-bind
+    - control_type: notice-authority-bind
+  execution_status: executed
+  digest: <sha256>
+```
+
+- legal execution は fixed jurisdiction policy registry から `policy_ref` と
+  `notice_authority_ref` を選び、reviewer scope / liability / escalation contact を
+  ready bundle に束縛する
+- `verify_reviewer` / `verify_reviewer_from_network` は
+  `credential_verification.legal_execution` を必須にし、
+  attestation は `execution_status=executed` の receipt が無ければ fail-closed
+- reviewer binding は `legal_execution_id / legal_execution_digest / legal_policy_ref` を
+  immutable に保持し、jurisdiction-specific legal execution を event 側にも焼き付ける
+- raw legal package 本文や regulator transcript は repo に保存せず、
+  policy ref / digest / notice authority / execution control digests のみを残す
+
 ## 不変条件
 
 1. event は append-only。書換 API を物理的に持たない
@@ -172,19 +217,23 @@ guardian_verifier_network_receipt:
   `register_reviewer / verify_reviewer / verify_reviewer_from_network / record / attest / revoke_reviewer / breach / snapshot`
   の 8 op
 - `guardian_reviewer_record.schema`、`guardian_reviewer_verification.schema`、
+  `guardian_jurisdiction_legal_execution.schema`、
   `guardian_verifier_network_receipt.schema`、`guardian_verifier_transport_exchange.schema`、
   `guardian_jurisdiction_evidence_bundle.schema`、
   `guardian_oversight_event.schema` で serialize
 - `oversight-demo` で reviewer 登録、live verification、`veto -> satisfied`、
-  scope mismatch reject、`pin-renewal -> breached` を同時に確認
+  jurisdiction legal execution binding、scope mismatch reject、`pin-renewal -> breached` を同時に確認
 - `oversight-network-demo` で verifier endpoint 解決、trust root binding、
-  authority chain binding、transport exchange digest binding、network-backed `veto -> satisfied` を確認
+  authority chain binding、transport exchange digest binding、jurisdiction legal execution binding、
+  network-backed `veto -> satisfied` を確認
 - `evals/safety/guardian_pin_breach_propagation.yaml` で breach → role 解除を守る
 - `evals/safety/guardian_reviewer_attestation_contract.yaml` で proof binding と liability scope enforcement を守る
 - `evals/safety/guardian_reviewer_live_verification.yaml` で verifier snapshot と jurisdiction bundle binding を守る
+- `evals/safety/guardian_jurisdiction_legal_execution.yaml` で policy provenance と control completeness を守る
 - `evals/safety/guardian_reviewer_verifier_network.yaml` で verifier endpoint / authority chain / trust root binding を守る
 - decision-log に `2026-04-18_guardian-oversight-channel.md` と
-  `2026-04-20_guardian-reviewer-verifier-network.md`
+  `2026-04-20_guardian-reviewer-verifier-network.md`、
+  `2026-04-22_guardian-jurisdiction-legal-execution.md`
 
 ## 思兼神メタファー
 

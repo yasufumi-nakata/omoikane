@@ -1231,6 +1231,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["reviewer_registry_ready"])
         self.assertTrue(result["validation"]["live_verification_ready"])
         self.assertTrue(result["validation"]["jurisdiction_bundle_ready"])
+        self.assertTrue(result["validation"]["legal_execution_ready"])
+        self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["responsibility_scope_enforced"])
         self.assertTrue(result["validation"]["pin_breach_propagated"])
         self.assertTrue(result["validation"]["human_pin_cleared"])
@@ -1261,11 +1263,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["binding_carries_transport_exchange_digest"])
         self.assertTrue(result["validation"]["binding_carries_trust_root"])
         self.assertTrue(result["validation"]["binding_carries_authority_chain"])
+        self.assertTrue(result["validation"]["legal_execution_executed"])
+        self.assertTrue(result["validation"]["legal_execution_network_bound"])
+        self.assertTrue(result["validation"]["binding_carries_legal_execution"])
+        self.assertTrue(result["validation"]["binding_carries_legal_policy"])
         self.assertTrue(result["validation"]["transport_exchange_bound"])
         self.assertTrue(result["validation"]["transport_exchange_request_digest_bound"])
         self.assertEqual(
             "verifier://guardian-oversight.jp",
             result["reviewer"]["credential_verification"]["network_receipt"]["verifier_endpoint"],
+        )
+        self.assertEqual(
+            "guardian-jurisdiction-legal-execution-v1",
+            result["reviewer"]["credential_verification"]["legal_execution"]["execution_profile_id"],
         )
         self.assertEqual(
             "root://guardian-oversight.jp/reviewer-live-pki",
@@ -1274,6 +1284,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             result["event"]["reviewer_bindings"][0]["transport_exchange_digest"],
             result["reviewer"]["credential_verification"]["network_receipt"]["transport_exchange"]["digest"],
+        )
+        self.assertEqual(
+            result["event"]["reviewer_bindings"][0]["legal_execution_digest"],
+            result["reviewer"]["credential_verification"]["legal_execution"]["digest"],
         )
 
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:

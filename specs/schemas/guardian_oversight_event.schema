@@ -91,6 +91,9 @@ properties:
         - transport_profile
         - jurisdiction_bundle_ref
         - jurisdiction_bundle_digest
+        - legal_execution_id
+        - legal_execution_digest
+        - legal_policy_ref
         - guardian_role
         - category
         - attested_at
@@ -130,6 +133,15 @@ properties:
           type: string
           minLength: 1
         jurisdiction_bundle_digest:
+          type: string
+          minLength: 1
+        legal_execution_id:
+          type: string
+          minLength: 1
+        legal_execution_digest:
+          type: string
+          minLength: 1
+        legal_policy_ref:
           type: string
           minLength: 1
         network_receipt_id:
@@ -206,7 +218,30 @@ examples:
       reviewers: []
       status: pending
       escalation_window_seconds: 86400
-    reviewer_bindings: []
+    reviewer_bindings:
+      - reviewer_id: human-reviewer-001
+        credential_id: credential-alpha
+        proof_ref: proof://oversight/reviewer-alpha/v1
+        liability_mode: joint
+        legal_ack_ref: legal://oversight/reviewer-alpha/v1
+        verification_id: reviewer-verification-0123456789ab
+        verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+        challenge_digest: sha256:alpha-proof-bridge-20260419
+        transport_profile: reviewer-live-proof-bridge-v1
+        jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+        jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
+        legal_execution_id: legal-execution-0123456789ab
+        legal_execution_digest: 4d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6b
+        legal_policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+        network_receipt_id: verifier-network-receipt-0123456789ab
+        transport_exchange_id: verifier-transport-exchange-0123456789ab
+        transport_exchange_digest: a0a91f8e9e985df49009b612c5e55ff145ce3bf9d768577575e95e667604c6c2
+        authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+        trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+        trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+        guardian_role: integrity
+        category: pin-renewal
+        attested_at: "2026-04-18T16:35:00Z"
     escalation_path:
       - human-reviewer-pool-A
       - external-ethics-board

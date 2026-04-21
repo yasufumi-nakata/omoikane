@@ -1,0 +1,231 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/guardian_jurisdiction_legal_execution.schema"
+title: GuardianJurisdictionLegalExecution
+description: >
+  Deterministic jurisdiction-specific legal execution receipt bound to one reviewer
+  verification before Guardian attestation.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - execution_id
+  - reviewer_id
+  - verification_id
+  - jurisdiction
+  - transport_profile
+  - execution_profile_id
+  - execution_scope
+  - policy_ref
+  - policy_digest
+  - notice_authority_ref
+  - liability_mode
+  - legal_ack_ref
+  - escalation_contact
+  - allowed_guardian_roles
+  - allowed_categories
+  - jurisdiction_bundle_ref
+  - jurisdiction_bundle_digest
+  - network_receipt_id
+  - authority_chain_ref
+  - trust_root_ref
+  - required_control_count
+  - executed_control_count
+  - executed_controls
+  - execution_status
+  - executed_at
+  - valid_until
+  - digest
+properties:
+  kind:
+    const: guardian_jurisdiction_legal_execution
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  execution_id:
+    type: string
+    minLength: 1
+  reviewer_id:
+    type: string
+    minLength: 1
+  verification_id:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  transport_profile:
+    type: string
+    enum:
+      - reviewer-live-proof-bridge-v1
+  execution_profile_id:
+    const: guardian-jurisdiction-legal-execution-v1
+  execution_scope:
+    const: reviewer-attestation-preflight
+  policy_ref:
+    type: string
+    minLength: 1
+  policy_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  notice_authority_ref:
+    type: string
+    minLength: 1
+  liability_mode:
+    type: string
+    enum:
+      - individual
+      - institutional
+      - joint
+  legal_ack_ref:
+    type: string
+    minLength: 1
+  escalation_contact:
+    type: string
+    minLength: 1
+  allowed_guardian_roles:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - ethics
+        - integrity
+        - identity
+  allowed_categories:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - veto
+        - attest
+        - rule-update
+        - emergency-trigger
+        - pin-renewal
+  jurisdiction_bundle_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_digest:
+    type: string
+    minLength: 1
+  network_receipt_id:
+    type:
+      - string
+      - "null"
+  authority_chain_ref:
+    type:
+      - string
+      - "null"
+  trust_root_ref:
+    type:
+      - string
+      - "null"
+  required_control_count:
+    type: integer
+    minimum: 1
+  executed_control_count:
+    type: integer
+    minimum: 1
+  executed_controls:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - control_id
+        - control_type
+        - status
+        - evidence_ref
+        - evidence_digest
+      properties:
+        control_id:
+          type: string
+          minLength: 1
+        control_type:
+          type: string
+          enum:
+            - bundle-ready-check
+            - liability-ack-bind
+            - scope-manifest-bind
+            - escalation-contact-bind
+            - notice-authority-bind
+        status:
+          const: executed
+        evidence_ref:
+          type: string
+          minLength: 1
+        evidence_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  execution_status:
+    const: executed
+  executed_at:
+    type: string
+    format: date-time
+  valid_until:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: guardian_jurisdiction_legal_execution
+    schema_version: 1.0.0
+    execution_id: legal-execution-0123456789ab
+    reviewer_id: human-reviewer-network-001
+    verification_id: reviewer-verification-0123456789ab
+    jurisdiction: JP-13
+    transport_profile: reviewer-live-proof-bridge-v1
+    execution_profile_id: guardian-jurisdiction-legal-execution-v1
+    execution_scope: reviewer-attestation-preflight
+    policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+    policy_digest: 992764d85fe1888d1a5e72943382af5b37a1618a37bfc4213c3f278371045f51
+    notice_authority_ref: authority://guardian-oversight.jp/legal-desk
+    liability_mode: joint
+    legal_ack_ref: legal://oversight-network/reviewer-alpha/v1
+    escalation_contact: mailto:oversight-network-alpha@example.invalid
+    allowed_guardian_roles:
+      - integrity
+    allowed_categories:
+      - veto
+    jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+    jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
+    network_receipt_id: verifier-network-receipt-0123456789ab
+    authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+    trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+    required_control_count: 5
+    executed_control_count: 5
+    executed_controls:
+      - control_id: legal-execution-0123456789ab-control-1
+        control_type: bundle-ready-check
+        status: executed
+        evidence_ref: legal-execution://human-reviewer-network-001/legal-execution-0123456789ab/bundle-ready-check
+        evidence_digest: 1df32212b89cf2d1864950daf3849823c8cfa2df6f643fd8e8a2c4bea90fa2d1
+      - control_id: legal-execution-0123456789ab-control-2
+        control_type: liability-ack-bind
+        status: executed
+        evidence_ref: legal-execution://human-reviewer-network-001/legal-execution-0123456789ab/liability-ack-bind
+        evidence_digest: 6c5adca33f9973150b31163c1b0f5d5648d16b379f085d814a5d72d0d7682153
+      - control_id: legal-execution-0123456789ab-control-3
+        control_type: scope-manifest-bind
+        status: executed
+        evidence_ref: legal-execution://human-reviewer-network-001/legal-execution-0123456789ab/scope-manifest-bind
+        evidence_digest: 5a71f24d2507d5c6de7a26f9608dba72e2c214ec72d94f541ddab2f792a9f780
+      - control_id: legal-execution-0123456789ab-control-4
+        control_type: escalation-contact-bind
+        status: executed
+        evidence_ref: legal-execution://human-reviewer-network-001/legal-execution-0123456789ab/escalation-contact-bind
+        evidence_digest: 860645bb8b693d3e1cfdcc22e80622e85d922d0985d6312802dafaf84e1bc4a7
+      - control_id: legal-execution-0123456789ab-control-5
+        control_type: notice-authority-bind
+        status: executed
+        evidence_ref: legal-execution://human-reviewer-network-001/legal-execution-0123456789ab/notice-authority-bind
+        evidence_digest: f1b8ec53fa4ece04d3128dc2f971696c0d41e52c09c6a1f2d39f2fa90265711a
+    execution_status: executed
+    executed_at: "2026-04-22T03:00:00Z"
+    valid_until: "2026-10-20T00:00:00Z"
+    digest: 4d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6b

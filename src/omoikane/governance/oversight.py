@@ -32,6 +32,32 @@ VERIFIER_NETWORK_PROFILE_ID = "guardian-reviewer-remote-attestation-v1"
 VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID = "digest-bound-reviewer-transport-exchange-v1"
 VERIFIER_TRANSPORT_REQUEST_KIND = "reviewer-live-proof-request"
 VERIFIER_TRANSPORT_RESPONSE_KIND = "reviewer-live-proof-response"
+LEGAL_EXECUTION_PROFILE_ID = "guardian-jurisdiction-legal-execution-v1"
+LEGAL_EXECUTION_SCOPE = "reviewer-attestation-preflight"
+LEGAL_EXECUTION_CONTROL_TYPES = (
+    "bundle-ready-check",
+    "liability-ack-bind",
+    "scope-manifest-bind",
+    "escalation-contact-bind",
+    "notice-authority-bind",
+)
+LEGAL_EXECUTION_POLICIES = {
+    "EU-DE": {
+        "policy_ref": "policy://guardian-oversight/eu-de/reviewer-attestation/v1",
+        "notice_authority_ref": "authority://guardian-oversight.de/legal-desk",
+        "retention_window_days": 21,
+    },
+    "JP-13": {
+        "policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+        "notice_authority_ref": "authority://guardian-oversight.jp/legal-desk",
+        "retention_window_days": 30,
+    },
+    "US-CA": {
+        "policy_ref": "policy://guardian-oversight/us-ca/reviewer-attestation/v1",
+        "notice_authority_ref": "authority://guardian-oversight.us/legal-desk",
+        "retention_window_days": 45,
+    },
+}
 VERIFIER_NETWORK_ENDPOINTS = {
     "verifier://guardian-oversight.jp": {
         "supported_jurisdictions": ("JP-13",),
@@ -79,6 +105,14 @@ def _normalize_optional_non_empty(value: Optional[str], field_name: str) -> Opti
     if value is None:
         return None
     return _normalize_non_empty(value, field_name)
+
+
+def _jurisdiction_legal_policy(jurisdiction: str) -> Dict[str, Any]:
+    normalized = _normalize_non_empty(jurisdiction, "jurisdiction")
+    policy = LEGAL_EXECUTION_POLICIES.get(normalized)
+    if policy is None:
+        raise ValueError(f"unsupported jurisdiction legal execution policy: {normalized}")
+    return dict(policy)
 
 
 def _verifier_endpoint_from_ref(verifier_ref: str) -> str:
@@ -160,6 +194,110 @@ class JurisdictionEvidenceBundle:
 
 
 @dataclass(frozen=True)
+class GuardianJurisdictionLegalExecution:
+    """Deterministic legal execution receipt bound to one reviewer jurisdiction."""
+
+    execution_id: str
+    reviewer_id: str
+    verification_id: str
+    jurisdiction: str
+    transport_profile: str
+    execution_profile_id: str
+    execution_scope: str
+    policy_ref: str
+    policy_digest: str
+    notice_authority_ref: str
+    liability_mode: str
+    legal_ack_ref: str
+    escalation_contact: str
+    allowed_guardian_roles: List[str]
+    allowed_categories: List[str]
+    jurisdiction_bundle_ref: str
+    jurisdiction_bundle_digest: str
+    network_receipt_id: Optional[str]
+    authority_chain_ref: Optional[str]
+    trust_root_ref: Optional[str]
+    required_control_count: int
+    executed_control_count: int
+    executed_controls: List[Dict[str, Any]]
+    execution_status: str
+    executed_at: str
+    valid_until: str
+    digest: str
+    kind: str = "guardian_jurisdiction_legal_execution"
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _normalize_non_empty(self.execution_id, "execution_id")
+        _normalize_non_empty(self.reviewer_id, "reviewer_id")
+        _normalize_non_empty(self.verification_id, "verification_id")
+        _normalize_non_empty(self.jurisdiction, "jurisdiction")
+        if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
+            raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        if self.execution_profile_id != LEGAL_EXECUTION_PROFILE_ID:
+            raise ValueError(f"unsupported execution_profile_id: {self.execution_profile_id}")
+        if self.execution_scope != LEGAL_EXECUTION_SCOPE:
+            raise ValueError(f"unsupported execution_scope: {self.execution_scope}")
+        _normalize_non_empty(self.policy_ref, "policy_ref")
+        _normalize_non_empty(self.policy_digest, "policy_digest")
+        _normalize_non_empty(self.notice_authority_ref, "notice_authority_ref")
+        if self.liability_mode not in REVIEWER_LIABILITY_MODES:
+            raise ValueError(f"unsupported liability_mode: {self.liability_mode}")
+        _normalize_non_empty(self.legal_ack_ref, "legal_ack_ref")
+        _normalize_non_empty(self.escalation_contact, "escalation_contact")
+        normalized_roles = _unique_strings(self.allowed_guardian_roles, "allowed_guardian_roles")
+        normalized_categories = _unique_strings(self.allowed_categories, "allowed_categories")
+        if any(role not in GUARDIAN_ROLES for role in normalized_roles):
+            raise ValueError("allowed_guardian_roles contains unsupported value")
+        if any(category not in OVERSIGHT_CATEGORIES for category in normalized_categories):
+            raise ValueError("allowed_categories contains unsupported value")
+        object.__setattr__(self, "allowed_guardian_roles", normalized_roles)
+        object.__setattr__(self, "allowed_categories", normalized_categories)
+        _normalize_non_empty(self.jurisdiction_bundle_ref, "jurisdiction_bundle_ref")
+        _normalize_non_empty(self.jurisdiction_bundle_digest, "jurisdiction_bundle_digest")
+        if self.network_receipt_id is not None:
+            _normalize_non_empty(self.network_receipt_id, "network_receipt_id")
+        if self.authority_chain_ref is not None:
+            _normalize_non_empty(self.authority_chain_ref, "authority_chain_ref")
+        if self.trust_root_ref is not None:
+            _normalize_non_empty(self.trust_root_ref, "trust_root_ref")
+        if self.required_control_count < 1:
+            raise ValueError("required_control_count must be >= 1")
+        if self.executed_control_count < 1:
+            raise ValueError("executed_control_count must be >= 1")
+        if self.executed_control_count != len(self.executed_controls):
+            raise ValueError("executed_control_count must equal len(executed_controls)")
+        if self.required_control_count != len(self.executed_controls):
+            raise ValueError("required_control_count must equal len(executed_controls)")
+        for index, control in enumerate(self.executed_controls):
+            if not isinstance(control, dict):
+                raise ValueError(f"executed_controls[{index}] must be a mapping")
+            control_id = _normalize_non_empty(control.get("control_id", ""), "control_id")
+            control_type = _normalize_non_empty(control.get("control_type", ""), "control_type")
+            if control_type not in LEGAL_EXECUTION_CONTROL_TYPES:
+                raise ValueError(f"unsupported control_type: {control_type}")
+            if control.get("status") != "executed":
+                raise ValueError("executed_controls status must be executed")
+            evidence_ref = _normalize_non_empty(control.get("evidence_ref", ""), "evidence_ref")
+            evidence_digest = _normalize_non_empty(
+                control.get("evidence_digest", ""),
+                "evidence_digest",
+            )
+            control["control_id"] = control_id
+            control["control_type"] = control_type
+            control["evidence_ref"] = evidence_ref
+            control["evidence_digest"] = evidence_digest
+        if self.execution_status != "executed":
+            raise ValueError(f"unsupported execution_status: {self.execution_status}")
+        _parse_datetime(self.executed_at, "executed_at")
+        _parse_datetime(self.valid_until, "valid_until")
+        _normalize_non_empty(self.digest, "digest")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ReviewerCredentialVerification:
     """Current reviewer credential verification snapshot."""
 
@@ -172,6 +310,7 @@ class ReviewerCredentialVerification:
     challenge_digest: str
     transport_profile: str
     jurisdiction_bundle: JurisdictionEvidenceBundle
+    legal_execution: GuardianJurisdictionLegalExecution
     network_receipt: Optional["GuardianVerifierNetworkReceipt"] = None
     kind: str = "guardian_reviewer_verification"
     schema_version: str = SCHEMA_VERSION
@@ -191,6 +330,18 @@ class ReviewerCredentialVerification:
             raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
         if self.jurisdiction_bundle.transport_profile != self.transport_profile:
             raise ValueError("jurisdiction_bundle transport_profile must match verification")
+        if self.legal_execution.verification_id != self.verification_id:
+            raise ValueError("legal_execution verification_id must match verification")
+        if self.legal_execution.jurisdiction != self.jurisdiction_bundle.jurisdiction:
+            raise ValueError("legal_execution jurisdiction must match jurisdiction_bundle")
+        if self.legal_execution.transport_profile != self.transport_profile:
+            raise ValueError("legal_execution transport_profile must match verification")
+        if self.legal_execution.jurisdiction_bundle_ref != self.jurisdiction_bundle.package_ref:
+            raise ValueError("legal_execution jurisdiction_bundle_ref must match verification")
+        if self.legal_execution.jurisdiction_bundle_digest != self.jurisdiction_bundle.package_digest:
+            raise ValueError("legal_execution jurisdiction_bundle_digest must match verification")
+        if _parse_datetime(self.legal_execution.valid_until, "legal_execution.valid_until") > valid_until:
+            raise ValueError("legal_execution valid_until must not exceed verification valid_until")
         if self.network_receipt is not None:
             if self.network_receipt.transport_profile != self.transport_profile:
                 raise ValueError("network_receipt transport_profile must match verification")
@@ -204,6 +355,14 @@ class ReviewerCredentialVerification:
                 raise ValueError("network_receipt jurisdiction must match jurisdiction_bundle")
             if self.network_receipt.receipt_status != self.status:
                 raise ValueError("network_receipt receipt_status must match verification status")
+            if self.legal_execution.network_receipt_id != self.network_receipt.receipt_id:
+                raise ValueError("legal_execution network_receipt_id must match verification")
+            if self.legal_execution.authority_chain_ref != self.network_receipt.authority_chain_ref:
+                raise ValueError("legal_execution authority_chain_ref must match verification")
+            if self.legal_execution.trust_root_ref != self.network_receipt.trust_root_ref:
+                raise ValueError("legal_execution trust_root_ref must match verification")
+        elif self.legal_execution.network_receipt_id is not None:
+            raise ValueError("legal_execution network_receipt_id requires verification network_receipt")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -218,6 +377,7 @@ class ReviewerCredentialVerification:
             "challenge_digest": self.challenge_digest,
             "transport_profile": self.transport_profile,
             "jurisdiction_bundle": self.jurisdiction_bundle.to_dict(),
+            "legal_execution": self.legal_execution.to_dict(),
             "network_receipt": (
                 self.network_receipt.to_dict()
                 if self.network_receipt is not None
@@ -452,6 +612,9 @@ class ReviewerBinding:
     transport_profile: str
     jurisdiction_bundle_ref: str
     jurisdiction_bundle_digest: str
+    legal_execution_id: str
+    legal_execution_digest: str
+    legal_policy_ref: str
     guardian_role: str
     category: str
     network_receipt_id: Optional[str] = None
@@ -481,6 +644,18 @@ class ReviewerBinding:
         self.jurisdiction_bundle_digest = _normalize_non_empty(
             self.jurisdiction_bundle_digest,
             "jurisdiction_bundle_digest",
+        )
+        self.legal_execution_id = _normalize_non_empty(
+            self.legal_execution_id,
+            "legal_execution_id",
+        )
+        self.legal_execution_digest = _normalize_non_empty(
+            self.legal_execution_digest,
+            "legal_execution_digest",
+        )
+        self.legal_policy_ref = _normalize_non_empty(
+            self.legal_policy_ref,
+            "legal_policy_ref",
         )
         self.network_receipt_id = _normalize_optional_non_empty(
             self.network_receipt_id,
@@ -693,9 +868,31 @@ class OversightService:
             "identity_proof.valid_until",
         ):
             raise ValueError("valid_until must not exceed identity proof validity")
+        verification_id = new_id("reviewer-verification")
+        jurisdiction_bundle = JurisdictionEvidenceBundle(
+            bundle_id=new_id("jurisdiction-bundle"),
+            jurisdiction=reviewer.identity_proof.jurisdiction,
+            package_ref=jurisdiction_bundle_ref,
+            package_digest=jurisdiction_bundle_digest,
+            status=jurisdiction_bundle_status,
+            transport_profile=transport_profile,
+            updated_at=verified_at_value,
+        )
+        legal_execution = self._build_legal_execution(
+            reviewer=reviewer,
+            verification_id=verification_id,
+            verifier_ref=verifier_ref,
+            challenge_ref=challenge_ref,
+            challenge_digest=challenge_digest,
+            transport_profile=transport_profile,
+            jurisdiction_bundle=jurisdiction_bundle,
+            valid_until=valid_until_value,
+            recorded_at=verified_at_value,
+            network_receipt=network_receipt,
+        )
 
         reviewer.credential_verification = ReviewerCredentialVerification(
-            verification_id=new_id("reviewer-verification"),
+            verification_id=verification_id,
             status=verification_status,
             verified_at=verified_at_value,
             valid_until=valid_until_value,
@@ -703,15 +900,8 @@ class OversightService:
             challenge_ref=challenge_ref,
             challenge_digest=challenge_digest,
             transport_profile=transport_profile,
-            jurisdiction_bundle=JurisdictionEvidenceBundle(
-                bundle_id=new_id("jurisdiction-bundle"),
-                jurisdiction=reviewer.identity_proof.jurisdiction,
-                package_ref=jurisdiction_bundle_ref,
-                package_digest=jurisdiction_bundle_digest,
-                status=jurisdiction_bundle_status,
-                transport_profile=transport_profile,
-                updated_at=verified_at_value,
-            ),
+            jurisdiction_bundle=jurisdiction_bundle,
+            legal_execution=legal_execution,
             network_receipt=network_receipt,
         )
         self._reviewers[reviewer.reviewer_id] = reviewer
@@ -784,6 +974,7 @@ class OversightService:
                     transport_profile=verification.jurisdiction_bundle.transport_profile,
                     updated_at=reviewer.revoked_at,
                 ),
+                legal_execution=verification.legal_execution,
                 network_receipt=(
                     self._revoke_network_receipt(network_receipt, revoked_at=reviewer.revoked_at)
                     if network_receipt is not None
@@ -818,6 +1009,9 @@ class OversightService:
                     "transport_profile",
                     "jurisdiction_bundle_ref",
                     "jurisdiction_bundle_digest",
+                    "legal_execution_id",
+                    "legal_execution_digest",
+                    "legal_policy_ref",
                     "network_receipt_id",
                     "transport_exchange_id",
                     "transport_exchange_digest",
@@ -863,6 +1057,16 @@ class OversightService:
                     endpoint["max_observed_latency_ms"]
                     for endpoint in VERIFIER_NETWORK_ENDPOINTS.values()
                 ),
+            },
+            "jurisdiction_legal_execution_policy": {
+                "execution_profile_id": LEGAL_EXECUTION_PROFILE_ID,
+                "execution_scope": LEGAL_EXECUTION_SCOPE,
+                "supported_jurisdictions": sorted(LEGAL_EXECUTION_POLICIES),
+                "required_control_types": list(LEGAL_EXECUTION_CONTROL_TYPES),
+                "policies": {
+                    jurisdiction: dict(policy)
+                    for jurisdiction, policy in sorted(LEGAL_EXECUTION_POLICIES.items())
+                },
             },
         }
 
@@ -964,6 +1168,17 @@ class OversightService:
             )
         if verification.jurisdiction_bundle.jurisdiction != reviewer.identity_proof.jurisdiction:
             raise PermissionError("reviewer jurisdiction bundle must match identity proof jurisdiction")
+        if verification.legal_execution.execution_status != "executed":
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} lacks executed jurisdiction legal execution"
+            )
+        if _parse_datetime(
+            verification.legal_execution.valid_until,
+            "legal_execution.valid_until",
+        ) <= _parse_datetime(utc_now_iso(), "now"):
+            raise PermissionError(
+                f"reviewer {reviewer.reviewer_id} jurisdiction legal execution expired"
+            )
         network_receipt = verification.network_receipt
 
         event.human_attestation.reviewers.append(reviewer.reviewer_id)
@@ -980,6 +1195,9 @@ class OversightService:
                 transport_profile=verification.transport_profile,
                 jurisdiction_bundle_ref=verification.jurisdiction_bundle.package_ref,
                 jurisdiction_bundle_digest=verification.jurisdiction_bundle.package_digest,
+                legal_execution_id=verification.legal_execution.execution_id,
+                legal_execution_digest=verification.legal_execution.digest,
+                legal_policy_ref=verification.legal_execution.policy_ref,
                 network_receipt_id=(
                     network_receipt.receipt_id if network_receipt is not None else None
                 ),
@@ -1008,6 +1226,132 @@ class OversightService:
         )
         if event.human_attestation.received_quorum >= event.human_attestation.required_quorum:
             event.human_attestation.status = "satisfied"
+
+    def _build_legal_execution(
+        self,
+        *,
+        reviewer: GuardianReviewerRecord,
+        verification_id: str,
+        verifier_ref: str,
+        challenge_ref: str,
+        challenge_digest: str,
+        transport_profile: str,
+        jurisdiction_bundle: JurisdictionEvidenceBundle,
+        valid_until: str,
+        recorded_at: str,
+        network_receipt: Optional[GuardianVerifierNetworkReceipt],
+    ) -> GuardianJurisdictionLegalExecution:
+        policy = _jurisdiction_legal_policy(reviewer.identity_proof.jurisdiction)
+        policy_payload = {
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "policy_ref": policy["policy_ref"],
+            "notice_authority_ref": policy["notice_authority_ref"],
+            "retention_window_days": policy["retention_window_days"],
+            "execution_scope": LEGAL_EXECUTION_SCOPE,
+            "required_control_types": list(LEGAL_EXECUTION_CONTROL_TYPES),
+        }
+        policy_digest = sha256_text(canonical_json(policy_payload))
+        execution_id = new_id("legal-execution")
+        control_payloads = [
+            (
+                "bundle-ready-check",
+                {
+                    "bundle_ref": jurisdiction_bundle.package_ref,
+                    "bundle_digest": jurisdiction_bundle.package_digest,
+                    "bundle_status": jurisdiction_bundle.status,
+                    "bundle_updated_at": jurisdiction_bundle.updated_at,
+                },
+            ),
+            (
+                "liability-ack-bind",
+                {
+                    "liability_mode": reviewer.responsibility.liability_mode,
+                    "legal_ack_ref": reviewer.responsibility.legal_ack_ref,
+                },
+            ),
+            (
+                "scope-manifest-bind",
+                {
+                    "allowed_guardian_roles": list(reviewer.responsibility.allowed_guardian_roles),
+                    "allowed_categories": list(reviewer.responsibility.allowed_categories),
+                },
+            ),
+            (
+                "escalation-contact-bind",
+                {
+                    "escalation_contact": reviewer.responsibility.escalation_contact,
+                },
+            ),
+            (
+                "notice-authority-bind",
+                {
+                    "policy_ref": policy["policy_ref"],
+                    "notice_authority_ref": policy["notice_authority_ref"],
+                    "verifier_ref": verifier_ref,
+                    "challenge_ref": challenge_ref,
+                    "challenge_digest": challenge_digest,
+                    "network_receipt_id": (
+                        network_receipt.receipt_id if network_receipt is not None else None
+                    ),
+                    "authority_chain_ref": (
+                        network_receipt.authority_chain_ref if network_receipt is not None else None
+                    ),
+                    "trust_root_ref": (
+                        network_receipt.trust_root_ref if network_receipt is not None else None
+                    ),
+                },
+            ),
+        ]
+        executed_controls: List[Dict[str, Any]] = []
+        for index, (control_type, evidence_payload) in enumerate(control_payloads, start=1):
+            evidence_digest = sha256_text(canonical_json(evidence_payload))
+            executed_controls.append(
+                {
+                    "control_id": f"{execution_id}-control-{index}",
+                    "control_type": control_type,
+                    "status": "executed",
+                    "evidence_ref": (
+                        f"legal-execution://{reviewer.reviewer_id}/{execution_id}/{control_type}"
+                    ),
+                    "evidence_digest": evidence_digest,
+                }
+            )
+        execution_payload = {
+            "execution_id": execution_id,
+            "reviewer_id": reviewer.reviewer_id,
+            "verification_id": verification_id,
+            "jurisdiction": reviewer.identity_proof.jurisdiction,
+            "transport_profile": transport_profile,
+            "execution_profile_id": LEGAL_EXECUTION_PROFILE_ID,
+            "execution_scope": LEGAL_EXECUTION_SCOPE,
+            "policy_ref": policy["policy_ref"],
+            "policy_digest": policy_digest,
+            "notice_authority_ref": policy["notice_authority_ref"],
+            "liability_mode": reviewer.responsibility.liability_mode,
+            "legal_ack_ref": reviewer.responsibility.legal_ack_ref,
+            "escalation_contact": reviewer.responsibility.escalation_contact,
+            "allowed_guardian_roles": list(reviewer.responsibility.allowed_guardian_roles),
+            "allowed_categories": list(reviewer.responsibility.allowed_categories),
+            "jurisdiction_bundle_ref": jurisdiction_bundle.package_ref,
+            "jurisdiction_bundle_digest": jurisdiction_bundle.package_digest,
+            "network_receipt_id": (
+                network_receipt.receipt_id if network_receipt is not None else None
+            ),
+            "authority_chain_ref": (
+                network_receipt.authority_chain_ref if network_receipt is not None else None
+            ),
+            "trust_root_ref": network_receipt.trust_root_ref if network_receipt is not None else None,
+            "required_control_count": len(executed_controls),
+            "executed_control_count": len(executed_controls),
+            "executed_controls": executed_controls,
+            "execution_status": "executed",
+            "executed_at": recorded_at,
+            "valid_until": valid_until,
+        }
+        return GuardianJurisdictionLegalExecution(
+            **execution_payload,
+            digest=sha256_text(canonical_json(execution_payload)),
+        )
 
     def _event(self, event_id: str) -> GuardianOversightEvent:
         event_key = _normalize_non_empty(event_id, "event_id")

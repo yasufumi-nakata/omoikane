@@ -105,6 +105,7 @@ class OversightServiceTests(unittest.TestCase):
         )
 
         network_receipt = verified["credential_verification"]["network_receipt"]
+        legal_execution = verified["credential_verification"]["legal_execution"]
         self.assertEqual("guardian-reviewer-remote-attestation-v1", network_receipt["network_profile_id"])
         self.assertEqual("verifier://guardian-oversight.jp", network_receipt["verifier_endpoint"])
         self.assertEqual(
@@ -118,6 +119,15 @@ class OversightServiceTests(unittest.TestCase):
         self.assertTrue(network_receipt["transport_exchange"]["request_payload_ref"].startswith("sealed://"))
         self.assertTrue(network_receipt["transport_exchange"]["response_payload_digest"])
         self.assertLessEqual(network_receipt["observed_latency_ms"], 250.0)
+        self.assertEqual("guardian-jurisdiction-legal-execution-v1", legal_execution["execution_profile_id"])
+        self.assertEqual("reviewer-attestation-preflight", legal_execution["execution_scope"])
+        self.assertEqual(
+            "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+            legal_execution["policy_ref"],
+        )
+        self.assertEqual(network_receipt["receipt_id"], legal_execution["network_receipt_id"])
+        self.assertEqual(5, legal_execution["required_control_count"])
+        self.assertEqual(5, legal_execution["executed_control_count"])
 
     def test_network_verification_rejects_unknown_endpoint(self) -> None:
         service = OversightService()
@@ -224,6 +234,12 @@ class OversightServiceTests(unittest.TestCase):
             "legal://jp-13/guardian-oversight/v1",
             updated["reviewer_bindings"][0]["jurisdiction_bundle_ref"],
         )
+        self.assertTrue(updated["reviewer_bindings"][0]["legal_execution_id"])
+        self.assertTrue(updated["reviewer_bindings"][0]["legal_execution_digest"])
+        self.assertEqual(
+            "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+            updated["reviewer_bindings"][0]["legal_policy_ref"],
+        )
         self.assertIsNone(updated["reviewer_bindings"][0]["network_receipt_id"])
 
     def test_attestation_rejects_reviewer_outside_scope(self) -> None:
@@ -308,6 +324,10 @@ class OversightServiceTests(unittest.TestCase):
         snapshot = trust.snapshot("integrity-guardian")
 
         self.assertEqual("verified", verified["credential_verification"]["status"])
+        self.assertEqual(
+            "executed",
+            verified["credential_verification"]["legal_execution"]["execution_status"],
+        )
         self.assertEqual("breached", breached["human_attestation"]["status"])
         self.assertTrue(breached["pin_breach_propagated"])
         self.assertFalse(snapshot["pinned_by_human"])

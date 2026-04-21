@@ -3377,6 +3377,19 @@ json.dump(response, sys.stdout)
                     reviewer["credential_verification"]["jurisdiction_bundle"]["status"] == "ready"
                     for reviewer in self.oversight.reviewer_snapshot()
                 ),
+                "legal_execution_ready": all(
+                    reviewer["credential_verification"]["legal_execution"]["execution_status"]
+                    == "executed"
+                    for reviewer in self.oversight.reviewer_snapshot()
+                ),
+                "legal_execution_bound": (
+                    veto_event["reviewer_bindings"][0]["legal_execution_id"]
+                    == reviewer_alpha["credential_verification"]["legal_execution"]["execution_id"]
+                    and veto_event["reviewer_bindings"][0]["legal_execution_digest"]
+                    == reviewer_alpha["credential_verification"]["legal_execution"]["digest"]
+                    and veto_event["reviewer_bindings"][0]["legal_policy_ref"]
+                    == reviewer_alpha["credential_verification"]["legal_execution"]["policy_ref"]
+                ),
                 "responsibility_scope_enforced": scope_rejection["ok"],
                 "pin_breach_propagated": pin_event["pin_breach_propagated"],
                 "human_pin_cleared": not trust_after_breach["pinned_by_human"],
@@ -3422,6 +3435,7 @@ json.dump(response, sys.stdout)
         )
         policy = self.oversight.policy_snapshot()
         network_receipt = reviewer["credential_verification"]["network_receipt"]
+        legal_execution = reviewer["credential_verification"]["legal_execution"]
         transport_exchange = network_receipt["transport_exchange"]
         veto_entry = self.ledger.append(
             identity_id=identity.identity_id,
@@ -3497,6 +3511,27 @@ json.dump(response, sys.stdout)
                 "binding_carries_authority_chain": (
                     veto_event["reviewer_bindings"][0]["authority_chain_ref"]
                     == network_receipt["authority_chain_ref"]
+                ),
+                "legal_execution_executed": (
+                    legal_execution["execution_status"] == "executed"
+                    and legal_execution["execution_profile_id"]
+                    == policy["jurisdiction_legal_execution_policy"]["execution_profile_id"]
+                ),
+                "legal_execution_network_bound": (
+                    legal_execution["network_receipt_id"] == network_receipt["receipt_id"]
+                    and legal_execution["authority_chain_ref"]
+                    == network_receipt["authority_chain_ref"]
+                    and legal_execution["trust_root_ref"] == network_receipt["trust_root_ref"]
+                ),
+                "binding_carries_legal_execution": (
+                    veto_event["reviewer_bindings"][0]["legal_execution_id"]
+                    == legal_execution["execution_id"]
+                    and veto_event["reviewer_bindings"][0]["legal_execution_digest"]
+                    == legal_execution["digest"]
+                ),
+                "binding_carries_legal_policy": (
+                    veto_event["reviewer_bindings"][0]["legal_policy_ref"]
+                    == legal_execution["policy_ref"]
                 ),
                 "transport_exchange_bound": (
                     transport_exchange["verifier_endpoint"] == network_receipt["verifier_endpoint"]

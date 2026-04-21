@@ -1696,6 +1696,15 @@ entries:
     rationale: Required to serialize one jurisdiction-specific legal evidence package summary without storing raw documents in repo.
   - priority: P1
     kind: schema
+    file: specs/schemas/guardian_jurisdiction_legal_execution.schema
+    consumers:
+      - specs/schemas/guardian_reviewer_verification.schema
+      - specs/interfaces/governance.oversight.v0.idl
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize one jurisdiction-specific legal execution receipt that binds policy, liability acknowledgement, scope manifest, and notice authority before Guardian attestation.
+  - priority: P1
+    kind: schema
     file: specs/schemas/guardian_oversight_snapshot.schema
     consumers:
       - specs/interfaces/governance.oversight.v0.idl
@@ -1709,7 +1718,7 @@ entries:
       - docs/04-ai-governance/guardian-oversight.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make reviewer registration, live verification, verifier-network receipt and transport-exchange binding, scoped attestation, breach propagation, and snapshot behavior machine-readable.
+    rationale: Required to make reviewer registration, live verification, verifier-network receipt and transport-exchange binding, jurisdiction-specific legal execution, scoped attestation, breach propagation, and snapshot behavior machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/governance.naming.v0.idl
@@ -1739,6 +1748,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects live verifier snapshot binding, jurisdiction evidence bundle readiness, and transport profile consistency for Guardian reviewers.
+  - priority: P1
+    kind: eval
+    file: evals/safety/guardian_jurisdiction_legal_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects jurisdiction-specific legal execution receipt binding, policy provenance, reviewer scope carryover, and control execution completeness before Guardian attestation.
   - priority: P1
     kind: eval
     file: evals/safety/guardian_reviewer_verifier_network.yaml
