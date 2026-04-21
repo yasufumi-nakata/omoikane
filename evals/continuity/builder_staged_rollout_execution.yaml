@@ -11,6 +11,9 @@ expect:
   sandbox_apply_status: applied
   sandbox_apply_patch_count: 2
   eval_report_evidence_bound: true
+  eval_execution_evidence_bound: true
+  eval_execution_command_count: 2
+  eval_execution_cleanup_status: removed
   rollout_status: promoted
   rollout_completed_stage_count: 4
   rollout_stage_ids:
@@ -19,4 +22,4 @@ expect:
     - broad-50pct
     - full-100pct
   rollback_ready: true
-  self_modify_ledger_count: 7
+  self_modify_ledger_count: 8

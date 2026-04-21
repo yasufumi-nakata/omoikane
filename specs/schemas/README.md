@@ -75,6 +75,7 @@
 - `release_manifest.schema`
 - `build_request.yaml`
 - `build_artifact.yaml`
+- `diff_eval_execution_receipt.schema`
 - `patch_descriptor.schema`
 - `sandbox_apply_receipt.schema`
 - `staged_rollout_session.schema`

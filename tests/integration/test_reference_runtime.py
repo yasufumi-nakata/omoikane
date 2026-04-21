@@ -332,9 +332,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["sandbox_apply_ok"])
         self.assertEqual("applied", result["validation"]["sandbox_apply_status"])
         self.assertEqual(2, result["validation"]["sandbox_apply_patch_count"])
-        self.assertEqual(2, result["validation"]["selected_eval_count"])
+        self.assertEqual(3, result["validation"]["selected_eval_count"])
+        self.assertTrue(result["validation"]["eval_execution_ok"])
+        self.assertEqual("passed", result["validation"]["eval_execution_status"])
+        self.assertEqual(2, result["validation"]["eval_execution_command_count"])
+        self.assertEqual("removed", result["validation"]["eval_execution_cleanup_status"])
         self.assertEqual("promote", result["validation"]["rollout_decision"])
         self.assertTrue(result["validation"]["eval_report_evidence_bound"])
+        self.assertTrue(result["validation"]["eval_execution_evidence_bound"])
         self.assertTrue(result["validation"]["rollout_session_ok"])
         self.assertEqual("promoted", result["validation"]["rollout_status"])
         self.assertEqual(4, result["validation"]["rollout_completed_stage_count"])
@@ -351,6 +356,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             [
                 "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
                 "evals/continuity/builder_staged_rollout_execution.yaml",
             ],
             result["builder"]["suite_selection"]["selected_evals"],
@@ -360,12 +366,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["builder"]["eval_reports"][0]["profile_id"],
         )
         self.assertEqual(64, len(result["builder"]["eval_reports"][0]["comparison_digest"]))
+        execution_report = next(
+            report
+            for report in result["builder"]["eval_reports"]
+            if report["eval_ref"] == "evals/continuity/differential_eval_execution_binding.yaml"
+        )
+        self.assertTrue(execution_report["execution_bound"])
+        self.assertEqual(2, execution_report["execution_receipt"]["executed_command_count"])
         self.assertTrue(
             result["builder"]["build_request"]["design_delta_ref"].startswith("design://")
         )
         self.assertEqual("applied", result["builder"]["sandbox_apply_receipt"]["status"])
+        self.assertEqual("passed", result["builder"]["eval_execution_session"]["status"])
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
-        self.assertEqual(7, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual(8, result["ledger_verification"]["category_counts"]["self-modify"])
 
     def test_builder_live_demo_runs_actual_workspace_commands(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -405,8 +419,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("rolled-back", result["validation"]["rollback_status"])
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
-        self.assertEqual(5, result["validation"]["selected_eval_count"])
+        self.assertEqual(6, result["validation"]["selected_eval_count"])
         self.assertTrue(result["validation"]["eval_report_evidence_bound"])
+        self.assertTrue(result["validation"]["eval_execution_evidence_bound"])
+        self.assertEqual(2, result["validation"]["eval_execution_command_count"])
+        self.assertEqual("removed", result["validation"]["eval_execution_cleanup_status"])
         self.assertEqual(
             "mirage://build-l5-rollback-0001/snapshot/pre-apply",
             result["validation"]["restored_snapshot_ref"],

@@ -24,6 +24,9 @@ MANDATORY_ROLLBACK_OVERSIGHT_EVAL = (
     "evals/continuity/builder_rollback_oversight_network.yaml"
 )
 MANDATORY_LIVE_ENACTMENT_EVAL = "evals/continuity/builder_live_enactment_execution.yaml"
+MANDATORY_DIFF_EVAL_EXECUTION_EVAL = (
+    "evals/continuity/differential_eval_execution_binding.yaml"
+)
 ROLLOUT_STAGE_ORDER = (
     ("dark-launch", 0, "shadow-only", "shadow-match"),
     ("canary-5pct", 5, "limited-visible", "guardian-pass"),
@@ -403,10 +406,14 @@ class DifferentialEvaluationPolicy:
     target_eval_map: Dict[str, tuple[str, ...]] = field(
         default_factory=lambda: {
             "L5.PatchGenerator": (MANDATORY_BUILD_PIPELINE_EVAL,),
-            "L5.DifferentialEvaluator": (MANDATORY_BUILD_PIPELINE_EVAL,),
+            "L5.DifferentialEvaluator": (
+                MANDATORY_BUILD_PIPELINE_EVAL,
+                MANDATORY_DIFF_EVAL_EXECUTION_EVAL,
+            ),
             "L5.RollbackEngine": (
                 MANDATORY_BUILD_PIPELINE_EVAL,
                 MANDATORY_LIVE_ENACTMENT_EVAL,
+                MANDATORY_DIFF_EVAL_EXECUTION_EVAL,
                 MANDATORY_STAGED_ROLLOUT_EVAL,
                 MANDATORY_ROLLBACK_EVAL,
                 MANDATORY_ROLLBACK_OVERSIGHT_EVAL,
@@ -422,6 +429,7 @@ class DifferentialEvaluationPolicy:
             "hold_on_fail": self.hold_on_fail,
             "ref_observation_profile": self.ref_observation_profile,
             "default_execution_profile": self.default_execution_profile,
+            "mandatory_execution_eval": MANDATORY_DIFF_EVAL_EXECUTION_EVAL,
             "target_eval_map": {key: list(value) for key, value in self.target_eval_map.items()},
             "execution_profiles": {
                 key: value["profile_id"] for key, value in DIFF_EVAL_EXECUTION_PROFILES.items()
@@ -461,6 +469,7 @@ class DifferentialEvaluatorService:
         eval_ref: str,
         baseline_ref: str,
         sandbox_ref: str,
+        enactment_session: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         profile = self._execution_profile(eval_ref)
         baseline_observation = self._observe_variant_ref(baseline_ref)
@@ -470,11 +479,33 @@ class DifferentialEvaluatorService:
             baseline_observation=baseline_observation,
             sandbox_observation=sandbox_observation,
         )
+        execution_receipt = self._build_execution_receipt(
+            eval_ref=eval_ref,
+            enactment_session=enactment_session,
+        )
+        if execution_receipt is not None:
+            if not execution_receipt["all_commands_passed"]:
+                triggered_rules.append(
+                    f"execution-command-failure:{execution_receipt['executed_command_count']}"
+                )
+                if outcome == "pass":
+                    outcome = "fail"
+            elif execution_receipt["cleanup_status"] != "removed":
+                triggered_rules.append(
+                    f"execution-cleanup-incomplete:{execution_receipt['cleanup_status']}"
+                )
+                if outcome == "pass":
+                    outcome = "fail"
+            else:
+                triggered_rules.append(
+                    f"execution-commands-pass:{execution_receipt['executed_command_count']}"
+                )
         comparison_summary = self._build_comparison_summary(
             outcome=outcome,
             profile_id=profile["profile_id"],
             baseline_observation=baseline_observation,
             sandbox_observation=sandbox_observation,
+            execution_receipt=execution_receipt,
         )
         comparison_digest = sha256_text(
             canonical_json(
@@ -485,10 +516,11 @@ class DifferentialEvaluatorService:
                     "sandbox_observation": sandbox_observation,
                     "outcome": outcome,
                     "triggered_rules": triggered_rules,
+                    "execution_receipt": execution_receipt,
                 }
             )
         )
-        return {
+        report = {
             "eval_ref": eval_ref,
             "outcome": outcome,
             "report_ref": f"report://{eval_ref.replace('/', ':')}",
@@ -499,7 +531,12 @@ class DifferentialEvaluatorService:
             "triggered_rules": triggered_rules,
             "comparison_summary": comparison_summary,
             "comparison_digest": comparison_digest,
+            "execution_bound": execution_receipt is not None,
         }
+        if execution_receipt is not None:
+            report["execution_receipt"] = execution_receipt
+            report["execution_receipt_digest"] = execution_receipt["evidence_digest"]
+        return report
 
     @staticmethod
     def classify_rollout(*, outcomes: Sequence[str]) -> Dict[str, Any]:
@@ -605,12 +642,65 @@ class DifferentialEvaluatorService:
         profile_id: str,
         baseline_observation: Mapping[str, Any],
         sandbox_observation: Mapping[str, Any],
+        execution_receipt: Mapping[str, Any] | None,
     ) -> str:
-        return (
+        summary = (
             f"{profile_id} compared {baseline_observation.get('scheme')} baseline "
             f"{baseline_observation.get('state')} to {sandbox_observation.get('scheme')} "
             f"sandbox {sandbox_observation.get('state')} and classified the eval as {outcome}."
         )
+        if execution_receipt is None:
+            return summary
+        return (
+            f"{summary} Actual temp-workspace commands were bound via "
+            f"{execution_receipt.get('execution_profile_id')} "
+            f"({execution_receipt.get('executed_command_count')} commands, "
+            f"cleanup={execution_receipt.get('cleanup_status')})."
+        )
+
+    @staticmethod
+    def _build_execution_receipt(
+        *,
+        eval_ref: str,
+        enactment_session: Mapping[str, Any] | None,
+    ) -> Dict[str, Any] | None:
+        if enactment_session is None:
+            return None
+        command_runs = [
+            {
+                "eval_ref": str(run.get("eval_ref", "")),
+                "command": str(run.get("command", "")),
+                "exit_code": int(run.get("exit_code", 0)),
+                "status": str(run.get("status", "")),
+                "stdout_excerpt": str(run.get("stdout_excerpt", "")),
+                "stderr_excerpt": str(run.get("stderr_excerpt", "")),
+            }
+            for run in enactment_session.get("command_runs", [])
+            if run.get("eval_ref") == eval_ref
+        ]
+        if not command_runs:
+            return None
+        cleanup_status = str(enactment_session.get("cleanup_status", "not-started"))
+        all_commands_passed = all(run["status"] == "pass" for run in command_runs)
+        receipt = {
+            "kind": "diff_eval_execution_receipt",
+            "schema_version": "1.0",
+            "execution_receipt_id": new_id("diff-eval-exec"),
+            "eval_ref": eval_ref,
+            "execution_profile_id": "mirage-temp-workspace-command-binding-v1",
+            "enactment_session_id": str(enactment_session.get("enactment_session_id", "")),
+            "workspace_snapshot_ref": str(
+                enactment_session.get("workspace_snapshot_refs", {}).get("post_apply", "")
+            ),
+            "workspace_scope": "temp-workspace",
+            "cleanup_status": cleanup_status,
+            "command_runs": command_runs,
+            "executed_command_count": len(command_runs),
+            "all_commands_passed": all_commands_passed,
+            "executed_at": str(enactment_session.get("executed_at", utc_now_iso())),
+        }
+        receipt["evidence_digest"] = sha256_text(canonical_json(receipt))
+        return receipt
 
 
 @dataclass(frozen=True)

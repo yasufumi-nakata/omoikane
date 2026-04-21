@@ -62,7 +62,8 @@ ContinuityLedger 記録
 - 改修対象に応じた eval suite を選択
 - pass / fail / regression の三値
 - reference runtime の `DifferentialEvaluator` は baseline / sandbox ref を parsed observation に落とし、
-  comparison digest と triggered rule を残して判定する
+  comparison digest と triggered rule を残して判定し、actual temp-workspace command がある場合は
+  `diff_eval_execution_receipt` も report に束縛する
 - regression は即 rollback
 
 ## 段階反映
@@ -80,7 +81,8 @@ reference runtime では `builder-demo` が
 `sandbox_apply_receipt` と `staged_rollout_session` を返し、
 上記 Stage 0/1/2/3 が固定順序で machine-checkable に実行される。
 その途中の diff eval report は target-aware patch plan に対して
-baseline / sandbox observation、triggered rule、comparison digest を束縛する。
+baseline / sandbox observation、triggered rule、comparison digest、
+必要時は temp-workspace command evidence (`diff_eval_execution_receipt`) まで束縛する。
 `rollback-demo` は regression 検出時に
 `builder_rollback_session` を返し、canary rollback 後に
 pre-apply snapshot が復元されることに加え、

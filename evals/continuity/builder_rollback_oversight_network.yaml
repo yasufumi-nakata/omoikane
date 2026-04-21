@@ -10,6 +10,7 @@ checks:
     command: PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
 expect:
   rollback_status: rolled-back
+  eval_execution_evidence_bound: true
   reviewer_oversight_status: satisfied
   reviewer_quorum_required: 2
   reviewer_quorum_received: 2

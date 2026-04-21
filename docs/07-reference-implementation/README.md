@@ -283,7 +283,8 @@ JSON で可視化し、Council の `emit_build_request` handoff が
 `staged_rollout_session` schema に束縛されたまま immutable boundary を検証し、
 target subsystem に整列した patch descriptor を生成し、
 Mirage Self への sandbox apply、parsed baseline / sandbox observation と
-comparison digest を持つ `council_output_build_request_pipeline` および
+temp workspace の actual command run を束縛した `diff_eval_execution_receipt` と comparison digest を持つ
+`council_output_build_request_pipeline` および
 `builder_staged_rollout_execution` eval report、`promote` / `hold` / `rollback`
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
 `full-100pct`) の固定順序実行まで

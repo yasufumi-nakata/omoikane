@@ -1,0 +1,14 @@
+eval_id: differential_eval_execution_binding
+target: selfctor.diff_eval
+summary: >
+  DifferentialEvaluator が temp workspace 上の actual command execution を
+  diff eval report へ束縛し、cleanup 済み execution receipt を comparison digest と一緒に返すこと
+checks:
+  - name: builders source marker smoke
+    command: python3 -c "from pathlib import Path; text = Path('src/omoikane/self_construction/builders.py').read_text(encoding='utf-8'); assert 'workspace-enacted:' in text; print('builders marker ok')"
+  - name: builders test marker smoke
+    command: python3 -c "from pathlib import Path; text = Path('tests/unit/test_builders.py').read_text(encoding='utf-8'); assert 'workspace-enacted:' in text; print('tests marker ok')"
+expect:
+  eval_execution_evidence_bound: true
+  eval_execution_command_count: 2
+  eval_execution_cleanup_status: removed

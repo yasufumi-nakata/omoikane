@@ -3,6 +3,8 @@ kind: service
 namespace: selfctor.diff_eval.v0
 service: DifferentialEvaluatorService
 summary: Select and execute eval suites against sandbox and baseline variants.
+imports:
+  diff_eval_execution_receipt: ../schemas/diff_eval_execution_receipt.schema
 operations:
   select_suite:
     summary: Resolve an eval list from a build request and affected subsystem.
@@ -61,6 +63,7 @@ operations:
           - triggered_rules
           - comparison_summary
           - comparison_digest
+          - execution_bound
         properties:
           eval_ref:
             type: string
@@ -91,8 +94,16 @@ operations:
           comparison_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          execution_bound:
+            type: boolean
+          execution_receipt:
+            schema_ref: diff_eval_execution_receipt
+          execution_receipt_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
     guarantees:
       - every eval report binds parsed baseline and sandbox observations with a comparison digest
+      - temp-workspace eval command evidence is bound when actual enactment receipts are available
       - regression classification remains fail-closed for rollback-triggering evidence
   classify_rollout:
     summary: Classify whether rollout may proceed after all evals complete.

@@ -537,7 +537,16 @@ entries:
       - reference-runtime
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/self-modification.md
-    rationale: Differential evaluation contract across eval selection, A/B result reports, and rollout classification.
+    rationale: Differential evaluation contract across eval selection, A/B result reports, actual temp-workspace command evidence binding, and rollout classification.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/diff_eval_execution_receipt.schema
+    consumers:
+      - specs/interfaces/selfctor.diff_eval.v0.idl
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/self-modification.md
+      - reference-runtime
+    rationale: Required to serialize actual temp-workspace eval command evidence before DifferentialEvaluator classifies promote, hold, or rollback.
   - priority: P1
     kind: schema
     file: specs/schemas/builder_live_enactment_session.schema
@@ -1762,7 +1771,15 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - docs/07-reference-implementation/README.md
-    rationale: Protects the council-approved build_request handoff, immutable boundary validation, differential eval selection, and rollout promotion classification.
+    rationale: Protects the council-approved build_request handoff, immutable boundary validation, differential eval selection, temp-workspace execution receipt binding, and rollout promotion classification.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/differential_eval_execution_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Protects DifferentialEvaluator binding of actual temp-workspace command evidence and cleanup-complete execution receipts.
   - priority: P1
     kind: eval
     file: evals/continuity/builder_live_enactment_execution.yaml

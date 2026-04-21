@@ -1,0 +1,125 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/diff_eval_execution_receipt.schema"
+title: DifferentialEvalExecutionReceipt
+description: >
+  Actual temp-workspace eval command evidence bound into one DifferentialEvaluator
+  report before rollout classification.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - execution_receipt_id
+  - eval_ref
+  - execution_profile_id
+  - enactment_session_id
+  - workspace_snapshot_ref
+  - workspace_scope
+  - cleanup_status
+  - command_runs
+  - executed_command_count
+  - all_commands_passed
+  - evidence_digest
+  - executed_at
+properties:
+  kind:
+    const: diff_eval_execution_receipt
+  schema_version:
+    const: "1.0"
+  execution_receipt_id:
+    type: string
+    pattern: "^diff-eval-exec-[a-f0-9]{12}$"
+  eval_ref:
+    type: string
+    pattern: "^evals/"
+  execution_profile_id:
+    type: string
+    const: mirage-temp-workspace-command-binding-v1
+  enactment_session_id:
+    type: string
+    pattern: "^enactment-session-[a-f0-9]{12}$"
+  workspace_snapshot_ref:
+    type: string
+    pattern: "^mirage://"
+  workspace_scope:
+    type: string
+    const: temp-workspace
+  cleanup_status:
+    type: string
+    enum:
+      - removed
+      - retained
+      - not-started
+  command_runs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - eval_ref
+        - command
+        - exit_code
+        - status
+        - stdout_excerpt
+        - stderr_excerpt
+      properties:
+        eval_ref:
+          type: string
+          pattern: "^evals/"
+        command:
+          type: string
+          minLength: 3
+        exit_code:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+            - timeout
+        stdout_excerpt:
+          type: string
+        stderr_excerpt:
+          type: string
+  executed_command_count:
+    type: integer
+    minimum: 1
+  all_commands_passed:
+    type: boolean
+  evidence_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  executed_at:
+    type: string
+    format: date-time
+allOf:
+  - if:
+      properties:
+        all_commands_passed:
+          const: true
+    then:
+      properties:
+        cleanup_status:
+          const: removed
+examples:
+  - kind: diff_eval_execution_receipt
+    schema_version: "1.0"
+    execution_receipt_id: diff-eval-exec-0123456789ab
+    eval_ref: evals/continuity/differential_eval_execution_binding.yaml
+    execution_profile_id: mirage-temp-workspace-command-binding-v1
+    enactment_session_id: enactment-session-0123456789ab
+    workspace_snapshot_ref: mirage://build-l5-0001/snapshot/live-post-apply
+    workspace_scope: temp-workspace
+    cleanup_status: removed
+    command_runs:
+      - eval_ref: evals/continuity/differential_eval_execution_binding.yaml
+        command: python3 -c "print('builders marker ok')"
+        exit_code: 0
+        status: pass
+        stdout_excerpt: builders marker ok
+        stderr_excerpt: ""
+    executed_command_count: 1
+    all_commands_passed: true
+    evidence_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    executed_at: "2026-04-21T12:00:00Z"

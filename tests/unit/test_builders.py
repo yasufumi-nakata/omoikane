@@ -296,7 +296,10 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ["evals/continuity/council_output_build_request_pipeline.yaml"],
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
+            ],
             result["selected_evals"],
         )
 
@@ -315,7 +318,41 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
         self.assertEqual("mirage", result["sandbox_observation"]["scheme"])
         self.assertEqual("current", result["sandbox_observation"]["state"])
         self.assertIn("sandbox-state-pass:current", result["triggered_rules"])
+        self.assertFalse(result["execution_bound"])
         self.assertEqual(64, len(result["comparison_digest"]))
+
+    def test_run_ab_eval_binds_actual_execution_receipt_when_enactment_session_exists(self) -> None:
+        request = _design_backed_request(
+            target_subsystem="L5.DifferentialEvaluator",
+            request_id="build-l5-exec-0001",
+            must_pass=["evals/continuity/differential_eval_execution_binding.yaml"],
+        )
+        artifact = PatchGeneratorService().generate_patch_set(request)
+        enactment_session = LiveEnactmentService().execute(
+            build_request=request,
+            build_artifact=artifact,
+            eval_refs=["evals/continuity/differential_eval_execution_binding.yaml"],
+            repo_root=Path(__file__).resolve().parents[2],
+        )
+
+        result = DifferentialEvaluatorService().run_ab_eval(
+            eval_ref="evals/continuity/differential_eval_execution_binding.yaml",
+            baseline_ref="runtime://baseline/current",
+            sandbox_ref="mirage://build-l5-exec-0001/snapshot/current",
+            enactment_session=enactment_session,
+        )
+
+        self.assertEqual("pass", result["outcome"])
+        self.assertTrue(result["execution_bound"])
+        self.assertEqual(
+            "mirage-temp-workspace-command-binding-v1",
+            result["execution_receipt"]["execution_profile_id"],
+        )
+        self.assertEqual(2, result["execution_receipt"]["executed_command_count"])
+        self.assertTrue(result["execution_receipt"]["all_commands_passed"])
+        self.assertEqual("removed", result["execution_receipt"]["cleanup_status"])
+        self.assertEqual(64, len(result["execution_receipt_digest"]))
+        self.assertIn("execution-commands-pass:2", result["triggered_rules"])
 
     def test_run_ab_eval_marks_rollback_breach_as_regression(self) -> None:
         service = DifferentialEvaluatorService()

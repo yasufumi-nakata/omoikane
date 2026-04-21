@@ -328,6 +328,19 @@ class OmoikaneReferenceOS:
         )
         return design_manifest, design_validation, build_request
 
+    @staticmethod
+    def _diff_eval_execution_eval_ref() -> str:
+        return "evals/continuity/differential_eval_execution_binding.yaml"
+
+    @classmethod
+    def _execution_bound_eval_refs(cls, selected_evals: List[str]) -> List[str]:
+        execution_eval = cls._diff_eval_execution_eval_ref()
+        return [eval_ref for eval_ref in selected_evals if eval_ref == execution_eval]
+
+    @staticmethod
+    def _execution_bound_reports(eval_reports: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [report for report in eval_reports if report.get("execution_bound")]
+
     @contextmanager
     def _design_reader_demo_repo(
         self,
@@ -8240,6 +8253,7 @@ json.dump(response, sys.stdout)
             change_class="feature-improvement",
             must_pass=[
                 "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
                 "evals/continuity/builder_staged_rollout_execution.yaml",
             ],
             council_session_id="sess-builder-0001",
@@ -8260,14 +8274,29 @@ json.dump(response, sys.stdout)
             target_subsystem=build_request["target_subsystem"],
             requested_evals=build_request["constraints"]["must_pass"],
         )
+        execution_eval_refs = self._execution_bound_eval_refs(suite_selection["selected_evals"])
+        eval_execution_session = None
+        eval_execution_validation = {"ok": True, "errors": []}
+        if execution_eval_refs:
+            eval_execution_session = self.live_enactment.execute(
+                build_request=build_request,
+                build_artifact=build_artifact,
+                eval_refs=execution_eval_refs,
+                repo_root=self.repo_root,
+            )
+            eval_execution_validation = self.live_enactment.validate_session(eval_execution_session)
         eval_reports = [
             self.diff_evaluator.run_ab_eval(
                 eval_ref=eval_ref,
                 baseline_ref="runtime://baseline/current",
                 sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
+                enactment_session=(
+                    eval_execution_session if eval_ref in execution_eval_refs else None
+                ),
             )
             for eval_ref in suite_selection["selected_evals"]
         ]
+        execution_bound_reports = self._execution_bound_reports(eval_reports)
         rollout = self.diff_evaluator.classify_rollout(
             outcomes=[report["outcome"] for report in eval_reports]
         )
@@ -8379,6 +8408,21 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        if eval_execution_session is not None:
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="selfctor.enactment.executed",
+                payload={
+                    "policy": self.live_enactment.policy(),
+                    "session": eval_execution_session,
+                    "validation": eval_execution_validation,
+                },
+                actor="LiveEnactmentService",
+                category="self-modify",
+                layer="L5",
+                signature_roles=["self", "council", "guardian"],
+                substrate="classical-silicon",
+            )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="selfctor.diff_eval.completed",
@@ -8439,6 +8483,7 @@ json.dump(response, sys.stdout)
                 "sandbox_apply_receipt": sandbox_apply_receipt,
                 "patches": patch_descriptions,
                 "suite_selection": suite_selection,
+                "eval_execution_session": eval_execution_session,
                 "eval_reports": eval_reports,
                 "rollout": rollout,
                 "rollout_session": rollout_session,
@@ -8451,6 +8496,12 @@ json.dump(response, sys.stdout)
                     scope_validation["allowed"]
                     and build_artifact["status"] == "ready"
                     and sandbox_apply_validation["ok"]
+                    and eval_execution_validation["ok"]
+                    and (
+                        eval_execution_session is None
+                        or eval_execution_session["status"] == "passed"
+                    )
+                    and bool(execution_bound_reports)
                     and all_evals_passed
                     and rollout["decision"] == "promote"
                     and rollout_session_validation["ok"]
@@ -8470,6 +8521,20 @@ json.dump(response, sys.stdout)
                 "sandbox_apply_status": sandbox_apply_receipt["status"],
                 "sandbox_apply_patch_count": sandbox_apply_receipt["applied_patch_count"],
                 "selected_eval_count": len(suite_selection["selected_evals"]),
+                "eval_execution_ok": eval_execution_validation["ok"],
+                "eval_execution_status": (
+                    eval_execution_session["status"] if eval_execution_session is not None else "not-run"
+                ),
+                "eval_execution_command_count": (
+                    execution_bound_reports[0]["execution_receipt"]["executed_command_count"]
+                    if execution_bound_reports
+                    else 0
+                ),
+                "eval_execution_cleanup_status": (
+                    execution_bound_reports[0]["execution_receipt"]["cleanup_status"]
+                    if execution_bound_reports
+                    else "not-run"
+                ),
                 "all_evals_passed": all_evals_passed,
                 "eval_report_evidence_bound": all(
                     len(str(report.get("comparison_digest", ""))) == 64
@@ -8477,6 +8542,13 @@ json.dump(response, sys.stdout)
                     and bool(report.get("baseline_observation", {}).get("binding_digest"))
                     and bool(report.get("sandbox_observation", {}).get("binding_digest"))
                     for report in eval_reports
+                ),
+                "eval_execution_evidence_bound": bool(execution_bound_reports)
+                and all(
+                    len(str(report.get("execution_receipt_digest", ""))) == 64
+                    and report["execution_receipt"]["all_commands_passed"]
+                    and report["execution_receipt"]["cleanup_status"] == "removed"
+                    for report in execution_bound_reports
                 ),
                 "rollout_decision": rollout["decision"],
                 "rollout_session_ok": rollout_session_validation["ok"],
@@ -8719,6 +8791,7 @@ json.dump(response, sys.stdout)
             must_pass=[
                 "evals/continuity/council_output_build_request_pipeline.yaml",
                 "evals/continuity/builder_live_enactment_execution.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
                 "evals/continuity/builder_staged_rollout_execution.yaml",
                 "evals/continuity/builder_rollback_execution.yaml",
                 "evals/continuity/builder_rollback_oversight_network.yaml",
@@ -8741,13 +8814,26 @@ json.dump(response, sys.stdout)
             target_subsystem=build_request["target_subsystem"],
             requested_evals=build_request["constraints"]["must_pass"],
         )
+        execution_eval_refs = self._execution_bound_eval_refs(suite_selection["selected_evals"])
         enactment_session = self.live_enactment.execute(
             build_request=build_request,
             build_artifact=build_artifact,
-            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            eval_refs=[
+                "evals/continuity/builder_live_enactment_execution.yaml",
+            ],
             repo_root=self.repo_root,
         )
         enactment_validation = self.live_enactment.validate_session(enactment_session)
+        eval_execution_session = None
+        eval_execution_validation = {"ok": True, "errors": []}
+        if execution_eval_refs:
+            eval_execution_session = self.live_enactment.execute(
+                build_request=build_request,
+                build_artifact=build_artifact,
+                eval_refs=execution_eval_refs,
+                repo_root=self.repo_root,
+            )
+            eval_execution_validation = self.live_enactment.validate_session(eval_execution_session)
         eval_reports = [
             self.diff_evaluator.run_ab_eval(
                 eval_ref=eval_ref,
@@ -8757,9 +8843,13 @@ json.dump(response, sys.stdout)
                     if eval_ref == "evals/continuity/builder_rollback_execution.yaml"
                     else sandbox_apply_receipt["sandbox_snapshot_ref"]
                 ),
+                enactment_session=(
+                    eval_execution_session if eval_ref in execution_eval_refs else None
+                ),
             )
             for eval_ref in suite_selection["selected_evals"]
         ]
+        execution_bound_reports = self._execution_bound_reports(eval_reports)
         rollout = self.diff_evaluator.classify_rollout(
             outcomes=[report["outcome"] for report in eval_reports]
         )
@@ -9043,6 +9133,7 @@ json.dump(response, sys.stdout)
                 "artifact": build_artifact,
                 "sandbox_apply_receipt": sandbox_apply_receipt,
                 "enactment_session": enactment_session,
+                "eval_execution_session": eval_execution_session,
                 "patches": patch_descriptions,
                 "suite_selection": suite_selection,
                 "eval_reports": eval_reports,
@@ -9061,6 +9152,12 @@ json.dump(response, sys.stdout)
                     and sandbox_apply_validation["ok"]
                     and enactment_validation["ok"]
                     and enactment_session["status"] == "passed"
+                    and eval_execution_validation["ok"]
+                    and (
+                        eval_execution_session is None
+                        or eval_execution_session["status"] == "passed"
+                    )
+                    and bool(execution_bound_reports)
                     and regression_detected
                     and rollout["decision"] == "rollback"
                     and rollout_session_validation["ok"]
@@ -9076,6 +9173,10 @@ json.dump(response, sys.stdout)
                 "selected_eval_count": len(suite_selection["selected_evals"]),
                 "live_enactment_ok": enactment_validation["ok"],
                 "live_enactment_status": enactment_session["status"],
+                "eval_execution_ok": eval_execution_validation["ok"],
+                "eval_execution_status": (
+                    eval_execution_session["status"] if eval_execution_session is not None else "not-run"
+                ),
                 "regression_detected": regression_detected,
                 "eval_report_evidence_bound": all(
                     len(str(report.get("comparison_digest", ""))) == 64
@@ -9083,6 +9184,23 @@ json.dump(response, sys.stdout)
                     and bool(report.get("baseline_observation", {}).get("binding_digest"))
                     and bool(report.get("sandbox_observation", {}).get("binding_digest"))
                     for report in eval_reports
+                ),
+                "eval_execution_evidence_bound": bool(execution_bound_reports)
+                and all(
+                    len(str(report.get("execution_receipt_digest", ""))) == 64
+                    and report["execution_receipt"]["all_commands_passed"]
+                    and report["execution_receipt"]["cleanup_status"] == "removed"
+                    for report in execution_bound_reports
+                ),
+                "eval_execution_command_count": (
+                    execution_bound_reports[0]["execution_receipt"]["executed_command_count"]
+                    if execution_bound_reports
+                    else 0
+                ),
+                "eval_execution_cleanup_status": (
+                    execution_bound_reports[0]["execution_receipt"]["cleanup_status"]
+                    if execution_bound_reports
+                    else "not-run"
                 ),
                 "rollback_trigger": rollback_session["trigger"],
                 "rollout_decision": rollout["decision"],

@@ -15,6 +15,9 @@ checks:
 expect:
   rollback_status: rolled-back
   live_enactment_status: passed
+  eval_execution_evidence_bound: true
+  eval_execution_command_count: 2
+  eval_execution_cleanup_status: removed
   rollback_trigger: eval-regression
   restored_snapshot_prefix: mirage://build-l5-rollback-0001/snapshot/pre-apply
   reverted_patch_count: 2
@@ -45,6 +48,7 @@ expect:
   telemetry_gate_command_count: 2
   continuity_event_ref_count: 2
   notification_ref_count: 3
+  selected_eval_count: 6
   rollout_decision: rollback
   rollout_status: rolled-back
   self_modify_ledger_count: 9
