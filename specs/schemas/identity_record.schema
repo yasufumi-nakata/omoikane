@@ -10,6 +10,7 @@ required:
   - consent_proof
   - created_at
   - status
+  - pause_state
   - metadata
 properties:
   identity_id:
@@ -26,7 +27,7 @@ properties:
     format: date-time
   status:
     type: string
-    enum: [active, terminated]
+    enum: [active, paused, terminated]
   parent_id:
     type:
       - string
@@ -36,8 +37,61 @@ properties:
       - string
       - "null"
     format: date-time
+  pause_state:
+    type:
+      - object
+      - "null"
+    additionalProperties: false
+    required:
+      - paused_at
+      - pause_reason
+      - pause_authority
+      - council_resolution_ref
+      - resumed_at
+      - resume_self_proof_ref
+    properties:
+      paused_at:
+        type: string
+        format: date-time
+      pause_reason:
+        type: string
+        minLength: 1
+      pause_authority:
+        type: string
+        enum: [self, council]
+      council_resolution_ref:
+        type:
+          - string
+          - "null"
+        minLength: 1
+      resumed_at:
+        type:
+          - string
+          - "null"
+        format: date-time
+      resume_self_proof_ref:
+        type:
+          - string
+          - "null"
+        minLength: 1
   metadata:
     type: object
     additionalProperties:
       type: string
-
+examples:
+  - identity_id: id-0001
+    lineage_id: id-0001
+    consent_proof: consent://identity-demo/v1
+    created_at: "2026-04-21T12:00:00Z"
+    status: paused
+    parent_id: null
+    terminated_at: null
+    pause_state:
+      paused_at: "2026-04-21T12:05:00Z"
+      pause_reason: bounded continuity review
+      pause_authority: council
+      council_resolution_ref: council://identity/pause-0001
+      resumed_at: null
+      resume_self_proof_ref: null
+    metadata:
+      display_name: Identity Pause Sandbox

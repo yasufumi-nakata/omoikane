@@ -1,0 +1,26 @@
+eval_id: identity_pause_resume_contract
+target: kernel.identity
+level: L1
+description: >
+  Active identity が self または Council resolution で pause され、
+  explicit self proof でのみ resume でき、
+  最新 pause/resume cycle が identity_record.pause_state に残ること。
+fixtures:
+  - scenario: council_pause_then_self_resume
+    requested_by: council
+    expected:
+      paused_status: paused
+      resumed_status: active
+  - scenario: self_pause_then_self_resume
+    requested_by: self
+    expected:
+      council_resolution_ref: null
+      resumed_status: active
+assertions:
+  - Council pause must fail-closed unless council_resolution_ref is present
+  - Resume must fail-closed unless explicit self_proof is supplied while the identity is paused
+  - pause_state must record pause_authority, pause_reason, paused_at, and the last resume_self_proof_ref
+  - Self-initiated pause must not bind a council_resolution_ref
+metric: exact-match
+threshold: 1.0
+ethics_check: true

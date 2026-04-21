@@ -55,6 +55,14 @@ entries:
     rationale: Required to encode append-only continuity evidence.
   - priority: P1
     kind: schema
+    file: specs/schemas/identity_record.schema
+    consumers:
+      - specs/interfaces/kernel.identity.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/kernel/identity-lifecycle.md
+    rationale: Required to serialize the reference identity lifecycle record, including the bounded pause/resume cycle metadata.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ethics_event.schema
     consumers:
       - specs/schemas/ethics_decision.yaml
@@ -1811,6 +1819,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the fixed Omoikane romanization and Mirage Self naming policy across docs and runtime.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/identity_pause_resume_contract.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/kernel/identity-lifecycle.md
+      - agents/builders/eval-builder.yaml
+    rationale: Protects council-approved pause, self-only resume, and last pause-cycle audit metadata across the identity lifecycle contract.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_stability.yaml

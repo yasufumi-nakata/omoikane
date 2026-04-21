@@ -307,6 +307,71 @@ class KernelTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             registry.fork(identity.identity_id, "unsafe", ForkApprovals(True, False, False))
 
+    def test_identity_council_pause_requires_resolution_ref(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-pause-council")
+
+        with self.assertRaisesRegex(PermissionError, "council pause requires council_resolution_ref"):
+            registry.pause(
+                identity.identity_id,
+                requested_by="council",
+                reason="bounded continuity review",
+            )
+
+    def test_identity_pause_and_resume_record_last_pause_cycle(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-pause-resume")
+
+        paused = registry.pause(
+            identity.identity_id,
+            requested_by="council",
+            reason="bounded continuity review",
+            council_resolution_ref="council://identity/pause-0001",
+        )
+
+        self.assertEqual("paused", paused.status)
+        self.assertIsNotNone(paused.pause_state)
+        self.assertEqual("council", paused.pause_state.pause_authority)
+        self.assertEqual("council://identity/pause-0001", paused.pause_state.council_resolution_ref)
+        self.assertIsNone(paused.pause_state.resumed_at)
+
+        resumed = registry.resume(
+            identity.identity_id,
+            self_proof="self-proof://identity-resume-0001",
+        )
+
+        self.assertEqual("active", resumed.status)
+        self.assertIsNotNone(resumed.pause_state)
+        self.assertIsNotNone(resumed.pause_state.resumed_at)
+        self.assertEqual(
+            "self-proof://identity-resume-0001",
+            resumed.pause_state.resume_self_proof_ref,
+        )
+
+    def test_identity_self_pause_rejects_council_resolution_ref(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-self-pause")
+
+        with self.assertRaisesRegex(ValueError, "self pause must not include council_resolution_ref"):
+            registry.pause(
+                identity.identity_id,
+                requested_by="self",
+                reason="bounded reflective suspension",
+                council_resolution_ref="council://identity/invalid",
+            )
+
+    def test_identity_resume_requires_self_proof(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-resume-proof")
+        registry.pause(
+            identity.identity_id,
+            requested_by="self",
+            reason="bounded reflective suspension",
+        )
+
+        with self.assertRaisesRegex(PermissionError, "self proof is required for resume"):
+            registry.resume(identity.identity_id, self_proof="")
+
     def test_termination_gate_completes_and_releases_allocation(self) -> None:
         registry = IdentityRegistry()
         ledger = ContinuityLedger()

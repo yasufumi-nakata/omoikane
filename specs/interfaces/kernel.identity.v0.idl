@@ -49,6 +49,47 @@ operations:
                 type: boolean
     output:
       schema_ref: identity_record
+  pause:
+    summary: Pause an active identity at self request or by Council resolution.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - requested_by
+          - reason
+        properties:
+          identity_id:
+            type: string
+          requested_by:
+            type: string
+            enum:
+              - self
+              - council
+          reason:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: identity_record
+  resume:
+    summary: Resume a paused identity only with explicit self proof.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - self_proof
+        properties:
+          identity_id:
+            type: string
+          self_proof:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: identity_record
   terminate:
     summary: Terminate an identity only with self proof.
     input:
@@ -64,4 +105,9 @@ operations:
             type: string
     output:
       schema_ref: identity_record
-
+compatibility:
+  stability: bootstrap
+  notes:
+    - status is fixed to active, paused, or terminated in the reference runtime.
+    - council-initiated pause requires council_resolution_ref, while resume requires explicit self_proof.
+    - pause_state preserves the most recent pause/resume cycle as machine-readable audit metadata.

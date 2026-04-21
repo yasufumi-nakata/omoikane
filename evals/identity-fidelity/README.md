@@ -4,11 +4,16 @@
 
 ## 実装済み eval
 
+- `identity_pause_resume_contract.yaml`
 - `self_model_stability.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
 軽微な trait drift が abrupt takeover 判定に誤爆しないことを保護する。
+
+`identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
+self pause roundtrip と対応し、最新 pause cycle の audit metadata が
+`identity_record.pause_state` に残ることを保護する。
 
 ## 評価項目（暫定）
 

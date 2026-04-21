@@ -7,7 +7,7 @@ OS の心臓部。**自我の連続性・唯一性・終了権** を物理的に
 
 | モジュール | 責務 | 依存 |
 |---|---|---|
-| `IdentityRegistry` | 自我 ID 発行・回収・複製承認 | L0 attest |
+| `IdentityRegistry` | 自我 ID 発行・pause/resume・回収・複製承認 | L0 attest |
 | `ContinuityLedger` | append-only な連続性ログ | L0 storage |
 | `AscensionScheduler` | アップロード・退避・復元の時間管理 | L2, L0 |
 | `EthicsEnforcer` | [docs/00-philosophy/ethics.md](../../00-philosophy/ethics.md) の規約強制 | Council 通知 |
@@ -18,6 +18,8 @@ OS の心臓部。**自我の連続性・唯一性・終了権** を物理的に
 
 ```
 identity.create(human_consent_proof) → IdentityId
+identity.pause(id, requested_by, reason) → IdentityRecord
+identity.resume(id, self_proof) → IdentityRecord
 identity.fork(id, justification) → IdentityId            # 倫理審査必須
 termination.request(id, by_self_proof) → TerminationOutcome # 最優先
 ledger.append(entry: ContinuityLogEntry) → LedgerCursor

@@ -696,6 +696,27 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, len(result["ledger_snapshot"]))
         self.assertEqual("self-modify", result["ledger_snapshot"][-1]["category"])
 
+    def test_identity_demo_reports_pause_resume_contract(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_identity_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["council_pause_requires_resolution"])
+        self.assertTrue(result["validation"]["council_pause_records_pause_state"])
+        self.assertTrue(result["validation"]["resume_requires_self_proof"])
+        self.assertTrue(result["validation"]["council_pause_resume_roundtrip"])
+        self.assertTrue(result["validation"]["self_pause_allows_no_council_ref"])
+        self.assertTrue(result["validation"]["self_pause_resume_roundtrip"])
+        self.assertEqual("paused", result["transitions"]["council_pause"]["status"])
+        self.assertEqual(
+            "council",
+            result["transitions"]["council_pause"]["pause_state"]["pause_authority"],
+        )
+        self.assertEqual("active", result["transitions"]["self_resume"]["status"])
+        self.assertIsNone(result["transitions"]["self_pause"]["pause_state"]["council_resolution_ref"])
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["identity-lifecycle"])
+
     def test_scheduler_demo_reports_timeout_rollback_and_completion(self) -> None:
         runtime = OmoikaneReferenceOS()
 

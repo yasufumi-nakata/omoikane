@@ -22,6 +22,7 @@ PYTHONPATH=src python3 -m omoikane.cli amendment-demo --json
 PYTHONPATH=src python3 -m omoikane.cli version-demo --json
 PYTHONPATH=src python3 -m omoikane.cli naming-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
+PYTHONPATH=src python3 -m omoikane.cli identity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-council-demo --json
@@ -76,6 +77,12 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+
+`identity-demo` は L1 IdentityRegistry の reference contract
+(`kernel.identity.v0`) を JSON で可視化し、
+Council resolution 付き pause、self proof のみ許可する resume、
+self-initiated pause では `council_resolution_ref` を持たないこと、
+最新 pause/resume cycle を `pause_state` と `identity-lifecycle` ledger event に残すことを確認する。
 
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、

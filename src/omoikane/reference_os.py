@@ -9180,6 +9180,182 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_identity_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://identity-demo/v1",
+            metadata={"display_name": "Identity Pause Sandbox"},
+        )
+        created = asdict(identity)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.created",
+            payload={"display_name": "Identity Pause Sandbox", "lineage_id": identity.lineage_id},
+            actor="IdentityRegistry",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        try:
+            self.identity.pause(
+                identity.identity_id,
+                requested_by="council",
+                reason="bounded continuity review window",
+            )
+        except PermissionError as exc:
+            blocked_council_pause = {"status": "blocked", "reason": str(exc)}
+        else:
+            blocked_council_pause = {"status": "unexpected-pass", "reason": ""}
+
+        council_paused_record = self.identity.pause(
+            identity.identity_id,
+            requested_by="council",
+            reason="bounded continuity review window",
+            council_resolution_ref="council://identity-lifecycle/pause-0001",
+        )
+        council_pause = asdict(council_paused_record)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.paused",
+            payload={
+                "status": council_paused_record.status,
+                "pause_state": council_pause["pause_state"],
+            },
+            actor="IdentityRegistry",
+            category="identity-lifecycle",
+            layer="L1",
+            signature_roles=["council"],
+            substrate="classical-silicon",
+        )
+
+        try:
+            self.identity.resume(identity.identity_id, self_proof="")
+        except PermissionError as exc:
+            blocked_resume = {"status": "blocked", "reason": str(exc)}
+        else:
+            blocked_resume = {"status": "unexpected-pass", "reason": ""}
+
+        council_resumed_record = self.identity.resume(
+            identity.identity_id,
+            self_proof="self-proof://identity-demo-resume-council/v1",
+        )
+        council_resume = asdict(council_resumed_record)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.resumed",
+            payload={
+                "status": council_resumed_record.status,
+                "pause_state": council_resume["pause_state"],
+            },
+            actor="IdentityRegistry",
+            category="identity-lifecycle",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        self_paused_record = self.identity.pause(
+            identity.identity_id,
+            requested_by="self",
+            reason="bounded reflective suspension",
+        )
+        self_pause = asdict(self_paused_record)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.paused",
+            payload={
+                "status": self_paused_record.status,
+                "pause_state": self_pause["pause_state"],
+            },
+            actor="IdentityRegistry",
+            category="identity-lifecycle",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        self_resumed_record = self.identity.resume(
+            identity.identity_id,
+            self_proof="self-proof://identity-demo-resume-self/v1",
+        )
+        self_resume = asdict(self_resumed_record)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.resumed",
+            payload={
+                "status": self_resumed_record.status,
+                "pause_state": self_resume["pause_state"],
+            },
+            actor="IdentityRegistry",
+            category="identity-lifecycle",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        validation = {
+            "council_pause_requires_resolution": (
+                blocked_council_pause["status"] == "blocked"
+                and blocked_council_pause["reason"] == "council pause requires council_resolution_ref"
+            ),
+            "council_pause_records_pause_state": (
+                council_pause["status"] == "paused"
+                and council_pause["pause_state"] is not None
+                and council_pause["pause_state"]["pause_authority"] == "council"
+                and council_pause["pause_state"]["council_resolution_ref"]
+                == "council://identity-lifecycle/pause-0001"
+            ),
+            "resume_requires_self_proof": (
+                blocked_resume["status"] == "blocked"
+                and blocked_resume["reason"] == "self proof is required for resume"
+            ),
+            "council_pause_resume_roundtrip": (
+                council_resume["status"] == "active"
+                and council_resume["pause_state"] is not None
+                and council_resume["pause_state"]["resumed_at"] is not None
+                and council_resume["pause_state"]["resume_self_proof_ref"]
+                == "self-proof://identity-demo-resume-council/v1"
+            ),
+            "self_pause_allows_no_council_ref": (
+                self_pause["status"] == "paused"
+                and self_pause["pause_state"] is not None
+                and self_pause["pause_state"]["pause_authority"] == "self"
+                and self_pause["pause_state"]["council_resolution_ref"] is None
+            ),
+            "self_pause_resume_roundtrip": (
+                self_resume["status"] == "active"
+                and self_resume["pause_state"] is not None
+                and self_resume["pause_state"]["resume_self_proof_ref"]
+                == "self-proof://identity-demo-resume-self/v1"
+            ),
+        }
+
+        return {
+            "policy": {
+                "statuses": ["active", "paused", "terminated"],
+                "pause_authorities": ["self", "council"],
+                "resume_authority": "self",
+                "council_pause_requires_resolution_ref": True,
+            },
+            "transitions": {
+                "created": created,
+                "council_pause": council_pause,
+                "council_resume": council_resume,
+                "self_pause": self_pause,
+                "self_resume": self_resume,
+            },
+            "blocked": {
+                "council_pause_without_resolution": blocked_council_pause,
+                "resume_without_self_proof": blocked_resume,
+            },
+            "validation": validation,
+            "identity_snapshot": self.identity.snapshot(),
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_continuity_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://continuity-demo/v1",

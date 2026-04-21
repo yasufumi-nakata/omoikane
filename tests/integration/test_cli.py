@@ -655,6 +655,27 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
         self.assertEqual(3, len(result["ledger_snapshot"]))
 
+    def test_identity_demo_emits_pause_resume_contract_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "identity-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["council_pause_requires_resolution"])
+        self.assertTrue(result["validation"]["council_pause_records_pause_state"])
+        self.assertTrue(result["validation"]["resume_requires_self_proof"])
+        self.assertTrue(result["validation"]["council_pause_resume_roundtrip"])
+        self.assertTrue(result["validation"]["self_pause_allows_no_council_ref"])
+        self.assertTrue(result["validation"]["self_pause_resume_roundtrip"])
+        self.assertEqual("paused", result["transitions"]["council_pause"]["status"])
+        self.assertEqual(
+            "council",
+            result["transitions"]["council_pause"]["pause_state"]["pause_authority"],
+        )
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["identity-lifecycle"])
+
     def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:
         stdout = io.StringIO()
 

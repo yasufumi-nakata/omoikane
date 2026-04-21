@@ -45,6 +45,14 @@
 | Active → Terminated | 本人のみ（Council は実行補助） |
 | Active → Failed | システム障害検知時、Guardian 判断 |
 
+## Reference runtime contract
+
+- `IdentityRegistry` の `status` は `active / paused / terminated` に固定する
+- `pause(requested_by=self)` は non-empty `reason` のみを要求し、`council_resolution_ref` を持たない
+- `pause(requested_by=council)` は fail-closed で `council_resolution_ref` を必須にする
+- `resume` は `self_proof` を必須にし、直前の `pause_state` に `resumed_at` と `resume_self_proof_ref` を残す
+- `identity_record.pause_state` は最新 1 回分の pause/resume cycle を machine-readable に保持する
+
 ## 自己同一性確認テスト（Identity Confirmation）
 
 Ascending → Active への遷移時に必ず実施：
