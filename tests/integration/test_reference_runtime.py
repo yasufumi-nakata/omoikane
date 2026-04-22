@@ -1552,6 +1552,28 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["workspace_discovery"]["coverage_summary"]["non_source_supported_coverage_areas"],
         )
 
+    def test_yaoyorozu_demo_supports_memory_edit_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
+
+        self.assertEqual("memory-edit-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertIn(
+            "memory-edit-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "memory-archivist",
+                "design-auditor",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
         runtime = OmoikaneReferenceOS()
 

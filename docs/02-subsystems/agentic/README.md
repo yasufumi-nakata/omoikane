@@ -23,7 +23,7 @@
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を `review_budget=3` で走査し、
   `yaoyorozu_workspace_discovery` として cross-workspace builder coverage を machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
-  Council convocation / builder handoff plan を materialize し、
+  `self-modify-patch-v1` / `memory-edit-v1` の Council convocation / builder handoff plan を materialize し、
   selected builder handoff を repo-local subprocess worker dispatch receipt まで実行しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
   `yaoyorozu_consensus_dispatch_binding` として束縛する。

@@ -43,7 +43,10 @@ properties:
     type: string
     minLength: 1
   proposal_profile:
-    const: self-modify-patch-v1
+    type: string
+    enum:
+      - self-modify-patch-v1
+      - memory-edit-v1
   summary:
     type: string
     minLength: 1

@@ -70,7 +70,9 @@ operations:
         properties:
           proposal_profile:
             type: string
-            const: self-modify-patch-v1
+            enum:
+              - self-modify-patch-v1
+              - memory-edit-v1
           session_mode:
             type: string
             enum:
@@ -86,7 +88,7 @@ operations:
       - builder handoff must cover runtime, schema, eval, and docs surfaces
   prepare_worker_dispatch:
     summary: >
-      Convert one selected self-modify convocation into a repo-local worker dispatch plan
+      Convert one selected bounded Yaoyorozu convocation into a repo-local worker dispatch plan
       that launches bounded builder processes for runtime, schema, eval, and docs coverage.
     input:
       inline_schema:
@@ -230,7 +232,7 @@ operations:
 compatibility:
   stability: bootstrap
   notes:
-    - The reference runtime currently fixes proposal_profile to self-modify-patch-v1.
+    - The reference runtime supports the bounded `self-modify-patch-v1` and `memory-edit-v1` proposal profiles.
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with explicit review_budget and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling by grouping eval and docs as one evidence-sync root.

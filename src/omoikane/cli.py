@@ -325,6 +325,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "yaoyorozu-demo",
         help="Run the repo-local Yaoyorozu registry sync and council convocation scenario",
     )
+    yaoyorozu_parser.add_argument(
+        "--proposal-profile",
+        default="self-modify-patch-v1",
+        choices=("self-modify-patch-v1", "memory-edit-v1"),
+        help="Select the bounded Yaoyorozu proposal profile to materialize",
+    )
     yaoyorozu_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
     oversight_parser = subparsers.add_parser(
@@ -581,7 +587,10 @@ def main() -> None:
         return
 
     if args.command == "yaoyorozu-demo":
-        _print_result(runtime.run_yaoyorozu_demo(), args.json)
+        _print_result(
+            runtime.run_yaoyorozu_demo(proposal_profile=args.proposal_profile),
+            args.json,
+        )
         return
 
     if args.command == "oversight-demo":

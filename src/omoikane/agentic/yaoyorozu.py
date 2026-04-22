@@ -29,6 +29,10 @@ YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
 YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
+YAOYOROZU_PROPOSAL_PROFILES = (
+    "self-modify-patch-v1",
+    "memory-edit-v1",
+)
 YAOYOROZU_WORKER_TARGET_PATHS = {
     "runtime": ["src/omoikane/", "tests/unit/", "tests/integration/"],
     "schema": ["specs/interfaces/", "specs/schemas/"],
@@ -432,7 +436,50 @@ class YaoyorozuRegistryPolicy:
                         "candidate_agents": ["doc-sync-builder"],
                     },
                 ],
-            }
+            },
+            "memory-edit-v1": {
+                "summary": "Prepare a bounded Council review and reversible memory-edit handoff for one recall-affect-buffer session.",
+                "council_roles": [
+                    {
+                        "role_id": "memory-archivist",
+                        "role_label": "MemoryArchivist",
+                        "candidate_agents": ["memory-archivist"],
+                    },
+                    {
+                        "role_id": "design-auditor",
+                        "role_label": "DesignAuditor",
+                        "candidate_agents": ["design-architect"],
+                    },
+                    {
+                        "role_id": "conservatism-advocate",
+                        "role_label": "ConservatismAdvocate",
+                        "candidate_agents": ["conservatism-advocate"],
+                    },
+                    {
+                        "role_id": "ethics-committee",
+                        "role_label": "EthicsCommittee",
+                        "candidate_agents": ["ethics-committee"],
+                    },
+                ],
+                "builder_handoff": [
+                    {
+                        "coverage_area": "runtime",
+                        "candidate_agents": ["codex-builder"],
+                    },
+                    {
+                        "coverage_area": "schema",
+                        "candidate_agents": ["schema-builder"],
+                    },
+                    {
+                        "coverage_area": "eval",
+                        "candidate_agents": ["eval-builder"],
+                    },
+                    {
+                        "coverage_area": "docs",
+                        "candidate_agents": ["doc-sync-builder"],
+                    },
+                ],
+            },
         }
     )
 
@@ -546,7 +593,11 @@ class YaoyorozuRegistryService:
                 "capability_index": capability_index,
                 "supported_coverage_areas": supported_coverage_areas,
                 "missing_coverage_areas": missing_coverage_areas,
-                "proposal_profiles": ["self-modify-patch-v1"] if builder_agent_ids else [],
+                "proposal_profiles": (
+                    list(self._policy.council_profiles)
+                    if builder_agent_ids
+                    else []
+                ),
                 "validation": {
                     "has_agents_root": True,
                     "builder_roles_present": bool(builder_agent_ids),

@@ -3461,7 +3461,11 @@ json.dump(response, sys.stdout)
             },
         }
 
-    def run_yaoyorozu_demo(self) -> Dict[str, Any]:
+    def run_yaoyorozu_demo(
+        self,
+        *,
+        proposal_profile: str = "self-modify-patch-v1",
+    ) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://yaoyorozu-demo/v1",
             metadata={"display_name": "Yaoyorozu Demo Identity"},
@@ -3513,7 +3517,7 @@ json.dump(response, sys.stdout)
         )
         registry_snapshot = self.yaoyorozu.sync_from_agents_directory(self.repo_root / "agents")
         convocation = self.yaoyorozu.prepare_council_convocation(
-            proposal_profile="self-modify-patch-v1",
+            proposal_profile=proposal_profile,
             session_mode="standard",
             target_identity_ref=identity.identity_id,
         )

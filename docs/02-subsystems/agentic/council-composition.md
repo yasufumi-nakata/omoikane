@@ -61,7 +61,9 @@ reference runtime では `agentic.trust.v0` を参照し、
 さらに `agentic.yaoyorozu.v0` と `yaoyorozu-demo` は
 repo-local `agents/` の定義を trust snapshot に束縛し、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role と
-`Self-Modify Patch` 用の council panel / builder handoff coverage を
+`self-modify-patch-v1` の council panel / builder handoff coverage に加えて、
+`memory-edit-v1` では `MemoryArchivist` / `DesignAuditor` /
+`ConservatismAdvocate` / `EthicsCommittee` を使う reversible memory-edit review panel を
 deterministic に召集できることを確認する。
 
 ## 多 Council 化

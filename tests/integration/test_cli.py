@@ -1408,6 +1408,38 @@ class CliIntegrationTests(unittest.TestCase):
             ),
         )
 
+    def test_yaoyorozu_demo_supports_memory_edit_profile(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "yaoyorozu-demo",
+                "--proposal-profile",
+                "memory-edit-v1",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("memory-edit-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertIn(
+            "memory-edit-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "memory-archivist",
+                "design-auditor",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+
     def test_oversight_demo_emits_breach_propagation(self) -> None:
         stdout = io.StringIO()
 

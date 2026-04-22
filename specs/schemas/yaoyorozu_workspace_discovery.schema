@@ -301,7 +301,10 @@ properties:
           minItems: 1
           uniqueItems: true
           items:
-            const: self-modify-patch-v1
+            type: string
+            enum:
+              - self-modify-patch-v1
+              - memory-edit-v1
         validation:
           type: object
           additionalProperties: false
@@ -429,6 +432,7 @@ examples:
         missing_coverage_areas: []
         proposal_profiles:
           - self-modify-patch-v1
+          - memory-edit-v1
         validation:
           has_agents_root: true
           builder_roles_present: true

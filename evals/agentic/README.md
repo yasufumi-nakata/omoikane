@@ -74,6 +74,11 @@ coverage-complete な worker dispatch が
 `runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle に畳まれ、
 同じ ConsensusBus session と guardian gate digest に束縛されること。
 
+### Yaoyorozu Memory Edit Profile
+`memory-edit-v1` の reversible memory-edit convocation が
+`MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
+panel と 4 coverage の worker dispatch を維持すること。
+
 ## 実装済み eval
 
 - `amendment_constitutional_freeze.yaml`
@@ -101,5 +106,6 @@ coverage-complete な worker dispatch が
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
+- `yaoyorozu_memory_edit_profile.yaml`
 - `yaoyorozu_task_graph_binding.yaml`
 - `yaoyorozu_workspace_discovery.yaml`
