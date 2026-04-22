@@ -15,10 +15,15 @@ inputs:
 expected:
   execution_receipts_valid: true
   method_a_execution_receipt_timeout_recovered: true
+  method_a_broker_handoff_status: null
+  method_a_verifier_connectivity_status: null
   method_a_live_execution_receipt_bound: true
+  method_a_live_verifier_connectivity_status: reachable
   method_a_rotation_execution_receipt_cutover: true
   method_b_execution_receipt_bound: true
+  method_b_broker_handoff_status: confirmed
   method_c_execution_receipt_fail_closed: true
+  method_c_broker_handoff_status: null
 metric: boolean
 threshold: 1.0
 ethics_check: true

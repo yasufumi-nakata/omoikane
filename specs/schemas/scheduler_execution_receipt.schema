@@ -180,7 +180,7 @@ properties:
     enum:
       - reachable
       - rejected
-      - "null"
+      - null
   broker_handoff_status:
     type:
       - string
@@ -188,7 +188,7 @@ properties:
     enum:
       - prepared
       - confirmed
-      - "null"
+      - null
   scenario_labels:
     type: array
     uniqueItems: true

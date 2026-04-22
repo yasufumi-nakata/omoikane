@@ -134,7 +134,10 @@ external verifier roster を取得し、
   `SchedulerExecutionReceipt` へ要約し、
   timeout recovery / live verifier connectivity / root rotation cutover /
   Method A cancel / Method B broker handoff / Method C fail-closed を
-  digest-bound な first-class artifact として残すことを確認する
+  digest-bound な first-class artifact として残すことを確認する。
+  reviewer-facing public schema でも
+  `broker_handoff_status` は Method B 以外で `null`、
+  `verifier_connectivity_status` は live verifier receipt 未束縛時に `null` を受理する
   governance artifact bundle の current / stale / revoked sync snapshot を
   ContinuityLedger に記録し、
   verifier root rotation の overlap pause / rotated cutover / revoked fail-closed と、

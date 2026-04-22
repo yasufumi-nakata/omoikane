@@ -303,7 +303,7 @@ operations:
       schema_ref: scheduler_execution_receipt
     guarantees:
       - receipt must summarize the fixed method blueprint, visited stages, and continuity refs from exactly one handle
-      - execution_profile_id must be fixed by method and broker_handoff_status must remain null outside Method B
+      - execution_profile_id must be fixed by method, broker_handoff_status must remain null outside Method B, and verifier_connectivity_status must remain null unless a live verifier receipt was bound
       - cancelled handles must expose final_status=cancelled, cancel_count, and scenario_labels including cancelled
       - receipt_digest must match the digest-less canonical payload
   observe:
