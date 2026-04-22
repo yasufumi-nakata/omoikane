@@ -34,6 +34,7 @@ PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --json
+PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile fork-request-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-network-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
@@ -284,6 +285,8 @@ repo-local `agents/` から materialize した trust-bound registry snapshot、
 `self-modify-patch-v1` の `DesignAuditor` / `ChangeAdvocate` /
 `ConservatismAdvocate` / `EthicsCommittee` panel と、
 `memory-edit-v1` の `MemoryArchivist` / `DesignAuditor` /
+`ConservatismAdvocate` / `EthicsCommittee` panel、
+`fork-request-v1` の `IdentityProtector` / `LegalScholar` /
 `ConservatismAdvocate` / `EthicsCommittee` panel を
 同じ bounded profile catalog から選べること、
 runtime / schema / eval / docs を覆う builder handoff coverage、
@@ -292,6 +295,8 @@ runtime / schema / eval / docs を覆う builder handoff coverage、
 同一 convocation session に束縛されることを確認する。
 CLI は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch chain へ切り替えられる。
+同じ CLI は `--proposal-profile fork-request-v1` により
+identity fork の triple-approval review 向け convocation / dispatch chain へ切り替えられる。
 さらに同じ session 上で `ConsensusBus` が builder report / guardian gate /
 final resolve を監査し、blocked direct handoff と worker claim chain を
 `yaoyorozu_consensus_dispatch_binding` として束縛することを確認する。

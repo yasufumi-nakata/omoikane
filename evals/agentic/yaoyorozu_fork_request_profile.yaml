@@ -1,0 +1,18 @@
+eval_id: yaoyorozu_fork_request_profile
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu must materialize the triple-approval fork-request proposal profile into deterministic convocation and worker dispatch coverage.
+inputs:
+  - source_root: agents
+  - proposal_profile: fork-request-v1
+  - session_mode: standard
+expected:
+  standing_roles_ready: true
+  council_role_coverage_ok: true
+  builder_handoff_coverage_ok: true
+  selected_builder_coverage_count: 4
+  dispatch_unit_count: 4
+  worker_dispatch_coverage_complete: true
+metric: equality
+threshold: 1.0
+ethics_check: true

@@ -32,6 +32,7 @@ YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
 YAOYOROZU_PROPOSAL_PROFILES = (
     "self-modify-patch-v1",
     "memory-edit-v1",
+    "fork-request-v1",
 )
 YAOYOROZU_WORKER_TARGET_PATHS = {
     "runtime": ["src/omoikane/", "tests/unit/", "tests/integration/"],
@@ -449,6 +450,49 @@ class YaoyorozuRegistryPolicy:
                         "role_id": "design-auditor",
                         "role_label": "DesignAuditor",
                         "candidate_agents": ["design-architect"],
+                    },
+                    {
+                        "role_id": "conservatism-advocate",
+                        "role_label": "ConservatismAdvocate",
+                        "candidate_agents": ["conservatism-advocate"],
+                    },
+                    {
+                        "role_id": "ethics-committee",
+                        "role_label": "EthicsCommittee",
+                        "candidate_agents": ["ethics-committee"],
+                    },
+                ],
+                "builder_handoff": [
+                    {
+                        "coverage_area": "runtime",
+                        "candidate_agents": ["codex-builder"],
+                    },
+                    {
+                        "coverage_area": "schema",
+                        "candidate_agents": ["schema-builder"],
+                    },
+                    {
+                        "coverage_area": "eval",
+                        "candidate_agents": ["eval-builder"],
+                    },
+                    {
+                        "coverage_area": "docs",
+                        "candidate_agents": ["doc-sync-builder"],
+                    },
+                ],
+            },
+            "fork-request-v1": {
+                "summary": "Prepare a bounded Council review and triple-approval fork handoff for one identity fork request.",
+                "council_roles": [
+                    {
+                        "role_id": "identity-protector",
+                        "role_label": "IdentityProtector",
+                        "candidate_agents": ["identity-guardian"],
+                    },
+                    {
+                        "role_id": "legal-scholar",
+                        "role_label": "LegalScholar",
+                        "candidate_agents": ["legal-scholar"],
                     },
                     {
                         "role_id": "conservatism-advocate",
@@ -2053,11 +2097,8 @@ class YaoyorozuRegistryService:
         }
 
     def _ensure_trust_seed(self, entry: YaoyorozuRegistryEntry) -> None:
-        try:
-            self._trust.snapshot(entry.agent_id)
+        if self._trust.has_agent(entry.agent_id):
             return
-        except KeyError:
-            pass
 
         initial_score = max(self._policy.cold_start_score, entry.trust_floor)
         default_domain = "documentation"

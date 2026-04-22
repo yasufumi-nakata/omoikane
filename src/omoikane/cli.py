@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from .agentic.yaoyorozu import YAOYOROZU_PROPOSAL_PROFILES
 from .reference_os import OmoikaneReferenceOS
 
 
@@ -328,7 +329,7 @@ def _build_parser() -> argparse.ArgumentParser:
     yaoyorozu_parser.add_argument(
         "--proposal-profile",
         default="self-modify-patch-v1",
-        choices=("self-modify-patch-v1", "memory-edit-v1"),
+        choices=YAOYOROZU_PROPOSAL_PROFILES,
         help="Select the bounded Yaoyorozu proposal profile to materialize",
     )
     yaoyorozu_parser.add_argument("--json", action="store_true", help="Emit JSON only")

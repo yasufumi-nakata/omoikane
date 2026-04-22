@@ -73,6 +73,7 @@ operations:
             enum:
               - self-modify-patch-v1
               - memory-edit-v1
+              - fork-request-v1
           session_mode:
             type: string
             enum:
@@ -232,7 +233,7 @@ operations:
 compatibility:
   stability: bootstrap
   notes:
-    - The reference runtime supports the bounded `self-modify-patch-v1` and `memory-edit-v1` proposal profiles.
+    - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, and `fork-request-v1` proposal profiles.
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with explicit review_budget and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling by grouping eval and docs as one evidence-sync root.

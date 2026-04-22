@@ -79,6 +79,11 @@ coverage-complete な worker dispatch が
 `MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
 panel と 4 coverage の worker dispatch を維持すること。
 
+### Yaoyorozu Fork Request Profile
+`fork-request-v1` の identity fork convocation が
+`IdentityProtector` / `LegalScholar` / `ConservatismAdvocate` / `EthicsCommittee`
+panel と 4 coverage の worker dispatch を維持すること。
+
 ## 実装済み eval
 
 - `amendment_constitutional_freeze.yaml`
@@ -105,6 +110,7 @@ panel と 4 coverage の worker dispatch を維持すること。
 - `trust_score_update_guard.yaml`
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_council_convocation.yaml`
+- `yaoyorozu_fork_request_profile.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
 - `yaoyorozu_memory_edit_profile.yaml`
 - `yaoyorozu_task_graph_binding.yaml`

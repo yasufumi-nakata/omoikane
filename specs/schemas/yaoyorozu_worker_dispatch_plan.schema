@@ -50,6 +50,7 @@ properties:
     enum:
       - self-modify-patch-v1
       - memory-edit-v1
+      - fork-request-v1
   session_mode:
     type: string
     enum:

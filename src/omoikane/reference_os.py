@@ -3487,6 +3487,11 @@ json.dump(response, sys.stdout)
                 "per_domain": {"council_deliberation": 0.74, "self_modify": 0.7},
             },
             {
+                "agent_id": "legal-scholar",
+                "initial_score": 0.71,
+                "per_domain": {"council_deliberation": 0.76, "fork_governance": 0.81},
+            },
+            {
                 "agent_id": "schema-builder",
                 "initial_score": 0.84,
                 "per_domain": {"self_modify": 0.86, "schema_sync": 0.92},

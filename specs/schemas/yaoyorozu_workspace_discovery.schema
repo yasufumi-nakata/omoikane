@@ -305,6 +305,7 @@ properties:
             enum:
               - self-modify-patch-v1
               - memory-edit-v1
+              - fork-request-v1
         validation:
           type: object
           additionalProperties: false
@@ -433,6 +434,7 @@ examples:
         proposal_profiles:
           - self-modify-patch-v1
           - memory-edit-v1
+          - fork-request-v1
         validation:
           has_agents_root: true
           builder_roles_present: true

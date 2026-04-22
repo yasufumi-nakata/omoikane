@@ -1440,6 +1440,46 @@ class CliIntegrationTests(unittest.TestCase):
             [selection["role_id"] for selection in result["convocation"]["council_panel"]],
         )
 
+    def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "yaoyorozu-demo",
+                "--proposal-profile",
+                "fork-request-v1",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("fork-request-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertIn(
+            "fork-request-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "identity-protector",
+                "legal-scholar",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertEqual(
+            "identity-guardian",
+            result["convocation"]["council_panel"][0]["selected_agent_id"],
+        )
+        self.assertEqual(
+            "legal-scholar",
+            result["convocation"]["council_panel"][1]["selected_agent_id"],
+        )
+
     def test_oversight_demo_emits_breach_propagation(self) -> None:
         stdout = io.StringIO()
 

@@ -47,6 +47,7 @@ properties:
     enum:
       - self-modify-patch-v1
       - memory-edit-v1
+      - fork-request-v1
   summary:
     type: string
     minLength: 1

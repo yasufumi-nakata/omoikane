@@ -1574,6 +1574,36 @@ class ReferenceRuntimeTests(unittest.TestCase):
             [selection["role_id"] for selection in result["convocation"]["council_panel"]],
         )
 
+    def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo(proposal_profile="fork-request-v1")
+
+        self.assertEqual("fork-request-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertIn(
+            "fork-request-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "identity-protector",
+                "legal-scholar",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertEqual(
+            "identity-guardian",
+            result["convocation"]["council_panel"][0]["selected_agent_id"],
+        )
+        self.assertEqual(
+            "legal-scholar",
+            result["convocation"]["council_panel"][1]["selected_agent_id"],
+        )
+
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
         runtime = OmoikaneReferenceOS()
 

@@ -54,6 +54,8 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 selected builder 群が repo-local worker dispatch receipt として実行される。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
+さらに `--proposal-profile fork-request-v1` により
+identity fork の triple-approval review 向け convocation / dispatch へ切り替えられる。
 そのうえで同じ Council session 上の `ConsensusBus` transcript が
 blocked direct builder handoff と guardian-gated resolve を伴う
 `yaoyorozu_consensus_dispatch_binding` として束縛される。

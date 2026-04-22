@@ -172,6 +172,10 @@ class TrustService:
     def snapshot(self, agent_id: str) -> Dict[str, Any]:
         return self._state(agent_id).to_dict(self._thresholds)
 
+    def has_agent(self, agent_id: str) -> bool:
+        agent_key = self._normalize_non_empty(agent_id, "agent_id")
+        return agent_key in self._states
+
     def all_snapshots(self) -> List[Dict[str, Any]]:
         return [self._states[agent_id].to_dict(self._thresholds) for agent_id in sorted(self._states)]
 

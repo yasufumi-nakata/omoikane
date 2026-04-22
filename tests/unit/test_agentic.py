@@ -2294,7 +2294,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             discovery["coverage_summary"]["non_source_supported_coverage_areas"],
         )
         self.assertEqual(
-            ["self-modify-patch-v1", "memory-edit-v1"],
+            ["self-modify-patch-v1", "memory-edit-v1", "fork-request-v1"],
             discovery["workspaces"][0]["proposal_profiles"],
         )
 
@@ -2387,6 +2387,63 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(
             "memory-archivist",
             session["council_panel"][0]["selected_agent_id"],
+        )
+
+    def test_prepare_fork_request_convocation_selects_identity_and_legal_roles(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        seeds = [
+            ("design-architect", 0.72, {"council_deliberation": 0.8, "self_modify": 0.76}),
+            ("memory-archivist", 0.66, {"council_deliberation": 0.7}),
+            ("change-advocate", 0.68, {"council_deliberation": 0.72, "self_modify": 0.71}),
+            ("conservatism-advocate", 0.69, {"council_deliberation": 0.74, "self_modify": 0.7}),
+            ("ethics-committee", 0.82, {"council_deliberation": 0.88, "self_modify": 0.82}),
+            ("legal-scholar", 0.71, {"council_deliberation": 0.76, "fork_governance": 0.81}),
+            ("identity-guardian", 0.99, {"council_deliberation": 0.99, "identity_governance": 0.99}),
+            ("integrity-guardian", 0.99, {"council_deliberation": 0.99, "self_modify": 0.99}),
+            ("codex-builder", 0.9, {"self_modify": 0.96}),
+            ("schema-builder", 0.84, {"self_modify": 0.86}),
+            ("eval-builder", 0.85, {"self_modify": 0.87}),
+            ("doc-sync-builder", 0.83, {"self_modify": 0.85}),
+        ]
+        for agent_id, initial_score, per_domain in seeds:
+            kwargs = {
+                "agent_id": agent_id,
+                "initial_score": initial_score,
+                "per_domain": per_domain,
+            }
+            if agent_id == "integrity-guardian":
+                kwargs["pinned_by_human"] = True
+                kwargs["pinned_reason"] = "guardian bootstrap"
+            trust.register_agent(**kwargs)
+        service = YaoyorozuRegistryService(trust_service=trust)
+        service.sync_from_agents_directory(repo_root / "agents")
+
+        session = service.prepare_council_convocation(
+            proposal_profile="fork-request-v1",
+            target_identity_ref="identity://unit-test",
+        )
+
+        self.assertEqual("fork-request-v1", session["proposal_profile"])
+        self.assertTrue(session["validation"]["standing_roles_ready"])
+        self.assertTrue(session["validation"]["council_role_coverage_ok"])
+        self.assertTrue(session["validation"]["builder_handoff_coverage_ok"])
+        self.assertEqual(
+            [
+                "identity-protector",
+                "legal-scholar",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in session["council_panel"]],
+        )
+        self.assertEqual(
+            "identity-guardian",
+            session["council_panel"][0]["selected_agent_id"],
+        )
+        self.assertEqual(
+            "legal-scholar",
+            session["council_panel"][1]["selected_agent_id"],
         )
 
     def test_prepare_worker_dispatch_materializes_repo_local_plan(self) -> None:

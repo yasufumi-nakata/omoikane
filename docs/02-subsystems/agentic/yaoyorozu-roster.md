@@ -77,7 +77,7 @@ source workspace に加えて bounded same-host local candidate workspace catalo
 `yaoyorozu_workspace_discovery` として記録し、
 repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
-`self-modify-patch-v1` と `memory-edit-v1` を切り替え可能な
+`self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` を切り替え可能な
 bounded proposal profile catalog、および runtime / schema / eval / docs の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
 同じ demo は builder report / guardian gate / final resolve を
