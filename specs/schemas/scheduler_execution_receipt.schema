@@ -22,6 +22,7 @@ required:
   - history_length
   - continuity_event_refs
   - transition_counts
+  - cancel_count
   - rollback_count
   - pause_count
   - sync_count
@@ -139,6 +140,9 @@ properties:
       sync:
         type: integer
         minimum: 0
+  cancel_count:
+    type: integer
+    minimum: 0
   rollback_count:
     type: integer
     minimum: 0
@@ -202,6 +206,7 @@ properties:
         - verifier-revoked
         - broker-handoff-prepared
         - broker-handoff-confirmed
+        - cancelled
         - completed
   outcome_summary:
     type: object
@@ -218,6 +223,7 @@ properties:
       - verifier_revoked_fail_closed
       - method_b_broker_prepared
       - method_b_broker_confirmed
+      - cancelled
       - completed
     properties:
       timeout_recovered:
@@ -241,6 +247,8 @@ properties:
       method_b_broker_prepared:
         type: boolean
       method_b_broker_confirmed:
+        type: boolean
+      cancelled:
         type: boolean
       completed:
         type: boolean

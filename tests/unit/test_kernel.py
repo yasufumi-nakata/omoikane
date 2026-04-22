@@ -623,6 +623,40 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(scheduler.validate_handle(observed)["ok"])
         self.assertTrue(ledger.verify()["ok"])
 
+    def test_ascension_scheduler_cancel_closes_handle_and_execution_receipt(self) -> None:
+        ledger = ContinuityLedger()
+        scheduler = AscensionScheduler(ledger)
+        plan = scheduler.build_method_a_plan("identity://scheduler-cancel")
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-19T06:04:00Z",
+                sync_token="method-a-cancel",
+            ),
+        )
+        scheduler.advance(handle["handle_id"], "identity-confirmation")
+
+        cancelled = scheduler.cancel(
+            handle["handle_id"],
+            "external termination governance requested before protected handoff",
+        )
+        receipt = scheduler.compile_execution_receipt(handle["handle_id"])
+        validation = scheduler.validate_execution_receipt(receipt)
+
+        self.assertEqual("cancelled", cancelled["status"])
+        self.assertIsNotNone(cancelled["closed_at"])
+        self.assertEqual("cancel", cancelled["history"][-1]["transition"])
+        self.assertEqual("active-handoff", cancelled["current_stage"])
+        self.assertTrue(validation["ok"])
+        self.assertEqual("cancelled", receipt["final_status"])
+        self.assertEqual(1, receipt["cancel_count"])
+        self.assertTrue(receipt["outcome_summary"]["cancelled"])
+        self.assertIn("cancelled", receipt["scenario_labels"])
+
     def test_ascension_scheduler_method_b_substrate_signal_pauses_and_rolls_back(self) -> None:
         ledger = ContinuityLedger()
         scheduler = AscensionScheduler(ledger)

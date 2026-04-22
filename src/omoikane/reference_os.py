@@ -4128,6 +4128,33 @@ json.dump(response, sys.stdout)
         method_a_rotation_final = self.scheduler.observe(method_a_rotation_scheduled["handle_id"])
         method_a_rotation_validation = self.scheduler.validate_handle(method_a_rotation_final)
 
+        method_a_cancel_identity = self.identity.create(
+            human_consent_proof="consent://scheduler-demo-method-a-cancel/v1",
+            metadata={"display_name": "Cancellation Sandbox"},
+        )
+        method_a_cancel_plan = self.scheduler.build_method_a_plan(method_a_cancel_identity.identity_id)
+        method_a_cancel_scheduled = self.scheduler.schedule(method_a_cancel_plan)
+        method_a_cancel_scan = self.scheduler.advance(method_a_cancel_scheduled["handle_id"], "scan-baseline")
+        method_a_cancel_bdb = self.scheduler.advance(method_a_cancel_scheduled["handle_id"], "bdb-bridge")
+        method_a_cancel_artifact_sync = self.scheduler.sync_governance_artifacts(
+            method_a_cancel_scheduled["handle_id"],
+            sync_report(
+                method_a_cancel_plan["governance_artifacts"],
+                checked_at="2026-04-19T06:04:00Z",
+                sync_token="method-a-cancel",
+            ),
+        )
+        method_a_cancel_identity_confirmation = self.scheduler.advance(
+            method_a_cancel_scheduled["handle_id"],
+            "identity-confirmation",
+        )
+        method_a_cancelled = self.scheduler.cancel(
+            method_a_cancel_scheduled["handle_id"],
+            reason="external termination governance requested before protected handoff",
+        )
+        method_a_cancel_final = self.scheduler.observe(method_a_cancel_scheduled["handle_id"])
+        method_a_cancel_validation = self.scheduler.validate_handle(method_a_cancel_final)
+
         method_b_identity = self.identity.create(
             human_consent_proof="consent://scheduler-demo-method-b/v1",
             metadata={"display_name": "Parallel Run Sandbox"},
@@ -4345,6 +4372,7 @@ json.dump(response, sys.stdout)
             "method_a": method_a_validation,
             "method_a_live": method_a_live_validation,
             "method_a_rotation": method_a_rotation_validation,
+            "method_a_cancel": method_a_cancel_validation,
             "method_b": method_b_validation,
             "method_c": method_c_validation,
             "method_c_revoked": method_c_revoked_validation,
@@ -4357,6 +4385,9 @@ json.dump(response, sys.stdout)
             ),
             "method_a_rotation": self.scheduler.compile_execution_receipt(
                 method_a_rotation_scheduled["handle_id"]
+            ),
+            "method_a_cancel": self.scheduler.compile_execution_receipt(
+                method_a_cancel_scheduled["handle_id"]
             ),
             "method_b": self.scheduler.compile_execution_receipt(method_b_scheduled["handle_id"]),
             "method_c": self.scheduler.compile_execution_receipt(method_c_scheduled["handle_id"]),
@@ -4383,6 +4414,7 @@ json.dump(response, sys.stdout)
                 "method_a": plan,
                 "method_a_live": method_a_live_plan,
                 "method_a_rotation": method_a_rotation_plan,
+                "method_a_cancel": method_a_cancel_plan,
                 "method_b": method_b_plan,
                 "method_c": method_c_plan,
                 "method_c_revoked": method_c_revoked_plan,
@@ -4425,6 +4457,15 @@ json.dump(response, sys.stdout)
                     "verifier_cutover": method_a_rotation_cutover,
                     "resume_after_cutover": method_a_rotation_resume,
                     "final_handle": method_a_rotation_final,
+                },
+                "method_a_cancel": {
+                    "scheduled": method_a_cancel_scheduled,
+                    "scan_baseline": method_a_cancel_scan,
+                    "bdb_bridge": method_a_cancel_bdb,
+                    "artifact_sync": method_a_cancel_artifact_sync,
+                    "identity_confirmation": method_a_cancel_identity_confirmation,
+                    "cancelled": method_a_cancelled,
+                    "final_handle": method_a_cancel_final,
                 },
                 "identity_confirmation": confirmation_result,
                 "active_handoff": handoff_result,
@@ -4487,6 +4528,7 @@ json.dump(response, sys.stdout)
             "final_handle": final_handle,
             "method_a_live_final_handle": method_a_live_final,
             "method_a_rotation_final_handle": method_a_rotation_final,
+            "method_a_cancel_final_handle": method_a_cancel_final,
             "method_b_final_handle": method_b_final,
             "method_c_final_handle": method_c_final,
             "method_c_revoked_final_handle": method_c_revoked_final,
@@ -4504,6 +4546,7 @@ json.dump(response, sys.stdout)
                     method_a_validation["errors"]
                     + method_a_live_validation["errors"]
                     + method_a_rotation_validation["errors"]
+                    + method_a_cancel_validation["errors"]
                     + method_b_validation["errors"]
                     + method_c_validation["errors"]
                     + method_c_revoked_validation["errors"]
@@ -4645,6 +4688,11 @@ json.dump(response, sys.stdout)
                 "timeout_rolled_back": timeout["action"] == "rollback"
                 and timeout["rollback_target"] == "bdb-bridge"
                 and after_timeout["current_stage"] == "bdb-bridge",
+                "method_a_cancelled": (
+                    method_a_cancelled["status"] == "cancelled"
+                    and method_a_cancel_final["status"] == "cancelled"
+                    and method_a_cancel_final["current_stage"] == "active-handoff"
+                ),
                 "pause_resume_roundtrip": paused["status"] == "paused"
                 and resumed["status"] == "advancing",
                 "completed": final_handle["status"] == "completed"
@@ -4685,6 +4733,11 @@ json.dump(response, sys.stdout)
                         "verifier_rotation_cutover"
                     ]
                     and execution_receipt_validations["method_a_rotation"]["ok"]
+                ),
+                "method_a_cancel_execution_receipt_bound": (
+                    execution_receipts["method_a_cancel"]["outcome_summary"]["cancelled"]
+                    and execution_receipts["method_a_cancel"]["cancel_count"] == 1
+                    and execution_receipt_validations["method_a_cancel"]["ok"]
                 ),
                 "method_b_execution_receipt_bound": (
                     execution_receipts["method_b"]["outcome_summary"][

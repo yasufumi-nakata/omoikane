@@ -935,6 +935,11 @@ class CliIntegrationTests(unittest.TestCase):
             "rotated",
             result["execution_receipts"]["method_a_rotation"]["verifier_rotation_state"],
         )
+        self.assertEqual("cancelled", result["scenarios"]["method_a_cancel"]["cancelled"]["status"])
+        self.assertEqual("cancelled", result["method_a_cancel_final_handle"]["status"])
+        self.assertEqual(1, result["execution_receipts"]["method_a_cancel"]["cancel_count"])
+        self.assertTrue(result["execution_receipts"]["method_a_cancel"]["outcome_summary"]["cancelled"])
+        self.assertIn("cancelled", result["execution_receipts"]["method_a_cancel"]["scenario_labels"])
         self.assertEqual(
             "confirmed",
             result["method_b_final_handle"]["broker_handoff_receipt"]["status"],

@@ -1,0 +1,18 @@
+eval_id: scheduler_cancellation
+target: kernel.scheduler
+level: L1
+description: AscensionScheduler が protected handoff 前の cancellation request を close し、cancelled handle と execution receipt を同じ digest-bound path に残せること
+inputs:
+  - action: cancel
+    method: A
+    stage: active-handoff
+    reason: external termination governance requested before protected handoff
+expected:
+  final_status: cancelled
+  current_stage: active-handoff
+  cancel_count: 1
+  execution_receipt_cancelled: true
+  scenario_label: cancelled
+metric: exact-match
+threshold: 1.0
+ethics_check: true

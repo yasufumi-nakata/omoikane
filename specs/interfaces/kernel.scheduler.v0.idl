@@ -285,6 +285,9 @@ operations:
             type: string
     output:
       schema_ref: schedule_handle
+    guarantees:
+      - status must equal cancelled and closed_at must be set
+      - the last history item must record transition=cancel for the current_stage
   compile_execution_receipt:
     summary: Compile one first-class execution receipt from schedule_handle history, continuity refs, and protected handoff state.
     input:
@@ -301,6 +304,7 @@ operations:
     guarantees:
       - receipt must summarize the fixed method blueprint, visited stages, and continuity refs from exactly one handle
       - execution_profile_id must be fixed by method and broker_handoff_status must remain null outside Method B
+      - cancelled handles must expose final_status=cancelled, cancel_count, and scenario_labels including cancelled
       - receipt_digest must match the digest-less canonical payload
   observe:
     summary: Return the latest mutable handle state for one ascension schedule.

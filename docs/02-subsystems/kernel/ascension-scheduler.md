@@ -99,6 +99,11 @@ scheduler.cancel(handle, reason) → ScheduleHandle
 scheduler.compile_execution_receipt(handle) → SchedulerExecutionReceipt
 ```
 
+`cancel` は current stage を保ったまま handle を `cancelled` へ閉じ、
+last history item に `transition=cancel` を追加する。
+`compile_execution_receipt` はその cancelled handle も first-class artifact として要約し、
+`cancel_count=1` と `scenario_labels=['cancelled', ...]` を reviewer-facing に残す。
+
 `sync_governance_artifacts` の入力は `artifacts` に加えて
 `verifier_roster` snapshot
 (`roster_ref` / `active_root_id` / `next_root_id` / `rotation_state` /
@@ -125,7 +130,7 @@ external verifier roster を取得し、
   `compile_execution_receipt` が Method A/B/C handle を
   `SchedulerExecutionReceipt` へ要約し、
   timeout recovery / live verifier connectivity / root rotation cutover /
-  Method B broker handoff / Method C fail-closed を
+  Method A cancel / Method B broker handoff / Method C fail-closed を
   digest-bound な first-class artifact として残すことを確認する
   governance artifact bundle の current / stale / revoked sync snapshot を
   ContinuityLedger に記録し、
@@ -134,6 +139,7 @@ external verifier roster を取得し、
   connectivity receipt binding を 1 シナリオで確認する
 - `evals/continuity/scheduler_stage_rollback.yaml` と
   `evals/continuity/scheduler_method_profiles.yaml`、
+  `evals/continuity/scheduler_cancellation.yaml`、
   `evals/continuity/scheduler_method_b_broker_handoff.yaml`、
   `evals/continuity/scheduler_governance_artifacts.yaml`、
   `evals/continuity/scheduler_artifact_sync.yaml`、

@@ -70,6 +70,7 @@ SCHEDULER_EXECUTION_SCENARIO_LABELS = (
     "verifier-revoked",
     "broker-handoff-prepared",
     "broker-handoff-confirmed",
+    "cancelled",
     "completed",
 )
 SCHEDULER_METHOD_B_PREPARE_STAGE = "dual-channel-review"
@@ -963,6 +964,8 @@ class AscensionScheduler:
             scenario_labels.append("broker-handoff-prepared")
         if method_b_broker_confirmed:
             scenario_labels.append("broker-handoff-confirmed")
+        if handle["status"] == "cancelled":
+            scenario_labels.append("cancelled")
         if handle["status"] == "completed":
             scenario_labels.append("completed")
 
@@ -982,6 +985,7 @@ class AscensionScheduler:
             "history_length": len(history),
             "continuity_event_refs": continuity_event_refs,
             "transition_counts": transition_counts,
+            "cancel_count": transition_counts["cancel"],
             "rollback_count": transition_counts["rollback"],
             "pause_count": transition_counts["pause"],
             "sync_count": transition_counts["sync"],
@@ -1004,6 +1008,7 @@ class AscensionScheduler:
                 "verifier_revoked_fail_closed": verifier_revoked_fail_closed,
                 "method_b_broker_prepared": method_b_broker_prepared,
                 "method_b_broker_confirmed": method_b_broker_confirmed,
+                "cancelled": handle["status"] == "cancelled",
                 "completed": handle["status"] == "completed",
             },
             "protected_gate_summary": {
@@ -1247,6 +1252,7 @@ class AscensionScheduler:
                 errors.append("sum of transition_counts must match history_length")
 
         for field_name, transition_name in (
+            ("cancel_count", "cancel"),
             ("rollback_count", "rollback"),
             ("pause_count", "pause"),
             ("sync_count", "sync"),
@@ -1328,10 +1334,14 @@ class AscensionScheduler:
                 "verifier_revoked_fail_closed",
                 "method_b_broker_prepared",
                 "method_b_broker_confirmed",
+                "cancelled",
                 "completed",
             ):
                 if not isinstance(outcome_summary.get(key), bool):
                     errors.append(f"outcome_summary.{key} must be a boolean")
+            if isinstance(final_status, str) and isinstance(outcome_summary.get("cancelled"), bool):
+                if outcome_summary["cancelled"] != (final_status == "cancelled"):
+                    errors.append("outcome_summary.cancelled must match final_status")
             if isinstance(final_status, str) and isinstance(outcome_summary.get("completed"), bool):
                 if outcome_summary["completed"] != (final_status == "completed"):
                     errors.append("outcome_summary.completed must match final_status")
@@ -1348,6 +1358,7 @@ class AscensionScheduler:
                     ("verifier_revoked_fail_closed", "verifier-revoked"),
                     ("method_b_broker_prepared", "broker-handoff-prepared"),
                     ("method_b_broker_confirmed", "broker-handoff-confirmed"),
+                    ("cancelled", "cancelled"),
                     ("completed", "completed"),
                 ):
                     if key in outcome_summary and isinstance(outcome_summary.get(key), bool):

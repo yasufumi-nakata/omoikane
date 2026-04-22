@@ -142,8 +142,10 @@ loopback live verifier endpoint から取得した roster に
 さらに `compile_execution_receipt` が Method A/B/C の
 `schedule_handle` history を `scheduler_execution_receipt` へ要約し、
 timeout recovery、live verifier connectivity、verifier rotation cutover、
-Method B broker handoff、Method C fail-closed を
+Method A cancel、Method B broker handoff、Method C fail-closed を
 digest-bound な first-class artifact として残すことを確認する。
+公開 `scheduler_execution_receipt.schema` との cancel/completed/fail-closed contract は
+integration test で継続検証する。
 
 `amendment-demo` は L4 governance amendment policy を JSON で可視化し、
 `T-Core` が常に `frozen` に留まること、
