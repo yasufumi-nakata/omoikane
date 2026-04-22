@@ -75,6 +75,7 @@ meta/                 ── 用語集・決定履歴
 - `PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli trust-demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli builder-live-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli gap-report --json`

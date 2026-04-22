@@ -29,6 +29,7 @@ from .agentic.distributed_transport_mtls_fixtures import (
 )
 from .agentic.task_graph import TaskGraphService
 from .agentic.trust import TrustService
+from .agentic.yaoyorozu import YaoyorozuRegistryService
 from .common import canonical_json, new_id, sha256_text, utc_now_iso
 from .cognitive import (
     AttentionCue,
@@ -240,6 +241,7 @@ class OmoikaneReferenceOS:
         self.consensus_bus = ConsensusBus()
         self.task_graph = TaskGraphService()
         self.trust = TrustService()
+        self.yaoyorozu = YaoyorozuRegistryService(trust_service=self.trust)
         self.design_reader = DesignReaderService()
         self.patch_generator = PatchGeneratorService()
         self.diff_evaluator = DifferentialEvaluatorService()
@@ -3397,6 +3399,107 @@ json.dump(response, sys.stdout)
                 snapshot["agent_id"]: snapshot
                 for snapshot in service.all_snapshots()
             },
+        }
+
+    def run_yaoyorozu_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://yaoyorozu-demo/v1",
+            metadata={"display_name": "Yaoyorozu Demo Identity"},
+        )
+        demo_trust = [
+            {
+                "agent_id": "memory-archivist",
+                "initial_score": 0.66,
+                "per_domain": {"council_deliberation": 0.7, "memory_editing": 0.76},
+            },
+            {
+                "agent_id": "change-advocate",
+                "initial_score": 0.68,
+                "per_domain": {"council_deliberation": 0.72, "self_modify": 0.71},
+            },
+            {
+                "agent_id": "conservatism-advocate",
+                "initial_score": 0.69,
+                "per_domain": {"council_deliberation": 0.74, "self_modify": 0.7},
+            },
+            {
+                "agent_id": "schema-builder",
+                "initial_score": 0.84,
+                "per_domain": {"self_modify": 0.86, "schema_sync": 0.92},
+            },
+            {
+                "agent_id": "eval-builder",
+                "initial_score": 0.85,
+                "per_domain": {"self_modify": 0.87, "eval_sync": 0.91},
+            },
+            {
+                "agent_id": "doc-sync-builder",
+                "initial_score": 0.83,
+                "per_domain": {"self_modify": 0.85, "documentation": 0.9},
+            },
+            {
+                "agent_id": "codex-builder",
+                "initial_score": 0.9,
+                "per_domain": {"self_modify": 0.96, "runtime": 0.93},
+            },
+        ]
+        for seed in demo_trust:
+            self.trust.register_agent(**seed)
+
+        registry_snapshot = self.yaoyorozu.sync_from_agents_directory(self.repo_root / "agents")
+        convocation = self.yaoyorozu.prepare_council_convocation(
+            proposal_profile="self-modify-patch-v1",
+            session_mode="standard",
+            target_identity_ref=identity.identity_id,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.registry.synced",
+            payload=registry_snapshot,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.convocation.prepared",
+            payload=convocation,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+        ledger_verification = self.ledger.verify()
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": self.yaoyorozu.policy_snapshot(),
+            "registry": registry_snapshot,
+            "convocation": convocation,
+            "validation": {
+                "registry_entry_count": registry_snapshot["entry_count"],
+                "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
+                "weighted_vote_ready_count": registry_snapshot["selection_ready_counts"][
+                    "weighted_vote_ready"
+                ],
+                "builder_coverage_count": convocation["selection_summary"][
+                    "selected_builder_coverage_count"
+                ],
+                "standing_roles_ready": convocation["validation"]["standing_roles_ready"],
+                "council_role_coverage_ok": convocation["validation"]["council_role_coverage_ok"],
+                "builder_handoff_coverage_ok": convocation["validation"][
+                    "builder_handoff_coverage_ok"
+                ],
+                "ok": (
+                    convocation["validation"]["ok"]
+                    and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
+                ),
+            },
+            "ledger_verification": ledger_verification,
         }
 
     def run_guardian_oversight_demo(self) -> Dict[str, Any]:

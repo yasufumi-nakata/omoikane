@@ -58,6 +58,11 @@ reference runtime では `agentic.trust.v0` を参照し、
 `global_score >= 0.5` を召集条件、
 `global_score >= 0.6` を weighted-majority の重み付与条件に固定する。
 `guardian_role` は `0.99 + pinned_by_human` が揃わない限り成立しない。
+さらに `agentic.yaoyorozu.v0` と `yaoyorozu-demo` は
+repo-local `agents/` の定義を trust snapshot に束縛し、
+`Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role と
+`Self-Modify Patch` 用の council panel / builder handoff coverage を
+deterministic に召集できることを確認する。
 
 ## 多 Council 化
 

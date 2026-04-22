@@ -1,0 +1,17 @@
+eval_id: yaoyorozu_council_convocation
+target: agentic.yaoyorozu
+level: L4
+description: Repo-local Yaoyorozu registry must bind trust-gated Council convocation and builder handoff coverage.
+inputs:
+  - source_root: agents
+  - proposal_profile: self-modify-patch-v1
+  - session_mode: standard
+expected:
+  standing_roles_ready: true
+  council_role_coverage_ok: true
+  weighted_vote_quorum_ready: true
+  builder_handoff_coverage_ok: true
+  selected_builder_coverage_count: 4
+metric: equality
+threshold: 1.0
+ethics_check: true

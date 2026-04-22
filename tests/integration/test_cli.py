@@ -1351,6 +1351,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["events"][-1]["applied"])
         self.assertTrue(result["agents"]["design-architect"]["eligibility"]["count_for_weighted_vote"])
 
+    def test_yaoyorozu_demo_emits_registry_and_convocation_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "yaoyorozu-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["convocation"]["validation"]["builder_handoff_coverage_ok"])
+        self.assertEqual(
+            "selected",
+            result["convocation"]["standing_roles"]["guardian_liaison"]["status"],
+        )
+        self.assertGreaterEqual(result["registry"]["entry_count"], 10)
+
     def test_oversight_demo_emits_breach_propagation(self) -> None:
         stdout = io.StringIO()
 

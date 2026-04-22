@@ -19,7 +19,9 @@
 - 利用可能 Agent の登録簿
 - 各 Agent の role, capability, trust score を管理
 - 役割定義は [agents/](../../../agents/) 配下
-- reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持つ
+- reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持ち、
+  `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が repo-local `agents/` から trust-bound registry snapshot と
+  Council convocation / builder handoff plan を materialize する
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

@@ -73,6 +73,9 @@
 - `cognitive_audit_resolution.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
+- `agent_registry_entry.schema`
+- `yaoyorozu_registry_snapshot.schema`
+- `council_convocation_session.schema`
 - `guardian_oversight_event.schema`
 - `guardian_reviewer_record.schema`
 - `guardian_reviewer_verification.schema`

@@ -1,0 +1,468 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/council_convocation_session.schema"
+title: CouncilConvocationSession
+description: Deterministic Council convocation and builder handoff plan derived from the Yaoyorozu registry.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - session_id
+  - recorded_at
+  - session_digest
+  - registry_snapshot_ref
+  - policy_id
+  - proposal_profile
+  - summary
+  - session_mode
+  - target_identity_ref
+  - standing_roles
+  - council_panel
+  - builder_handoff
+  - selection_summary
+  - validation
+properties:
+  kind:
+    const: council_convocation_session
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  session_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  session_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://"
+  policy_id:
+    type: string
+    minLength: 1
+  proposal_profile:
+    const: self-modify-patch-v1
+  summary:
+    type: string
+    minLength: 1
+  session_mode:
+    type: string
+    enum:
+      - standard
+      - expedited
+  target_identity_ref:
+    type: string
+    minLength: 1
+  standing_roles:
+    type: object
+    additionalProperties: false
+    required:
+      - speaker
+      - recorder
+      - guardian_liaison
+      - self_liaison
+    properties:
+      speaker:
+        $ref: "#/$defs/selection"
+      recorder:
+        $ref: "#/$defs/selection"
+      guardian_liaison:
+        $ref: "#/$defs/selection"
+      self_liaison:
+        $ref: "#/$defs/selection"
+  council_panel:
+    type: array
+    minItems: 4
+    items:
+      $ref: "#/$defs/selection"
+  builder_handoff:
+    type: array
+    minItems: 4
+    items:
+      $ref: "#/$defs/builder_selection"
+  selection_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - required_council_role_count
+      - selected_council_role_count
+      - weighted_vote_ready_count
+      - selected_builder_coverage_count
+      - missing_council_roles
+      - missing_builder_coverage
+    properties:
+      required_council_role_count:
+        type: integer
+        minimum: 1
+      selected_council_role_count:
+        type: integer
+        minimum: 0
+      weighted_vote_ready_count:
+        type: integer
+        minimum: 0
+      selected_builder_coverage_count:
+        type: integer
+        minimum: 0
+      missing_council_roles:
+        type: array
+        items:
+          type: string
+      missing_builder_coverage:
+        type: array
+        items:
+          type: string
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - standing_roles_ready
+      - guardian_liaison_ready
+      - self_liaison_bound
+      - council_role_coverage_ok
+      - weighted_vote_quorum_ready
+      - builder_handoff_coverage_ok
+      - ok
+    properties:
+      standing_roles_ready:
+        type: boolean
+      guardian_liaison_ready:
+        type: boolean
+      self_liaison_bound:
+        type: boolean
+      council_role_coverage_ok:
+        type: boolean
+      weighted_vote_quorum_ready:
+        type: boolean
+      builder_handoff_coverage_ok:
+        type: boolean
+      ok:
+        type: boolean
+$defs:
+  selection:
+    type: object
+    additionalProperties: false
+    required:
+      - role_id
+      - role_label
+      - selected_agent_id
+      - display_name
+      - source_ref
+      - status
+      - trust_score
+      - invite_eligible
+      - weighted_vote_eligible
+      - apply_to_runtime_eligible
+      - candidate_count
+      - candidate_agent_ids
+      - selection_reason
+    properties:
+      role_id:
+        type: string
+        minLength: 1
+      role_label:
+        type: string
+        minLength: 1
+      selected_agent_id:
+        type: string
+      display_name:
+        type: string
+      source_ref:
+        type: string
+      status:
+        type: string
+        enum:
+          - selected
+          - blocked
+          - missing
+      trust_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      invite_eligible:
+        type: boolean
+      weighted_vote_eligible:
+        type: boolean
+      apply_to_runtime_eligible:
+        type: boolean
+      candidate_count:
+        type: integer
+        minimum: 0
+      candidate_agent_ids:
+        type: array
+        items:
+          type: string
+      selection_reason:
+        type: string
+        minLength: 1
+  builder_selection:
+    type: object
+    additionalProperties: false
+    required:
+      - role_id
+      - role_label
+      - selected_agent_id
+      - display_name
+      - source_ref
+      - status
+      - trust_score
+      - invite_eligible
+      - weighted_vote_eligible
+      - apply_to_runtime_eligible
+      - candidate_count
+      - candidate_agent_ids
+      - selection_reason
+      - coverage_area
+    properties:
+      role_id:
+        type: string
+        minLength: 1
+      role_label:
+        type: string
+        minLength: 1
+      selected_agent_id:
+        type: string
+      display_name:
+        type: string
+      source_ref:
+        type: string
+      status:
+        type: string
+        enum:
+          - selected
+          - blocked
+          - missing
+      trust_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      invite_eligible:
+        type: boolean
+      weighted_vote_eligible:
+        type: boolean
+      apply_to_runtime_eligible:
+        type: boolean
+      candidate_count:
+        type: integer
+        minimum: 0
+      candidate_agent_ids:
+        type: array
+        items:
+          type: string
+      selection_reason:
+        type: string
+        minLength: 1
+      coverage_area:
+        type: string
+        enum:
+          - runtime
+          - schema
+          - eval
+          - docs
+examples:
+  - kind: council_convocation_session
+    schema_version: 1.0.0
+    session_id: council-convocation-0001
+    recorded_at: "2026-04-22T14:00:00+00:00"
+    session_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    registry_snapshot_ref: registry://yaoyorozu-registry-0001
+    policy_id: repo-local-yaoyorozu-registry-v1
+    proposal_profile: self-modify-patch-v1
+    summary: Prepare a bounded Council review and builder handoff for one self-modify patch.
+    session_mode: standard
+    target_identity_ref: identity://primary
+    standing_roles:
+      speaker:
+        role_id: speaker
+        role_label: Speaker
+        selected_agent_id: design-architect
+        display_name: DesignArchitect
+        source_ref: agents/councilors/design-architect.yaml
+        status: selected
+        trust_score: 0.72
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - design-architect
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      recorder:
+        role_id: recorder
+        role_label: Recorder
+        selected_agent_id: memory-archivist
+        display_name: MemoryArchivist
+        source_ref: agents/councilors/memory-archivist.yaml
+        status: selected
+        trust_score: 0.66
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - memory-archivist
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      guardian_liaison:
+        role_id: guardian-liaison
+        role_label: GuardianLiaison
+        selected_agent_id: integrity-guardian
+        display_name: IntegrityGuardian
+        source_ref: agents/guardians/integrity-guardian.yaml
+        status: selected
+        trust_score: 0.99
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: true
+        candidate_count: 1
+        candidate_agent_ids:
+          - integrity-guardian
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      self_liaison:
+        role_id: self-liaison
+        role_label: SelfLiaison
+        selected_agent_id: self-liaison://primary
+        display_name: SelfLiaison
+        source_ref: identity://primary
+        status: selected
+        trust_score: 1.0
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - self-liaison://primary
+        selection_reason: Primary identity remains an explicit veto holder in every Council session.
+    council_panel:
+      - role_id: design-auditor
+        role_label: DesignAuditor
+        selected_agent_id: design-architect
+        display_name: DesignArchitect
+        source_ref: agents/councilors/design-architect.yaml
+        status: selected
+        trust_score: 0.72
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - design-architect
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      - role_id: change-advocate
+        role_label: ChangeAdvocate
+        selected_agent_id: change-advocate
+        display_name: ChangeAdvocate
+        source_ref: agents/councilors/change-advocate.yaml
+        status: selected
+        trust_score: 0.68
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - change-advocate
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      - role_id: conservatism-advocate
+        role_label: ConservatismAdvocate
+        selected_agent_id: conservatism-advocate
+        display_name: ConservatismAdvocate
+        source_ref: agents/councilors/conservatism-advocate.yaml
+        status: selected
+        trust_score: 0.69
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - conservatism-advocate
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+      - role_id: ethics-committee
+        role_label: EthicsCommittee
+        selected_agent_id: ethics-committee
+        display_name: EthicsCommittee
+        source_ref: agents/councilors/ethics-committee.yaml
+        status: selected
+        trust_score: 0.82
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: false
+        candidate_count: 1
+        candidate_agent_ids:
+          - ethics-committee
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+    builder_handoff:
+      - role_id: builder-runtime
+        role_label: BuilderHandoff
+        selected_agent_id: codex-builder
+        display_name: CodexBuilder
+        source_ref: agents/builders/codex-builder.yaml
+        status: selected
+        trust_score: 0.9
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: true
+        candidate_count: 1
+        candidate_agent_ids:
+          - codex-builder
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+        coverage_area: runtime
+      - role_id: builder-schema
+        role_label: BuilderHandoff
+        selected_agent_id: schema-builder
+        display_name: SchemaBuilder
+        source_ref: agents/builders/schema-builder.yaml
+        status: selected
+        trust_score: 0.84
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: true
+        candidate_count: 1
+        candidate_agent_ids:
+          - schema-builder
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+        coverage_area: schema
+      - role_id: builder-eval
+        role_label: BuilderHandoff
+        selected_agent_id: eval-builder
+        display_name: EvalBuilder
+        source_ref: agents/builders/eval-builder.yaml
+        status: selected
+        trust_score: 0.85
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: true
+        candidate_count: 1
+        candidate_agent_ids:
+          - eval-builder
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+        coverage_area: eval
+      - role_id: builder-docs
+        role_label: BuilderHandoff
+        selected_agent_id: doc-sync-builder
+        display_name: DocSyncBuilder
+        source_ref: agents/builders/doc-sync-builder.yaml
+        status: selected
+        trust_score: 0.83
+        invite_eligible: true
+        weighted_vote_eligible: true
+        apply_to_runtime_eligible: true
+        candidate_count: 1
+        candidate_agent_ids:
+          - doc-sync-builder
+        selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
+        coverage_area: docs
+    selection_summary:
+      required_council_role_count: 4
+      selected_council_role_count: 4
+      weighted_vote_ready_count: 4
+      selected_builder_coverage_count: 4
+      missing_council_roles: []
+      missing_builder_coverage: []
+    validation:
+      standing_roles_ready: true
+      guardian_liaison_ready: true
+      self_liaison_bound: true
+      council_role_coverage_ok: true
+      weighted_vote_quorum_ready: true
+      builder_handoff_coverage_ok: true
+      ok: true

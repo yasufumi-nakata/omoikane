@@ -321,6 +321,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     trust_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    yaoyorozu_parser = subparsers.add_parser(
+        "yaoyorozu-demo",
+        help="Run the repo-local Yaoyorozu registry sync and council convocation scenario",
+    )
+    yaoyorozu_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     oversight_parser = subparsers.add_parser(
         "oversight-demo",
         help="Run the Guardian human oversight quorum and pin breach scenario",
@@ -572,6 +578,10 @@ def main() -> None:
 
     if args.command == "trust-demo":
         _print_result(runtime.run_trust_demo(), args.json)
+        return
+
+    if args.command == "yaoyorozu-demo":
+        _print_result(runtime.run_yaoyorozu_demo(), args.json)
         return
 
     if args.command == "oversight-demo":

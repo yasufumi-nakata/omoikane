@@ -22,6 +22,7 @@
 - `agentic.cognitive_audit.v0.idl`
 - `agentic.task_graph.v0.idl`
 - `agentic.trust.v0.idl`
+- `agentic.yaoyorozu.v0.idl`
 - `cognitive.affect.v0.idl`
 - `cognitive.attention.v0.idl`
 - `cognitive.volition.v0.idl`

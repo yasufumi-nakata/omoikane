@@ -47,6 +47,10 @@
 4. 結果は [meta/decision-log/](../../meta/decision-log/) に記録
 5. Builder の書き込み先は `src/`, `tests/`, `specs/`, `evals/` に限定する
 
+reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json`
+により、この roster が trust-bound registry snapshot と
+`Self-Modify Patch` 向け Council / builder handoff plan に materialize される。
+
 ## 並列召喚
 
 独立な subagent タスクは並列召喚可。

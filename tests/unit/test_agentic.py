@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+from pathlib import Path
 import socket
 import ssl
 import sys
@@ -23,6 +24,7 @@ from omoikane.agentic.distributed_transport_mtls_fixtures import (
 )
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
+from omoikane.agentic.yaoyorozu import YaoyorozuRegistryService
 from omoikane.common import canonical_json, sha256_text
 
 
@@ -2176,6 +2178,76 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(0.99, snapshot["global_score"])
         self.assertTrue(snapshot["eligibility"]["guardian_role"])
         self.assertEqual("guardian bootstrap", snapshot["pinned_reason"])
+
+
+class YaoyorozuRegistryServiceTests(unittest.TestCase):
+    def test_sync_repo_agents_materializes_registry_snapshot(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        trust.register_agent(
+            "design-architect",
+            initial_score=0.72,
+            per_domain={"council_deliberation": 0.8},
+        )
+        trust.register_agent(
+            "memory-archivist",
+            initial_score=0.66,
+            per_domain={"council_deliberation": 0.7},
+        )
+        trust.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        service = YaoyorozuRegistryService(trust_service=trust)
+
+        snapshot = service.sync_from_agents_directory(repo_root / "agents")
+
+        self.assertGreaterEqual(snapshot["entry_count"], 10)
+        self.assertIn("councilor", snapshot["role_index"])
+        self.assertIn("docs.propose-change", snapshot["capability_index"])
+        self.assertGreaterEqual(snapshot["selection_ready_counts"]["guardian_ready"], 1)
+
+    def test_prepare_self_modify_convocation_selects_required_roles(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        seeds = [
+            ("design-architect", 0.72, {"council_deliberation": 0.8, "self_modify": 0.76}),
+            ("memory-archivist", 0.66, {"council_deliberation": 0.7}),
+            ("change-advocate", 0.68, {"council_deliberation": 0.72, "self_modify": 0.71}),
+            ("conservatism-advocate", 0.69, {"council_deliberation": 0.74, "self_modify": 0.7}),
+            ("ethics-committee", 0.82, {"council_deliberation": 0.88, "self_modify": 0.82}),
+            ("integrity-guardian", 0.99, {"council_deliberation": 0.99, "self_modify": 0.99}),
+            ("codex-builder", 0.9, {"self_modify": 0.96}),
+            ("schema-builder", 0.84, {"self_modify": 0.86}),
+            ("eval-builder", 0.85, {"self_modify": 0.87}),
+            ("doc-sync-builder", 0.83, {"self_modify": 0.85}),
+        ]
+        for agent_id, initial_score, per_domain in seeds:
+            kwargs = {
+                "agent_id": agent_id,
+                "initial_score": initial_score,
+                "per_domain": per_domain,
+            }
+            if agent_id == "integrity-guardian":
+                kwargs["pinned_by_human"] = True
+                kwargs["pinned_reason"] = "guardian bootstrap"
+            trust.register_agent(**kwargs)
+        service = YaoyorozuRegistryService(trust_service=trust)
+        service.sync_from_agents_directory(repo_root / "agents")
+
+        session = service.prepare_council_convocation(
+            proposal_profile="self-modify-patch-v1",
+            target_identity_ref="identity://unit-test",
+        )
+
+        self.assertTrue(session["validation"]["standing_roles_ready"])
+        self.assertTrue(session["validation"]["council_role_coverage_ok"])
+        self.assertTrue(session["validation"]["builder_handoff_coverage_ok"])
+        self.assertEqual(4, session["selection_summary"]["selected_builder_coverage_count"])
+        self.assertEqual("selected", session["standing_roles"]["guardian_liaison"]["status"])
 
 
 class CognitiveAuditTests(unittest.TestCase):

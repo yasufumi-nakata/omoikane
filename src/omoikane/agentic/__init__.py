@@ -14,6 +14,7 @@ from .council import (
 from .distributed_transport import DistributedTransportService
 from .task_graph import TaskGraphService
 from .trust import TrustService, TrustThresholds, TrustUpdatePolicy
+from .yaoyorozu import YaoyorozuRegistryPolicy, YaoyorozuRegistryService
 
 __all__ = [
     "CognitiveAuditService",
@@ -31,4 +32,6 @@ __all__ = [
     "TrustService",
     "TrustThresholds",
     "TrustUpdatePolicy",
+    "YaoyorozuRegistryPolicy",
+    "YaoyorozuRegistryService",
 ]

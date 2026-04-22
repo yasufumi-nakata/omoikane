@@ -1,0 +1,113 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/agent_registry_entry.schema"
+title: AgentRegistryEntry
+description: Canonical repo-local Yaoyorozu registry entry bound to a trust snapshot.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - agent_id
+  - display_name
+  - role
+  - source_ref
+  - capabilities
+  - trust_floor
+  - substrate_requirements
+  - input_schema_ref
+  - output_schema_ref
+  - ethics_constraints
+  - prompt_or_policy_ref
+  - trust_snapshot
+properties:
+  kind:
+    const: agent_registry_entry
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  agent_id:
+    type: string
+    minLength: 1
+  display_name:
+    type: string
+    minLength: 1
+  role:
+    type: string
+    enum:
+      - councilor
+      - builder
+      - researcher
+      - guardian
+  source_ref:
+    type: string
+    pattern: "^agents/"
+  capabilities:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  trust_floor:
+    type: number
+    minimum: 0
+    maximum: 1
+  substrate_requirements:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  input_schema_ref:
+    type: string
+  output_schema_ref:
+    type: string
+  ethics_constraints:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  prompt_or_policy_ref:
+    type: string
+  trust_snapshot:
+    $ref: trust_snapshot.schema
+examples:
+  - kind: agent_registry_entry
+    schema_version: 1.0.0
+    agent_id: design-architect
+    display_name: DesignArchitect
+    role: councilor
+    source_ref: agents/councilors/design-architect.yaml
+    capabilities:
+      - docs.read
+      - docs.propose-change
+      - integrity.cross-reference-check
+    trust_floor: 0.6
+    substrate_requirements:
+      - any
+    input_schema_ref: specs/schemas/council_input.yaml
+    output_schema_ref: specs/schemas/council_output.yaml
+    ethics_constraints:
+      - A1-continuity
+      - A2-uniqueness
+    prompt_or_policy_ref: agents/councilors/design-architect.policy.md
+    trust_snapshot:
+      kind: trust_snapshot
+      schema_version: 1.0.0
+      agent_id: design-architect
+      global_score: 0.72
+      per_domain:
+        council_deliberation: 0.8
+      history: []
+      pinned_by_human: false
+      pinned_reason: ""
+      thresholds:
+        council_invite_floor: 0.5
+        weighted_vote_floor: 0.6
+        apply_floor: 0.8
+        self_modify_floor: 0.95
+        guardian_floor: 0.99
+        guardian_requires_human_pin: true
+      eligibility:
+        invite_to_council: true
+        count_for_weighted_vote: true
+        apply_to_runtime: false
+        self_modify_role: false
+        guardian_role: false

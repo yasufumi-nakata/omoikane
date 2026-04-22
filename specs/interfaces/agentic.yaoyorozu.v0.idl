@@ -1,0 +1,57 @@
+idl_version: 1
+kind: service
+namespace: agentic.yaoyorozu.v0
+service: YaoyorozuRegistryService
+summary: Repo-local agent registry sync plus bounded Council convocation and builder handoff planning.
+imports:
+  yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
+  council_convocation_session: ../schemas/council_convocation_session.schema
+operations:
+  sync_registry:
+    summary: Materialize one trust-bound registry snapshot from repo-local agents/ definitions.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_root
+        properties:
+          source_root:
+            type: string
+            const: agents
+    output:
+      schema_ref: yaoyorozu_registry_snapshot
+    guarantees:
+      - synced entries must remain bound to repo-local agents/ definitions
+      - every entry must carry a trust_snapshot and trust_floor
+      - role_index and capability_index must remain machine-readable
+  prepare_council_convocation:
+    summary: Derive one deterministic Council convocation and builder handoff plan from the synced registry.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - proposal_profile
+          - session_mode
+          - target_identity_ref
+        properties:
+          proposal_profile:
+            type: string
+            const: self-modify-patch-v1
+          session_mode:
+            type: string
+            enum:
+              - standard
+              - expedited
+          target_identity_ref:
+            type: string
+    output:
+      schema_ref: council_convocation_session
+    guarantees:
+      - standing roles must include speaker, recorder, guardian_liaison, and self_liaison
+      - council panel must satisfy weighted vote quorum before emit_build_request
+      - builder handoff must cover runtime, schema, eval, and docs surfaces
+compatibility:
+  stability: bootstrap
+  notes:
+    - The reference runtime currently fixes proposal_profile to self-modify-patch-v1.
+    - Cross-workspace worker discovery and live agent process orchestration remain outside this repo.

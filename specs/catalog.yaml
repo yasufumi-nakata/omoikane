@@ -1732,6 +1732,49 @@ entries:
     rationale: Protects the fixed trust delta table, threshold gates, and human pin behavior.
   - priority: P1
     kind: schema
+    file: specs/schemas/agent_registry_entry.schema
+    consumers:
+      - specs/schemas/yaoyorozu_registry_snapshot.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - reference-runtime
+    rationale: Required to serialize one repo-local agent definition together with its trust-bound eligibility state.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_registry_snapshot.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/04-ai-governance/subagent-roster.md
+      - reference-runtime
+    rationale: Required to materialize the repo-local Yaoyorozu registry from agents/ as a machine-readable snapshot.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/council_convocation_session.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/council-composition.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind standing roles, council panel selection, and builder handoff coverage into one deterministic convocation artifact.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/agentic.yaoyorozu.v0.idl
+    consumers:
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/council-composition.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make repo-local registry sync and bounded Council convocation machine-readable across docs and runtime.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_council_convocation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects standing role readiness, weighted vote quorum, and builder handoff coverage for self-modify convocation.
+  - priority: P1
+    kind: schema
     file: specs/schemas/guardian_oversight_event.schema
     consumers:
       - specs/interfaces/governance.oversight.v0.idl
