@@ -9070,6 +9070,436 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_patch_generator_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://patch-generator-demo/v1",
+            metadata={"display_name": "Patch Generator Sandbox"},
+        )
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.PatchGenerator",
+            change_summary=(
+                "Materialize planning-cue aligned multi-file patch descriptors from a "
+                "design-backed build request."
+            ),
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
+                "specs/schemas/build_request.yaml",
+                "specs/schemas/build_artifact.yaml",
+                "specs/schemas/patch_descriptor.schema",
+            ],
+            output_paths=[
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "tests/integration/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
+            ],
+            request_id="build-l5-patch-generator-0001",
+            change_class="feature-improvement",
+            must_pass=["evals/continuity/council_output_build_request_pipeline.yaml"],
+            council_session_id="sess-patch-generator-0001",
+            guardian_gate="pass",
+        )
+        ready_scope_validation = self.patch_generator.validate_scope(build_request)
+        ready_artifact = self.patch_generator.generate_patch_set(build_request)
+        ready_patches = [
+            self.patch_generator.describe_patch(descriptor)
+            for descriptor in ready_artifact.get("patches", [])
+        ]
+
+        blocked_request = json.loads(canonical_json(build_request))
+        blocked_request["request_id"] = "build-l5-patch-generator-blocked-0001"
+        blocked_request["planning_cues"] = []
+        blocked_request["constraints"]["allowed_write_paths"] = [
+            "src/",
+            "../escape",
+        ]
+        blocked_request["constraints"]["forbidden"] = ["L1.EthicsEnforcer"]
+        blocked_scope_validation = self.patch_generator.validate_scope(blocked_request)
+        blocked_artifact = self.patch_generator.generate_patch_set(blocked_request)
+        blocked_rules = list(blocked_artifact.get("blocking_rules", []))
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.generated",
+            payload={
+                "policy": self.patch_generator.policy(),
+                "request": build_request,
+                "artifact": ready_artifact,
+                "scope_validation": ready_scope_validation,
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.blocked",
+            payload={
+                "policy": self.patch_generator.policy(),
+                "request": blocked_request,
+                "artifact": blocked_artifact,
+                "scope_validation": blocked_scope_validation,
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "patch_generator": {
+                "policy": self.patch_generator.policy(),
+                "design_manifest": design_manifest,
+                "build_request": build_request,
+                "ready_scope_validation": ready_scope_validation,
+                "ready_artifact": ready_artifact,
+                "ready_patches": ready_patches,
+                "blocked_request": blocked_request,
+                "blocked_scope_validation": blocked_scope_validation,
+                "blocked_artifact": blocked_artifact,
+            },
+            "validation": {
+                "ok": (
+                    design_validation["ok"]
+                    and ready_scope_validation["allowed"]
+                    and ready_artifact["status"] == "ready"
+                    and len(ready_patches) == 5
+                    and blocked_artifact["status"] == "blocked"
+                    and any(
+                        "allowed write path escapes workspace scope" in rule
+                        for rule in blocked_rules
+                    )
+                    and any("planning_cues must not be empty" in rule for rule in blocked_rules)
+                    and any(
+                        "immutable boundary missing from forbidden list: L1.ContinuityLedger"
+                        in rule
+                        for rule in blocked_rules
+                    )
+                ),
+                "design_reader_handoff_ok": design_validation["ok"],
+                "ready_artifact_status": ready_artifact["status"],
+                "ready_patch_count": len(ready_patches),
+                "ready_patch_targets": [patch["target_path"] for patch in ready_patches],
+                "ready_scope_allowed": ready_scope_validation["allowed"],
+                "blocked_artifact_status": blocked_artifact["status"],
+                "blocked_rule_count": len(blocked_rules),
+                "blocked_rule_mentions_scope_escape": any(
+                    "allowed write path escapes workspace scope" in rule
+                    for rule in blocked_rules
+                ),
+                "blocked_rule_mentions_planning_cues": any(
+                    "planning_cues must not be empty" in rule for rule in blocked_rules
+                ),
+                "blocked_rule_mentions_immutable_boundary": any(
+                    "immutable boundary missing from forbidden list: L1.ContinuityLedger"
+                    in rule
+                    for rule in blocked_rules
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_diff_eval_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://diff-eval-demo/v1",
+            metadata={"display_name": "Diff Evaluator Sandbox"},
+        )
+        design_manifest, design_validation, build_request = self._prepare_design_backed_request(
+            target_subsystem="L5.DifferentialEvaluator",
+            change_summary=(
+                "Classify parsed A/B evidence and temp-workspace execution receipts for "
+                "builder promotion."
+            ),
+            spec_refs=[
+                "specs/interfaces/selfctor.design_reader.v0.idl",
+                "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/interfaces/selfctor.enactment.v0.idl",
+                "specs/interfaces/selfctor.diff_eval.v0.idl",
+                "specs/schemas/design_delta_manifest.schema",
+                "specs/schemas/build_request.yaml",
+                "specs/schemas/build_artifact.yaml",
+                "specs/schemas/sandbox_apply_receipt.schema",
+                "specs/schemas/builder_live_enactment_session.schema",
+                "specs/schemas/diff_eval_execution_receipt.schema",
+            ],
+            output_paths=[
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "tests/integration/",
+                "docs/02-subsystems/self-construction/",
+                "docs/04-ai-governance/",
+                "evals/continuity/",
+                "meta/decision-log/",
+            ],
+            request_id="build-l5-diff-eval-0001",
+            change_class="feature-improvement",
+            must_pass=[
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
+            ],
+            council_session_id="sess-diff-eval-0001",
+            guardian_gate="pass",
+        )
+        scope_validation = self.patch_generator.validate_scope(build_request)
+        build_artifact = self.patch_generator.generate_patch_set(build_request)
+        sandbox_apply_receipt = self.sandbox_apply.apply_artifact(
+            build_request=build_request,
+            build_artifact=build_artifact,
+        )
+        sandbox_apply_validation = self.sandbox_apply.validate_receipt(sandbox_apply_receipt)
+        suite_selection = self.diff_evaluator.select_suite(
+            target_subsystem=build_request["target_subsystem"],
+            requested_evals=build_request["constraints"]["must_pass"],
+        )
+        execution_eval_refs = self._execution_bound_eval_refs(suite_selection["selected_evals"])
+        eval_execution_session = None
+        eval_execution_validation = {"ok": True, "errors": []}
+        eval_execution_oversight_event = None
+        if execution_eval_refs:
+            eval_execution_oversight_event = self._build_live_enactment_oversight_event(
+                reviewer_namespace="diff-eval",
+                payload_ref=f"artifact://{build_artifact['artifact_id']}",
+            )
+            eval_execution_session = self.live_enactment.execute(
+                build_request=build_request,
+                build_artifact=build_artifact,
+                eval_refs=execution_eval_refs,
+                repo_root=self.repo_root,
+                guardian_oversight_event=eval_execution_oversight_event,
+            )
+            eval_execution_validation = self.live_enactment.validate_session(eval_execution_session)
+        pass_reports = [
+            self.diff_evaluator.run_ab_eval(
+                eval_ref=eval_ref,
+                baseline_ref="runtime://baseline/current",
+                sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
+                enactment_session=(
+                    eval_execution_session if eval_ref in execution_eval_refs else None
+                ),
+            )
+            for eval_ref in suite_selection["selected_evals"]
+        ]
+        execution_bound_reports = self._execution_bound_reports(pass_reports)
+        promote_decision = self.diff_evaluator.classify_rollout(
+            outcomes=[report["outcome"] for report in pass_reports]
+        )
+        hold_report = self.diff_evaluator.run_ab_eval(
+            eval_ref="evals/continuity/council_output_build_request_pipeline.yaml",
+            baseline_ref="runtime://baseline/current",
+            sandbox_ref="workspace://builder/session/hold",
+        )
+        hold_decision = self.diff_evaluator.classify_rollout(
+            outcomes=[pass_reports[0]["outcome"], hold_report["outcome"]]
+        )
+        rollback_report = self.diff_evaluator.run_ab_eval(
+            eval_ref="evals/continuity/builder_rollback_execution.yaml",
+            baseline_ref="runtime://baseline/current",
+            sandbox_ref="mirage://build-l5-diff-eval-rollback/snapshot/rollback-breach",
+        )
+        rollback_decision = self.diff_evaluator.classify_rollout(
+            outcomes=[pass_reports[0]["outcome"], rollback_report["outcome"]]
+        )
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.design.read",
+            payload={
+                "policy": self.design_reader.policy(),
+                "manifest": design_manifest,
+                "validation": design_validation,
+            },
+            actor="DesignReaderService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.generated",
+            payload={
+                "policy": self.patch_generator.policy(),
+                "artifact": build_artifact,
+                "scope_validation": scope_validation,
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.sandbox.applied",
+            payload={
+                "policy": self.sandbox_apply.policy(),
+                "receipt": sandbox_apply_receipt,
+                "validation": sandbox_apply_validation,
+            },
+            actor="SandboxApplyService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        if eval_execution_session is not None:
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="guardian.enactment.attestation.satisfied",
+                payload=eval_execution_oversight_event,
+                actor="HumanOversightChannel",
+                category="guardian-oversight",
+                layer="L4",
+                signature_roles=["third_party"],
+                substrate="classical-silicon",
+            )
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="selfctor.enactment.executed",
+                payload={
+                    "policy": self.live_enactment.policy(),
+                    "session": eval_execution_session,
+                    "validation": eval_execution_validation,
+                },
+                actor="LiveEnactmentService",
+                category="self-modify",
+                layer="L5",
+                signature_roles=["self", "council", "guardian"],
+                substrate="classical-silicon",
+            )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.diff_eval.completed",
+            payload={
+                "policy": self.diff_evaluator.policy(),
+                "selected_evals": suite_selection["selected_evals"],
+                "pass_reports": pass_reports,
+                "hold_report": hold_report,
+                "rollback_report": rollback_report,
+                "classifications": {
+                    "promote": promote_decision,
+                    "hold": hold_decision,
+                    "rollback": rollback_decision,
+                },
+            },
+            actor="DifferentialEvaluatorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "diff_eval": {
+                "policy": self.diff_evaluator.policy(),
+                "design_manifest": design_manifest,
+                "build_request": build_request,
+                "artifact": build_artifact,
+                "sandbox_apply_receipt": sandbox_apply_receipt,
+                "suite_selection": suite_selection,
+                "eval_execution_session": eval_execution_session,
+                "pass_reports": pass_reports,
+                "hold_report": hold_report,
+                "rollback_report": rollback_report,
+                "decisions": {
+                    "promote": promote_decision,
+                    "hold": hold_decision,
+                    "rollback": rollback_decision,
+                },
+            },
+            "validation": {
+                "ok": (
+                    design_validation["ok"]
+                    and scope_validation["allowed"]
+                    and build_artifact["status"] == "ready"
+                    and sandbox_apply_validation["ok"]
+                    and eval_execution_validation["ok"]
+                    and all(report["outcome"] == "pass" for report in pass_reports)
+                    and promote_decision["decision"] == "promote"
+                    and hold_report["outcome"] == "fail"
+                    and hold_decision["decision"] == "hold"
+                    and rollback_report["outcome"] == "regression"
+                    and rollback_decision["decision"] == "rollback"
+                    and len(execution_bound_reports) == 1
+                ),
+                "design_reader_handoff_ok": design_validation["ok"],
+                "scope_allowed": scope_validation["allowed"],
+                "artifact_ready": build_artifact["status"] == "ready",
+                "sandbox_apply_ok": sandbox_apply_validation["ok"],
+                "selected_eval_count": len(suite_selection["selected_evals"]),
+                "selected_evals": suite_selection["selected_evals"],
+                "execution_eval_selected": bool(execution_eval_refs),
+                "pass_report_count": len(pass_reports),
+                "pass_reports_all_pass": all(
+                    report["outcome"] == "pass" for report in pass_reports
+                ),
+                "promote_decision": promote_decision["decision"],
+                "hold_outcome": hold_report["outcome"],
+                "hold_decision": hold_decision["decision"],
+                "rollback_outcome": rollback_report["outcome"],
+                "rollback_decision": rollback_decision["decision"],
+                "execution_report_bound": bool(execution_bound_reports)
+                and execution_bound_reports[0]["execution_bound"],
+                "execution_command_count": (
+                    execution_bound_reports[0]["execution_receipt"]["executed_command_count"]
+                    if execution_bound_reports
+                    else 0
+                ),
+                "execution_cleanup_status": (
+                    execution_bound_reports[0]["execution_receipt"]["cleanup_status"]
+                    if execution_bound_reports
+                    else "not-run"
+                ),
+                "execution_session_status": (
+                    eval_execution_session["status"] if eval_execution_session is not None else "not-run"
+                ),
+                "execution_reviewer_network_attested": (
+                    eval_execution_session["oversight_gate"]["reviewer_network_attested"]
+                    if eval_execution_session is not None
+                    else False
+                ),
+                "pass_report_evidence_bound": all(
+                    len(str(report.get("comparison_digest", ""))) == 64
+                    and bool(report.get("baseline_observation", {}).get("binding_digest"))
+                    and bool(report.get("sandbox_observation", {}).get("binding_digest"))
+                    for report in pass_reports
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_sandbox_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://sandbox-demo/v1",

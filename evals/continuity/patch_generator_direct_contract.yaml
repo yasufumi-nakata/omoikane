@@ -1,0 +1,16 @@
+eval_id: patch_generator_direct_contract
+target: selfctor.patch_generator
+summary: >
+  PatchGenerator が design-backed build_request から planning-cue aligned な
+  ready artifact を生成しつつ、workspace escape・immutable boundary 欠落・
+  planning cue 欠如を含む blocked request を fail-closed に列挙すること
+checks:
+  - name: patch generator direct contract smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli patch-generator-demo --json
+expect:
+  ready_artifact_status: ready
+  ready_patch_count: 5
+  blocked_artifact_status: blocked
+  blocked_rule_mentions_scope_escape: true
+  blocked_rule_mentions_planning_cues: true
+  blocked_rule_mentions_immutable_boundary: true

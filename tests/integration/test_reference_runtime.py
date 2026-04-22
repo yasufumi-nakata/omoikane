@@ -372,6 +372,75 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(7, result["validation"]["output_path_count"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["self-modify"])
 
+    def test_patch_generator_demo_returns_ready_and_blocked_artifacts(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_patch_generator_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["design_reader_handoff_ok"])
+        self.assertTrue(result["validation"]["ready_scope_allowed"])
+        self.assertEqual("ready", result["validation"]["ready_artifact_status"])
+        self.assertEqual(5, result["validation"]["ready_patch_count"])
+        self.assertEqual(
+            [
+                "src/omoikane/self_construction/builders.py",
+                "tests/unit/test_builders.py",
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "docs/02-subsystems/self-construction/README.md",
+                "meta/decision-log/build-l5-patch-generator-0001.md",
+            ],
+            result["validation"]["ready_patch_targets"],
+        )
+        self.assertEqual("blocked", result["validation"]["blocked_artifact_status"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_scope_escape"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_planning_cues"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_immutable_boundary"])
+        self.assertGreaterEqual(result["validation"]["blocked_rule_count"], 3)
+        self.assertEqual(
+            "blocked",
+            result["patch_generator"]["blocked_artifact"]["status"],
+        )
+        self.assertEqual(3, result["ledger_verification"]["category_counts"]["self-modify"])
+
+    def test_diff_eval_demo_classifies_promote_hold_and_rollback(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_diff_eval_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["design_reader_handoff_ok"])
+        self.assertTrue(result["validation"]["scope_allowed"])
+        self.assertTrue(result["validation"]["artifact_ready"])
+        self.assertTrue(result["validation"]["sandbox_apply_ok"])
+        self.assertEqual(2, result["validation"]["selected_eval_count"])
+        self.assertEqual(
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
+            ],
+            result["validation"]["selected_evals"],
+        )
+        self.assertTrue(result["validation"]["execution_eval_selected"])
+        self.assertEqual(2, result["validation"]["pass_report_count"])
+        self.assertTrue(result["validation"]["pass_reports_all_pass"])
+        self.assertEqual("promote", result["validation"]["promote_decision"])
+        self.assertEqual("fail", result["validation"]["hold_outcome"])
+        self.assertEqual("hold", result["validation"]["hold_decision"])
+        self.assertEqual("regression", result["validation"]["rollback_outcome"])
+        self.assertEqual("rollback", result["validation"]["rollback_decision"])
+        self.assertTrue(result["validation"]["execution_report_bound"])
+        self.assertEqual(2, result["validation"]["execution_command_count"])
+        self.assertEqual("removed", result["validation"]["execution_cleanup_status"])
+        self.assertEqual("passed", result["validation"]["execution_session_status"])
+        self.assertTrue(result["validation"]["execution_reviewer_network_attested"])
+        self.assertTrue(result["validation"]["pass_report_evidence_bound"])
+        self.assertEqual("promote", result["diff_eval"]["decisions"]["promote"]["decision"])
+        self.assertEqual("hold", result["diff_eval"]["decisions"]["hold"]["decision"])
+        self.assertEqual("rollback", result["diff_eval"]["decisions"]["rollback"]["decision"])
+        self.assertEqual(5, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
+
     def test_builder_demo_returns_valid_build_pipeline(self) -> None:
         runtime = OmoikaneReferenceOS()
 

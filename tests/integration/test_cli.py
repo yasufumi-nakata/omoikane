@@ -339,6 +339,53 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["build_request_has_design_delta_digest"])
         self.assertEqual(7, result["validation"]["output_path_count"])
 
+    def test_patch_generator_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "patch-generator-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["ready_scope_allowed"])
+        self.assertEqual("ready", result["validation"]["ready_artifact_status"])
+        self.assertEqual(5, result["validation"]["ready_patch_count"])
+        self.assertEqual("blocked", result["validation"]["blocked_artifact_status"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_scope_escape"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_planning_cues"])
+        self.assertTrue(result["validation"]["blocked_rule_mentions_immutable_boundary"])
+        self.assertGreaterEqual(result["validation"]["blocked_rule_count"], 3)
+
+    def test_diff_eval_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "diff-eval-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(2, result["validation"]["selected_eval_count"])
+        self.assertEqual(
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                "evals/continuity/differential_eval_execution_binding.yaml",
+            ],
+            result["validation"]["selected_evals"],
+        )
+        self.assertTrue(result["validation"]["execution_eval_selected"])
+        self.assertTrue(result["validation"]["pass_reports_all_pass"])
+        self.assertEqual("promote", result["validation"]["promote_decision"])
+        self.assertEqual("fail", result["validation"]["hold_outcome"])
+        self.assertEqual("hold", result["validation"]["hold_decision"])
+        self.assertEqual("regression", result["validation"]["rollback_outcome"])
+        self.assertEqual("rollback", result["validation"]["rollback_decision"])
+        self.assertTrue(result["validation"]["execution_report_bound"])
+        self.assertEqual(2, result["validation"]["execution_command_count"])
+        self.assertEqual("removed", result["validation"]["execution_cleanup_status"])
+        self.assertEqual("passed", result["validation"]["execution_session_status"])
+        self.assertTrue(result["validation"]["execution_reviewer_network_attested"])
+        self.assertTrue(result["validation"]["pass_report_evidence_bound"])
+
     def test_builder_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

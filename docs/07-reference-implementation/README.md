@@ -57,6 +57,8 @@ PYTHONPATH=src python3 -m omoikane.cli perception-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
 PYTHONPATH=src python3 -m omoikane.cli design-reader-demo --json
+PYTHONPATH=src python3 -m omoikane.cli patch-generator-demo --json
+PYTHONPATH=src python3 -m omoikane.cli diff-eval-demo --json
 PYTHONPATH=src python3 -m omoikane.cli reasoning-demo --json
 PYTHONPATH=src python3 -m omoikane.cli cognitive-demo --json
 PYTHONPATH=src python3 -m omoikane.cli affect-demo --json
@@ -322,6 +324,20 @@ section-level `changed_section_count` / `section_changes`、
 `docs/` / `specs/` source digest、`must_sync_docs`、
 `planning_cues` を持つ `design_delta_manifest`、
 fail-closed `build_request` handoff を 1 シナリオで確認する。
+
+`patch-generator-demo` は L5 PatchGenerator の reference contract
+(`selfctor.patch_generator.v0`) を JSON で可視化し、
+design-backed `build_request` から planning cue / target subsystem / output path に整列した
+ready multi-file patch descriptor を生成しつつ、
+workspace escape、immutable boundary 欠落、planning cue 欠如を含む blocked request が
+`blocking_rules` を列挙した fail-closed artifact に落ちることを 1 シナリオで確認する。
+
+`diff-eval-demo` は L5 DifferentialEvaluator の reference contract
+(`selfctor.diff_eval.v0`) を JSON で可視化し、
+selected eval suite、parsed baseline / sandbox observation、
+temp workspace の actual command evidence を束縛した `diff_eval_execution_receipt`、
+および `pass -> promote`、`fail -> hold`、`regression -> rollback` の
+fail-closed classify を direct surface として 1 シナリオで確認する。
 
 `builder-demo` は L5 self-construction builder pipeline の reference contract
 (`selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0`) を

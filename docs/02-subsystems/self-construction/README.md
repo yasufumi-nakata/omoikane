@@ -68,6 +68,11 @@ reference runtime では `builder-demo` がこの流れのうち
 さらに `design-reader-demo` は
 `docs/specs -> git HEAD delta scan -> source digest + section_changes -> design_delta_manifest + planning_cues -> fail-closed build_request`
 の入口 handoff を deterministic に再現する。
+さらに `patch-generator-demo` は
+`build_request -> validate_scope -> ready multi-file patch descriptor -> blocked scope validation`
+を direct contract として再現し、`diff-eval-demo` は
+`select_suite -> parsed baseline/sandbox observation -> execution-bound eval report -> promote/hold/rollback classify`
+を standalone surface として再現する。
 
 ## Mirage Self（サンドボックス自我）
 

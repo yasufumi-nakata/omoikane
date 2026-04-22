@@ -197,6 +197,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     design_reader_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    patch_generator_parser = subparsers.add_parser(
+        "patch-generator-demo",
+        help="Run the L5 planning-cue aligned patch descriptor generation and fail-closed scope blocking scenario",
+    )
+    patch_generator_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
+    diff_eval_parser = subparsers.add_parser(
+        "diff-eval-demo",
+        help="Run the L5 parsed A/B evidence, execution receipt binding, and promote/hold/rollback classification scenario",
+    )
+    diff_eval_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     sandbox_parser = subparsers.add_parser(
         "sandbox-demo",
         help="Run the L5 sandbox suffering proxy and freeze scenario",
@@ -480,6 +492,14 @@ def main() -> None:
 
     if args.command == "design-reader-demo":
         _print_result(runtime.run_design_reader_demo(), args.json)
+        return
+
+    if args.command == "patch-generator-demo":
+        _print_result(runtime.run_patch_generator_demo(), args.json)
+        return
+
+    if args.command == "diff-eval-demo":
+        _print_result(runtime.run_diff_eval_demo(), args.json)
         return
 
     if args.command == "sandbox-demo":

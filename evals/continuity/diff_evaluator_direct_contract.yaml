@@ -1,0 +1,21 @@
+eval_id: diff_evaluator_direct_contract
+target: selfctor.diff_eval
+summary: >
+  DifferentialEvaluator が parsed baseline/sandbox observation と
+  temp-workspace execution receipt を束縛した pass path に加え、
+  fail を hold、regression を rollback へ fail-closed に分類すること
+checks:
+  - name: diff evaluator direct contract smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli diff-eval-demo --json
+expect:
+  selected_eval_count: 2
+  execution_eval_selected: true
+  pass_reports_all_pass: true
+  promote_decision: promote
+  hold_outcome: fail
+  hold_decision: hold
+  rollback_outcome: regression
+  rollback_decision: rollback
+  execution_report_bound: true
+  execution_command_count: 2
+  execution_cleanup_status: removed
