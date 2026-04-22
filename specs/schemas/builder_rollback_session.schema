@@ -162,7 +162,7 @@ properties:
         const: true
       max_reverted_patch_count:
         type: integer
-        const: 4
+        const: 5
   trigger:
     type: string
     enum:

@@ -152,30 +152,53 @@ $defs:
         type: string
         minLength: 1
   executed_stage:
-    allOf:
-      - $ref: "#/$defs/stage_descriptor"
-      - type: object
-        required:
-          - status
-          - guardian_gate
-          - rollback_ref
-        properties:
-          status:
-            type: string
-            enum:
-              - completed
-              - blocked
-              - rolled-back
-          guardian_gate:
-            type: string
-            enum:
-              - observe
-              - pass
-              - hold
-              - reject
-          rollback_ref:
-            type: string
-            pattern: "^rollback://"
+    type: object
+    additionalProperties: false
+    required:
+      - stage_id
+      - traffic_percent
+      - delivery_mode
+      - promotion_signal
+      - status
+      - guardian_gate
+      - rollback_ref
+    properties:
+      stage_id:
+        type: string
+        enum:
+          - dark-launch
+          - canary-5pct
+          - broad-50pct
+          - full-100pct
+      traffic_percent:
+        type: integer
+        enum: [0, 5, 50, 100]
+      delivery_mode:
+        type: string
+        enum:
+          - shadow-only
+          - limited-visible
+          - shared-visible
+          - primary-visible
+      promotion_signal:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum:
+          - completed
+          - blocked
+          - rolled-back
+      guardian_gate:
+        type: string
+        enum:
+          - observe
+          - pass
+          - hold
+          - reject
+      rollback_ref:
+        type: string
+        pattern: "^rollback://"
 examples:
   - kind: staged_rollout_session
     schema_version: "1.0"

@@ -352,6 +352,7 @@ artifact-bound reviewer network attestation を通過した temp workspace の a
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
 `full-100pct`) の固定順序実行まで
 ledger-safe な `self-modify` chain で進むことを確認する。
+公開 `staged_rollout_session.schema` との整合は integration test で継続検証する。
 
 `builder-live-demo` は L5 live enactment の reference contract
 (`selfctor.enactment.v0`) を JSON で可視化し、
@@ -362,6 +363,8 @@ runtime/tests/evals/docs/meta/decision-log の approved scope 以外には広げ
 `builder_live_enactment_execution` eval の command を実際に実行し、
 `builder_live_oversight_network` expectation と `workspace-enacted` marker を持つ mutated file、
 network-attested oversight gate、cleanup 済み receipt を 1 シナリオで確認する。
+公開 `builder_live_enactment_session.schema` は canonical
+`guardian_oversight_event.schema` と同じ reviewer binding shape を使う。
 
 `rollback-demo` は L5 builder rollback の reference contract
 (`selfctor.rollback.v0`) を JSON で可視化し、
@@ -379,6 +382,8 @@ cleanup 済み telemetry gate、
 append-only continuity ref 2 本、
 self / council / guardian の 3 者通知を
 1 シナリオで確認する。
+公開 `builder_rollback_session.schema` とは
+`max_reverted_patch_count=5` を含む rollback policy contract まで同期する。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

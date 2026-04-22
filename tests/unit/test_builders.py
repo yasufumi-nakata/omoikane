@@ -223,6 +223,17 @@ def _live_enactment_oversight_event(*, artifact_ref: str) -> dict[str, object]:
     return event
 
 
+def _capture_repo_targets(
+    repo_root: Path,
+    paths: list[str],
+) -> dict[str, str | None]:
+    snapshots: dict[str, str | None] = {}
+    for path in paths:
+        target = repo_root / path
+        snapshots[path] = target.read_text(encoding="utf-8") if target.exists() else None
+    return snapshots
+
+
 class DesignReaderServiceTests(unittest.TestCase):
     def test_scan_repo_delta_detects_modified_design_and_spec_refs(self) -> None:
         reader = DesignReaderService()
@@ -594,17 +605,22 @@ class RolloutPlannerServiceTests(unittest.TestCase):
 class RollbackEngineServiceTests(unittest.TestCase):
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
+        repo_root = Path(__file__).resolve().parents[2]
         request = _design_backed_request(
             target_subsystem="L5.RollbackEngine",
             request_id="build-l5-rollback-0001",
             must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
+        baseline_snapshots = _capture_repo_targets(
+            repo_root,
+            [str(patch["target_path"]) for patch in artifact["patches"]],
+        )
         live_enactment_session = LiveEnactmentService().execute(
             build_request=request,
             build_artifact=artifact,
             eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
-            repo_root=Path(__file__).resolve().parents[2],
+            repo_root=repo_root,
             guardian_oversight_event=_live_enactment_oversight_event(
                 artifact_ref=f"artifact://{artifact['artifact_id']}"
             ),
@@ -639,7 +655,7 @@ class RollbackEngineServiceTests(unittest.TestCase):
                 ],
             },
             live_enactment_session=live_enactment_session,
-            repo_root=Path(__file__).resolve().parents[2],
+            repo_root=repo_root,
             trigger="eval-regression",
             reason="Regression detected during canary rollout.",
             initiator="IntegrityGuardian",
@@ -749,6 +765,14 @@ class RollbackEngineServiceTests(unittest.TestCase):
         self.assertTrue(session["telemetry_gate"]["reviewer_network_attested"])
         self.assertEqual(3, len(session["notification_refs"]))
         self.assertTrue(service.validate_session(session)["ok"])
+        for relative_path, baseline_text in baseline_snapshots.items():
+            target = repo_root / relative_path
+            restored_text = target.read_text(encoding="utf-8") if target.exists() else None
+            self.assertEqual(
+                baseline_text,
+                restored_text,
+                msg=f"rollback execution leaked into current checkout: {relative_path}",
+            )
 
 
 class LiveEnactmentServiceTests(unittest.TestCase):
@@ -763,6 +787,10 @@ class LiveEnactmentServiceTests(unittest.TestCase):
             ],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
+        baseline_snapshots = _capture_repo_targets(
+            repo_root,
+            [str(patch["target_path"]) for patch in artifact["patches"]],
+        )
 
         session = LiveEnactmentService().execute(
             build_request=request,
@@ -784,6 +812,14 @@ class LiveEnactmentServiceTests(unittest.TestCase):
         self.assertEqual("enactment-approved", session["oversight_gate"]["status"])
         self.assertTrue(session["oversight_gate"]["reviewer_network_attested"])
         self.assertTrue(LiveEnactmentService().validate_session(session)["ok"])
+        for relative_path, baseline_text in baseline_snapshots.items():
+            target = repo_root / relative_path
+            restored_text = target.read_text(encoding="utf-8") if target.exists() else None
+            self.assertEqual(
+                baseline_text,
+                restored_text,
+                msg=f"live enactment leaked into current checkout: {relative_path}",
+            )
 
     def test_execute_blocks_without_network_attested_oversight_event(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
