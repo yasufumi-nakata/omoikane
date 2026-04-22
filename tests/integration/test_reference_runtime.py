@@ -295,13 +295,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_semantic_demo()
 
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["connectome"]["ok"])
         self.assertTrue(result["validation"]["semantic"]["ok"])
+        self.assertTrue(result["validation"]["procedural_handoff"]["ok"])
         self.assertEqual(2, result["validation"]["semantic"]["concept_count"])
         self.assertEqual(
             ["council-review", "migration-check"],
             result["validation"]["semantic"]["labels"],
         )
+        self.assertEqual(
+            ["council-review", "migration-check"],
+            result["validation"]["procedural_handoff"]["canonical_labels"],
+        )
+        self.assertEqual(
+            "mind.procedural.v0",
+            result["validation"]["procedural_handoff"]["target_namespace"],
+        )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["semantic-projection"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["semantic-handoff"])
 
     def test_procedural_demo_returns_valid_preview(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -310,13 +321,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["connectome"]["ok"])
+        self.assertTrue(result["validation"]["semantic"]["ok"])
+        self.assertTrue(result["validation"]["semantic_handoff"]["ok"])
+        self.assertTrue(result["validation"]["handoff_matches_preview_policy"])
         self.assertTrue(result["validation"]["procedural"]["ok"])
         self.assertEqual(2, result["validation"]["procedural"]["recommendation_count"])
         self.assertEqual(
             ["continuity_integrator->ethics_gate", "sensory_ingress->continuity_integrator"],
             sorted(result["validation"]["procedural"]["target_paths"]),
         )
+        self.assertEqual("ready", result["procedural"]["semantic_handoff"]["status"])
         self.assertEqual(["skill-execution"], result["procedural"]["snapshot"]["deferred_surfaces"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["semantic-handoff"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-preview"])
 
     def test_procedural_writeback_demo_returns_valid_receipt(self) -> None:

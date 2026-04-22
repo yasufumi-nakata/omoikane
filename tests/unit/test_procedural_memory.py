@@ -9,6 +9,7 @@ from omoikane.mind.memory import (
     ProceduralSkillEnactmentService,
     ProceduralSkillExecutor,
     ProceduralMemoryWritebackGate,
+    SemanticMemoryProjector,
 )
 
 
@@ -50,6 +51,50 @@ class ProceduralMemoryProjectorTests(unittest.TestCase):
         self.assertTrue(
             any("recommendation_count" in error for error in validation["errors"])
         )
+
+    def test_project_from_handoff_returns_valid_preview(self) -> None:
+        semantic = SemanticMemoryProjector()
+        projector = ProceduralMemoryProjector()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        semantic_snapshot = semantic.project("identity-demo", manifest)
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        handoff = semantic.prepare_procedural_handoff(
+            "identity-demo",
+            semantic_snapshot,
+            connectome_document,
+        )
+
+        snapshot = projector.project_from_handoff(
+            "identity-demo",
+            handoff,
+            manifest,
+            connectome_document,
+        )
+        validation = projector.validate(snapshot)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(2, validation["recommendation_count"])
+
+    def test_project_from_handoff_rejects_connectome_digest_mismatch(self) -> None:
+        semantic = SemanticMemoryProjector()
+        projector = ProceduralMemoryProjector()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        semantic_snapshot = semantic.project("identity-demo", manifest)
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        handoff = semantic.prepare_procedural_handoff(
+            "identity-demo",
+            semantic_snapshot,
+            connectome_document,
+        )
+        handoff["connectome_snapshot_digest"] = "0" * 64
+
+        with self.assertRaisesRegex(ValueError, "semantic procedural handoff"):
+            projector.project_from_handoff(
+                "identity-demo",
+                handoff,
+                manifest,
+                connectome_document,
+            )
 
 
 class ProceduralMemoryWritebackGateTests(unittest.TestCase):

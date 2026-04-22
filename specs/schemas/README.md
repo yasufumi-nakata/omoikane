@@ -18,6 +18,7 @@
 - `episodic_stream_snapshot.schema`
 - `memory_crystal_manifest.schema`
 - `semantic_memory_snapshot.schema`
+- `semantic_procedural_handoff.schema`
 - `procedural_memory_preview.schema`
 - `procedural_writeback_receipt.schema`
 - `procedural_skill_enactment_session.schema`

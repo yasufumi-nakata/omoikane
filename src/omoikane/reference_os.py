@@ -7195,6 +7195,8 @@ json.dump(response, sys.stdout)
         )
         semantic_snapshot = self.semantic.project(identity.identity_id, manifest)
         semantic_validation = self.semantic.validate(semantic_snapshot)
+        connectome_document = self.connectome.build_reference_snapshot(identity.identity_id)
+        connectome_validation = self.connectome.validate(connectome_document)
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="mind.memory.semantic_projected",
@@ -7211,6 +7213,34 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council"],
             substrate="classical-silicon",
         )
+        semantic_handoff = self.semantic.prepare_procedural_handoff(
+            identity.identity_id,
+            semantic_snapshot,
+            connectome_document,
+        )
+        handoff_validation = self.semantic.validate_procedural_handoff(
+            semantic_handoff,
+            semantic_snapshot=semantic_snapshot,
+            connectome_document=connectome_document,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.semantic_procedural_handoff_prepared",
+            payload={
+                "policy_id": semantic_handoff["handoff_policy"]["policy_id"],
+                "handoff_id": semantic_handoff["handoff_id"],
+                "handoff_digest": semantic_handoff["digest"],
+                "target_namespace": semantic_handoff["handoff_policy"]["target_namespace"],
+                "concept_count": semantic_handoff["concept_count"],
+                "canonical_labels": handoff_validation["canonical_labels"],
+                "connectome_snapshot_digest": semantic_handoff["connectome_snapshot_digest"],
+            },
+            actor="SemanticMemoryProjector",
+            category="semantic-handoff",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -7220,12 +7250,21 @@ json.dump(response, sys.stdout)
                 "projection_policy": self.semantic.profile(),
                 "episodic_stream": episodic_snapshot,
                 "manifest": manifest,
+                "connectome": connectome_document,
                 "snapshot": semantic_snapshot,
+                "procedural_handoff": semantic_handoff,
             },
             "validation": {
                 "manifest": manifest_validation,
+                "connectome": connectome_validation,
                 "semantic": semantic_validation,
-                "ok": manifest_validation["ok"] and semantic_validation["ok"],
+                "procedural_handoff": handoff_validation,
+                "ok": (
+                    manifest_validation["ok"]
+                    and connectome_validation["ok"]
+                    and semantic_validation["ok"]
+                    and handoff_validation["ok"]
+                ),
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -7243,6 +7282,19 @@ json.dump(response, sys.stdout)
         manifest_validation = self.memory.validate(manifest)
         connectome_document = self.connectome.build_reference_snapshot(identity.identity_id)
         connectome_validation = self.connectome.validate(connectome_document)
+        semantic_snapshot = self.semantic.project(identity.identity_id, manifest)
+        semantic_validation = self.semantic.validate(semantic_snapshot)
+        semantic_handoff = self.semantic.prepare_procedural_handoff(
+            identity.identity_id,
+            semantic_snapshot,
+            connectome_document,
+        )
+        handoff_validation = self.semantic.validate_procedural_handoff(
+            semantic_handoff,
+            semantic_snapshot=semantic_snapshot,
+            manifest=manifest,
+            connectome_document=connectome_document,
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="mind.memory.crystal_compacted",
@@ -7259,8 +7311,43 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council"],
             substrate="classical-silicon",
         )
-        procedural_snapshot = self.procedural.project(
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.semantic_projected",
+            payload={
+                "policy_id": semantic_snapshot["projection_policy"]["policy_id"],
+                "concept_count": semantic_snapshot["concept_count"],
+                "labels": semantic_validation["labels"],
+                "source_manifest_digest": semantic_snapshot["source_manifest_digest"],
+                "deferred_surfaces": semantic_snapshot["deferred_surfaces"],
+            },
+            actor="SemanticMemoryProjector",
+            category="semantic-projection",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.semantic_procedural_handoff_prepared",
+            payload={
+                "policy_id": semantic_handoff["handoff_policy"]["policy_id"],
+                "handoff_id": semantic_handoff["handoff_id"],
+                "handoff_digest": semantic_handoff["digest"],
+                "target_namespace": semantic_handoff["handoff_policy"]["target_namespace"],
+                "concept_count": semantic_handoff["concept_count"],
+                "canonical_labels": handoff_validation["canonical_labels"],
+                "connectome_snapshot_digest": semantic_handoff["connectome_snapshot_digest"],
+            },
+            actor="SemanticMemoryProjector",
+            category="semantic-handoff",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        procedural_snapshot = self.procedural.project_from_handoff(
             identity.identity_id,
+            semantic_handoff,
             manifest,
             connectome_document,
         )
@@ -7274,6 +7361,7 @@ json.dump(response, sys.stdout)
                 "target_paths": procedural_validation["target_paths"],
                 "source_manifest_digest": procedural_snapshot["source_manifest_digest"],
                 "connectome_snapshot_digest": procedural_snapshot["connectome_snapshot_digest"],
+                "semantic_handoff_digest": semantic_handoff["digest"],
                 "deferred_surfaces": procedural_snapshot["deferred_surfaces"],
             },
             actor="ProceduralMemoryProjector",
@@ -7292,15 +7380,25 @@ json.dump(response, sys.stdout)
                 "episodic_stream": episodic_snapshot,
                 "manifest": manifest,
                 "connectome": connectome_document,
+                "semantic_snapshot": semantic_snapshot,
+                "semantic_handoff": semantic_handoff,
                 "snapshot": procedural_snapshot,
             },
             "validation": {
                 "manifest": manifest_validation,
                 "connectome": connectome_validation,
+                "semantic": semantic_validation,
+                "semantic_handoff": handoff_validation,
                 "procedural": procedural_validation,
+                "handoff_matches_preview_policy": (
+                    semantic_handoff["handoff_policy"]["target_preview_policy"]
+                    == procedural_snapshot["preview_policy"]["policy_id"]
+                ),
                 "ok": (
                     manifest_validation["ok"]
                     and connectome_validation["ok"]
+                    and semantic_validation["ok"]
+                    and handoff_validation["ok"]
                     and procedural_validation["ok"]
                 ),
             },

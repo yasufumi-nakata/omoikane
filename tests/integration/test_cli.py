@@ -279,7 +279,9 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["connectome"]["ok"])
         self.assertTrue(result["validation"]["semantic"]["ok"])
+        self.assertTrue(result["validation"]["procedural_handoff"]["ok"])
         self.assertEqual(2, result["validation"]["semantic"]["concept_count"])
         self.assertEqual(
             ["council-review", "migration-check"],
@@ -289,6 +291,7 @@ class CliIntegrationTests(unittest.TestCase):
             ["procedural-memory"],
             result["semantic"]["snapshot"]["deferred_surfaces"],
         )
+        self.assertEqual("ready", result["semantic"]["procedural_handoff"]["status"])
 
     def test_procedural_demo_emits_valid_preview_json(self) -> None:
         stdout = io.StringIO()
@@ -298,6 +301,8 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["semantic_handoff"]["ok"])
+        self.assertTrue(result["validation"]["handoff_matches_preview_policy"])
         self.assertTrue(result["validation"]["procedural"]["ok"])
         self.assertEqual(2, result["validation"]["procedural"]["recommendation_count"])
         self.assertEqual(
@@ -308,6 +313,7 @@ class CliIntegrationTests(unittest.TestCase):
             ["skill-execution"],
             result["procedural"]["snapshot"]["deferred_surfaces"],
         )
+        self.assertEqual("ready", result["procedural"]["semantic_handoff"]["status"])
 
     def test_procedural_writeback_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

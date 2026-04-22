@@ -8,6 +8,7 @@ summary: >
 imports:
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
   connectome_document: ../schemas/connectome_document.schema
+  semantic_procedural_handoff: ../schemas/semantic_procedural_handoff.schema
   procedural_memory_preview: ../schemas/procedural_memory_preview.schema
 operations:
   project:
@@ -35,6 +36,35 @@ operations:
       - each recommendation must preserve source_segment_ids and source_event_ids
       - weight deltas must remain within the fixed max_weight_delta
       - any later apply path must require self, council, and guardian approval
+  project_from_handoff:
+    summary: >
+      Build the same connectome-coupled procedural preview from one validated
+      semantic handoff, one manifest, and one connectome snapshot.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - handoff
+          - manifest
+          - connectome_document
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          handoff:
+            schema_ref: semantic_procedural_handoff
+          manifest:
+            schema_ref: memory_crystal_manifest
+          connectome_document:
+            schema_ref: connectome_document
+    output:
+      schema_ref: procedural_memory_preview
+    guarantees:
+      - handoff source_manifest_digest must match the supplied manifest
+      - handoff connectome_snapshot_digest must match the supplied connectome snapshot
+      - handoff target_preview_policy must equal connectome-coupled-procedural-preview-v1
   validate_snapshot:
     summary: Validate one procedural preview snapshot against the fixed preview policy.
     input:

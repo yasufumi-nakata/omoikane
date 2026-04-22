@@ -73,10 +73,14 @@ reference runtime では MemoryCrystal manifest の各 segment を
 - `segment.theme` を `canonical_label` に昇格する
 - `semantic_anchors` を retrieval cue / alias 候補として保持する
 - `source_event_ids` / `source_refs` / `time_span` / `affect_summary` を失わず保持する
-- procedural memory は `Connectome` 側の preview 前段として deferred と明示する
+- semantic snapshot 自体は procedural memory を deferred と明示したまま維持し、
+  validated `Connectome` snapshot に束縛された digest-bound handoff を別 artifact として返す
 
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
+
+handoff schema:
+[specs/schemas/semantic_procedural_handoff.schema](../../../specs/schemas/semantic_procedural_handoff.schema)
 
 ## Reference runtime の procedural preview
 

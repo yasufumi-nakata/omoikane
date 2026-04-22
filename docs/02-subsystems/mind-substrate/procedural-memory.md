@@ -16,6 +16,9 @@ human-approved な **bounded writeback receipt** を生成する。
 canonical schema:
 [specs/schemas/procedural_memory_preview.schema](../../../specs/schemas/procedural_memory_preview.schema)
 
+semantic handoff schema:
+[specs/schemas/semantic_procedural_handoff.schema](../../../specs/schemas/semantic_procedural_handoff.schema)
+
 writeback receipt schema:
 [specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
 
@@ -50,11 +53,12 @@ skill enactment session schema:
 
 ## Reference Runtime
 
-- `mind.procedural.v0.idl` で `project / validate_snapshot` を定義
+- `mind.procedural.v0.idl` で `project / project_from_handoff / validate_snapshot` を定義
 - `mind.procedural_writeback.v0.idl` で `apply_preview / validate_receipt` を定義
 - `mind.skill_execution.v0.idl` で `execute / validate_receipt` を定義
 - `mind.skill_enactment.v0.idl` で `execute / validate_session` を定義
-- `procedural-demo --json` で `MemoryCrystal` manifest と `Connectome` snapshot から preview を生成する
+- `procedural-demo --json` で `semantic_procedural_handoff` を消費しつつ
+  `MemoryCrystal` manifest と `Connectome` snapshot から preview を生成する
 - `procedural-writeback-demo --json` で preview を human-approved writeback に昇格し、
   copied `Connectome` snapshot、writeback receipt、continuity diff metadata を確認する
 - `procedural-skill-demo --json` で writeback 後の selected recommendation を

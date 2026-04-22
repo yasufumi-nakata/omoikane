@@ -7,12 +7,16 @@ L2 Mind Substrate のサブシステム。`MemoryCrystal` の append-only segmen
 
 - `MemoryCrystal` の `theme` / `semantic_anchors` / `source_event_ids` を失わずに概念化する
 - 体験記憶そのものを改変せず、参照用の semantic snapshot だけを生成する
-- procedural memory へ越境せず、`Connectome` 側の将来 preview へ境界を残す
+- procedural memory へ越境実行せず、validated `Connectome` snapshot に束縛された
+  digest-bound handoff だけを準備する
 
 ## Canonical Snapshot
 
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
+
+semantic handoff schema:
+[specs/schemas/semantic_procedural_handoff.schema](../../../specs/schemas/semantic_procedural_handoff.schema)
 
 必須フィールド:
 
@@ -36,10 +40,14 @@ canonical schema:
 
 ## Reference Runtime
 
-- `mind.semantic.v0.idl` で `project / validate_snapshot` を定義
-- `semantic-demo --json` で `MemoryCrystal` manifest から semantic snapshot を生成する
+- `mind.semantic.v0.idl` で
+  `project / prepare_procedural_handoff / validate_snapshot / validate_procedural_handoff`
+  を定義
+- `semantic-demo --json` で `MemoryCrystal` manifest から semantic snapshot を生成し、
+  validated `Connectome` snapshot に束縛された `semantic_procedural_handoff` を返す
 - ledger には `semantic-projection` category で source manifest digest と concept label を残す
-- `procedural-memory` は v0 では常に deferred と明示する
+- ledger には `semantic-handoff` category で handoff digest と target namespace を残す
+- `procedural-memory` は snapshot contract 上では v0 の deferred surface として明示する
 
 ## 不変条件
 
@@ -47,6 +55,7 @@ canonical schema:
 2. projection は read-only であり `MemoryCrystal` を上書きしない
 3. `deferred_surfaces` から procedural memory を外さない
 4. concept digest は payload から決定論的に再計算できる
+5. handoff は validated `Connectome` snapshot と target namespace を digest-bound に固定する
 
 ## 関連
 

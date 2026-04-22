@@ -428,16 +428,20 @@ append-only snapshot、最新 5 event の handoff window、
 (`mind.semantic.v0`) を JSON で可視化し、
 `MemoryCrystal` segment を `semantic-segment-rollup-v1` で
 read-only concept view に投影しつつ、
-`procedural-memory` が deferred surface として残ること、
-`semantic-projection` ledger event が source manifest digest と concept label を記録することを確認する。
+snapshot contract 上では `procedural-memory` が deferred surface として残る一方、
+validated `Connectome` snapshot に束縛された
+`semantic_procedural_handoff` を生成し、
+`semantic-projection` と `semantic-handoff` の両 ledger event が
+source manifest digest / concept label / handoff digest を記録することを確認する。
 
 `procedural-demo` は L2 procedural preview の reference contract
 (`mind.procedural.v0`) を JSON で可視化し、
-`MemoryCrystal` segment と `Connectome` snapshot を
+semantic projection 由来の `semantic_procedural_handoff` と
+`MemoryCrystal` segment / `Connectome` snapshot を
 `connectome-coupled-procedural-preview-v1` で突き合わせ、
 bounded な `weight-delta-preview` recommendation と
-`procedural-preview` ledger event が source manifest / connectome digest と
-target path を記録することを確認する。
+`procedural-preview` ledger event が source manifest / connectome digest /
+semantic handoff digest / target path を記録することを確認する。
 
 `procedural-writeback-demo` は L2 procedural writeback gate の reference contract
 (`mind.procedural_writeback.v0`) を JSON で可視化し、

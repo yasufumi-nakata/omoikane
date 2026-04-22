@@ -6,6 +6,8 @@ summary: Deterministic read-only semantic projection derived from MemoryCrystal 
 imports:
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
   semantic_memory_snapshot: ../schemas/semantic_memory_snapshot.schema
+  connectome_document: ../schemas/connectome_document.schema
+  semantic_procedural_handoff: ../schemas/semantic_procedural_handoff.schema
 operations:
   project:
     summary: Build a semantic concept view from one validated MemoryCrystal manifest.
@@ -28,6 +30,32 @@ operations:
       - projection must not mutate or supersede MemoryCrystal source segments
       - each concept must preserve supporting_segment_ids and supporting_event_ids
       - procedural-memory must remain a deferred surface in v0
+  prepare_procedural_handoff:
+    summary: >
+      Prepare one digest-bound bridge artifact that hands a semantic snapshot to
+      `mind.procedural.v0` without mutating MemoryCrystal or Connectome state.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - snapshot
+          - connectome_document
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          snapshot:
+            schema_ref: semantic_memory_snapshot
+          connectome_document:
+            schema_ref: connectome_document
+    output:
+      schema_ref: semantic_procedural_handoff
+    guarantees:
+      - handoff must preserve source_manifest_digest and source_segment_ids from the semantic snapshot
+      - handoff must bind one validated connectome snapshot before procedural preview begins
+      - handoff must remain read-only and digest-bound
   validate_snapshot:
     summary: Validate one semantic memory snapshot against the fixed projection policy.
     input:
@@ -70,7 +98,54 @@ operations:
             items:
               type: string
               minLength: 1
+  validate_procedural_handoff:
+    summary: Validate one semantic-to-procedural handoff artifact against the fixed bridge policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - handoff
+        properties:
+          handoff:
+            schema_ref: semantic_procedural_handoff
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - concept_count
+          - canonical_labels
+          - target_namespace
+          - status
+          - errors
+        properties:
+          ok:
+            type: boolean
+          concept_count:
+            type: integer
+            minimum: 0
+          canonical_labels:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          target_namespace:
+            type: string
+            minLength: 1
+          status:
+            type: string
+            minLength: 1
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
 events:
   mind.memory.semantic_projected:
     payload:
       schema_ref: semantic_memory_snapshot
+  mind.memory.semantic_procedural_handoff_prepared:
+    payload:
+      schema_ref: semantic_procedural_handoff

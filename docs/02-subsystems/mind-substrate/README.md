@@ -47,7 +47,8 @@ canonical schema:
 `MemoryCrystal` の segment を read-only な semantic concept view に投影する層。
 - reference runtime では `semantic-segment-rollup-v1` を採用
 - `segment.theme` を canonical label とし、`semantic_anchors` を retrieval cue として保持
-- procedural memory はまだ `Connectome` 側の preview に留め、ここでは明示的に deferred とする
+- semantic snapshot 自体は procedural memory を明示的に deferred のまま保ちつつ、
+  validated `Connectome` snapshot に束縛された digest-bound handoff を準備する
 canonical schema:
 [specs/schemas/semantic_memory_snapshot.schema](../../../specs/schemas/semantic_memory_snapshot.schema)
 

@@ -1,0 +1,19 @@
+eval_id: semantic_procedural_handoff
+target: mind.semantic_procedural_handoff
+summary: >
+  semantic projection が read-only boundary を保ったまま、validated Connectome
+  snapshot に束縛された digest-bound procedural handoff を返すこと
+checks:
+  - name: semantic demo handoff smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
+expect:
+  semantic_ok: true
+  connectome_ok: true
+  handoff_ok: true
+  handoff_status: ready
+  concept_count: 2
+  canonical_labels:
+    - council-review
+    - migration-check
+  target_namespace: mind.procedural.v0
+  semantic_handoff_ledger_count: 1

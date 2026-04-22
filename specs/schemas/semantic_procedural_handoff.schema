@@ -1,0 +1,170 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/semantic_procedural_handoff.schema"
+title: SemanticProceduralHandoff
+description: >
+  Digest-bound bridge artifact that prepares one semantic memory snapshot for
+  connectome-coupled procedural preview without mutating MemoryCrystal or
+  Connectome state.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - handoff_id
+  - identity_id
+  - generated_at
+  - handoff_policy
+  - semantic_snapshot_digest
+  - source_manifest_digest
+  - source_segment_ids
+  - connectome_snapshot_id
+  - connectome_snapshot_digest
+  - concept_count
+  - concept_bindings
+  - status
+  - digest
+properties:
+  kind:
+    type: string
+    const: semantic_procedural_handoff
+  schema_version:
+    type: string
+    const: "1.0"
+  handoff_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  generated_at:
+    type: string
+    format: date-time
+  handoff_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - source_projection_policy
+      - target_preview_policy
+      - target_namespace
+      - handoff_mode
+      - read_only
+      - connectome_required
+      - required_eval_refs
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: semantic-to-procedural-preview-handoff-v1
+      source_projection_policy:
+        type: string
+        const: semantic-segment-rollup-v1
+      target_preview_policy:
+        type: string
+        const: connectome-coupled-procedural-preview-v1
+      target_namespace:
+        type: string
+        const: mind.procedural.v0
+      handoff_mode:
+        type: string
+        const: digest-bound-concept-bridge
+      read_only:
+        type: boolean
+        const: true
+      connectome_required:
+        type: boolean
+        const: true
+      required_eval_refs:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  semantic_snapshot_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_manifest_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_segment_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  connectome_snapshot_id:
+    type: string
+    format: uuid
+  connectome_snapshot_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  concept_count:
+    type: integer
+    minimum: 1
+  concept_bindings:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/concept_binding"
+  status:
+    type: string
+    const: ready
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+$defs:
+  concept_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - concept_id
+      - canonical_label
+      - supporting_segment_ids
+      - supporting_event_ids
+      - retrieval_cues
+      - source_segment_digest
+      - confidence
+      - digest
+    properties:
+      concept_id:
+        type: string
+        minLength: 1
+      canonical_label:
+        type: string
+        minLength: 1
+      supporting_segment_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      supporting_event_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      retrieval_cues:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      source_segment_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"

@@ -30,6 +30,12 @@ COMPACTION_STRATEGY_ID = "append-only-segment-rollup-v1"
 MAX_SOURCE_EVENTS_PER_SEGMENT = 3
 SEMANTIC_MEMORY_SCHEMA_VERSION = "1.0"
 SEMANTIC_PROJECTION_POLICY_ID = "semantic-segment-rollup-v1"
+SEMANTIC_PROCEDURAL_HANDOFF_SCHEMA_VERSION = "1.0"
+SEMANTIC_PROCEDURAL_HANDOFF_POLICY_ID = "semantic-to-procedural-preview-handoff-v1"
+SEMANTIC_PROCEDURAL_HANDOFF_TARGET_NAMESPACE = "mind.procedural.v0"
+SEMANTIC_PROCEDURAL_HANDOFF_REQUIRED_EVALS = [
+    "evals/continuity/semantic_procedural_handoff.yaml",
+]
 MEMORY_EDIT_SCHEMA_VERSION = "1.0"
 MEMORY_EDIT_POLICY_ID = "consented-recall-affect-buffer-v1"
 MEMORY_EDIT_ALLOWED_OPERATION = "affect-buffer-on-recall"
@@ -80,6 +86,14 @@ def _semantic_concept_digest_payload(concept: Dict[str, Any]) -> Dict[str, Any]:
 
 def _memory_recall_view_digest_payload(view: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in view.items() if key != "digest"}
+
+
+def _semantic_procedural_concept_binding_digest_payload(binding: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in binding.items() if key != "digest"}
+
+
+def _semantic_procedural_handoff_digest_payload(handoff: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in handoff.items() if key != "digest"}
 
 
 def _procedural_recommendation_digest_payload(recommendation: Dict[str, Any]) -> Dict[str, Any]:
@@ -852,6 +866,19 @@ class SemanticMemoryProjector:
         manifest = MemoryCrystalStore().build_reference_manifest(identity_id)
         return self.project(identity_id, manifest)
 
+    def handoff_policy(self) -> Dict[str, Any]:
+        return {
+            "schema_version": SEMANTIC_PROCEDURAL_HANDOFF_SCHEMA_VERSION,
+            "policy_id": SEMANTIC_PROCEDURAL_HANDOFF_POLICY_ID,
+            "source_projection_policy": SEMANTIC_PROJECTION_POLICY_ID,
+            "target_preview_policy": PROCEDURAL_PREVIEW_POLICY_ID,
+            "target_namespace": SEMANTIC_PROCEDURAL_HANDOFF_TARGET_NAMESPACE,
+            "handoff_mode": "digest-bound-concept-bridge",
+            "read_only": True,
+            "connectome_required": True,
+            "required_eval_refs": list(SEMANTIC_PROCEDURAL_HANDOFF_REQUIRED_EVALS),
+        }
+
     def project(self, identity_id: str, manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(identity_id, str) or not identity_id.strip():
             raise ValueError("identity_id must be a non-empty string")
@@ -885,6 +912,313 @@ class SemanticMemoryProjector:
         if not validation["ok"]:
             raise ValueError(f"semantic snapshot failed validation: {validation['errors']}")
         return snapshot
+
+    def prepare_procedural_handoff(
+        self,
+        identity_id: str,
+        snapshot: Dict[str, Any],
+        connectome_document: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if not isinstance(snapshot, dict):
+            raise ValueError("snapshot must be a mapping")
+        if not isinstance(connectome_document, dict):
+            raise ValueError("connectome_document must be a mapping")
+
+        snapshot_validation = self.validate(snapshot)
+        if not snapshot_validation["ok"]:
+            raise ValueError(
+                "semantic snapshot must satisfy projection contract before handoff: "
+                f"{snapshot_validation['errors']}"
+            )
+        connectome_validation = ConnectomeModel().validate(connectome_document)
+        if not connectome_validation["ok"]:
+            raise ValueError("connectome_document must satisfy Connectome validation")
+        if snapshot.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match snapshot.identity_id")
+        if connectome_document.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match connectome_document.identity_id")
+
+        concept_bindings = [
+            self._build_procedural_concept_binding(concept)
+            for concept in snapshot["concepts"]
+        ]
+        handoff = {
+            "kind": "semantic_procedural_handoff",
+            "schema_version": SEMANTIC_PROCEDURAL_HANDOFF_SCHEMA_VERSION,
+            "handoff_id": new_id("semantic-handoff"),
+            "identity_id": identity_id,
+            "generated_at": utc_now_iso(),
+            "handoff_policy": self.handoff_policy(),
+            "semantic_snapshot_digest": sha256_text(canonical_json(snapshot)),
+            "source_manifest_digest": snapshot["source_manifest_digest"],
+            "source_segment_ids": list(snapshot["source_segment_ids"]),
+            "connectome_snapshot_id": connectome_document["snapshot_id"],
+            "connectome_snapshot_digest": sha256_text(canonical_json(connectome_document)),
+            "concept_count": len(concept_bindings),
+            "concept_bindings": concept_bindings,
+            "status": "ready",
+        }
+        handoff["digest"] = sha256_text(canonical_json(_semantic_procedural_handoff_digest_payload(handoff)))
+        validation = self.validate_procedural_handoff(
+            handoff,
+            semantic_snapshot=snapshot,
+            connectome_document=connectome_document,
+        )
+        if not validation["ok"]:
+            raise ValueError(
+                f"semantic procedural handoff failed validation: {validation['errors']}"
+            )
+        return handoff
+
+    def validate_procedural_handoff(
+        self,
+        handoff: Dict[str, Any],
+        *,
+        semantic_snapshot: Dict[str, Any] | None = None,
+        manifest: Dict[str, Any] | None = None,
+        connectome_document: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        canonical_labels: List[str] = []
+
+        if not isinstance(handoff, dict):
+            raise ValueError("handoff must be a mapping")
+        if handoff.get("kind") != "semantic_procedural_handoff":
+            errors.append("kind must equal 'semantic_procedural_handoff'")
+        if handoff.get("schema_version") != SEMANTIC_PROCEDURAL_HANDOFF_SCHEMA_VERSION:
+            errors.append(
+                "schema_version must equal "
+                f"{SEMANTIC_PROCEDURAL_HANDOFF_SCHEMA_VERSION!r}"
+            )
+        MemoryCrystalStore._require_non_empty_string(handoff.get("handoff_id"), "handoff_id", errors)
+        identity_id = handoff.get("identity_id")
+        MemoryCrystalStore._require_non_empty_string(identity_id, "identity_id", errors)
+        MemoryCrystalStore._require_non_empty_string(handoff.get("generated_at"), "generated_at", errors)
+
+        handoff_policy = handoff.get("handoff_policy")
+        if not isinstance(handoff_policy, dict):
+            errors.append("handoff_policy must be an object")
+        else:
+            expected_policy = self.handoff_policy()
+            for field_name, expected_value in expected_policy.items():
+                if handoff_policy.get(field_name) != expected_value:
+                    errors.append(f"handoff_policy.{field_name} mismatch")
+
+        for field_name in (
+            "semantic_snapshot_digest",
+            "source_manifest_digest",
+            "connectome_snapshot_digest",
+            "digest",
+        ):
+            value = handoff.get(field_name)
+            if not isinstance(value, str) or len(value) != 64:
+                errors.append(f"{field_name} must be a sha256 hex string")
+
+        source_segment_ids = handoff.get("source_segment_ids")
+        if not isinstance(source_segment_ids, list) or not source_segment_ids:
+            errors.append("source_segment_ids must be a non-empty list")
+            source_segment_ids = []
+        else:
+            for segment_id in source_segment_ids:
+                if not isinstance(segment_id, str) or not segment_id.strip():
+                    errors.append("source_segment_ids must contain non-empty strings")
+
+        connectome_snapshot_id = handoff.get("connectome_snapshot_id")
+        MemoryCrystalStore._require_non_empty_string(
+            connectome_snapshot_id,
+            "connectome_snapshot_id",
+            errors,
+        )
+
+        concept_bindings = handoff.get("concept_bindings")
+        if not isinstance(concept_bindings, list) or not concept_bindings:
+            errors.append("concept_bindings must be a non-empty list")
+            concept_bindings = []
+
+        seen_binding_ids = set()
+        seen_segment_ids = set()
+        binding_map: Dict[str, Dict[str, Any]] = {}
+        for index, binding in enumerate(concept_bindings):
+            if not isinstance(binding, dict):
+                errors.append(f"concept_bindings[{index}] must be an object")
+                continue
+            concept_id = binding.get("concept_id")
+            MemoryCrystalStore._require_non_empty_string(
+                concept_id,
+                f"concept_bindings[{index}].concept_id",
+                errors,
+            )
+            if isinstance(concept_id, str) and concept_id:
+                if concept_id in seen_binding_ids:
+                    errors.append(f"duplicate concept_bindings concept_id: {concept_id}")
+                else:
+                    seen_binding_ids.add(concept_id)
+                    binding_map[concept_id] = binding
+
+            canonical_label = binding.get("canonical_label")
+            MemoryCrystalStore._require_non_empty_string(
+                canonical_label,
+                f"concept_bindings[{index}].canonical_label",
+                errors,
+            )
+            if isinstance(canonical_label, str) and canonical_label:
+                canonical_labels.append(canonical_label)
+
+            for field_name in ("supporting_segment_ids", "supporting_event_ids", "retrieval_cues"):
+                value = binding.get(field_name)
+                if not isinstance(value, list) or not value:
+                    errors.append(f"concept_bindings[{index}].{field_name} must be a non-empty list")
+                    continue
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        errors.append(
+                            f"concept_bindings[{index}].{field_name} must contain non-empty strings"
+                        )
+                if field_name == "supporting_segment_ids":
+                    seen_segment_ids.update(value)
+
+            source_segment_digest = binding.get("source_segment_digest")
+            if not isinstance(source_segment_digest, str) or len(source_segment_digest) != 64:
+                errors.append(
+                    f"concept_bindings[{index}].source_segment_digest must be a sha256 hex string"
+                )
+            MemoryCrystalStore._require_number_in_range(
+                binding.get("confidence"),
+                0.0,
+                1.0,
+                f"concept_bindings[{index}].confidence",
+                errors,
+            )
+
+            digest = binding.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append(f"concept_bindings[{index}].digest must be a sha256 hex string")
+            else:
+                expected_digest = sha256_text(
+                    canonical_json(_semantic_procedural_concept_binding_digest_payload(binding))
+                )
+                if digest != expected_digest:
+                    errors.append(f"concept_bindings[{index}].digest mismatch")
+
+        concept_count = handoff.get("concept_count")
+        if concept_count != len(concept_bindings):
+            errors.append(
+                f"concept_count must equal len(concept_bindings) ({len(concept_bindings)}), "
+                f"got {concept_count!r}"
+            )
+        if handoff.get("status") != "ready":
+            errors.append("status must equal 'ready'")
+
+        if isinstance(source_segment_ids, list) and source_segment_ids and seen_segment_ids:
+            if sorted(source_segment_ids) != sorted(seen_segment_ids):
+                errors.append("source_segment_ids must equal the union of supporting_segment_ids")
+
+        if semantic_snapshot is not None:
+            semantic_validation = self.validate(semantic_snapshot)
+            if not semantic_validation["ok"]:
+                errors.append(
+                    "semantic_snapshot must satisfy projection contract: "
+                    f"{semantic_validation['errors']}"
+                )
+            else:
+                if semantic_snapshot.get("identity_id") != identity_id:
+                    errors.append("identity_id must match semantic_snapshot.identity_id")
+                expected_digest = sha256_text(canonical_json(semantic_snapshot))
+                if handoff.get("semantic_snapshot_digest") != expected_digest:
+                    errors.append("semantic_snapshot_digest mismatch")
+                if handoff.get("source_manifest_digest") != semantic_snapshot.get("source_manifest_digest"):
+                    errors.append("source_manifest_digest must match semantic_snapshot")
+                if handoff.get("source_segment_ids") != semantic_snapshot.get("source_segment_ids"):
+                    errors.append("source_segment_ids must match semantic_snapshot")
+                concept_map = {
+                    concept["concept_id"]: concept for concept in semantic_snapshot.get("concepts", [])
+                }
+                if len(concept_map) != len(concept_bindings):
+                    errors.append("semantic_snapshot concept_count must match concept_bindings")
+                for concept_id, binding in binding_map.items():
+                    concept = concept_map.get(concept_id)
+                    if concept is None:
+                        errors.append(
+                            f"concept_bindings[{concept_id}] must reference semantic_snapshot concept_id"
+                        )
+                        continue
+                    for field_name in (
+                        "canonical_label",
+                        "supporting_segment_ids",
+                        "supporting_event_ids",
+                        "retrieval_cues",
+                        "source_segment_digest",
+                    ):
+                        if binding.get(field_name) != concept.get(field_name):
+                            errors.append(
+                                f"concept_bindings[{concept_id}].{field_name} must match semantic_snapshot"
+                            )
+                    if binding.get("confidence") != concept.get("confidence"):
+                        errors.append(
+                            f"concept_bindings[{concept_id}].confidence must match semantic_snapshot"
+                        )
+
+        if manifest is not None:
+            manifest_validation = MemoryCrystalStore().validate(manifest)
+            if not manifest_validation["ok"]:
+                errors.append(
+                    f"manifest must satisfy MemoryCrystal validation: {manifest_validation['errors']}"
+                )
+            else:
+                if manifest.get("identity_id") != identity_id:
+                    errors.append("identity_id must match manifest.identity_id")
+                expected_manifest_digest = sha256_text(canonical_json(manifest))
+                if handoff.get("source_manifest_digest") != expected_manifest_digest:
+                    errors.append("source_manifest_digest must match manifest digest")
+                manifest_segment_ids = [segment["segment_id"] for segment in manifest["segments"]]
+                if handoff.get("source_segment_ids") != manifest_segment_ids:
+                    errors.append("source_segment_ids must match manifest segment ids")
+                manifest_segment_digests = {
+                    segment["segment_id"]: segment["digest"] for segment in manifest["segments"]
+                }
+                for concept_id, binding in binding_map.items():
+                    supporting_segment_ids = binding.get("supporting_segment_ids", [])
+                    if any(segment_id not in manifest_segment_digests for segment_id in supporting_segment_ids):
+                        errors.append(
+                            f"concept_bindings[{concept_id}] must reference manifest segment ids"
+                        )
+                        continue
+                    if len(supporting_segment_ids) == 1:
+                        segment_id = supporting_segment_ids[0]
+                        if binding.get("source_segment_digest") != manifest_segment_digests[segment_id]:
+                            errors.append(
+                                f"concept_bindings[{concept_id}].source_segment_digest must match manifest"
+                            )
+
+        if connectome_document is not None:
+            connectome_validation = ConnectomeModel().validate(connectome_document)
+            if not connectome_validation["ok"]:
+                errors.append("connectome_document must satisfy Connectome validation")
+            else:
+                if connectome_document.get("identity_id") != identity_id:
+                    errors.append("identity_id must match connectome_document.identity_id")
+                if handoff.get("connectome_snapshot_id") != connectome_document.get("snapshot_id"):
+                    errors.append("connectome_snapshot_id must match connectome_document.snapshot_id")
+                expected_connectome_digest = sha256_text(canonical_json(connectome_document))
+                if handoff.get("connectome_snapshot_digest") != expected_connectome_digest:
+                    errors.append("connectome_snapshot_digest must match connectome_document digest")
+
+        digest = handoff.get("digest")
+        if isinstance(digest, str) and len(digest) == 64:
+            expected_digest = sha256_text(canonical_json(_semantic_procedural_handoff_digest_payload(handoff)))
+            if digest != expected_digest:
+                errors.append("digest mismatch")
+
+        return {
+            "ok": not errors,
+            "concept_count": len(concept_bindings),
+            "canonical_labels": canonical_labels,
+            "target_namespace": SEMANTIC_PROCEDURAL_HANDOFF_TARGET_NAMESPACE,
+            "status": handoff.get("status", ""),
+            "errors": errors,
+        }
 
     def validate(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
@@ -1078,6 +1412,21 @@ class SemanticMemoryProjector:
         }
         concept["digest"] = sha256_text(canonical_json(_semantic_concept_digest_payload(concept)))
         return concept
+
+    def _build_procedural_concept_binding(self, concept: Dict[str, Any]) -> Dict[str, Any]:
+        binding = {
+            "concept_id": concept["concept_id"],
+            "canonical_label": concept["canonical_label"],
+            "supporting_segment_ids": list(concept["supporting_segment_ids"]),
+            "supporting_event_ids": list(concept["supporting_event_ids"]),
+            "retrieval_cues": list(concept["retrieval_cues"]),
+            "source_segment_digest": concept["source_segment_digest"],
+            "confidence": concept["confidence"],
+        }
+        binding["digest"] = sha256_text(
+            canonical_json(_semantic_procedural_concept_binding_digest_payload(binding))
+        )
+        return binding
 
 
 class MemoryEditingService:
@@ -1504,6 +1853,27 @@ class ProceduralMemoryProjector:
     def build_reference_snapshot(self, identity_id: str) -> Dict[str, Any]:
         manifest = MemoryCrystalStore().build_reference_manifest(identity_id)
         connectome_document = ConnectomeModel().build_reference_snapshot(identity_id)
+        return self.project(identity_id, manifest, connectome_document)
+
+    def project_from_handoff(
+        self,
+        identity_id: str,
+        handoff: Dict[str, Any],
+        manifest: Dict[str, Any],
+        connectome_document: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        handoff_validation = SemanticMemoryProjector().validate_procedural_handoff(
+            handoff,
+            manifest=manifest,
+            connectome_document=connectome_document,
+        )
+        if not handoff_validation["ok"]:
+            raise ValueError(
+                "semantic procedural handoff must satisfy bridge contract before procedural preview: "
+                f"{handoff_validation['errors']}"
+            )
+        if handoff.get("identity_id") != identity_id:
+            raise ValueError("identity_id must match handoff.identity_id")
         return self.project(identity_id, manifest, connectome_document)
 
     def project(

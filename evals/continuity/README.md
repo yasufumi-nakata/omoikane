@@ -24,6 +24,10 @@ MemoryCrystal へそのまま compaction handoff できるか。
 MemoryCrystal segment からの semantic projection が
 read-only policy と deferred procedural boundary を守るか。
 
+### Semantic Procedural Handoff
+semantic projection が digest-bound handoff artifact を返し、
+validated Connectome snapshot を procedural preview 前に束縛できるか。
+
 ### Procedural Memory Preview
 MemoryCrystal segment と Connectome snapshot からの procedural preview が
 read-only policy と bounded weight delta を守るか。

@@ -77,13 +77,11 @@ properties:
             const: guardian
       deferred_surfaces:
         type: array
-        minItems: 2
-        maxItems: 2
-        prefixItems:
-          - type: string
-            const: weight-application
-          - type: string
-            const: skill-execution
+        minItems: 1
+        maxItems: 1
+        items:
+          type: string
+          const: skill-execution
   source_manifest_digest:
     type: string
     pattern: "^[0-9a-f]{64}$"
@@ -113,13 +111,11 @@ properties:
     const: true
   deferred_surfaces:
     type: array
-    minItems: 2
-    maxItems: 2
-    prefixItems:
-      - type: string
-        const: weight-application
-      - type: string
-        const: skill-execution
+    minItems: 1
+    maxItems: 1
+    items:
+      type: string
+      const: skill-execution
 $defs:
   recommendation:
     type: object

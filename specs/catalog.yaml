@@ -1570,6 +1570,16 @@ entries:
     rationale: Required to serialize the deterministic semantic projection derived from MemoryCrystal segments.
   - priority: P1
     kind: schema
+    file: specs/schemas/semantic_procedural_handoff.schema
+    consumers:
+      - specs/interfaces/mind.semantic.v0.idl
+      - specs/interfaces/mind.procedural.v0.idl
+      - docs/02-subsystems/mind-substrate/semantic-memory.md
+      - docs/02-subsystems/mind-substrate/procedural-memory.md
+      - reference-runtime
+    rationale: Required to serialize one digest-bound semantic-to-procedural bridge artifact before connectome-coupled preview begins.
+  - priority: P1
+    kind: schema
     file: specs/schemas/memory_edit_session.schema
     consumers:
       - specs/interfaces/mind.memory_edit.v0.idl
@@ -1584,7 +1594,7 @@ entries:
       - docs/02-subsystems/mind-substrate/semantic-memory.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 semantic projection contract machine-readable without mutating MemoryCrystal source segments.
+    rationale: Required to make the L2 semantic projection and procedural handoff contract machine-readable without mutating MemoryCrystal source segments.
   - priority: P1
     kind: idl
     file: specs/interfaces/mind.memory_edit.v0.idl
@@ -1608,6 +1618,13 @@ entries:
       - agents/builders/eval-builder.yaml
     rationale: Protects the read-only semantic projection policy, concept count, and deferred procedural boundary.
   - priority: P1
+    kind: eval
+    file: evals/continuity/semantic_procedural_handoff.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the digest-bound semantic-to-procedural bridge, target namespace, and connectome binding before procedural preview begins.
+  - priority: P1
     kind: schema
     file: specs/schemas/procedural_memory_preview.schema
     consumers:
@@ -1622,7 +1639,7 @@ entries:
       - docs/02-subsystems/mind-substrate/procedural-memory.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 procedural preview contract machine-readable and supply a stable source surface for bounded writeback.
+    rationale: Required to make the L2 procedural preview contract machine-readable and consume a stable semantic handoff surface before bounded writeback.
   - priority: P1
     kind: eval
     file: evals/continuity/procedural_preview_contract.yaml
