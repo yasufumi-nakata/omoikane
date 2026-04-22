@@ -168,6 +168,61 @@ def _rollback_oversight_event(*, rollback_plan_ref: str) -> dict[str, object]:
     return event
 
 
+def _live_enactment_oversight_event(*, artifact_ref: str) -> dict[str, object]:
+    oversight = OversightService()
+    for reviewer_id, display_name, challenge_digest, verified_at in (
+        (
+            "human-reviewer-live-enactment-alpha",
+            "Live Enactment Review Alpha",
+            "sha256:live-enactment-reviewer-alpha-20260422",
+            "2026-04-22T00:00:00+00:00",
+        ),
+        (
+            "human-reviewer-live-enactment-beta",
+            "Live Enactment Review Beta",
+            "sha256:live-enactment-reviewer-beta-20260422",
+            "2026-04-22T00:05:00+00:00",
+        ),
+    ):
+        oversight.register_reviewer(
+            reviewer_id=reviewer_id,
+            display_name=display_name,
+            credential_id=f"credential-{reviewer_id}",
+            attestation_type="institutional-badge",
+            proof_ref=f"proof://live-enactment/{reviewer_id}/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-22T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref=f"legal://live-enactment/{reviewer_id}/v1",
+            escalation_contact=f"mailto:{reviewer_id}@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        oversight.verify_reviewer_from_network(
+            reviewer_id,
+            verifier_ref=f"verifier://guardian-oversight.jp/{reviewer_id}",
+            challenge_ref=f"challenge://live-enactment/{reviewer_id}/2026-04-22T00:00:00Z",
+            challenge_digest=challenge_digest,
+            jurisdiction_bundle_ref="legal://jp-13/live-enactment/v1",
+            jurisdiction_bundle_digest="sha256:jp13-live-enactment-v1",
+            verified_at=verified_at,
+            valid_until="2026-10-22T00:00:00+00:00",
+        )
+    event = oversight.record(
+        guardian_role="integrity",
+        category="attest",
+        payload_ref=artifact_ref,
+        escalation_path=["guardian-oversight.jp", "live-enactment-review-board"],
+    )
+    event = oversight.attest(
+        event["event_id"], reviewer_id="human-reviewer-live-enactment-alpha"
+    )
+    event = oversight.attest(
+        event["event_id"], reviewer_id="human-reviewer-live-enactment-beta"
+    )
+    return event
+
+
 class DesignReaderServiceTests(unittest.TestCase):
     def test_scan_repo_delta_detects_modified_design_and_spec_refs(self) -> None:
         reader = DesignReaderService()
@@ -411,6 +466,9 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
             build_artifact=artifact,
             eval_refs=["evals/continuity/differential_eval_execution_binding.yaml"],
             repo_root=Path(__file__).resolve().parents[2],
+            guardian_oversight_event=_live_enactment_oversight_event(
+                artifact_ref=f"artifact://{artifact['artifact_id']}"
+            ),
         )
 
         result = DifferentialEvaluatorService().run_ab_eval(
@@ -536,21 +594,20 @@ class RolloutPlannerServiceTests(unittest.TestCase):
 class RollbackEngineServiceTests(unittest.TestCase):
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
+        request = _design_backed_request(
+            target_subsystem="L5.RollbackEngine",
+            request_id="build-l5-rollback-0001",
+            must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+        )
+        artifact = PatchGeneratorService().generate_patch_set(request)
         live_enactment_session = LiveEnactmentService().execute(
-            build_request=_design_backed_request(
-                target_subsystem="L5.RollbackEngine",
-                request_id="build-l5-rollback-0001",
-                must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
-            ),
-            build_artifact=PatchGeneratorService().generate_patch_set(
-                _design_backed_request(
-                    target_subsystem="L5.RollbackEngine",
-                    request_id="build-l5-rollback-0001",
-                    must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
-                )
-            ),
+            build_request=request,
+            build_artifact=artifact,
             eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
             repo_root=Path(__file__).resolve().parents[2],
+            guardian_oversight_event=_live_enactment_oversight_event(
+                artifact_ref=f"artifact://{artifact['artifact_id']}"
+            ),
         )
 
         session = service.execute_rollback(
@@ -700,6 +757,39 @@ class LiveEnactmentServiceTests(unittest.TestCase):
         request = _design_backed_request(
             target_subsystem="L5.LiveEnactment",
             request_id="build-l5-live-0001",
+            must_pass=[
+                "evals/continuity/builder_live_enactment_execution.yaml",
+                "evals/continuity/builder_live_oversight_network.yaml",
+            ],
+        )
+        artifact = PatchGeneratorService().generate_patch_set(request)
+
+        session = LiveEnactmentService().execute(
+            build_request=request,
+            build_artifact=artifact,
+            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            repo_root=repo_root,
+            guardian_oversight_event=_live_enactment_oversight_event(
+                artifact_ref=f"artifact://{artifact['artifact_id']}"
+            ),
+        )
+
+        self.assertEqual("passed", session["status"])
+        self.assertEqual("1.1", session["schema_version"])
+        self.assertEqual(5, session["mutated_file_count"])
+        self.assertEqual(2, session["executed_command_count"])
+        self.assertTrue(session["all_commands_passed"])
+        self.assertEqual("removed", session["cleanup_status"])
+        self.assertEqual("satisfied", session["guardian_oversight_event"]["human_attestation"]["status"])
+        self.assertEqual("enactment-approved", session["oversight_gate"]["status"])
+        self.assertTrue(session["oversight_gate"]["reviewer_network_attested"])
+        self.assertTrue(LiveEnactmentService().validate_session(session)["ok"])
+
+    def test_execute_blocks_without_network_attested_oversight_event(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        request = _design_backed_request(
+            target_subsystem="L5.LiveEnactment",
+            request_id="build-l5-live-blocked-0001",
             must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
@@ -711,12 +801,10 @@ class LiveEnactmentServiceTests(unittest.TestCase):
             repo_root=repo_root,
         )
 
-        self.assertEqual("passed", session["status"])
-        self.assertEqual(5, session["mutated_file_count"])
-        self.assertEqual(2, session["executed_command_count"])
-        self.assertTrue(session["all_commands_passed"])
-        self.assertEqual("removed", session["cleanup_status"])
-        self.assertTrue(LiveEnactmentService().validate_session(session)["ok"])
+        self.assertEqual("blocked", session["status"])
+        self.assertEqual(0, session["executed_command_count"])
+        self.assertEqual("blocked", session["oversight_gate"]["status"])
+        self.assertIn("guardian_oversight_event.kind must equal guardian_oversight_event", session["blocking_rules"])
 
 
 if __name__ == "__main__":

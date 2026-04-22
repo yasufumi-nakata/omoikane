@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/builder_live_enactment_session.schema"
 title: BuilderLiveEnactmentSession
-description: Deterministic record emitted when builder patches are materialized in a temp workspace and actual eval commands are executed there.
+description: Deterministic record emitted when builder patches are materialized in a temp workspace and actual eval commands are executed there under network-attested Guardian oversight.
 type: object
 additionalProperties: false
 required:
@@ -21,13 +21,15 @@ required:
   - executed_command_count
   - all_commands_passed
   - cleanup_status
+  - guardian_oversight_event
+  - oversight_gate
   - preserved_invariants
   - executed_at
 properties:
   kind:
     const: builder_live_enactment_session
   schema_version:
-    const: "1.0"
+    const: "1.1"
   enactment_session_id:
     type: string
     pattern: "^enactment-session-[a-f0-9]{12}$"
@@ -47,6 +49,11 @@ properties:
       - command_timeout_seconds
       - cleanup_after_run
       - mandatory_eval
+      - required_oversight_eval
+      - require_reviewer_network_attestation
+      - required_oversight_guardian_role
+      - required_oversight_category
+      - required_oversight_quorum
     properties:
       policy_id:
         type: string
@@ -66,6 +73,21 @@ properties:
       mandatory_eval:
         type: string
         const: evals/continuity/builder_live_enactment_execution.yaml
+      required_oversight_eval:
+        type: string
+        const: evals/continuity/builder_live_oversight_network.yaml
+      require_reviewer_network_attestation:
+        type: boolean
+        const: true
+      required_oversight_guardian_role:
+        type: string
+        const: integrity
+      required_oversight_category:
+        type: string
+        const: attest
+      required_oversight_quorum:
+        type: integer
+        const: 2
   status:
     type: string
     enum:
@@ -74,7 +96,6 @@ properties:
       - blocked
   workspace_root:
     type: string
-    minLength: 1
   workspace_snapshot_refs:
     type: object
     additionalProperties: false
@@ -166,10 +187,165 @@ properties:
       - removed
       - retained
       - not-started
+  guardian_oversight_event:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - guardian_role
+      - category
+      - payload_ref
+      - human_attestation
+      - reviewer_bindings
+    properties:
+      kind:
+        const: guardian_oversight_event
+      guardian_role:
+        type: string
+        const: integrity
+      category:
+        type: string
+        const: attest
+      payload_ref:
+        type: string
+        pattern: "^artifact://artifact-[a-f0-9]{12}$"
+      human_attestation:
+        type: object
+        additionalProperties: false
+        required:
+          - required_quorum
+          - received_quorum
+          - status
+        properties:
+          required_quorum:
+            type: integer
+            const: 2
+          received_quorum:
+            type: integer
+            minimum: 0
+          status:
+            type: string
+            enum:
+              - pending
+              - satisfied
+              - breached
+      reviewer_bindings:
+        type: array
+        minItems: 2
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - reviewer_id
+            - network_receipt_id
+            - authority_chain_ref
+            - trust_root_ref
+            - trust_root_digest
+            - transport_profile
+            - guardian_role
+            - category
+          properties:
+            reviewer_id:
+              type: string
+              minLength: 1
+            network_receipt_id:
+              type: string
+              minLength: 1
+            authority_chain_ref:
+              type: string
+              minLength: 1
+            trust_root_ref:
+              type: string
+              minLength: 1
+            trust_root_digest:
+              type: string
+              minLength: 1
+            transport_profile:
+              type: string
+              const: reviewer-live-proof-bridge-v1
+            guardian_role:
+              type: string
+              const: integrity
+            category:
+              type: string
+              const: attest
+  oversight_gate:
+    type: object
+    additionalProperties: false
+    required:
+      - gate_id
+      - source_enactment_session_id
+      - status
+      - cleanup_status
+      - executed_command_count
+      - passed_command_count
+      - reviewer_oversight_status
+      - reviewer_quorum_required
+      - reviewer_quorum_received
+      - reviewer_binding_count
+      - reviewer_network_receipt_count
+      - reviewer_network_attested
+      - decision_basis
+      - blocking_reasons
+    properties:
+      gate_id:
+        type: string
+        pattern: "^oversight-gate-[a-f0-9]{12}$"
+      source_enactment_session_id:
+        type: string
+        pattern: "^enactment-session-[a-f0-9]{12}$"
+      status:
+        type: string
+        enum:
+          - enactment-approved
+          - blocked
+      cleanup_status:
+        type: string
+        enum:
+          - removed
+          - retained
+          - not-started
+      executed_command_count:
+        type: integer
+        minimum: 0
+      passed_command_count:
+        type: integer
+        minimum: 0
+      reviewer_oversight_status:
+        type: string
+        enum:
+          - pending
+          - satisfied
+          - breached
+      reviewer_quorum_required:
+        type: integer
+        minimum: 0
+      reviewer_quorum_received:
+        type: integer
+        minimum: 0
+      reviewer_binding_count:
+        type: integer
+        minimum: 0
+      reviewer_network_receipt_count:
+        type: integer
+        minimum: 0
+      reviewer_network_attested:
+        type: boolean
+      decision_basis:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          minLength: 1
+      blocking_reasons:
+        type: array
+        items:
+          type: string
+          minLength: 1
   preserved_invariants:
     type: array
-    minItems: 3
-    maxItems: 3
+    minItems: 4
+    maxItems: 4
     prefixItems:
       - type: string
         const: temp-workspace-only
@@ -177,6 +353,8 @@ properties:
         const: immutable-boundaries-preserved
       - type: string
         const: cleanup-after-run
+      - type: string
+        const: reviewer-network-attested-enactment
   executed_at:
     type: string
     format: date-time
@@ -200,6 +378,14 @@ allOf:
           const: true
         cleanup_status:
           const: removed
+        oversight_gate:
+          properties:
+            status:
+              const: enactment-approved
+            cleanup_status:
+              const: removed
+            reviewer_network_attested:
+              const: true
   - if:
       properties:
         status:
@@ -209,7 +395,7 @@ allOf:
         - blocking_rules
 examples:
   - kind: builder_live_enactment_session
-    schema_version: "1.0"
+    schema_version: "1.1"
     enactment_session_id: enactment-session-0123456789ab
     request_id: build-l5-live-0001
     artifact_id: artifact-0123456789ab
@@ -220,6 +406,11 @@ examples:
       command_timeout_seconds: 15
       cleanup_after_run: true
       mandatory_eval: evals/continuity/builder_live_enactment_execution.yaml
+      required_oversight_eval: evals/continuity/builder_live_oversight_network.yaml
+      require_reviewer_network_attestation: true
+      required_oversight_guardian_role: integrity
+      required_oversight_category: attest
+      required_oversight_quorum: 2
     status: passed
     workspace_root: /tmp/omoikane-builder-live-example
     workspace_snapshot_refs:
@@ -249,6 +440,7 @@ examples:
     mutated_file_count: 5
     eval_refs:
       - evals/continuity/builder_live_enactment_execution.yaml
+      - evals/continuity/builder_live_oversight_network.yaml
     command_runs:
       - eval_ref: evals/continuity/builder_live_enactment_execution.yaml
         command: python3 -c "print('builders marker ok')"
@@ -265,8 +457,53 @@ examples:
     executed_command_count: 2
     all_commands_passed: true
     cleanup_status: removed
+    guardian_oversight_event:
+      kind: guardian_oversight_event
+      guardian_role: integrity
+      category: attest
+      payload_ref: artifact://artifact-0123456789ab
+      human_attestation:
+        required_quorum: 2
+        received_quorum: 2
+        status: satisfied
+      reviewer_bindings:
+        - reviewer_id: human-reviewer-builder-live-alpha
+          network_receipt_id: verifier-network-receipt-0123456789ab
+          authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+          trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+          trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+          transport_profile: reviewer-live-proof-bridge-v1
+          guardian_role: integrity
+          category: attest
+        - reviewer_id: human-reviewer-builder-live-beta
+          network_receipt_id: verifier-network-receipt-89abcdef0123
+          authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+          trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+          trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+          transport_profile: reviewer-live-proof-bridge-v1
+          guardian_role: integrity
+          category: attest
+    oversight_gate:
+      gate_id: oversight-gate-0123456789ab
+      source_enactment_session_id: enactment-session-0123456789ab
+      status: enactment-approved
+      cleanup_status: removed
+      executed_command_count: 2
+      passed_command_count: 2
+      reviewer_oversight_status: satisfied
+      reviewer_quorum_required: 2
+      reviewer_quorum_received: 2
+      reviewer_binding_count: 2
+      reviewer_network_receipt_count: 2
+      reviewer_network_attested: true
+      decision_basis:
+        - reviewer-network-attested
+        - temp-workspace-cleaned
+        - command-receipts-preserved
+      blocking_reasons: []
     preserved_invariants:
       - temp-workspace-only
       - immutable-boundaries-preserved
       - cleanup-after-run
-    executed_at: "2026-04-20T05:00:00Z"
+      - reviewer-network-attested-enactment
+    executed_at: "2026-04-20T12:00:00Z"

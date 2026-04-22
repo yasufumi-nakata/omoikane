@@ -87,7 +87,8 @@ runtime/tests/evals/docs/meta/decision-log にまたがる planning-cue aligned 
 その途中の diff eval report は target-aware patch plan に対して
 baseline / sandbox observation、triggered rule、comparison digest、
 必要時は temp-workspace command evidence (`diff_eval_execution_receipt`) まで束縛する。
-`builder-live-demo` は同じ patch plan を temp workspace に materialize し、
+`builder-live-demo` は同じ patch plan を temp workspace に materialize する前に、
+artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を満たし、
 live repo ではなく Mirage Self 側でのみ actual command を走らせる。
 `rollback-demo` は regression 検出時に
 `builder_rollback_session` を返し、canary rollback 後に

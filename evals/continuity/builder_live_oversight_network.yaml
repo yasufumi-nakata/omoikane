@@ -1,0 +1,17 @@
+eval_id: builder_live_oversight_network
+target: selfctor.enactment
+summary: >
+  Builder live enactment が artifact payload に束縛された integrity Guardian の oversight event を持ち、
+  verifier-network で live verification された reviewer 2 名の attestation と
+  network receipt binding を oversight gate へ焼き付けたうえで
+  enactment-approved になること
+expect:
+  enactment_status: passed
+  reviewer_oversight_status: satisfied
+  reviewer_quorum_required: 2
+  reviewer_quorum_received: 2
+  reviewer_binding_count: 2
+  reviewer_network_receipt_count: 2
+  reviewer_network_attested: true
+  enactment_payload_ref_bound: true
+  oversight_gate_status: enactment-approved

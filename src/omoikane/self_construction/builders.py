@@ -2848,6 +2848,11 @@ class LiveEnactmentPolicy:
     command_timeout_seconds: int = 15
     cleanup_after_run: bool = True
     mandatory_eval: str = MANDATORY_LIVE_ENACTMENT_EVAL
+    required_oversight_eval: str = "evals/continuity/builder_live_oversight_network.yaml"
+    require_reviewer_network_attestation: bool = True
+    required_oversight_guardian_role: str = "integrity"
+    required_oversight_category: str = "attest"
+    required_oversight_quorum: int = 2
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -2857,6 +2862,11 @@ class LiveEnactmentPolicy:
             "command_timeout_seconds": self.command_timeout_seconds,
             "cleanup_after_run": self.cleanup_after_run,
             "mandatory_eval": self.mandatory_eval,
+            "required_oversight_eval": self.required_oversight_eval,
+            "require_reviewer_network_attestation": self.require_reviewer_network_attestation,
+            "required_oversight_guardian_role": self.required_oversight_guardian_role,
+            "required_oversight_category": self.required_oversight_category,
+            "required_oversight_quorum": self.required_oversight_quorum,
         }
 
 
@@ -2876,11 +2886,18 @@ class LiveEnactmentService:
         build_artifact: Mapping[str, Any],
         eval_refs: Sequence[str],
         repo_root: Path | str,
+        guardian_oversight_event: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         repo_path = Path(repo_root)
         patches = list(build_artifact.get("patches", []))
         allowed_write_paths = list(build_request.get("constraints", {}).get("allowed_write_paths", []))
         blocking_rules: list[str] = []
+        artifact_id = str(build_artifact.get("artifact_id", ""))
+        artifact_ref = f"artifact://{artifact_id}" if artifact_id else ""
+        oversight_summary = self._validate_guardian_oversight_event(
+            guardian_oversight_event=guardian_oversight_event or {},
+            artifact_ref=artifact_ref,
+        )
 
         if build_artifact.get("status") != "ready":
             blocking_rules.append("build artifact must be ready before live enactment")
@@ -2892,6 +2909,7 @@ class LiveEnactmentService:
             )
         if not allowed_write_paths:
             blocking_rules.append("allowed_write_paths must not be empty")
+        blocking_rules.extend(oversight_summary["errors"])
 
         workspace_root = ""
         materialized_files: list[Dict[str, Any]] = []
@@ -2957,12 +2975,13 @@ class LiveEnactmentService:
             run["status"] == "pass" for run in command_runs
         )
         status = "blocked" if blocking_rules else "passed" if all_commands_passed else "failed"
+        enactment_session_id = new_id("enactment-session")
         return {
             "kind": "builder_live_enactment_session",
-            "schema_version": "1.0",
-            "enactment_session_id": new_id("enactment-session"),
+            "schema_version": "1.1",
+            "enactment_session_id": enactment_session_id,
             "request_id": build_request["request_id"],
-            "artifact_id": build_artifact.get("artifact_id", ""),
+            "artifact_id": artifact_id,
             "policy": self.policy(),
             "status": status,
             "workspace_root": workspace_root,
@@ -2974,10 +2993,18 @@ class LiveEnactmentService:
             "executed_command_count": len(command_runs),
             "all_commands_passed": all_commands_passed,
             "cleanup_status": cleanup_status,
+            "guardian_oversight_event": dict(guardian_oversight_event or {}),
+            "oversight_gate": self._build_oversight_gate(
+                enactment_session_id=enactment_session_id,
+                command_runs=command_runs,
+                cleanup_status=cleanup_status,
+                oversight_summary=oversight_summary,
+            ),
             "preserved_invariants": [
                 "temp-workspace-only",
                 "immutable-boundaries-preserved",
                 "cleanup-after-run",
+                "reviewer-network-attested-enactment",
             ],
             "executed_at": utc_now_iso(),
             **({"blocking_rules": blocking_rules} if blocking_rules else {}),
@@ -2987,16 +3014,98 @@ class LiveEnactmentService:
         errors: list[str] = []
         if session.get("kind") != "builder_live_enactment_session":
             errors.append("kind must equal builder_live_enactment_session")
-        if session.get("schema_version") != "1.0":
-            errors.append("schema_version must equal 1.0")
+        if session.get("schema_version") != "1.1":
+            errors.append("schema_version must equal 1.1")
         if session.get("status") not in {"passed", "failed", "blocked"}:
             errors.append("status must be passed, failed, or blocked")
+        policy = dict(session.get("policy", {}))
+        if policy.get("policy_id") != self._policy.policy_id:
+            errors.append(f"policy.policy_id must equal {self._policy.policy_id}")
+        if policy.get("mandatory_eval") != self._policy.mandatory_eval:
+            errors.append(f"policy.mandatory_eval must equal {self._policy.mandatory_eval}")
+        if policy.get("required_oversight_eval") != self._policy.required_oversight_eval:
+            errors.append(
+                f"policy.required_oversight_eval must equal {self._policy.required_oversight_eval}"
+            )
+        if (
+            policy.get("require_reviewer_network_attestation")
+            != self._policy.require_reviewer_network_attestation
+        ):
+            errors.append("policy.require_reviewer_network_attestation must equal true")
+        if policy.get("required_oversight_guardian_role") != self._policy.required_oversight_guardian_role:
+            errors.append(
+                "policy.required_oversight_guardian_role must equal "
+                f"{self._policy.required_oversight_guardian_role}"
+            )
+        if policy.get("required_oversight_category") != self._policy.required_oversight_category:
+            errors.append(
+                "policy.required_oversight_category must equal "
+                f"{self._policy.required_oversight_category}"
+            )
+        if policy.get("required_oversight_quorum") != self._policy.required_oversight_quorum:
+            errors.append(
+                "policy.required_oversight_quorum must equal "
+                f"{self._policy.required_oversight_quorum}"
+            )
         refs = dict(session.get("workspace_snapshot_refs", {}))
         for key in ("pre_apply", "post_apply"):
             if not str(refs.get(key, "")).startswith("mirage://"):
                 errors.append(f"workspace_snapshot_refs.{key} must start with mirage://")
         if session.get("cleanup_status") not in {"removed", "retained", "not-started"}:
             errors.append("cleanup_status must be removed, retained, or not-started")
+        oversight_summary = self._validate_guardian_oversight_event(
+            guardian_oversight_event=session.get("guardian_oversight_event", {}),
+            artifact_ref=(
+                f"artifact://{session['artifact_id']}" if str(session.get("artifact_id", "")) else ""
+            ),
+        )
+        oversight_gate = dict(session.get("oversight_gate", {}))
+        if session.get("status") == "passed":
+            if not oversight_summary["network_attested"]:
+                errors.append(
+                    "guardian_oversight_event must bind satisfied network-reviewed attestation"
+                )
+            if oversight_gate.get("status") != "enactment-approved":
+                errors.append("oversight_gate.status must equal enactment-approved")
+            if oversight_gate.get("cleanup_status") != "removed":
+                errors.append("oversight_gate.cleanup_status must equal removed")
+            if int(oversight_gate.get("executed_command_count", 0)) != len(
+                list(session.get("command_runs", []))
+            ):
+                errors.append("oversight_gate.executed_command_count must match command_runs")
+            if int(oversight_gate.get("passed_command_count", 0)) != len(
+                list(session.get("command_runs", []))
+            ):
+                errors.append(
+                    "oversight_gate.passed_command_count must match passed command_runs"
+                )
+            if oversight_gate.get("reviewer_oversight_status") != "satisfied":
+                errors.append("oversight_gate.reviewer_oversight_status must equal satisfied")
+            if (
+                int(oversight_gate.get("reviewer_quorum_required", 0))
+                != self._policy.required_oversight_quorum
+            ):
+                errors.append(
+                    "oversight_gate.reviewer_quorum_required must equal "
+                    f"{self._policy.required_oversight_quorum}"
+                )
+            if int(oversight_gate.get("reviewer_quorum_received", 0)) < self._policy.required_oversight_quorum:
+                errors.append(
+                    "oversight_gate.reviewer_quorum_received must satisfy required oversight quorum"
+                )
+            if int(oversight_gate.get("reviewer_binding_count", 0)) < self._policy.required_oversight_quorum:
+                errors.append(
+                    "oversight_gate.reviewer_binding_count must satisfy required oversight quorum"
+                )
+            if (
+                int(oversight_gate.get("reviewer_network_receipt_count", 0))
+                < self._policy.required_oversight_quorum
+            ):
+                errors.append(
+                    "oversight_gate.reviewer_network_receipt_count must satisfy required oversight quorum"
+                )
+            if not bool(oversight_gate.get("reviewer_network_attested")):
+                errors.append("oversight_gate.reviewer_network_attested must be true")
         if session.get("status") == "passed":
             if int(session.get("mutated_file_count", 0)) < 1:
                 errors.append("mutated_file_count must be >= 1 for passed sessions")
@@ -3009,6 +3118,138 @@ class LiveEnactmentService:
         elif session.get("status") == "blocked" and not list(session.get("blocking_rules", [])):
             errors.append("blocked sessions must include blocking_rules")
         return {"ok": not errors, "errors": errors}
+
+    def _validate_guardian_oversight_event(
+        self,
+        *,
+        guardian_oversight_event: Mapping[str, Any],
+        artifact_ref: str,
+    ) -> Dict[str, Any]:
+        event = dict(guardian_oversight_event)
+        human_attestation = dict(event.get("human_attestation", {}))
+        reviewer_bindings = list(event.get("reviewer_bindings", []))
+        errors: list[str] = []
+        if event.get("kind") != "guardian_oversight_event":
+            errors.append("guardian_oversight_event.kind must equal guardian_oversight_event")
+        if event.get("guardian_role") != self._policy.required_oversight_guardian_role:
+            errors.append(
+                "guardian_oversight_event.guardian_role must equal "
+                f"{self._policy.required_oversight_guardian_role}"
+            )
+        if event.get("category") != self._policy.required_oversight_category:
+            errors.append(
+                "guardian_oversight_event.category must equal "
+                f"{self._policy.required_oversight_category}"
+            )
+        if artifact_ref and event.get("payload_ref") != artifact_ref:
+            errors.append("guardian_oversight_event.payload_ref must match artifact ref")
+        required_quorum = int(human_attestation.get("required_quorum", 0) or 0)
+        received_quorum = int(human_attestation.get("received_quorum", 0) or 0)
+        if required_quorum != self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.human_attestation.required_quorum must equal "
+                f"{self._policy.required_oversight_quorum}"
+            )
+        if human_attestation.get("status") != "satisfied":
+            errors.append("guardian_oversight_event.human_attestation.status must equal satisfied")
+        if received_quorum < self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.human_attestation.received_quorum must satisfy "
+                "required oversight quorum"
+            )
+        if len(reviewer_bindings) < self._policy.required_oversight_quorum:
+            errors.append(
+                "guardian_oversight_event.reviewer_bindings must satisfy required oversight quorum"
+            )
+        reviewer_ids: list[str] = []
+        network_receipt_count = 0
+        for binding in reviewer_bindings:
+            reviewer_id = str(binding.get("reviewer_id", ""))
+            if reviewer_id:
+                reviewer_ids.append(reviewer_id)
+            if binding.get("guardian_role") != self._policy.required_oversight_guardian_role:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings guardian_role must match enactment policy"
+                )
+            if binding.get("category") != self._policy.required_oversight_category:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings category must match enactment policy"
+                )
+            if binding.get("transport_profile") != "reviewer-live-proof-bridge-v1":
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings transport_profile must equal "
+                    "reviewer-live-proof-bridge-v1"
+                )
+            network_fields = (
+                "network_receipt_id",
+                "authority_chain_ref",
+                "trust_root_ref",
+                "trust_root_digest",
+            )
+            if all(binding.get(field) for field in network_fields):
+                network_receipt_count += 1
+            else:
+                errors.append(
+                    "guardian_oversight_event.reviewer_bindings must include network receipt bindings"
+                )
+        if len(set(reviewer_ids)) != len(reviewer_ids):
+            errors.append("guardian_oversight_event reviewer bindings must be unique")
+        network_attested = (
+            required_quorum == self._policy.required_oversight_quorum
+            and received_quorum >= self._policy.required_oversight_quorum
+            and human_attestation.get("status") == "satisfied"
+            and len(reviewer_bindings) >= self._policy.required_oversight_quorum
+            and network_receipt_count >= self._policy.required_oversight_quorum
+            and not errors
+        )
+        return {
+            "errors": errors,
+            "status": str(human_attestation.get("status", "pending")),
+            "required_quorum": required_quorum,
+            "received_quorum": received_quorum,
+            "reviewer_binding_count": len(reviewer_bindings),
+            "network_receipt_count": network_receipt_count,
+            "network_attested": network_attested,
+        }
+
+    def _build_oversight_gate(
+        self,
+        *,
+        enactment_session_id: str,
+        command_runs: Sequence[Mapping[str, Any]],
+        cleanup_status: str,
+        oversight_summary: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        passed_command_count = sum(run.get("status") == "pass" for run in command_runs)
+        blocking_reasons = list(oversight_summary.get("errors", []))
+        if cleanup_status != "removed":
+            blocking_reasons.append("temp workspace cleanup must complete before enactment closes")
+        if not command_runs:
+            blocking_reasons.append("live enactment must preserve at least one command receipt")
+        if passed_command_count != len(command_runs):
+            blocking_reasons.append("all live enactment commands must pass before approval")
+        return {
+            "gate_id": new_id("oversight-gate"),
+            "source_enactment_session_id": enactment_session_id,
+            "status": "enactment-approved" if not blocking_reasons else "blocked",
+            "cleanup_status": cleanup_status,
+            "executed_command_count": len(command_runs),
+            "passed_command_count": passed_command_count,
+            "reviewer_oversight_status": str(oversight_summary.get("status", "pending")),
+            "reviewer_quorum_required": int(oversight_summary.get("required_quorum", 0)),
+            "reviewer_quorum_received": int(oversight_summary.get("received_quorum", 0)),
+            "reviewer_binding_count": int(oversight_summary.get("reviewer_binding_count", 0)),
+            "reviewer_network_receipt_count": int(
+                oversight_summary.get("network_receipt_count", 0)
+            ),
+            "reviewer_network_attested": bool(oversight_summary.get("network_attested")),
+            "decision_basis": [
+                "reviewer-network-attested",
+                "temp-workspace-cleaned",
+                "command-receipts-preserved",
+            ],
+            "blocking_reasons": blocking_reasons,
+        }
 
     @staticmethod
     def _comment_prefix(path: Path) -> str:

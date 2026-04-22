@@ -2,11 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.enactment.v0
 service: LiveEnactmentService
-summary: Materialize builder patch descriptors inside a temp workspace and run actual eval commands before promotion.
+summary: Materialize builder patch descriptors inside a temp workspace and run actual eval commands only after network-attested Guardian oversight approves the artifact.
 imports:
   build_request: ../schemas/build_request.yaml
   build_artifact: ../schemas/build_artifact.yaml
   builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
+  guardian_oversight_event: ../schemas/guardian_oversight_event.schema
 operations:
   execute:
     summary: Create a temp Mirage Self workspace, materialize bounded files, and execute eval commands.
@@ -36,12 +37,15 @@ operations:
       - build artifact must already be ready
       - every target_path must remain inside allowed_write_paths
       - live enactment must run only in a temp workspace
+      - a satisfied integrity Guardian oversight event with network-backed reviewer bindings must already be bound to the target artifact
     guarantees:
       - immutable boundaries remain outside the materialized file set
       - actual eval commands run against the temp workspace rather than the live repo
       - temp workspace cleanup completes before the session closes
+      - execution must fail closed when reviewer quorum, network receipt binding, or artifact payload binding is missing
+      - output session must carry the guardian_oversight_event snapshot and an oversight_gate summary that records approval status and receipt counts
   validate_session:
-    summary: Validate one live enactment session against the bounded temp-workspace policy.
+    summary: Validate one live enactment session against the bounded temp-workspace and reviewer-network oversight policy.
     input:
       schema_ref: builder_live_enactment_session
     output:

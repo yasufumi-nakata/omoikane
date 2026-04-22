@@ -38,7 +38,9 @@ section-level `section_changes` と `planning_cues` を含む `design_delta_mani
 fail-closed `build_request` emit、runtime/tests/evals/docs/meta にまたがる target-aware patch descriptor 生成、Mirage Self への sandbox apply、
 parsed baseline/sandbox observation と comparison digest に加え temp workspace command evidence も持つ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
-rollback execution は `builder-live-demo` の actual command receipt にも束縛され、
+`builder-live-demo` の actual command receipt は
+artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
+rollback execution はその receipt にも束縛され、
 temp rollback workspace 上の actual reverse-apply command receipt、
 reverse-apply journal、detached git worktree 上の checkout-bound mutation receipt、
 telemetry gate を通過した時だけ `rolled-back` になる。

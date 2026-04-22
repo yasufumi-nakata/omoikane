@@ -330,7 +330,7 @@ JSON で可視化し、Council の `emit_build_request` handoff が
 `staged_rollout_session` schema に束縛されたまま immutable boundary を検証し、
 planning cue と target subsystem に整列した multi-file patch descriptor を生成し、
 Mirage Self への sandbox apply、parsed baseline / sandbox observation と
-temp workspace の actual command run を束縛した `diff_eval_execution_receipt` と comparison digest を持つ
+artifact-bound reviewer network attestation を通過した temp workspace の actual command run を束縛した `diff_eval_execution_receipt` と comparison digest を持つ
 `council_output_build_request_pipeline` および
 `builder_staged_rollout_execution` eval report、`promote` / `hold` / `rollback`
 の rollout 分類、Stage 0/1/2/3 (`dark-launch` / `canary-5pct` / `broad-50pct` /
@@ -340,11 +340,12 @@ ledger-safe な `self-modify` chain で進むことを確認する。
 `builder-live-demo` は L5 live enactment の reference contract
 (`selfctor.enactment.v0`) を JSON で可視化し、
 `PatchGeneratorService` が生成した patch descriptor を
+artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を満たしたうえで
 temp workspace にだけ materialize しつつ、
 runtime/tests/evals/docs/meta/decision-log の approved scope 以外には広げず、
 `builder_live_enactment_execution` eval の command を実際に実行し、
-`workspace-enacted` marker を持つ mutated file と
-cleanup 済み receipt を 1 シナリオで確認する。
+`builder_live_oversight_network` expectation と `workspace-enacted` marker を持つ mutated file、
+network-attested oversight gate、cleanup 済み receipt を 1 シナリオで確認する。
 
 `rollback-demo` は L5 builder rollback の reference contract
 (`selfctor.rollback.v0`) を JSON で可視化し、

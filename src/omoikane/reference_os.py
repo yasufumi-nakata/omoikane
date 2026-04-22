@@ -341,6 +341,71 @@ class OmoikaneReferenceOS:
     def _execution_bound_reports(eval_reports: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         return [report for report in eval_reports if report.get("execution_bound")]
 
+    def _build_live_enactment_oversight_event(
+        self,
+        *,
+        reviewer_namespace: str,
+        payload_ref: str,
+    ) -> Dict[str, Any]:
+        oversight = OversightService(trust_service=self.trust)
+        jurisdiction_bundle_ref = f"legal://jp-13/{reviewer_namespace}/v1"
+        jurisdiction_bundle_digest = f"sha256:jp13-{reviewer_namespace}-v1"
+        reviewer_specs = (
+            (
+                "alpha",
+                "Live Enactment Review Alpha",
+                f"sha256:{reviewer_namespace}-alpha-20260422",
+                "2026-04-22T00:00:00+00:00",
+            ),
+            (
+                "beta",
+                "Live Enactment Review Beta",
+                f"sha256:{reviewer_namespace}-beta-20260422",
+                "2026-04-22T00:05:00+00:00",
+            ),
+        )
+        for suffix, display_name, challenge_digest, verified_at in reviewer_specs:
+            reviewer_id = f"human-reviewer-{reviewer_namespace}-{suffix}"
+            oversight.register_reviewer(
+                reviewer_id=reviewer_id,
+                display_name=display_name,
+                credential_id=f"credential-{reviewer_namespace}-{suffix}",
+                attestation_type="institutional-badge",
+                proof_ref=f"proof://{reviewer_namespace}/{suffix}/v1",
+                jurisdiction="JP-13",
+                valid_until="2027-04-22T00:00:00+00:00",
+                liability_mode="joint",
+                legal_ack_ref=f"legal://{reviewer_namespace}/{suffix}/v1",
+                escalation_contact=f"mailto:{reviewer_namespace}-{suffix}@example.invalid",
+                allowed_guardian_roles=["integrity"],
+                allowed_categories=["attest"],
+            )
+            oversight.verify_reviewer_from_network(
+                reviewer_id,
+                verifier_ref=f"verifier://guardian-oversight.jp/{reviewer_id}",
+                challenge_ref=f"challenge://{reviewer_namespace}/{suffix}/2026-04-22T00:00:00Z",
+                challenge_digest=challenge_digest,
+                jurisdiction_bundle_ref=jurisdiction_bundle_ref,
+                jurisdiction_bundle_digest=jurisdiction_bundle_digest,
+                verified_at=verified_at,
+                valid_until="2026-10-22T00:00:00+00:00",
+            )
+        event = oversight.record(
+            guardian_role="integrity",
+            category="attest",
+            payload_ref=payload_ref,
+            escalation_path=["guardian-oversight.jp", f"{reviewer_namespace}-review-board"],
+        )
+        event = oversight.attest(
+            event["event_id"],
+            reviewer_id=f"human-reviewer-{reviewer_namespace}-alpha",
+        )
+        event = oversight.attest(
+            event["event_id"],
+            reviewer_id=f"human-reviewer-{reviewer_namespace}-beta",
+        )
+        return event
+
     @contextmanager
     def _design_reader_demo_repo(
         self,
@@ -9060,11 +9125,15 @@ json.dump(response, sys.stdout)
             spec_refs=[
                 "specs/interfaces/selfctor.design_reader.v0.idl",
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
+                "specs/interfaces/selfctor.enactment.v0.idl",
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
                 "specs/interfaces/selfctor.rollout.v0.idl",
+                "specs/interfaces/governance.oversight.v0.idl",
                 "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
+                "specs/schemas/builder_live_enactment_session.schema",
+                "specs/schemas/guardian_oversight_event.schema",
                 "specs/schemas/sandbox_apply_receipt.schema",
                 "specs/schemas/staged_rollout_session.schema",
             ],
@@ -9105,12 +9174,18 @@ json.dump(response, sys.stdout)
         execution_eval_refs = self._execution_bound_eval_refs(suite_selection["selected_evals"])
         eval_execution_session = None
         eval_execution_validation = {"ok": True, "errors": []}
+        eval_execution_oversight_event = None
         if execution_eval_refs:
+            eval_execution_oversight_event = self._build_live_enactment_oversight_event(
+                reviewer_namespace="builder-eval",
+                payload_ref=f"artifact://{build_artifact['artifact_id']}",
+            )
             eval_execution_session = self.live_enactment.execute(
                 build_request=build_request,
                 build_artifact=build_artifact,
                 eval_refs=execution_eval_refs,
                 repo_root=self.repo_root,
+                guardian_oversight_event=eval_execution_oversight_event,
             )
             eval_execution_validation = self.live_enactment.validate_session(eval_execution_session)
         eval_reports = [
@@ -9239,6 +9314,16 @@ json.dump(response, sys.stdout)
         if eval_execution_session is not None:
             self.ledger.append(
                 identity_id=identity.identity_id,
+                event_type="guardian.enactment.attestation.satisfied",
+                payload=eval_execution_oversight_event,
+                actor="HumanOversightChannel",
+                category="guardian-oversight",
+                layer="L4",
+                signature_roles=["third_party"],
+                substrate="classical-silicon",
+            )
+            self.ledger.append(
+                identity_id=identity.identity_id,
                 event_type="selfctor.enactment.executed",
                 payload={
                     "policy": self.live_enactment.policy(),
@@ -9363,6 +9448,16 @@ json.dump(response, sys.stdout)
                     if execution_bound_reports
                     else "not-run"
                 ),
+                "eval_execution_reviewer_network_attested": (
+                    eval_execution_session["oversight_gate"]["reviewer_network_attested"]
+                    if eval_execution_session is not None
+                    else False
+                ),
+                "eval_execution_oversight_gate_status": (
+                    eval_execution_session["oversight_gate"]["status"]
+                    if eval_execution_session is not None
+                    else "not-run"
+                ),
                 "all_evals_passed": all_evals_passed,
                 "eval_report_evidence_bound": all(
                     len(str(report.get("comparison_digest", ""))) == 64
@@ -9404,10 +9499,12 @@ json.dump(response, sys.stdout)
                 "specs/interfaces/selfctor.design_reader.v0.idl",
                 "specs/interfaces/selfctor.patch_generator.v0.idl",
                 "specs/interfaces/selfctor.enactment.v0.idl",
+                "specs/interfaces/governance.oversight.v0.idl",
                 "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
                 "specs/schemas/builder_live_enactment_session.schema",
+                "specs/schemas/guardian_oversight_event.schema",
             ],
             output_paths=[
                 "src/omoikane/self_construction/",
@@ -9419,7 +9516,10 @@ json.dump(response, sys.stdout)
             ],
             request_id="build-l5-live-0001",
             change_class="feature-improvement",
-            must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
+            must_pass=[
+                "evals/continuity/builder_live_enactment_execution.yaml",
+                "evals/continuity/builder_live_oversight_network.yaml",
+            ],
             council_session_id="sess-builder-live-0001",
             guardian_gate="pass",
         )
@@ -9433,11 +9533,16 @@ json.dump(response, sys.stdout)
             target_subsystem=build_request["target_subsystem"],
             requested_evals=build_request["constraints"]["must_pass"],
         )
+        enactment_oversight_event = self._build_live_enactment_oversight_event(
+            reviewer_namespace="builder-live",
+            payload_ref=f"artifact://{build_artifact['artifact_id']}",
+        )
         enactment_session = self.live_enactment.execute(
             build_request=build_request,
             build_artifact=build_artifact,
             eval_refs=suite_selection["selected_evals"],
             repo_root=self.repo_root,
+            guardian_oversight_event=enactment_oversight_event,
         )
         enactment_validation = self.live_enactment.validate_session(enactment_session)
         council_output = {
@@ -9528,6 +9633,16 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="guardian.enactment.attestation.satisfied",
+            payload=enactment_oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="selfctor.enactment.executed",
             payload={
                 "policy": self.live_enactment.policy(),
@@ -9578,6 +9693,38 @@ json.dump(response, sys.stdout)
                 "executed_command_count": enactment_session["executed_command_count"],
                 "all_commands_passed": enactment_session["all_commands_passed"],
                 "cleanup_status": enactment_session["cleanup_status"],
+                "reviewer_oversight_status": enactment_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["status"],
+                "reviewer_quorum_required": enactment_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["required_quorum"],
+                "reviewer_quorum_received": enactment_session["guardian_oversight_event"][
+                    "human_attestation"
+                ]["received_quorum"],
+                "reviewer_binding_count": len(
+                    enactment_session["guardian_oversight_event"]["reviewer_bindings"]
+                ),
+                "reviewer_network_receipt_count": sum(
+                    bool(binding["network_receipt_id"])
+                    for binding in enactment_session["guardian_oversight_event"][
+                        "reviewer_bindings"
+                    ]
+                ),
+                "reviewer_network_attested": enactment_session["oversight_gate"][
+                    "reviewer_network_attested"
+                ],
+                "enactment_payload_ref_bound": enactment_session["guardian_oversight_event"][
+                    "payload_ref"
+                ]
+                == f"artifact://{build_artifact['artifact_id']}",
+                "oversight_gate_status": enactment_session["oversight_gate"]["status"],
+                "oversight_gate_cleanup_status": enactment_session["oversight_gate"][
+                    "cleanup_status"
+                ],
+                "oversight_gate_command_count": enactment_session["oversight_gate"][
+                    "executed_command_count"
+                ],
                 "council_output_binds_build_request": council_output["emitted_artifacts"][0]["ref"]
                 == f"build://{build_request['request_id']}",
             },
@@ -9601,10 +9748,12 @@ json.dump(response, sys.stdout)
                 "specs/interfaces/selfctor.diff_eval.v0.idl",
                 "specs/interfaces/selfctor.rollout.v0.idl",
                 "specs/interfaces/selfctor.rollback.v0.idl",
+                "specs/interfaces/governance.oversight.v0.idl",
                 "specs/schemas/design_delta_manifest.schema",
                 "specs/schemas/build_request.yaml",
                 "specs/schemas/build_artifact.yaml",
                 "specs/schemas/builder_live_enactment_session.schema",
+                "specs/schemas/guardian_oversight_event.schema",
                 "specs/schemas/sandbox_apply_receipt.schema",
                 "specs/schemas/staged_rollout_session.schema",
                 "specs/schemas/builder_rollback_session.schema",
@@ -9647,6 +9796,10 @@ json.dump(response, sys.stdout)
             requested_evals=build_request["constraints"]["must_pass"],
         )
         execution_eval_refs = self._execution_bound_eval_refs(suite_selection["selected_evals"])
+        enactment_oversight_event = self._build_live_enactment_oversight_event(
+            reviewer_namespace="builder-rollback-live",
+            payload_ref=f"artifact://{build_artifact['artifact_id']}",
+        )
         enactment_session = self.live_enactment.execute(
             build_request=build_request,
             build_artifact=build_artifact,
@@ -9654,6 +9807,7 @@ json.dump(response, sys.stdout)
                 "evals/continuity/builder_live_enactment_execution.yaml",
             ],
             repo_root=self.repo_root,
+            guardian_oversight_event=enactment_oversight_event,
         )
         enactment_validation = self.live_enactment.validate_session(enactment_session)
         eval_execution_session = None
@@ -9664,6 +9818,7 @@ json.dump(response, sys.stdout)
                 build_artifact=build_artifact,
                 eval_refs=execution_eval_refs,
                 repo_root=self.repo_root,
+                guardian_oversight_event=enactment_oversight_event,
             )
             eval_execution_validation = self.live_enactment.validate_session(eval_execution_session)
         eval_reports = [
@@ -9865,6 +10020,16 @@ json.dump(response, sys.stdout)
             category="self-modify",
             layer="L5",
             signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.enactment.attestation.satisfied",
+            payload=enactment_oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
             substrate="classical-silicon",
         )
         self.ledger.append(

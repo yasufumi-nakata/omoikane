@@ -87,6 +87,11 @@ Mirage Self への sandbox apply が rollback-ready receipt を返し、
 builder staged rollout が dark-launch から full-100pct まで
 固定順序で完了するか。
 
+### Builder Live Oversight Network
+builder live enactment が integrity Guardian の attestation event に
+reviewer verifier-network receipt を 2 名分束縛したまま
+enactment-approved へ到達するか。
+
 ### Builder Rollback Execution
 builder staged rollout で regression が検出された時に、
 RollbackEngine が pre-apply Mirage Self snapshot を復元し、

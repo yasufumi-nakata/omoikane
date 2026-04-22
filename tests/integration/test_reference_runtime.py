@@ -366,7 +366,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["design_reader_handoff_ok"])
         self.assertEqual("ready", result["validation"]["design_manifest_status"])
-        self.assertEqual(12, result["validation"]["design_source_digest_count"])
+        self.assertEqual(16, result["validation"]["design_source_digest_count"])
         self.assertEqual(3, result["validation"]["must_sync_docs_count"])
         self.assertTrue(result["validation"]["scope_allowed"])
         self.assertTrue(result["validation"]["immutable_boundaries_preserved"])
@@ -421,6 +421,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(execution_report["execution_bound"])
         self.assertEqual(2, execution_report["execution_receipt"]["executed_command_count"])
+        self.assertTrue(result["validation"]["eval_execution_reviewer_network_attested"])
+        self.assertEqual(
+            "enactment-approved",
+            result["validation"]["eval_execution_oversight_gate_status"],
+        )
         self.assertTrue(
             result["builder"]["build_request"]["design_delta_ref"].startswith("design://")
         )
@@ -428,6 +433,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("passed", result["builder"]["eval_execution_session"]["status"])
         self.assertEqual("promoted", result["builder"]["rollout_session"]["status"])
         self.assertEqual(8, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
 
     def test_builder_live_demo_runs_actual_workspace_commands(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -444,12 +450,30 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["executed_command_count"])
         self.assertTrue(result["validation"]["all_commands_passed"])
         self.assertEqual("removed", result["validation"]["cleanup_status"])
+        self.assertEqual("satisfied", result["validation"]["reviewer_oversight_status"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_required"])
+        self.assertEqual(2, result["validation"]["reviewer_quorum_received"])
+        self.assertEqual(2, result["validation"]["reviewer_binding_count"])
+        self.assertEqual(2, result["validation"]["reviewer_network_receipt_count"])
+        self.assertTrue(result["validation"]["reviewer_network_attested"])
+        self.assertTrue(result["validation"]["enactment_payload_ref_bound"])
+        self.assertEqual("enactment-approved", result["validation"]["oversight_gate_status"])
+        self.assertEqual("removed", result["validation"]["oversight_gate_cleanup_status"])
+        self.assertEqual(2, result["validation"]["oversight_gate_command_count"])
         self.assertEqual(
-            ["evals/continuity/builder_live_enactment_execution.yaml"],
+            [
+                "evals/continuity/builder_live_enactment_execution.yaml",
+                "evals/continuity/builder_live_oversight_network.yaml",
+            ],
             result["builder"]["suite_selection"]["selected_evals"],
         )
         self.assertEqual("passed", result["builder"]["enactment_session"]["status"])
+        self.assertEqual(
+            "enactment-approved",
+            result["builder"]["enactment_session"]["oversight_gate"]["status"],
+        )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
 
     def test_rollback_demo_restores_pre_apply_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -466,6 +490,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("rolled-back", result["validation"]["rollout_status"])
         self.assertEqual("rolled-back", result["validation"]["rollback_status"])
         self.assertEqual("passed", result["validation"]["live_enactment_status"])
+        self.assertTrue(
+            result["builder"]["enactment_session"]["oversight_gate"]["reviewer_network_attested"]
+        )
         self.assertEqual("eval-regression", result["validation"]["rollback_trigger"])
         self.assertEqual(6, result["validation"]["selected_eval_count"])
         self.assertTrue(result["validation"]["eval_report_evidence_bound"])
@@ -527,6 +554,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["builder"]["rollback_guardian_oversight_event"]["human_attestation"]["status"],
         )
         self.assertEqual(9, result["ledger_verification"]["category_counts"]["self-modify"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["guardian-oversight"])
 
     def test_reasoning_demo_records_baseline_and_fallback(self) -> None:
         runtime = OmoikaneReferenceOS()
