@@ -6020,6 +6020,8 @@ json.dump(response, sys.stdout)
             identity_id=identity.identity_id,
             world_state_ref=f"wms://state/{world_state['state_id']}",
             body_anchor_ref="avatar://atrium/self-body/core",
+            avatar_body_map_ref="avatar-body-map://atrium/self-body/v1",
+            proprioceptive_calibration_ref="calibration://atrium/self-body/v1",
         )
 
         coherent_tick = self.qualia.append(
@@ -6046,7 +6048,13 @@ json.dump(response, sys.stdout)
                 "haptic": "artifact://loopback/haptic/coherent-wrist-v1",
             },
             latency_ms=42.0,
-            body_coherence_score=0.08,
+            body_map_alignment_ref="alignment://atrium/self-body/coherent-v1",
+            body_map_alignment={
+                "core": 0.96,
+                "left-hand": 0.91,
+                "right-hand": 0.93,
+                "stance": 0.94,
+            },
             attention_target=coherent_tick.attention_target,
             guardian_observed=True,
             qualia_binding_ref=f"qualia://tick/{coherent_tick.tick_id}",
@@ -6101,7 +6109,13 @@ json.dump(response, sys.stdout)
                 "haptic": "artifact://loopback/haptic/drifted-floor-v1",
             },
             latency_ms=168.0,
-            body_coherence_score=0.42,
+            body_map_alignment_ref="alignment://atrium/self-body/drifted-v1",
+            body_map_alignment={
+                "core": 0.58,
+                "left-hand": 0.61,
+                "right-hand": 0.55,
+                "stance": 0.52,
+            },
             attention_target=degraded_tick.attention_target,
             guardian_observed=True,
             qualia_binding_ref=f"qualia://tick/{degraded_tick.tick_id}",
@@ -6191,6 +6205,17 @@ json.dump(response, sys.stdout)
                 "qualia_binding_bound": coherent["qualia_binding_ref"].startswith("qualia://tick/")
                 and degraded["qualia_binding_ref"].startswith("qualia://tick/")
                 and stabilized["qualia_binding_ref"].startswith("qualia://loopback-stabilize/"),
+                "body_map_bound": final_session["avatar_body_map_ref"].startswith("avatar-body-map://"),
+                "proprioceptive_calibration_bound": final_session[
+                    "proprioceptive_calibration_ref"
+                ].startswith("calibration://"),
+                "alignment_ref_bound": coherent["body_map_alignment_ref"].startswith("alignment://")
+                and degraded["body_map_alignment_ref"].startswith("alignment://")
+                and stabilized["body_map_alignment_ref"].startswith("alignment://"),
+                "artifact_family_body_map_bound": all(
+                    scene["avatar_body_map_ref"] == final_session["avatar_body_map_ref"]
+                    for scene in artifact_family["scene_summaries"]
+                ),
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
             },

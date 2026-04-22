@@ -17,6 +17,9 @@ expected:
   stabilized_delivery_status: stabilized
   final_session_status: active
   qualia_binding_bound: true
+  body_map_bound: true
+  proprioceptive_calibration_bound: true
+  alignment_ref_bound: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

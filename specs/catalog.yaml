@@ -776,7 +776,7 @@ entries:
       - specs/interfaces/interface.sensory_loopback.v0.idl
       - docs/02-subsystems/interface/sensory-loopback.md
       - reference-runtime
-    rationale: Required to serialize one bounded loopback session with world/body anchors, guardian thresholds, and digest-only artifact policy.
+    rationale: Required to serialize one bounded loopback session with world/body anchors, avatar body-map calibration refs, guardian thresholds, and digest-only artifact policy.
   - priority: P1
     kind: schema
     file: specs/schemas/sensory_loopback_receipt.schema
@@ -785,7 +785,7 @@ entries:
       - docs/02-subsystems/interface/sensory-loopback.md
       - evals/interface/sensory_loopback_guard.yaml
       - reference-runtime
-    rationale: Required to serialize one coherent, attenuated, held, or stabilized loopback receipt without leaking raw sensory payloads.
+    rationale: Required to serialize one coherent, attenuated, held, or stabilized loopback receipt with derived body-map drift and calibration binding without leaking raw sensory payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/sensory_loopback_artifact_family.schema
@@ -794,7 +794,7 @@ entries:
       - docs/02-subsystems/interface/sensory-loopback.md
       - evals/interface/sensory_loopback_artifact_family.yaml
       - reference-runtime
-    rationale: Required to serialize one bounded multi-scene loopback artifact family that binds coherent delivery, guardian hold, and stabilization recovery without raw sensory payload retention.
+    rationale: Required to serialize one bounded multi-scene loopback artifact family that binds coherent delivery, guardian hold, stabilization recovery, and calibration refs without raw sensory payload retention.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
@@ -802,21 +802,21 @@ entries:
       - reference-runtime
       - docs/02-subsystems/interface/sensory-loopback.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make L6 sensory loopback delivery, guardian hold, stabilization, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
+    rationale: Required to make L6 sensory loopback delivery, guardian hold, stabilization, avatar body-map calibration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_guard.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects body-coherent delivery, guardian hold, and qualia-bound stabilization for bounded sensory loopback sessions.
+    rationale: Protects body-coherent delivery, avatar body-map calibration binding, guardian hold, and qualia-bound stabilization for bounded sensory loopback sessions.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_artifact_family.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects multi-scene loopback artifact family ordering, guardian intervention accounting, and final session binding.
+    rationale: Protects multi-scene loopback artifact family ordering, guardian intervention accounting, final session binding, and body-map calibration continuity.
   - priority: P1
     kind: schema
     file: specs/schemas/collective_merge_session.schema

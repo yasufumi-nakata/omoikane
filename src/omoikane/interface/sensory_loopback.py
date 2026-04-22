@@ -33,6 +33,16 @@ SENSORY_LOOPBACK_LATENCY_BUDGET_MS = 90.0
 SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS = 140.0
 SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD = 0.20
 SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD = 0.35
+SENSORY_LOOPBACK_BODY_MAP_PROFILE = "avatar-proprioceptive-map-v1"
+SENSORY_LOOPBACK_PROPRIOCEPTIVE_CALIBRATION_POLICY = "ref-bound-avatar-map-v1"
+SENSORY_LOOPBACK_BODY_MAP_SEGMENTS = ("core", "left-hand", "right-hand", "stance")
+SENSORY_LOOPBACK_BODY_MAP_SEGMENT_SET = set(SENSORY_LOOPBACK_BODY_MAP_SEGMENTS)
+SENSORY_LOOPBACK_BODY_MAP_WEIGHTS = {
+    "core": 0.4,
+    "left-hand": 0.2,
+    "right-hand": 0.2,
+    "stance": 0.2,
+}
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY = "multi-scene-artifact-family-v1"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY = "family-digest+scene-summary-ref-only"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES = 4
@@ -65,6 +75,10 @@ class SensoryLoopbackService:
             "hold_drift_threshold": SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
             "world_anchor_required": True,
             "body_schema_mode": "virtual-self-anchor-v1",
+            "body_map_profile": SENSORY_LOOPBACK_BODY_MAP_PROFILE,
+            "body_map_segments": list(SENSORY_LOOPBACK_BODY_MAP_SEGMENTS),
+            "body_map_weights": dict(SENSORY_LOOPBACK_BODY_MAP_WEIGHTS),
+            "proprioceptive_calibration_policy": SENSORY_LOOPBACK_PROPRIOCEPTIVE_CALIBRATION_POLICY,
             "artifact_storage_policy": "artifact-digest+summary-ref-only",
             "qualia_binding_policy": "surrogate-tick-ref",
             "artifact_family_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
@@ -79,12 +93,24 @@ class SensoryLoopbackService:
         identity_id: str,
         world_state_ref: str,
         body_anchor_ref: str,
+        avatar_body_map_ref: str,
+        proprioceptive_calibration_ref: str,
         channels: Sequence[str] = DEFAULT_LOOPBACK_CHANNELS,
     ) -> Dict[str, Any]:
         normalized_identity = self._normalize_non_empty_string(identity_id, "identity_id")
         normalized_world_state = self._normalize_non_empty_string(world_state_ref, "world_state_ref")
         normalized_body_anchor = self._normalize_non_empty_string(body_anchor_ref, "body_anchor_ref")
+        normalized_body_map_ref = self._normalize_non_empty_string(
+            avatar_body_map_ref,
+            "avatar_body_map_ref",
+        )
+        normalized_calibration_ref = self._normalize_non_empty_string(
+            proprioceptive_calibration_ref,
+            "proprioceptive_calibration_ref",
+        )
         normalized_channels = self._normalize_channels(channels)
+        body_map_anchor_refs = self._build_body_map_anchor_refs(normalized_body_anchor)
+        baseline_alignment_ref = f"alignment://sensory-loopback/{new_id('sl-align')}"
 
         opened_at = utc_now_iso()
         session_id = new_id("sl")
@@ -102,6 +128,11 @@ class SensoryLoopbackService:
             "attenuation_latency_ms": SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS,
             "coherence_drift_threshold": SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD,
             "hold_drift_threshold": SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
+            "body_map_profile": SENSORY_LOOPBACK_BODY_MAP_PROFILE,
+            "avatar_body_map_ref": normalized_body_map_ref,
+            "body_map_anchor_refs": body_map_anchor_refs,
+            "body_map_weights": dict(SENSORY_LOOPBACK_BODY_MAP_WEIGHTS),
+            "proprioceptive_calibration_ref": normalized_calibration_ref,
             "safe_baseline_ref": "loopback://baseline/guardian-safe-v1",
             "artifact_storage_policy": "artifact-digest+summary-ref-only",
             "qualia_binding_policy": "surrogate-tick-ref",
@@ -109,6 +140,8 @@ class SensoryLoopbackService:
             "last_delivery_id": "",
             "last_delivery_status": "none",
             "last_guardian_action": "none",
+            "last_body_map_alignment_ref": baseline_alignment_ref,
+            "last_body_map_alignment": self._default_body_map_alignment(),
             "artifact_family_count": 0,
             "last_artifact_family_id": "",
             "last_artifact_family_ref": "",
@@ -124,7 +157,8 @@ class SensoryLoopbackService:
         scene_summary: str,
         artifact_refs: Mapping[str, str],
         latency_ms: float,
-        body_coherence_score: float,
+        body_map_alignment_ref: str,
+        body_map_alignment: Mapping[str, float],
         attention_target: str,
         guardian_observed: bool,
         qualia_binding_ref: str = "",
@@ -141,7 +175,12 @@ class SensoryLoopbackService:
         if len(normalized_artifacts) < 2:
             raise ValueError("artifact_refs must cover at least 2 channels")
         normalized_latency = self._normalize_non_negative_number(latency_ms, "latency_ms")
-        coherence_score = self._normalize_score(body_coherence_score, "body_coherence_score")
+        normalized_alignment_ref = self._normalize_non_empty_string(
+            body_map_alignment_ref,
+            "body_map_alignment_ref",
+        )
+        normalized_alignment = self._normalize_body_map_alignment(body_map_alignment)
+        coherence_score = self._derive_body_coherence_score(normalized_alignment)
         normalized_attention_target = self._normalize_non_empty_string(
             attention_target,
             "attention_target",
@@ -206,6 +245,11 @@ class SensoryLoopbackService:
             "artifact_digest": artifact_digest,
             "latency_ms": round(normalized_latency, 3),
             "body_coherence_score": round(coherence_score, 3),
+            "body_map_profile": session["body_map_profile"],
+            "avatar_body_map_ref": session["avatar_body_map_ref"],
+            "proprioceptive_calibration_ref": session["proprioceptive_calibration_ref"],
+            "body_map_alignment_ref": normalized_alignment_ref,
+            "body_map_alignment": normalized_alignment,
             "classification": classification,
             "delivery_status": delivery_status,
             "guardian_action": guardian_action,
@@ -222,6 +266,8 @@ class SensoryLoopbackService:
         session["last_delivery_id"] = delivery_id
         session["last_delivery_status"] = delivery_status
         session["last_guardian_action"] = guardian_action
+        session["last_body_map_alignment_ref"] = normalized_alignment_ref
+        session["last_body_map_alignment"] = normalized_alignment
         session["last_audit_event_ref"] = receipt["audit_event_ref"]
         return deepcopy(receipt)
 
@@ -244,6 +290,8 @@ class SensoryLoopbackService:
         delivery_id = new_id("sl-delivery")
         recorded_at = utc_now_iso()
         artifact_digest = sha256_text(canonical_json({}))
+        restored_alignment_ref = f"alignment://sensory-loopback/{delivery_id}/restored"
+        restored_alignment = self._default_body_map_alignment()
         receipt = {
             "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
             "delivery_id": delivery_id,
@@ -255,6 +303,11 @@ class SensoryLoopbackService:
             "artifact_digest": artifact_digest,
             "latency_ms": 0.0,
             "body_coherence_score": 0.0,
+            "body_map_profile": session["body_map_profile"],
+            "avatar_body_map_ref": session["avatar_body_map_ref"],
+            "proprioceptive_calibration_ref": session["proprioceptive_calibration_ref"],
+            "body_map_alignment_ref": restored_alignment_ref,
+            "body_map_alignment": restored_alignment,
             "classification": "stabilized",
             "delivery_status": "stabilized",
             "guardian_action": "resume-loopback",
@@ -268,10 +321,13 @@ class SensoryLoopbackService:
         session["updated_at"] = recorded_at
         session["status"] = "active"
         session["body_anchor_ref"] = restored_body_anchor
+        session["body_map_anchor_refs"] = self._build_body_map_anchor_refs(restored_body_anchor)
         session["delivery_count"] += 1
         session["last_delivery_id"] = delivery_id
         session["last_delivery_status"] = "stabilized"
         session["last_guardian_action"] = "resume-loopback"
+        session["last_body_map_alignment_ref"] = restored_alignment_ref
+        session["last_body_map_alignment"] = restored_alignment
         session["last_audit_event_ref"] = receipt["audit_event_ref"]
         return deepcopy(receipt)
 
@@ -329,6 +385,22 @@ class SensoryLoopbackService:
                     "artifact_digest": self._normalize_non_empty_string(
                         receipt.get("artifact_digest"),
                         "artifact_digest",
+                    ),
+                    "body_coherence_score": self._normalize_score(
+                        receipt.get("body_coherence_score"),
+                        "body_coherence_score",
+                    ),
+                    "avatar_body_map_ref": self._normalize_non_empty_string(
+                        receipt.get("avatar_body_map_ref"),
+                        "avatar_body_map_ref",
+                    ),
+                    "proprioceptive_calibration_ref": self._normalize_non_empty_string(
+                        receipt.get("proprioceptive_calibration_ref"),
+                        "proprioceptive_calibration_ref",
+                    ),
+                    "body_map_alignment_ref": self._normalize_non_empty_string(
+                        receipt.get("body_map_alignment_ref"),
+                        "body_map_alignment_ref",
                     ),
                     "qualia_binding_ref": self._normalize_non_empty_string(
                         receipt.get("qualia_binding_ref"),
@@ -444,6 +516,48 @@ class SensoryLoopbackService:
             )
         if session.get("hold_drift_threshold") != SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD:
             errors.append("hold_drift_threshold must match the reference profile")
+        if session.get("body_map_profile") != SENSORY_LOOPBACK_BODY_MAP_PROFILE:
+            errors.append(f"body_map_profile must be {SENSORY_LOOPBACK_BODY_MAP_PROFILE}")
+        self._check_non_empty_string(
+            session.get("avatar_body_map_ref"),
+            "avatar_body_map_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            session.get("proprioceptive_calibration_ref"),
+            "proprioceptive_calibration_ref",
+            errors,
+        )
+        body_map_anchor_refs = session.get("body_map_anchor_refs")
+        if not self._mapping_has_exact_segment_keys(body_map_anchor_refs):
+            errors.append("body_map_anchor_refs must cover the canonical avatar body map segments")
+        else:
+            for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS:
+                self._check_non_empty_string(
+                    body_map_anchor_refs.get(segment),
+                    f"body_map_anchor_refs.{segment}",
+                    errors,
+                )
+        body_map_weights = session.get("body_map_weights")
+        if body_map_weights != SENSORY_LOOPBACK_BODY_MAP_WEIGHTS:
+            errors.append("body_map_weights must match the reference avatar body map weights")
+        self._check_non_empty_string(
+            session.get("last_body_map_alignment_ref"),
+            "last_body_map_alignment_ref",
+            errors,
+        )
+        last_body_map_alignment = session.get("last_body_map_alignment")
+        if not self._mapping_has_exact_segment_keys(last_body_map_alignment):
+            errors.append("last_body_map_alignment must cover the canonical avatar body map segments")
+        else:
+            for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS:
+                try:
+                    self._normalize_score(
+                        last_body_map_alignment.get(segment),
+                        f"last_body_map_alignment.{segment}",
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
 
         delivery_count = session.get("delivery_count")
         if not isinstance(delivery_count, int) or delivery_count < 0:
@@ -465,6 +579,8 @@ class SensoryLoopbackService:
             "supports_body_stabilization": session.get("hold_drift_threshold")
             == SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
             "world_anchor_bound": bool(session.get("world_state_ref")),
+            "body_map_bound": bool(session.get("avatar_body_map_ref")),
+            "proprioceptive_calibration_bound": bool(session.get("proprioceptive_calibration_ref")),
             "artifact_family_tracking_enabled": isinstance(session.get("last_artifact_family_ref"), str),
         }
 
@@ -518,6 +634,42 @@ class SensoryLoopbackService:
         coherence_score = receipt.get("body_coherence_score")
         if not isinstance(coherence_score, (int, float)) or not 0 <= coherence_score <= 1:
             errors.append("body_coherence_score must be between 0 and 1")
+        if receipt.get("body_map_profile") != SENSORY_LOOPBACK_BODY_MAP_PROFILE:
+            errors.append(f"body_map_profile must be {SENSORY_LOOPBACK_BODY_MAP_PROFILE}")
+        self._check_non_empty_string(
+            receipt.get("avatar_body_map_ref"),
+            "avatar_body_map_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("proprioceptive_calibration_ref"),
+            "proprioceptive_calibration_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("body_map_alignment_ref"),
+            "body_map_alignment_ref",
+            errors,
+        )
+        body_map_alignment = receipt.get("body_map_alignment")
+        if not self._mapping_has_exact_segment_keys(body_map_alignment):
+            errors.append("body_map_alignment must cover the canonical avatar body map segments")
+        else:
+            normalized_alignment: Dict[str, float] | None = {}
+            for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS:
+                try:
+                    normalized_alignment[segment] = self._normalize_score(
+                        body_map_alignment.get(segment),
+                        f"body_map_alignment.{segment}",
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
+                    normalized_alignment = None
+                    break
+            if normalized_alignment is not None:
+                expected_coherence_score = self._derive_body_coherence_score(normalized_alignment)
+                if round(float(coherence_score), 3) != expected_coherence_score:
+                    errors.append("body_coherence_score must match the weighted avatar body map drift")
 
         return {
             "ok": not errors,
@@ -525,6 +677,8 @@ class SensoryLoopbackService:
             "guardian_recoverable": delivery_status in {"attenuate-to-safe-baseline", "guardian-hold", "stabilized"},
             "immersion_preserved": bool(receipt.get("immersion_preserved")),
             "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
+            "body_map_bound": bool(receipt.get("avatar_body_map_ref")),
+            "calibration_bound": bool(receipt.get("proprioceptive_calibration_ref")),
         }
 
     def validate_artifact_family(self, artifact_family: Mapping[str, Any]) -> Dict[str, Any]:
@@ -595,6 +749,26 @@ class SensoryLoopbackService:
                 self._check_non_empty_string(
                     scene.get("artifact_digest"),
                     f"scene_summaries[{index}].artifact_digest",
+                    errors,
+                )
+                coherence_score = scene.get("body_coherence_score")
+                if not isinstance(coherence_score, (int, float)) or not 0 <= coherence_score <= 1:
+                    errors.append(
+                        f"scene_summaries[{index}].body_coherence_score must be between 0 and 1",
+                    )
+                self._check_non_empty_string(
+                    scene.get("avatar_body_map_ref"),
+                    f"scene_summaries[{index}].avatar_body_map_ref",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    scene.get("proprioceptive_calibration_ref"),
+                    f"scene_summaries[{index}].proprioceptive_calibration_ref",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    scene.get("body_map_alignment_ref"),
+                    f"scene_summaries[{index}].body_map_alignment_ref",
                     errors,
                 )
                 self._check_non_empty_string(
@@ -760,6 +934,50 @@ class SensoryLoopbackService:
         if invalid:
             raise ValueError(f"delivered_channels contains unsupported values: {invalid}")
         return normalized
+
+    @staticmethod
+    def _mapping_has_exact_segment_keys(value: Any) -> bool:
+        return isinstance(value, Mapping) and set(value) == SENSORY_LOOPBACK_BODY_MAP_SEGMENT_SET
+
+    @staticmethod
+    def _default_body_map_alignment() -> Dict[str, float]:
+        return {segment: 1.0 for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS}
+
+    def _build_body_map_anchor_refs(self, body_anchor_ref: str) -> Dict[str, str]:
+        trimmed = body_anchor_ref.rstrip("/")
+        if "/" in trimmed:
+            base_ref, tail = trimmed.rsplit("/", 1)
+            if tail not in SENSORY_LOOPBACK_BODY_MAP_SEGMENT_SET:
+                base_ref = trimmed
+        else:
+            base_ref = trimmed
+        return {
+            segment: trimmed if segment == "core" else f"{base_ref}/{segment}"
+            for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS
+        }
+
+    def _normalize_body_map_alignment(self, alignment: Mapping[str, float]) -> Dict[str, float]:
+        if not self._mapping_has_exact_segment_keys(alignment):
+            raise ValueError(
+                "body_map_alignment must cover the canonical avatar body map segments",
+            )
+        return {
+            segment: round(
+                self._normalize_score(alignment.get(segment), f"body_map_alignment.{segment}"),
+                3,
+            )
+            for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS
+        }
+
+    @staticmethod
+    def _derive_body_coherence_score(alignment: Mapping[str, float]) -> float:
+        return round(
+            sum(
+                (1.0 - float(alignment[segment])) * SENSORY_LOOPBACK_BODY_MAP_WEIGHTS[segment]
+                for segment in SENSORY_LOOPBACK_BODY_MAP_SEGMENTS
+            ),
+            3,
+        )
 
     @staticmethod
     def _artifact_family_digest(

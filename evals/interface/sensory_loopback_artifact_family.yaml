@@ -15,6 +15,7 @@ expected:
   artifact_family_guardian_intervention_count: 2
   artifact_family_final_session_status: active
   artifact_family_bound: true
+  artifact_family_body_map_bound: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

@@ -82,6 +82,10 @@ properties:
         - delivery_status
         - guardian_action
         - artifact_digest
+        - body_coherence_score
+        - avatar_body_map_ref
+        - proprioceptive_calibration_ref
+        - body_map_alignment_ref
         - qualia_binding_ref
         - attention_target
         - safe_baseline_applied
@@ -126,6 +130,19 @@ properties:
         artifact_digest:
           type: string
           minLength: 32
+        body_coherence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        avatar_body_map_ref:
+          type: string
+          minLength: 1
+        proprioceptive_calibration_ref:
+          type: string
+          minLength: 1
+        body_map_alignment_ref:
+          type: string
+          minLength: 1
         qualia_binding_ref:
           type: string
           minLength: 1
@@ -188,6 +205,10 @@ examples:
         delivery_status: delivered
         guardian_action: continue-loopback
         artifact_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+        body_coherence_score: 0.06
+        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
+        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
+        body_map_alignment_ref: alignment://atrium/self-body/coherent-v1
         qualia_binding_ref: qualia://tick/tick-1111
         attention_target: avatar://atrium/self-body/core
         safe_baseline_applied: false
@@ -202,6 +223,10 @@ examples:
         delivery_status: guardian-hold
         guardian_action: freeze-loopback
         artifact_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+        body_coherence_score: 0.43
+        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
+        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
+        body_map_alignment_ref: alignment://atrium/self-body/drifted-v1
         qualia_binding_ref: qualia://tick/tick-2222
         attention_target: guardian-review
         safe_baseline_applied: true
@@ -213,6 +238,10 @@ examples:
         delivery_status: stabilized
         guardian_action: resume-loopback
         artifact_digest: 99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa
+        body_coherence_score: 0.0
+        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
+        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
+        body_map_alignment_ref: alignment://sensory-loopback/sl-delivery-eeee3333ffff/restored
         qualia_binding_ref: qualia://loopback-stabilize/sl-delivery-eeee3333ffff
         attention_target: avatar://atrium/self-body/core
         safe_baseline_applied: true

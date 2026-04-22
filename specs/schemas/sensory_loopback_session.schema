@@ -20,6 +20,11 @@ required:
   - attenuation_latency_ms
   - coherence_drift_threshold
   - hold_drift_threshold
+  - body_map_profile
+  - avatar_body_map_ref
+  - body_map_anchor_refs
+  - body_map_weights
+  - proprioceptive_calibration_ref
   - safe_baseline_ref
   - artifact_storage_policy
   - qualia_binding_policy
@@ -27,6 +32,8 @@ required:
   - last_delivery_id
   - last_delivery_status
   - last_guardian_action
+  - last_body_map_alignment_ref
+  - last_body_map_alignment
   - artifact_family_count
   - last_artifact_family_id
   - last_artifact_family_ref
@@ -77,6 +84,52 @@ properties:
     const: 0.2
   hold_drift_threshold:
     const: 0.35
+  body_map_profile:
+    const: avatar-proprioceptive-map-v1
+  avatar_body_map_ref:
+    type: string
+    minLength: 1
+  body_map_anchor_refs:
+    type: object
+    additionalProperties: false
+    required:
+      - core
+      - left-hand
+      - right-hand
+      - stance
+    properties:
+      core:
+        type: string
+        minLength: 1
+      left-hand:
+        type: string
+        minLength: 1
+      right-hand:
+        type: string
+        minLength: 1
+      stance:
+        type: string
+        minLength: 1
+  body_map_weights:
+    type: object
+    additionalProperties: false
+    required:
+      - core
+      - left-hand
+      - right-hand
+      - stance
+    properties:
+      core:
+        const: 0.4
+      left-hand:
+        const: 0.2
+      right-hand:
+        const: 0.2
+      stance:
+        const: 0.2
+  proprioceptive_calibration_ref:
+    type: string
+    minLength: 1
   safe_baseline_ref:
     type: string
     minLength: 1
@@ -93,6 +146,34 @@ properties:
     type: string
   last_guardian_action:
     type: string
+  last_body_map_alignment_ref:
+    type: string
+    minLength: 1
+  last_body_map_alignment:
+    type: object
+    additionalProperties: false
+    required:
+      - core
+      - left-hand
+      - right-hand
+      - stance
+    properties:
+      core:
+        type: number
+        minimum: 0
+        maximum: 1
+      left-hand:
+        type: number
+        minimum: 0
+        maximum: 1
+      right-hand:
+        type: number
+        minimum: 0
+        maximum: 1
+      stance:
+        type: number
+        minimum: 0
+        maximum: 1
   artifact_family_count:
     type: integer
     minimum: 0

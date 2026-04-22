@@ -12,6 +12,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             identity_id="identity://loopback-primary",
             world_state_ref="wms://state/state-1",
             body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
         )
 
         receipt = service.deliver_bundle(
@@ -23,7 +25,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 "haptic": "artifact://haptic/coherent",
             },
             latency_ms=48.0,
-            body_coherence_score=0.09,
+            body_map_alignment_ref="alignment://body/coherent-v1",
+            body_map_alignment={
+                "core": 0.95,
+                "left-hand": 0.92,
+                "right-hand": 0.91,
+                "stance": 0.93,
+            },
             attention_target="avatar://body/core",
             guardian_observed=True,
             qualia_binding_ref="qualia://tick/0",
@@ -35,10 +43,16 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertEqual("delivered", receipt["delivery_status"])
         self.assertTrue(receipt["immersion_preserved"])
         self.assertFalse(receipt["safe_baseline_applied"])
+        self.assertEqual("avatar-body-map://body/v1", receipt["avatar_body_map_ref"])
+        self.assertEqual("calibration://body/v1", receipt["proprioceptive_calibration_ref"])
         self.assertEqual("active", snapshot["status"])
         self.assertTrue(session_validation["ok"])
         self.assertTrue(session_validation["artifact_digest_only"])
+        self.assertTrue(session_validation["body_map_bound"])
+        self.assertTrue(session_validation["proprioceptive_calibration_bound"])
         self.assertTrue(receipt_validation["ok"])
+        self.assertTrue(receipt_validation["body_map_bound"])
+        self.assertTrue(receipt_validation["calibration_bound"])
 
     def test_high_drift_bundle_triggers_guardian_hold_until_stabilized(self) -> None:
         service = SensoryLoopbackService()
@@ -46,6 +60,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             identity_id="identity://loopback-primary",
             world_state_ref="wms://state/state-2",
             body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
         )
 
         held = service.deliver_bundle(
@@ -57,7 +73,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 "haptic": "artifact://haptic/drifted",
             },
             latency_ms=172.0,
-            body_coherence_score=0.44,
+            body_map_alignment_ref="alignment://body/drifted-v1",
+            body_map_alignment={
+                "core": 0.54,
+                "left-hand": 0.57,
+                "right-hand": 0.59,
+                "stance": 0.55,
+            },
             attention_target="guardian-review",
             guardian_observed=True,
             qualia_binding_ref="qualia://tick/1",
@@ -84,6 +106,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             identity_id="identity://loopback-primary",
             world_state_ref="wms://state/state-3",
             body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
         )
 
         with self.assertRaisesRegex(PermissionError, "guardian observation"):
@@ -95,9 +119,44 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                     "auditory": "artifact://auditory/drifted",
                 },
                 latency_ms=132.0,
-                body_coherence_score=0.28,
+                body_map_alignment_ref="alignment://body/degraded-v1",
+                body_map_alignment={
+                    "core": 0.73,
+                    "left-hand": 0.74,
+                    "right-hand": 0.69,
+                    "stance": 0.72,
+                },
                 attention_target="guardian-review",
                 guardian_observed=False,
+            )
+
+    def test_body_map_alignment_must_cover_canonical_segments(self) -> None:
+        service = SensoryLoopbackService()
+        session = service.open_session(
+            identity_id="identity://loopback-primary",
+            world_state_ref="wms://state/state-3b",
+            body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
+        )
+
+        with self.assertRaisesRegex(ValueError, "canonical avatar body map segments"):
+            service.deliver_bundle(
+                session["session_id"],
+                scene_summary="alignment omits one body segment",
+                artifact_refs={
+                    "visual": "artifact://visual/missing-segment",
+                    "auditory": "artifact://auditory/missing-segment",
+                },
+                latency_ms=48.0,
+                body_map_alignment_ref="alignment://body/incomplete-v1",
+                body_map_alignment={
+                    "core": 0.94,
+                    "left-hand": 0.89,
+                    "right-hand": 0.91,
+                },
+                attention_target="avatar://body/core",
+                guardian_observed=True,
             )
 
     def test_multi_scene_artifact_family_tracks_guardian_recovery(self) -> None:
@@ -106,6 +165,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             identity_id="identity://loopback-primary",
             world_state_ref="wms://state/state-4",
             body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
         )
 
         coherent = service.deliver_bundle(
@@ -117,7 +178,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 "haptic": "artifact://haptic/coherent-family",
             },
             latency_ms=51.0,
-            body_coherence_score=0.12,
+            body_map_alignment_ref="alignment://body/family-coherent-v1",
+            body_map_alignment={
+                "core": 0.93,
+                "left-hand": 0.9,
+                "right-hand": 0.88,
+                "stance": 0.92,
+            },
             attention_target="avatar://body/core",
             guardian_observed=True,
             qualia_binding_ref="qualia://tick/family-0",
@@ -131,7 +198,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 "haptic": "artifact://haptic/drifted-family",
             },
             latency_ms=171.0,
-            body_coherence_score=0.43,
+            body_map_alignment_ref="alignment://body/family-drifted-v1",
+            body_map_alignment={
+                "core": 0.56,
+                "left-hand": 0.58,
+                "right-hand": 0.53,
+                "stance": 0.57,
+            },
             attention_target="guardian-review",
             guardian_observed=True,
             qualia_binding_ref="qualia://tick/family-1",
@@ -157,6 +230,10 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertEqual(1, len(artifact_family["stabilization_delivery_ids"]))
         self.assertEqual(1, snapshot["artifact_family_count"])
         self.assertEqual(artifact_family["family_ref"], snapshot["last_artifact_family_ref"])
+        self.assertEqual(
+            "avatar-body-map://body/v1",
+            artifact_family["scene_summaries"][0]["avatar_body_map_ref"],
+        )
 
 
 if __name__ == "__main__":

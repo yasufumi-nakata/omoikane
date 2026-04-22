@@ -8,6 +8,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 - `visual / auditory / haptic` の 2 以上の channel を束ねて自己フィードバックを返す
 - `WMS` の `world_state_ref` と `body_anchor_ref` に束縛し、
   avatar body の drift を検出する
+- `avatar_body_map_ref` と `proprioceptive_calibration_ref` により、
+  canonical な body segment map と calibration snapshot を receipt/family へ束縛する
 - artifact 本体は保持せず、`artifact_ref` と digest と summary のみを監査へ残す
 - coherent / guardian-hold / stabilize の複数 scene を
   bounded な artifact family として束ね、回復経路を digest-only で再監査できる
@@ -25,13 +27,15 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | coherence_drift_threshold | `0.20` |
 | hold_drift_threshold | `0.35` |
 | body_schema_mode | `virtual-self-anchor-v1` |
+| body_map_profile | `avatar-proprioceptive-map-v1` |
+| proprioceptive_calibration_policy | `ref-bound-avatar-map-v1` |
 | artifact_storage_policy | `artifact-digest+summary-ref-only` |
 | qualia_binding_policy | `surrogate-tick-ref` |
 | artifact_family_policy | `multi-scene-artifact-family-v1` |
 | artifact_family_max_scenes | `4` |
 
-reference runtime では raw retinal/audio/haptic stream は扱わず、
-**artifact ref + digest + body coherence score** に限定した contract を固定する。
+reference runtime では raw retinal/audio/haptic payload は扱わず、
+**artifact ref + digest + avatar body-map alignment** に限定した contract を固定する。
 
 ## API
 
@@ -41,6 +45,8 @@ sensory_loopback.open_session:
     identity_id: <identity ref>
     world_state_ref: <wms state ref>
     body_anchor_ref: <avatar body anchor>
+    avatar_body_map_ref: <canonical avatar body map ref>
+    proprioceptive_calibration_ref: <latest calibration snapshot ref>
     channels: [visual, auditory, haptic]
   output: sensory_loopback_session
 
@@ -53,7 +59,12 @@ sensory_loopback.deliver_bundle:
       auditory: <artifact ref>
       haptic: <artifact ref>
     latency_ms: <float>
-    body_coherence_score: <0.0..1.0>
+    body_map_alignment_ref: <alignment receipt ref>
+    body_map_alignment:
+      core: <0.0..1.0>
+      left-hand: <0.0..1.0>
+      right-hand: <0.0..1.0>
+      stance: <0.0..1.0>
     attention_target: <focus ref>
     guardian_observed: <bool>
     qualia_binding_ref: <qualia tick ref>
@@ -92,6 +103,7 @@ degraded bundle は Guardian observe が無い限り reject する。
 4. **2 channel 以上** ── body-coherent delivery を名乗るには最低 2 modality が必要
 5. **qualia は ref のみ** ── loopback receipt は surrogate tick 参照だけを返す
 6. **artifact family は同一 session 内限定** ── multi-scene family は 2-4 receipt を同一 session に束縛する
+7. **body map calibration 必須** ── session と receipt は `avatar_body_map_ref` / `proprioceptive_calibration_ref` / `body_map_alignment_ref` を必ず持つ
 
 ## reference runtime の扱い
 
@@ -103,14 +115,14 @@ degraded bundle は Guardian observe が無い限り reject する。
 - `sensory-loopback-demo --json` で coherent delivery、
   guardian hold、stabilize 復帰、multi-scene artifact family capture を 1 シナリオで可視化
 - `evals/interface/sensory_loopback_guard.yaml` で
-  body coherence guard と qualia binding を固定
+  body coherence guard、avatar body-map calibration binding、qualia binding を固定
 - `evals/interface/sensory_loopback_artifact_family.yaml` で
-  family scene 順序、guardian intervention 数、final session binding を固定
+  family scene 順序、guardian intervention 数、final session binding、
+  body-map binding を固定
 
 ## 未解決
 
-- raw retinal/audio/haptic stream の hardware-specific timing
-- richer avatar body map と proprioceptive calibration
+- raw retinal/audio/haptic payload を actual capture pipeline へ接続する repo 外 adapter
 - collective / IMC 共有空間での multi-self loopback arbitration
 
 ## 関連

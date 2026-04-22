@@ -17,6 +17,11 @@ required:
   - artifact_digest
   - latency_ms
   - body_coherence_score
+  - body_map_profile
+  - avatar_body_map_ref
+  - proprioceptive_calibration_ref
+  - body_map_alignment_ref
+  - body_map_alignment
   - classification
   - delivery_status
   - guardian_action
@@ -73,6 +78,42 @@ properties:
     type: number
     minimum: 0
     maximum: 1
+  body_map_profile:
+    const: avatar-proprioceptive-map-v1
+  avatar_body_map_ref:
+    type: string
+    minLength: 1
+  proprioceptive_calibration_ref:
+    type: string
+    minLength: 1
+  body_map_alignment_ref:
+    type: string
+    minLength: 1
+  body_map_alignment:
+    type: object
+    additionalProperties: false
+    required:
+      - core
+      - left-hand
+      - right-hand
+      - stance
+    properties:
+      core:
+        type: number
+        minimum: 0
+        maximum: 1
+      left-hand:
+        type: number
+        minimum: 0
+        maximum: 1
+      right-hand:
+        type: number
+        minimum: 0
+        maximum: 1
+      stance:
+        type: number
+        minimum: 0
+        maximum: 1
   classification:
     type: string
     enum:

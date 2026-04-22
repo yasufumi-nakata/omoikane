@@ -9,7 +9,7 @@ imports:
   sensory_loopback_artifact_family: ../schemas/sensory_loopback_artifact_family.schema
 operations:
   open_session:
-    summary: Bind one loopback session to a world-state anchor and a virtual body anchor before delivery begins.
+    summary: Bind one loopback session to a world-state anchor, virtual body anchor, and avatar body-map calibration before delivery begins.
     input:
       inline_schema:
         type: object
@@ -17,6 +17,8 @@ operations:
           - identity_id
           - world_state_ref
           - body_anchor_ref
+          - avatar_body_map_ref
+          - proprioceptive_calibration_ref
           - channels
         properties:
           identity_id:
@@ -26,6 +28,12 @@ operations:
             type: string
             minLength: 1
           body_anchor_ref:
+            type: string
+            minLength: 1
+          avatar_body_map_ref:
+            type: string
+            minLength: 1
+          proprioceptive_calibration_ref:
             type: string
             minLength: 1
           channels:
@@ -42,9 +50,10 @@ operations:
       schema_ref: sensory_loopback_session
     guarantees:
       - loopback sessions must bind to one world_state_ref before any delivery occurs
+      - loopback sessions must bind to one avatar_body_map_ref and one proprioceptive_calibration_ref before delivery occurs
       - channels must cover at least 2 modalities to claim body-coherent feedback
   deliver_bundle:
-    summary: Deliver one bounded multi-sensory bundle or degrade it into a guardian-controlled safe baseline.
+    summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence or degrade it into a guardian-controlled safe baseline.
     input:
       inline_schema:
         type: object
@@ -53,7 +62,8 @@ operations:
           - scene_summary
           - artifact_refs
           - latency_ms
-          - body_coherence_score
+          - body_map_alignment_ref
+          - body_map_alignment
           - attention_target
           - guardian_observed
         properties:
@@ -80,10 +90,34 @@ operations:
           latency_ms:
             type: number
             minimum: 0
-          body_coherence_score:
-            type: number
-            minimum: 0
-            maximum: 1
+          body_map_alignment_ref:
+            type: string
+            minLength: 1
+          body_map_alignment:
+            type: object
+            additionalProperties: false
+            required:
+              - core
+              - left-hand
+              - right-hand
+              - stance
+            properties:
+              core:
+                type: number
+                minimum: 0
+                maximum: 1
+              left-hand:
+                type: number
+                minimum: 0
+                maximum: 1
+              right-hand:
+                type: number
+                minimum: 0
+                maximum: 1
+              stance:
+                type: number
+                minimum: 0
+                maximum: 1
           attention_target:
             type: string
             minLength: 1
@@ -95,6 +129,7 @@ operations:
     output:
       schema_ref: sensory_loopback_receipt
     guarantees:
+      - body_coherence_score must be derived from the weighted body_map_alignment payload
       - coherent bundles must remain within 90ms latency and 0.20 body drift
       - degraded bundles require guardian observation before attenuation or hold
       - guardian-hold receipts must apply safe baseline and flag council review
@@ -192,5 +227,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves digest-only, body-coherent loopback handling and bounded multi-scene artifact family capture inside the reference runtime.
-    - Raw retinal/audio/haptic streams, richer avatar-body maps, and hardware-specific actuator timing remain future work.
+    - This contract proves digest-only, body-coherent loopback handling, avatar body-map calibration binding, and bounded multi-scene artifact family capture inside the reference runtime.
+    - Raw payload capture and device-driver timing stay outside this bootstrap boundary so the in-repo runtime remains deterministic and digest-only.
