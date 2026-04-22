@@ -1495,9 +1495,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_ethics_demo()
 
         self.assertEqual("deterministic-rule-tree-v0", result["language"]["language_id"])
-        self.assertEqual("Veto", result["decisions"]["immutable_boundary"]["status"])
-        self.assertEqual("Escalate", result["decisions"]["sandbox_escalation"]["status"])
-        self.assertEqual("Approval", result["decisions"]["approved_fork"]["status"])
+        self.assertEqual("veto", result["decisions"]["immutable_boundary"]["outcome"])
+        self.assertEqual("escalate", result["decisions"]["sandbox_escalation"]["outcome"])
+        self.assertEqual("approval", result["decisions"]["approved_fork"]["outcome"])
+        self.assertTrue(result["validation"]["resolution_policy_machine_readable"])
+        self.assertTrue(result["validation"]["conflict_prefers_veto"])
+        self.assertEqual(
+            "A7-ewa-blocked-token",
+            result["decisions"]["ewa_conflict_resolution"]["resolution"]["selected_rule_id"],
+        )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-veto"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["ethics-escalate"])
 

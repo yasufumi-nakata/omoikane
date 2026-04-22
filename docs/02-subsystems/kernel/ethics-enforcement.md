@@ -40,6 +40,15 @@ escalation:
 この形式は [`specs/schemas/ethics_rule.schema`](../../../specs/schemas/ethics_rule.schema) と
 [`specs/interfaces/kernel.ethics.v0.idl`](../../../specs/interfaces/kernel.ethics.v0.idl) で固定する。
 
+### 規約衝突の解消順序
+
+reference runtime では `priority-then-lexical-ethics-resolution-v1` を採用する。
+
+- まず outcome の強さを `veto > escalate > approval` で比較する
+- 同じ outcome 同士では `resolution_priority` の高い rule を優先する
+- それでも同順位なら `rule_id` の lexical order で tie-break する
+- 決定 payload には winning rule だけでなく matched rule 全件と resolution trace を残す
+
 ## Veto と Escalate の違い
 
 - **Veto**: 規約違反が明確。即時拒否。
@@ -67,6 +76,5 @@ EthicsLedger も三重保管。
 
 ## なお未解決
 
-- 規約間矛盾の解消順序（lexical vs. priority）
 - 多文化／多 substrate 環境での規約の翻訳と妥当性
 - 「本人同意」の真正性検証（強制下での同意の検出）

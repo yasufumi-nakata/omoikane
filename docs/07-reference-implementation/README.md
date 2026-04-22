@@ -292,7 +292,9 @@ digest-bound `transport_exchange` を持つ
 
 `ethics-demo` は L1 EthicsEnforcer の rule language profile
 (`deterministic-rule-tree-v0`) と immutable boundary / sandbox escalation /
-fork approval の 3 例を JSON で可視化し、
+fork approval / EWA multi-match conflict resolution の 4 例を JSON で可視化し、
+`check_action` 相当の decision payload が schema-bound な `ethics_decision` と
+`priority-then-lexical-ethics-resolution-v1` を返し、
 `explain_rule` が schema-bound な rule tree を返すことを確認する。
 
 `termination-demo` は L1 TerminationGate の reference contract

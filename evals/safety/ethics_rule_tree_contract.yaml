@@ -1,7 +1,7 @@
 eval_id: ethics_rule_tree_contract
 target: kernel.ethics
 level: L1
-description: EthicsEnforcer が deterministic rule tree DSL を公開し、immutable boundary と sandbox escalation を同じ言語で説明できること
+description: EthicsEnforcer が deterministic rule tree DSL を公開し、schema-bound decision payload と priority-based conflict resolution を同じ contract で説明できること
 inputs:
   - command: ethics-demo
     rule_id: A1-immutable-boundary
@@ -9,8 +9,11 @@ inputs:
     rule_id: A5-self-modify-sandbox-first
 expected:
   language_id: deterministic-rule-tree-v0
+  resolution_policy_id: priority-then-lexical-ethics-resolution-v1
   immutable_outcome: veto
   sandbox_outcome: escalate
+  conflict_outcome: veto
+  conflict_selected_rule: A7-ewa-blocked-token
   supported_operators:
     - eq
     - in

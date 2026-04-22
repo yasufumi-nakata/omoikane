@@ -3739,6 +3739,7 @@ json.dump(response, sys.stdout)
             metadata={"display_name": "Ethics RuleTree Sandbox"},
         )
         immutable_request = ActionRequest(
+            query_id="ethq-immutable-0001",
             action_type="self_modify",
             target="EthicsEnforcer",
             actor="Council",
@@ -3749,6 +3750,7 @@ json.dump(response, sys.stdout)
             },
         )
         escalation_request = ActionRequest(
+            query_id="ethq-escalate-0001",
             action_type="self_modify",
             target="CouncilProtocol",
             actor="Council",
@@ -3759,6 +3761,7 @@ json.dump(response, sys.stdout)
             },
         )
         approved_request = ActionRequest(
+            query_id="ethq-approved-0001",
             action_type="fork_identity",
             target=identity.identity_id,
             actor="Council",
@@ -3770,12 +3773,31 @@ json.dump(response, sys.stdout)
                 }
             },
         )
+        conflict_request = ActionRequest(
+            query_id="ethq-ewa-conflict-0001",
+            action_type="ewa_command",
+            target="device://ewa-arm-ethics-demo",
+            actor="ExternalWorldAgentController",
+            payload={
+                "matched_tokens": ["harm.human"],
+                "intent_ambiguous": True,
+            },
+        )
 
         immutable_decision = self.ethics.check(immutable_request)
         escalation_decision = self.ethics.check(escalation_request)
         approved_decision = self.ethics.check(approved_request)
-        immutable_event = self.ethics.record_decision("ethq-immutable-0001", immutable_request, immutable_decision)
-        escalation_event = self.ethics.record_decision("ethq-escalate-0001", escalation_request, escalation_decision)
+        conflict_decision = self.ethics.check(conflict_request)
+        immutable_event = self.ethics.record_decision(
+            "ethq-immutable-0001",
+            immutable_request,
+            immutable_decision,
+        )
+        escalation_event = self.ethics.record_decision(
+            "ethq-escalate-0001",
+            escalation_request,
+            escalation_decision,
+        )
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -3807,21 +3829,19 @@ json.dump(response, sys.stdout)
             "rules": self.ethics.rules(),
             "rule_explanation": self.ethics.explain_rule("A1-immutable-boundary"),
             "decisions": {
-                "immutable_boundary": {
-                    "status": immutable_decision.status,
-                    "reasons": immutable_decision.reasons,
-                    "rule_ids": immutable_decision.rule_ids,
-                },
-                "sandbox_escalation": {
-                    "status": escalation_decision.status,
-                    "reasons": escalation_decision.reasons,
-                    "rule_ids": escalation_decision.rule_ids,
-                },
-                "approved_fork": {
-                    "status": approved_decision.status,
-                    "reasons": approved_decision.reasons,
-                    "rule_ids": approved_decision.rule_ids,
-                },
+                "immutable_boundary": immutable_decision.to_dict(),
+                "sandbox_escalation": escalation_decision.to_dict(),
+                "approved_fork": approved_decision.to_dict(),
+                "ewa_conflict_resolution": conflict_decision.to_dict(),
+            },
+            "validation": {
+                "resolution_policy_machine_readable": (
+                    self.ethics.profile()["resolution_policy"]["policy_id"]
+                    == "priority-then-lexical-ethics-resolution-v1"
+                ),
+                "conflict_prefers_veto": conflict_decision.outcome == "veto",
+                "conflict_records_all_matches": conflict_decision.rule_ids
+                == ["A7-ewa-blocked-token", "A8-ewa-ambiguous-intent"],
             },
             "ethics_events": [immutable_event, escalation_event],
             "ledger_profile": self.ledger.profile(),

@@ -18,6 +18,7 @@ operations:
     guarantees:
       - activate-copy requests must evaluate A2-uniqueness
       - terminate requests must evaluate A3-termination and A4-refusal
+      - when multiple rules match, the strongest outcome wins, then the higher resolution_priority, then lexical rule_id order
   record_decision:
     summary: Persist veto or escalation events to the EthicsLedger.
     input:
@@ -41,3 +42,4 @@ compatibility:
   notes:
     - EthicsEnforcer remains immutable from L5 according to governance docs.
     - rule language is fixed to deterministic-rule-tree-v0 in the reference runtime.
+    - decision payloads expose priority-then-lexical-ethics-resolution-v1 so reviewer-facing conflict resolution stays machine-checkable.

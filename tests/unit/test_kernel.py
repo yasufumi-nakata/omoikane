@@ -292,6 +292,11 @@ class KernelTests(unittest.TestCase):
 
         self.assertEqual("Veto", decision.status)
         self.assertEqual(["A1-immutable-boundary"], decision.rule_ids)
+        self.assertEqual("veto", decision.outcome)
+        self.assertEqual(
+            "priority-then-lexical-ethics-resolution-v1",
+            decision.resolution["policy_id"],
+        )
 
     def test_ethics_exposes_rule_tree_profile(self) -> None:
         enforcer = EthicsEnforcer()
@@ -300,13 +305,19 @@ class KernelTests(unittest.TestCase):
         rule = enforcer.explain_rule("A1-immutable-boundary")
 
         self.assertEqual("deterministic-rule-tree-v0", profile["language_id"])
+        self.assertEqual(
+            "priority-then-lexical-ethics-resolution-v1",
+            profile["resolution_policy"]["policy_id"],
+        )
         self.assertEqual("ethics_rule", rule["kind"])
         self.assertEqual("veto", rule["outcome"])
         self.assertEqual("in", rule["predicate"]["all"][1]["operator"])
+        self.assertEqual(100, rule["resolution_priority"])
 
     def test_ethics_records_escalation_event(self) -> None:
         enforcer = EthicsEnforcer()
         request = ActionRequest(
+            query_id="ethq-escalate-0001",
             action_type="self_modify",
             target="CouncilProtocol",
             actor="Council",
@@ -323,6 +334,10 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("Escalate", decision.status)
         self.assertEqual("escalate", event["decision"])
         self.assertEqual("A5-self-modify-sandbox-first", event["rule_id"])
+        self.assertEqual(
+            ["A5-self-modify-sandbox-first", "A6-self-modify-guardian-signature"],
+            event["matched_rule_ids"],
+        )
         self.assertIn("guardian", event["signatures"])
 
     def test_ethics_vetoes_blocked_ewa_command(self) -> None:
@@ -360,6 +375,29 @@ class KernelTests(unittest.TestCase):
 
         self.assertEqual("Escalate", decision.status)
         self.assertEqual(["A8-ewa-ambiguous-intent"], decision.rule_ids)
+
+    def test_ethics_resolves_multi_match_by_priority_then_lexical_order(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        decision = enforcer.check(
+            ActionRequest(
+                action_type="ewa_command",
+                target="device://ewa-arm-03",
+                actor="ExternalWorldAgentController",
+                payload={
+                    "matched_tokens": ["harm.human"],
+                    "intent_ambiguous": True,
+                },
+            )
+        )
+
+        self.assertEqual("Veto", decision.status)
+        self.assertEqual(
+            ["A7-ewa-blocked-token", "A8-ewa-ambiguous-intent"],
+            decision.rule_ids,
+        )
+        self.assertEqual("A7-ewa-blocked-token", decision.resolution["selected_rule_id"])
+        self.assertEqual("rule-id-lexical", decision.resolution["tie_break"])
 
     def test_identity_fork_requires_triple_approval(self) -> None:
         registry = IdentityRegistry()

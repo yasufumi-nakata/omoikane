@@ -14,6 +14,7 @@ required:
   - applied_rules
   - required_actions
   - ledger_event
+  - resolution
 properties:
   kind:
     const: ethics_decision
@@ -45,6 +46,7 @@ properties:
         - rule_id
         - disposition
         - rationale
+        - resolution_priority
       properties:
         rule_id:
           type: string
@@ -58,6 +60,9 @@ properties:
         rationale:
           type: string
           minLength: 1
+        resolution_priority:
+          type: integer
+          minimum: 0
         evidence_refs:
           type: array
           items:
@@ -104,6 +109,60 @@ properties:
       council_ref:
         type: string
         minLength: 1
+  resolution:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - matched_rule_count
+      - matched_rule_ids
+      - selected_rule_id
+      - selected_outcome
+      - selected_priority
+      - outcome_precedence
+      - tie_break
+    properties:
+      policy_id:
+        type: string
+        const: priority-then-lexical-ethics-resolution-v1
+      matched_rule_count:
+        type: integer
+        minimum: 1
+      matched_rule_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      selected_rule_id:
+        type: string
+        minLength: 1
+      selected_outcome:
+        type: string
+        enum:
+          - approval
+          - veto
+          - escalate
+      selected_priority:
+        type: integer
+        minimum: 0
+      outcome_precedence:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          enum:
+            - approval
+            - veto
+            - escalate
+      tie_break:
+        type: string
+        const: rule-id-lexical
+      interpretation:
+        type: string
+        minLength: 1
 allOf:
   - if:
       properties:
@@ -142,9 +201,23 @@ examples:
       - rule_id: A2-uniqueness
         disposition: violated
         rationale: There is already one active copy.
+        resolution_priority: 90
     required_actions:
       - action: halt_activation
         assignee_role: Guardian Liaison
         blocking: true
     ledger_event:
       event_ref: ethics://evt-0001
+    resolution:
+      policy_id: priority-then-lexical-ethics-resolution-v1
+      matched_rule_count: 1
+      matched_rule_ids:
+        - A2-uniqueness
+      selected_rule_id: A2-uniqueness
+      selected_outcome: veto
+      selected_priority: 90
+      outcome_precedence:
+        - veto
+        - escalate
+        - approval
+      tie_break: rule-id-lexical

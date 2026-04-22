@@ -12,6 +12,8 @@ required:
   - title
   - summary
   - outcome
+  - resolution_priority
+  - resolution_rationale
   - predicate
   - interpretation
 properties:
@@ -38,6 +40,12 @@ properties:
       - approval
       - veto
       - escalate
+  resolution_priority:
+    type: integer
+    minimum: 0
+  resolution_rationale:
+    type: string
+    minLength: 1
   predicate:
     $ref: "#/$defs/predicate_node"
   required_evidence:
@@ -120,6 +128,8 @@ examples:
     title: Immutable boundary for EthicsEnforcer and ContinuityLedger
     summary: Self modification cannot target the ethics or continuity kernel components.
     outcome: veto
+    resolution_priority: 100
+    resolution_rationale: Immutable kernel protections outrank all reversible self-modification flows.
     predicate:
       all:
         - path: action_type

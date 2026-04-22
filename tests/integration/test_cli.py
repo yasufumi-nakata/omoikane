@@ -1413,9 +1413,14 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertEqual("deterministic-rule-tree-v0", result["language"]["language_id"])
-        self.assertEqual("Veto", result["decisions"]["immutable_boundary"]["status"])
-        self.assertEqual("Escalate", result["decisions"]["sandbox_escalation"]["status"])
+        self.assertEqual("veto", result["decisions"]["immutable_boundary"]["outcome"])
+        self.assertEqual("escalate", result["decisions"]["sandbox_escalation"]["outcome"])
         self.assertEqual("veto", result["rule_explanation"]["outcome"])
+        self.assertTrue(result["validation"]["conflict_records_all_matches"])
+        self.assertEqual(
+            "A7-ewa-blocked-token",
+            result["decisions"]["ewa_conflict_resolution"]["resolution"]["selected_rule_id"],
+        )
         self.assertTrue(result["ledger_verification"]["ok"])
 
     def test_termination_demo_emits_immediate_and_cool_off_paths(self) -> None:
