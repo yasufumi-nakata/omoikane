@@ -3452,6 +3452,12 @@ json.dump(response, sys.stdout)
             session_mode="standard",
             target_identity_ref=identity.identity_id,
         )
+        dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(convocation)
+        dispatch_plan_validation = self.yaoyorozu.validate_worker_dispatch_plan(dispatch_plan)
+        dispatch_receipt = self.yaoyorozu.execute_worker_dispatch(dispatch_plan)
+        dispatch_receipt_validation = self.yaoyorozu.validate_worker_dispatch_receipt(
+            dispatch_receipt
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="yaoyorozu.registry.synced",
@@ -3470,6 +3476,24 @@ json.dump(response, sys.stdout)
             layer="L4",
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.worker_dispatch.planned",
+            payload=dispatch_plan,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.worker_dispatch.executed",
+            payload=dispatch_receipt,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
         ledger_verification = self.ledger.verify()
 
         return {
@@ -3480,6 +3504,8 @@ json.dump(response, sys.stdout)
             "policy": self.yaoyorozu.policy_snapshot(),
             "registry": registry_snapshot,
             "convocation": convocation,
+            "dispatch_plan": dispatch_plan,
+            "dispatch_receipt": dispatch_receipt,
             "validation": {
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
@@ -3489,13 +3515,22 @@ json.dump(response, sys.stdout)
                 "builder_coverage_count": convocation["selection_summary"][
                     "selected_builder_coverage_count"
                 ],
+                "dispatch_unit_count": dispatch_plan_validation["dispatch_unit_count"],
+                "dispatch_success_count": dispatch_receipt_validation["success_count"],
                 "standing_roles_ready": convocation["validation"]["standing_roles_ready"],
                 "council_role_coverage_ok": convocation["validation"]["council_role_coverage_ok"],
                 "builder_handoff_coverage_ok": convocation["validation"][
                     "builder_handoff_coverage_ok"
                 ],
+                "worker_dispatch_plan_ok": dispatch_plan_validation["ok"],
+                "worker_dispatch_receipt_ok": dispatch_receipt_validation["ok"],
+                "worker_dispatch_coverage_complete": dispatch_receipt_validation[
+                    "coverage_complete"
+                ],
                 "ok": (
                     convocation["validation"]["ok"]
+                    and dispatch_plan_validation["ok"]
+                    and dispatch_receipt_validation["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },

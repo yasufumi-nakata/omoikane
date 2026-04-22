@@ -1,0 +1,259 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_worker_dispatch_plan.schema"
+title: YaoyorozuWorkerDispatchPlan
+description: Repo-local worker dispatch plan derived from a Council convocation builder handoff.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - dispatch_id
+  - planned_at
+  - dispatch_digest
+  - dispatch_profile
+  - registry_snapshot_ref
+  - convocation_session_ref
+  - policy_id
+  - proposal_profile
+  - session_mode
+  - target_identity_ref
+  - workspace_root
+  - dispatch_units
+  - selection_summary
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_worker_dispatch_plan
+  schema_version:
+    const: 1.0.0
+  dispatch_id:
+    type: string
+    pattern: "^yaoyorozu-dispatch-[a-f0-9]{12}$"
+  planned_at:
+    type: string
+    format: date-time
+  dispatch_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_profile:
+    const: repo-local-subprocess-worker-dispatch-v1
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://"
+  convocation_session_ref:
+    type: string
+    pattern: "^convocation://"
+  policy_id:
+    const: repo-local-yaoyorozu-registry-v1
+  proposal_profile:
+    const: self-modify-patch-v1
+  session_mode:
+    type: string
+    enum:
+      - standard
+      - expedited
+  target_identity_ref:
+    type: string
+    minLength: 1
+  workspace_root:
+    type: string
+    minLength: 1
+  dispatch_units:
+    type: array
+    minItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - unit_id
+        - role_id
+        - coverage_area
+        - selected_agent_id
+        - display_name
+        - source_ref
+        - source_kind
+        - dispatch_scope
+        - sandbox_mode
+        - workspace_scope
+        - entrypoint_ref
+        - command_preview
+        - command_digest
+        - target_paths
+        - expected_report_fields
+      properties:
+        unit_id:
+          type: string
+          pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        role_id:
+          type: string
+          minLength: 1
+        coverage_area:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+        selected_agent_id:
+          type: string
+          minLength: 1
+        display_name:
+          type: string
+          minLength: 1
+        source_ref:
+          type: string
+          minLength: 1
+        source_kind:
+          const: repo-local-agent
+        dispatch_scope:
+          const: repo-local-subprocess
+        sandbox_mode:
+          const: temp-workspace-only
+        workspace_scope:
+          const: repo-local
+        entrypoint_ref:
+          const: python-module://omoikane.agentic.local_worker_stub
+        command_preview:
+          type: array
+          minItems: 8
+          items:
+            type: string
+            minLength: 1
+        command_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        target_paths:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        expected_report_fields:
+          type: array
+          minItems: 9
+          items:
+            type: string
+            minLength: 1
+  selection_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - required_worker_count
+      - selected_worker_count
+      - unique_coverage_areas
+      - missing_coverage
+      - runtime_exec_ready
+    properties:
+      required_worker_count:
+        type: integer
+        minimum: 1
+      selected_worker_count:
+        type: integer
+        minimum: 0
+      unique_coverage_areas:
+        type: array
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      missing_coverage:
+        type: array
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      runtime_exec_ready:
+        type: boolean
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - registry_bound
+      - convocation_bound
+      - builder_coverage_ok
+      - unique_command_digests
+      - repo_local_scope_only
+      - ok
+    properties:
+      registry_bound:
+        const: true
+      convocation_bound:
+        const: true
+      builder_coverage_ok:
+        const: true
+      unique_command_digests:
+        const: true
+      repo_local_scope_only:
+        const: true
+      ok:
+        const: true
+examples:
+  - kind: yaoyorozu_worker_dispatch_plan
+    schema_version: 1.0.0
+    dispatch_id: yaoyorozu-dispatch-0123456789ab
+    planned_at: "2026-04-23T06:20:00Z"
+    dispatch_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_profile: repo-local-subprocess-worker-dispatch-v1
+    registry_snapshot_ref: registry://yaoyorozu-registry-0123456789ab
+    convocation_session_ref: convocation://council-convocation-0123456789ab
+    policy_id: repo-local-yaoyorozu-registry-v1
+    proposal_profile: self-modify-patch-v1
+    session_mode: standard
+    target_identity_ref: identity://primary
+    workspace_root: /Users/example/omoikane
+    dispatch_units:
+      - unit_id: worker-dispatch-0123456789ab
+        role_id: builder-runtime
+        coverage_area: runtime
+        selected_agent_id: codex-builder
+        display_name: CodexBuilder
+        source_ref: agents/builders/codex-builder.yaml
+        source_kind: repo-local-agent
+        dispatch_scope: repo-local-subprocess
+        sandbox_mode: temp-workspace-only
+        workspace_scope: repo-local
+        entrypoint_ref: python-module://omoikane.agentic.local_worker_stub
+        command_preview:
+          - python3
+          - -m
+          - omoikane.agentic.local_worker_stub
+          - --agent-id
+          - codex-builder
+          - --role-id
+          - builder-runtime
+          - --coverage-area
+          - runtime
+        command_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        target_paths:
+          - src/omoikane/
+          - tests/unit/
+          - tests/integration/
+        expected_report_fields:
+          - kind
+          - agent_id
+          - role_id
+          - coverage_area
+          - dispatch_profile
+          - workspace_scope
+          - source_ref
+          - target_paths
+          - status
+    selection_summary:
+      required_worker_count: 4
+      selected_worker_count: 4
+      unique_coverage_areas: [docs, eval, runtime, schema]
+      missing_coverage: []
+      runtime_exec_ready: true
+    validation:
+      registry_bound: true
+      convocation_bound: true
+      builder_coverage_ok: true
+      unique_command_digests: true
+      repo_local_scope_only: true
+      ok: true

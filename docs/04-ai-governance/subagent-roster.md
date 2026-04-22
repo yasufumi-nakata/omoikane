@@ -49,7 +49,8 @@
 
 reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json`
 により、この roster が trust-bound registry snapshot と
-`Self-Modify Patch` 向け Council / builder handoff plan に materialize される。
+`Self-Modify Patch` 向け Council / builder handoff plan に materialize され、
+selected builder 群が repo-local worker dispatch receipt として実行される。
 
 ## 並列召喚
 

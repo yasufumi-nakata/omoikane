@@ -21,7 +21,8 @@
 - 役割定義は [agents/](../../../agents/) 配下
 - reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持ち、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が repo-local `agents/` から trust-bound registry snapshot と
-  Council convocation / builder handoff plan を materialize する
+  Council convocation / builder handoff plan を materialize し、
+  selected builder handoff を repo-local subprocess worker dispatch receipt まで実行する
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

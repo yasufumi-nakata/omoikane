@@ -2,10 +2,12 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded Council convocation and builder handoff planning.
+summary: Repo-local agent registry sync plus bounded Council convocation and local worker dispatch planning.
 imports:
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
+  yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
+  yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
 operations:
   sync_registry:
     summary: Materialize one trust-bound registry snapshot from repo-local agents/ definitions.
@@ -50,8 +52,45 @@ operations:
       - standing roles must include speaker, recorder, guardian_liaison, and self_liaison
       - council panel must satisfy weighted vote quorum before emit_build_request
       - builder handoff must cover runtime, schema, eval, and docs surfaces
+  prepare_worker_dispatch:
+    summary: >
+      Convert one selected self-modify convocation into a repo-local worker dispatch plan
+      that launches bounded builder processes for runtime, schema, eval, and docs coverage.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - convocation_session
+        properties:
+          convocation_session:
+            schema_ref: council_convocation_session
+    output:
+      schema_ref: yaoyorozu_worker_dispatch_plan
+    guarantees:
+      - dispatch units must be derived only from selected builder_handoff entries
+      - every command preview must remain repo-local, subprocess-bound, and temp-workspace-only
+      - runtime, schema, eval, and docs coverage areas must each map to one dispatch unit
+  execute_worker_dispatch:
+    summary: >
+      Execute one repo-local worker dispatch plan as bounded subprocess workers and return
+      the resulting process-bound execution receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - dispatch_plan
+        properties:
+          dispatch_plan:
+            schema_ref: yaoyorozu_worker_dispatch_plan
+    output:
+      schema_ref: yaoyorozu_worker_dispatch_receipt
+    guarantees:
+      - every launched worker must echo a ready report bound to the same command_digest
+      - worker execution must stay inside the repo-local workspace and inherit the dispatch profile
+      - only zero-exit, ready-reported workers count toward completed dispatch coverage
 compatibility:
   stability: bootstrap
   notes:
     - The reference runtime currently fixes proposal_profile to self-modify-patch-v1.
-    - Cross-workspace worker discovery and live agent process orchestration remain outside this repo.
+    - Cross-workspace worker discovery remains outside this repo.
+    - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

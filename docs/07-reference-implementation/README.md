@@ -278,7 +278,9 @@ repo-local `agents/` から materialize した trust-bound registry snapshot、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role、
 `Self-Modify Patch` 向けの `DesignAuditor` / `ChangeAdvocate` /
 `ConservatismAdvocate` / `EthicsCommittee` panel、
-および runtime / schema / eval / docs を覆う builder handoff coverage が
+runtime / schema / eval / docs を覆う builder handoff coverage、
+さらにそれを repo-local subprocess worker へ展開した
+`yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されることを確認する。
 
 `oversight-demo` は L4 Guardian human oversight channel を JSON で可視化し、

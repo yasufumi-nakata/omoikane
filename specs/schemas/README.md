@@ -130,6 +130,8 @@
 - `volition_shift.schema`
 - `wms_reconcile.schema`
 - `world_state.schema`
+- `yaoyorozu_worker_dispatch_plan.schema`
+- `yaoyorozu_worker_dispatch_receipt.schema`
 - `yaoyorozu_registry_snapshot.schema`
 
 ## 次段階

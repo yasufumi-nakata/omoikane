@@ -3,12 +3,42 @@
 from __future__ import annotations
 
 import ast
+import json
+import os
+import subprocess
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .trust import TrustService
+
+
+YAOYOROZU_WORKER_DISPATCH_PROFILE = "repo-local-subprocess-worker-dispatch-v1"
+YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
+YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
+YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
+YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
+YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
+YAOYOROZU_WORKER_TARGET_PATHS = {
+    "runtime": ["src/omoikane/", "tests/unit/", "tests/integration/"],
+    "schema": ["specs/interfaces/", "specs/schemas/"],
+    "eval": ["evals/"],
+    "docs": ["docs/", "meta/decision-log/"],
+}
+YAOYOROZU_WORKER_REPORT_KIND = "yaoyorozu_local_worker_report"
+YAOYOROZU_WORKER_REPORT_FIELDS = [
+    "kind",
+    "agent_id",
+    "role_id",
+    "coverage_area",
+    "dispatch_profile",
+    "workspace_scope",
+    "source_ref",
+    "target_paths",
+    "status",
+]
 
 
 def _pascal_case(name: str) -> str:
@@ -30,6 +60,12 @@ def _normalize_string_list(value: Any) -> List[str]:
             return [str(item).strip() for item in parsed if str(item).strip()]
         return [stripped.strip("'\"")]
     return []
+
+
+def _non_empty_string(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value.strip()
 
 
 def _parse_agent_definition(path: Path) -> Dict[str, Any]:
@@ -88,6 +124,53 @@ def _parse_agent_definition(path: Path) -> Dict[str, Any]:
     return data
 
 
+def _dispatch_unit_digest_payload(unit: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "unit_id": unit["unit_id"],
+        "role_id": unit["role_id"],
+        "coverage_area": unit["coverage_area"],
+        "selected_agent_id": unit["selected_agent_id"],
+        "source_ref": unit["source_ref"],
+        "dispatch_scope": unit["dispatch_scope"],
+        "sandbox_mode": unit["sandbox_mode"],
+        "workspace_scope": unit["workspace_scope"],
+        "entrypoint_ref": unit["entrypoint_ref"],
+        "command_preview": unit["command_preview"],
+        "target_paths": unit["target_paths"],
+    }
+
+
+def _dispatch_plan_digest_payload(plan: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": plan["schema_version"],
+        "dispatch_profile": plan["dispatch_profile"],
+        "registry_snapshot_ref": plan["registry_snapshot_ref"],
+        "convocation_session_ref": plan["convocation_session_ref"],
+        "policy_id": plan["policy_id"],
+        "proposal_profile": plan["proposal_profile"],
+        "session_mode": plan["session_mode"],
+        "target_identity_ref": plan["target_identity_ref"],
+        "workspace_root": plan["workspace_root"],
+        "dispatch_units": plan["dispatch_units"],
+        "selection_summary": plan["selection_summary"],
+        "validation": plan["validation"],
+    }
+
+
+def _dispatch_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": receipt["schema_version"],
+        "dispatch_plan_ref": receipt["dispatch_plan_ref"],
+        "dispatch_plan_digest": receipt["dispatch_plan_digest"],
+        "dispatch_profile": receipt["dispatch_profile"],
+        "execution_profile": receipt["execution_profile"],
+        "workspace_root": receipt["workspace_root"],
+        "results": receipt["results"],
+        "execution_summary": receipt["execution_summary"],
+        "validation": receipt["validation"],
+    }
+
+
 @dataclass(frozen=True)
 class YaoyorozuRegistryEntry:
     """One repo-local agent definition with trust-bound runtime metadata."""
@@ -133,7 +216,19 @@ class YaoyorozuRegistryPolicy:
     weighted_vote_floor: float = 0.6
     apply_floor: float = 0.8
     default_convocation_profile: str = "self-modify-patch-v1"
+    worker_dispatch_profile: str = YAOYOROZU_WORKER_DISPATCH_PROFILE
+    worker_execution_profile: str = YAOYOROZU_WORKER_EXECUTION_PROFILE
+    worker_dispatch_scope: str = YAOYOROZU_WORKER_DISPATCH_SCOPE
+    worker_sandbox_mode: str = YAOYOROZU_WORKER_SANDBOX_MODE
+    worker_entrypoint_ref: str = YAOYOROZU_WORKER_ENTRYPOINT_REF
+    worker_workspace_scope: str = YAOYOROZU_WORKSPACE_SCOPE
     top_k_per_role: int = 1
+    worker_target_paths: Dict[str, List[str]] = field(
+        default_factory=lambda: {
+            coverage_area: list(paths)
+            for coverage_area, paths in YAOYOROZU_WORKER_TARGET_PATHS.items()
+        }
+    )
     standing_roles: Dict[str, str] = field(
         default_factory=lambda: {
             "speaker": "design-architect",
@@ -411,6 +506,371 @@ class YaoyorozuRegistryService:
             "recorded_at": utc_now_iso(),
             "session_digest": sha256_text(canonical_json(session_body)),
             **session_body,
+        }
+
+    def prepare_worker_dispatch(self, convocation_session: Mapping[str, Any]) -> Dict[str, Any]:
+        if not self._entries or self._agents_root is None:
+            raise ValueError("registry must be synced before preparing worker dispatch")
+        if convocation_session.get("kind") != "council_convocation_session":
+            raise ValueError("convocation_session.kind must equal council_convocation_session")
+
+        builder_handoff = convocation_session.get("builder_handoff", [])
+        if not isinstance(builder_handoff, list):
+            raise ValueError("convocation_session.builder_handoff must be a list")
+
+        repo_root = self._agents_root.parent
+        dispatch_units: List[Dict[str, Any]] = []
+        selected_coverage: List[str] = []
+        for selection in builder_handoff:
+            if not isinstance(selection, Mapping):
+                raise ValueError("builder_handoff entries must be mappings")
+            coverage_area = _non_empty_string(selection.get("coverage_area"), "builder_handoff.coverage_area")
+            if coverage_area not in self._policy.worker_target_paths:
+                raise ValueError(f"unsupported coverage area: {coverage_area}")
+            if selection.get("status") != "selected":
+                continue
+
+            target_paths = list(self._policy.worker_target_paths[coverage_area])
+            command_preview = [
+                "python3",
+                "-m",
+                "omoikane.agentic.local_worker_stub",
+                "--agent-id",
+                _non_empty_string(selection.get("selected_agent_id"), "builder_handoff.selected_agent_id"),
+                "--role-id",
+                _non_empty_string(selection.get("role_id"), "builder_handoff.role_id"),
+                "--coverage-area",
+                coverage_area,
+                "--dispatch-profile",
+                self._policy.worker_dispatch_profile,
+                "--workspace-scope",
+                self._policy.worker_workspace_scope,
+                "--source-ref",
+                _non_empty_string(selection.get("source_ref"), "builder_handoff.source_ref"),
+            ]
+            for target_path in target_paths:
+                command_preview.extend(["--target-path", target_path])
+
+            unit = {
+                "unit_id": new_id("worker-dispatch"),
+                "role_id": _non_empty_string(selection.get("role_id"), "builder_handoff.role_id"),
+                "coverage_area": coverage_area,
+                "selected_agent_id": _non_empty_string(
+                    selection.get("selected_agent_id"),
+                    "builder_handoff.selected_agent_id",
+                ),
+                "display_name": _non_empty_string(selection.get("display_name"), "builder_handoff.display_name"),
+                "source_ref": _non_empty_string(selection.get("source_ref"), "builder_handoff.source_ref"),
+                "source_kind": "repo-local-agent",
+                "dispatch_scope": self._policy.worker_dispatch_scope,
+                "sandbox_mode": self._policy.worker_sandbox_mode,
+                "workspace_scope": self._policy.worker_workspace_scope,
+                "entrypoint_ref": self._policy.worker_entrypoint_ref,
+                "command_preview": command_preview,
+                "target_paths": target_paths,
+                "expected_report_fields": list(YAOYOROZU_WORKER_REPORT_FIELDS),
+            }
+            unit["command_digest"] = sha256_text(canonical_json(_dispatch_unit_digest_payload(unit)))
+            dispatch_units.append(unit)
+            selected_coverage.append(coverage_area)
+
+        required_coverage = list(self._policy.worker_target_paths)
+        missing_coverage = [coverage for coverage in required_coverage if coverage not in selected_coverage]
+        unique_command_digests = len({unit["command_digest"] for unit in dispatch_units}) == len(dispatch_units)
+        validation = {
+            "registry_bound": bool(self._last_snapshot_id),
+            "convocation_bound": bool(convocation_session.get("session_id")),
+            "builder_coverage_ok": not missing_coverage and len(dispatch_units) == len(required_coverage),
+            "unique_command_digests": unique_command_digests,
+            "repo_local_scope_only": all(
+                unit["dispatch_scope"] == self._policy.worker_dispatch_scope
+                and unit["workspace_scope"] == self._policy.worker_workspace_scope
+                for unit in dispatch_units
+            ),
+        }
+        validation["ok"] = all(validation.values())
+        dispatch_body = {
+            "dispatch_profile": self._policy.worker_dispatch_profile,
+            "registry_snapshot_ref": (
+                f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
+            ),
+            "convocation_session_ref": (
+                f"convocation://{convocation_session['session_id']}"
+                if convocation_session.get("session_id")
+                else ""
+            ),
+            "policy_id": self._policy.policy_id,
+            "proposal_profile": _non_empty_string(
+                convocation_session.get("proposal_profile"),
+                "convocation_session.proposal_profile",
+            ),
+            "session_mode": _non_empty_string(
+                convocation_session.get("session_mode"),
+                "convocation_session.session_mode",
+            ),
+            "target_identity_ref": _non_empty_string(
+                convocation_session.get("target_identity_ref"),
+                "convocation_session.target_identity_ref",
+            ),
+            "workspace_root": str(repo_root),
+            "dispatch_units": dispatch_units,
+            "selection_summary": {
+                "required_worker_count": len(required_coverage),
+                "selected_worker_count": len(dispatch_units),
+                "unique_coverage_areas": sorted(set(selected_coverage)),
+                "missing_coverage": missing_coverage,
+                "runtime_exec_ready": bool(dispatch_units),
+            },
+            "validation": validation,
+        }
+        dispatch = {
+            "kind": "yaoyorozu_worker_dispatch_plan",
+            "schema_version": "1.0.0",
+            "dispatch_id": new_id("yaoyorozu-dispatch"),
+            "planned_at": utc_now_iso(),
+            **dispatch_body,
+        }
+        dispatch["dispatch_digest"] = sha256_text(canonical_json(_dispatch_plan_digest_payload(dispatch)))
+        return dispatch
+
+    def validate_worker_dispatch_plan(self, dispatch_plan: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        units = dispatch_plan.get("dispatch_units", [])
+        if dispatch_plan.get("kind") != "yaoyorozu_worker_dispatch_plan":
+            errors.append("kind must equal yaoyorozu_worker_dispatch_plan")
+        if dispatch_plan.get("dispatch_profile") != self._policy.worker_dispatch_profile:
+            errors.append("dispatch_profile mismatch")
+        if not isinstance(units, list) or not units:
+            errors.append("dispatch_units must be a non-empty list")
+            units = []
+
+        coverage_areas: List[str] = []
+        digests: List[str] = []
+        for unit in units:
+            if not isinstance(unit, Mapping):
+                errors.append("dispatch_units entries must be mappings")
+                continue
+            coverage_area = unit.get("coverage_area")
+            if coverage_area not in self._policy.worker_target_paths:
+                errors.append("dispatch unit coverage_area is invalid")
+                continue
+            coverage_areas.append(str(coverage_area))
+            digests.append(str(unit.get("command_digest", "")))
+            if unit.get("dispatch_scope") != self._policy.worker_dispatch_scope:
+                errors.append("dispatch unit must remain repo-local-subprocess scoped")
+            if unit.get("sandbox_mode") != self._policy.worker_sandbox_mode:
+                errors.append("dispatch unit sandbox_mode must be temp-workspace-only")
+            if unit.get("workspace_scope") != self._policy.worker_workspace_scope:
+                errors.append("dispatch unit workspace_scope must be repo-local")
+            if unit.get("entrypoint_ref") != self._policy.worker_entrypoint_ref:
+                errors.append("dispatch unit entrypoint_ref mismatch")
+
+        missing_coverage = [
+            coverage for coverage in self._policy.worker_target_paths if coverage not in coverage_areas
+        ]
+        if len(set(digests)) != len(digests):
+            errors.append("dispatch unit command digests must be unique")
+
+        return {
+            "ok": not errors and not missing_coverage,
+            "dispatch_unit_count": len(units),
+            "unique_coverage_areas": sorted(set(coverage_areas)),
+            "missing_coverage": missing_coverage,
+            "runtime_exec_ready": bool(units),
+            "errors": errors,
+        }
+
+    def execute_worker_dispatch(self, dispatch_plan: Mapping[str, Any]) -> Dict[str, Any]:
+        if dispatch_plan.get("kind") != "yaoyorozu_worker_dispatch_plan":
+            raise ValueError("dispatch_plan.kind must equal yaoyorozu_worker_dispatch_plan")
+
+        repo_root = Path(
+            _non_empty_string(dispatch_plan.get("workspace_root"), "dispatch_plan.workspace_root")
+        ).resolve()
+        units = dispatch_plan.get("dispatch_units", [])
+        if not isinstance(units, list) or not units:
+            raise ValueError("dispatch_plan.dispatch_units must be a non-empty list")
+
+        env = os.environ.copy()
+        src_root = repo_root / "src"
+        existing_pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = (
+            str(src_root)
+            if not existing_pythonpath
+            else f"{src_root}{os.pathsep}{existing_pythonpath}"
+        )
+
+        results: List[Dict[str, Any]] = []
+        failed_role_ids: List[str] = []
+        for launch_index, unit in enumerate(units, start=1):
+            if not isinstance(unit, Mapping):
+                raise ValueError("dispatch_plan.dispatch_units entries must be mappings")
+            preview = unit.get("command_preview")
+            if not isinstance(preview, list) or not all(isinstance(item, str) for item in preview):
+                raise ValueError("dispatch unit command_preview must be a list of strings")
+            command = [sys.executable if preview[0] == "python3" else preview[0], *preview[1:]]
+            process = subprocess.Popen(
+                command,
+                cwd=repo_root,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            stdout_text, stderr_text = process.communicate()
+            stdout_text = stdout_text.strip()
+            stderr_text = stderr_text.strip()
+            report: Dict[str, Any]
+            try:
+                loaded = json.loads(stdout_text) if stdout_text else {}
+                report = loaded if isinstance(loaded, dict) else {}
+            except json.JSONDecodeError:
+                report = {}
+            if not report:
+                report = {
+                    "kind": YAOYOROZU_WORKER_REPORT_KIND,
+                    "agent_id": unit["selected_agent_id"],
+                    "role_id": unit["role_id"],
+                    "coverage_area": unit["coverage_area"],
+                    "dispatch_profile": dispatch_plan["dispatch_profile"],
+                    "workspace_scope": self._policy.worker_workspace_scope,
+                    "source_ref": unit["source_ref"],
+                    "target_paths": list(unit["target_paths"]),
+                    "status": "failed",
+                }
+
+            result = {
+                "unit_id": unit["unit_id"],
+                "launch_index": launch_index,
+                "role_id": unit["role_id"],
+                "coverage_area": unit["coverage_area"],
+                "selected_agent_id": unit["selected_agent_id"],
+                "command_digest": unit["command_digest"],
+                "process_id": process.pid,
+                "process_status": "completed" if process.returncode == 0 else "failed",
+                "exit_code": process.returncode,
+                "reported_status": report.get("status", "failed"),
+                "stdout_digest": sha256_text(stdout_text),
+                "stderr_digest": sha256_text(stderr_text),
+                "report_digest": sha256_text(canonical_json(report)),
+                "report": report,
+            }
+            if process.returncode != 0 or report.get("status") != "ready":
+                failed_role_ids.append(str(unit["role_id"]))
+            results.append(result)
+
+        execution_summary = {
+            "launched_process_count": len(results),
+            "completed_process_count": sum(
+                1 for result in results if result["process_status"] == "completed"
+            ),
+            "successful_process_count": sum(
+                1
+                for result in results
+                if result["process_status"] == "completed"
+                and result["exit_code"] == 0
+                and result["reported_status"] == "ready"
+            ),
+            "failed_role_ids": failed_role_ids,
+            "coverage_areas": [str(result["coverage_area"]) for result in results],
+        }
+        validation = {
+            "command_digests_match": all(
+                any(
+                    isinstance(unit, Mapping)
+                    and unit.get("unit_id") == result["unit_id"]
+                    and unit.get("command_digest") == result["command_digest"]
+                    for unit in units
+                )
+                for result in results
+            ),
+            "all_processes_exited_zero": all(result["exit_code"] == 0 for result in results),
+            "all_reports_ready": all(result["reported_status"] == "ready" for result in results),
+            "coverage_complete": sorted(execution_summary["coverage_areas"])
+            == sorted(
+                [
+                    str(unit["coverage_area"])
+                    for unit in units
+                    if isinstance(unit, Mapping)
+                ]
+            ),
+        }
+        validation["ok"] = all(validation.values())
+        receipt = {
+            "kind": "yaoyorozu_worker_dispatch_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": new_id("yaoyorozu-dispatch-receipt"),
+            "executed_at": utc_now_iso(),
+            "dispatch_plan_ref": f"dispatch://{dispatch_plan['dispatch_id']}",
+            "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+            "dispatch_profile": dispatch_plan["dispatch_profile"],
+            "execution_profile": self._policy.worker_execution_profile,
+            "workspace_root": str(repo_root),
+            "results": results,
+            "execution_summary": execution_summary,
+            "validation": validation,
+        }
+        receipt["receipt_digest"] = sha256_text(canonical_json(_dispatch_receipt_digest_payload(receipt)))
+        return receipt
+
+    def validate_worker_dispatch_receipt(
+        self,
+        dispatch_receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        results = dispatch_receipt.get("results", [])
+        if dispatch_receipt.get("kind") != "yaoyorozu_worker_dispatch_receipt":
+            errors.append("kind must equal yaoyorozu_worker_dispatch_receipt")
+        if dispatch_receipt.get("dispatch_profile") != self._policy.worker_dispatch_profile:
+            errors.append("dispatch_profile mismatch")
+        if dispatch_receipt.get("execution_profile") != self._policy.worker_execution_profile:
+            errors.append("execution_profile mismatch")
+        if not isinstance(results, list) or not results:
+            errors.append("results must be a non-empty list")
+            results = []
+
+        coverage_areas: List[str] = []
+        for result in results:
+            if not isinstance(result, Mapping):
+                errors.append("results entries must be mappings")
+                continue
+            coverage_areas.append(str(result.get("coverage_area", "")))
+            report = result.get("report", {})
+            if not isinstance(report, Mapping):
+                errors.append("result.report must be a mapping")
+                continue
+            if report.get("kind") != YAOYOROZU_WORKER_REPORT_KIND:
+                errors.append("worker report kind mismatch")
+            if report.get("status") != "ready":
+                errors.append("worker report status must be ready")
+            if report.get("workspace_scope") != self._policy.worker_workspace_scope:
+                errors.append("worker report workspace_scope must be repo-local")
+            if report.get("dispatch_profile") != self._policy.worker_dispatch_profile:
+                errors.append("worker report dispatch_profile mismatch")
+            if result.get("exit_code") != 0:
+                errors.append("worker process exit_code must be 0")
+
+        missing_coverage = [
+            coverage for coverage in self._policy.worker_target_paths if coverage not in coverage_areas
+        ]
+        return {
+            "ok": not errors and not missing_coverage,
+            "completed_process_count": sum(
+                1
+                for result in results
+                if isinstance(result, Mapping) and result.get("process_status") == "completed"
+            ),
+            "success_count": sum(
+                1
+                for result in results
+                if isinstance(result, Mapping)
+                and result.get("process_status") == "completed"
+                and result.get("exit_code") == 0
+                and result.get("reported_status") == "ready"
+            ),
+            "coverage_complete": not missing_coverage,
+            "missing_coverage": missing_coverage,
+            "errors": errors,
         }
 
     def _ensure_trust_seed(self, entry: YaoyorozuRegistryEntry) -> None:

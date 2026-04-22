@@ -1507,6 +1507,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["reviewer"]["credential_verification"]["legal_execution"]["digest"],
         )
 
+    def test_yaoyorozu_demo_executes_local_worker_dispatch(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["dispatch_plan"]["validation"]["ok"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["ok"])
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(4, result["validation"]["dispatch_success_count"])
+        self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["successful_process_count"])
+        self.assertTrue(
+            all(
+                process["report"]["workspace_scope"] == "repo-local"
+                for process in result["dispatch_receipt"]["results"]
+            )
+        )
+
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
         runtime = OmoikaneReferenceOS()
 

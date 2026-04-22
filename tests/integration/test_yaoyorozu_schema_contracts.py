@@ -59,3 +59,19 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/council_convocation_session.schema",
             result["convocation"],
         )
+
+    def test_worker_dispatch_plan_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
+            result["dispatch_plan"],
+        )
+
+    def test_worker_dispatch_receipt_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
+        )

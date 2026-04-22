@@ -2249,6 +2249,89 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(4, session["selection_summary"]["selected_builder_coverage_count"])
         self.assertEqual("selected", session["standing_roles"]["guardian_liaison"]["status"])
 
+    def test_prepare_worker_dispatch_materializes_repo_local_plan(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        seeds = [
+            ("design-architect", 0.72, {"council_deliberation": 0.8, "self_modify": 0.76}),
+            ("memory-archivist", 0.66, {"council_deliberation": 0.7}),
+            ("change-advocate", 0.68, {"council_deliberation": 0.72, "self_modify": 0.71}),
+            ("conservatism-advocate", 0.69, {"council_deliberation": 0.74, "self_modify": 0.7}),
+            ("ethics-committee", 0.82, {"council_deliberation": 0.88, "self_modify": 0.82}),
+            ("integrity-guardian", 0.99, {"council_deliberation": 0.99, "self_modify": 0.99}),
+            ("codex-builder", 0.9, {"self_modify": 0.96}),
+            ("schema-builder", 0.84, {"self_modify": 0.86}),
+            ("eval-builder", 0.85, {"self_modify": 0.87}),
+            ("doc-sync-builder", 0.83, {"self_modify": 0.85}),
+        ]
+        for agent_id, initial_score, per_domain in seeds:
+            kwargs = {
+                "agent_id": agent_id,
+                "initial_score": initial_score,
+                "per_domain": per_domain,
+            }
+            if agent_id == "integrity-guardian":
+                kwargs["pinned_by_human"] = True
+                kwargs["pinned_reason"] = "guardian bootstrap"
+            trust.register_agent(**kwargs)
+        service = YaoyorozuRegistryService(trust_service=trust)
+        service.sync_from_agents_directory(repo_root / "agents")
+        session = service.prepare_council_convocation(target_identity_ref="identity://unit-test")
+
+        plan = service.prepare_worker_dispatch(session)
+        validation = service.validate_worker_dispatch_plan(plan)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(4, validation["dispatch_unit_count"])
+        self.assertEqual([], validation["missing_coverage"])
+        self.assertEqual(
+            ["docs", "eval", "runtime", "schema"],
+            validation["unique_coverage_areas"],
+        )
+        self.assertTrue(plan["validation"]["repo_local_scope_only"])
+
+    def test_execute_worker_dispatch_returns_completed_receipt(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        seeds = [
+            ("design-architect", 0.72, {"council_deliberation": 0.8, "self_modify": 0.76}),
+            ("memory-archivist", 0.66, {"council_deliberation": 0.7}),
+            ("change-advocate", 0.68, {"council_deliberation": 0.72, "self_modify": 0.71}),
+            ("conservatism-advocate", 0.69, {"council_deliberation": 0.74, "self_modify": 0.7}),
+            ("ethics-committee", 0.82, {"council_deliberation": 0.88, "self_modify": 0.82}),
+            ("integrity-guardian", 0.99, {"council_deliberation": 0.99, "self_modify": 0.99}),
+            ("codex-builder", 0.9, {"self_modify": 0.96}),
+            ("schema-builder", 0.84, {"self_modify": 0.86}),
+            ("eval-builder", 0.85, {"self_modify": 0.87}),
+            ("doc-sync-builder", 0.83, {"self_modify": 0.85}),
+        ]
+        for agent_id, initial_score, per_domain in seeds:
+            kwargs = {
+                "agent_id": agent_id,
+                "initial_score": initial_score,
+                "per_domain": per_domain,
+            }
+            if agent_id == "integrity-guardian":
+                kwargs["pinned_by_human"] = True
+                kwargs["pinned_reason"] = "guardian bootstrap"
+            trust.register_agent(**kwargs)
+        service = YaoyorozuRegistryService(trust_service=trust)
+        service.sync_from_agents_directory(repo_root / "agents")
+        session = service.prepare_council_convocation(target_identity_ref="identity://unit-test")
+        plan = service.prepare_worker_dispatch(session)
+
+        receipt = service.execute_worker_dispatch(plan)
+        validation = service.validate_worker_dispatch_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(4, validation["success_count"])
+        self.assertTrue(validation["coverage_complete"])
+        self.assertEqual([], validation["missing_coverage"])
+        self.assertEqual(4, receipt["execution_summary"]["successful_process_count"])
+        self.assertTrue(
+            all(result["report"]["kind"] == "yaoyorozu_local_worker_report" for result in receipt["results"])
+        )
+
 
 class CognitiveAuditTests(unittest.TestCase):
     def test_audit_record_binds_cross_layer_refs(self) -> None:

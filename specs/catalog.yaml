@@ -1774,6 +1774,24 @@ entries:
       - reference-runtime
     rationale: Required to bind standing roles, council panel selection, and builder handoff coverage into one deterministic convocation artifact.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_worker_dispatch_plan.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize one repo-local builder handoff dispatch plan with fixed coverage areas and subprocess command previews.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
     consumers:
@@ -1782,7 +1800,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync and bounded Council convocation machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, bounded Council convocation, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_council_convocation.yaml
@@ -1790,6 +1808,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects standing role readiness, weighted vote quorum, and builder handoff coverage for self-modify convocation.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_local_worker_dispatch.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects repo-local subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

@@ -59,6 +59,11 @@ cognitive audit follow-up に束縛され、
 review preserve / boundary preserve / human governance escalation を
 deterministic に切り替えられること。
 
+### Yaoyorozu Local Worker Dispatch
+repo-local `agents/` から選んだ builder handoff が
+runtime / schema / eval / docs の 4 coverage へ分解され、
+actual subprocess worker receipt として machine-checkable に実行されること。
+
 ## 実装済み eval
 
 - `amendment_constitutional_freeze.yaml`
@@ -84,3 +89,4 @@ deterministic に切り替えられること。
 - `task_graph_complexity_guard.yaml`
 - `trust_score_update_guard.yaml`
 - `yaoyorozu_council_convocation.yaml`
+- `yaoyorozu_local_worker_dispatch.yaml`

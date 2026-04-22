@@ -74,4 +74,6 @@ prompt_or_policy_ref: <agents/.../policy.md>
 新規 Agent タイプの追加は Council 承認＋ docs 更新を経て YaoyorozuRegistry に登録する。
 reference runtime では `yaoyorozu-demo` が
 repo-local `agents/` をそのまま sync し、
-trust-bound registry snapshot と bounded convocation plan を JSON で可視化する。
+trust-bound registry snapshot、bounded convocation plan、
+および runtime / schema / eval / docs の 4 coverage を持つ
+repo-local worker dispatch receipt を JSON で可視化する。

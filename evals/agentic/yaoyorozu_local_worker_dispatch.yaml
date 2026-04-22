@@ -1,0 +1,17 @@
+eval_id: yaoyorozu_local_worker_dispatch
+target: agentic.yaoyorozu
+level: L4
+description: Repo-local Yaoyorozu registry must execute builder handoff coverage as bounded local worker dispatch receipts.
+inputs:
+  - source_root: agents
+  - proposal_profile: self-modify-patch-v1
+  - session_mode: standard
+expected:
+  dispatch_unit_count: 4
+  dispatch_success_count: 4
+  worker_dispatch_plan_ok: true
+  worker_dispatch_receipt_ok: true
+  worker_dispatch_coverage_complete: true
+metric: equality
+threshold: 1.0
+ethics_check: true

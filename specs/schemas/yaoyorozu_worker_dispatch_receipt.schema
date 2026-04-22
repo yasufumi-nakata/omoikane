@@ -1,0 +1,260 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_worker_dispatch_receipt.schema"
+title: YaoyorozuWorkerDispatchReceipt
+description: Process-bound receipt for one repo-local Yaoyorozu worker dispatch plan.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - executed_at
+  - receipt_digest
+  - dispatch_plan_ref
+  - dispatch_plan_digest
+  - dispatch_profile
+  - execution_profile
+  - workspace_root
+  - results
+  - execution_summary
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_worker_dispatch_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^yaoyorozu-dispatch-receipt-[a-f0-9]{12}$"
+  executed_at:
+    type: string
+    format: date-time
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://"
+  dispatch_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_profile:
+    const: repo-local-subprocess-worker-dispatch-v1
+  execution_profile:
+    const: repo-local-subprocess-worker-execution-v1
+  workspace_root:
+    type: string
+    minLength: 1
+  results:
+    type: array
+    minItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - unit_id
+        - launch_index
+        - role_id
+        - coverage_area
+        - selected_agent_id
+        - command_digest
+        - process_id
+        - process_status
+        - exit_code
+        - reported_status
+        - stdout_digest
+        - stderr_digest
+        - report_digest
+        - report
+      properties:
+        unit_id:
+          type: string
+          pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        launch_index:
+          type: integer
+          minimum: 1
+        role_id:
+          type: string
+          minLength: 1
+        coverage_area:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+        selected_agent_id:
+          type: string
+          minLength: 1
+        command_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        process_id:
+          type: integer
+          minimum: 1
+        process_status:
+          type: string
+          enum:
+            - completed
+            - failed
+        exit_code:
+          type: integer
+          minimum: 0
+        reported_status:
+          const: ready
+        stdout_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        stderr_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        report_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        report:
+          type: object
+          additionalProperties: false
+          required:
+            - kind
+            - agent_id
+            - role_id
+            - coverage_area
+            - dispatch_profile
+            - workspace_scope
+            - source_ref
+            - target_paths
+            - status
+          properties:
+            kind:
+              const: yaoyorozu_local_worker_report
+            agent_id:
+              type: string
+              minLength: 1
+            role_id:
+              type: string
+              minLength: 1
+            coverage_area:
+              type: string
+              enum:
+                - runtime
+                - schema
+                - eval
+                - docs
+            dispatch_profile:
+              const: repo-local-subprocess-worker-dispatch-v1
+            workspace_scope:
+              const: repo-local
+            source_ref:
+              type: string
+              minLength: 1
+            target_paths:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                minLength: 1
+            status:
+              const: ready
+  execution_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - launched_process_count
+      - completed_process_count
+      - successful_process_count
+      - failed_role_ids
+      - coverage_areas
+    properties:
+      launched_process_count:
+        type: integer
+        minimum: 1
+      completed_process_count:
+        type: integer
+        minimum: 0
+      successful_process_count:
+        type: integer
+        minimum: 0
+      failed_role_ids:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      coverage_areas:
+        type: array
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - command_digests_match
+      - all_processes_exited_zero
+      - all_reports_ready
+      - coverage_complete
+      - ok
+    properties:
+      command_digests_match:
+        const: true
+      all_processes_exited_zero:
+        const: true
+      all_reports_ready:
+        const: true
+      coverage_complete:
+        const: true
+      ok:
+        const: true
+examples:
+  - kind: yaoyorozu_worker_dispatch_receipt
+    schema_version: 1.0.0
+    receipt_id: yaoyorozu-dispatch-receipt-0123456789ab
+    executed_at: "2026-04-23T06:21:00Z"
+    receipt_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+    dispatch_plan_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_profile: repo-local-subprocess-worker-dispatch-v1
+    execution_profile: repo-local-subprocess-worker-execution-v1
+    workspace_root: /Users/example/omoikane
+    results:
+      - unit_id: worker-dispatch-0123456789ab
+        launch_index: 1
+        role_id: builder-runtime
+        coverage_area: runtime
+        selected_agent_id: codex-builder
+        command_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        process_id: 43210
+        process_status: completed
+        exit_code: 0
+        reported_status: ready
+        stdout_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        report:
+          kind: yaoyorozu_local_worker_report
+          agent_id: codex-builder
+          role_id: builder-runtime
+          coverage_area: runtime
+          dispatch_profile: repo-local-subprocess-worker-dispatch-v1
+          workspace_scope: repo-local
+          source_ref: agents/builders/codex-builder.yaml
+          target_paths:
+            - src/omoikane/
+            - tests/unit/
+            - tests/integration/
+          status: ready
+    execution_summary:
+      launched_process_count: 4
+      completed_process_count: 4
+      successful_process_count: 4
+      failed_role_ids: []
+      coverage_areas: [docs, eval, runtime, schema]
+    validation:
+      command_digests_match: true
+      all_processes_exited_zero: true
+      all_reports_ready: true
+      coverage_complete: true
+      ok: true
