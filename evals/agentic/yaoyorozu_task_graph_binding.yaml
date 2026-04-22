@@ -1,0 +1,19 @@
+eval_id: yaoyorozu_task_graph_binding
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu worker dispatch must collapse into the fixed three-root TaskGraph bundle and remain bound to the same ConsensusBus session, guardian gate, and synthesis receipt.
+inputs:
+  - proposal_profile: self-modify-patch-v1
+  - max_parallelism: 3
+  - ready_root_bundle_count: 3
+  - dispatch_unit_count: 4
+expected:
+  task_graph_binding_ok: true
+  task_graph_ready_node_count: 3
+  task_graph_dispatch_unit_count: 4
+  task_graph_synthesis_count: 3
+  task_graph_guardian_gate_bound: true
+  task_graph_worker_claims_bound: true
+metric: equality
+threshold: 1.0
+ethics_check: true

@@ -1379,11 +1379,28 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(7, result["validation"]["consensus_message_count"])
         self.assertTrue(result["validation"]["consensus_dispatch_ok"])
         self.assertTrue(result["validation"]["consensus_direct_handoff_blocked"])
+        self.assertTrue(result["validation"]["task_graph_binding_ok"])
+        self.assertEqual(3, result["validation"]["task_graph_ready_node_count"])
+        self.assertEqual(4, result["validation"]["task_graph_dispatch_unit_count"])
+        self.assertEqual(3, result["validation"]["task_graph_synthesis_count"])
+        self.assertTrue(result["validation"]["task_graph_guardian_gate_bound"])
+        self.assertTrue(result["validation"]["task_graph_worker_claims_bound"])
+        self.assertTrue(result["validation"]["task_graph_coverage_grouping_ok"])
         self.assertEqual(
             result["convocation"]["session_id"],
             result["consensus_dispatch"]["consensus_session_id"],
         )
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(
+            ["docs", "eval"],
+            sorted(
+                next(
+                    binding["coverage_areas"]
+                    for binding in result["task_graph_binding"]["node_bindings"]
+                    if "docs" in binding["coverage_areas"]
+                )
+            ),
+        )
 
     def test_oversight_demo_emits_breach_propagation(self) -> None:
         stdout = io.StringIO()

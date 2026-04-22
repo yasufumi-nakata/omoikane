@@ -83,3 +83,11 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
             result["consensus_dispatch"],
         )
+
+    def test_task_graph_binding_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
+        )

@@ -81,3 +81,7 @@ repo-local worker dispatch receipt を JSON で可視化する。
 `ConsensusBus` transcript として監査し、
 blocked direct builder handoff と worker claim chain を
 `yaoyorozu_consensus_dispatch_binding` へ束縛する。
+さらに `TaskGraph` 側では `max_parallelism=3` を守るため、
+`runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle へ畳み、
+worker dispatch receipt と guardian gate / resolve digest を
+`yaoyorozu_task_graph_binding` として固定する。

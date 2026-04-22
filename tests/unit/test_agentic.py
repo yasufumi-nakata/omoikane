@@ -26,6 +26,7 @@ from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
 from omoikane.agentic.yaoyorozu import YaoyorozuRegistryService
 from omoikane.common import canonical_json, sha256_text
+from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class CouncilTests(unittest.TestCase):
@@ -2330,6 +2331,25 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(4, receipt["execution_summary"]["successful_process_count"])
         self.assertTrue(
             all(result["report"]["kind"] == "yaoyorozu_local_worker_report" for result in receipt["results"])
+        )
+
+    def test_task_graph_binding_groups_eval_and_docs_under_complexity_ceiling(self) -> None:
+        result = OmoikaneReferenceOS().run_yaoyorozu_demo()
+        binding = result["task_graph_binding"]
+
+        self.assertTrue(binding["validation"]["ok"])
+        self.assertEqual(3, binding["task_graph_dispatch"]["dispatched_count"])
+        self.assertEqual(
+            4,
+            sum(len(node_binding["dispatch_unit_ids"]) for node_binding in binding["node_bindings"]),
+        )
+        self.assertEqual(3, binding["task_graph_synthesis"]["accepted_result_count"])
+        self.assertIn(
+            ["docs", "eval"],
+            sorted(
+                sorted(node_binding["coverage_areas"])
+                for node_binding in binding["node_bindings"]
+            ),
         )
 
 

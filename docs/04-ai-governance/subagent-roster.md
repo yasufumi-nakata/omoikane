@@ -54,6 +54,10 @@ selected builder 群が repo-local worker dispatch receipt として実行され
 そのうえで同じ Council session 上の `ConsensusBus` transcript が
 blocked direct builder handoff と guardian-gated resolve を伴う
 `yaoyorozu_consensus_dispatch_binding` として束縛される。
+さらに 4 worker coverage は `TaskGraph` の complexity ceiling に合わせて
+3 root bundle へ畳まれ、
+worker claim / guardian gate / resolve digest を伴う
+`yaoyorozu_task_graph_binding` として execution bundle 化される。
 
 ## 並列召喚
 

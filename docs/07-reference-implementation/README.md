@@ -285,6 +285,11 @@ runtime / schema / eval / docs を覆う builder handoff coverage、
 さらに同じ session 上で `ConsensusBus` が builder report / guardian gate /
 final resolve を監査し、blocked direct handoff と worker claim chain を
 `yaoyorozu_consensus_dispatch_binding` として束縛することを確認する。
+さらに fixed `max_parallelism=3` を超えないよう
+`runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle へ畳み込んだ
+`TaskGraph` が、
+同じ session 上の worker claim / guardian gate / resolve digest を
+`yaoyorozu_task_graph_binding` として束縛することを確認する。
 
 `oversight-demo` は L4 Guardian human oversight channel を JSON で可視化し、
 registered reviewer の `proof_ref` / `legal_ack_ref` / liability scope に加えて、

@@ -1802,6 +1802,17 @@ entries:
       - reference-runtime
     rationale: Required to bind one Yaoyorozu convocation, builder dispatch receipt, guardian gate, and blocked direct handoff evidence to the same ConsensusBus session.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_task_graph_binding.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind one coverage-complete Yaoyorozu dispatch bundle to the fixed three-root TaskGraph, ConsensusBus claim chain, and guardian gate digest.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
     consumers:
@@ -1810,7 +1821,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, bounded Council convocation, same-session ConsensusBus handoff binding, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, bounded Council convocation, same-session ConsensusBus/TaskGraph handoff binding, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_council_convocation.yaml
@@ -1832,6 +1843,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects same-session ConsensusBus dispatch binding, direct handoff blocking, and guardian-gated resolution for Yaoyorozu worker execution.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_task_graph_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects same-session TaskGraph bundling, three-root complexity compliance, and guardian-bound synthesis for Yaoyorozu worker execution.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

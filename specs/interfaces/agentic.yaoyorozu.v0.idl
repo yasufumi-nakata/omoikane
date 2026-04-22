@@ -2,13 +2,14 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded Council convocation, same-session ConsensusBus handoff binding, and local worker dispatch planning.
+summary: Repo-local agent registry sync plus bounded Council convocation, same-session ConsensusBus and TaskGraph handoff binding, and local worker dispatch planning.
 imports:
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
   yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
   yaoyorozu_consensus_dispatch_binding: ../schemas/yaoyorozu_consensus_dispatch_binding.schema
+  yaoyorozu_task_graph_binding: ../schemas/yaoyorozu_task_graph_binding.schema
   consensus_message: ../schemas/consensus_message.schema
 operations:
   sync_registry:
@@ -169,10 +170,39 @@ operations:
       - dispatch plan, dispatch receipt, and every worker unit claim must be tracked by the audit summary
       - guardian gate and final resolve must bind the same dispatch_receipt_digest before the handoff is considered complete
       - direct builder-to-builder handoff attempts must be recorded as blocked and never silently bypass the bus
+  bind_task_graph_dispatch:
+    summary: >
+      Collapse one coverage-complete worker dispatch into the fixed three-root TaskGraph bundle
+      and bind it to the same Council session, ConsensusBus claim chain, guardian gate, and synthesis receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - convocation_session
+          - dispatch_plan
+          - dispatch_receipt
+          - consensus_binding
+        properties:
+          convocation_session:
+            schema_ref: council_convocation_session
+          dispatch_plan:
+            schema_ref: yaoyorozu_worker_dispatch_plan
+          dispatch_receipt:
+            schema_ref: yaoyorozu_worker_dispatch_receipt
+          consensus_binding:
+            schema_ref: yaoyorozu_consensus_dispatch_binding
+    output:
+      schema_ref: yaoyorozu_task_graph_binding
+    guarantees:
+      - root TaskGraph bundles must stay within max_parallelism=3 by grouping runtime, schema, and evidence-sync(eval+docs)
+      - every dispatch unit must bind exactly once to one ready root node together with its ConsensusBus report claim
+      - guardian gate and final resolve digests must bind the review and synthesis nodes before the execution bundle is considered complete
+      - synthesis must accept exactly one result ref per ready root node and must not bypass the Council review node
 compatibility:
   stability: bootstrap
   notes:
     - The reference runtime currently fixes proposal_profile to self-modify-patch-v1.
     - Cross-workspace worker discovery remains outside this repo.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
+    - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling by grouping eval and docs as one evidence-sync root.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

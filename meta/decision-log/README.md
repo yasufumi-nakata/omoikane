@@ -50,6 +50,7 @@ status: decided | superseded
 - [2026-04-18_memory-crystal-compaction-policy.md](2026-04-18_memory-crystal-compaction-policy.md)
 - [2026-04-19_semantic-memory-projection.md](2026-04-19_semantic-memory-projection.md)
 - [2026-04-23_semantic-procedural-handoff.md](2026-04-23_semantic-procedural-handoff.md)
+- [2026-04-23_yaoyorozu-task-graph-binding.md](2026-04-23_yaoyorozu-task-graph-binding.md)
 - [2026-04-23_yaoyorozu-local-worker-dispatch.md](2026-04-23_yaoyorozu-local-worker-dispatch.md)
 - [2026-04-23_gap-report-eval-inventory-drift.md](2026-04-23_gap-report-eval-inventory-drift.md)
 - [2026-04-19_procedural-memory-preview.md](2026-04-19_procedural-memory-preview.md)

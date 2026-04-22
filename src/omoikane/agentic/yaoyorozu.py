@@ -13,12 +13,14 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
+from .task_graph import TaskGraphService
 from .trust import TrustService
 
 
 YAOYOROZU_WORKER_DISPATCH_PROFILE = "repo-local-subprocess-worker-dispatch-v1"
 YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
 YAOYOROZU_CONSENSUS_BINDING_PROFILE = "repo-local-yaoyorozu-consensus-bus-binding-v1"
+YAOYOROZU_TASK_GRAPH_BINDING_PROFILE = "repo-local-yaoyorozu-task-graph-binding-v1"
 YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
@@ -41,6 +43,20 @@ YAOYOROZU_WORKER_REPORT_FIELDS = [
     "target_paths",
     "status",
 ]
+YAOYOROZU_TASK_GRAPH_ROOT_BUNDLES = (
+    {
+        "bundle_role": "runtime-bundle",
+        "coverage_areas": ("runtime",),
+    },
+    {
+        "bundle_role": "schema-bundle",
+        "coverage_areas": ("schema",),
+    },
+    {
+        "bundle_role": "evidence-sync-bundle",
+        "coverage_areas": ("eval", "docs"),
+    },
+)
 
 
 def _pascal_case(name: str) -> str:
@@ -193,6 +209,41 @@ def _consensus_dispatch_binding_digest_payload(binding: Mapping[str, Any]) -> Di
     }
 
 
+def _task_graph_digest_payload(graph: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "graph_id": graph["graph_id"],
+        "intent": graph["intent"],
+        "required_roles": graph["required_roles"],
+        "nodes": graph["nodes"],
+        "complexity_policy": graph["complexity_policy"],
+        "created_at": graph["created_at"],
+    }
+
+
+def _task_graph_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": binding["schema_version"],
+        "binding_profile": binding["binding_profile"],
+        "convocation_session_ref": binding["convocation_session_ref"],
+        "convocation_session_digest": binding["convocation_session_digest"],
+        "dispatch_plan_ref": binding["dispatch_plan_ref"],
+        "dispatch_plan_digest": binding["dispatch_plan_digest"],
+        "dispatch_receipt_ref": binding["dispatch_receipt_ref"],
+        "dispatch_receipt_digest": binding["dispatch_receipt_digest"],
+        "consensus_binding_ref": binding["consensus_binding_ref"],
+        "consensus_binding_digest": binding["consensus_binding_digest"],
+        "consensus_session_id": binding["consensus_session_id"],
+        "task_graph_ref": binding["task_graph_ref"],
+        "task_graph_digest": binding["task_graph_digest"],
+        "task_graph_dispatch_digest": binding["task_graph_dispatch_digest"],
+        "task_graph_synthesis_digest": binding["task_graph_synthesis_digest"],
+        "guardian_gate_message_digest": binding["guardian_gate_message_digest"],
+        "resolve_message_digest": binding["resolve_message_digest"],
+        "node_bindings": binding["node_bindings"],
+        "validation": binding["validation"],
+    }
+
+
 @dataclass(frozen=True)
 class YaoyorozuRegistryEntry:
     """One repo-local agent definition with trust-bound runtime metadata."""
@@ -244,12 +295,22 @@ class YaoyorozuRegistryPolicy:
     worker_sandbox_mode: str = YAOYOROZU_WORKER_SANDBOX_MODE
     worker_entrypoint_ref: str = YAOYOROZU_WORKER_ENTRYPOINT_REF
     worker_workspace_scope: str = YAOYOROZU_WORKSPACE_SCOPE
+    task_graph_binding_profile: str = YAOYOROZU_TASK_GRAPH_BINDING_PROFILE
     top_k_per_role: int = 1
     worker_target_paths: Dict[str, List[str]] = field(
         default_factory=lambda: {
             coverage_area: list(paths)
             for coverage_area, paths in YAOYOROZU_WORKER_TARGET_PATHS.items()
         }
+    )
+    task_graph_root_bundles: List[Dict[str, Any]] = field(
+        default_factory=lambda: [
+            {
+                "bundle_role": str(bundle["bundle_role"]),
+                "coverage_areas": [str(area) for area in bundle["coverage_areas"]],
+            }
+            for bundle in YAOYOROZU_TASK_GRAPH_ROOT_BUNDLES
+        ]
     )
     standing_roles: Dict[str, str] = field(
         default_factory=lambda: {
@@ -1097,6 +1158,475 @@ class YaoyorozuRegistryService:
             "tracked_claim_count": len(tracked_claim_ids),
             "report_message_count": report_message_count,
             "blocked_direct_attempts": audit_summary.get("blocked_direct_attempts", 0),
+            "errors": errors,
+        }
+
+    def bind_task_graph_dispatch(
+        self,
+        *,
+        convocation_session: Mapping[str, Any],
+        dispatch_plan: Mapping[str, Any],
+        dispatch_receipt: Mapping[str, Any],
+        consensus_binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if convocation_session.get("kind") != "council_convocation_session":
+            raise ValueError("convocation_session.kind must equal council_convocation_session")
+        if dispatch_plan.get("kind") != "yaoyorozu_worker_dispatch_plan":
+            raise ValueError("dispatch_plan.kind must equal yaoyorozu_worker_dispatch_plan")
+        if dispatch_receipt.get("kind") != "yaoyorozu_worker_dispatch_receipt":
+            raise ValueError("dispatch_receipt.kind must equal yaoyorozu_worker_dispatch_receipt")
+        if consensus_binding.get("kind") != "yaoyorozu_consensus_dispatch_binding":
+            raise ValueError("consensus_binding.kind must equal yaoyorozu_consensus_dispatch_binding")
+
+        session_id = _non_empty_string(convocation_session.get("session_id"), "convocation_session.session_id")
+        convocation_session_ref = f"convocation://{session_id}"
+        dispatch_plan_ref = f"dispatch://{dispatch_plan['dispatch_id']}"
+        dispatch_receipt_ref = f"dispatch-receipt://{dispatch_receipt['receipt_id']}"
+        consensus_binding_ref = f"consensus-binding://{consensus_binding['binding_id']}"
+        if dispatch_plan.get("convocation_session_ref") != convocation_session_ref:
+            raise ValueError("dispatch plan must remain bound to the same convocation session")
+        if dispatch_receipt.get("dispatch_plan_ref") != dispatch_plan_ref:
+            raise ValueError("dispatch receipt must remain bound to the same dispatch plan")
+        if consensus_binding.get("convocation_session_ref") != convocation_session_ref:
+            raise ValueError("consensus binding must remain bound to the same convocation session")
+        if consensus_binding.get("dispatch_plan_ref") != dispatch_plan_ref:
+            raise ValueError("consensus binding must remain bound to the same dispatch plan")
+        if consensus_binding.get("dispatch_receipt_ref") != dispatch_receipt_ref:
+            raise ValueError("consensus binding must remain bound to the same dispatch receipt")
+        if consensus_binding.get("dispatch_receipt_digest") != dispatch_receipt.get("receipt_digest"):
+            raise ValueError("consensus binding must reuse the same dispatch receipt digest")
+        if consensus_binding.get("consensus_session_id") != session_id:
+            raise ValueError("consensus binding must reuse the same session id")
+
+        messages = consensus_binding.get("messages", [])
+        if not isinstance(messages, list) or not messages:
+            raise ValueError("consensus binding must expose non-empty messages")
+
+        dispatch_units = [
+            dict(unit)
+            for unit in dispatch_plan.get("dispatch_units", [])
+            if isinstance(unit, Mapping)
+        ]
+        if not dispatch_units:
+            raise ValueError("dispatch plan must expose dispatch units")
+        dispatch_units_by_coverage = {
+            str(unit["coverage_area"]): unit for unit in dispatch_units if unit.get("coverage_area")
+        }
+        expected_unit_ids = {str(unit["unit_id"]) for unit in dispatch_units if unit.get("unit_id")}
+        report_message_by_unit_id: Dict[str, Dict[str, Any]] = {}
+        for message in messages:
+            if not isinstance(message, Mapping):
+                continue
+            if message.get("intent") != "report" or message.get("phase") != "opening":
+                continue
+            related_claim_ids = message.get("related_claim_ids", [])
+            if not isinstance(related_claim_ids, list):
+                continue
+            for claim_id in related_claim_ids:
+                if not isinstance(claim_id, str) or claim_id not in expected_unit_ids:
+                    continue
+                report_message_by_unit_id[claim_id] = dict(message)
+
+        guardian_gate_message = next(
+            (
+                dict(message)
+                for message in messages
+                if isinstance(message, Mapping)
+                and message.get("phase") == "gate"
+                and message.get("intent") == "gate"
+            ),
+            None,
+        )
+        if guardian_gate_message is None:
+            raise ValueError("consensus binding must expose one guardian gate message")
+        resolve_message = next(
+            (
+                dict(message)
+                for message in messages
+                if isinstance(message, Mapping)
+                and message.get("phase") == "resolve"
+                and message.get("intent") == "resolve"
+            ),
+            None,
+        )
+        if resolve_message is None:
+            raise ValueError("consensus binding must expose one resolve message")
+
+        bundle_specs: List[Dict[str, Any]] = []
+        for bundle in self._policy.task_graph_root_bundles:
+            coverage_areas = [str(area) for area in bundle["coverage_areas"]]
+            grouped_units: List[Dict[str, Any]] = []
+            for coverage_area in coverage_areas:
+                unit = dispatch_units_by_coverage.get(coverage_area)
+                if unit is None:
+                    raise ValueError(f"dispatch unit missing for coverage area {coverage_area}")
+                grouped_units.append(unit)
+            bundle_specs.append(
+                {
+                    "bundle_role": str(bundle["bundle_role"]),
+                    "coverage_areas": coverage_areas,
+                    "dispatch_units": grouped_units,
+                }
+            )
+
+        task_graph_service = TaskGraphService()
+        graph = task_graph_service.build_graph(
+            intent=(
+                f"{_non_empty_string(convocation_session.get('summary'), 'convocation_session.summary')} "
+                "into same-session builder execution bundles"
+            ),
+            required_roles=[bundle["bundle_role"] for bundle in bundle_specs],
+        )
+        root_nodes = graph["nodes"][: len(bundle_specs)]
+        review_node = graph["nodes"][len(bundle_specs)]
+        synthesis_node = graph["nodes"][len(bundle_specs) + 1]
+        if review_node.get("id") != "node-council-review":
+            raise ValueError("TaskGraph review node must remain node-council-review")
+        if synthesis_node.get("id") != "node-result-synthesis":
+            raise ValueError("TaskGraph synthesis node must remain node-result-synthesis")
+
+        node_bindings: List[Dict[str, Any]] = []
+        result_refs: List[str] = []
+        for node, bundle in zip(root_nodes, bundle_specs):
+            dispatch_unit_ids = [str(unit["unit_id"]) for unit in bundle["dispatch_units"]]
+            selected_agent_ids = [
+                str(unit["selected_agent_id"])
+                for unit in bundle["dispatch_units"]
+                if unit.get("selected_agent_id")
+            ]
+            report_messages: List[Dict[str, Any]] = []
+            for unit_id in dispatch_unit_ids:
+                report_message = report_message_by_unit_id.get(unit_id)
+                if report_message is None:
+                    raise ValueError(f"worker report message missing for dispatch unit {unit_id}")
+                report_messages.append(report_message)
+            target_paths = sorted(
+                {
+                    str(target_path)
+                    for unit in bundle["dispatch_units"]
+                    for target_path in unit.get("target_paths", [])
+                    if isinstance(target_path, str)
+                }
+            )
+            node["input_spec"] = {
+                **dict(node["input_spec"]),
+                "session_id": session_id,
+                "convocation_session_ref": convocation_session_ref,
+                "dispatch_plan_ref": dispatch_plan_ref,
+                "dispatch_receipt_ref": dispatch_receipt_ref,
+                "consensus_binding_ref": consensus_binding_ref,
+                "coverage_areas": list(bundle["coverage_areas"]),
+                "dispatch_unit_ids": dispatch_unit_ids,
+                "selected_agent_ids": selected_agent_ids,
+                "consensus_claim_ids": dispatch_unit_ids,
+            }
+            output_spec = (
+                dict(node["output_spec"])
+                if isinstance(node.get("output_spec"), dict)
+                else {"artifact_ref": str(node.get("output_spec", ""))}
+            )
+            output_spec.update(
+                {
+                    "artifact_ref": f"artifact://{node['id']}",
+                    "review_target": "node-council-review",
+                    "report_message_digests": [
+                        str(message["message_digest"]) for message in report_messages
+                    ],
+                }
+            )
+            node["output_spec"] = output_spec
+            result_ref = f"artifact://{node['id']}"
+            result_refs.append(result_ref)
+            node_bindings.append(
+                {
+                    "task_node_id": node["id"],
+                    "task_node_role": node["role"],
+                    "coverage_areas": list(bundle["coverage_areas"]),
+                    "dispatch_unit_ids": dispatch_unit_ids,
+                    "selected_agent_ids": selected_agent_ids,
+                    "report_message_ids": [str(message["message_id"]) for message in report_messages],
+                    "report_message_digests": [
+                        str(message["message_digest"]) for message in report_messages
+                    ],
+                    "consensus_claim_ids": dispatch_unit_ids,
+                    "target_paths": target_paths,
+                    "result_ref": result_ref,
+                }
+            )
+
+        review_node["input_spec"] = {
+            **dict(review_node["input_spec"]),
+            "session_id": session_id,
+            "dispatch_receipt_ref": dispatch_receipt_ref,
+            "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+            "consensus_binding_ref": consensus_binding_ref,
+            "guardian_gate_message_digest": guardian_gate_message["message_digest"],
+        }
+        review_output = (
+            dict(review_node["output_spec"])
+            if isinstance(review_node.get("output_spec"), dict)
+            else {"artifact_ref": str(review_node.get("output_spec", ""))}
+        )
+        review_output.update(
+            {
+                "guardian_gate_message_digest": guardian_gate_message["message_digest"],
+                "resolve_target": "node-result-synthesis",
+            }
+        )
+        review_node["output_spec"] = review_output
+
+        synthesis_node["input_spec"] = {
+            **dict(synthesis_node["input_spec"]),
+            "session_id": session_id,
+            "dispatch_receipt_ref": dispatch_receipt_ref,
+            "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+            "consensus_binding_ref": consensus_binding_ref,
+            "resolve_message_digest": resolve_message["message_digest"],
+            "result_refs": list(result_refs),
+        }
+        synthesis_output = (
+            dict(synthesis_node["output_spec"])
+            if isinstance(synthesis_node.get("output_spec"), dict)
+            else {"artifact_ref": str(synthesis_node.get("output_spec", ""))}
+        )
+        synthesis_output.update(
+            {
+                "artifact_ref": "artifact://yaoyorozu-task-graph-bundle",
+                "resolve_message_digest": resolve_message["message_digest"],
+            }
+        )
+        synthesis_node["output_spec"] = synthesis_output
+
+        task_graph_validation = task_graph_service.validate_graph(graph)
+        task_graph_dispatch = task_graph_service.dispatch_graph(
+            graph_id=graph["graph_id"],
+            nodes=graph["nodes"],
+            complexity_policy=graph["complexity_policy"],
+        )
+        task_graph_synthesis = task_graph_service.synthesize_results(
+            graph_id=graph["graph_id"],
+            result_refs=result_refs,
+            complexity_policy=graph["complexity_policy"],
+        )
+
+        actual_dispatch_unit_ids = sorted(
+            unit_id
+            for node_binding in node_bindings
+            for unit_id in node_binding["dispatch_unit_ids"]
+        )
+        expected_dispatch_unit_ids = sorted(expected_unit_ids)
+        coverage_groups = sorted(
+            ",".join(sorted(node_binding["coverage_areas"])) for node_binding in node_bindings
+        )
+        expected_coverage_groups = sorted(
+            ",".join(sorted(bundle["coverage_areas"])) for bundle in bundle_specs
+        )
+        validation = {
+            "same_session_bound": (
+                all(
+                    isinstance(node.get("input_spec"), Mapping)
+                    and node["input_spec"].get("session_id") == session_id
+                    for node in graph["nodes"]
+                )
+                and consensus_binding.get("consensus_session_id") == session_id
+            ),
+            "consensus_binding_bound": (
+                consensus_binding.get("convocation_session_ref") == convocation_session_ref
+                and consensus_binding.get("dispatch_plan_ref") == dispatch_plan_ref
+                and consensus_binding.get("dispatch_receipt_ref") == dispatch_receipt_ref
+            ),
+            "complexity_policy_ok": (
+                task_graph_validation["ok"]
+                and task_graph_validation["root_count"]
+                <= graph["complexity_policy"]["max_parallelism"]
+            ),
+            "root_bundle_count_ok": (
+                task_graph_validation["root_count"] == len(bundle_specs)
+                and task_graph_dispatch["dispatched_count"] == len(bundle_specs)
+            ),
+            "dispatch_units_bound": actual_dispatch_unit_ids == expected_dispatch_unit_ids,
+            "coverage_grouping_ok": coverage_groups == expected_coverage_groups,
+            "worker_claims_bound": (
+                all(
+                    set(node_binding["consensus_claim_ids"]).issubset(
+                        set(consensus_binding.get("dispatch_claim_ids", []))
+                    )
+                    for node_binding in node_bindings
+                )
+                and all(
+                    expected_unit_ids.issuperset(set(node_binding["dispatch_unit_ids"]))
+                    for node_binding in node_bindings
+                )
+            ),
+            "guardian_gate_bound": (
+                isinstance(review_node.get("input_spec"), Mapping)
+                and review_node["input_spec"].get("guardian_gate_message_digest")
+                == guardian_gate_message["message_digest"]
+            ),
+            "resolve_bound": (
+                isinstance(synthesis_node.get("input_spec"), Mapping)
+                and synthesis_node["input_spec"].get("resolve_message_digest")
+                == resolve_message["message_digest"]
+            ),
+            "synthesis_bound": (
+                task_graph_synthesis["accepted_result_count"] == len(result_refs)
+                and sorted(task_graph_dispatch["ready_node_ids"])
+                == sorted(node_binding["task_node_id"] for node_binding in node_bindings)
+            ),
+        }
+        validation["ok"] = all(validation.values())
+
+        binding = {
+            "kind": "yaoyorozu_task_graph_binding",
+            "schema_version": "1.0.0",
+            "binding_id": new_id("yaoyorozu-task-graph"),
+            "bound_at": utc_now_iso(),
+            "binding_profile": self._policy.task_graph_binding_profile,
+            "convocation_session_ref": convocation_session_ref,
+            "convocation_session_digest": convocation_session["session_digest"],
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+            "dispatch_receipt_ref": dispatch_receipt_ref,
+            "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+            "consensus_binding_ref": consensus_binding_ref,
+            "consensus_binding_digest": consensus_binding["binding_digest"],
+            "consensus_session_id": session_id,
+            "task_graph_ref": f"task-graph://{graph['graph_id']}",
+            "task_graph_digest": sha256_text(canonical_json(_task_graph_digest_payload(graph))),
+            "task_graph_dispatch_digest": sha256_text(canonical_json(task_graph_dispatch)),
+            "task_graph_synthesis_digest": sha256_text(canonical_json(task_graph_synthesis)),
+            "guardian_gate_message_digest": guardian_gate_message["message_digest"],
+            "resolve_message_digest": resolve_message["message_digest"],
+            "task_graph": graph,
+            "task_graph_validation": task_graph_validation,
+            "task_graph_dispatch": task_graph_dispatch,
+            "task_graph_synthesis": task_graph_synthesis,
+            "node_bindings": node_bindings,
+            "validation": validation,
+        }
+        binding["binding_digest"] = sha256_text(
+            canonical_json(_task_graph_binding_digest_payload(binding))
+        )
+        return binding
+
+    def validate_task_graph_dispatch_binding(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if binding.get("kind") != "yaoyorozu_task_graph_binding":
+            errors.append("kind must equal yaoyorozu_task_graph_binding")
+        if binding.get("binding_profile") != self._policy.task_graph_binding_profile:
+            errors.append("binding_profile mismatch")
+
+        task_graph = binding.get("task_graph", {})
+        task_graph_validation = binding.get("task_graph_validation", {})
+        task_graph_dispatch = binding.get("task_graph_dispatch", {})
+        task_graph_synthesis = binding.get("task_graph_synthesis", {})
+        node_bindings = binding.get("node_bindings", [])
+        validation = binding.get("validation", {})
+        if not isinstance(task_graph, Mapping):
+            errors.append("task_graph must be a mapping")
+            task_graph = {}
+        if not isinstance(task_graph_validation, Mapping):
+            errors.append("task_graph_validation must be a mapping")
+            task_graph_validation = {}
+        if not isinstance(task_graph_dispatch, Mapping):
+            errors.append("task_graph_dispatch must be a mapping")
+            task_graph_dispatch = {}
+        if not isinstance(task_graph_synthesis, Mapping):
+            errors.append("task_graph_synthesis must be a mapping")
+            task_graph_synthesis = {}
+        if not isinstance(node_bindings, list) or not node_bindings:
+            errors.append("node_bindings must be a non-empty list")
+            node_bindings = []
+        if not isinstance(validation, Mapping):
+            errors.append("validation must be a mapping")
+            validation = {}
+
+        graph_id = task_graph.get("graph_id")
+        if not isinstance(graph_id, str) or not graph_id.strip():
+            errors.append("task_graph.graph_id must be a non-empty string")
+
+        nodes = task_graph.get("nodes", [])
+        if not isinstance(nodes, list) or not nodes:
+            errors.append("task_graph.nodes must be a non-empty list")
+            nodes = []
+        ready_node_ids = task_graph_dispatch.get("ready_node_ids", [])
+        if not isinstance(ready_node_ids, list) or not ready_node_ids:
+            errors.append("task_graph_dispatch.ready_node_ids must be a non-empty list")
+            ready_node_ids = []
+        review_node = next(
+            (
+                node
+                for node in nodes
+                if isinstance(node, Mapping) and node.get("id") == "node-council-review"
+            ),
+            {},
+        )
+        synthesis_node = next(
+            (
+                node
+                for node in nodes
+                if isinstance(node, Mapping) and node.get("id") == "node-result-synthesis"
+            ),
+            {},
+        )
+
+        bound_dispatch_unit_ids: List[str] = []
+        for node_binding in node_bindings:
+            if not isinstance(node_binding, Mapping):
+                errors.append("node_bindings entries must be mappings")
+                continue
+            task_node_id = node_binding.get("task_node_id")
+            if task_node_id not in ready_node_ids:
+                errors.append("task_node_id must remain one of the ready root nodes")
+            dispatch_unit_ids = node_binding.get("dispatch_unit_ids", [])
+            if not isinstance(dispatch_unit_ids, list) or not dispatch_unit_ids:
+                errors.append("dispatch_unit_ids must be a non-empty list")
+                continue
+            bound_dispatch_unit_ids.extend(str(unit_id) for unit_id in dispatch_unit_ids)
+            report_message_digests = node_binding.get("report_message_digests", [])
+            if not isinstance(report_message_digests, list) or len(report_message_digests) != len(
+                dispatch_unit_ids
+            ):
+                errors.append("report_message_digests must align with dispatch_unit_ids")
+
+        if len(set(bound_dispatch_unit_ids)) != len(bound_dispatch_unit_ids):
+            errors.append("dispatch unit bindings must remain unique across root bundles")
+        if task_graph_validation.get("ok") is not True:
+            errors.append("task_graph_validation must remain ok")
+        if task_graph_dispatch.get("graph_id") != graph_id:
+            errors.append("task_graph_dispatch.graph_id must match task_graph.graph_id")
+        if task_graph_synthesis.get("graph_id") != graph_id:
+            errors.append("task_graph_synthesis.graph_id must match task_graph.graph_id")
+        if task_graph_synthesis.get("accepted_result_count") != len(ready_node_ids):
+            errors.append("task_graph_synthesis must accept exactly one result per ready root node")
+        if task_graph_dispatch.get("dispatched_count") != len(ready_node_ids):
+            errors.append("task_graph_dispatch.dispatched_count must match ready_node_ids count")
+        if not isinstance(review_node.get("input_spec"), Mapping) or review_node["input_spec"].get(
+            "guardian_gate_message_digest"
+        ) != binding.get("guardian_gate_message_digest"):
+            errors.append("review node must bind guardian gate digest")
+        if not isinstance(synthesis_node.get("input_spec"), Mapping) or synthesis_node["input_spec"].get(
+            "resolve_message_digest"
+        ) != binding.get("resolve_message_digest"):
+            errors.append("synthesis node must bind resolve digest")
+        if validation.get("ok") is not True:
+            errors.append("binding validation must remain ok")
+
+        return {
+            "ok": not errors,
+            "ready_node_count": len(ready_node_ids),
+            "dispatch_unit_count": len(set(bound_dispatch_unit_ids)),
+            "synthesis_count": int(task_graph_synthesis.get("accepted_result_count", 0)),
+            "guardian_gate_bound": (
+                isinstance(review_node.get("input_spec"), Mapping)
+                and review_node["input_spec"].get("guardian_gate_message_digest")
+                == binding.get("guardian_gate_message_digest")
+            ),
+            "worker_claims_bound": validation.get("worker_claims_bound") is True,
+            "coverage_grouping_ok": validation.get("coverage_grouping_ok") is True,
             "errors": errors,
         }
 

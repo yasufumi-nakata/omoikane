@@ -1,0 +1,324 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_task_graph_binding.schema"
+title: YaoyorozuTaskGraphBinding
+description: Same-session TaskGraph bundle binding for one Yaoyorozu convocation, worker dispatch receipt, and ConsensusBus handoff.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_id
+  - bound_at
+  - binding_digest
+  - binding_profile
+  - convocation_session_ref
+  - convocation_session_digest
+  - dispatch_plan_ref
+  - dispatch_plan_digest
+  - dispatch_receipt_ref
+  - dispatch_receipt_digest
+  - consensus_binding_ref
+  - consensus_binding_digest
+  - consensus_session_id
+  - task_graph_ref
+  - task_graph_digest
+  - task_graph_dispatch_digest
+  - task_graph_synthesis_digest
+  - guardian_gate_message_digest
+  - resolve_message_digest
+  - task_graph
+  - task_graph_validation
+  - task_graph_dispatch
+  - task_graph_synthesis
+  - node_bindings
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_task_graph_binding
+  schema_version:
+    const: 1.0.0
+  binding_id:
+    type: string
+    pattern: "^yaoyorozu-task-graph-[a-f0-9]{12}$"
+  bound_at:
+    type: string
+    format: date-time
+  binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  binding_profile:
+    const: repo-local-yaoyorozu-task-graph-binding-v1
+  convocation_session_ref:
+    type: string
+    pattern: "^convocation://"
+  convocation_session_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://"
+  dispatch_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_receipt_ref:
+    type: string
+    pattern: "^dispatch-receipt://"
+  dispatch_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  consensus_binding_ref:
+    type: string
+    pattern: "^consensus-binding://yaoyorozu-consensus-[a-f0-9]{12}$"
+  consensus_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  consensus_session_id:
+    type: string
+    pattern: "^council-convocation-[a-f0-9]{12}$"
+  task_graph_ref:
+    type: string
+    pattern: "^task-graph://graph-[a-f0-9]{12}$"
+  task_graph_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  task_graph_dispatch_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  task_graph_synthesis_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  guardian_gate_message_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  resolve_message_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  task_graph:
+    type: object
+    additionalProperties: false
+    required:
+      - graph_id
+      - intent
+      - required_roles
+      - nodes
+      - complexity_policy
+      - created_at
+    properties:
+      graph_id:
+        type: string
+        pattern: "^graph-[a-f0-9]{12}$"
+      intent:
+        type: string
+        minLength: 1
+      required_roles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      nodes:
+        type: array
+        minItems: 5
+        maxItems: 5
+        items:
+          $ref: ./task_node.schema
+      complexity_policy:
+        $ref: ./task_graph_policy.schema
+      created_at:
+        type: string
+        format: date-time
+  task_graph_validation:
+    type: object
+    additionalProperties: false
+    required:
+      - ok
+      - graph_id
+      - policy_id
+      - node_count
+      - edge_count
+      - root_count
+      - max_depth
+    properties:
+      ok:
+        const: true
+      graph_id:
+        type: string
+        pattern: "^graph-[a-f0-9]{12}$"
+      policy_id:
+        const: reference-v0
+      node_count:
+        const: 5
+      edge_count:
+        const: 4
+      root_count:
+        const: 3
+      max_depth:
+        const: 3
+  task_graph_dispatch:
+    type: object
+    additionalProperties: false
+    required:
+      - graph_id
+      - dispatched_count
+      - ready_node_ids
+    properties:
+      graph_id:
+        type: string
+        pattern: "^graph-[a-f0-9]{12}$"
+      dispatched_count:
+        const: 3
+      ready_node_ids:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          enum:
+            - node-1
+            - node-2
+            - node-3
+  task_graph_synthesis:
+    type: object
+    additionalProperties: false
+    required:
+      - graph_id
+      - synthesis_ref
+      - accepted_result_count
+    properties:
+      graph_id:
+        type: string
+        pattern: "^graph-[a-f0-9]{12}$"
+      synthesis_ref:
+        type: string
+        pattern: "^synthesis-[a-f0-9]{12}$"
+      accepted_result_count:
+        const: 3
+  node_bindings:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - task_node_id
+        - task_node_role
+        - coverage_areas
+        - dispatch_unit_ids
+        - selected_agent_ids
+        - report_message_ids
+        - report_message_digests
+        - consensus_claim_ids
+        - target_paths
+        - result_ref
+      properties:
+        task_node_id:
+          type: string
+          enum:
+            - node-1
+            - node-2
+            - node-3
+        task_node_role:
+          type: string
+          minLength: 1
+        coverage_areas:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - runtime
+              - schema
+              - eval
+              - docs
+        dispatch_unit_ids:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        selected_agent_ids:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        report_message_ids:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 8
+        report_message_digests:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+        consensus_claim_ids:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        target_paths:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        result_ref:
+          type: string
+          pattern: "^artifact://node-[123]$"
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - same_session_bound
+      - consensus_binding_bound
+      - complexity_policy_ok
+      - root_bundle_count_ok
+      - dispatch_units_bound
+      - coverage_grouping_ok
+      - worker_claims_bound
+      - guardian_gate_bound
+      - resolve_bound
+      - synthesis_bound
+      - ok
+    properties:
+      same_session_bound:
+        const: true
+      consensus_binding_bound:
+        const: true
+      complexity_policy_ok:
+        const: true
+      root_bundle_count_ok:
+        const: true
+      dispatch_units_bound:
+        const: true
+      coverage_grouping_ok:
+        const: true
+      worker_claims_bound:
+        const: true
+      guardian_gate_bound:
+        const: true
+      resolve_bound:
+        const: true
+      synthesis_bound:
+        const: true
+      ok:
+        const: true

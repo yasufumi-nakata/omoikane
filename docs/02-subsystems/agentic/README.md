@@ -24,14 +24,20 @@
   Council convocation / builder handoff plan を materialize し、
   selected builder handoff を repo-local subprocess worker dispatch receipt まで実行しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
-  `yaoyorozu_consensus_dispatch_binding` として束縛する
+  `yaoyorozu_consensus_dispatch_binding` として束縛する。
+  さらに fixed `max_parallelism=3` を守るため、
+  `runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle に畳み込んだ
+  `TaskGraph` execution bundle を `yaoyorozu_task_graph_binding` として残す
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）
 - 各ノードはサブタスク、エッジは依存
 - Council が分解、Yaoyorozu が実行
 - reference runtime v0 では `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3`
-  に固定し、過大な DAG は build 前に reject する
+  に固定し、過大な DAG は build 前に reject する。
+  `yaoyorozu-demo` はこの ceiling を破らないため、4 worker coverage を
+  `runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root node へ group してから
+  review / synthesis へ流す
 
 ### ConsensusBus
 - Agent 間の合意形成メッセージバス

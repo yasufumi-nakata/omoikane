@@ -3549,6 +3549,15 @@ json.dump(response, sys.stdout)
         consensus_dispatch_validation = self.yaoyorozu.validate_consensus_dispatch_binding(
             consensus_dispatch
         )
+        task_graph_binding = self.yaoyorozu.bind_task_graph_dispatch(
+            convocation_session=convocation,
+            dispatch_plan=dispatch_plan,
+            dispatch_receipt=dispatch_receipt,
+            consensus_binding=consensus_dispatch,
+        )
+        task_graph_binding_validation = self.yaoyorozu.validate_task_graph_dispatch_binding(
+            task_graph_binding
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="yaoyorozu.registry.synced",
@@ -3613,6 +3622,15 @@ json.dump(response, sys.stdout)
             layer="L4",
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.task_graph.bound",
+            payload=task_graph_binding,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
         ledger_verification = self.ledger.verify()
 
         return {
@@ -3626,6 +3644,7 @@ json.dump(response, sys.stdout)
             "dispatch_plan": dispatch_plan,
             "dispatch_receipt": dispatch_receipt,
             "consensus_dispatch": consensus_dispatch,
+            "task_graph_binding": task_graph_binding,
             "validation": {
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
@@ -3655,11 +3674,29 @@ json.dump(response, sys.stdout)
                 "consensus_direct_handoff_blocked": consensus_dispatch["validation"][
                     "direct_handoff_blocked"
                 ],
+                "task_graph_binding_ok": task_graph_binding_validation["ok"],
+                "task_graph_ready_node_count": task_graph_binding_validation[
+                    "ready_node_count"
+                ],
+                "task_graph_dispatch_unit_count": task_graph_binding_validation[
+                    "dispatch_unit_count"
+                ],
+                "task_graph_synthesis_count": task_graph_binding_validation["synthesis_count"],
+                "task_graph_guardian_gate_bound": task_graph_binding_validation[
+                    "guardian_gate_bound"
+                ],
+                "task_graph_worker_claims_bound": task_graph_binding_validation[
+                    "worker_claims_bound"
+                ],
+                "task_graph_coverage_grouping_ok": task_graph_binding_validation[
+                    "coverage_grouping_ok"
+                ],
                 "ok": (
                     convocation["validation"]["ok"]
                     and dispatch_plan_validation["ok"]
                     and dispatch_receipt_validation["ok"]
                     and consensus_dispatch_validation["ok"]
+                    and task_graph_binding_validation["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },
