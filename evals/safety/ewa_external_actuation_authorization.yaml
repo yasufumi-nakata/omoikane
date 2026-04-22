@@ -13,6 +13,7 @@ expected:
   authorization_ok: true
   authorization_ready: true
   authorization_matches_command: true
+  authorization_stop_signal_path_ready: true
   authorization_delivery_scope: physical-device-actuation
   approved_status: executed
 metric: boolean

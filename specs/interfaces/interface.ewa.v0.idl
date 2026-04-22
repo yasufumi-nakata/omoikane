@@ -7,6 +7,7 @@ imports:
   ewa_command: ../schemas/ewa_command.schema
   ewa_audit: ../schemas/ewa_audit.schema
   ewa_motor_plan: ../schemas/ewa_motor_plan.schema
+  ewa_stop_signal_path: ../schemas/ewa_stop_signal_path.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
@@ -159,6 +160,83 @@ operations:
             items:
               type: string
               minLength: 1
+  prepare_stop_signal_path:
+    summary: Arm one bounded hardware kill-switch wiring and stop-signal bus path before non-read-only actuation authorization.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - command
+          - motor_plan
+          - kill_switch_wiring_ref
+          - stop_signal_bus_ref
+          - interlock_controller_ref
+        properties:
+          command:
+            schema_ref: ewa_command
+          motor_plan:
+            schema_ref: ewa_motor_plan
+          kill_switch_wiring_ref:
+            type: string
+            minLength: 1
+          stop_signal_bus_ref:
+            type: string
+            minLength: 1
+          interlock_controller_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: ewa_stop_signal_path
+    guarantees:
+      - read-only commands must not arm a stop-signal path
+      - stop-signal path must bind one handle_id, device_id, command_id, motor_plan_id/digest, and safe_stop_policy_id before authorization
+      - armed_trigger_bindings must cover the fixed trigger set guardian-manual-stop, watchdog-timeout, sensor-drift, and emergency-disconnect
+      - stop_signal_bus_profile_id must equal bounded-hardware-kill-switch-bus-v1
+  validate_stop_signal_path:
+    summary: Validate one armed hardware kill-switch wiring and stop-signal bus receipt against the fixed emergency-stop policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - path
+        properties:
+          path:
+            schema_ref: ewa_stop_signal_path
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - path_ready
+          - profile_valid
+          - safe_stop_policy_bound
+          - trigger_coverage_complete
+          - motor_plan_bound
+          - release_window_aligned
+          - errors
+        properties:
+          ok:
+            type: boolean
+          path_ready:
+            type: boolean
+          profile_valid:
+            type: boolean
+          safe_stop_policy_bound:
+            type: boolean
+          trigger_coverage_complete:
+            type: boolean
+          motor_plan_bound:
+            type: boolean
+          release_window_aligned:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   execute_legal_preflight:
     summary: Execute one jurisdiction-bound legal preflight before EWA actuation authorization is issued.
     input:
@@ -275,12 +353,15 @@ operations:
         required:
           - command
           - motor_plan
+          - stop_signal_path
           - legal_execution
         properties:
           command:
             schema_ref: ewa_command
           motor_plan:
             schema_ref: ewa_motor_plan
+          stop_signal_path:
+            schema_ref: ewa_stop_signal_path
           legal_execution:
             schema_ref: ewa_legal_execution
           valid_for_seconds:
@@ -292,7 +373,7 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, legal_execution_id/digest, and approval path
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, legal_execution_id/digest, and approval path
       - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
@@ -303,7 +384,7 @@ operations:
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
       - non-read-only commands require one active authorization_id whose digests match the command payload
-      - non-read-only audit entries must remain bound to one motor_plan receipt and one legal_execution receipt
+      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, and one legal_execution receipt
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
@@ -334,8 +415,10 @@ operations:
           - intent_digest_matches
           - jurisdiction_bundle_ready
           - motor_plan_ready
+          - stop_signal_path_ready
           - legal_execution_ready
           - motor_plan_bound
+          - stop_signal_path_bound
           - legal_execution_bound
           - window_open
           - status_authorized
@@ -356,9 +439,13 @@ operations:
             type: boolean
           motor_plan_ready:
             type: boolean
+          stop_signal_path_ready:
+            type: boolean
           legal_execution_ready:
             type: boolean
           motor_plan_bound:
+            type: boolean
+          stop_signal_path_bound:
             type: boolean
           legal_execution_bound:
             type: boolean
@@ -469,6 +556,7 @@ operations:
       - emergency stop must latch actuator_state=emergency-stopped and safe_state_status=latched-safe before release
       - emergency stop must bind the last command_id and bound_command_digest
       - emergency stop must bind the last authorization artifact when one was active
+      - emergency stop must bind one armed stop_signal_path and the activated trigger channel that delivered the bus latch
       - release_required must remain true until the handle is force-released
       - further actuation commands must fail closed until release completes
   validate_emergency_stop:
@@ -491,7 +579,10 @@ operations:
           - trigger_source_valid
           - safe_state_latched
           - hardware_interlock_engaged
+          - bus_delivery_latched
           - authorization_bound
+          - stop_signal_path_bound
+          - trigger_binding_matched
           - release_required
           - errors
         properties:
@@ -503,7 +594,13 @@ operations:
             type: boolean
           hardware_interlock_engaged:
             type: boolean
+          bus_delivery_latched:
+            type: boolean
           authorization_bound:
+            type: boolean
+          stop_signal_path_bound:
+            type: boolean
+          trigger_binding_matched:
             type: boolean
           release_required:
             type: boolean
@@ -557,6 +654,9 @@ events:
   ewa.motor_plan_prepared:
     payload:
       schema_ref: ewa_motor_plan
+  ewa.stop_signal_path_prepared:
+    payload:
+      schema_ref: ewa_stop_signal_path
   ewa.legal_execution_prepared:
     payload:
       schema_ref: ewa_legal_execution
@@ -572,5 +672,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves bounded safety gating, device-specific motor semantics, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
-    - Raw hardware buses, regulator APIs, and site-specific firmware adapters stay outside this reference runtime.
+    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - Raw regulator APIs and site-specific firmware adapters stay outside this reference runtime; only digest-bound stop-signal bus arming is modeled here.

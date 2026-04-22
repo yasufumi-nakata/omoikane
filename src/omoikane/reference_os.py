@@ -5660,6 +5660,21 @@ json.dump(response, sys.stdout)
             instruction="move the inspection arm two centimeters to reposition the lantern",
             reversibility="reversible",
         )
+        stop_signal_path = self.ewa.prepare_stop_signal_path(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            motor_plan_id=motor_plan["plan_id"],
+            kill_switch_wiring_ref="wiring://lab-drone-arm-01/emergency-stop-loop/v1",
+            stop_signal_bus_ref="stop-bus://lab-drone-arm-01/emergency-latch/v1",
+            interlock_controller_ref="interlock://lab-drone-arm-01/safety-plc",
+        )
+        stop_signal_path_validation = self.ewa.validate_stop_signal_path(
+            stop_signal_path,
+            motor_plan=motor_plan,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+        )
         legal_execution = self.ewa.execute_legal_preflight(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -5690,6 +5705,7 @@ json.dump(response, sys.stdout)
             intent_summary="reposition lantern for inspection without changing the environment permanently",
             ethics_attestation_id="ethics://ewa/approved-001",
             motor_plan_id=motor_plan["plan_id"],
+            stop_signal_path_id=stop_signal_path["path_id"],
             legal_execution_id=legal_execution["execution_id"],
             guardian_observed=True,
             intent_confidence=0.96,
@@ -5698,6 +5714,7 @@ json.dump(response, sys.stdout)
         authorization_validation = self.ewa.validate_authorization(
             authorization,
             motor_plan=motor_plan,
+            stop_signal_path=stop_signal_path,
             legal_execution=legal_execution,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
@@ -5765,14 +5782,21 @@ json.dump(response, sys.stdout)
             "irreversible_requires_unanimity": veto_handle_validation["irreversible_requires_unanimity"],
             "actuation_authorization_bound": handle_validation["actuation_authorization_bound"],
             "motor_plan_ok": motor_plan_validation["ok"],
+            "stop_signal_path_ok": stop_signal_path_validation["ok"],
             "motor_plan_bound": handle_validation["motor_plan_bound"]
             and authorization_validation["motor_plan_bound"],
+            "stop_signal_path_bound": handle_validation["stop_signal_path_bound"]
+            and authorization_validation["stop_signal_path_bound"],
             "legal_execution_ok": legal_execution_validation["ok"],
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
             "approved_command_motor_plan_bound": (
                 approved_command["motor_plan_id"] == motor_plan["plan_id"]
                 and approved_command["motor_plan_digest"] == motor_plan["plan_digest"]
+            ),
+            "approved_command_stop_signal_path_bound": (
+                approved_command["stop_signal_path_id"] == stop_signal_path["path_id"]
+                and approved_command["stop_signal_path_digest"] == stop_signal_path["path_digest"]
             ),
             "approved_command_legal_execution_bound": (
                 approved_command["legal_execution_id"] == legal_execution["execution_id"]
@@ -5789,11 +5813,17 @@ json.dump(response, sys.stdout)
             "authorization_delivery_scope": authorization_validation["delivery_scope"],
             "authorization_matches_command": authorization_validation["instruction_digest_matches"]
             and authorization_validation["intent_digest_matches"],
+            "authorization_stop_signal_path_ready": authorization_validation[
+                "stop_signal_path_ready"
+            ],
             "emergency_stop_ok": emergency_stop_validation["ok"],
             "emergency_stop_trigger_source_valid": emergency_stop_validation["trigger_source_valid"],
             "emergency_stop_latched": emergency_stop_validation["safe_state_latched"],
             "emergency_stop_hardware_interlock": emergency_stop_validation[
                 "hardware_interlock_engaged"
+            ],
+            "emergency_stop_bus_delivery_latched": emergency_stop_validation[
+                "bus_delivery_latched"
             ],
             "emergency_stop_release_required": emergency_stop_validation["release_required"],
             "emergency_stop_bound_to_command": emergency_stop["command_id"]
@@ -5805,10 +5835,17 @@ json.dump(response, sys.stdout)
             and emergency_stop["authorization_id"] == authorization["authorization_id"]
             and emergency_stop["bound_authorization_digest"]
             == authorization["authorization_digest"],
+            "emergency_stop_bound_to_stop_signal_path": emergency_stop_validation[
+                "stop_signal_path_bound"
+            ]
+            and emergency_stop_validation["trigger_binding_matched"]
+            and emergency_stop["stop_signal_path_id"] == stop_signal_path["path_id"]
+            and emergency_stop["stop_signal_path_digest"] == stop_signal_path["path_digest"],
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]
             and motor_plan_validation["ok"]
+            and stop_signal_path_validation["ok"]
             and legal_execution_validation["ok"]
             and authorization_validation["ok"]
             and emergency_stop_validation["ok"],
@@ -5830,6 +5867,16 @@ json.dump(response, sys.stdout)
             payload=motor_plan,
             actor="ExternalWorldAgentController",
             category="interface-ewa-plan",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.stop_signal_path.prepared",
+            payload=stop_signal_path,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-stop-signal",
             layer="L6",
             signature_roles=["guardian"],
             substrate="robotic-actuator",
@@ -5935,6 +5982,8 @@ json.dump(response, sys.stdout)
             "handle_validation": handle_validation,
             "motor_plan": motor_plan,
             "motor_plan_validation": motor_plan_validation,
+            "stop_signal_path": stop_signal_path,
+            "stop_signal_path_validation": stop_signal_path_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "authorization": authorization,

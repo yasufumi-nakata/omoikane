@@ -21,6 +21,15 @@ required:
   - triggered_at
   - bound_command_digest
   - bound_authorization_digest
+  - stop_signal_path_id
+  - stop_signal_path_digest
+  - stop_signal_bus_profile_id
+  - kill_switch_wiring_ref
+  - activated_binding_id
+  - activated_channel_ref
+  - activated_signal_path_ref
+  - activated_interlock_ref
+  - bus_delivery_status
   - safe_state_ref
   - actuator_state
   - safe_state_status
@@ -71,6 +80,33 @@ properties:
   bound_authorization_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
+  stop_signal_path_id:
+    type: string
+    minLength: 8
+  stop_signal_path_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  stop_signal_bus_profile_id:
+    type: string
+    const: bounded-hardware-kill-switch-bus-v1
+  kill_switch_wiring_ref:
+    type: string
+    minLength: 1
+  activated_binding_id:
+    type: string
+    minLength: 8
+  activated_channel_ref:
+    type: string
+    minLength: 1
+  activated_signal_path_ref:
+    type: string
+    minLength: 1
+  activated_interlock_ref:
+    type: string
+    minLength: 1
+  bus_delivery_status:
+    type: string
+    const: latched
   safe_state_ref:
     type: string
     minLength: 1

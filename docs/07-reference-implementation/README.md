@@ -507,17 +507,22 @@ collective dissolution を 1 シナリオで確認する。
 device-specific `ewa_motor_plan` が
 `actuator_profile_id` / `motion_profile` / `target_pose_ref` /
 `rollback_vector_ref` / `safe_stop_policy_id` を固定し、
+armed `ewa_stop_signal_path` が
+`kill_switch_wiring_ref` / `stop_signal_bus_ref` /
+fixed 4 trigger binding (`guardian-manual-stop` / `watchdog-timeout` /
+`sensor-drift` / `emergency-disconnect`) を固定したうえで、
 jurisdiction-bound `ewa_legal_execution` が
 `policy_ref` / `legal_basis_ref` / `notice_authority_ref` / `liability_mode` /
 fixed 5-control preflight を固定したうえで、
 `external_actuation_authorization` artifact が
-`instruction_digest` / `intent_summary_digest` / `motor_plan_id` /
+`instruction_digest` / `intent_summary_digest` / `motor_plan_id` / `stop_signal_path_id` /
 `legal_execution_id` / `guardian_verification_ref` /
 `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 `watchdog-timeout` emergency stop が
 `command_id` / `bound_command_digest` / `bound_authorization_digest` /
-`hardware_interlock_state=engaged` / `release_required=true` を返し、
+`activated_channel_ref` / `hardware_interlock_state=engaged` /
+`release_required=true` を返し、
 その後 forced release が実行されること、
 さらに別 handle 上で blocked token を含む irreversible command を
 fail-closed で veto し、digest-only audit を維持することを確認する。

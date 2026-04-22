@@ -36,6 +36,8 @@ EWA_AUTHORIZATION_MAX_WINDOW_SECONDS = 900
 EWA_MOTOR_PLAN_PROFILE_ID = "device-specific-motor-semantics-v1"
 EWA_LEGAL_EXECUTION_PROFILE_ID = "ewa-jurisdiction-legal-execution-v1"
 EWA_LEGAL_EXECUTION_SCOPE = "physical-actuation-preflight"
+EWA_STOP_SIGNAL_PATH_POLICY_ID = "guardian-latched-stop-signal-bus-v1"
+EWA_STOP_SIGNAL_BUS_PROFILE_ID = "bounded-hardware-kill-switch-bus-v1"
 EWA_ALLOWED_LIABILITY_MODES = {"individual", "institutional", "joint"}
 EWA_LEGAL_EXECUTION_CONTROL_TYPES = (
     "bundle-ready-check",
@@ -44,6 +46,12 @@ EWA_LEGAL_EXECUTION_CONTROL_TYPES = (
     "notice-authority-bind",
     "escalation-contact-bind",
 )
+EWA_STOP_SIGNAL_BINDING_SUFFIXES = {
+    "guardian-manual-stop": ("guardian-latch", "guardian-console", "guardian-relay"),
+    "watchdog-timeout": ("watchdog-trip", "watchdog-monitor", "watchdog-relay"),
+    "sensor-drift": ("sensor-drift-trip", "sensor-monitor", "sensor-relay"),
+    "emergency-disconnect": ("disconnect-trip", "disconnect-monitor", "disconnect-relay"),
+}
 EWA_BLOCKED_TOKEN_PATTERNS = {
     "harm.human": (
         r"\b(kill|attack|stab|shoot|poison|injure|harm)\b",
@@ -85,6 +93,10 @@ def _legal_execution_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "digest"}
 
 
+def _stop_signal_path_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "path_digest"}
+
+
 class ExternalWorldAgentController:
     """Deterministic L6 physical-actuation boundary with ethics-first gating."""
 
@@ -94,6 +106,7 @@ class ExternalWorldAgentController:
         self.authorizations: Dict[str, Dict[str, Any]] = {}
         self.motor_plans: Dict[str, Dict[str, Any]] = {}
         self.legal_executions: Dict[str, Dict[str, Any]] = {}
+        self.stop_signal_paths: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -157,6 +170,19 @@ class ExternalWorldAgentController:
                 "allowed_liability_modes": sorted(EWA_ALLOWED_LIABILITY_MODES),
                 "required_controls": list(EWA_LEGAL_EXECUTION_CONTROL_TYPES),
             },
+            "stop_signal_bus_policy": {
+                "policy_id": EWA_STOP_SIGNAL_PATH_POLICY_ID,
+                "profile_id": EWA_STOP_SIGNAL_BUS_PROFILE_ID,
+                "safe_stop_policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
+                "required_trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
+                "redundant_channel_count": len(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
+                "binding_roles": {
+                    trigger_source: channel_suffix
+                    for trigger_source, (channel_suffix, _, _) in EWA_STOP_SIGNAL_BINDING_SUFFIXES.items()
+                },
+                "requires_armed_bindings": True,
+                "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
+            },
             "emergency_stop_policy": {
                 "policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
                 "trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
@@ -190,6 +216,8 @@ class ExternalWorldAgentController:
             "last_motor_plan_digest": "",
             "last_legal_execution_id": "",
             "last_legal_execution_digest": "",
+            "last_stop_signal_path_id": "",
+            "last_stop_signal_path_digest": "",
             "last_emergency_stop_id": "",
             "emergency_stop_active": False,
             "audit_log": [],
@@ -402,6 +430,234 @@ class ExternalWorldAgentController:
                 and instruction_digest_matches
                 and safe_stop_policy_bound
                 and motion_limits_valid
+                and digest_matches
+            ),
+        }
+
+    def prepare_stop_signal_path(
+        self,
+        handle_id: str,
+        *,
+        command_id: str,
+        motor_plan_id: str,
+        kill_switch_wiring_ref: str,
+        stop_signal_bus_ref: str,
+        interlock_controller_ref: str,
+    ) -> Dict[str, Any]:
+        handle = self._require_active_handle(handle_id)
+        if handle.get("emergency_stop_active"):
+            raise ValueError("handle is latched in emergency stop; release required before arming stop path")
+
+        normalized_command_id = self._normalize_non_empty_string(command_id, "command_id")
+        normalized_motor_plan_id = self._normalize_non_empty_string(motor_plan_id, "motor_plan_id")
+        normalized_wiring_ref = self._normalize_non_empty_string(
+            kill_switch_wiring_ref,
+            "kill_switch_wiring_ref",
+        )
+        normalized_bus_ref = self._normalize_non_empty_string(
+            stop_signal_bus_ref,
+            "stop_signal_bus_ref",
+        )
+        normalized_interlock_ref = self._normalize_non_empty_string(
+            interlock_controller_ref,
+            "interlock_controller_ref",
+        )
+
+        motor_plan = self._require_motor_plan(normalized_motor_plan_id)
+        motor_plan_validation = self.validate_motor_plan(
+            motor_plan,
+            handle_id=handle_id,
+            device_id=handle["device_id"],
+            command_id=normalized_command_id,
+            reversibility=str(motor_plan.get("reversibility", "")),
+        )
+        if not motor_plan_validation["ok"]:
+            raise ValueError(motor_plan_validation["errors"][0])
+
+        path_id = new_id("ewa-stop-path")
+        bindings: List[Dict[str, Any]] = []
+        for trigger_source in sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            channel_suffix, signal_suffix, relay_suffix = EWA_STOP_SIGNAL_BINDING_SUFFIXES[trigger_source]
+            bindings.append(
+                {
+                    "binding_id": new_id("ewa-stop-binding"),
+                    "trigger_source": trigger_source,
+                    "channel_ref": f"stop-channel://{path_id}/{channel_suffix}",
+                    "signal_path_ref": f"stop-signal://{path_id}/{signal_suffix}",
+                    "interlock_ref": f"{normalized_interlock_ref}/{relay_suffix}",
+                    "latch_mode": "latched-safe",
+                    "readiness_state": "armed",
+                }
+            )
+
+        path = {
+            "kind": "ewa_stop_signal_path",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "path_id": path_id,
+            "policy_id": EWA_STOP_SIGNAL_PATH_POLICY_ID,
+            "handle_id": handle_id,
+            "device_id": handle["device_id"],
+            "command_id": normalized_command_id,
+            "motor_plan_id": normalized_motor_plan_id,
+            "motor_plan_digest": motor_plan["plan_digest"],
+            "actuator_group": motor_plan["actuator_group"],
+            "safe_stop_policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
+            "kill_switch_wiring_ref": normalized_wiring_ref,
+            "stop_signal_bus_ref": normalized_bus_ref,
+            "stop_signal_bus_profile_id": EWA_STOP_SIGNAL_BUS_PROFILE_ID,
+            "interlock_controller_ref": normalized_interlock_ref,
+            "armed_trigger_bindings": bindings,
+            "redundant_channel_count": len(bindings),
+            "armed_at": utc_now_iso(),
+            "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
+        }
+        path["path_digest"] = sha256_text(canonical_json(_stop_signal_path_digest_payload(path)))
+        self.stop_signal_paths[path_id] = path
+        return deepcopy(path)
+
+    def validate_stop_signal_path(
+        self,
+        path: Mapping[str, Any],
+        *,
+        motor_plan: Mapping[str, Any] | None = None,
+        handle_id: str | None = None,
+        device_id: str | None = None,
+        command_id: str | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(path, Mapping):
+            raise ValueError("path must be a mapping")
+
+        errors: List[str] = []
+        self._check_non_empty_string(path.get("path_id"), "path_id", errors)
+        self._check_non_empty_string(path.get("handle_id"), "handle_id", errors)
+        self._check_non_empty_string(path.get("device_id"), "device_id", errors)
+        self._check_non_empty_string(path.get("command_id"), "command_id", errors)
+        self._check_non_empty_string(path.get("motor_plan_id"), "motor_plan_id", errors)
+        self._check_non_empty_string(path.get("motor_plan_digest"), "motor_plan_digest", errors)
+        self._check_non_empty_string(path.get("actuator_group"), "actuator_group", errors)
+        self._check_non_empty_string(path.get("kill_switch_wiring_ref"), "kill_switch_wiring_ref", errors)
+        self._check_non_empty_string(path.get("stop_signal_bus_ref"), "stop_signal_bus_ref", errors)
+        self._check_non_empty_string(
+            path.get("interlock_controller_ref"),
+            "interlock_controller_ref",
+            errors,
+        )
+        self._check_non_empty_string(path.get("path_digest"), "path_digest", errors)
+
+        if path.get("kind") != "ewa_stop_signal_path":
+            errors.append("kind must be ewa_stop_signal_path")
+        if path.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if path.get("policy_id") != EWA_STOP_SIGNAL_PATH_POLICY_ID:
+            errors.append(f"policy_id must be {EWA_STOP_SIGNAL_PATH_POLICY_ID}")
+
+        profile_valid = True
+        if path.get("stop_signal_bus_profile_id") != EWA_STOP_SIGNAL_BUS_PROFILE_ID:
+            profile_valid = False
+            errors.append(
+                f"stop_signal_bus_profile_id must be {EWA_STOP_SIGNAL_BUS_PROFILE_ID}"
+            )
+        safe_stop_policy_bound = path.get("safe_stop_policy_id") == EWA_EMERGENCY_STOP_POLICY_ID
+        if not safe_stop_policy_bound:
+            profile_valid = False
+            errors.append(f"safe_stop_policy_id must be {EWA_EMERGENCY_STOP_POLICY_ID}")
+
+        bindings = path.get("armed_trigger_bindings")
+        trigger_coverage_complete = True
+        seen_trigger_sources = set()
+        if not isinstance(bindings, list) or not bindings:
+            trigger_coverage_complete = False
+            errors.append("armed_trigger_bindings must be a non-empty list")
+            bindings = []
+        for binding in bindings:
+            if not isinstance(binding, Mapping):
+                trigger_coverage_complete = False
+                errors.append("armed_trigger_bindings entries must be mappings")
+                continue
+            trigger_source = binding.get("trigger_source")
+            if trigger_source not in EWA_ALLOWED_EMERGENCY_STOP_SOURCES:
+                trigger_coverage_complete = False
+                errors.append("armed_trigger_bindings trigger_source must cover the fixed stop sources")
+            else:
+                seen_trigger_sources.add(trigger_source)
+            self._check_non_empty_string(binding.get("binding_id"), "binding_id", errors)
+            self._check_non_empty_string(binding.get("channel_ref"), "channel_ref", errors)
+            self._check_non_empty_string(binding.get("signal_path_ref"), "signal_path_ref", errors)
+            self._check_non_empty_string(binding.get("interlock_ref"), "interlock_ref", errors)
+            if binding.get("latch_mode") != "latched-safe":
+                trigger_coverage_complete = False
+                errors.append("armed_trigger_bindings latch_mode must be latched-safe")
+            if binding.get("readiness_state") != "armed":
+                trigger_coverage_complete = False
+                errors.append("armed_trigger_bindings readiness_state must be armed")
+        if seen_trigger_sources != set(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            trigger_coverage_complete = False
+            errors.append("armed_trigger_bindings must cover every fixed emergency-stop trigger source")
+        if path.get("redundant_channel_count") != len(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            trigger_coverage_complete = False
+            errors.append(
+                "redundant_channel_count must equal the fixed emergency-stop trigger count"
+            )
+
+        if handle_id is not None and path.get("handle_id") != handle_id:
+            errors.append("stop signal path handle_id does not match the active handle")
+        if device_id is not None and path.get("device_id") != device_id:
+            errors.append("stop signal path device_id does not match the active handle")
+        if command_id is not None and path.get("command_id") != command_id:
+            errors.append("stop signal path command_id does not match the command")
+
+        motor_plan_bound = True
+        try:
+            bound_motor_plan = (
+                dict(motor_plan)
+                if motor_plan is not None
+                else self._require_motor_plan(str(path.get("motor_plan_id", "")))
+            )
+        except (KeyError, ValueError):
+            motor_plan_bound = False
+            errors.append("stop signal path must reference a known motor plan")
+            bound_motor_plan = {}
+        if bound_motor_plan:
+            if bound_motor_plan.get("plan_id") != path.get("motor_plan_id"):
+                motor_plan_bound = False
+                errors.append("stop signal path motor_plan_id must match the motor plan")
+            if bound_motor_plan.get("plan_digest") != path.get("motor_plan_digest"):
+                motor_plan_bound = False
+                errors.append("stop signal path motor_plan_digest must match the motor plan")
+            if bound_motor_plan.get("actuator_group") != path.get("actuator_group"):
+                motor_plan_bound = False
+                errors.append("stop signal path actuator_group must match the motor plan")
+
+        release_window_aligned = (
+            path.get("release_window_seconds")
+            == EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS
+        )
+        if not release_window_aligned:
+            errors.append(
+                "stop signal path release_window_seconds must align with the emergency stop policy"
+            )
+
+        self._parse_datetime(path.get("armed_at"), "armed_at", errors)
+        digest_matches = path.get("path_digest") == sha256_text(
+            canonical_json(_stop_signal_path_digest_payload(dict(path)))
+        )
+        if not digest_matches:
+            errors.append("path_digest must match the canonical stop signal path payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_valid": profile_valid,
+            "safe_stop_policy_bound": safe_stop_policy_bound,
+            "trigger_coverage_complete": trigger_coverage_complete,
+            "motor_plan_bound": motor_plan_bound,
+            "release_window_aligned": release_window_aligned,
+            "path_ready": (
+                profile_valid
+                and safe_stop_policy_bound
+                and trigger_coverage_complete
+                and motor_plan_bound
+                and release_window_aligned
                 and digest_matches
             ),
         }
@@ -696,6 +952,7 @@ class ExternalWorldAgentController:
         intent_summary: str,
         ethics_attestation_id: str,
         motor_plan_id: str,
+        stop_signal_path_id: str,
         legal_execution_id: str,
         council_attestation_id: str = "",
         council_attestation_mode: str = "none",
@@ -721,6 +978,10 @@ class ExternalWorldAgentController:
         normalized_motor_plan_id = self._normalize_non_empty_string(
             motor_plan_id,
             "motor_plan_id",
+        )
+        normalized_stop_signal_path_id = self._normalize_non_empty_string(
+            stop_signal_path_id,
+            "stop_signal_path_id",
         )
         normalized_legal_execution_id = self._normalize_non_empty_string(
             legal_execution_id,
@@ -784,6 +1045,17 @@ class ExternalWorldAgentController:
         if not motor_plan_validation["ok"]:
             raise ValueError(motor_plan_validation["errors"][0])
 
+        stop_signal_path = self._require_stop_signal_path(normalized_stop_signal_path_id)
+        stop_signal_path_validation = self.validate_stop_signal_path(
+            stop_signal_path,
+            motor_plan=motor_plan,
+            handle_id=handle_id,
+            device_id=handle["device_id"],
+            command_id=normalized_command_id,
+        )
+        if not stop_signal_path_validation["ok"]:
+            raise ValueError(stop_signal_path_validation["errors"][0])
+
         legal_execution = self._require_legal_execution(normalized_legal_execution_id)
         legal_execution_validation = self.validate_legal_execution(
             legal_execution,
@@ -838,6 +1110,9 @@ class ExternalWorldAgentController:
             "motor_plan_id": motor_plan["plan_id"],
             "motor_plan_digest": motor_plan["plan_digest"],
             "motor_profile_id": motor_plan["profile_id"],
+            "stop_signal_path_id": stop_signal_path["path_id"],
+            "stop_signal_path_digest": stop_signal_path["path_digest"],
+            "stop_signal_path_profile_id": stop_signal_path["stop_signal_bus_profile_id"],
             "legal_execution_id": legal_execution["execution_id"],
             "legal_execution_digest": legal_execution["digest"],
             "legal_execution_profile_id": legal_execution["execution_profile_id"],
@@ -1046,11 +1321,15 @@ class ExternalWorldAgentController:
                 )
             motor_plan_id = authorization["motor_plan_id"]
             motor_plan_digest = authorization["motor_plan_digest"]
+            stop_signal_path_id = authorization["stop_signal_path_id"]
+            stop_signal_path_digest = authorization["stop_signal_path_digest"]
             legal_execution_id = authorization["legal_execution_id"]
             legal_execution_digest = authorization["legal_execution_digest"]
         else:
             motor_plan_id = ""
             motor_plan_digest = ""
+            stop_signal_path_id = ""
+            stop_signal_path_digest = ""
             legal_execution_id = ""
             legal_execution_digest = ""
 
@@ -1078,6 +1357,8 @@ class ExternalWorldAgentController:
             ),
             motor_plan_id=motor_plan_id,
             motor_plan_digest=motor_plan_digest,
+            stop_signal_path_id=stop_signal_path_id,
+            stop_signal_path_digest=stop_signal_path_digest,
             legal_execution_id=legal_execution_id,
             legal_execution_digest=legal_execution_digest,
         )
@@ -1090,6 +1371,8 @@ class ExternalWorldAgentController:
         )
         handle["last_motor_plan_id"] = motor_plan_id
         handle["last_motor_plan_digest"] = motor_plan_digest
+        handle["last_stop_signal_path_id"] = stop_signal_path_id
+        handle["last_stop_signal_path_digest"] = stop_signal_path_digest
         handle["last_legal_execution_id"] = legal_execution_id
         handle["last_legal_execution_digest"] = legal_execution_digest
         handle["last_emergency_stop_id"] = ""
@@ -1151,11 +1434,24 @@ class ExternalWorldAgentController:
             raise ValueError("handle is already latched in emergency stop")
         if not handle.get("last_command_id"):
             raise ValueError("emergency stop requires a previously executed command")
+        if not handle.get("last_stop_signal_path_id"):
+            raise ValueError("emergency stop requires an armed stop signal path bound to the last command")
 
         normalized_trigger_source = self._normalize_emergency_stop_source(trigger_source)
         normalized_reason = self._normalize_non_empty_string(reason, "reason")
         if len(normalized_reason) < 8:
             raise ValueError("reason must be at least 8 characters")
+        stop_signal_path = self._require_stop_signal_path(str(handle["last_stop_signal_path_id"]))
+        activated_binding = next(
+            (
+                binding
+                for binding in stop_signal_path["armed_trigger_bindings"]
+                if binding["trigger_source"] == normalized_trigger_source
+            ),
+            None,
+        )
+        if activated_binding is None:
+            raise ValueError("stop signal path does not arm the requested trigger source")
 
         stop_id = new_id("ewa-stop")
         handle["actuator_state"] = "emergency-stopped"
@@ -1197,6 +1493,15 @@ class ExternalWorldAgentController:
             "triggered_at": audit["recorded_at"],
             "bound_command_digest": handle.get("last_command_digest", ""),
             "bound_authorization_digest": handle.get("last_authorization_digest", ""),
+            "stop_signal_path_id": stop_signal_path["path_id"],
+            "stop_signal_path_digest": stop_signal_path["path_digest"],
+            "stop_signal_bus_profile_id": stop_signal_path["stop_signal_bus_profile_id"],
+            "kill_switch_wiring_ref": stop_signal_path["kill_switch_wiring_ref"],
+            "activated_binding_id": activated_binding["binding_id"],
+            "activated_channel_ref": activated_binding["channel_ref"],
+            "activated_signal_path_ref": activated_binding["signal_path_ref"],
+            "activated_interlock_ref": activated_binding["interlock_ref"],
+            "bus_delivery_status": "latched",
             "safe_state_ref": f"ewa-safe://{handle_id}/{stop_id}",
             "actuator_state": "emergency-stopped",
             "safe_state_status": "latched-safe",
@@ -1253,11 +1558,15 @@ class ExternalWorldAgentController:
     def snapshot_legal_execution(self, execution_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_legal_execution(execution_id))
 
+    def snapshot_stop_signal_path(self, path_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_stop_signal_path(path_id))
+
     def validate_authorization(
         self,
         authorization: Mapping[str, Any],
         *,
         motor_plan: Mapping[str, Any] | None = None,
+        stop_signal_path: Mapping[str, Any] | None = None,
         legal_execution: Mapping[str, Any] | None = None,
         handle_id: str | None = None,
         device_id: str | None = None,
@@ -1309,6 +1618,21 @@ class ExternalWorldAgentController:
             errors,
         )
         self._check_non_empty_string(
+            authorization.get("stop_signal_path_id"),
+            "stop_signal_path_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("stop_signal_path_digest"),
+            "stop_signal_path_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("stop_signal_path_profile_id"),
+            "stop_signal_path_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("legal_execution_id"),
             "legal_execution_id",
             errors,
@@ -1344,6 +1668,10 @@ class ExternalWorldAgentController:
             errors.append(f"delivery_scope must be {EWA_AUTHORIZATION_DELIVERY_SCOPE}")
         if authorization.get("motor_profile_id") != EWA_MOTOR_PLAN_PROFILE_ID:
             errors.append(f"motor_profile_id must be {EWA_MOTOR_PLAN_PROFILE_ID}")
+        if authorization.get("stop_signal_path_profile_id") != EWA_STOP_SIGNAL_BUS_PROFILE_ID:
+            errors.append(
+                f"stop_signal_path_profile_id must be {EWA_STOP_SIGNAL_BUS_PROFILE_ID}"
+            )
         if authorization.get("legal_execution_profile_id") != EWA_LEGAL_EXECUTION_PROFILE_ID:
             errors.append(
                 f"legal_execution_profile_id must be {EWA_LEGAL_EXECUTION_PROFILE_ID}"
@@ -1468,6 +1796,45 @@ class ExternalWorldAgentController:
                 motor_plan_bound = False
                 errors.extend(plan_validation["errors"])
 
+        stop_signal_path_bound = True
+        stop_signal_path_validation: Dict[str, Any] = {"path_ready": False}
+        try:
+            bound_stop_signal_path = (
+                dict(stop_signal_path)
+                if stop_signal_path is not None
+                else self._require_stop_signal_path(str(authorization.get("stop_signal_path_id", "")))
+            )
+        except (KeyError, ValueError):
+            stop_signal_path_bound = False
+            errors.append("authorization must reference a known stop signal path")
+            bound_stop_signal_path = {}
+        if bound_stop_signal_path:
+            if bound_stop_signal_path.get("path_id") != authorization.get("stop_signal_path_id"):
+                stop_signal_path_bound = False
+                errors.append("authorization stop_signal_path_id must match the stop signal path")
+            if bound_stop_signal_path.get("path_digest") != authorization.get("stop_signal_path_digest"):
+                stop_signal_path_bound = False
+                errors.append(
+                    "authorization stop_signal_path_digest must match the stop signal path"
+                )
+            if bound_stop_signal_path.get("stop_signal_bus_profile_id") != authorization.get(
+                "stop_signal_path_profile_id"
+            ):
+                stop_signal_path_bound = False
+                errors.append(
+                    "authorization stop_signal_path_profile_id must match the stop signal path"
+                )
+            stop_signal_path_validation = self.validate_stop_signal_path(
+                bound_stop_signal_path,
+                motor_plan=bound_motor_plan if bound_motor_plan else None,
+                handle_id=str(authorization.get("handle_id", "")),
+                device_id=str(authorization.get("device_id", "")),
+                command_id=str(authorization.get("command_id", "")),
+            )
+            if not stop_signal_path_validation["ok"]:
+                stop_signal_path_bound = False
+                errors.extend(stop_signal_path_validation["errors"])
+
         legal_execution_bound = True
         legal_execution_validation: Dict[str, Any] = {"execution_ready": False}
         try:
@@ -1573,8 +1940,10 @@ class ExternalWorldAgentController:
             "intent_digest_matches": intent_digest_matches,
             "jurisdiction_bundle_ready": jurisdiction_bundle_ready,
             "motor_plan_ready": plan_validation.get("plan_ready", False),
+            "stop_signal_path_ready": stop_signal_path_validation.get("path_ready", False),
             "legal_execution_ready": legal_execution_validation.get("execution_ready", False),
             "motor_plan_bound": motor_plan_bound,
+            "stop_signal_path_bound": stop_signal_path_bound,
             "legal_execution_bound": legal_execution_bound,
             "window_open": window_open,
             "status_authorized": status_authorized,
@@ -1585,8 +1954,10 @@ class ExternalWorldAgentController:
                 and intent_digest_matches
                 and jurisdiction_bundle_ready
                 and plan_validation.get("plan_ready", False)
+                and stop_signal_path_validation.get("path_ready", False)
                 and legal_execution_validation.get("execution_ready", False)
                 and motor_plan_bound
+                and stop_signal_path_bound
                 and legal_execution_bound
                 and window_open
                 and status_authorized
@@ -1624,6 +1995,7 @@ class ExternalWorldAgentController:
         irreversible_requires_unanimity = True
         actuation_authorization_bound = True
         motor_plan_bound = True
+        stop_signal_path_bound = True
         legal_execution_bound = True
         emergency_stop_release_sequence_valid = True
         emergency_stop_seen = False
@@ -1662,6 +2034,17 @@ class ExternalWorldAgentController:
                 motor_plan_digest = entry.get("motor_plan_digest", "")
                 if not isinstance(motor_plan_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", motor_plan_digest):
                     motor_plan_bound = False
+                if not isinstance(entry.get("stop_signal_path_id"), str) or not entry.get(
+                    "stop_signal_path_id",
+                    "",
+                ).strip():
+                    stop_signal_path_bound = False
+                stop_signal_path_digest = entry.get("stop_signal_path_digest", "")
+                if not isinstance(stop_signal_path_digest, str) or not re.fullmatch(
+                    r"[a-f0-9]{64}",
+                    stop_signal_path_digest,
+                ):
+                    stop_signal_path_bound = False
                 if not isinstance(entry.get("legal_execution_id"), str) or not entry.get(
                     "legal_execution_id",
                     "",
@@ -1692,6 +2075,8 @@ class ExternalWorldAgentController:
             errors.append("non-read-only command execution requires an authorization_id in approval_path")
         if not motor_plan_bound:
             errors.append("non-read-only command execution requires a bound motor_plan receipt")
+        if not stop_signal_path_bound:
+            errors.append("non-read-only command execution requires a bound stop_signal_path receipt")
         if not legal_execution_bound:
             errors.append("non-read-only command execution requires a bound legal_execution receipt")
         if emergency_stop_seen and not release_after_stop_seen:
@@ -1709,6 +2094,7 @@ class ExternalWorldAgentController:
             "irreversible_requires_unanimity": irreversible_requires_unanimity,
             "actuation_authorization_bound": actuation_authorization_bound,
             "motor_plan_bound": motor_plan_bound,
+            "stop_signal_path_bound": stop_signal_path_bound,
             "legal_execution_bound": legal_execution_bound,
             "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
@@ -1725,6 +2111,46 @@ class ExternalWorldAgentController:
         self._check_non_empty_string(receipt.get("command_id"), "command_id", errors)
         self._check_non_empty_string(receipt.get("reason"), "reason", errors)
         self._check_non_empty_string(receipt.get("bound_command_digest"), "bound_command_digest", errors)
+        self._check_non_empty_string(
+            receipt.get("stop_signal_path_id"),
+            "stop_signal_path_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("stop_signal_path_digest"),
+            "stop_signal_path_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("stop_signal_bus_profile_id"),
+            "stop_signal_bus_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("kill_switch_wiring_ref"),
+            "kill_switch_wiring_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("activated_binding_id"),
+            "activated_binding_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("activated_channel_ref"),
+            "activated_channel_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("activated_signal_path_ref"),
+            "activated_signal_path_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("activated_interlock_ref"),
+            "activated_interlock_ref",
+            errors,
+        )
         self._check_non_empty_string(receipt.get("safe_state_ref"), "safe_state_ref", errors)
         self._check_non_empty_string(receipt.get("audit_event_ref"), "audit_event_ref", errors)
         self._check_non_empty_string(receipt.get("stop_digest"), "stop_digest", errors)
@@ -1751,6 +2177,9 @@ class ExternalWorldAgentController:
         hardware_interlock_engaged = receipt.get("hardware_interlock_state") == "engaged"
         if not hardware_interlock_engaged:
             errors.append("hardware_interlock_state must be engaged")
+        bus_delivery_latched = receipt.get("bus_delivery_status") == "latched"
+        if not bus_delivery_latched:
+            errors.append("bus_delivery_status must be latched")
         release_required = receipt.get("release_required") is True
         if not release_required:
             errors.append("release_required must be true")
@@ -1778,6 +2207,52 @@ class ExternalWorldAgentController:
                 "authorization_id and bound_authorization_digest must be empty together or bind the last authorization"
             )
 
+        stop_signal_path_bound = True
+        trigger_binding_matched = True
+        try:
+            stop_signal_path = self._require_stop_signal_path(str(receipt.get("stop_signal_path_id", "")))
+        except ValueError:
+            stop_signal_path_bound = False
+            trigger_binding_matched = False
+            errors.append("emergency stop must reference a known stop signal path")
+            stop_signal_path = {}
+        if stop_signal_path:
+            if stop_signal_path.get("path_digest") != receipt.get("stop_signal_path_digest"):
+                stop_signal_path_bound = False
+                errors.append("stop_signal_path_digest must match the bound stop signal path")
+            if stop_signal_path.get("stop_signal_bus_profile_id") != receipt.get(
+                "stop_signal_bus_profile_id"
+            ):
+                stop_signal_path_bound = False
+                errors.append("stop_signal_bus_profile_id must match the bound stop signal path")
+            if stop_signal_path.get("kill_switch_wiring_ref") != receipt.get("kill_switch_wiring_ref"):
+                stop_signal_path_bound = False
+                errors.append("kill_switch_wiring_ref must match the bound stop signal path")
+            matching_binding = next(
+                (
+                    binding
+                    for binding in stop_signal_path.get("armed_trigger_bindings", [])
+                    if binding.get("trigger_source") == receipt.get("trigger_source")
+                ),
+                None,
+            )
+            if matching_binding is None:
+                trigger_binding_matched = False
+                errors.append("trigger_source must resolve to an armed stop-signal binding")
+            else:
+                if matching_binding.get("binding_id") != receipt.get("activated_binding_id"):
+                    trigger_binding_matched = False
+                    errors.append("activated_binding_id must match the trigger binding")
+                if matching_binding.get("channel_ref") != receipt.get("activated_channel_ref"):
+                    trigger_binding_matched = False
+                    errors.append("activated_channel_ref must match the trigger binding")
+                if matching_binding.get("signal_path_ref") != receipt.get("activated_signal_path_ref"):
+                    trigger_binding_matched = False
+                    errors.append("activated_signal_path_ref must match the trigger binding")
+                if matching_binding.get("interlock_ref") != receipt.get("activated_interlock_ref"):
+                    trigger_binding_matched = False
+                    errors.append("activated_interlock_ref must match the trigger binding")
+
         self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
 
         digest_matches = receipt.get("stop_digest") == sha256_text(
@@ -1791,7 +2266,10 @@ class ExternalWorldAgentController:
             "trigger_source_valid": trigger_source_valid,
             "safe_state_latched": safe_state_latched,
             "hardware_interlock_engaged": hardware_interlock_engaged,
+            "bus_delivery_latched": bus_delivery_latched,
             "authorization_bound": authorization_bound,
+            "stop_signal_path_bound": stop_signal_path_bound,
+            "trigger_binding_matched": trigger_binding_matched,
             "release_required": release_required,
             "errors": errors,
         }
@@ -1842,6 +2320,8 @@ class ExternalWorldAgentController:
         approval_path: Dict[str, Any],
         motor_plan_id: str = "",
         motor_plan_digest: str = "",
+        stop_signal_path_id: str = "",
+        stop_signal_path_digest: str = "",
         legal_execution_id: str = "",
         legal_execution_digest: str = "",
     ) -> Dict[str, Any]:
@@ -1867,6 +2347,8 @@ class ExternalWorldAgentController:
             "approval_path": approval_path,
             "motor_plan_id": motor_plan_id,
             "motor_plan_digest": motor_plan_digest,
+            "stop_signal_path_id": stop_signal_path_id,
+            "stop_signal_path_digest": stop_signal_path_digest,
             "legal_execution_id": legal_execution_id,
             "legal_execution_digest": legal_execution_digest,
             "audit_event_ref": audit_event_ref,
@@ -1978,6 +2460,13 @@ class ExternalWorldAgentController:
             return self.motor_plans[normalized_plan_id]
         except KeyError as exc:
             raise KeyError(f"unknown plan_id: {normalized_plan_id}") from exc
+
+    def _require_stop_signal_path(self, path_id: str) -> Dict[str, Any]:
+        normalized_path_id = self._normalize_non_empty_string(path_id, "path_id")
+        try:
+            return self.stop_signal_paths[normalized_path_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown path_id: {normalized_path_id}") from exc
 
     def _require_legal_execution(self, execution_id: str) -> Dict[str, Any]:
         normalized_execution_id = self._normalize_non_empty_string(

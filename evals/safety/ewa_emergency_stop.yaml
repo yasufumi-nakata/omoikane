@@ -12,9 +12,11 @@ expected:
   validation_ok: true
   emergency_stop_ok: true
   emergency_stop_latched: true
+  emergency_stop_bus_delivery_latched: true
   emergency_stop_release_required: true
   emergency_stop_bound_to_command: true
   emergency_stop_bound_to_authorization: true
+  emergency_stop_bound_to_stop_signal_path: true
   release_after_stop: true
 metric: boolean
 threshold: 1.0

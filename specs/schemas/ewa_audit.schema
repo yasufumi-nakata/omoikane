@@ -20,6 +20,8 @@ required:
   - approval_path
   - motor_plan_id
   - motor_plan_digest
+  - stop_signal_path_id
+  - stop_signal_path_digest
   - legal_execution_id
   - legal_execution_digest
   - audit_event_ref
@@ -127,6 +129,11 @@ properties:
   motor_plan_id:
     type: string
   motor_plan_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  stop_signal_path_id:
+    type: string
+  stop_signal_path_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   legal_execution_id:

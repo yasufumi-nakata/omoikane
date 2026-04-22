@@ -29,6 +29,9 @@ required:
   - motor_plan_id
   - motor_plan_digest
   - motor_profile_id
+  - stop_signal_path_id
+  - stop_signal_path_digest
+  - stop_signal_path_profile_id
   - legal_execution_id
   - legal_execution_digest
   - legal_execution_profile_id
@@ -111,6 +114,15 @@ properties:
   motor_profile_id:
     type: string
     const: device-specific-motor-semantics-v1
+  stop_signal_path_id:
+    type: string
+    minLength: 8
+  stop_signal_path_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  stop_signal_path_profile_id:
+    type: string
+    const: bounded-hardware-kill-switch-bus-v1
   legal_execution_id:
     type: string
     minLength: 8

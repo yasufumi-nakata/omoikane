@@ -1,0 +1,126 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_stop_signal_path.schema"
+title: EWAStopSignalPath
+description: >
+  Armed hardware kill-switch wiring and stop-signal bus receipt bound to one
+  non-read-only EWA command before actuation authorization is issued.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - path_id
+  - policy_id
+  - handle_id
+  - device_id
+  - command_id
+  - motor_plan_id
+  - motor_plan_digest
+  - actuator_group
+  - safe_stop_policy_id
+  - kill_switch_wiring_ref
+  - stop_signal_bus_ref
+  - stop_signal_bus_profile_id
+  - interlock_controller_ref
+  - armed_trigger_bindings
+  - redundant_channel_count
+  - armed_at
+  - release_window_seconds
+  - path_digest
+properties:
+  kind:
+    const: ewa_stop_signal_path
+  schema_version:
+    const: "1.0"
+  path_id:
+    type: string
+    pattern: "^ewa-stop-path-[a-f0-9]{12}$"
+  policy_id:
+    type: string
+    const: guardian-latched-stop-signal-bus-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  motor_plan_id:
+    type: string
+    minLength: 8
+  motor_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  actuator_group:
+    type: string
+    minLength: 1
+  safe_stop_policy_id:
+    type: string
+    const: guardian-latched-emergency-stop-v1
+  kill_switch_wiring_ref:
+    type: string
+    minLength: 1
+  stop_signal_bus_ref:
+    type: string
+    minLength: 1
+  stop_signal_bus_profile_id:
+    type: string
+    const: bounded-hardware-kill-switch-bus-v1
+  interlock_controller_ref:
+    type: string
+    minLength: 1
+  armed_trigger_bindings:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - binding_id
+        - trigger_source
+        - channel_ref
+        - signal_path_ref
+        - interlock_ref
+        - latch_mode
+        - readiness_state
+      properties:
+        binding_id:
+          type: string
+          minLength: 8
+        trigger_source:
+          type: string
+          enum:
+            - guardian-manual-stop
+            - watchdog-timeout
+            - sensor-drift
+            - emergency-disconnect
+        channel_ref:
+          type: string
+          minLength: 1
+        signal_path_ref:
+          type: string
+          minLength: 1
+        interlock_ref:
+          type: string
+          minLength: 1
+        latch_mode:
+          type: string
+          const: latched-safe
+        readiness_state:
+          type: string
+          const: armed
+  redundant_channel_count:
+    type: integer
+    const: 4
+  armed_at:
+    type: string
+    format: date-time
+  release_window_seconds:
+    type: integer
+    const: 30
+  path_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

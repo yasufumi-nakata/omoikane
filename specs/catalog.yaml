@@ -1144,6 +1144,14 @@ entries:
     rationale: Required to serialize one device-specific EWA motor semantics receipt with actuator profile, motion envelope, rollback vector, and safe-stop binding.
   - priority: P1
     kind: schema
+    file: specs/schemas/ewa_stop_signal_path.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to serialize one armed hardware kill-switch wiring and stop-signal bus receipt before non-read-only EWA authorization.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ewa_legal_execution.schema
     consumers:
       - specs/interfaces/interface.ewa.v0.idl
@@ -1158,7 +1166,7 @@ entries:
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/02-subsystems/mind-substrate/procedural-memory.md
       - reference-runtime
-    rationale: Required to serialize one guardian-reviewed, jurisdiction-bound physical actuation authorization bound to motor semantics and legal preflight receipts without storing raw instruction text.
+    rationale: Required to serialize one guardian-reviewed, jurisdiction-bound physical actuation authorization bound to motor semantics, armed stop-signal routing, and legal preflight receipts without storing raw instruction text.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_emergency_stop.schema
@@ -1166,7 +1174,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one latched EWA emergency stop with bound command digests, safe-state interlock, and forced-release requirement.
+    rationale: Required to serialize one latched EWA emergency stop with bound command digests, activated stop-signal channel binding, safe-state interlock, and forced-release requirement.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_audit.schema
@@ -1182,7 +1190,7 @@ entries:
       - docs/02-subsystems/interface/README.md
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, legal preflight, authorization, emergency-stop, and forced-release safety gating before real device adapters land.
+    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, armed stop-signal routing, legal preflight, authorization, emergency-stop, and forced-release safety gating before real device adapters land.
   - priority: P1
     kind: eval
     file: evals/interface/imc_disclosure_floor.yaml
@@ -1205,6 +1213,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
     rationale: Protects jurisdiction-bound authorization issuance, command digest binding, ready bundle gating, and fail-closed actuation authorization at the EWA boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_stop_signal_path_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+    rationale: Protects armed stop-signal trigger coverage, motor-plan binding, and authorization gating for bounded hardware kill-switch routing at the EWA boundary.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_motor_semantics_legal_execution.yaml

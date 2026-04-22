@@ -36,6 +36,21 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             instruction="move the inspection arm two centimeters to reposition the lantern",
             reversibility="reversible",
         )
+        stop_signal_path = controller.prepare_stop_signal_path(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            motor_plan_id=motor_plan["plan_id"],
+            kill_switch_wiring_ref="wiring://ewa-arm-01/emergency-stop-loop/v1",
+            stop_signal_bus_ref="stop-bus://ewa-arm-01/emergency-latch/v1",
+            interlock_controller_ref="interlock://ewa-arm-01/safety-plc",
+        )
+        stop_signal_path_validation = controller.validate_stop_signal_path(
+            stop_signal_path,
+            motor_plan=motor_plan,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+        )
         legal_execution = controller.execute_legal_preflight(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -66,6 +81,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             intent_summary="reposition lantern for inspection without permanent change",
             ethics_attestation_id="ethics://ewa/approved-001",
             motor_plan_id=motor_plan["plan_id"],
+            stop_signal_path_id=stop_signal_path["path_id"],
             legal_execution_id=legal_execution["execution_id"],
             guardian_observed=True,
             intent_confidence=0.94,
@@ -73,6 +89,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         authorization_validation = controller.validate_authorization(
             authorization,
             motor_plan=motor_plan,
+            stop_signal_path=stop_signal_path,
             legal_execution=legal_execution,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
@@ -86,6 +103,8 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             "handle": handle,
             "motor_plan": motor_plan,
             "motor_plan_validation": motor_plan_validation,
+            "stop_signal_path": stop_signal_path,
+            "stop_signal_path_validation": stop_signal_path_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "authorization": authorization,
@@ -124,12 +143,16 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
 
         self.assertTrue(context["motor_plan_validation"]["ok"])
         self.assertTrue(context["motor_plan_validation"]["plan_ready"])
+        self.assertTrue(context["stop_signal_path_validation"]["ok"])
+        self.assertTrue(context["stop_signal_path_validation"]["path_ready"])
         self.assertTrue(context["legal_execution_validation"]["ok"])
         self.assertTrue(context["legal_execution_validation"]["execution_ready"])
         self.assertTrue(authorization_validation["ok"])
         self.assertTrue(authorization_validation["motor_plan_ready"])
+        self.assertTrue(authorization_validation["stop_signal_path_ready"])
         self.assertTrue(authorization_validation["legal_execution_ready"])
         self.assertTrue(authorization_validation["motor_plan_bound"])
+        self.assertTrue(authorization_validation["stop_signal_path_bound"])
         self.assertTrue(authorization_validation["legal_execution_bound"])
         self.assertEqual("physical-device-actuation", authorization_validation["delivery_scope"])
         self.assertEqual("executed", approved["status"])
@@ -140,6 +163,11 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         )
         self.assertEqual(motor_plan["plan_id"], approved["motor_plan_id"])
         self.assertEqual(motor_plan["plan_digest"], approved["motor_plan_digest"])
+        self.assertEqual(context["stop_signal_path"]["path_id"], approved["stop_signal_path_id"])
+        self.assertEqual(
+            context["stop_signal_path"]["path_digest"],
+            approved["stop_signal_path_digest"],
+        )
         self.assertEqual(legal_execution["execution_id"], approved["legal_execution_id"])
         self.assertEqual(legal_execution["digest"], approved["legal_execution_digest"])
         self.assertEqual("held", observed["safety_status"])
@@ -149,6 +177,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["summary_only_audit"])
         self.assertTrue(validation["actuation_authorization_bound"])
         self.assertTrue(validation["motor_plan_bound"])
+        self.assertTrue(validation["stop_signal_path_bound"])
         self.assertTrue(validation["legal_execution_bound"])
         self.assertTrue(validation["released"])
 
@@ -244,6 +273,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             escalation_contact="mailto:ewa-oversight@example.invalid",
             valid_for_seconds=360,
         )
+        stop_signal_path = controller.prepare_stop_signal_path(
+            handle["handle_id"],
+            command_id="ewa-command-plan-001",
+            motor_plan_id=motor_plan["plan_id"],
+            kill_switch_wiring_ref="wiring://ewa-arm-04/emergency-stop-loop/v1",
+            stop_signal_bus_ref="stop-bus://ewa-arm-04/emergency-latch/v1",
+            interlock_controller_ref="interlock://ewa-arm-04/safety-plc",
+        )
 
         with self.assertRaisesRegex(ValueError, "motor plan command_id"):
             controller.authorize(
@@ -254,6 +291,84 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 intent_summary="reposition lantern for bounded inspection without permanent change",
                 ethics_attestation_id="ethics://ewa/approved-003",
                 motor_plan_id=motor_plan["plan_id"],
+                stop_signal_path_id=stop_signal_path["path_id"],
+                legal_execution_id=legal_execution["execution_id"],
+                guardian_observed=True,
+                intent_confidence=0.95,
+            )
+
+    def test_authorization_rejects_mismatched_stop_signal_path(self) -> None:
+        controller = ExternalWorldAgentController()
+        handle = controller.acquire(
+            "device://ewa-arm-05",
+            "reposition a lantern for bounded inspection",
+        )
+        motor_plan = controller.prepare_motor_plan(
+            handle["handle_id"],
+            command_id="ewa-command-authorize-002",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            guardian_observed=True,
+            actuator_profile_id="device://ewa-arm-05/profile/articulated-inspection-arm-v1",
+            actuator_group="inspection-arm",
+            motion_profile="cartesian-reposition-v1",
+            target_pose_ref="pose://lantern/reposition-window-a",
+            safety_zone_ref="zone://inspection/perimeter-a",
+            rollback_vector_ref="rollback://lantern/reposition-window-a",
+            max_linear_speed_mps=0.08,
+            max_force_newton=6.5,
+            hold_timeout_ms=1200,
+        )
+        other_motor_plan = controller.prepare_motor_plan(
+            handle["handle_id"],
+            command_id="ewa-command-other-002",
+            instruction="move the inspection arm one centimeter to the right",
+            reversibility="reversible",
+            guardian_observed=True,
+            actuator_profile_id="device://ewa-arm-05/profile/articulated-inspection-arm-v1",
+            actuator_group="inspection-arm",
+            motion_profile="cartesian-reposition-v1",
+            target_pose_ref="pose://lantern/reposition-window-b",
+            safety_zone_ref="zone://inspection/perimeter-b",
+            rollback_vector_ref="rollback://lantern/reposition-window-b",
+            max_linear_speed_mps=0.08,
+            max_force_newton=6.5,
+            hold_timeout_ms=1200,
+        )
+        stop_signal_path = controller.prepare_stop_signal_path(
+            handle["handle_id"],
+            command_id="ewa-command-other-002",
+            motor_plan_id=other_motor_plan["plan_id"],
+            kill_switch_wiring_ref="wiring://ewa-arm-05/emergency-stop-loop/v1",
+            stop_signal_bus_ref="stop-bus://ewa-arm-05/emergency-latch/v1",
+            interlock_controller_ref="interlock://ewa-arm-05/safety-plc",
+        )
+        legal_execution = controller.execute_legal_preflight(
+            handle["handle_id"],
+            command_id="ewa-command-authorize-002",
+            reversibility="reversible",
+            jurisdiction="JP-13",
+            legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-005",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            jurisdiction_bundle_status="ready",
+            notice_authority_ref="authority://jp-13/lab-robotics-oversight-desk",
+            liability_mode="joint",
+            escalation_contact="mailto:ewa-oversight@example.invalid",
+            valid_for_seconds=360,
+        )
+
+        with self.assertRaisesRegex(ValueError, "stop signal path command_id"):
+            controller.authorize(
+                handle["handle_id"],
+                command_id="ewa-command-authorize-002",
+                instruction="move the inspection arm two centimeters to reposition the lantern",
+                reversibility="reversible",
+                intent_summary="reposition lantern for bounded inspection without permanent change",
+                ethics_attestation_id="ethics://ewa/approved-005",
+                motor_plan_id=motor_plan["plan_id"],
+                stop_signal_path_id=stop_signal_path["path_id"],
                 legal_execution_id=legal_execution["execution_id"],
                 guardian_observed=True,
                 intent_confidence=0.95,
@@ -308,12 +423,20 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(stop_validation["ok"])
         self.assertTrue(stop_validation["safe_state_latched"])
         self.assertTrue(stop_validation["hardware_interlock_engaged"])
+        self.assertTrue(stop_validation["bus_delivery_latched"])
         self.assertTrue(stop_validation["authorization_bound"])
+        self.assertTrue(stop_validation["stop_signal_path_bound"])
+        self.assertTrue(stop_validation["trigger_binding_matched"])
         self.assertEqual("watchdog-timeout", stop["trigger_source"])
         self.assertEqual(approved["command_id"], stop["command_id"])
         self.assertEqual(approved["instruction_digest"], stop["bound_command_digest"])
         self.assertEqual(authorization["authorization_id"], stop["authorization_id"])
         self.assertEqual(authorization["authorization_digest"], stop["bound_authorization_digest"])
+        self.assertEqual(context["stop_signal_path"]["path_id"], stop["stop_signal_path_id"])
+        self.assertEqual(
+            context["stop_signal_path"]["path_digest"],
+            stop["stop_signal_path_digest"],
+        )
         self.assertEqual("vetoed", veto["status"])
         self.assertEqual(
             "handle is latched in emergency stop; release required before further actuation",

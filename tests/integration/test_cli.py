@@ -103,27 +103,41 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["motor_plan_ok"])
         self.assertTrue(result["validation"]["motor_plan_bound"])
+        self.assertTrue(result["validation"]["stop_signal_path_ok"])
+        self.assertTrue(result["validation"]["stop_signal_path_bound"])
         self.assertTrue(result["validation"]["legal_execution_ok"])
         self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["authorization_ok"])
         self.assertTrue(result["validation"]["authorization_ready"])
         self.assertTrue(result["validation"]["authorization_matches_command"])
+        self.assertTrue(result["validation"]["authorization_stop_signal_path_ready"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
         self.assertEqual(result["motor_plan"]["plan_id"], result["approved_command"]["motor_plan_id"])
+        self.assertEqual(
+            result["stop_signal_path"]["path_id"],
+            result["approved_command"]["stop_signal_path_id"],
+        )
         self.assertEqual(
             result["legal_execution"]["execution_id"],
             result["approved_command"]["legal_execution_id"],
         )
         self.assertTrue(result["validation"]["approved_command_motor_plan_bound"])
+        self.assertTrue(result["validation"]["approved_command_stop_signal_path_bound"])
         self.assertTrue(result["validation"]["approved_command_legal_execution_bound"])
         self.assertTrue(result["validation"]["emergency_stop_ok"])
         self.assertTrue(result["validation"]["emergency_stop_latched"])
+        self.assertTrue(result["validation"]["emergency_stop_bus_delivery_latched"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_authorization"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_stop_signal_path"])
         self.assertTrue(result["validation"]["release_after_stop"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
+        self.assertEqual(
+            result["stop_signal_path"]["path_id"],
+            result["emergency_stop"]["stop_signal_path_id"],
+        )
         self.assertEqual(
             result["authorization"]["authorization_id"],
             result["approved_command"]["approval_path"]["authorization_id"],

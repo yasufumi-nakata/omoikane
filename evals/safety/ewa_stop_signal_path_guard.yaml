@@ -1,0 +1,19 @@
+eval_id: ewa_stop_signal_path_guard
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が bounded hardware kill-switch wiring と
+  stop-signal bus を armed receipt に固定し、
+  authorization / approved command / emergency stop に同じ path digest を束縛できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  stop_signal_path_ok: true
+  stop_signal_path_bound: true
+  approved_command_stop_signal_path_bound: true
+  emergency_stop_bound_to_stop_signal_path: true
+metric: boolean
+threshold: 1.0
+ethics_check: true
