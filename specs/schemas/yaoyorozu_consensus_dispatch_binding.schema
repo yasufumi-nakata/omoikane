@@ -1,0 +1,423 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_consensus_dispatch_binding.schema"
+title: YaoyorozuConsensusDispatchBinding
+description: Same-session ConsensusBus binding for one Yaoyorozu convocation, worker dispatch plan, and dispatch receipt.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_id
+  - bound_at
+  - binding_digest
+  - binding_profile
+  - convocation_session_ref
+  - convocation_session_digest
+  - dispatch_plan_ref
+  - dispatch_plan_digest
+  - dispatch_receipt_ref
+  - dispatch_receipt_digest
+  - consensus_session_id
+  - transport_profile
+  - dispatch_claim_ids
+  - messages
+  - blocked_direct_attempt
+  - audit_summary
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_consensus_dispatch_binding
+  schema_version:
+    const: 1.0.0
+  binding_id:
+    type: string
+    pattern: "^yaoyorozu-consensus-[a-f0-9]{12}$"
+  bound_at:
+    type: string
+    format: date-time
+  binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  binding_profile:
+    const: repo-local-yaoyorozu-consensus-bus-binding-v1
+  convocation_session_ref:
+    type: string
+    pattern: "^convocation://"
+  convocation_session_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://"
+  dispatch_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_receipt_ref:
+    type: string
+    pattern: "^dispatch-receipt://"
+  dispatch_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  consensus_session_id:
+    type: string
+    pattern: "^council-convocation-[a-f0-9]{12}$"
+  transport_profile:
+    const: consensus-bus-only
+  dispatch_claim_ids:
+    type: array
+    minItems: 6
+    items:
+      type: string
+      minLength: 1
+  messages:
+    type: array
+    minItems: 6
+    items:
+      $ref: ./consensus_message.schema
+  blocked_direct_attempt:
+    type: object
+    additionalProperties: false
+    required:
+      - attempt_id
+      - session_id
+      - sender_role
+      - recipient
+      - attempted_intent
+      - status
+      - enforced_policy
+      - reason
+      - blocked_at
+    properties:
+      attempt_id:
+        type: string
+        pattern: "^consensus-block-[a-f0-9]{12}$"
+      session_id:
+        type: string
+        pattern: "^council-convocation-[a-f0-9]{12}$"
+      sender_role:
+        type: string
+        minLength: 1
+      recipient:
+        type: string
+        minLength: 1
+      attempted_intent:
+        type: string
+        minLength: 1
+      status:
+        const: blocked
+      enforced_policy:
+        const: consensus-bus-only
+      reason:
+        type: string
+        minLength: 1
+      blocked_at:
+        type: string
+        format: date-time
+  audit_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - session_id
+      - message_count
+      - blocked_direct_attempts
+      - sender_roles
+      - delivery_scopes
+      - transport_profiles
+      - all_transport_bus_only
+      - guardian_gate_present
+      - resolve_present
+      - phase_sequence
+      - ordered_phases
+      - first_phase
+      - last_phase
+      - related_claim_ids
+      - message_refs
+    properties:
+      session_id:
+        type: string
+        pattern: "^council-convocation-[a-f0-9]{12}$"
+      message_count:
+        type: integer
+        minimum: 6
+      blocked_direct_attempts:
+        const: 1
+      sender_roles:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          minLength: 1
+      delivery_scopes:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          enum:
+            - council
+            - agent
+            - broadcast
+      transport_profiles:
+        type: array
+        items:
+          type: string
+          const: consensus-bus-only
+      all_transport_bus_only:
+        const: true
+      guardian_gate_present:
+        const: true
+      resolve_present:
+        const: true
+      phase_sequence:
+        type: array
+        minItems: 6
+        items:
+          type: string
+          enum:
+            - brief
+            - opening
+            - rebuttal
+            - amendment
+            - decision
+            - gate
+            - resolve
+      ordered_phases:
+        const: true
+      first_phase:
+        const: brief
+      last_phase:
+        const: resolve
+      related_claim_ids:
+        type: array
+        minItems: 6
+        items:
+          type: string
+          minLength: 1
+      message_refs:
+        type: array
+        minItems: 6
+        items:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - same_session_bound
+      - dispatch_plan_bound
+      - dispatch_receipt_coverage_complete
+      - all_transport_bus_only
+      - ordered_phases
+      - dispatch_claims_tracked
+      - worker_reports_routed
+      - guardian_gate_present
+      - resolve_present
+      - direct_handoff_blocked
+      - ok
+    properties:
+      same_session_bound:
+        const: true
+      dispatch_plan_bound:
+        const: true
+      dispatch_receipt_coverage_complete:
+        const: true
+      all_transport_bus_only:
+        const: true
+      ordered_phases:
+        const: true
+      dispatch_claims_tracked:
+        const: true
+      worker_reports_routed:
+        const: true
+      guardian_gate_present:
+        const: true
+      resolve_present:
+        const: true
+      direct_handoff_blocked:
+        const: true
+      ok:
+        const: true
+examples:
+  - kind: yaoyorozu_consensus_dispatch_binding
+    schema_version: 1.0.0
+    binding_id: yaoyorozu-consensus-0123456789ab
+    bound_at: "2026-04-23T08:10:00Z"
+    binding_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    binding_profile: repo-local-yaoyorozu-consensus-bus-binding-v1
+    convocation_session_ref: convocation://council-convocation-0123456789ab
+    convocation_session_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+    dispatch_plan_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_receipt_ref: dispatch-receipt://yaoyorozu-dispatch-receipt-0123456789ab
+    dispatch_receipt_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    consensus_session_id: council-convocation-0123456789ab
+    transport_profile: consensus-bus-only
+    dispatch_claim_ids:
+      - yaoyorozu-dispatch-0123456789ab
+      - yaoyorozu-dispatch-receipt-0123456789ab
+      - worker-dispatch-000000000001
+      - worker-dispatch-000000000002
+      - worker-dispatch-000000000003
+      - worker-dispatch-000000000004
+    messages:
+      - message_id: consensus-msg-000000000001
+        session_id: council-convocation-0123456789ab
+        sender_role: Council
+        recipient: broadcast
+        delivery_scope: broadcast
+        intent: dispatch
+        phase: brief
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+        related_claim_ids:
+          - yaoyorozu-dispatch-0123456789ab
+          - worker-dispatch-000000000001
+        emitted_at: "2026-04-23T08:10:05Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000001
+        message_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - message_id: consensus-msg-000000000002
+        session_id: council-convocation-0123456789ab
+        sender_role: codex-builder
+        recipient: council
+        delivery_scope: council
+        intent: report
+        phase: opening
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_unit_ref: worker-dispatch-000000000001
+        related_claim_ids:
+          - worker-dispatch-000000000001
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:10Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000002
+        message_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      - message_id: consensus-msg-000000000003
+        session_id: council-convocation-0123456789ab
+        sender_role: schema-builder
+        recipient: council
+        delivery_scope: council
+        intent: report
+        phase: opening
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_unit_ref: worker-dispatch-000000000002
+        related_claim_ids:
+          - worker-dispatch-000000000002
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:11Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000003
+        message_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      - message_id: consensus-msg-000000000004
+        session_id: council-convocation-0123456789ab
+        sender_role: eval-builder
+        recipient: council
+        delivery_scope: council
+        intent: report
+        phase: opening
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_unit_ref: worker-dispatch-000000000003
+        related_claim_ids:
+          - worker-dispatch-000000000003
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:12Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000004
+        message_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+      - message_id: consensus-msg-000000000005
+        session_id: council-convocation-0123456789ab
+        sender_role: doc-sync-builder
+        recipient: council
+        delivery_scope: council
+        intent: report
+        phase: opening
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_unit_ref: worker-dispatch-000000000004
+        related_claim_ids:
+          - worker-dispatch-000000000004
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:13Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000005
+        message_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      - message_id: consensus-msg-000000000006
+        session_id: council-convocation-0123456789ab
+        sender_role: integrity-guardian
+        recipient: council
+        delivery_scope: council
+        intent: gate
+        phase: gate
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_receipt_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        related_claim_ids:
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:14Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000006
+        message_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+      - message_id: consensus-msg-000000000007
+        session_id: council-convocation-0123456789ab
+        sender_role: Council
+        recipient: broadcast
+        delivery_scope: broadcast
+        intent: resolve
+        phase: resolve
+        transport_profile: consensus-bus-only
+        payload:
+          dispatch_receipt_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        related_claim_ids:
+          - yaoyorozu-dispatch-0123456789ab
+          - yaoyorozu-dispatch-receipt-0123456789ab
+        emitted_at: "2026-04-23T08:10:15Z"
+        signature_ref: sig://consensus-bus/consensus-msg-000000000007
+        message_digest: 9999999999999999999999999999999999999999999999999999999999999999
+    blocked_direct_attempt:
+      attempt_id: consensus-block-0123456789ab
+      session_id: council-convocation-0123456789ab
+      sender_role: codex-builder
+      recipient: agent://schema-builder
+      attempted_intent: report
+      status: blocked
+      enforced_policy: consensus-bus-only
+      reason: direct builder-to-builder handoff is forbidden
+      blocked_at: "2026-04-23T08:11:00Z"
+    audit_summary:
+      session_id: council-convocation-0123456789ab
+      message_count: 7
+      blocked_direct_attempts: 1
+      sender_roles: [Council, codex-builder, doc-sync-builder, eval-builder, integrity-guardian, schema-builder]
+      delivery_scopes: [broadcast, council]
+      transport_profiles: [consensus-bus-only]
+      all_transport_bus_only: true
+      guardian_gate_present: true
+      resolve_present: true
+      phase_sequence: [brief, opening, opening, opening, opening, gate, resolve]
+      ordered_phases: true
+      first_phase: brief
+      last_phase: resolve
+      related_claim_ids:
+        - yaoyorozu-dispatch-0123456789ab
+        - yaoyorozu-dispatch-receipt-0123456789ab
+        - worker-dispatch-000000000001
+        - worker-dispatch-000000000002
+        - worker-dispatch-000000000003
+        - worker-dispatch-000000000004
+      message_refs:
+        - 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - 1111111111111111111111111111111111111111111111111111111111111111
+        - 2222222222222222222222222222222222222222222222222222222222222222
+        - 3333333333333333333333333333333333333333333333333333333333333333
+        - 4444444444444444444444444444444444444444444444444444444444444444
+        - 5555555555555555555555555555555555555555555555555555555555555555
+        - 6666666666666666666666666666666666666666666666666666666666666666
+    validation:
+      same_session_bound: true
+      dispatch_plan_bound: true
+      dispatch_receipt_coverage_complete: true
+      all_transport_bus_only: true
+      ordered_phases: true
+      dispatch_claims_tracked: true
+      worker_reports_routed: true
+      guardian_gate_present: true
+      resolve_present: true
+      direct_handoff_blocked: true
+      ok: true

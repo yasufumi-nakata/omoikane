@@ -1515,10 +1515,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["dispatch_plan"]["validation"]["ok"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["ok"])
+        self.assertTrue(result["consensus_dispatch"]["validation"]["ok"])
         self.assertEqual(4, result["validation"]["dispatch_unit_count"])
         self.assertEqual(4, result["validation"]["dispatch_success_count"])
+        self.assertEqual(7, result["validation"]["consensus_message_count"])
+        self.assertTrue(result["validation"]["consensus_dispatch_ok"])
+        self.assertTrue(result["validation"]["consensus_direct_handoff_blocked"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["successful_process_count"])
+        self.assertEqual(
+            "consensus-bus-only",
+            result["consensus_dispatch"]["transport_profile"],
+        )
+        self.assertEqual(
+            result["convocation"]["session_id"],
+            result["consensus_dispatch"]["consensus_session_id"],
+        )
+        self.assertEqual(
+            1,
+            result["consensus_dispatch"]["audit_summary"]["blocked_direct_attempts"],
+        )
         self.assertTrue(
             all(
                 process["report"]["workspace_scope"] == "repo-local"

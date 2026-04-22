@@ -3458,6 +3458,97 @@ json.dump(response, sys.stdout)
         dispatch_receipt_validation = self.yaoyorozu.validate_worker_dispatch_receipt(
             dispatch_receipt
         )
+        session_id = convocation["session_id"]
+        dispatch_plan_ref = f"dispatch://{dispatch_plan['dispatch_id']}"
+        dispatch_receipt_ref = f"dispatch-receipt://{dispatch_receipt['receipt_id']}"
+        brief = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="dispatch",
+            phase="brief",
+            payload={
+                "convocation_session_ref": f"convocation://{convocation['session_id']}",
+                "dispatch_plan_ref": dispatch_plan_ref,
+                "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+                "coverage_areas": dispatch_plan["selection_summary"]["unique_coverage_areas"],
+            },
+            related_claim_ids=[
+                dispatch_plan["dispatch_id"],
+                *[unit["unit_id"] for unit in dispatch_plan["dispatch_units"]],
+            ],
+        )
+        worker_reports = []
+        for result in dispatch_receipt["results"]:
+            worker_reports.append(
+                self.consensus_bus.publish(
+                    session_id=session_id,
+                    sender_role=result["selected_agent_id"],
+                    recipient="council",
+                    intent="report",
+                    phase="opening",
+                    payload={
+                        "dispatch_unit_ref": result["unit_id"],
+                        "dispatch_receipt_ref": dispatch_receipt_ref,
+                        "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+                        "coverage_area": result["coverage_area"],
+                        "status": result["reported_status"],
+                        "report_digest": result["report_digest"],
+                    },
+                    related_claim_ids=[result["unit_id"], dispatch_receipt["receipt_id"]],
+                )
+            )
+        blocked_direct_attempt = self.consensus_bus.reject_direct_message(
+            session_id=session_id,
+            sender_role=dispatch_receipt["results"][0]["selected_agent_id"],
+            recipient=f"agent://{dispatch_receipt['results'][1]['selected_agent_id']}",
+            attempted_intent="report",
+            reason="direct builder-to-builder handoff is forbidden; Council-routed ConsensusBus delivery is required",
+        )
+        guardian_gate = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="integrity-guardian",
+            recipient="council",
+            intent="gate",
+            phase="gate",
+            payload={
+                "dispatch_receipt_ref": dispatch_receipt_ref,
+                "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+                "successful_process_count": dispatch_receipt["execution_summary"][
+                    "successful_process_count"
+                ],
+                "coverage_complete": dispatch_receipt_validation["coverage_complete"],
+            },
+            related_claim_ids=[dispatch_receipt["receipt_id"]],
+            ethics_check_id="ethics://yaoyorozu-demo/worker-dispatch-gate",
+        )
+        resolution = self.consensus_bus.publish(
+            session_id=session_id,
+            sender_role="Council",
+            recipient="broadcast",
+            intent="resolve",
+            phase="resolve",
+            payload={
+                "dispatch_receipt_ref": dispatch_receipt_ref,
+                "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+                "status": "ready-for-builder-apply-review",
+                "coverage_areas": dispatch_receipt["execution_summary"]["coverage_areas"],
+            },
+            related_claim_ids=[dispatch_plan["dispatch_id"], dispatch_receipt["receipt_id"]],
+        )
+        consensus_messages = [brief, *worker_reports, guardian_gate, resolution]
+        consensus_audit = self.consensus_bus.audit_session(session_id)
+        consensus_dispatch = self.yaoyorozu.bind_consensus_dispatch(
+            convocation_session=convocation,
+            dispatch_plan=dispatch_plan,
+            dispatch_receipt=dispatch_receipt,
+            messages=consensus_messages,
+            blocked_direct_attempt=blocked_direct_attempt,
+            audit_summary=consensus_audit,
+        )
+        consensus_dispatch_validation = self.yaoyorozu.validate_consensus_dispatch_binding(
+            consensus_dispatch
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="yaoyorozu.registry.synced",
@@ -3494,6 +3585,34 @@ json.dump(response, sys.stdout)
             layer="L4",
             substrate="classical-silicon",
         )
+        for message in consensus_messages:
+            self.ledger.append(
+                identity_id=identity.identity_id,
+                event_type="yaoyorozu.consensus.emitted",
+                payload=message,
+                actor=message["sender_role"],
+                category="yaoyorozu",
+                layer="L4",
+                substrate="classical-silicon",
+            )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.consensus.direct_blocked",
+            payload=blocked_direct_attempt,
+            actor="ConsensusBus",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.consensus.bound",
+            payload=consensus_dispatch,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
         ledger_verification = self.ledger.verify()
 
         return {
@@ -3506,6 +3625,7 @@ json.dump(response, sys.stdout)
             "convocation": convocation,
             "dispatch_plan": dispatch_plan,
             "dispatch_receipt": dispatch_receipt,
+            "consensus_dispatch": consensus_dispatch,
             "validation": {
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
@@ -3527,10 +3647,19 @@ json.dump(response, sys.stdout)
                 "worker_dispatch_coverage_complete": dispatch_receipt_validation[
                     "coverage_complete"
                 ],
+                "consensus_dispatch_ok": consensus_dispatch_validation["ok"],
+                "consensus_message_count": consensus_dispatch_validation["message_count"],
+                "consensus_related_claim_count": consensus_dispatch_validation[
+                    "tracked_claim_count"
+                ],
+                "consensus_direct_handoff_blocked": consensus_dispatch["validation"][
+                    "direct_handoff_blocked"
+                ],
                 "ok": (
                     convocation["validation"]["ok"]
                     and dispatch_plan_validation["ok"]
                     and dispatch_receipt_validation["ok"]
+                    and consensus_dispatch_validation["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },

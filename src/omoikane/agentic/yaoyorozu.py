@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
+from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
 from .trust import TrustService
 
 
 YAOYOROZU_WORKER_DISPATCH_PROFILE = "repo-local-subprocess-worker-dispatch-v1"
 YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
+YAOYOROZU_CONSENSUS_BINDING_PROFILE = "repo-local-yaoyorozu-consensus-bus-binding-v1"
 YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
@@ -168,6 +170,26 @@ def _dispatch_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, An
         "results": receipt["results"],
         "execution_summary": receipt["execution_summary"],
         "validation": receipt["validation"],
+    }
+
+
+def _consensus_dispatch_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": binding["schema_version"],
+        "binding_profile": binding["binding_profile"],
+        "convocation_session_ref": binding["convocation_session_ref"],
+        "convocation_session_digest": binding["convocation_session_digest"],
+        "dispatch_plan_ref": binding["dispatch_plan_ref"],
+        "dispatch_plan_digest": binding["dispatch_plan_digest"],
+        "dispatch_receipt_ref": binding["dispatch_receipt_ref"],
+        "dispatch_receipt_digest": binding["dispatch_receipt_digest"],
+        "consensus_session_id": binding["consensus_session_id"],
+        "transport_profile": binding["transport_profile"],
+        "dispatch_claim_ids": binding["dispatch_claim_ids"],
+        "messages": binding["messages"],
+        "blocked_direct_attempt": binding["blocked_direct_attempt"],
+        "audit_summary": binding["audit_summary"],
+        "validation": binding["validation"],
     }
 
 
@@ -870,6 +892,211 @@ class YaoyorozuRegistryService:
             ),
             "coverage_complete": not missing_coverage,
             "missing_coverage": missing_coverage,
+            "errors": errors,
+        }
+
+    def bind_consensus_dispatch(
+        self,
+        *,
+        convocation_session: Mapping[str, Any],
+        dispatch_plan: Mapping[str, Any],
+        dispatch_receipt: Mapping[str, Any],
+        messages: Sequence[Mapping[str, Any]],
+        blocked_direct_attempt: Mapping[str, Any],
+        audit_summary: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if convocation_session.get("kind") != "council_convocation_session":
+            raise ValueError("convocation_session.kind must equal council_convocation_session")
+        if dispatch_plan.get("kind") != "yaoyorozu_worker_dispatch_plan":
+            raise ValueError("dispatch_plan.kind must equal yaoyorozu_worker_dispatch_plan")
+        if dispatch_receipt.get("kind") != "yaoyorozu_worker_dispatch_receipt":
+            raise ValueError("dispatch_receipt.kind must equal yaoyorozu_worker_dispatch_receipt")
+        if not isinstance(messages, Sequence) or not messages:
+            raise ValueError("messages must be a non-empty sequence")
+
+        session_id = _non_empty_string(convocation_session.get("session_id"), "convocation_session.session_id")
+        convocation_session_ref = f"convocation://{session_id}"
+        if dispatch_plan.get("convocation_session_ref") != convocation_session_ref:
+            raise ValueError("dispatch plan must remain bound to the same convocation session")
+
+        dispatch_plan_ref = f"dispatch://{dispatch_plan['dispatch_id']}"
+        if dispatch_receipt.get("dispatch_plan_ref") != dispatch_plan_ref:
+            raise ValueError("dispatch receipt must remain bound to the same dispatch plan")
+        if dispatch_receipt.get("dispatch_plan_digest") != dispatch_plan.get("dispatch_digest"):
+            raise ValueError("dispatch receipt digest binding must match dispatch plan digest")
+
+        normalized_messages = [dict(message) for message in messages]
+        report_message_count = sum(
+            1
+            for message in normalized_messages
+            if message.get("intent") == "report" and message.get("phase") == "opening"
+        )
+        same_session_bound = (
+            all(message.get("session_id") == session_id for message in normalized_messages)
+            and blocked_direct_attempt.get("session_id") == session_id
+            and audit_summary.get("session_id") == session_id
+        )
+        expected_claim_ids = [
+            str(dispatch_plan["dispatch_id"]),
+            str(dispatch_receipt["receipt_id"]),
+            *[
+                str(unit["unit_id"])
+                for unit in dispatch_plan.get("dispatch_units", [])
+                if isinstance(unit, Mapping) and unit.get("unit_id")
+            ],
+        ]
+        audit_claim_ids = {
+            str(claim_id)
+            for claim_id in audit_summary.get("related_claim_ids", [])
+            if isinstance(claim_id, str)
+        }
+        gate_payload_bound = any(
+            message.get("phase") == "gate"
+            and isinstance(message.get("payload"), Mapping)
+            and message["payload"].get("dispatch_receipt_digest") == dispatch_receipt.get("receipt_digest")
+            for message in normalized_messages
+        )
+        resolve_payload_bound = any(
+            message.get("phase") == "resolve"
+            and isinstance(message.get("payload"), Mapping)
+            and message["payload"].get("dispatch_receipt_digest") == dispatch_receipt.get("receipt_digest")
+            for message in normalized_messages
+        )
+        validation = {
+            "same_session_bound": same_session_bound,
+            "dispatch_plan_bound": dispatch_receipt.get("dispatch_plan_ref") == dispatch_plan_ref,
+            "dispatch_receipt_coverage_complete": bool(
+                dispatch_receipt.get("validation", {}).get("coverage_complete")
+            ),
+            "all_transport_bus_only": all(
+                message.get("transport_profile") == CONSENSUS_BUS_TRANSPORT_PROFILE
+                for message in normalized_messages
+            )
+            and audit_summary.get("all_transport_bus_only") is True,
+            "ordered_phases": bool(audit_summary.get("ordered_phases")),
+            "dispatch_claims_tracked": set(expected_claim_ids).issubset(audit_claim_ids),
+            "worker_reports_routed": report_message_count
+            == len(dispatch_receipt.get("results", [])),
+            "guardian_gate_present": bool(audit_summary.get("guardian_gate_present")) and gate_payload_bound,
+            "resolve_present": bool(audit_summary.get("resolve_present")) and resolve_payload_bound,
+            "direct_handoff_blocked": (
+                blocked_direct_attempt.get("status") == "blocked"
+                and blocked_direct_attempt.get("enforced_policy")
+                == CONSENSUS_BUS_TRANSPORT_PROFILE
+                and audit_summary.get("blocked_direct_attempts") == 1
+            ),
+        }
+        validation["ok"] = all(validation.values())
+        binding = {
+            "kind": "yaoyorozu_consensus_dispatch_binding",
+            "schema_version": "1.0.0",
+            "binding_id": new_id("yaoyorozu-consensus"),
+            "bound_at": utc_now_iso(),
+            "binding_profile": YAOYOROZU_CONSENSUS_BINDING_PROFILE,
+            "convocation_session_ref": convocation_session_ref,
+            "convocation_session_digest": convocation_session["session_digest"],
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+            "dispatch_receipt_ref": f"dispatch-receipt://{dispatch_receipt['receipt_id']}",
+            "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+            "consensus_session_id": session_id,
+            "transport_profile": CONSENSUS_BUS_TRANSPORT_PROFILE,
+            "dispatch_claim_ids": expected_claim_ids,
+            "messages": normalized_messages,
+            "blocked_direct_attempt": dict(blocked_direct_attempt),
+            "audit_summary": dict(audit_summary),
+            "validation": validation,
+        }
+        binding["binding_digest"] = sha256_text(
+            canonical_json(_consensus_dispatch_binding_digest_payload(binding))
+        )
+        return binding
+
+    def validate_consensus_dispatch_binding(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        messages = binding.get("messages", [])
+        audit_summary = binding.get("audit_summary", {})
+        blocked_direct_attempt = binding.get("blocked_direct_attempt", {})
+        session_id = binding.get("consensus_session_id")
+        if binding.get("kind") != "yaoyorozu_consensus_dispatch_binding":
+            errors.append("kind must equal yaoyorozu_consensus_dispatch_binding")
+        if binding.get("binding_profile") != YAOYOROZU_CONSENSUS_BINDING_PROFILE:
+            errors.append("binding_profile mismatch")
+        if binding.get("transport_profile") != CONSENSUS_BUS_TRANSPORT_PROFILE:
+            errors.append("transport_profile mismatch")
+        if not isinstance(messages, list) or not messages:
+            errors.append("messages must be a non-empty list")
+            messages = []
+        if not isinstance(audit_summary, Mapping):
+            errors.append("audit_summary must be a mapping")
+            audit_summary = {}
+        if not isinstance(blocked_direct_attempt, Mapping):
+            errors.append("blocked_direct_attempt must be a mapping")
+            blocked_direct_attempt = {}
+        if not isinstance(session_id, str) or not session_id.strip():
+            errors.append("consensus_session_id must be a non-empty string")
+
+        tracked_claim_ids = {
+            str(claim_id)
+            for claim_id in audit_summary.get("related_claim_ids", [])
+            if isinstance(claim_id, str)
+        }
+        expected_claim_ids = {
+            str(claim_id)
+            for claim_id in binding.get("dispatch_claim_ids", [])
+            if isinstance(claim_id, str)
+        }
+        report_message_count = 0
+        previous_phase_order = -1
+        for message in messages:
+            if not isinstance(message, Mapping):
+                errors.append("messages entries must be mappings")
+                continue
+            if message.get("session_id") != session_id:
+                errors.append("every bus message must reuse the same convocation session_id")
+            if message.get("transport_profile") != CONSENSUS_BUS_TRANSPORT_PROFILE:
+                errors.append("every bus message must remain consensus-bus-only")
+            phase = str(message.get("phase", ""))
+            if phase not in CONSENSUS_BUS_PHASE_ORDER:
+                errors.append("bus message phase is invalid")
+                continue
+            current_phase_order = CONSENSUS_BUS_PHASE_ORDER[phase]
+            if current_phase_order < previous_phase_order:
+                errors.append("bus message phases must remain ordered")
+            previous_phase_order = current_phase_order
+            if message.get("intent") == "report" and phase == "opening":
+                report_message_count += 1
+
+        if blocked_direct_attempt.get("session_id") != session_id:
+            errors.append("blocked direct attempt must reuse the same session_id")
+        if blocked_direct_attempt.get("status") != "blocked":
+            errors.append("blocked direct attempt status must equal blocked")
+        if blocked_direct_attempt.get("enforced_policy") != CONSENSUS_BUS_TRANSPORT_PROFILE:
+            errors.append("blocked direct attempt must enforce consensus-bus-only")
+        if audit_summary.get("session_id") != session_id:
+            errors.append("audit summary must reuse the same session_id")
+        if audit_summary.get("all_transport_bus_only") is not True:
+            errors.append("audit summary must report all_transport_bus_only")
+        if audit_summary.get("guardian_gate_present") is not True:
+            errors.append("audit summary must report guardian_gate_present")
+        if audit_summary.get("resolve_present") is not True:
+            errors.append("audit summary must report resolve_present")
+        if audit_summary.get("ordered_phases") is not True:
+            errors.append("audit summary must report ordered phases")
+        if audit_summary.get("blocked_direct_attempts") != 1:
+            errors.append("audit summary must report exactly one blocked direct attempt")
+        if not expected_claim_ids.issubset(tracked_claim_ids):
+            errors.append("audit summary must track dispatch claim ids")
+
+        return {
+            "ok": not errors,
+            "message_count": len(messages),
+            "tracked_claim_count": len(tracked_claim_ids),
+            "report_message_count": report_message_count,
+            "blocked_direct_attempts": audit_summary.get("blocked_direct_attempts", 0),
             "errors": errors,
         }
 

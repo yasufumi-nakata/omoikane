@@ -5,6 +5,8 @@ description: Message envelope emitted on the ConsensusBus.
 type: object
 additionalProperties: false
 required:
+  - kind
+  - schema_version
   - message_id
   - session_id
   - sender_role
@@ -17,6 +19,10 @@ required:
   - emitted_at
   - message_digest
 properties:
+  kind:
+    const: consensus_message
+  schema_version:
+    const: 1.0.0
   message_id:
     type: string
     minLength: 8
@@ -68,6 +74,11 @@ properties:
     items:
       type: string
       minLength: 1
+  ethics_check_id:
+    type:
+      - string
+      - "null"
+    minLength: 1
   emitted_at:
     type: string
     format: date-time

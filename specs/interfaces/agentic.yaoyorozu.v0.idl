@@ -2,12 +2,14 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded Council convocation and local worker dispatch planning.
+summary: Repo-local agent registry sync plus bounded Council convocation, same-session ConsensusBus handoff binding, and local worker dispatch planning.
 imports:
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
   yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
+  yaoyorozu_consensus_dispatch_binding: ../schemas/yaoyorozu_consensus_dispatch_binding.schema
+  consensus_message: ../schemas/consensus_message.schema
 operations:
   sync_registry:
     summary: Materialize one trust-bound registry snapshot from repo-local agents/ definitions.
@@ -88,9 +90,89 @@ operations:
       - every launched worker must echo a ready report bound to the same command_digest
       - worker execution must stay inside the repo-local workspace and inherit the dispatch profile
       - only zero-exit, ready-reported workers count toward completed dispatch coverage
+  bind_consensus_dispatch:
+    summary: >
+      Bind one convocation, worker dispatch plan, and worker dispatch receipt to the same
+      ConsensusBus session with builder reports, guardian gate, and blocked direct handoff evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - convocation_session
+          - dispatch_plan
+          - dispatch_receipt
+          - messages
+          - blocked_direct_attempt
+          - audit_summary
+        properties:
+          convocation_session:
+            schema_ref: council_convocation_session
+          dispatch_plan:
+            schema_ref: yaoyorozu_worker_dispatch_plan
+          dispatch_receipt:
+            schema_ref: yaoyorozu_worker_dispatch_receipt
+          messages:
+            type: array
+            items:
+              schema_ref: consensus_message
+          blocked_direct_attempt:
+            type: object
+            required:
+              - session_id
+              - status
+              - enforced_policy
+            properties:
+              session_id:
+                type: string
+              status:
+                type: string
+                const: blocked
+              enforced_policy:
+                type: string
+                const: consensus-bus-only
+          audit_summary:
+            type: object
+            required:
+              - session_id
+              - blocked_direct_attempts
+              - all_transport_bus_only
+              - guardian_gate_present
+              - resolve_present
+              - ordered_phases
+              - related_claim_ids
+            properties:
+              session_id:
+                type: string
+              blocked_direct_attempts:
+                type: integer
+                const: 1
+              all_transport_bus_only:
+                type: boolean
+                const: true
+              guardian_gate_present:
+                type: boolean
+                const: true
+              resolve_present:
+                type: boolean
+                const: true
+              ordered_phases:
+                type: boolean
+                const: true
+              related_claim_ids:
+                type: array
+                items:
+                  type: string
+    output:
+      schema_ref: yaoyorozu_consensus_dispatch_binding
+    guarantees:
+      - every bus message must reuse the convocation session_id and remain consensus-bus-only
+      - dispatch plan, dispatch receipt, and every worker unit claim must be tracked by the audit summary
+      - guardian gate and final resolve must bind the same dispatch_receipt_digest before the handoff is considered complete
+      - direct builder-to-builder handoff attempts must be recorded as blocked and never silently bypass the bus
 compatibility:
   stability: bootstrap
   notes:
     - The reference runtime currently fixes proposal_profile to self-modify-patch-v1.
     - Cross-workspace worker discovery remains outside this repo.
+    - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

@@ -1792,6 +1792,16 @@ entries:
       - reference-runtime
     rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_consensus_dispatch_binding.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind one Yaoyorozu convocation, builder dispatch receipt, guardian gate, and blocked direct handoff evidence to the same ConsensusBus session.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
     consumers:
@@ -1800,7 +1810,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, bounded Council convocation, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, bounded Council convocation, same-session ConsensusBus handoff binding, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_council_convocation.yaml
@@ -1815,6 +1825,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects repo-local subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_consensus_dispatch.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects same-session ConsensusBus dispatch binding, direct handoff blocking, and guardian-gated resolution for Yaoyorozu worker execution.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

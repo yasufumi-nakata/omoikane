@@ -51,6 +51,9 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 により、この roster が trust-bound registry snapshot と
 `Self-Modify Patch` 向け Council / builder handoff plan に materialize され、
 selected builder 群が repo-local worker dispatch receipt として実行される。
+そのうえで同じ Council session 上の `ConsensusBus` transcript が
+blocked direct builder handoff と guardian-gated resolve を伴う
+`yaoyorozu_consensus_dispatch_binding` として束縛される。
 
 ## 並列召喚
 

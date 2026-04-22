@@ -1,0 +1,17 @@
+eval_id: yaoyorozu_consensus_dispatch
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu builder handoff must remain bound to one ConsensusBus session with worker reports, guardian gate, and blocked direct builder handoff evidence.
+inputs:
+  - proposal_profile: self-modify-patch-v1
+  - transport_profile: consensus-bus-only
+  - blocked_direct_attempts: 1
+  - required_claim_count: 6
+expected:
+  consensus_dispatch_ok: true
+  consensus_message_count: 7
+  consensus_direct_handoff_blocked: true
+  worker_dispatch_coverage_complete: true
+metric: equality
+threshold: 1.0
+ethics_check: true

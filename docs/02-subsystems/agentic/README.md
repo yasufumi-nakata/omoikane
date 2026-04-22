@@ -22,7 +22,9 @@
 - reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持ち、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が repo-local `agents/` から trust-bound registry snapshot と
   Council convocation / builder handoff plan を materialize し、
-  selected builder handoff を repo-local subprocess worker dispatch receipt まで実行する
+  selected builder handoff を repo-local subprocess worker dispatch receipt まで実行しつつ、
+  同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
+  `yaoyorozu_consensus_dispatch_binding` として束縛する
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

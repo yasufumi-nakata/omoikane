@@ -88,5 +88,6 @@ actual subprocess worker receipt として machine-checkable に実行される�
 - `multi_council_externalization.yaml`
 - `task_graph_complexity_guard.yaml`
 - `trust_score_update_guard.yaml`
+- `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`

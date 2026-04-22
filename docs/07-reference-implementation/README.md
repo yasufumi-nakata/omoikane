@@ -282,6 +282,9 @@ runtime / schema / eval / docs を覆う builder handoff coverage、
 さらにそれを repo-local subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されることを確認する。
+さらに同じ session 上で `ConsensusBus` が builder report / guardian gate /
+final resolve を監査し、blocked direct handoff と worker claim chain を
+`yaoyorozu_consensus_dispatch_binding` として束縛することを確認する。
 
 `oversight-demo` は L4 Guardian human oversight channel を JSON で可視化し、
 registered reviewer の `proof_ref` / `legal_ack_ref` / liability scope に加えて、

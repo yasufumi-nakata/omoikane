@@ -77,3 +77,7 @@ repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
 および runtime / schema / eval / docs の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
+同じ demo は builder report / guardian gate / final resolve を
+`ConsensusBus` transcript として監査し、
+blocked direct builder handoff と worker claim chain を
+`yaoyorozu_consensus_dispatch_binding` へ束縛する。
