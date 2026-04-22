@@ -24,7 +24,7 @@ L1 Kernel のサブモジュール。**本人の終了権の即時実行口**。
 ## API
 
 ```
-termination.request(identity_id, by_self_proof, reason?) → TerminationOutcome
+termination.request(identity_id, by_self_proof, reason?, scheduler_handle_ref?, active_allocation_id?) → TerminationOutcome
 termination.observe(identity_id) → TerminationStatus | NoTermination
 ```
 
@@ -34,10 +34,15 @@ termination.observe(identity_id) → TerminationStatus | NoTermination
 termination_outcome:
   identity_id: <id>
   recorded_at: <iso8601>
-  status: completed | rejected
+  status: completed | cool-off-pending | rejected
   reject_reason: invalid-self-proof | identity-not-found | ""
+  scheduler_handle_ref: <optional schedule handle id>
   ledger_event_ref: <continuity entry>
   scheduler_handle_cancelled: <bool>
+  scheduler_cancellation:
+    handle_id: <schedule handle id or "">
+    result: not-requested | deferred | cancelled | scheduler-unavailable | handle-not-found | cancel-error
+    execution_receipt_digest: <scheduler execution receipt digest or "">
   substrate_lease_released: <bool>
   notifications:
     - audience: ethics
@@ -65,13 +70,21 @@ termination_outcome:
 - 設定は `identity_record.termination_policy` フィールドに保持
 - delay 中も再度 `terminate` 即時実行を要求可能（撤回は本人のみ）
 - Council / Guardian は delay 期間に説得は出来るが、強制的に延長できない
+- bound `scheduler_handle_ref` があっても、`cool-off-pending` は cancel せず
+  `scheduler_cancellation.result=deferred` として残す
 
 ## reference runtime の扱い
 
 - `kernel.termination.v0.idl` に `request / observe` の 2 op
-- `termination_request.schema` / `termination_outcome.schema` を導入
-- `termination-demo` を CLI に追加し、即時実行・冷却期間・reject path をカバー
+- `termination_request.schema` / `termination_outcome.schema` は
+  optional `scheduler_handle_ref` / `active_allocation_id` と
+  `scheduler_cancellation` receipt summary を含む
+- `termination-demo` は実際の Method A handle を bound し、
+  即時実行では cancel receipt digest まで、
+  冷却期間・reject path では non-cancel を machine-checkable に示す
 - 既存 `evals/performance/termination_latency.yaml` を `termination-gate.md` 参照に更新
+- `evals/continuity/termination_scheduler_cancellation.yaml` で
+  bound scheduler handle の cancel binding を continuity eval として保護する
 
 ## 思兼神メタファー
 

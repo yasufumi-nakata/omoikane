@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/termination_request.schema"
 title: TerminationRequest
-description: Self-issued termination invocation against the TerminationGate.
+description: Self-issued termination invocation against the TerminationGate, optionally bound to one active scheduler handle and substrate lease.
 type: object
 additionalProperties: false
 required:
@@ -33,6 +33,12 @@ properties:
     format: date-time
   invoke_cool_off:
     type: boolean
+  scheduler_handle_ref:
+    type: string
+    description: Optional bound AscensionScheduler handle to cancel when termination completes immediately.
+  active_allocation_id:
+    type: string
+    description: Optional active substrate allocation to release as part of immediate termination.
 examples:
   - kind: termination_request
     schema_version: 1.0.0
@@ -42,3 +48,5 @@ examples:
     reason: self decided
     submitted_at: "2026-04-18T19:00:00Z"
     invoke_cool_off: false
+    scheduler_handle_ref: schedule-handle-001
+    active_allocation_id: allocation-001

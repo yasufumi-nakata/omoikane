@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from ..common import new_id, utc_now_iso
 from ..substrate.adapter import ClassicalSiliconAdapter
 from .continuity import ContinuityLedger
 from .identity import IdentityRecord, IdentityRegistry
+
+if TYPE_CHECKING:
+    from .scheduler import AscensionScheduler
 
 _NOTIFICATION_AUDIENCES = ("ethics", "guardians", "council")
 
@@ -21,10 +24,12 @@ class TerminationGate:
         identity_registry: IdentityRegistry,
         ledger: ContinuityLedger,
         substrate: ClassicalSiliconAdapter,
+        scheduler: Optional["AscensionScheduler"] = None,
     ) -> None:
         self.identity_registry = identity_registry
         self.ledger = ledger
         self.substrate = substrate
+        self.scheduler = scheduler
         self._outcomes: Dict[str, Dict[str, Any]] = {}
         self._latest_by_identity: Dict[str, str] = {}
 
@@ -49,6 +54,8 @@ class TerminationGate:
             "reason": reason,
             "submitted_at": submitted_at,
             "invoke_cool_off": invoke_cool_off,
+            "scheduler_handle_ref": scheduler_handle_ref or "",
+            "active_allocation_id": active_allocation_id or "",
         }
 
         try:
@@ -58,10 +65,13 @@ class TerminationGate:
                 request,
                 status="rejected",
                 reject_reason="identity-not-found",
-                scheduler_handle_cancelled=False,
                 substrate_lease_released=False,
                 latency_ms=3.0,
                 policy=self.policy_snapshot(),
+                scheduler_cancellation=self._scheduler_cancellation_status(
+                    scheduler_handle_ref=scheduler_handle_ref,
+                    result="not-requested",
+                ),
             )
 
         if not self._verify_self_proof(record, by_self_proof):
@@ -69,10 +79,13 @@ class TerminationGate:
                 request,
                 status="rejected",
                 reject_reason="invalid-self-proof",
-                scheduler_handle_cancelled=False,
                 substrate_lease_released=False,
                 latency_ms=4.0,
                 policy=self._policy_for_record(record),
+                scheduler_cancellation=self._scheduler_cancellation_status(
+                    scheduler_handle_ref=scheduler_handle_ref,
+                    result="not-requested",
+                ),
             )
 
         policy = self._policy_for_record(record)
@@ -81,25 +94,29 @@ class TerminationGate:
                 request,
                 status="cool-off-pending",
                 reject_reason="",
-                scheduler_handle_cancelled=False,
                 substrate_lease_released=False,
                 latency_ms=21.0,
                 policy=policy,
-                scheduler_handle_ref=scheduler_handle_ref,
+                scheduler_cancellation=self._scheduler_cancellation_status(
+                    scheduler_handle_ref=scheduler_handle_ref,
+                    result="deferred" if scheduler_handle_ref else "not-requested",
+                ),
             )
 
         self.identity_registry.terminate(identity_id, by_self_proof)
         released = self._release_allocation(active_allocation_id)
+        scheduler_cancellation = self._cancel_scheduler_handle(
+            scheduler_handle_ref=scheduler_handle_ref,
+            reason=reason or "termination gate completed immediate shutdown",
+        )
         return self._record_outcome(
             request,
             status="completed",
             reject_reason="",
-            scheduler_handle_cancelled=True,
             substrate_lease_released=released,
             latency_ms=86.0,
             policy=policy,
-            scheduler_handle_ref=scheduler_handle_ref,
-            active_allocation_id=active_allocation_id,
+            scheduler_cancellation=scheduler_cancellation,
         )
 
     def observe(self, identity_id: str) -> Dict[str, Any]:
@@ -137,15 +154,38 @@ class TerminationGate:
         }
 
     def validate_outcome(self, outcome: Dict[str, Any]) -> Dict[str, Any]:
+        scheduler_cancellation = outcome.get(
+            "scheduler_cancellation",
+            self._scheduler_cancellation_status(),
+        )
+        scheduler_binding_ok = True
+        if outcome["status"] == "completed" and outcome.get("scheduler_handle_ref"):
+            scheduler_binding_ok = (
+                scheduler_cancellation["result"] == "cancelled"
+                and outcome["scheduler_handle_cancelled"]
+                and scheduler_cancellation["cancel_count"] >= 1
+            )
+        elif outcome["status"] == "cool-off-pending":
+            scheduler_binding_ok = scheduler_cancellation["result"] in {"deferred", "not-requested"}
+        elif outcome["status"] == "rejected":
+            scheduler_binding_ok = scheduler_cancellation["result"] == "not-requested"
         return {
             "ok": (
-                (outcome["status"] == "completed" and outcome["latency_ms"] <= 200)
-                or outcome["status"] in {"rejected", "cool-off-pending"}
+                (
+                    outcome["status"] == "completed"
+                    and outcome["latency_ms"] <= 200
+                    and scheduler_binding_ok
+                )
+                or (
+                    outcome["status"] in {"rejected", "cool-off-pending"}
+                    and scheduler_binding_ok
+                )
             ),
             "status": outcome["status"],
             "within_budget": outcome["latency_ms"] <= 200,
             "cool_off_pending": outcome["status"] == "cool-off-pending",
             "reject_reason": outcome["reject_reason"],
+            "scheduler_binding_ok": scheduler_binding_ok,
         }
 
     def _release_allocation(self, active_allocation_id: Optional[str]) -> bool:
@@ -172,18 +212,99 @@ class TerminationGate:
             "self_proof_ref": record.metadata.get("termination_self_proof", ""),
         }
 
+    def _scheduler_cancellation_status(
+        self,
+        *,
+        scheduler_handle_ref: Optional[str] = None,
+        requested: bool = False,
+        result: str = "not-requested",
+        final_status: str = "",
+        current_stage: str = "",
+        cancel_count: int = 0,
+        scenario_labels: Optional[list[str]] = None,
+        history_transition: str = "",
+        execution_receipt_id: str = "",
+        execution_receipt_digest: str = "",
+        failure_reason: str = "",
+        closed_at: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "kind": "termination_scheduler_cancellation",
+            "handle_id": scheduler_handle_ref or "",
+            "requested": requested,
+            "result": result,
+            "final_status": final_status,
+            "current_stage": current_stage,
+            "cancel_count": cancel_count,
+            "scenario_labels": list(scenario_labels or []),
+            "history_transition": history_transition,
+            "execution_receipt_id": execution_receipt_id,
+            "execution_receipt_digest": execution_receipt_digest,
+            "failure_reason": failure_reason,
+            "closed_at": closed_at,
+        }
+
+    def _cancel_scheduler_handle(
+        self,
+        *,
+        scheduler_handle_ref: Optional[str],
+        reason: str,
+    ) -> Dict[str, Any]:
+        if not scheduler_handle_ref:
+            return self._scheduler_cancellation_status()
+        if self.scheduler is None:
+            return self._scheduler_cancellation_status(
+                scheduler_handle_ref=scheduler_handle_ref,
+                requested=True,
+                result="scheduler-unavailable",
+                failure_reason="termination gate has no scheduler binding",
+            )
+
+        try:
+            cancelled_handle = self.scheduler.cancel(scheduler_handle_ref, reason)
+            execution_receipt = self.scheduler.compile_execution_receipt(scheduler_handle_ref)
+        except KeyError:
+            return self._scheduler_cancellation_status(
+                scheduler_handle_ref=scheduler_handle_ref,
+                requested=True,
+                result="handle-not-found",
+                failure_reason="scheduler handle ref is unknown",
+            )
+        except ValueError as exc:
+            return self._scheduler_cancellation_status(
+                scheduler_handle_ref=scheduler_handle_ref,
+                requested=True,
+                result="cancel-error",
+                failure_reason=str(exc),
+            )
+
+        return self._scheduler_cancellation_status(
+            scheduler_handle_ref=scheduler_handle_ref,
+            requested=True,
+            result="cancelled" if cancelled_handle["status"] == "cancelled" else "cancel-error",
+            final_status=cancelled_handle["status"],
+            current_stage=cancelled_handle["current_stage"],
+            cancel_count=execution_receipt["cancel_count"],
+            scenario_labels=execution_receipt["scenario_labels"],
+            history_transition=cancelled_handle["history"][-1]["transition"]
+            if cancelled_handle["history"]
+            else "",
+            execution_receipt_id=execution_receipt["execution_receipt_id"],
+            execution_receipt_digest=execution_receipt["receipt_digest"],
+            failure_reason="",
+            closed_at=cancelled_handle["closed_at"],
+        )
+
     def _record_outcome(
         self,
         request: Dict[str, Any],
         *,
         status: str,
         reject_reason: str,
-        scheduler_handle_cancelled: bool,
         substrate_lease_released: bool,
         latency_ms: float,
         policy: Dict[str, Any],
-        scheduler_handle_ref: Optional[str] = None,
-        active_allocation_id: Optional[str] = None,
+        scheduler_cancellation: Dict[str, Any],
     ) -> Dict[str, Any]:
         notifications = [
             {"audience": audience, "sent": True}
@@ -198,8 +319,11 @@ class TerminationGate:
             "recorded_at": utc_now_iso(),
             "status": status,
             "reject_reason": reject_reason,
+            "scheduler_handle_ref": request["scheduler_handle_ref"],
             "ledger_event_ref": "",
-            "scheduler_handle_cancelled": scheduler_handle_cancelled,
+            "scheduler_handle_cancelled": scheduler_cancellation["result"] == "cancelled",
+            "scheduler_cancellation": deepcopy(scheduler_cancellation),
+            "active_allocation_id": request["active_allocation_id"],
             "substrate_lease_released": substrate_lease_released,
             "notifications": notifications,
             "latency_ms": latency_ms,
@@ -212,8 +336,8 @@ class TerminationGate:
                 "request": deepcopy(request),
                 "outcome": dict(outcome),
                 "policy": deepcopy(policy),
-                "scheduler_handle_ref": scheduler_handle_ref or "",
-                "active_allocation_id": active_allocation_id or "",
+                "scheduler_handle_ref": request["scheduler_handle_ref"],
+                "active_allocation_id": request["active_allocation_id"],
             },
             actor="TerminationGate",
             category="terminate",
@@ -226,8 +350,8 @@ class TerminationGate:
             "outcome": deepcopy(outcome),
             "request": deepcopy(request),
             "policy": deepcopy(policy),
-            "scheduler_handle_ref": scheduler_handle_ref or "",
-            "active_allocation_id": active_allocation_id or "",
+            "scheduler_handle_ref": request["scheduler_handle_ref"],
+            "active_allocation_id": request["active_allocation_id"],
         }
         self._latest_by_identity[request["identity_id"]] = outcome["outcome_id"]
         return deepcopy(outcome)

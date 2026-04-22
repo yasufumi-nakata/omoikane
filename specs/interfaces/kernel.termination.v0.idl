@@ -8,11 +8,15 @@ imports:
   termination_outcome: ../schemas/termination_outcome.schema
 operations:
   request:
-    summary: Execute immediate termination, reject invalid self-proof, or park into a preconsented cool-off window.
+    summary: Execute immediate termination, reject invalid self-proof, or park into a preconsented cool-off window while optionally binding one scheduler cancel receipt and substrate release.
     input:
       schema_ref: termination_request
     output:
       schema_ref: termination_outcome
+    guarantees:
+      - completed outcomes must remain within the bounded latency budget and release the bound substrate lease
+      - when scheduler_handle_ref is provided and termination completes immediately, scheduler_cancellation.result must equal cancelled and the execution_receipt_digest must bind the cancelled handle
+      - cool-off-pending and rejected outcomes must not cancel the bound scheduler handle
   observe:
     summary: Return the latest known termination status for one identity.
     input:

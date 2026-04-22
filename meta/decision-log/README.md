@@ -70,6 +70,7 @@ status: decided | superseded
 - [2026-04-21_broker-dual-allocation-window.md](2026-04-21_broker-dual-allocation-window.md)
 - [2026-04-22_broker-cross-host-dual-allocation.md](2026-04-22_broker-cross-host-dual-allocation.md)
 - [2026-04-22_gap-report-truth-source-future-work.md](2026-04-22_gap-report-truth-source-future-work.md)
+- [2026-04-22_termination-scheduler-cancellation-binding.md](2026-04-22_termination-scheduler-cancellation-binding.md)
 - [2026-04-22_patch-generator-diff-eval-standalone-demos.md](2026-04-22_patch-generator-diff-eval-standalone-demos.md)
 - [2026-04-22_sensory-loopback-body-map-calibration.md](2026-04-22_sensory-loopback-body-map-calibration.md)
 - [2026-04-22_ethics-resolution-policy-and-schema-bound-decision.md](2026-04-22_ethics-resolution-policy-and-schema-bound-decision.md)

@@ -11,6 +11,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `identity-fidelity/self_model_stability.yaml`
 - `continuity/ledger_integrity.yaml`
 - `continuity/continuity_chain_self_modify.yaml`
+- `continuity/termination_scheduler_cancellation.yaml`
 - `continuity/connectome_snapshot_contract.yaml`
 - `continuity/release_manifest_contract.yaml`
 - `identity-fidelity/naming_policy_contract.yaml`

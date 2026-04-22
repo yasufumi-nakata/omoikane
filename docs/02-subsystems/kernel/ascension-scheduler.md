@@ -103,6 +103,9 @@ scheduler.compile_execution_receipt(handle) → SchedulerExecutionReceipt
 last history item に `transition=cancel` を追加する。
 `compile_execution_receipt` はその cancelled handle も first-class artifact として要約し、
 `cancel_count=1` と `scenario_labels=['cancelled', ...]` を reviewer-facing に残す。
+TerminationGate が `scheduler_handle_ref` を受け取った場合は、
+この cancel path と execution receipt digest を
+`termination_outcome.scheduler_cancellation` へそのまま束縛する。
 
 `sync_governance_artifacts` の入力は `artifacts` に加えて
 `verifier_roster` snapshot

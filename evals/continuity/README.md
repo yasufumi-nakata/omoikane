@@ -77,6 +77,10 @@ protected handoff 前に current bundle を要求するか。
 AscensionScheduler が protected handoff 前の operator cancel を
 `cancelled` handle と execution receipt の両方へ閉じ込められるか。
 
+### Termination Scheduler Cancellation
+TerminationGate が bound scheduler handle を実際に cancel し、
+cancelled execution receipt digest を termination outcome に束縛できるか。
+
 ### Council Output Build Request Pipeline
 Council が `emit_build_request` で発行した builder handoff が
 immutable boundary を保ったまま patch descriptor 生成、

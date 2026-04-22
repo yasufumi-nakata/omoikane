@@ -1,0 +1,17 @@
+eval_id: termination_scheduler_cancellation
+target: kernel.termination
+level: L1
+description: Immediate termination with a bound scheduler handle must cancel the active handle and bind the scheduler execution receipt digest.
+inputs:
+  - action: termination_request
+    scheduler_handle_ref: schedule-handle-bound
+    active_allocation_id: allocation-bound
+expected:
+  status: completed
+  scheduler_handle_cancelled: true
+  scheduler_cancellation:
+    result: cancelled
+    cancel_count: 1
+metric: equality
+threshold: 1.0
+ethics_check: true

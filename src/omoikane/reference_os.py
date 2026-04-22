@@ -130,7 +130,12 @@ class OmoikaneReferenceOS:
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
         self.scheduler = AscensionScheduler(self.ledger)
-        self.termination = TerminationGate(self.identity, self.ledger, self.substrate)
+        self.termination = TerminationGate(
+            self.identity,
+            self.ledger,
+            self.substrate,
+            self.scheduler,
+        )
         self.qualia = QualiaBuffer()
         self.connectome = ConnectomeModel()
         self.episodic = EpisodicStream()
@@ -4784,6 +4789,114 @@ json.dump(response, sys.stdout)
         }
 
     def run_termination_demo(self) -> Dict[str, Any]:
+        def sync_report(
+            governance_artifacts: Dict[str, str],
+            *,
+            checked_at: str,
+            sync_token: str,
+        ) -> Dict[str, Any]:
+            roster_ref = governance_artifacts["artifact_bundle_ref"].replace(
+                "artifact://",
+                "verifier://",
+                1,
+            ).replace("/bundle", "/root-roster")
+
+            active_root_id = f"root://termination-demo/{sync_token}/active"
+            accepted_roots = [
+                {
+                    "root_id": active_root_id,
+                    "fingerprint": sha256_text(
+                        canonical_json(
+                            {
+                                "root_id": active_root_id,
+                                "checked_at": checked_at,
+                                "status": "active",
+                            }
+                        )
+                    ),
+                    "status": "active",
+                }
+            ]
+            artifacts: List[Dict[str, Any]] = []
+            for artifact_key in (
+                "self_consent_ref",
+                "ethics_attestation_ref",
+                "council_attestation_ref",
+                "legal_attestation_ref",
+                "artifact_bundle_ref",
+            ):
+                artifact_ref = governance_artifacts[artifact_key]
+                artifacts.append(
+                    {
+                        "artifact_key": artifact_key,
+                        "status": "current",
+                        "proof_digest": sha256_text(
+                            canonical_json(
+                                {
+                                    "artifact_key": artifact_key,
+                                    "artifact_ref": artifact_ref,
+                                    "checked_at": checked_at,
+                                    "status": "current",
+                                    "sync_token": sync_token,
+                                }
+                            )
+                        ),
+                        "external_sync_ref": f"sync://termination-demo/{sync_token}/{artifact_key}",
+                    }
+                )
+            return {
+                "checked_at": checked_at,
+                "artifacts": artifacts,
+                "verifier_roster": {
+                    "roster_ref": roster_ref,
+                    "checked_at": checked_at,
+                    "active_root_id": active_root_id,
+                    "next_root_id": None,
+                    "rotation_state": "stable",
+                    "accepted_roots": accepted_roots,
+                    "proof_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "roster_ref": roster_ref,
+                                "checked_at": checked_at,
+                                "rotation_state": "stable",
+                                "sync_token": sync_token,
+                                "accepted_roots": accepted_roots,
+                            }
+                        )
+                    ),
+                    "external_sync_ref": f"sync://termination-demo/{sync_token}/verifier-roster",
+                    "dual_attestation_required": False,
+                    "dual_attested": False,
+                },
+            }
+
+        def schedule_active_handoff(identity_id: str, *, sync_token: str) -> Dict[str, Any]:
+            plan = self.scheduler.build_method_a_plan(identity_id)
+            scheduled = self.scheduler.schedule(plan)
+            scan_baseline = self.scheduler.advance(scheduled["handle_id"], "scan-baseline")
+            bdb_bridge = self.scheduler.advance(scheduled["handle_id"], "bdb-bridge")
+            artifact_sync = self.scheduler.sync_governance_artifacts(
+                scheduled["handle_id"],
+                sync_report(
+                    plan["governance_artifacts"],
+                    checked_at="2026-04-22T12:00:00Z",
+                    sync_token=sync_token,
+                ),
+            )
+            identity_confirmation = self.scheduler.advance(
+                scheduled["handle_id"],
+                "identity-confirmation",
+            )
+            return {
+                "plan": plan,
+                "scheduled": scheduled,
+                "scan_baseline": scan_baseline,
+                "bdb_bridge": bdb_bridge,
+                "artifact_sync": artifact_sync,
+                "identity_confirmation": identity_confirmation,
+            }
+
         completed_identity = self.identity.create(
             human_consent_proof="consent://termination-demo-complete/v1",
             metadata={
@@ -4791,6 +4904,10 @@ json.dump(response, sys.stdout)
                 "termination_self_proof": "self-proof://termination-demo-complete/v1",
                 "termination_policy_mode": "immediate-only",
             },
+        )
+        completed_schedule = schedule_active_handoff(
+            completed_identity.identity_id,
+            sync_token="termination-completed",
         )
         completed_allocation = self.substrate.allocate(
             units=24,
@@ -4801,8 +4918,12 @@ json.dump(response, sys.stdout)
             completed_identity.identity_id,
             "self-proof://termination-demo-complete/v1",
             reason="identity explicitly requested immediate stop",
-            scheduler_handle_ref="schedule://termination-demo-complete",
+            scheduler_handle_ref=completed_schedule["scheduled"]["handle_id"],
             active_allocation_id=completed_allocation.allocation_id,
+        )
+        completed_scheduler_handle = self.scheduler.observe(completed_schedule["scheduled"]["handle_id"])
+        completed_scheduler_execution_receipt = self.scheduler.compile_execution_receipt(
+            completed_schedule["scheduled"]["handle_id"]
         )
 
         cool_off_identity = self.identity.create(
@@ -4814,13 +4935,18 @@ json.dump(response, sys.stdout)
                 "termination_policy_days": "30",
             },
         )
+        cool_off_schedule = schedule_active_handoff(
+            cool_off_identity.identity_id,
+            sync_token="termination-cool-off",
+        )
         cool_off = self.termination.request(
             cool_off_identity.identity_id,
             "self-proof://termination-demo-cool-off/v1",
             reason="identity requested the preconsented review window",
             invoke_cool_off=True,
-            scheduler_handle_ref="schedule://termination-demo-cool-off",
+            scheduler_handle_ref=cool_off_schedule["scheduled"]["handle_id"],
         )
+        cool_off_scheduler_handle = self.scheduler.observe(cool_off_schedule["scheduled"]["handle_id"])
 
         rejected_identity = self.identity.create(
             human_consent_proof="consent://termination-demo-reject/v1",
@@ -4830,12 +4956,17 @@ json.dump(response, sys.stdout)
                 "termination_policy_mode": "immediate-only",
             },
         )
+        rejected_schedule = schedule_active_handoff(
+            rejected_identity.identity_id,
+            sync_token="termination-rejected",
+        )
         rejected = self.termination.request(
             rejected_identity.identity_id,
             "self-proof://invalid-proof/v1",
             reason="invalid proof must be rejected but still logged",
-            scheduler_handle_ref="schedule://termination-demo-reject",
+            scheduler_handle_ref=rejected_schedule["scheduled"]["handle_id"],
         )
+        rejected_scheduler_handle = self.scheduler.observe(rejected_schedule["scheduled"]["handle_id"])
 
         observations = {
             "completed": self.termination.observe(completed_identity.identity_id),
@@ -4846,11 +4977,21 @@ json.dump(response, sys.stdout)
             "completed_within_budget": completed["status"] == "completed"
             and completed["latency_ms"] <= 200
             and completed["scheduler_handle_cancelled"]
+            and completed["scheduler_cancellation"]["result"] == "cancelled"
+            and completed_scheduler_handle["status"] == "cancelled"
+            and completed_scheduler_execution_receipt["cancel_count"]
+            == completed["scheduler_cancellation"]["cancel_count"]
+            and "cancelled" in completed_scheduler_execution_receipt["scenario_labels"]
+            and bool(completed["scheduler_cancellation"]["execution_receipt_digest"])
             and completed["substrate_lease_released"],
             "cool_off_pending": cool_off["status"] == "cool-off-pending"
-            and observations["cool_off"]["status"] == "cool-off-pending",
+            and observations["cool_off"]["status"] == "cool-off-pending"
+            and cool_off["scheduler_cancellation"]["result"] == "deferred"
+            and cool_off_scheduler_handle["status"] == "advancing",
             "invalid_self_proof_rejected": rejected["status"] == "rejected"
-            and rejected["reject_reason"] == "invalid-self-proof",
+            and rejected["reject_reason"] == "invalid-self-proof"
+            and rejected["scheduler_cancellation"]["result"] == "not-requested"
+            and rejected_scheduler_handle["status"] == "advancing",
         }
 
         return {
@@ -4862,6 +5003,18 @@ json.dump(response, sys.stdout)
             },
             "observations": observations,
             "validation": validation,
+            "scheduler": {
+                "completed": {
+                    "handle": completed_scheduler_handle,
+                    "execution_receipt": completed_scheduler_execution_receipt,
+                },
+                "cool_off": {
+                    "handle": cool_off_scheduler_handle,
+                },
+                "rejected": {
+                    "handle": rejected_scheduler_handle,
+                },
+            },
             "identity_snapshot": self.identity.snapshot(),
             "substrate_snapshot": self.substrate.snapshot(),
             "ledger_profile": self.ledger.profile(),

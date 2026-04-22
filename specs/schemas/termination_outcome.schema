@@ -13,8 +13,11 @@ required:
   - recorded_at
   - status
   - reject_reason
+  - scheduler_handle_ref
   - ledger_event_ref
   - scheduler_handle_cancelled
+  - scheduler_cancellation
+  - active_allocation_id
   - substrate_lease_released
   - notifications
   - latency_ms
@@ -44,11 +47,75 @@ properties:
       - cool-off-pending
   reject_reason:
     type: string
+  scheduler_handle_ref:
+    type: string
+    description: Bound AscensionScheduler handle id when the request carries one.
   ledger_event_ref:
     type: string
     minLength: 1
   scheduler_handle_cancelled:
     type: boolean
+    description: True only when the bound scheduler handle was actually cancelled.
+  scheduler_cancellation:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - handle_id
+      - requested
+      - result
+      - final_status
+      - current_stage
+      - cancel_count
+      - scenario_labels
+      - history_transition
+      - execution_receipt_id
+      - execution_receipt_digest
+      - failure_reason
+      - closed_at
+    properties:
+      kind:
+        const: termination_scheduler_cancellation
+      handle_id:
+        type: string
+      requested:
+        type: boolean
+      result:
+        type: string
+        enum:
+          - not-requested
+          - deferred
+          - cancelled
+          - scheduler-unavailable
+          - handle-not-found
+          - cancel-error
+      final_status:
+        type: string
+      current_stage:
+        type: string
+      cancel_count:
+        type: integer
+        minimum: 0
+      scenario_labels:
+        type: array
+        items:
+          type: string
+      history_transition:
+        type: string
+      execution_receipt_id:
+        type: string
+      execution_receipt_digest:
+        type: string
+      failure_reason:
+        type: string
+      closed_at:
+        type:
+          - string
+          - "null"
+        format: date-time
+  active_allocation_id:
+    type: string
+    description: Bound active substrate allocation released by the immediate termination path.
   substrate_lease_released:
     type: boolean
   notifications:
@@ -79,12 +146,30 @@ allOf:
           const: completed
     then:
       properties:
-        scheduler_handle_cancelled:
-          const: true
         substrate_lease_released:
           const: true
         latency_ms:
           maximum: 200
+  - if:
+      properties:
+        scheduler_cancellation:
+          properties:
+            result:
+              const: cancelled
+    then:
+      properties:
+        scheduler_handle_cancelled:
+          const: true
+  - if:
+      properties:
+        status:
+          enum:
+            - rejected
+            - cool-off-pending
+    then:
+      properties:
+        scheduler_handle_cancelled:
+          const: false
 examples:
   - kind: termination_outcome
     schema_version: 1.0.0
@@ -94,8 +179,25 @@ examples:
     recorded_at: "2026-04-18T19:00:00.180Z"
     status: completed
     reject_reason: ""
+    scheduler_handle_ref: schedule-handle-001
     ledger_event_ref: continuity-event-termination-001
     scheduler_handle_cancelled: true
+    scheduler_cancellation:
+      kind: termination_scheduler_cancellation
+      handle_id: schedule-handle-001
+      requested: true
+      result: cancelled
+      final_status: cancelled
+      current_stage: active-handoff
+      cancel_count: 1
+      scenario_labels:
+        - cancelled
+      history_transition: cancel
+      execution_receipt_id: scheduler-exec-001
+      execution_receipt_digest: sha256:termination-scheduler-cancel-001
+      failure_reason: ""
+      closed_at: "2026-04-18T19:00:00.150Z"
+    active_allocation_id: allocation-001
     substrate_lease_released: true
     notifications:
       - audience: ethics

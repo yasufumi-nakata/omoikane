@@ -475,26 +475,49 @@ class KernelTests(unittest.TestCase):
         registry = IdentityRegistry()
         ledger = ContinuityLedger()
         substrate = ClassicalSiliconAdapter()
-        gate = TerminationGate(registry, ledger, substrate)
+        scheduler = AscensionScheduler(ledger)
+        gate = TerminationGate(registry, ledger, substrate, scheduler)
         identity = registry.create(
             "consent://termination-complete",
             metadata={"termination_self_proof": "self-proof://termination-complete/v1"},
         )
         allocation = substrate.allocate(12, "termination-test", identity.identity_id)
+        plan = scheduler.build_method_a_plan(identity.identity_id)
+        handle = scheduler.schedule(plan)
+        scheduler.advance(handle["handle_id"], "scan-baseline")
+        scheduler.advance(handle["handle_id"], "bdb-bridge")
+        scheduler.sync_governance_artifacts(
+            handle["handle_id"],
+            self._artifact_sync_report(
+                plan["governance_artifacts"],
+                checked_at="2026-04-22T12:00:00Z",
+                sync_token="termination-complete",
+            ),
+        )
+        scheduler.advance(handle["handle_id"], "identity-confirmation")
 
         outcome = gate.request(
             identity.identity_id,
             "self-proof://termination-complete/v1",
-            scheduler_handle_ref="schedule://termination-complete",
+            scheduler_handle_ref=handle["handle_id"],
             active_allocation_id=allocation.allocation_id,
         )
+        cancelled_handle = scheduler.observe(handle["handle_id"])
+        execution_receipt = scheduler.compile_execution_receipt(handle["handle_id"])
 
         self.assertEqual("completed", outcome["status"])
         self.assertTrue(outcome["scheduler_handle_cancelled"])
+        self.assertEqual("cancelled", outcome["scheduler_cancellation"]["result"])
+        self.assertEqual("cancelled", cancelled_handle["status"])
+        self.assertEqual("cancel", cancelled_handle["history"][-1]["transition"])
+        self.assertEqual(1, execution_receipt["cancel_count"])
+        self.assertIn("cancelled", execution_receipt["scenario_labels"])
+        self.assertTrue(outcome["scheduler_cancellation"]["execution_receipt_digest"])
         self.assertTrue(outcome["substrate_lease_released"])
         self.assertLessEqual(outcome["latency_ms"], 200)
         self.assertEqual("terminated", registry.get(identity.identity_id).status)
         self.assertEqual("released", substrate.allocations[allocation.allocation_id].status)
+        self.assertTrue(gate.validate_outcome(outcome)["scheduler_binding_ok"])
         self.assertTrue(ledger.verify()["ok"])
 
     def test_termination_gate_rejects_invalid_self_proof(self) -> None:
@@ -537,6 +560,7 @@ class KernelTests(unittest.TestCase):
 
         self.assertEqual("cool-off-pending", outcome["status"])
         self.assertFalse(outcome["scheduler_handle_cancelled"])
+        self.assertEqual("not-requested", outcome["scheduler_cancellation"]["result"])
         self.assertFalse(outcome["substrate_lease_released"])
         self.assertEqual("active", registry.get(identity.identity_id).status)
         observed = gate.observe(identity.identity_id)

@@ -1450,8 +1450,26 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["cool_off_pending"])
         self.assertTrue(result["validation"]["invalid_self_proof_rejected"])
         self.assertEqual("completed", result["outcomes"]["completed"]["status"])
+        self.assertEqual(
+            "cancelled",
+            result["outcomes"]["completed"]["scheduler_cancellation"]["result"],
+        )
+        self.assertEqual("cancelled", result["scheduler"]["completed"]["handle"]["status"])
+        self.assertEqual(1, result["scheduler"]["completed"]["execution_receipt"]["cancel_count"])
+        self.assertIn(
+            "cancelled",
+            result["scheduler"]["completed"]["execution_receipt"]["scenario_labels"],
+        )
+        self.assertTrue(result["outcomes"]["completed"]["scheduler_cancellation"]["execution_receipt_digest"])
         self.assertEqual("cool-off-pending", result["outcomes"]["cool_off"]["status"])
+        self.assertEqual("deferred", result["outcomes"]["cool_off"]["scheduler_cancellation"]["result"])
+        self.assertEqual("advancing", result["scheduler"]["cool_off"]["handle"]["status"])
         self.assertEqual("invalid-self-proof", result["outcomes"]["rejected"]["reject_reason"])
+        self.assertEqual(
+            "not-requested",
+            result["outcomes"]["rejected"]["scheduler_cancellation"]["result"],
+        )
+        self.assertEqual("advancing", result["scheduler"]["rejected"]["handle"]["status"])
         self.assertTrue(result["ledger_verification"]["ok"])
 
 
