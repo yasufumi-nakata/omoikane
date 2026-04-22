@@ -131,11 +131,38 @@ overlap snapshot と post-churn snapshot を
 - `continuity_guard` は overlap count / draining removal / quorum maintained を固定し、
   `status=quorum-maintained` だけを rotated receipt 前段の valid churn outcome とする
 
+## Remote authority-cluster discovery
+
+stable な authority plane に対しては
+`discover_remote_authority_clusters` により、
+live remote authority-cluster seed を review-capped discovery artifact に縮約し、
+candidate cluster 群から 1 つの accepted route catalog を選ぶ。
+
+| 項目 | 固定値 |
+|---|---|
+| discovery profile | `review-capped-authority-cluster-discovery-v1` |
+| seed transport | `live-http-json-authority-cluster-seed-v1` |
+| acceptance mode | `single accepted cluster after review` |
+| downstream handoff | `accepted_route_catalog -> discover_authority_route_targets` |
+
+- discovery は `seed_refs` ごとに `candidate_targets` / `candidate_clusters` を記録し、
+  `coverage_status`、`host_attestation_status`、`acceptance_status` を
+  machine-checkable に残す
+- `review_budget` は全 seed を覆えなければ fail-closed となり、
+  review しきれない open-world discovery を reference runtime に持ち込まない
+- accepted cluster は active authority-plane member 全件を覆い、
+  `remote_host_attestation_ref` が complete な場合にだけ選ばれる
+- `accepted_route_catalog` は authority plane 由来の
+  `server_role / authority_status / matched_root_refs` を retain し、
+  downstream の bounded route-target discovery へそのまま渡せる
+
 ## Authority route target discovery
 
 stable な authority plane に対しては
 `discover_authority_route_targets` により、
-reviewed `route_catalog` を active authority-plane member へ束縛し、
+reviewed `route_catalog` あるいは
+remote authority-cluster discovery が emit した `accepted_route_catalog` を
+active authority-plane member へ束縛し、
 trace 前段の discovery receipt を固定する。
 
 | 項目 | 固定値 |
@@ -143,7 +170,7 @@ trace 前段の discovery receipt を固定する。
 | discovery profile | `bounded-authority-route-target-discovery-v1` |
 | target scope | `active-only` |
 | authority cluster scope | single `authority_cluster_ref` |
-| source of truth | stable authority plane + reviewed route catalog |
+| source of truth | stable authority plane + reviewed route catalog or accepted remote discovery catalog |
 
 - discovery は `authority_plane` の active member 全件を `key_server_ref` 単位で覆わなければ fail-closed
 - 各 discovered target は `server_endpoint / server_name / remote_host_ref /
@@ -245,8 +272,8 @@ route trace / packet export / resolved interface へ束縛する。
   `route_binding_refs` を echo しつつ `lease_ref` と `broker_attestation_ref` を返す
 - `capture_command` は `tcpdump` / resolved interface / exact filter を含む preview として固定し、
   actual live capture 自体は repo 外の broker 実行面へ委譲する
-- residual future work は broad な cross-host authority routing 不在ではなく、
-  bounded reviewed route catalog の外側にある unbounded remote authority-cluster discovery へ絞られる
+- residual scope は broad な cross-host authority routing 不在ではなく、
+  remote seed review の budget policy と accepted cluster selection の厳格化へ限定される
 
 ## Relay telemetry
 

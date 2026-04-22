@@ -180,6 +180,15 @@ entries:
     rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, trusted-root coverage, and draining-overlap churn safety for rotated transport envelopes.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_authority_cluster_discovery.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_cluster_discovery.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize review-capped remote authority-cluster discovery, candidate-cluster triage, and one accepted route catalog before bounded route-target discovery continues.
+  - priority: P1
+    kind: schema
     file: specs/schemas/distributed_transport_authority_route_target_discovery.schema
     consumers:
       - specs/interfaces/agentic.distributed_transport.v0.idl
@@ -187,7 +196,7 @@ entries:
       - evals/agentic/distributed_transport_authority_route_target_discovery.yaml
       - specs/schemas/distributed_transport_authority_route_trace.schema
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
-    rationale: Required to serialize one bounded route-target discovery receipt that binds a reviewed route catalog to the currently reachable active authority-plane members before non-loopback mTLS tracing.
+    rationale: Required to serialize one bounded route-target discovery receipt that binds a reviewed route catalog or one accepted remote discovery catalog to the currently reachable active authority-plane members before non-loopback mTLS tracing.
   - priority: P1
     kind: schema
     file: specs/schemas/distributed_transport_authority_churn_window.schema
@@ -1393,6 +1402,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects overlap-safe key-server churn handling so each trusted root retains active authority coverage during replacement handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_cluster_discovery.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects review-capped remote authority-cluster discovery, fail-closed ambiguity/coverage handling, and accepted route-catalog binding before downstream tracing.
   - priority: P1
     kind: eval
     file: evals/agentic/distributed_transport_authority_route_trace.yaml

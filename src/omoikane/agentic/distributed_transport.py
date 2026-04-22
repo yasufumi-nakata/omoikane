@@ -55,6 +55,8 @@ AUTHORITY_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 AUTHORITY_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
 AUTHORITY_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
 AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE = "bounded-authority-route-target-discovery-v1"
+AUTHORITY_CLUSTER_DISCOVERY_PROFILE = "review-capped-authority-cluster-discovery-v1"
+AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE = "live-http-json-authority-cluster-seed-v1"
 AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
 AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
 AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
@@ -470,6 +472,60 @@ class DistributedTransportAuthorityChurnWindow:
             "removed_root_refs": list(self.removed_root_refs),
             "server_transitions": [dict(transition) for transition in self.server_transitions],
             "continuity_guard": dict(self.continuity_guard),
+            "proof_digest": self.proof_digest,
+            "digest": self.digest,
+        }
+
+
+@dataclass
+class DistributedTransportAuthorityClusterDiscovery:
+    """Review-capped remote authority-cluster discovery bound to one authority plane."""
+
+    discovery_ref: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    council_tier: str
+    transport_profile: str
+    discovery_profile: str
+    seed_transport_profile: str
+    seed_refs: List[str]
+    review_budget: int
+    candidate_targets: List[Dict[str, Any]]
+    candidate_clusters: List[Dict[str, Any]]
+    accepted_cluster_ref: str
+    accepted_route_catalog_ref: str
+    accepted_route_catalog_digest: str
+    accepted_route_catalog: List[Dict[str, Any]]
+    trusted_root_refs: List[str]
+    all_active_members_discovered: bool
+    discovery_status: str
+    recorded_at: str
+    proof_digest: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_cluster_discovery",
+            "schema_version": "1.0.0",
+            "discovery_ref": self.discovery_ref,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "discovery_profile": self.discovery_profile,
+            "seed_transport_profile": self.seed_transport_profile,
+            "seed_refs": list(self.seed_refs),
+            "review_budget": self.review_budget,
+            "candidate_targets": [dict(target) for target in self.candidate_targets],
+            "candidate_clusters": [dict(cluster) for cluster in self.candidate_clusters],
+            "accepted_cluster_ref": self.accepted_cluster_ref,
+            "accepted_route_catalog_ref": self.accepted_route_catalog_ref,
+            "accepted_route_catalog_digest": self.accepted_route_catalog_digest,
+            "accepted_route_catalog": [dict(target) for target in self.accepted_route_catalog],
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "all_active_members_discovered": self.all_active_members_discovered,
+            "discovery_status": self.discovery_status,
+            "recorded_at": self.recorded_at,
             "proof_digest": self.proof_digest,
             "digest": self.digest,
         }
@@ -1182,6 +1238,236 @@ class DistributedTransportService:
             removed_root_refs=removed_root_refs,
             server_transitions=server_transitions,
             continuity_guard=continuity_guard,
+            proof_digest=proof_digest,
+            digest=digest,
+        )
+
+    def discover_remote_authority_clusters(
+        self,
+        authority_plane: DistributedTransportAuthorityPlane,
+        *,
+        seed_refs: List[str],
+        review_budget: int = 4,
+        request_timeout_ms: int = 1_000,
+    ) -> DistributedTransportAuthorityClusterDiscovery:
+        normalized_seed_refs = self._normalize_string_list(seed_refs, "seed_refs")
+        normalized_review_budget = self._require_positive_int(review_budget, "review_budget")
+        if len(normalized_seed_refs) > normalized_review_budget:
+            raise ValueError(
+                "remote authority cluster discovery review_budget must cover every seed_ref"
+            )
+
+        active_authority_servers = {
+            server["key_server_ref"]: dict(server)
+            for server in authority_plane.key_servers
+            if server["authority_status"] == "active"
+        }
+        if not active_authority_servers:
+            raise ValueError(
+                "remote authority cluster discovery requires at least 1 active authority-plane member"
+            )
+
+        timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        candidate_targets: List[Dict[str, Any]] = []
+        candidate_clusters: List[Dict[str, Any]] = []
+        accepted_candidates: List[Dict[str, Any]] = []
+
+        for seed_ref in normalized_seed_refs:
+            request_started = time.monotonic()
+            with opener.open(seed_ref, timeout=timeout_ms / 1000.0) as response:
+                http_status = int(getattr(response, "status", response.getcode()))
+                payload_text = response.read().decode("utf-8")
+            observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 1)
+            if http_status != 200:
+                raise ValueError(
+                    f"remote authority cluster seed endpoint returned unexpected status {http_status}"
+                )
+            try:
+                payload = json.loads(payload_text)
+            except json.JSONDecodeError as exc:
+                raise ValueError("remote authority cluster seed endpoint must return JSON") from exc
+            if not isinstance(payload, Mapping):
+                raise ValueError("remote authority cluster seed payload must be a mapping")
+
+            cluster_ref = self._require_non_empty_string(payload.get("cluster_ref"), "cluster_ref")
+            if not cluster_ref.startswith("authority-cluster://"):
+                raise ValueError("cluster_ref must use authority-cluster://")
+            council_tier = self._require_non_empty_string(payload.get("council_tier"), "council_tier")
+            if council_tier != authority_plane.council_tier:
+                raise ValueError(
+                    "remote authority cluster discovery seed council_tier must match authority_plane"
+                )
+            transport_profile = self._require_non_empty_string(
+                payload.get("transport_profile"),
+                "transport_profile",
+            )
+            if transport_profile != authority_plane.transport_profile:
+                raise ValueError(
+                    "remote authority cluster discovery seed transport_profile must match authority_plane"
+                )
+            proof_digest = self._require_sha256_hex(payload.get("proof_digest"), "proof_digest")
+            normalized_targets = self._normalize_route_targets(payload.get("route_targets"))
+            authority_cluster_refs = {
+                target["authority_cluster_ref"] for target in normalized_targets.values()
+            }
+            if authority_cluster_refs != {cluster_ref}:
+                raise ValueError(
+                    "remote authority cluster discovery route_targets must share the seed cluster_ref"
+                )
+
+            matched_key_server_refs = sorted(
+                set(normalized_targets) & set(active_authority_servers)
+            )
+            all_active_members_discovered = sorted(normalized_targets) == sorted(active_authority_servers)
+            host_attestation_complete = all(
+                target["remote_host_attestation_ref"] for target in normalized_targets.values()
+            )
+            distinct_remote_host_count = len(
+                {target["remote_host_ref"] for target in normalized_targets.values()}
+            )
+            route_catalog: List[Dict[str, Any]] = []
+            for key_server_ref in sorted(normalized_targets):
+                target = normalized_targets[key_server_ref]
+                candidate_targets.append(
+                    {
+                        "seed_ref": seed_ref,
+                        "cluster_ref": cluster_ref,
+                        "key_server_ref": key_server_ref,
+                        "server_endpoint": target["server_endpoint"],
+                        "server_name": target["server_name"],
+                        "remote_host_ref": target["remote_host_ref"],
+                        "remote_host_attestation_ref": target["remote_host_attestation_ref"],
+                        "authority_cluster_ref": target["authority_cluster_ref"],
+                        "remote_jurisdiction": target["remote_jurisdiction"],
+                        "remote_network_zone": target["remote_network_zone"],
+                    }
+                )
+                authority_server = active_authority_servers.get(key_server_ref)
+                if authority_server is None:
+                    continue
+                route_catalog.append(
+                    {
+                        "key_server_ref": key_server_ref,
+                        "server_role": authority_server["server_role"],
+                        "authority_status": authority_server["authority_status"],
+                        "server_endpoint": target["server_endpoint"],
+                        "server_name": target["server_name"],
+                        "remote_host_ref": target["remote_host_ref"],
+                        "remote_host_attestation_ref": target["remote_host_attestation_ref"],
+                        "authority_cluster_ref": target["authority_cluster_ref"],
+                        "remote_jurisdiction": target["remote_jurisdiction"],
+                        "remote_network_zone": target["remote_network_zone"],
+                        "matched_root_refs": list(authority_server["matched_root_refs"]),
+                    }
+                )
+
+            coverage_status = "covered" if all_active_members_discovered else "partial"
+            host_attestation_status = "complete" if host_attestation_complete else "missing"
+            acceptance_status = "accepted"
+            if not all_active_members_discovered:
+                acceptance_status = "rejected-coverage"
+            elif not host_attestation_complete:
+                acceptance_status = "rejected-attestation"
+            candidate_clusters.append(
+                {
+                    "cluster_ref": cluster_ref,
+                    "seed_ref": seed_ref,
+                    "observed_latency_ms": observed_latency_ms,
+                    "http_status": http_status,
+                    "response_digest": sha256_text(canonical_json(payload)),
+                    "route_target_count": len(normalized_targets),
+                    "distinct_remote_host_count": distinct_remote_host_count,
+                    "matched_key_server_refs": matched_key_server_refs,
+                    "coverage_status": coverage_status,
+                    "host_attestation_status": host_attestation_status,
+                    "acceptance_status": acceptance_status,
+                    "proof_digest": proof_digest,
+                }
+            )
+            if acceptance_status == "accepted":
+                accepted_candidates.append(
+                    {
+                        "cluster_ref": cluster_ref,
+                        "seed_ref": seed_ref,
+                        "route_catalog": route_catalog,
+                    }
+                )
+
+        if not accepted_candidates:
+            raise ValueError("remote authority cluster discovery found no accepted cluster")
+        if len(accepted_candidates) != 1:
+            raise ValueError(
+                "remote authority cluster discovery requires exactly 1 accepted cluster after review"
+            )
+
+        accepted_candidate = accepted_candidates[0]
+        recorded_at = utc_now_iso()
+        accepted_route_catalog = list(accepted_candidate["route_catalog"])
+        accepted_cluster_ref = str(accepted_candidate["cluster_ref"])
+        accepted_route_catalog_ref = (
+            f"authority-route-catalog://{authority_plane.council_tier}/"
+            f"{sha256_text(f'{authority_plane.authority_plane_ref}:{accepted_cluster_ref}')[:16]}"
+        )
+        accepted_route_catalog_digest = sha256_text(canonical_json(accepted_route_catalog))
+        proof_digest = sha256_text(
+            canonical_json(
+                {
+                    "authority_plane_ref": authority_plane.authority_plane_ref,
+                    "seed_refs": normalized_seed_refs,
+                    "review_budget": normalized_review_budget,
+                    "accepted_cluster_ref": accepted_cluster_ref,
+                    "accepted_route_catalog_digest": accepted_route_catalog_digest,
+                    "candidate_clusters": candidate_clusters,
+                }
+            )
+        )
+        payload = {
+            "discovery_ref": (
+                f"authority-cluster-discovery://{authority_plane.council_tier}/"
+                f"{authority_plane.authority_plane_ref.split('/')[-1]}"
+            ),
+            "authority_plane_ref": authority_plane.authority_plane_ref,
+            "authority_plane_digest": authority_plane.digest,
+            "council_tier": authority_plane.council_tier,
+            "transport_profile": authority_plane.transport_profile,
+            "discovery_profile": AUTHORITY_CLUSTER_DISCOVERY_PROFILE,
+            "seed_transport_profile": AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
+            "seed_refs": normalized_seed_refs,
+            "review_budget": normalized_review_budget,
+            "candidate_targets": candidate_targets,
+            "candidate_clusters": candidate_clusters,
+            "accepted_cluster_ref": accepted_cluster_ref,
+            "accepted_route_catalog_ref": accepted_route_catalog_ref,
+            "accepted_route_catalog_digest": accepted_route_catalog_digest,
+            "accepted_route_catalog": accepted_route_catalog,
+            "trusted_root_refs": list(authority_plane.trusted_root_refs),
+            "all_active_members_discovered": True,
+            "discovery_status": "discovered",
+            "recorded_at": recorded_at,
+            "proof_digest": proof_digest,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthorityClusterDiscovery(
+            discovery_ref=payload["discovery_ref"],
+            authority_plane_ref=authority_plane.authority_plane_ref,
+            authority_plane_digest=authority_plane.digest,
+            council_tier=authority_plane.council_tier,
+            transport_profile=authority_plane.transport_profile,
+            discovery_profile=AUTHORITY_CLUSTER_DISCOVERY_PROFILE,
+            seed_transport_profile=AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
+            seed_refs=normalized_seed_refs,
+            review_budget=normalized_review_budget,
+            candidate_targets=candidate_targets,
+            candidate_clusters=candidate_clusters,
+            accepted_cluster_ref=accepted_cluster_ref,
+            accepted_route_catalog_ref=accepted_route_catalog_ref,
+            accepted_route_catalog_digest=accepted_route_catalog_digest,
+            accepted_route_catalog=accepted_route_catalog,
+            trusted_root_refs=list(authority_plane.trusted_root_refs),
+            all_active_members_discovered=True,
+            discovery_status="discovered",
+            recorded_at=recorded_at,
             proof_digest=proof_digest,
             digest=digest,
         )

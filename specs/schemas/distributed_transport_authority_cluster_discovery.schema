@@ -1,0 +1,331 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_cluster_discovery.schema"
+title: DistributedTransportAuthorityClusterDiscovery
+description: >
+  Review-capped remote authority-cluster discovery artifact that probes one or more live
+  authority-cluster seeds, summarizes candidate targets/clusters, and emits one accepted
+  route catalog bound to the current active authority-plane membership.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - discovery_ref
+  - authority_plane_ref
+  - authority_plane_digest
+  - council_tier
+  - transport_profile
+  - discovery_profile
+  - seed_transport_profile
+  - seed_refs
+  - review_budget
+  - candidate_targets
+  - candidate_clusters
+  - accepted_cluster_ref
+  - accepted_route_catalog_ref
+  - accepted_route_catalog_digest
+  - accepted_route_catalog
+  - trusted_root_refs
+  - all_active_members_discovered
+  - discovery_status
+  - recorded_at
+  - proof_digest
+  - digest
+properties:
+  kind:
+    const: distributed_transport_authority_cluster_discovery
+  schema_version:
+    const: "1.0.0"
+  discovery_ref:
+    type: string
+    pattern: "^authority-cluster-discovery://"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_tier:
+    type: string
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  discovery_profile:
+    const: review-capped-authority-cluster-discovery-v1
+  seed_transport_profile:
+    const: live-http-json-authority-cluster-seed-v1
+  seed_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^https?://"
+  review_budget:
+    type: integer
+    minimum: 1
+  candidate_targets:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - seed_ref
+        - cluster_ref
+        - key_server_ref
+        - server_endpoint
+        - server_name
+        - remote_host_ref
+        - remote_host_attestation_ref
+        - authority_cluster_ref
+        - remote_jurisdiction
+        - remote_network_zone
+      properties:
+        seed_ref:
+          type: string
+          pattern: "^https?://"
+        cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        server_endpoint:
+          type: string
+          pattern: "^https://"
+        server_name:
+          type: string
+          minLength: 1
+        remote_host_ref:
+          type: string
+          pattern: "^host://"
+        remote_host_attestation_ref:
+          type: string
+          pattern: "^host-attestation://"
+        authority_cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        remote_jurisdiction:
+          type: string
+          minLength: 1
+        remote_network_zone:
+          type: string
+          minLength: 1
+  candidate_clusters:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - cluster_ref
+        - seed_ref
+        - observed_latency_ms
+        - http_status
+        - response_digest
+        - route_target_count
+        - distinct_remote_host_count
+        - matched_key_server_refs
+        - coverage_status
+        - host_attestation_status
+        - acceptance_status
+        - proof_digest
+      properties:
+        cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        seed_ref:
+          type: string
+          pattern: "^https?://"
+        observed_latency_ms:
+          type: number
+          minimum: 0
+        http_status:
+          const: 200
+        response_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        route_target_count:
+          type: integer
+          minimum: 1
+        distinct_remote_host_count:
+          type: integer
+          minimum: 1
+        matched_key_server_refs:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^keyserver://"
+        coverage_status:
+          type: string
+          enum:
+            - covered
+            - partial
+        host_attestation_status:
+          type: string
+          enum:
+            - complete
+            - missing
+        acceptance_status:
+          type: string
+          enum:
+            - accepted
+            - rejected-coverage
+            - rejected-attestation
+        proof_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  accepted_cluster_ref:
+    type: string
+    pattern: "^authority-cluster://"
+  accepted_route_catalog_ref:
+    type: string
+    pattern: "^authority-route-catalog://"
+  accepted_route_catalog_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  accepted_route_catalog:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - key_server_ref
+        - server_role
+        - authority_status
+        - server_endpoint
+        - server_name
+        - remote_host_ref
+        - remote_host_attestation_ref
+        - authority_cluster_ref
+        - remote_jurisdiction
+        - remote_network_zone
+        - matched_root_refs
+      properties:
+        key_server_ref:
+          type: string
+          pattern: "^keyserver://"
+        server_role:
+          type: string
+          enum:
+            - quorum-notary
+            - directory-mirror
+        authority_status:
+          const: active
+        server_endpoint:
+          type: string
+          pattern: "^https://"
+        server_name:
+          type: string
+          minLength: 1
+        remote_host_ref:
+          type: string
+          pattern: "^host://"
+        remote_host_attestation_ref:
+          type: string
+          pattern: "^host-attestation://"
+        authority_cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        remote_jurisdiction:
+          type: string
+          minLength: 1
+        remote_network_zone:
+          type: string
+          minLength: 1
+        matched_root_refs:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+  trusted_root_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  all_active_members_discovered:
+    const: true
+  discovery_status:
+    const: discovered
+  recorded_at:
+    type: string
+    format: date-time
+  proof_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: distributed_transport_authority_cluster_discovery
+    schema_version: "1.0.0"
+    discovery_ref: authority-cluster-discovery://federation/route-nonce-0123456789ab
+    authority_plane_ref: authority-plane://federation/route-nonce-0123456789ab
+    authority_plane_digest: d4e0e62d6600dc44440f7aa84279ad42c7a1086ea7973d24828f00b7fcbfbe8a
+    council_tier: federation
+    transport_profile: federation-mtls-quorum-v1
+    discovery_profile: review-capped-authority-cluster-discovery-v1
+    seed_transport_profile: live-http-json-authority-cluster-seed-v1
+    seed_refs:
+      - http://127.0.0.1:18080/authority-cluster-seed-1
+    review_budget: 2
+    candidate_targets:
+      - seed_ref: http://127.0.0.1:18080/authority-cluster-seed-1
+        cluster_ref: authority-cluster://federation/review-window
+        key_server_ref: keyserver://federation/notary-a
+        server_endpoint: https://198.51.100.10:4443/authority-route-1
+        server_name: authority.local
+        remote_host_ref: host://federation/authority-edge-a
+        remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+        authority_cluster_ref: authority-cluster://federation/review-window
+        remote_jurisdiction: JP-13
+        remote_network_zone: apne1
+    candidate_clusters:
+      - cluster_ref: authority-cluster://federation/review-window
+        seed_ref: http://127.0.0.1:18080/authority-cluster-seed-1
+        observed_latency_ms: 4.2
+        http_status: 200
+        response_digest: 7b97a6b08d246ff1ecb0441e9b16790d8f373303fdf4d0d204b1ce50d4f31f91
+        route_target_count: 2
+        distinct_remote_host_count: 2
+        matched_key_server_refs:
+          - keyserver://federation/notary-a
+          - keyserver://federation/mirror-c-active
+        coverage_status: covered
+        host_attestation_status: complete
+        acceptance_status: accepted
+        proof_digest: 9ab9d997dd8d4903565dbe306dbec04e302b79690d909f11bfd5e34e5a6b5fd3
+    accepted_cluster_ref: authority-cluster://federation/review-window
+    accepted_route_catalog_ref: authority-route-catalog://federation/ab12cd34ef56ab78
+    accepted_route_catalog_digest: 62998bfeb0877b7666e7f78dbe3d136e0115d9b51f705fb154afb76eea714f4c
+    accepted_route_catalog:
+      - key_server_ref: keyserver://federation/notary-a
+        server_role: quorum-notary
+        authority_status: active
+        server_endpoint: https://198.51.100.10:4443/authority-route-1
+        server_name: authority.local
+        remote_host_ref: host://federation/authority-edge-a
+        remote_host_attestation_ref: host-attestation://federation/authority-edge-a/2026-04-22
+        authority_cluster_ref: authority-cluster://federation/review-window
+        remote_jurisdiction: JP-13
+        remote_network_zone: apne1
+        matched_root_refs:
+          - root://federation/pki-a
+    trusted_root_refs:
+      - root://federation/pki-a
+      - root://federation/pki-b
+    all_active_members_discovered: true
+    discovery_status: discovered
+    recorded_at: "2026-04-22T07:05:00Z"
+    proof_digest: 4da83bc6f96a5a0bb10278314b9a7ce83061b48696d9427c7a1f201c0b0dc2aa
+    digest: 6b62576fb077fb6c3415d64021117a3a0bc973b61dbdfd44bca858cd1d5c4376

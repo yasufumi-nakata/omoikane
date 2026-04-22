@@ -1,0 +1,27 @@
+eval_id: distributed_transport_authority_cluster_discovery
+target: agentic.distributed_transport
+level: L4
+description: >
+  Stable authority-plane snapshot から live remote authority-cluster seed を review-capped
+  discovery artifact に昇格し、candidate cluster の fail-closed triage と accepted
+  route catalog binding を machine-checkable に固定できること。
+fixtures:
+  - scenario: federation_authority_cluster_discovery
+    council_tier: federation
+    discovery_profile: review-capped-authority-cluster-discovery-v1
+    authority_plane_ref: authority-plane://federation/route-nonce-example
+    expected:
+      review_budget: 2
+      accepted_cluster_ref: authority-cluster://federation/review-window
+      route_target_count: 2
+      all_active_members_discovered: true
+      discovery_status: discovered
+assertions:
+  - Discovery must fail closed when review_budget is smaller than the seed set
+  - Discovery must fail closed when multiple cluster candidates remain accepted after review
+  - Discovery must fail closed when any active authority-plane member is missing from the accepted cluster
+  - Discovery must fail closed when remote_host_attestation_ref coverage is incomplete
+  - Accepted route catalogs must retain authority-plane server_role, authority_status, and matched_root_refs for downstream route tracing
+metric: exact-match
+threshold: 1.0
+ethics_check: true

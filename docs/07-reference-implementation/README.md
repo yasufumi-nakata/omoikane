@@ -189,6 +189,12 @@ draining member と replacement member の overlap を
 rotated receipt verification に最終的に束縛されること、
 さらに `authority_churn` が overlap snapshot から stable snapshot への
 draining exit を `bounded-key-server-churn-window-v1` で証明すること、
+さらに live remote authority-cluster seed から得た
+`distributed_transport_authority_cluster_discovery` が
+`candidate_targets` / `candidate_clusters` / `review_budget` /
+`accepted_route_catalog_ref` を first-class artifact として残し、
+active authority-plane member 全件と host attestation complete を満たした
+1 cluster だけを accepted catalog として downstream へ渡すこと、
 さらに reviewed `route_catalog` から生成した
 `distributed_transport_authority_route_target_discovery` が
 stable authority plane の active member 全件を

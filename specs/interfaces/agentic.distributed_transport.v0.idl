@@ -10,6 +10,7 @@ imports:
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
+  distributed_transport_authority_cluster_discovery: ../schemas/distributed_transport_authority_cluster_discovery.schema
   distributed_transport_authority_route_target_discovery: ../schemas/distributed_transport_authority_route_target_discovery.schema
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
   distributed_transport_os_observer_receipt: ../schemas/distributed_transport_os_observer_receipt.schema
@@ -239,11 +240,51 @@ operations:
       - removed key servers must have been previously marked draining
       - quorum_requirement and trusted_root_refs must remain sufficient after churn
       - churn_profile must equal bounded-key-server-churn-window-v1
+  discover_remote_authority_clusters:
+    summary: >
+      Probe one or more live remote authority-cluster seeds, reduce their candidate route targets
+      through a review-capped selection step, and emit one accepted route catalog bound to the
+      current active authority-plane membership before bounded route-target discovery continues.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - authority_plane_ref
+          - authority_plane_digest
+          - seed_refs
+        properties:
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          seed_refs:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^https?://"
+          review_budget:
+            type: integer
+            minimum: 1
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_authority_cluster_discovery
+    guarantees:
+      - review_budget must cover every probed seed_ref
+      - accepted discovery must cover every reachable active authority-plane member
+      - accepted clusters require complete remote_host_attestation_ref coverage
+      - accepted_route_catalog must preserve authority-plane server_role, authority_status, and matched_root_refs for each discovered target
   discover_authority_route_targets:
     summary: >
-      Bind one bounded reviewed route catalog to the currently reachable active authority-plane
-      members so non-loopback mTLS tracing is driven by a first-class discovery receipt rather
-      than a raw ad hoc route_targets list.
+      Bind one bounded reviewed route catalog, or one accepted route catalog emitted from
+      review-capped remote authority-cluster discovery, to the currently reachable active
+      authority-plane members so non-loopback mTLS tracing is driven by a first-class discovery
+      receipt rather than a raw ad hoc route_targets list.
     input:
       inline_schema:
         type: object
@@ -595,6 +636,9 @@ events:
   distributed.transport_telemetry_captured:
     payload:
       schema_ref: distributed_transport_relay_telemetry
+  distributed.transport_authority_cluster_discovered:
+    payload:
+      schema_ref: distributed_transport_authority_cluster_discovery
   distributed.transport_authority_route_targets_discovered:
     payload:
       schema_ref: distributed_transport_authority_route_target_discovery
@@ -610,5 +654,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, non-loopback mTLS authority routing, cross-host host/cluster binding, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
-    - Unbounded remote authority-cluster discovery outside a bounded reviewed route catalog remains future work.
+    - This contract fixes the in-repo reference profile for participant attestation, key-epoch overlap, live root-directory federation, bounded key-server fleet binding, churn reconciliation, review-capped remote authority-cluster discovery, non-loopback mTLS authority routing, cross-host host/cluster binding, trace-bound PCAP export, delegated privileged live-capture acquisition, multi-hop anti-replay, and bounded relay telemetry.
+    - Reviewed route catalogs remain supported as a curated ingress, and remote authority-cluster seeds are reduced to one accepted route catalog before route tracing proceeds.

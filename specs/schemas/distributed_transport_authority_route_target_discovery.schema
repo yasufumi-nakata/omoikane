@@ -3,7 +3,8 @@ $id: "https://omoikane.dev/specs/schemas/distributed_transport_authority_route_t
 title: DistributedTransportAuthorityRouteTargetDiscovery
 description: >
   Bounded authority-plane route-target discovery receipt that binds a reviewed route catalog
-  to the currently reachable active authority-plane members before non-loopback mTLS tracing.
+  or one accepted remote authority-cluster discovery catalog to the currently reachable active
+  authority-plane members before non-loopback mTLS tracing.
 type: object
 additionalProperties: false
 required:

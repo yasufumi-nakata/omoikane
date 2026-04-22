@@ -900,6 +900,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authority_plane_churn_safe"])
         self.assertTrue(result["validation"]["authority_churn_overlap_bound"])
         self.assertTrue(result["validation"]["authority_churn_requires_draining_exit"])
+        self.assertTrue(result["validation"]["authority_cluster_discovery_bound"])
         self.assertTrue(result["validation"]["authority_route_targets_discovered"])
         self.assertTrue(result["validation"]["authority_route_mtls_authenticated"])
         self.assertTrue(result["validation"]["authority_route_socket_trace_bound"])
@@ -946,6 +947,26 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             "discovered",
+            result["authority_cluster_discovery"]["federation_rotated"]["discovery_status"],
+        )
+        self.assertEqual(
+            "review-capped-authority-cluster-discovery-v1",
+            result["authority_cluster_discovery"]["federation_rotated"]["discovery_profile"],
+        )
+        self.assertEqual(
+            "authority-cluster://federation/review-window",
+            result["authority_cluster_discovery"]["federation_rotated"]["accepted_cluster_ref"],
+        )
+        self.assertEqual(
+            2,
+            result["authority_cluster_discovery"]["federation_rotated"]["review_budget"],
+        )
+        self.assertEqual(
+            1,
+            len(result["authority_cluster_discovery"]["federation_rotated"]["candidate_clusters"]),
+        )
+        self.assertEqual(
+            "discovered",
             result["authority_route_target_discovery"]["federation_rotated"]["discovery_status"],
         )
         self.assertEqual(
@@ -960,6 +981,10 @@ class CliIntegrationTests(unittest.TestCase):
             result["authority_route_target_discovery"]["federation_rotated"][
                 "all_active_members_targeted"
             ],
+        )
+        self.assertEqual(
+            result["authority_cluster_discovery"]["federation_rotated"]["accepted_route_catalog"],
+            result["authority_route_target_discovery"]["federation_rotated"]["route_targets"],
         )
         self.assertEqual(
             ["keyserver://federation/mirror-b-draining"],

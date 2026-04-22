@@ -2,7 +2,9 @@ eval_id: distributed_transport_authority_route_target_discovery
 target: agentic.distributed_transport
 level: L4
 description: >
-  Stable authority-plane snapshot から bounded reviewed route catalog を discovery receipt に昇格し、
+  Stable authority-plane snapshot から bounded reviewed route catalog あるいは
+  review-capped remote authority-cluster discovery が承認した catalog を
+  discovery receipt に昇格し、
   non-loopback mTLS authority route trace 前段で active member coverage と
   remote host / attestation / cluster binding を machine-checkable に固定できること。
 fixtures:
@@ -22,7 +24,7 @@ assertions:
   - Every discovered target must bind server_endpoint, server_name, remote_host_ref, and remote_host_attestation_ref
   - Authority cluster binding must remain single-cluster across the bounded discovery set
   - Discovery receipt must retain authority-plane matched_root_refs, server_role, and authority_status for each target
-  - Unbounded dynamic authority-cluster discovery outside the reviewed route catalog remains future work
+  - Discovery may consume the accepted_route_catalog emitted from review-capped remote authority-cluster discovery
 metric: exact-match
 threshold: 1.0
 ethics_check: true

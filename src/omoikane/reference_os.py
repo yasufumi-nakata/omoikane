@@ -1333,6 +1333,55 @@ class OmoikaneReferenceOS:
                 thread.join(timeout=1.0)
 
         @contextmanager
+        def authority_cluster_seed_bridge(seed_payloads: List[Dict[str, Any]]):
+            payload_by_path = {
+                f"/authority-cluster-seed-{index}": payload
+                for index, payload in enumerate(seed_payloads, start=1)
+            }
+
+            class LocalThreadingHTTPServer(ThreadingHTTPServer):
+                def server_bind(self) -> None:
+                    self.socket.bind(self.server_address)
+                    self.server_address = self.socket.getsockname()
+                    host, port = self.server_address[:2]
+                    self.server_name = str(host)
+                    self.server_port = int(port)
+
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    payload = payload_by_path.get(self.path)
+                    if payload is None:
+                        self.send_error(404)
+                        self.close_connection = True
+                        return
+                    body = json.dumps(payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            server.daemon_threads = True
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            try:
+                yield [f"{base_url}{path}" for path in payload_by_path]
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
+
+        @contextmanager
         def authority_route_bridge(
             authority_payloads: List[Dict[str, Any]],
             *,
@@ -1741,23 +1790,51 @@ class OmoikaneReferenceOS:
                 server_cert_path=cert_bundle["server_cert_path"],
                 server_key_path=cert_bundle["server_key_path"],
             ) as authority_route_catalog:
-                authority_route_target_discovery = (
-                    self.distributed_transport.discover_authority_route_targets(
-                        authority_plane,
-                        route_catalog=authority_route_catalog,
+                authority_cluster_seed_payload = {
+                    "kind": "distributed_transport_authority_cluster_seed",
+                    "schema_version": "1.0.0",
+                    "cluster_ref": "authority-cluster://federation/review-window",
+                    "council_tier": authority_plane.council_tier,
+                    "transport_profile": authority_plane.transport_profile,
+                    "route_targets": authority_route_catalog,
+                    "proof_digest": "",
+                }
+                authority_cluster_seed_payload["proof_digest"] = sha256_text(
+                    canonical_json(
+                        {
+                            "cluster_ref": authority_cluster_seed_payload["cluster_ref"],
+                            "council_tier": authority_cluster_seed_payload["council_tier"],
+                            "transport_profile": authority_cluster_seed_payload["transport_profile"],
+                            "route_targets": authority_cluster_seed_payload["route_targets"],
+                        }
                     )
                 )
-                authority_route_trace = self.distributed_transport.trace_non_loopback_authority_routes(
-                    rotated_federation_envelope,
-                    authority_plane,
-                    route_target_discovery=authority_route_target_discovery,
-                    ca_cert_path=cert_bundle["ca_cert_path"],
-                    ca_bundle_ref=CA_BUNDLE_REF,
-                    client_cert_path=cert_bundle["client_cert_path"],
-                    client_key_path=cert_bundle["client_key_path"],
-                    client_certificate_ref=CLIENT_CERTIFICATE_REF,
-                    request_timeout_ms=500,
-                )
+                with authority_cluster_seed_bridge([authority_cluster_seed_payload]) as authority_cluster_seed_refs:
+                    authority_cluster_discovery = (
+                        self.distributed_transport.discover_remote_authority_clusters(
+                            authority_plane,
+                            seed_refs=authority_cluster_seed_refs,
+                            review_budget=2,
+                            request_timeout_ms=500,
+                        )
+                    )
+                    authority_route_target_discovery = (
+                        self.distributed_transport.discover_authority_route_targets(
+                            authority_plane,
+                            route_catalog=authority_cluster_discovery.accepted_route_catalog,
+                        )
+                    )
+                    authority_route_trace = self.distributed_transport.trace_non_loopback_authority_routes(
+                        rotated_federation_envelope,
+                        authority_plane,
+                        route_target_discovery=authority_route_target_discovery,
+                        ca_cert_path=cert_bundle["ca_cert_path"],
+                        ca_bundle_ref=CA_BUNDLE_REF,
+                        client_cert_path=cert_bundle["client_cert_path"],
+                        client_key_path=cert_bundle["client_key_path"],
+                        client_certificate_ref=CLIENT_CERTIFICATE_REF,
+                        request_timeout_ms=500,
+                    )
         packet_capture_export = self.distributed_transport.export_authority_route_packet_capture(
             authority_route_trace,
         )
@@ -1844,6 +1921,16 @@ json.dump(response, sys.stdout)
             identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_churn_reconciled",
             payload=authority_churn.to_dict(),
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_cluster_discovered",
+            payload=authority_cluster_discovery.to_dict(),
             actor="DistributedTransportService",
             category="council-distributed",
             layer="L4",
@@ -2130,6 +2217,9 @@ json.dump(response, sys.stdout)
             "authority_churn": {
                 "federation_rotated": authority_churn.to_dict(),
             },
+            "authority_cluster_discovery": {
+                "federation_rotated": authority_cluster_discovery.to_dict(),
+            },
             "authority_route_target_discovery": {
                 "federation_rotated": authority_route_target_discovery.to_dict(),
             },
@@ -2234,6 +2324,34 @@ json.dump(response, sys.stdout)
                     == ["keyserver://federation/mirror-b-draining"]
                     and authority_churn.added_server_refs == []
                 ),
+                "authority_cluster_discovery_bound": (
+                    authority_cluster_discovery.discovery_profile
+                    == "review-capped-authority-cluster-discovery-v1"
+                    and authority_cluster_discovery.seed_transport_profile
+                    == "live-http-json-authority-cluster-seed-v1"
+                    and authority_cluster_discovery.discovery_status == "discovered"
+                    and authority_cluster_discovery.review_budget == 2
+                    and authority_cluster_discovery.accepted_cluster_ref
+                    == "authority-cluster://federation/review-window"
+                    and authority_cluster_discovery.authority_plane_ref
+                    == authority_plane.authority_plane_ref
+                    and authority_cluster_discovery.authority_plane_digest
+                    == authority_plane.digest
+                    and authority_cluster_discovery.all_active_members_discovered
+                    and authority_cluster_discovery.accepted_route_catalog_digest
+                    == sha256_text(
+                        canonical_json(authority_cluster_discovery.accepted_route_catalog)
+                    )
+                    and len(authority_cluster_discovery.candidate_clusters) == 1
+                    and authority_cluster_discovery.candidate_clusters[0]["acceptance_status"]
+                    == "accepted"
+                    and authority_cluster_discovery.candidate_clusters[0]["coverage_status"]
+                    == "covered"
+                    and authority_cluster_discovery.candidate_clusters[0][
+                        "host_attestation_status"
+                    ]
+                    == "complete"
+                ),
                 "authority_route_targets_discovered": (
                     authority_route_target_discovery.discovery_profile
                     == "bounded-authority-route-target-discovery-v1"
@@ -2248,6 +2366,8 @@ json.dump(response, sys.stdout)
                     and authority_route_target_discovery.authority_plane_digest
                     == authority_plane.digest
                     and authority_route_target_discovery.distinct_remote_host_count == 2
+                    and authority_route_target_discovery.route_targets
+                    == authority_cluster_discovery.accepted_route_catalog
                 ),
                 "authority_route_mtls_authenticated": (
                     authority_route_trace.trace_status == "authenticated"

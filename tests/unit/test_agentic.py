@@ -507,6 +507,55 @@ class DistributedTransportServiceTests(unittest.TestCase):
             thread.join(timeout=1.0)
 
     @contextmanager
+    def _authority_cluster_seed_servers(self, payloads: list[dict[str, object]]):
+        payload_by_path = {
+            f"/authority-cluster-seed-{index}": payload
+            for index, payload in enumerate(payloads, start=1)
+        }
+
+        class LocalThreadingHTTPServer(ThreadingHTTPServer):
+            def server_bind(self) -> None:
+                self.socket.bind(self.server_address)
+                self.server_address = self.socket.getsockname()
+                host, port = self.server_address[:2]
+                self.server_name = str(host)
+                self.server_port = int(port)
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.0"
+
+            def do_GET(self) -> None:  # noqa: N802
+                payload = payload_by_path.get(self.path)
+                if payload is None:
+                    self.send_error(404)
+                    self.close_connection = True
+                    return
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                self.close_connection = True
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                return
+
+        server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.daemon_threads = True
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            yield [f"{base_url}{path}" for path in payload_by_path]
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1.0)
+
+    @contextmanager
     def _authority_route_servers(
         self,
         payloads: list[dict[str, object]],
@@ -1381,6 +1430,294 @@ json.dump(
         self.assertTrue(churn_window.continuity_guard["overlap_satisfied"])
         self.assertTrue(churn_window.continuity_guard["removed_servers_draining"])
         self.assertEqual("quorum-maintained", churn_window.continuity_guard["status"])
+
+    def test_remote_authority_cluster_discovery_emits_accepted_route_catalog(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-cluster-001",
+            proposal_ref="proposal-transport-authority-cluster-001",
+            payload_ref="cas://sha256/test-authority-cluster",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "cluster-discovery"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-cluster-window",
+            "checked_at": "2026-04-22T01:10:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-cluster"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-cluster"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-cluster"),
+        }
+        stable_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-22T01:10:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-cluster"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-22T01:10:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-cluster"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(stable_payloads) as authority_endpoints:
+            authority_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-authority-cluster-test-") as cert_dir:
+            cert_bundle = write_fixture_bundle(cert_dir)
+            bind_host = self._discover_non_loopback_ipv4()
+            with self._authority_route_servers(
+                stable_payloads,
+                bind_host=bind_host,
+                ca_cert_path=cert_bundle["ca_cert_path"],
+                server_cert_path=cert_bundle["server_cert_path"],
+                server_key_path=cert_bundle["server_key_path"],
+            ) as route_targets:
+                seed_payload = {
+                    "kind": "distributed_transport_authority_cluster_seed",
+                    "schema_version": "1.0.0",
+                    "cluster_ref": "authority-cluster://federation/review-window",
+                    "council_tier": authority_plane.council_tier,
+                    "transport_profile": authority_plane.transport_profile,
+                    "route_targets": route_targets,
+                    "proof_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "cluster_ref": "authority-cluster://federation/review-window",
+                                "route_targets": route_targets,
+                            }
+                        )
+                    ),
+                }
+                with self._authority_cluster_seed_servers([seed_payload]) as seed_refs:
+                    discovery = service.discover_remote_authority_clusters(
+                        authority_plane,
+                        seed_refs=seed_refs,
+                        review_budget=2,
+                        request_timeout_ms=500,
+                    )
+
+        self.assertEqual("discovered", discovery.discovery_status)
+        self.assertEqual(
+            "review-capped-authority-cluster-discovery-v1",
+            discovery.discovery_profile,
+        )
+        self.assertEqual(
+            "live-http-json-authority-cluster-seed-v1",
+            discovery.seed_transport_profile,
+        )
+        self.assertEqual("authority-cluster://federation/review-window", discovery.accepted_cluster_ref)
+        self.assertEqual(2, discovery.review_budget)
+        self.assertTrue(discovery.all_active_members_discovered)
+        self.assertEqual(1, len(discovery.candidate_clusters))
+        self.assertEqual("accepted", discovery.candidate_clusters[0]["acceptance_status"])
+        self.assertEqual("covered", discovery.candidate_clusters[0]["coverage_status"])
+        self.assertEqual("complete", discovery.candidate_clusters[0]["host_attestation_status"])
+        self.assertEqual(2, len(discovery.accepted_route_catalog))
+        self.assertEqual(
+            sha256_text(canonical_json(discovery.accepted_route_catalog)),
+            discovery.accepted_route_catalog_digest,
+        )
+        route_target_discovery = service.discover_authority_route_targets(
+            authority_plane,
+            route_catalog=discovery.accepted_route_catalog,
+        )
+        self.assertEqual(discovery.accepted_route_catalog, route_target_discovery.route_targets)
+
+    def test_remote_authority_cluster_discovery_rejects_multiple_accepted_clusters(self) -> None:
+        service = DistributedTransportService()
+        envelope = service.issue_federation_handoff(
+            topology_ref="topology-transport-authority-cluster-ambiguous-001",
+            proposal_ref="proposal-transport-authority-cluster-ambiguous-001",
+            payload_ref="cas://sha256/test-authority-cluster-ambiguous",
+            payload_digest=sha256_text(
+                canonical_json({"scope": "cross-self", "authority_plane": "cluster-ambiguous"})
+            ),
+            participant_identity_ids=["identity://a", "identity://b"],
+        )
+        rotated = service.rotate_transport_keys(
+            envelope,
+            next_key_epoch=2,
+            trust_root_refs=["root://federation/pki-a", "root://federation/pki-b"],
+            trust_root_quorum=2,
+        )
+        root_directory_payload = {
+            "kind": "distributed_transport_root_directory",
+            "schema_version": "1.0.0",
+            "directory_ref": "rootdir://federation/authority-cluster-window-ambiguous",
+            "checked_at": "2026-04-22T01:20:00Z",
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "key_epoch": 2,
+            "active_root_ref": "root://federation/pki-b",
+            "accepted_roots": [
+                {
+                    "root_ref": "root://federation/pki-a",
+                    "fingerprint": sha256_text("root://federation/pki-a-authority-cluster-ambiguous"),
+                    "status": "candidate",
+                    "key_epoch": 2,
+                },
+                {
+                    "root_ref": "root://federation/pki-b",
+                    "fingerprint": sha256_text("root://federation/pki-b-authority-cluster-ambiguous"),
+                    "status": "active",
+                    "key_epoch": 2,
+                },
+            ],
+            "quorum_requirement": 2,
+            "proof_digest": sha256_text("authority-root-window-cluster-ambiguous"),
+        }
+        stable_payloads = [
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/notary-a",
+                "checked_at": "2026-04-22T01:20:01Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "quorum-notary",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-a"],
+                "proof_digest": sha256_text("authority-keyserver-a-cluster-ambiguous"),
+            },
+            {
+                "kind": "distributed_transport_key_server",
+                "schema_version": "1.0.0",
+                "key_server_ref": "keyserver://federation/mirror-c-active",
+                "checked_at": "2026-04-22T01:20:02Z",
+                "council_tier": "federation",
+                "served_transport_profile": "federation-mtls-quorum-v1",
+                "server_role": "directory-mirror",
+                "authority_status": "active",
+                "key_epoch": 2,
+                "advertised_root_refs": ["root://federation/pki-b"],
+                "proof_digest": sha256_text("authority-keyserver-c-cluster-ambiguous"),
+            },
+        ]
+
+        with self._root_directory_server(root_directory_payload) as root_endpoint:
+            root_directory = service.probe_live_root_directory(
+                rotated,
+                directory_endpoint=root_endpoint,
+                request_timeout_ms=500,
+            )
+        with self._authority_plane_servers(stable_payloads) as authority_endpoints:
+            authority_plane = service.probe_authority_plane(
+                rotated,
+                root_directory,
+                authority_endpoints=authority_endpoints,
+                request_timeout_ms=500,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-authority-cluster-ambiguous-") as cert_dir:
+            cert_bundle = write_fixture_bundle(cert_dir)
+            bind_host = self._discover_non_loopback_ipv4()
+            with self._authority_route_servers(
+                stable_payloads,
+                bind_host=bind_host,
+                ca_cert_path=cert_bundle["ca_cert_path"],
+                server_cert_path=cert_bundle["server_cert_path"],
+                server_key_path=cert_bundle["server_key_path"],
+            ) as route_targets:
+                alternate_route_targets = [dict(target) for target in route_targets]
+                alternate_route_targets[0]["authority_cluster_ref"] = (
+                    "authority-cluster://federation/review-window-b"
+                )
+                alternate_route_targets[1]["authority_cluster_ref"] = (
+                    "authority-cluster://federation/review-window-b"
+                )
+                seed_payloads = [
+                    {
+                        "kind": "distributed_transport_authority_cluster_seed",
+                        "schema_version": "1.0.0",
+                        "cluster_ref": "authority-cluster://federation/review-window-a",
+                        "council_tier": authority_plane.council_tier,
+                        "transport_profile": authority_plane.transport_profile,
+                        "route_targets": [
+                            {
+                                **target,
+                                "authority_cluster_ref": "authority-cluster://federation/review-window-a",
+                            }
+                            for target in route_targets
+                        ],
+                        "proof_digest": sha256_text("cluster-seed-a"),
+                    },
+                    {
+                        "kind": "distributed_transport_authority_cluster_seed",
+                        "schema_version": "1.0.0",
+                        "cluster_ref": "authority-cluster://federation/review-window-b",
+                        "council_tier": authority_plane.council_tier,
+                        "transport_profile": authority_plane.transport_profile,
+                        "route_targets": alternate_route_targets,
+                        "proof_digest": sha256_text("cluster-seed-b"),
+                    },
+                ]
+                with self._authority_cluster_seed_servers(seed_payloads) as seed_refs:
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        "requires exactly 1 accepted cluster",
+                    ):
+                        service.discover_remote_authority_clusters(
+                            authority_plane,
+                            seed_refs=seed_refs,
+                            review_budget=2,
+                            request_timeout_ms=500,
+                        )
 
     def test_non_loopback_authority_route_trace_binds_mtls_socket_evidence(self) -> None:
         service = DistributedTransportService()
