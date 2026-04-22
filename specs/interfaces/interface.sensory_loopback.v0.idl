@@ -2,14 +2,14 @@ idl_version: 1
 kind: service
 namespace: interface.sensory_loopback.v0
 service: SensoryLoopbackService
-summary: Canonical L6 contract for bounded visual/audio/haptic self-feedback with guardian stabilization.
+summary: Canonical L6 contract for bounded visual/audio/haptic self-feedback with guardian stabilization and shared-space arbitration.
 imports:
   sensory_loopback_session: ../schemas/sensory_loopback_session.schema
   sensory_loopback_receipt: ../schemas/sensory_loopback_receipt.schema
   sensory_loopback_artifact_family: ../schemas/sensory_loopback_artifact_family.schema
 operations:
   open_session:
-    summary: Bind one loopback session to a world-state anchor, virtual body anchor, and avatar body-map calibration before delivery begins.
+    summary: Bind one loopback session to a world-state anchor, virtual body anchor, avatar body-map calibration, and optional bounded shared-space context before delivery begins.
     input:
       inline_schema:
         type: object
@@ -19,7 +19,6 @@ operations:
           - body_anchor_ref
           - avatar_body_map_ref
           - proprioceptive_calibration_ref
-          - channels
         properties:
           identity_id:
             type: string
@@ -34,6 +33,20 @@ operations:
             type: string
             minLength: 1
           proprioceptive_calibration_ref:
+            type: string
+            minLength: 1
+          participant_identity_ids:
+            type: array
+            minItems: 1
+            maxItems: 4
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          shared_imc_session_id:
+            type: string
+            minLength: 1
+          shared_collective_id:
             type: string
             minLength: 1
           channels:
@@ -52,8 +65,10 @@ operations:
       - loopback sessions must bind to one world_state_ref before any delivery occurs
       - loopback sessions must bind to one avatar_body_map_ref and one proprioceptive_calibration_ref before delivery occurs
       - channels must cover at least 2 modalities to claim body-coherent feedback
+      - participant_identity_ids with more than 1 entry require shared_imc_session_id and bind guardian-mediated arbitration metadata
+      - shared_collective_id may only appear when shared_imc_session_id is also bound
   deliver_bundle:
-    summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence or degrade it into a guardian-controlled safe baseline.
+    summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence, optional shared-space owner arbitration, or degrade it into a guardian-controlled safe baseline.
     input:
       inline_schema:
         type: object
@@ -126,12 +141,35 @@ operations:
           qualia_binding_ref:
             type: string
             minLength: 1
+          owner_identity_id:
+            type: string
+            minLength: 1
+          participant_attention_targets:
+            type: object
+            minProperties: 1
+            propertyNames:
+              type: string
+              minLength: 1
+            additionalProperties:
+              type: string
+              minLength: 1
+          participant_presence_refs:
+            type: object
+            minProperties: 1
+            propertyNames:
+              type: string
+              minLength: 1
+            additionalProperties:
+              type: string
+              minLength: 1
     output:
       schema_ref: sensory_loopback_receipt
     guarantees:
       - body_coherence_score must be derived from the weighted body_map_alignment payload
       - coherent bundles must remain within 90ms latency and 0.20 body drift
       - degraded bundles require guardian observation before attenuation or hold
+      - shared-space bundles must bind one owner_identity_id and complete participant attention/presence maps
+      - conflicting participant_attention_targets require guardian observation and must emit guardian-mediated or guardian-hold arbitration_status
       - guardian-hold receipts must apply safe baseline and flag council review
       - audit output must retain artifact refs and digest only, never raw loopback payloads
   stabilize:
@@ -179,7 +217,7 @@ operations:
         required:
           - session_id
           - family_label
-          - delivery_ids
+          - receipts
         properties:
           session_id:
             type: string
@@ -187,19 +225,18 @@ operations:
           family_label:
             type: string
             minLength: 1
-          delivery_ids:
+          receipts:
             type: array
             minItems: 2
             maxItems: 4
-            uniqueItems: true
             items:
-              type: string
-              minLength: 8
+              schema_ref: sensory_loopback_receipt
     output:
       schema_ref: sensory_loopback_artifact_family
     guarantees:
       - artifact families must only group receipts from the same loopback session
       - artifact families must preserve per-scene digest, guardian action, and recovery state without raw payload retention
+      - shared-space artifact families must preserve participant bindings, arbitration refs, and arbitration counts across scenes
       - artifact family capture must expose the final session status at record time
   snapshot_artifact_family:
     summary: Read one recorded multi-scene loopback artifact family.
@@ -227,5 +264,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves digest-only, body-coherent loopback handling, avatar body-map calibration binding, and bounded multi-scene artifact family capture inside the reference runtime.
+    - This contract proves digest-only, body-coherent loopback handling, avatar body-map calibration binding, shared IMC/collective arbitration metadata, and bounded multi-scene artifact family capture inside the reference runtime.
     - Raw payload capture and device-driver timing stay outside this bootstrap boundary so the in-repo runtime remains deterministic and digest-only.

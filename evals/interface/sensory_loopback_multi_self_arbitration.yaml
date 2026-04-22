@@ -1,0 +1,22 @@
+eval_id: sensory_loopback_multi_self_arbitration
+target: interface.sensory_loopback
+level: L6
+description: >
+  Sensory Loopback が collective / IMC 共有空間で bounded multi-self session を開き、
+  participant binding と owner handoff を保ったまま guardian-mediated arbitration を
+  digest-only artifact family に残せること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
+expected:
+  validation_ok: true
+  shared_loopback_ok: true
+  shared_loopback_collective_bound: true
+  shared_loopback_imc_bound: true
+  shared_loopback_participants_bound: true
+  shared_loopback_arbitrated: true
+  shared_loopback_owner_handoff: true
+  shared_loopback_family_tracked: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

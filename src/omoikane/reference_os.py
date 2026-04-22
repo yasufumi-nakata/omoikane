@@ -6161,12 +6161,201 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="virtual-sensory-plane",
         )
+
+        peer = self.identity.create(
+            human_consent_proof="consent://sensory-loopback-peer-demo/v1",
+            metadata={"display_name": "Shared Loopback Peer"},
+        )
+        collective_identity = self.identity.create_collective(
+            [identity.identity_id, peer.identity_id],
+            consent_proof="consent://sensory-loopback-collective-demo/v1",
+            metadata={
+                "display_name": "Atrium Shared Field",
+                "purpose": "bounded shared sensory arbitration",
+            },
+        )
+        shared_imc_session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer.identity_id,
+            mode="merge_thought",
+            initiator_template={
+                "public_fields": ["display_name", "shared_focus", "presence_state"],
+                "intimate_fields": ["affect_summary", "intent_vector"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "shared_focus", "presence_state"],
+                "intimate_fields": ["affect_summary", "intent_vector"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        shared_collective = self.collective.register_collective(
+            collective_identity_id=collective_identity.identity_id,
+            member_ids=[identity.identity_id, peer.identity_id],
+            purpose="bounded shared sensory arbitration inside a collective atrium",
+            proposed_name="Atrium Shared Field",
+            council_witnessed=True,
+            federation_attested=True,
+            guardian_observed=True,
+        )
+        shared_world_session = self.wms.create_session(
+            [collective_identity.identity_id, identity.identity_id, peer.identity_id],
+            objects=[
+                "shared-mirror",
+                "collective-anchor",
+                "perimeter-lantern",
+            ],
+        )
+        shared_world_state = self.wms.snapshot(shared_world_session["session_id"])
+        shared_merge_session = self.collective.open_merge_session(
+            collective_id=shared_collective["collective_id"],
+            imc_session_id=shared_imc_session["session_id"],
+            wms_session_id=shared_world_session["session_id"],
+            requested_duration_seconds=6.0,
+            council_witnessed=True,
+            federation_attested=True,
+            guardian_observed=True,
+            shared_world_mode=shared_world_session["mode"],
+        )
+        shared_session = self.sensory_loopback.open_session(
+            identity_id=identity.identity_id,
+            world_state_ref=f"wms://state/{shared_world_state['state_id']}",
+            body_anchor_ref="avatar://atrium/shared-body/core",
+            avatar_body_map_ref="avatar-body-map://atrium/shared-body/v1",
+            proprioceptive_calibration_ref="calibration://atrium/shared-body/v1",
+            participant_identity_ids=[identity.identity_id, peer.identity_id],
+            shared_imc_session_id=shared_imc_session["session_id"],
+            shared_collective_id=shared_collective["collective_id"],
+        )
+        shared_aligned_tick = self.qualia.append(
+            summary="shared mirror alignment keeps both participants attached to one embodied anchor",
+            valence=0.22,
+            arousal=0.41,
+            clarity=0.88,
+            modality_salience={
+                "visual": 0.89,
+                "auditory": 0.71,
+                "somatic": 0.78,
+                "interoceptive": 0.43,
+            },
+            attention_target="avatar://atrium/shared-body/core",
+            self_awareness=0.74,
+            lucidity=0.9,
+        )
+        shared_aligned = self.sensory_loopback.deliver_bundle(
+            shared_session["session_id"],
+            scene_summary="aligned shared atrium loopback keeps both participants on the same avatar anchor",
+            artifact_refs={
+                "visual": "artifact://loopback/shared/visual/aligned-mirror-v1",
+                "auditory": "artifact://loopback/shared/audio/aligned-chorus-v1",
+                "haptic": "artifact://loopback/shared/haptic/aligned-floor-v1",
+            },
+            latency_ms=58.0,
+            body_map_alignment_ref="alignment://atrium/shared-body/aligned-v1",
+            body_map_alignment={
+                "core": 0.94,
+                "left-hand": 0.9,
+                "right-hand": 0.92,
+                "stance": 0.93,
+            },
+            attention_target=shared_aligned_tick.attention_target,
+            guardian_observed=True,
+            qualia_binding_ref=f"qualia://tick/{shared_aligned_tick.tick_id}",
+            owner_identity_id=identity.identity_id,
+            participant_attention_targets={
+                identity.identity_id: "avatar://atrium/shared-body/core",
+                peer.identity_id: "avatar://atrium/shared-body/core",
+            },
+            participant_presence_refs={
+                identity.identity_id: "presence://atrium/shared/self-core",
+                peer.identity_id: "presence://atrium/shared/peer-core",
+            },
+        )
+        shared_mediated_tick = self.qualia.append(
+            summary="guardian mediates competing focus claims inside the shared atrium without breaking body coherence",
+            valence=0.05,
+            arousal=0.56,
+            clarity=0.79,
+            modality_salience={
+                "visual": 0.84,
+                "auditory": 0.77,
+                "somatic": 0.73,
+                "interoceptive": 0.39,
+            },
+            attention_target="avatar://atrium/shared-body/perimeter",
+            self_awareness=0.72,
+            lucidity=0.87,
+        )
+        shared_mediated = self.sensory_loopback.deliver_bundle(
+            shared_session["session_id"],
+            scene_summary="guardian mediates competing shared-space targets while preserving coherent loopback",
+            artifact_refs={
+                "visual": "artifact://loopback/shared/visual/arbitrated-mirror-v1",
+                "auditory": "artifact://loopback/shared/audio/arbitrated-chorus-v1",
+                "haptic": "artifact://loopback/shared/haptic/arbitrated-floor-v1",
+            },
+            latency_ms=61.0,
+            body_map_alignment_ref="alignment://atrium/shared-body/arbitrated-v1",
+            body_map_alignment={
+                "core": 0.91,
+                "left-hand": 0.89,
+                "right-hand": 0.9,
+                "stance": 0.92,
+            },
+            attention_target=shared_mediated_tick.attention_target,
+            guardian_observed=True,
+            qualia_binding_ref=f"qualia://tick/{shared_mediated_tick.tick_id}",
+            owner_identity_id=peer.identity_id,
+            participant_attention_targets={
+                identity.identity_id: "avatar://atrium/shared-body/core",
+                peer.identity_id: "avatar://atrium/shared-body/perimeter",
+            },
+            participant_presence_refs={
+                identity.identity_id: "presence://atrium/shared/self-core",
+                peer.identity_id: "presence://atrium/shared/peer-perimeter",
+            },
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.bundle.arbitrated",
+            payload=shared_mediated,
+            actor="Guardian",
+            category="interface-sensory-loopback-shared",
+            layer="L6",
+            signature_roles=["guardian", "council"],
+            substrate="virtual-sensory-plane",
+        )
+        shared_artifact_family = self.sensory_loopback.capture_artifact_family(
+            shared_session["session_id"],
+            family_label="collective-atrium-arbitration-family",
+            receipts=[shared_aligned, shared_mediated],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.shared_artifact_family.recorded",
+            payload=shared_artifact_family,
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback-shared",
+            layer="L6",
+            signature_roles=["self", "guardian", "council"],
+            substrate="virtual-sensory-plane",
+        )
         final_session = self.sensory_loopback.snapshot(session["session_id"])
         session_validation = self.sensory_loopback.validate_session(final_session)
         coherent_validation = self.sensory_loopback.validate_receipt(coherent)
         degraded_validation = self.sensory_loopback.validate_receipt(degraded)
         stabilized_validation = self.sensory_loopback.validate_receipt(stabilized)
         artifact_family_validation = self.sensory_loopback.validate_artifact_family(artifact_family)
+        shared_final_session = self.sensory_loopback.snapshot(shared_session["session_id"])
+        shared_session_validation = self.sensory_loopback.validate_session(shared_final_session)
+        shared_aligned_validation = self.sensory_loopback.validate_receipt(shared_aligned)
+        shared_mediated_validation = self.sensory_loopback.validate_receipt(shared_mediated)
+        shared_artifact_family_validation = self.sensory_loopback.validate_artifact_family(
+            shared_artifact_family,
+        )
 
         return {
             "identity": {
@@ -6182,6 +6371,47 @@ json.dump(response, sys.stdout)
                 "stabilized": stabilized,
             },
             "artifact_family": artifact_family,
+            "shared_loopback": {
+                "peer": {
+                    "identity_id": peer.identity_id,
+                    "lineage_id": peer.lineage_id,
+                },
+                "world_state": shared_world_state,
+                "imc_session": shared_imc_session,
+                "collective": shared_collective,
+                "merge_session": shared_merge_session,
+                "session": shared_final_session,
+                "receipts": {
+                    "aligned": shared_aligned,
+                    "mediated": shared_mediated,
+                },
+                "artifact_family": shared_artifact_family,
+                "validation": {
+                    "ok": shared_session_validation["ok"]
+                    and shared_aligned_validation["ok"]
+                    and shared_mediated_validation["ok"]
+                    and shared_artifact_family_validation["ok"],
+                    "session_ok": shared_session_validation["ok"],
+                    "aligned_ok": shared_aligned_validation["ok"],
+                    "mediated_ok": shared_mediated_validation["ok"],
+                    "artifact_family_ok": shared_artifact_family_validation["ok"],
+                    "shared_space_mode_collective": shared_final_session["shared_space_mode"]
+                    == "collective-shared",
+                    "participant_bindings_complete": shared_mediated_validation[
+                        "participant_bindings_complete"
+                    ],
+                    "shared_imc_bound": shared_session_validation["shared_imc_bound"],
+                    "shared_collective_bound": shared_session_validation["shared_collective_bound"],
+                    "owner_handoff": shared_mediated["owner_identity_id"] == peer.identity_id,
+                    "guardian_arbitrated": shared_mediated_validation["guardian_arbitrated"]
+                    and shared_mediated["arbitration_status"] == "guardian-mediated",
+                    "artifact_family_arbitration_tracked": shared_artifact_family_validation[
+                        "arbitration_tracked"
+                    ]
+                    and shared_artifact_family["arbitration_scene_count"] == 2
+                    and shared_artifact_family["guardian_arbitration_count"] == 1,
+                },
+            },
             "qualia": {
                 "profile": self.qualia.profile(),
                 "recent": self.qualia.recent(2),
@@ -6216,6 +6446,28 @@ json.dump(response, sys.stdout)
                     scene["avatar_body_map_ref"] == final_session["avatar_body_map_ref"]
                     for scene in artifact_family["scene_summaries"]
                 ),
+                "shared_loopback_ok": shared_session_validation["ok"]
+                and shared_aligned_validation["ok"]
+                and shared_mediated_validation["ok"]
+                and shared_artifact_family_validation["ok"],
+                "shared_loopback_collective_bound": shared_session_validation[
+                    "shared_collective_bound"
+                ]
+                and shared_final_session["shared_space_mode"] == "collective-shared",
+                "shared_loopback_imc_bound": shared_session_validation["shared_imc_bound"],
+                "shared_loopback_participants_bound": shared_mediated_validation[
+                    "participant_bindings_complete"
+                ]
+                and shared_session_validation["participant_count"] == 2,
+                "shared_loopback_arbitrated": shared_mediated_validation["guardian_arbitrated"]
+                and shared_mediated["arbitration_status"] == "guardian-mediated",
+                "shared_loopback_owner_handoff": shared_mediated["owner_identity_id"]
+                == peer.identity_id,
+                "shared_loopback_family_tracked": shared_artifact_family_validation[
+                    "arbitration_tracked"
+                ]
+                and shared_artifact_family["arbitration_scene_count"] == 2
+                and shared_artifact_family["guardian_arbitration_count"] == 1,
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
             },

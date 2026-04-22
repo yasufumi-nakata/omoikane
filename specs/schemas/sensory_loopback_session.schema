@@ -13,6 +13,13 @@ required:
   - opened_at
   - updated_at
   - status
+  - participant_identity_ids
+  - shared_space_mode
+  - shared_imc_session_id
+  - shared_collective_id
+  - arbitration_policy_id
+  - arbitration_required
+  - current_owner_identity_id
   - world_state_ref
   - body_anchor_ref
   - allowed_channels
@@ -34,6 +41,8 @@ required:
   - last_guardian_action
   - last_body_map_alignment_ref
   - last_body_map_alignment
+  - last_arbitration_status
+  - last_arbitration_ref
   - artifact_family_count
   - last_artifact_family_id
   - last_artifact_family_ref
@@ -60,6 +69,31 @@ properties:
       - stabilizing
       - held
       - closed
+  participant_identity_ids:
+    type: array
+    minItems: 1
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  shared_space_mode:
+    type: string
+    enum:
+      - self-only
+      - imc-shared
+      - collective-shared
+  shared_imc_session_id:
+    type: string
+  shared_collective_id:
+    type: string
+  arbitration_policy_id:
+    const: guardian-mediated-multi-self-loopback-v1
+  arbitration_required:
+    type: boolean
+  current_owner_identity_id:
+    type: string
+    minLength: 1
   world_state_ref:
     type: string
     minLength: 1
@@ -174,6 +208,16 @@ properties:
         type: number
         minimum: 0
         maximum: 1
+  last_arbitration_status:
+    type: string
+    enum:
+      - self-exclusive
+      - shared-aligned
+      - guardian-mediated
+      - guardian-hold
+  last_arbitration_ref:
+    type: string
+    minLength: 1
   artifact_family_count:
     type: integer
     minimum: 0

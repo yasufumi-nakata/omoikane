@@ -42,7 +42,7 @@
 - 仮想空間での自己身体感覚
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json`
   で coherent delivery、guardian hold、safe baseline からの stabilization、
-  qualia binding ref をまとめて検証する
+  qualia binding ref、shared IMC / collective 空間での multi-self arbitration をまとめて検証する
 
 ### External World Agents (EWA)
 - ロボット・ドローン・センサ等の物理世界 actuator

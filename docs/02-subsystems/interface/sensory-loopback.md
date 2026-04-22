@@ -16,6 +16,9 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 - drift や latency overshoot 時は Guardian が safe baseline へ attenuate / hold する
 - `QualiaBuffer` へは raw stream ではなく `qualia_binding_ref` だけを返し、
   surrogate tick と結び直す
+- bounded な collective / IMC 共有空間では
+  `participant_identity_ids` / `shared_imc_session_id` / `shared_collective_id` を束縛し、
+  competing `attention_target` を guardian-mediated arbitration で machine-checkable にする
 
 ## Reference Runtime の固定 profile
 
@@ -33,6 +36,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | qualia_binding_policy | `surrogate-tick-ref` |
 | artifact_family_policy | `multi-scene-artifact-family-v1` |
 | artifact_family_max_scenes | `4` |
+| shared_space_modes | `self-only / imc-shared / collective-shared` |
+| arbitration_policy | `guardian-mediated-multi-self-loopback-v1` |
 
 reference runtime では raw retinal/audio/haptic payload は扱わず、
 **artifact ref + digest + avatar body-map alignment** に限定した contract を固定する。
@@ -47,6 +52,9 @@ sensory_loopback.open_session:
     body_anchor_ref: <avatar body anchor>
     avatar_body_map_ref: <canonical avatar body map ref>
     proprioceptive_calibration_ref: <latest calibration snapshot ref>
+    participant_identity_ids: [<identity ref>, ...]
+    shared_imc_session_id: <imc session ref>
+    shared_collective_id: <collective ref>
     channels: [visual, auditory, haptic]
   output: sensory_loopback_session
 
@@ -68,6 +76,11 @@ sensory_loopback.deliver_bundle:
     attention_target: <focus ref>
     guardian_observed: <bool>
     qualia_binding_ref: <qualia tick ref>
+    owner_identity_id: <current shared-space owner>
+    participant_attention_targets:
+      <identity ref>: <focus ref>
+    participant_presence_refs:
+      <identity ref>: <presence ref>
   output: sensory_loopback_receipt
 
 sensory_loopback.stabilize:
@@ -81,7 +94,7 @@ sensory_loopback.capture_artifact_family:
   input:
     session_id: <loopback session>
     family_label: <bounded family label>
-    delivery_ids: [<delivery ref>, <delivery ref>, ...]
+    receipts: [<receipt>, <receipt>, ...]
   output: sensory_loopback_artifact_family
 ```
 
@@ -92,6 +105,7 @@ sensory_loopback.capture_artifact_family:
 | latency <= 90ms かつ drift <= 0.20 | `delivery_status=delivered` |
 | latency <= 140ms かつ drift <= 0.35 | `delivery_status=attenuate-to-safe-baseline` |
 | それ以外 | `delivery_status=guardian-hold` |
+| shared space で participant target が衝突 | `guardian_observed=true` のときのみ `arbitration_status=guardian-mediated or guardian-hold` |
 
 degraded bundle は Guardian observe が無い限り reject する。
 
@@ -104,6 +118,7 @@ degraded bundle は Guardian observe が無い限り reject する。
 5. **qualia は ref のみ** ── loopback receipt は surrogate tick 参照だけを返す
 6. **artifact family は同一 session 内限定** ── multi-scene family は 2-4 receipt を同一 session に束縛する
 7. **body map calibration 必須** ── session と receipt は `avatar_body_map_ref` / `proprioceptive_calibration_ref` / `body_map_alignment_ref` を必ず持つ
+8. **shared arbitration は guardian mediation 必須** ── multi-self loopback では participant map を省略せず、競合 focus は Guardian observe 下でのみ反映する
 
 ## reference runtime の扱い
 
@@ -114,16 +129,22 @@ degraded bundle は Guardian observe が無い限り reject する。
   `sensory_loopback_artifact_family.schema` を追加
 - `sensory-loopback-demo --json` で coherent delivery、
   guardian hold、stabilize 復帰、multi-scene artifact family capture を 1 シナリオで可視化
+- 同じ demo 内で shared IMC / collective loopback session を開き、
+  `shared-aligned` と `guardian-mediated` arbitration path を
+  digest-only artifact family として可視化
 - `evals/interface/sensory_loopback_guard.yaml` で
   body coherence guard、avatar body-map calibration binding、qualia binding を固定
 - `evals/interface/sensory_loopback_artifact_family.yaml` で
   family scene 順序、guardian intervention 数、final session binding、
   body-map binding を固定
+- `evals/interface/sensory_loopback_multi_self_arbitration.yaml` で
+  participant binding、IMC/collective binding、owner handoff、
+  guardian-mediated arbitration tracking を固定
 
 ## 未解決
 
 - raw retinal/audio/haptic payload を actual capture pipeline へ接続する repo 外 adapter
-- collective / IMC 共有空間での multi-self loopback arbitration
+- 4 participant を超える shared sensory field や hardware timing 連動の arbitration scale-out
 
 ## 関連
 

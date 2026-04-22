@@ -235,6 +235,135 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             artifact_family["scene_summaries"][0]["avatar_body_map_ref"],
         )
 
+    def test_collective_shared_bundle_tracks_guardian_arbitration(self) -> None:
+        service = SensoryLoopbackService()
+        session = service.open_session(
+            identity_id="identity://loopback-primary",
+            world_state_ref="wms://state/shared-1",
+            body_anchor_ref="avatar://shared/core",
+            avatar_body_map_ref="avatar-body-map://shared/v1",
+            proprioceptive_calibration_ref="calibration://shared/v1",
+            participant_identity_ids=[
+                "identity://loopback-primary",
+                "identity://loopback-peer",
+            ],
+            shared_imc_session_id="imc://shared/session-1",
+            shared_collective_id="collective://shared/field-1",
+        )
+
+        aligned = service.deliver_bundle(
+            session["session_id"],
+            scene_summary="aligned shared atrium loopback",
+            artifact_refs={
+                "visual": "artifact://shared/aligned-visual",
+                "auditory": "artifact://shared/aligned-audio",
+                "haptic": "artifact://shared/aligned-haptic",
+            },
+            latency_ms=57.0,
+            body_map_alignment_ref="alignment://shared/aligned-v1",
+            body_map_alignment={
+                "core": 0.94,
+                "left-hand": 0.9,
+                "right-hand": 0.91,
+                "stance": 0.92,
+            },
+            attention_target="avatar://shared/core",
+            guardian_observed=True,
+            owner_identity_id="identity://loopback-primary",
+            participant_attention_targets={
+                "identity://loopback-primary": "avatar://shared/core",
+                "identity://loopback-peer": "avatar://shared/core",
+            },
+            participant_presence_refs={
+                "identity://loopback-primary": "presence://shared/self",
+                "identity://loopback-peer": "presence://shared/peer",
+            },
+        )
+        with self.assertRaisesRegex(PermissionError, "multi-self loopback arbitration"):
+            service.deliver_bundle(
+                session["session_id"],
+                scene_summary="competing focus without guardian",
+                artifact_refs={
+                    "visual": "artifact://shared/conflict-visual",
+                    "auditory": "artifact://shared/conflict-audio",
+                    "haptic": "artifact://shared/conflict-haptic",
+                },
+                latency_ms=60.0,
+                body_map_alignment_ref="alignment://shared/conflict-v1",
+                body_map_alignment={
+                    "core": 0.92,
+                    "left-hand": 0.89,
+                    "right-hand": 0.9,
+                    "stance": 0.91,
+                },
+                attention_target="avatar://shared/perimeter",
+                guardian_observed=False,
+                owner_identity_id="identity://loopback-peer",
+                participant_attention_targets={
+                    "identity://loopback-primary": "avatar://shared/core",
+                    "identity://loopback-peer": "avatar://shared/perimeter",
+                },
+                participant_presence_refs={
+                    "identity://loopback-primary": "presence://shared/self",
+                    "identity://loopback-peer": "presence://shared/peer-perimeter",
+                },
+            )
+        mediated = service.deliver_bundle(
+            session["session_id"],
+            scene_summary="guardian mediates competing shared-space targets",
+            artifact_refs={
+                "visual": "artifact://shared/conflict-visual",
+                "auditory": "artifact://shared/conflict-audio",
+                "haptic": "artifact://shared/conflict-haptic",
+            },
+            latency_ms=60.0,
+            body_map_alignment_ref="alignment://shared/conflict-v1",
+            body_map_alignment={
+                "core": 0.92,
+                "left-hand": 0.89,
+                "right-hand": 0.9,
+                "stance": 0.91,
+            },
+            attention_target="avatar://shared/perimeter",
+            guardian_observed=True,
+            owner_identity_id="identity://loopback-peer",
+            participant_attention_targets={
+                "identity://loopback-primary": "avatar://shared/core",
+                "identity://loopback-peer": "avatar://shared/perimeter",
+            },
+            participant_presence_refs={
+                "identity://loopback-primary": "presence://shared/self",
+                "identity://loopback-peer": "presence://shared/peer-perimeter",
+            },
+        )
+        artifact_family = service.capture_artifact_family(
+            session["session_id"],
+            family_label="shared-arbitration-family",
+            receipts=[aligned, mediated],
+        )
+        snapshot = service.snapshot(session["session_id"])
+        session_validation = service.validate_session(snapshot)
+        mediated_validation = service.validate_receipt(mediated)
+        family_validation = service.validate_artifact_family(artifact_family)
+
+        self.assertTrue(session_validation["ok"])
+        self.assertEqual("collective-shared", snapshot["shared_space_mode"])
+        self.assertEqual(2, session_validation["participant_count"])
+        self.assertTrue(session_validation["shared_imc_bound"])
+        self.assertTrue(session_validation["shared_collective_bound"])
+        self.assertEqual("shared-aligned", aligned["arbitration_status"])
+        self.assertEqual("guardian-mediated", mediated["arbitration_status"])
+        self.assertEqual("identity://loopback-peer", mediated["owner_identity_id"])
+        self.assertTrue(mediated_validation["participant_bindings_complete"])
+        self.assertTrue(mediated_validation["guardian_arbitrated"])
+        self.assertTrue(family_validation["ok"])
+        self.assertEqual(2, artifact_family["arbitration_scene_count"])
+        self.assertEqual(1, artifact_family["guardian_arbitration_count"])
+        self.assertEqual(
+            ["identity://loopback-primary", "identity://loopback-peer"],
+            artifact_family["scene_summaries"][1]["participant_identity_ids"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

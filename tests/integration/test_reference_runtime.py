@@ -148,12 +148,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["proprioceptive_calibration_bound"])
         self.assertTrue(result["validation"]["alignment_ref_bound"])
         self.assertTrue(result["validation"]["artifact_family_body_map_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_ok"])
+        self.assertTrue(result["validation"]["shared_loopback_collective_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_imc_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_participants_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_arbitrated"])
+        self.assertTrue(result["validation"]["shared_loopback_owner_handoff"])
+        self.assertTrue(result["validation"]["shared_loopback_family_tracked"])
         self.assertEqual("active", result["session"]["status"])
         self.assertTrue(result["session"]["avatar_body_map_ref"].startswith("avatar-body-map://"))
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["artifact_family"]["final_session_status"])
         self.assertEqual("guardian-hold", result["receipts"]["degraded"]["delivery_status"])
+        self.assertEqual("collective-shared", result["shared_loopback"]["session"]["shared_space_mode"])
+        self.assertEqual(
+            "guardian-mediated",
+            result["shared_loopback"]["receipts"]["mediated"]["arbitration_status"],
+        )
+        self.assertEqual(2, result["shared_loopback"]["artifact_family"]["scene_count"])
+        self.assertEqual(1, result["shared_loopback"]["artifact_family"]["guardian_arbitration_count"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
         self.assertEqual(
             1,
@@ -162,6 +176,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             1,
             result["ledger_verification"]["category_counts"]["interface-sensory-loopback-family"],
+        )
+        self.assertEqual(
+            2,
+            result["ledger_verification"]["category_counts"]["interface-sensory-loopback-shared"],
         )
 
     def test_reference_scenario_runs(self) -> None:

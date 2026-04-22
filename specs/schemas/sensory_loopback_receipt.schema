@@ -28,6 +28,16 @@ required:
   - immersion_preserved
   - safe_baseline_applied
   - requires_council_review
+  - participant_identity_ids
+  - shared_space_mode
+  - shared_imc_session_id
+  - shared_collective_id
+  - arbitration_policy_id
+  - arbitration_ref
+  - arbitration_status
+  - owner_identity_id
+  - participant_attention_targets
+  - participant_presence_refs
   - qualia_binding_ref
   - attention_target
   - audit_event_ref
@@ -141,6 +151,57 @@ properties:
     type: boolean
   requires_council_review:
     type: boolean
+  participant_identity_ids:
+    type: array
+    minItems: 1
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  shared_space_mode:
+    type: string
+    enum:
+      - self-only
+      - imc-shared
+      - collective-shared
+  shared_imc_session_id:
+    type: string
+  shared_collective_id:
+    type: string
+  arbitration_policy_id:
+    const: guardian-mediated-multi-self-loopback-v1
+  arbitration_ref:
+    type: string
+    minLength: 1
+  arbitration_status:
+    type: string
+    enum:
+      - self-exclusive
+      - shared-aligned
+      - guardian-mediated
+      - guardian-hold
+  owner_identity_id:
+    type: string
+    minLength: 1
+  participant_attention_targets:
+    type: object
+    minProperties: 1
+    propertyNames:
+      type: string
+      minLength: 1
+    additionalProperties:
+      type: string
+      minLength: 1
+  participant_presence_refs:
+    type: object
+    minProperties: 1
+    propertyNames:
+      type: string
+      minLength: 1
+    additionalProperties:
+      type: string
+      minLength: 1
   qualia_binding_ref:
     type: string
     minLength: 1

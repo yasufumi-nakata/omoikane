@@ -541,6 +541,11 @@ high-drift bundle が `guardian-hold` と `safe baseline` に落ちた後、
 coherent / held / stabilized の 3 scene が
 `multi-scene-artifact-family-v1` で 1 つの digest-only artifact family に束縛されつつ、
 audit が artifact digest と summary ref だけを保持することを確認する。
+同じ demo は sidecar の shared loopback path も返し、
+`participant_identity_ids` / `shared_imc_session_id` / `shared_collective_id` を束縛した
+collective-shared session 上で、
+owner handoff を伴う `shared-aligned` / `guardian-mediated` arbitration を
+別の digest-only artifact family として machine-checkable に残す。
 
 `version-demo` は hybrid versioning policy を JSON で可視化し、
 runtime semver、IDL/schema の `bootstrap` stability、governance calver、

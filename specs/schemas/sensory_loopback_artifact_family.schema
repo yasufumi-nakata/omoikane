@@ -15,10 +15,16 @@ required:
   - recorded_at
   - family_label
   - policy_id
+  - participant_identity_ids
+  - shared_space_mode
+  - shared_imc_session_id
+  - shared_collective_id
   - scene_count
   - delivery_ids
   - channels_observed
   - scene_summaries
+  - arbitration_scene_count
+  - guardian_arbitration_count
   - guardian_intervention_count
   - stabilization_delivery_ids
   - final_session_status
@@ -45,6 +51,24 @@ properties:
     minLength: 1
   policy_id:
     const: multi-scene-artifact-family-v1
+  participant_identity_ids:
+    type: array
+    minItems: 1
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  shared_space_mode:
+    type: string
+    enum:
+      - self-only
+      - imc-shared
+      - collective-shared
+  shared_imc_session_id:
+    type: string
+  shared_collective_id:
+    type: string
   scene_count:
     type: integer
     minimum: 2
@@ -74,22 +98,6 @@ properties:
     items:
       type: object
       additionalProperties: false
-      required:
-        - delivery_id
-        - scene_summary
-        - delivered_channels
-        - classification
-        - delivery_status
-        - guardian_action
-        - artifact_digest
-        - body_coherence_score
-        - avatar_body_map_ref
-        - proprioceptive_calibration_ref
-        - body_map_alignment_ref
-        - qualia_binding_ref
-        - attention_target
-        - safe_baseline_applied
-        - requires_council_review
       properties:
         delivery_id:
           type: string
@@ -149,10 +157,64 @@ properties:
         attention_target:
           type: string
           minLength: 1
+        participant_identity_ids:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        shared_space_mode:
+          type: string
+          enum:
+            - self-only
+            - imc-shared
+            - collective-shared
+        arbitration_ref:
+          type: string
+          minLength: 1
+        arbitration_status:
+          type: string
+          enum:
+            - self-exclusive
+            - shared-aligned
+            - guardian-mediated
+            - guardian-hold
+        owner_identity_id:
+          type: string
+          minLength: 1
         safe_baseline_applied:
           type: boolean
         requires_council_review:
           type: boolean
+      required:
+        - delivery_id
+        - scene_summary
+        - delivered_channels
+        - classification
+        - delivery_status
+        - guardian_action
+        - artifact_digest
+        - body_coherence_score
+        - avatar_body_map_ref
+        - proprioceptive_calibration_ref
+        - body_map_alignment_ref
+        - qualia_binding_ref
+        - attention_target
+        - participant_identity_ids
+        - shared_space_mode
+        - arbitration_ref
+        - arbitration_status
+        - owner_identity_id
+        - safe_baseline_applied
+        - requires_council_review
+  arbitration_scene_count:
+    type: integer
+    minimum: 0
+  guardian_arbitration_count:
+    type: integer
+    minimum: 0
   guardian_intervention_count:
     type: integer
     minimum: 0
@@ -183,20 +245,25 @@ examples:
     family_ref: loopback-family://sl-family-0123456789ab
     session_id: sl-112233445566
     recorded_at: "2026-04-21T08:00:00Z"
-    family_label: atrium-realignment-family
+    family_label: collective-atrium-arbitration-family
     policy_id: multi-scene-artifact-family-v1
-    scene_count: 3
+    participant_identity_ids:
+      - identity://atrium/self
+      - identity://atrium/peer
+    shared_space_mode: collective-shared
+    shared_imc_session_id: imc-112233445566
+    shared_collective_id: collective://atrium/meridian
+    scene_count: 2
     delivery_ids:
       - sl-delivery-aaaa1111bbbb
       - sl-delivery-cccc2222dddd
-      - sl-delivery-eeee3333ffff
     channels_observed:
       - visual
       - auditory
       - haptic
     scene_summaries:
       - delivery_id: sl-delivery-aaaa1111bbbb
-        scene_summary: coherent avatar mirror bundle
+        scene_summary: aligned shared atrium loopback keeps both participants on the same avatar anchor
         delivered_channels:
           - visual
           - auditory
@@ -206,49 +273,49 @@ examples:
         guardian_action: continue-loopback
         artifact_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
         body_coherence_score: 0.06
-        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
-        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
-        body_map_alignment_ref: alignment://atrium/self-body/coherent-v1
+        avatar_body_map_ref: avatar-body-map://atrium/collective/v1
+        proprioceptive_calibration_ref: calibration://atrium/collective/v1
+        body_map_alignment_ref: alignment://atrium/collective/aligned-v1
         qualia_binding_ref: qualia://tick/tick-1111
-        attention_target: avatar://atrium/self-body/core
+        attention_target: avatar://atrium/collective/core
+        participant_identity_ids:
+          - identity://atrium/self
+          - identity://atrium/peer
+        shared_space_mode: collective-shared
+        arbitration_ref: loopback-arbitration://sl-delivery-aaaa1111bbbb
+        arbitration_status: shared-aligned
+        owner_identity_id: identity://atrium/self
         safe_baseline_applied: false
         requires_council_review: false
       - delivery_id: sl-delivery-cccc2222dddd
-        scene_summary: drifted avatar echo triggers guardian hold
+        scene_summary: guardian mediates competing shared-space targets while preserving coherent loopback
         delivered_channels:
           - visual
           - auditory
           - haptic
-        classification: held
-        delivery_status: guardian-hold
-        guardian_action: freeze-loopback
+        classification: coherent
+        delivery_status: delivered
+        guardian_action: continue-loopback
         artifact_digest: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-        body_coherence_score: 0.43
-        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
-        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
-        body_map_alignment_ref: alignment://atrium/self-body/drifted-v1
+        body_coherence_score: 0.08
+        avatar_body_map_ref: avatar-body-map://atrium/collective/v1
+        proprioceptive_calibration_ref: calibration://atrium/collective/v1
+        body_map_alignment_ref: alignment://atrium/collective/arbitrated-v1
         qualia_binding_ref: qualia://tick/tick-2222
-        attention_target: guardian-review
-        safe_baseline_applied: true
-        requires_council_review: true
-      - delivery_id: sl-delivery-eeee3333ffff
-        scene_summary: guardian realigned the body anchor
-        delivered_channels: []
-        classification: stabilized
-        delivery_status: stabilized
-        guardian_action: resume-loopback
-        artifact_digest: 99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa
-        body_coherence_score: 0.0
-        avatar_body_map_ref: avatar-body-map://atrium/self-body/v1
-        proprioceptive_calibration_ref: calibration://atrium/self-body/v1
-        body_map_alignment_ref: alignment://sensory-loopback/sl-delivery-eeee3333ffff/restored
-        qualia_binding_ref: qualia://loopback-stabilize/sl-delivery-eeee3333ffff
-        attention_target: avatar://atrium/self-body/core
-        safe_baseline_applied: true
+        attention_target: avatar://atrium/collective/perimeter
+        participant_identity_ids:
+          - identity://atrium/self
+          - identity://atrium/peer
+        shared_space_mode: collective-shared
+        arbitration_ref: loopback-arbitration://sl-delivery-cccc2222dddd
+        arbitration_status: guardian-mediated
+        owner_identity_id: identity://atrium/peer
+        safe_baseline_applied: false
         requires_council_review: false
-    guardian_intervention_count: 2
-    stabilization_delivery_ids:
-      - sl-delivery-eeee3333ffff
+    arbitration_scene_count: 2
+    guardian_arbitration_count: 1
+    guardian_intervention_count: 0
+    stabilization_delivery_ids: []
     final_session_status: active
     artifact_storage_policy: family-digest+scene-summary-ref-only
     family_digest: ffeeddccbbaa00998877665544332211ffeeddccbbaa00998877665544332211

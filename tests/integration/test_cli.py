@@ -147,9 +147,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["proprioceptive_calibration_bound"])
         self.assertTrue(result["validation"]["alignment_ref_bound"])
         self.assertTrue(result["validation"]["artifact_family_ok"])
+        self.assertTrue(result["validation"]["shared_loopback_ok"])
+        self.assertTrue(result["validation"]["shared_loopback_collective_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_imc_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_participants_bound"])
+        self.assertTrue(result["validation"]["shared_loopback_arbitrated"])
+        self.assertTrue(result["validation"]["shared_loopback_owner_handoff"])
+        self.assertTrue(result["validation"]["shared_loopback_family_tracked"])
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
+        self.assertEqual("collective-shared", result["shared_loopback"]["session"]["shared_space_mode"])
+        self.assertEqual(
+            "guardian-mediated",
+            result["shared_loopback"]["receipts"]["mediated"]["arbitration_status"],
+        )
+        self.assertEqual(2, result["shared_loopback"]["artifact_family"]["scene_count"])
+        self.assertEqual(1, result["shared_loopback"]["artifact_family"]["guardian_arbitration_count"])
 
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

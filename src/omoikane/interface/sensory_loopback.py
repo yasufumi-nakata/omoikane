@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -46,6 +46,15 @@ SENSORY_LOOPBACK_BODY_MAP_WEIGHTS = {
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY = "multi-scene-artifact-family-v1"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY = "family-digest+scene-summary-ref-only"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES = 4
+SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS = 4
+SENSORY_LOOPBACK_SHARED_SPACE_MODES = {"self-only", "imc-shared", "collective-shared"}
+SENSORY_LOOPBACK_ARBITRATION_POLICY = "guardian-mediated-multi-self-loopback-v1"
+SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
+    "self-exclusive",
+    "shared-aligned",
+    "guardian-mediated",
+    "guardian-hold",
+}
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -85,6 +94,13 @@ class SensoryLoopbackService:
             "artifact_family_storage_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY,
             "artifact_family_max_scenes": SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES,
             "guardian_recovery_required": True,
+            "shared_space_modes": sorted(SENSORY_LOOPBACK_SHARED_SPACE_MODES),
+            "arbitration_policy": {
+                "policy_id": SENSORY_LOOPBACK_ARBITRATION_POLICY,
+                "max_participants": SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS,
+                "collective_requires_imc_binding": True,
+                "guardian_required_on_conflict": True,
+            },
         }
 
     def open_session(
@@ -95,6 +111,9 @@ class SensoryLoopbackService:
         body_anchor_ref: str,
         avatar_body_map_ref: str,
         proprioceptive_calibration_ref: str,
+        participant_identity_ids: Optional[Sequence[str]] = None,
+        shared_imc_session_id: str = "",
+        shared_collective_id: str = "",
         channels: Sequence[str] = DEFAULT_LOOPBACK_CHANNELS,
     ) -> Dict[str, Any]:
         normalized_identity = self._normalize_non_empty_string(identity_id, "identity_id")
@@ -109,6 +128,20 @@ class SensoryLoopbackService:
             "proprioceptive_calibration_ref",
         )
         normalized_channels = self._normalize_channels(channels)
+        participant_ids = self._normalize_participant_ids(
+            identity_id=normalized_identity,
+            participant_identity_ids=participant_identity_ids,
+        )
+        (
+            shared_space_mode,
+            normalized_shared_imc_session_id,
+            normalized_shared_collective_id,
+            arbitration_required,
+        ) = self._derive_shared_space_binding(
+            participant_identity_ids=participant_ids,
+            shared_imc_session_id=shared_imc_session_id,
+            shared_collective_id=shared_collective_id,
+        )
         body_map_anchor_refs = self._build_body_map_anchor_refs(normalized_body_anchor)
         baseline_alignment_ref = f"alignment://sensory-loopback/{new_id('sl-align')}"
 
@@ -121,6 +154,13 @@ class SensoryLoopbackService:
             "opened_at": opened_at,
             "updated_at": opened_at,
             "status": "active",
+            "participant_identity_ids": participant_ids,
+            "shared_space_mode": shared_space_mode,
+            "shared_imc_session_id": normalized_shared_imc_session_id,
+            "shared_collective_id": normalized_shared_collective_id,
+            "arbitration_policy_id": SENSORY_LOOPBACK_ARBITRATION_POLICY,
+            "arbitration_required": arbitration_required,
+            "current_owner_identity_id": normalized_identity,
             "world_state_ref": normalized_world_state,
             "body_anchor_ref": normalized_body_anchor,
             "allowed_channels": normalized_channels,
@@ -142,6 +182,10 @@ class SensoryLoopbackService:
             "last_guardian_action": "none",
             "last_body_map_alignment_ref": baseline_alignment_ref,
             "last_body_map_alignment": self._default_body_map_alignment(),
+            "last_arbitration_status": (
+                "self-exclusive" if not arbitration_required else "shared-aligned"
+            ),
+            "last_arbitration_ref": f"loopback-arbitration://{session_id}/open",
             "artifact_family_count": 0,
             "last_artifact_family_id": "",
             "last_artifact_family_ref": "",
@@ -162,6 +206,9 @@ class SensoryLoopbackService:
         attention_target: str,
         guardian_observed: bool,
         qualia_binding_ref: str = "",
+        owner_identity_id: str = "",
+        participant_attention_targets: Optional[Mapping[str, str]] = None,
+        participant_presence_refs: Optional[Mapping[str, str]] = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if session["status"] != "active":
@@ -192,6 +239,32 @@ class SensoryLoopbackService:
         )
         if not isinstance(guardian_observed, bool):
             raise ValueError("guardian_observed must be a boolean")
+        participant_ids = list(session["participant_identity_ids"])
+        owner_identity = self._normalize_non_empty_string(
+            owner_identity_id or session["current_owner_identity_id"],
+            "owner_identity_id",
+        )
+        if owner_identity not in participant_ids:
+            raise ValueError("owner_identity_id must be one of the session participants")
+        arbitration_required = bool(session["arbitration_required"])
+        participant_target_map = self._normalize_participant_attention_targets(
+            participant_attention_targets,
+            participant_identity_ids=participant_ids,
+            default_target=normalized_attention_target,
+            require_explicit=arbitration_required,
+        )
+        participant_presence_map = self._normalize_participant_presence_refs(
+            participant_presence_refs,
+            participant_identity_ids=participant_ids,
+            session_id=session_id,
+            require_explicit=arbitration_required,
+        )
+        selected_attention_target = participant_target_map[owner_identity]
+        if normalized_attention_target != selected_attention_target:
+            raise ValueError(
+                "attention_target must match the selected owner target for the loopback delivery",
+            )
+        attention_target_conflict = len(set(participant_target_map.values())) > 1
 
         degraded = (
             coherence_score > session["coherence_drift_threshold"]
@@ -199,6 +272,8 @@ class SensoryLoopbackService:
         )
         if degraded and not guardian_observed:
             raise PermissionError("guardian observation is required for degraded loopback bundles")
+        if attention_target_conflict and not guardian_observed:
+            raise PermissionError("guardian observation is required for multi-self loopback arbitration")
 
         if (
             coherence_score <= session["coherence_drift_threshold"]
@@ -231,6 +306,16 @@ class SensoryLoopbackService:
             requires_council_review = True
             session_status = "held"
 
+        if arbitration_required:
+            if delivery_status == "guardian-hold":
+                arbitration_status = "guardian-hold"
+            elif attention_target_conflict:
+                arbitration_status = "guardian-mediated"
+            else:
+                arbitration_status = "shared-aligned"
+        else:
+            arbitration_status = "self-exclusive"
+
         delivery_id = new_id("sl-delivery")
         recorded_at = utc_now_iso()
         artifact_digest = sha256_text(canonical_json(normalized_artifacts))
@@ -256,6 +341,16 @@ class SensoryLoopbackService:
             "immersion_preserved": immersion_preserved,
             "safe_baseline_applied": safe_baseline_applied,
             "requires_council_review": requires_council_review,
+            "participant_identity_ids": participant_ids,
+            "shared_space_mode": session["shared_space_mode"],
+            "shared_imc_session_id": session["shared_imc_session_id"],
+            "shared_collective_id": session["shared_collective_id"],
+            "arbitration_policy_id": session["arbitration_policy_id"],
+            "arbitration_ref": f"loopback-arbitration://{delivery_id}",
+            "arbitration_status": arbitration_status,
+            "owner_identity_id": owner_identity,
+            "participant_attention_targets": participant_target_map,
+            "participant_presence_refs": participant_presence_map,
             "qualia_binding_ref": normalized_qualia_ref,
             "attention_target": normalized_attention_target,
             "audit_event_ref": f"ledger://sensory-loopback/{delivery_id}",
@@ -268,6 +363,9 @@ class SensoryLoopbackService:
         session["last_guardian_action"] = guardian_action
         session["last_body_map_alignment_ref"] = normalized_alignment_ref
         session["last_body_map_alignment"] = normalized_alignment
+        session["current_owner_identity_id"] = owner_identity
+        session["last_arbitration_status"] = arbitration_status
+        session["last_arbitration_ref"] = receipt["arbitration_ref"]
         session["last_audit_event_ref"] = receipt["audit_event_ref"]
         return deepcopy(receipt)
 
@@ -292,6 +390,18 @@ class SensoryLoopbackService:
         artifact_digest = sha256_text(canonical_json({}))
         restored_alignment_ref = f"alignment://sensory-loopback/{delivery_id}/restored"
         restored_alignment = self._default_body_map_alignment()
+        participant_ids = list(session["participant_identity_ids"])
+        owner_identity = session["current_owner_identity_id"]
+        participant_target_map = {
+            participant_identity_id: restored_body_anchor
+            for participant_identity_id in participant_ids
+        }
+        participant_presence_map = self._normalize_participant_presence_refs(
+            None,
+            participant_identity_ids=participant_ids,
+            session_id=session_id,
+            require_explicit=False,
+        )
         receipt = {
             "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
             "delivery_id": delivery_id,
@@ -314,6 +424,18 @@ class SensoryLoopbackService:
             "immersion_preserved": True,
             "safe_baseline_applied": True,
             "requires_council_review": False,
+            "participant_identity_ids": participant_ids,
+            "shared_space_mode": session["shared_space_mode"],
+            "shared_imc_session_id": session["shared_imc_session_id"],
+            "shared_collective_id": session["shared_collective_id"],
+            "arbitration_policy_id": session["arbitration_policy_id"],
+            "arbitration_ref": f"loopback-arbitration://{delivery_id}",
+            "arbitration_status": (
+                "self-exclusive" if not session["arbitration_required"] else "shared-aligned"
+            ),
+            "owner_identity_id": owner_identity,
+            "participant_attention_targets": participant_target_map,
+            "participant_presence_refs": participant_presence_map,
             "qualia_binding_ref": f"qualia://loopback-stabilize/{delivery_id}",
             "attention_target": restored_body_anchor,
             "audit_event_ref": f"ledger://sensory-loopback/{delivery_id}",
@@ -328,6 +450,8 @@ class SensoryLoopbackService:
         session["last_guardian_action"] = "resume-loopback"
         session["last_body_map_alignment_ref"] = restored_alignment_ref
         session["last_body_map_alignment"] = restored_alignment
+        session["last_arbitration_status"] = receipt["arbitration_status"]
+        session["last_arbitration_ref"] = receipt["arbitration_ref"]
         session["last_audit_event_ref"] = receipt["audit_event_ref"]
         return deepcopy(receipt)
 
@@ -410,6 +534,29 @@ class SensoryLoopbackService:
                         receipt.get("attention_target"),
                         "attention_target",
                     ),
+                    "participant_identity_ids": self._normalize_participant_ids(
+                        identity_id=self._normalize_non_empty_string(
+                            receipt.get("owner_identity_id"),
+                            "owner_identity_id",
+                        ),
+                        participant_identity_ids=receipt.get("participant_identity_ids"),
+                    ),
+                    "shared_space_mode": self._normalize_shared_space_mode(
+                        receipt.get("shared_space_mode"),
+                        "shared_space_mode",
+                    ),
+                    "arbitration_ref": self._normalize_non_empty_string(
+                        receipt.get("arbitration_ref"),
+                        "arbitration_ref",
+                    ),
+                    "arbitration_status": self._normalize_arbitration_status(
+                        receipt.get("arbitration_status"),
+                        "arbitration_status",
+                    ),
+                    "owner_identity_id": self._normalize_non_empty_string(
+                        receipt.get("owner_identity_id"),
+                        "owner_identity_id",
+                    ),
                     "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
                     "requires_council_review": bool(receipt.get("requires_council_review")),
                 }
@@ -422,6 +569,10 @@ class SensoryLoopbackService:
             family_label=normalized_label,
             scene_summaries=scene_summaries,
             final_session_status=session["status"],
+            participant_identity_ids=session["participant_identity_ids"],
+            shared_space_mode=session["shared_space_mode"],
+            shared_imc_session_id=session["shared_imc_session_id"],
+            shared_collective_id=session["shared_collective_id"],
         )
         artifact_family = {
             "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
@@ -431,10 +582,24 @@ class SensoryLoopbackService:
             "recorded_at": recorded_at,
             "family_label": normalized_label,
             "policy_id": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
+            "participant_identity_ids": list(session["participant_identity_ids"]),
+            "shared_space_mode": session["shared_space_mode"],
+            "shared_imc_session_id": session["shared_imc_session_id"],
+            "shared_collective_id": session["shared_collective_id"],
             "scene_count": len(scene_summaries),
             "delivery_ids": delivery_ids,
             "channels_observed": _dedupe_preserve_order(channels_observed),
             "scene_summaries": scene_summaries,
+            "arbitration_scene_count": sum(
+                1
+                for scene in scene_summaries
+                if scene["arbitration_status"] != "self-exclusive"
+            ),
+            "guardian_arbitration_count": sum(
+                1
+                for scene in scene_summaries
+                if scene["arbitration_status"] in {"guardian-mediated", "guardian-hold"}
+            ),
             "guardian_intervention_count": sum(
                 1 for scene in scene_summaries if scene["guardian_action"] != "continue-loopback"
             ),
@@ -487,6 +652,67 @@ class SensoryLoopbackService:
             errors.append(
                 f"status must be one of {sorted(SENSORY_LOOPBACK_ALLOWED_SESSION_STATUS)}",
             )
+        participant_identity_ids = session.get("participant_identity_ids")
+        if not isinstance(participant_identity_ids, list) or not participant_identity_ids:
+            errors.append("participant_identity_ids must be a non-empty list")
+            participant_identity_ids = []
+        elif len(participant_identity_ids) != len(set(participant_identity_ids)):
+            errors.append("participant_identity_ids must be unique")
+        shared_space_mode = session.get("shared_space_mode")
+        if shared_space_mode not in SENSORY_LOOPBACK_SHARED_SPACE_MODES:
+            errors.append(
+                f"shared_space_mode must be one of {sorted(SENSORY_LOOPBACK_SHARED_SPACE_MODES)}",
+            )
+        shared_imc_session_id = session.get("shared_imc_session_id")
+        if not isinstance(shared_imc_session_id, str):
+            errors.append("shared_imc_session_id must be a string")
+            shared_imc_session_id = ""
+        shared_collective_id = session.get("shared_collective_id")
+        if not isinstance(shared_collective_id, str):
+            errors.append("shared_collective_id must be a string")
+            shared_collective_id = ""
+        if session.get("arbitration_policy_id") != SENSORY_LOOPBACK_ARBITRATION_POLICY:
+            errors.append(
+                f"arbitration_policy_id must be {SENSORY_LOOPBACK_ARBITRATION_POLICY}",
+            )
+        if not isinstance(session.get("arbitration_required"), bool):
+            errors.append("arbitration_required must be a boolean")
+        elif bool(session.get("arbitration_required")) != (len(participant_identity_ids) > 1):
+            errors.append("arbitration_required must match the participant count")
+        current_owner_identity_id = session.get("current_owner_identity_id")
+        if not isinstance(current_owner_identity_id, str) or (
+            participant_identity_ids and current_owner_identity_id not in participant_identity_ids
+        ):
+            errors.append("current_owner_identity_id must be one of participant_identity_ids")
+        if session.get("last_arbitration_status") not in SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES:
+            errors.append(
+                "last_arbitration_status must be one of "
+                f"{sorted(SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES)}",
+            )
+        self._check_non_empty_string(
+            session.get("last_arbitration_ref"),
+            "last_arbitration_ref",
+            errors,
+        )
+        if shared_space_mode == "self-only":
+            if len(participant_identity_ids) != 1:
+                errors.append("self-only sessions must bind exactly 1 participant")
+            if shared_imc_session_id or shared_collective_id:
+                errors.append("self-only sessions must not bind IMC or collective refs")
+        elif shared_space_mode == "imc-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append("imc-shared sessions must bind at least 2 participants")
+            if not shared_imc_session_id:
+                errors.append("imc-shared sessions must bind shared_imc_session_id")
+            if shared_collective_id:
+                errors.append("imc-shared sessions must not bind shared_collective_id")
+        elif shared_space_mode == "collective-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append("collective-shared sessions must bind at least 2 participants")
+            if not shared_imc_session_id:
+                errors.append("collective-shared sessions must bind shared_imc_session_id")
+            if not shared_collective_id:
+                errors.append("collective-shared sessions must bind shared_collective_id")
 
         channels = session.get("allowed_channels")
         if not isinstance(channels, list) or len(channels) < 2:
@@ -581,6 +807,13 @@ class SensoryLoopbackService:
             "world_anchor_bound": bool(session.get("world_state_ref")),
             "body_map_bound": bool(session.get("avatar_body_map_ref")),
             "proprioceptive_calibration_bound": bool(session.get("proprioceptive_calibration_ref")),
+            "participant_count": len(participant_identity_ids),
+            "shared_space_bound": shared_space_mode in SENSORY_LOOPBACK_SHARED_SPACE_MODES,
+            "shared_imc_bound": bool(shared_imc_session_id) or shared_space_mode == "self-only",
+            "shared_collective_bound": bool(shared_collective_id)
+            or shared_space_mode != "collective-shared",
+            "arbitration_ready": bool(session.get("last_arbitration_ref"))
+            and session.get("arbitration_policy_id") == SENSORY_LOOPBACK_ARBITRATION_POLICY,
             "artifact_family_tracking_enabled": isinstance(session.get("last_artifact_family_ref"), str),
         }
 
@@ -599,6 +832,90 @@ class SensoryLoopbackService:
         self._check_non_empty_string(receipt.get("audit_event_ref"), "audit_event_ref", errors)
         if receipt.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
             errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        participant_identity_ids = receipt.get("participant_identity_ids")
+        if not isinstance(participant_identity_ids, list) or not participant_identity_ids:
+            errors.append("participant_identity_ids must be a non-empty list")
+            participant_identity_ids = []
+        elif len(participant_identity_ids) != len(set(participant_identity_ids)):
+            errors.append("participant_identity_ids must be unique")
+        shared_space_mode = receipt.get("shared_space_mode")
+        if shared_space_mode not in SENSORY_LOOPBACK_SHARED_SPACE_MODES:
+            errors.append(
+                f"shared_space_mode must be one of {sorted(SENSORY_LOOPBACK_SHARED_SPACE_MODES)}",
+            )
+        shared_imc_session_id = receipt.get("shared_imc_session_id")
+        if not isinstance(shared_imc_session_id, str):
+            errors.append("shared_imc_session_id must be a string")
+            shared_imc_session_id = ""
+        shared_collective_id = receipt.get("shared_collective_id")
+        if not isinstance(shared_collective_id, str):
+            errors.append("shared_collective_id must be a string")
+            shared_collective_id = ""
+        if receipt.get("arbitration_policy_id") != SENSORY_LOOPBACK_ARBITRATION_POLICY:
+            errors.append(
+                f"arbitration_policy_id must be {SENSORY_LOOPBACK_ARBITRATION_POLICY}",
+            )
+        self._check_non_empty_string(receipt.get("arbitration_ref"), "arbitration_ref", errors)
+        arbitration_status = receipt.get("arbitration_status")
+        if arbitration_status not in SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES:
+            errors.append(
+                "arbitration_status must be one of "
+                f"{sorted(SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES)}",
+            )
+        owner_identity_id = receipt.get("owner_identity_id")
+        if not isinstance(owner_identity_id, str) or (
+            participant_identity_ids and owner_identity_id not in participant_identity_ids
+        ):
+            errors.append("owner_identity_id must be one of participant_identity_ids")
+        participant_attention_targets = receipt.get("participant_attention_targets")
+        if not isinstance(participant_attention_targets, Mapping):
+            errors.append("participant_attention_targets must be a mapping")
+            participant_attention_targets = {}
+        participant_presence_refs = receipt.get("participant_presence_refs")
+        if not isinstance(participant_presence_refs, Mapping):
+            errors.append("participant_presence_refs must be a mapping")
+            participant_presence_refs = {}
+        if participant_identity_ids:
+            if set(participant_attention_targets) != set(participant_identity_ids):
+                errors.append(
+                    "participant_attention_targets must cover exactly participant_identity_ids",
+                )
+            if set(participant_presence_refs) != set(participant_identity_ids):
+                errors.append(
+                    "participant_presence_refs must cover exactly participant_identity_ids",
+                )
+            for participant_identity_id in participant_identity_ids:
+                self._check_non_empty_string(
+                    participant_attention_targets.get(participant_identity_id),
+                    f"participant_attention_targets.{participant_identity_id}",
+                    errors,
+                )
+                self._check_non_empty_string(
+                    participant_presence_refs.get(participant_identity_id),
+                    f"participant_presence_refs.{participant_identity_id}",
+                    errors,
+                )
+        if shared_space_mode == "self-only":
+            if len(participant_identity_ids) != 1:
+                errors.append("self-only receipts must bind exactly 1 participant")
+            if shared_imc_session_id or shared_collective_id:
+                errors.append("self-only receipts must not bind IMC or collective refs")
+            if arbitration_status != "self-exclusive":
+                errors.append("self-only receipts must keep arbitration_status=self-exclusive")
+        elif shared_space_mode == "imc-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append("imc-shared receipts must bind at least 2 participants")
+            if not shared_imc_session_id:
+                errors.append("imc-shared receipts must bind shared_imc_session_id")
+            if shared_collective_id:
+                errors.append("imc-shared receipts must not bind shared_collective_id")
+        elif shared_space_mode == "collective-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append("collective-shared receipts must bind at least 2 participants")
+            if not shared_imc_session_id:
+                errors.append("collective-shared receipts must bind shared_imc_session_id")
+            if not shared_collective_id:
+                errors.append("collective-shared receipts must bind shared_collective_id")
 
         classification = receipt.get("classification")
         if classification not in SENSORY_LOOPBACK_ALLOWED_CLASSIFICATIONS:
@@ -670,6 +987,14 @@ class SensoryLoopbackService:
                 expected_coherence_score = self._derive_body_coherence_score(normalized_alignment)
                 if round(float(coherence_score), 3) != expected_coherence_score:
                     errors.append("body_coherence_score must match the weighted avatar body map drift")
+        if (
+            shared_space_mode != "self-only"
+            and delivery_status == "guardian-hold"
+            and arbitration_status != "guardian-hold"
+        ):
+            errors.append(
+                "shared guardian-hold receipts must keep arbitration_status=guardian-hold",
+            )
 
         return {
             "ok": not errors,
@@ -679,6 +1004,15 @@ class SensoryLoopbackService:
             "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
             "body_map_bound": bool(receipt.get("avatar_body_map_ref")),
             "calibration_bound": bool(receipt.get("proprioceptive_calibration_ref")),
+            "participant_bindings_complete": bool(participant_identity_ids)
+            and set(participant_attention_targets) == set(participant_identity_ids)
+            and set(participant_presence_refs) == set(participant_identity_ids),
+            "shared_space_bound": shared_space_mode in SENSORY_LOOPBACK_SHARED_SPACE_MODES,
+            "shared_imc_bound": bool(shared_imc_session_id) or shared_space_mode == "self-only",
+            "shared_collective_bound": bool(shared_collective_id)
+            or shared_space_mode != "collective-shared",
+            "owner_bound": owner_identity_id in participant_identity_ids if participant_identity_ids else False,
+            "guardian_arbitrated": arbitration_status in {"guardian-mediated", "guardian-hold"},
         }
 
     def validate_artifact_family(self, artifact_family: Mapping[str, Any]) -> Dict[str, Any]:
@@ -707,6 +1041,46 @@ class SensoryLoopbackService:
                 "artifact_storage_policy must be "
                 f"{SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY}",
             )
+        participant_identity_ids = artifact_family.get("participant_identity_ids")
+        if not isinstance(participant_identity_ids, list) or not participant_identity_ids:
+            errors.append("participant_identity_ids must be a non-empty list")
+            participant_identity_ids = []
+        elif len(participant_identity_ids) != len(set(participant_identity_ids)):
+            errors.append("participant_identity_ids must be unique")
+        shared_space_mode = artifact_family.get("shared_space_mode")
+        if shared_space_mode not in SENSORY_LOOPBACK_SHARED_SPACE_MODES:
+            errors.append(
+                f"shared_space_mode must be one of {sorted(SENSORY_LOOPBACK_SHARED_SPACE_MODES)}",
+            )
+        shared_imc_session_id = artifact_family.get("shared_imc_session_id")
+        if not isinstance(shared_imc_session_id, str):
+            errors.append("shared_imc_session_id must be a string")
+            shared_imc_session_id = ""
+        shared_collective_id = artifact_family.get("shared_collective_id")
+        if not isinstance(shared_collective_id, str):
+            errors.append("shared_collective_id must be a string")
+            shared_collective_id = ""
+        if shared_space_mode == "self-only":
+            if len(participant_identity_ids) != 1:
+                errors.append("self-only artifact families must bind exactly 1 participant")
+            if shared_imc_session_id or shared_collective_id:
+                errors.append("self-only artifact families must not bind IMC or collective refs")
+        elif shared_space_mode == "imc-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append("imc-shared artifact families must bind at least 2 participants")
+            if not shared_imc_session_id:
+                errors.append("imc-shared artifact families must bind shared_imc_session_id")
+            if shared_collective_id:
+                errors.append("imc-shared artifact families must not bind shared_collective_id")
+        elif shared_space_mode == "collective-shared":
+            if len(participant_identity_ids) < 2:
+                errors.append(
+                    "collective-shared artifact families must bind at least 2 participants",
+                )
+            if not shared_imc_session_id:
+                errors.append("collective-shared artifact families must bind shared_imc_session_id")
+            if not shared_collective_id:
+                errors.append("collective-shared artifact families must bind shared_collective_id")
 
         scene_count = artifact_family.get("scene_count")
         if (
@@ -781,6 +1155,44 @@ class SensoryLoopbackService:
                     f"scene_summaries[{index}].attention_target",
                     errors,
                 )
+                scene_participants = scene.get("participant_identity_ids")
+                if (
+                    not isinstance(scene_participants, list)
+                    or not scene_participants
+                    or len(scene_participants) != len(set(scene_participants))
+                ):
+                    errors.append(
+                        f"scene_summaries[{index}].participant_identity_ids must be a unique list",
+                    )
+                else:
+                    if scene_participants != participant_identity_ids:
+                        errors.append(
+                            f"scene_summaries[{index}].participant_identity_ids must match the family participant list",
+                        )
+                if scene.get("shared_space_mode") != shared_space_mode:
+                    errors.append(
+                        f"scene_summaries[{index}].shared_space_mode must match family shared_space_mode",
+                    )
+                self._check_non_empty_string(
+                    scene.get("arbitration_ref"),
+                    f"scene_summaries[{index}].arbitration_ref",
+                    errors,
+                )
+                if scene.get("arbitration_status") not in SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES:
+                    errors.append(
+                        f"scene_summaries[{index}].arbitration_status must be one of "
+                        f"{sorted(SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES)}",
+                    )
+                owner_identity_id = scene.get("owner_identity_id")
+                if (
+                    not isinstance(owner_identity_id, str)
+                    or isinstance(scene_participants, list)
+                    and scene_participants
+                    and owner_identity_id not in scene_participants
+                ):
+                    errors.append(
+                        f"scene_summaries[{index}].owner_identity_id must be one of the scene participants",
+                    )
                 if scene.get("classification") not in SENSORY_LOOPBACK_ALLOWED_CLASSIFICATIONS:
                     errors.append(
                         f"scene_summaries[{index}].classification must be one of "
@@ -832,6 +1244,33 @@ class SensoryLoopbackService:
                 errors.append(
                     "guardian_intervention_count must match non-continue guardian actions",
                 )
+        arbitration_scene_count = artifact_family.get("arbitration_scene_count")
+        if not isinstance(arbitration_scene_count, int) or arbitration_scene_count < 0:
+            errors.append("arbitration_scene_count must be a non-negative integer")
+        elif isinstance(scene_summaries, list):
+            expected_arbitration_scene_count = sum(
+                1
+                for scene in scene_summaries
+                if isinstance(scene, Mapping) and scene.get("arbitration_status") != "self-exclusive"
+            )
+            if arbitration_scene_count != expected_arbitration_scene_count:
+                errors.append(
+                    "arbitration_scene_count must match non-self-exclusive scene arbitration statuses",
+                )
+        guardian_arbitration_count = artifact_family.get("guardian_arbitration_count")
+        if not isinstance(guardian_arbitration_count, int) or guardian_arbitration_count < 0:
+            errors.append("guardian_arbitration_count must be a non-negative integer")
+        elif isinstance(scene_summaries, list):
+            expected_guardian_arbitration_count = sum(
+                1
+                for scene in scene_summaries
+                if isinstance(scene, Mapping)
+                and scene.get("arbitration_status") in {"guardian-mediated", "guardian-hold"}
+            )
+            if guardian_arbitration_count != expected_guardian_arbitration_count:
+                errors.append(
+                    "guardian_arbitration_count must match guardian-mediated or guardian-hold scenes",
+                )
 
         stabilization_delivery_ids = artifact_family.get("stabilization_delivery_ids")
         if not isinstance(stabilization_delivery_ids, list):
@@ -855,6 +1294,10 @@ class SensoryLoopbackService:
             family_label=artifact_family.get("family_label"),
             scene_summaries=scene_summaries if isinstance(scene_summaries, list) else [],
             final_session_status=artifact_family.get("final_session_status"),
+            participant_identity_ids=artifact_family.get("participant_identity_ids"),
+            shared_space_mode=artifact_family.get("shared_space_mode"),
+            shared_imc_session_id=artifact_family.get("shared_imc_session_id"),
+            shared_collective_id=artifact_family.get("shared_collective_id"),
         )
         if artifact_family.get("family_digest") != expected_digest:
             errors.append("family_digest must match the artifact family payload")
@@ -866,6 +1309,10 @@ class SensoryLoopbackService:
             "family_digest_bound": artifact_family.get("family_digest") == expected_digest,
             "guardian_recovery_tracked": isinstance(stabilization_delivery_ids, list)
             and bool(stabilization_delivery_ids),
+            "shared_space_bound": shared_space_mode in SENSORY_LOOPBACK_SHARED_SPACE_MODES,
+            "arbitration_tracked": bool(participant_identity_ids)
+            and isinstance(arbitration_scene_count, int)
+            and isinstance(guardian_arbitration_count, int),
         }
 
     def _require_session(self, session_id: str) -> Dict[str, Any]:
@@ -897,6 +1344,144 @@ class SensoryLoopbackService:
                 f"unsupported loopback channels: {', '.join(invalid)}",
             )
         return normalized
+
+    def _normalize_participant_ids(
+        self,
+        *,
+        identity_id: str,
+        participant_identity_ids: Optional[Sequence[str]],
+    ) -> List[str]:
+        if participant_identity_ids is None:
+            participant_identity_ids = [identity_id]
+        if not isinstance(participant_identity_ids, Sequence) or isinstance(
+            participant_identity_ids,
+            (str, bytes),
+        ):
+            raise ValueError("participant_identity_ids must be a sequence of identity refs")
+        normalized = _dedupe_preserve_order(
+            [
+                self._normalize_non_empty_string(
+                    participant_identity_id,
+                    "participant_identity_id",
+                )
+                for participant_identity_id in participant_identity_ids
+            ]
+        )
+        if identity_id not in normalized:
+            raise ValueError("participant_identity_ids must include identity_id")
+        if not normalized:
+            raise ValueError("participant_identity_ids must contain at least 1 identity")
+        if len(normalized) > SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS:
+            raise ValueError(
+                "participant_identity_ids may not exceed "
+                f"{SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS} identities",
+            )
+        return normalized
+
+    def _derive_shared_space_binding(
+        self,
+        *,
+        participant_identity_ids: Sequence[str],
+        shared_imc_session_id: str,
+        shared_collective_id: str,
+    ) -> Tuple[str, str, str, bool]:
+        normalized_imc_session_id = (
+            self._normalize_non_empty_string(shared_imc_session_id, "shared_imc_session_id")
+            if shared_imc_session_id
+            else ""
+        )
+        normalized_collective_id = (
+            self._normalize_non_empty_string(shared_collective_id, "shared_collective_id")
+            if shared_collective_id
+            else ""
+        )
+        arbitration_required = len(participant_identity_ids) > 1
+        if not arbitration_required:
+            if normalized_imc_session_id or normalized_collective_id:
+                raise ValueError("shared IMC/collective bindings require at least 2 participants")
+            return ("self-only", "", "", False)
+        if not normalized_imc_session_id and not normalized_collective_id:
+            raise ValueError(
+                "multi-self loopback sessions require shared_imc_session_id or shared_collective_id",
+            )
+        if normalized_collective_id and not normalized_imc_session_id:
+            raise ValueError("collective-shared sessions require shared_imc_session_id")
+        if normalized_collective_id:
+            return (
+                "collective-shared",
+                normalized_imc_session_id,
+                normalized_collective_id,
+                True,
+            )
+        return ("imc-shared", normalized_imc_session_id, "", True)
+
+    def _normalize_participant_attention_targets(
+        self,
+        participant_attention_targets: Optional[Mapping[str, str]],
+        *,
+        participant_identity_ids: Sequence[str],
+        default_target: str,
+        require_explicit: bool,
+    ) -> Dict[str, str]:
+        if participant_attention_targets is None:
+            if require_explicit:
+                raise ValueError(
+                    "participant_attention_targets must cover every participant in shared loopback sessions",
+                )
+            return {
+                participant_identity_id: default_target
+                for participant_identity_id in participant_identity_ids
+            }
+        if not isinstance(participant_attention_targets, Mapping):
+            raise ValueError("participant_attention_targets must be a mapping")
+        if set(participant_attention_targets) != set(participant_identity_ids):
+            raise ValueError(
+                "participant_attention_targets must cover exactly the session participants",
+            )
+        return {
+            participant_identity_id: self._normalize_non_empty_string(
+                participant_attention_targets.get(participant_identity_id),
+                f"participant_attention_targets.{participant_identity_id}",
+            )
+            for participant_identity_id in participant_identity_ids
+        }
+
+    def _normalize_participant_presence_refs(
+        self,
+        participant_presence_refs: Optional[Mapping[str, str]],
+        *,
+        participant_identity_ids: Sequence[str],
+        session_id: str,
+        require_explicit: bool,
+    ) -> Dict[str, str]:
+        if participant_presence_refs is None:
+            if require_explicit:
+                raise ValueError(
+                    "participant_presence_refs must cover every participant in shared loopback sessions",
+                )
+            return {
+                participant_identity_id: self._default_presence_ref(
+                    session_id,
+                    participant_identity_id,
+                )
+                for participant_identity_id in participant_identity_ids
+            }
+        if not isinstance(participant_presence_refs, Mapping):
+            raise ValueError("participant_presence_refs must be a mapping")
+        if set(participant_presence_refs) != set(participant_identity_ids):
+            raise ValueError("participant_presence_refs must cover exactly the session participants")
+        return {
+            participant_identity_id: self._normalize_non_empty_string(
+                participant_presence_refs.get(participant_identity_id),
+                f"participant_presence_refs.{participant_identity_id}",
+            )
+            for participant_identity_id in participant_identity_ids
+        }
+
+    @staticmethod
+    def _default_presence_ref(session_id: str, participant_identity_id: str) -> str:
+        participant_suffix = sha256_text(participant_identity_id)[:12]
+        return f"presence://sensory-loopback/{session_id}/{participant_suffix}"
 
     def _normalize_artifact_refs(
         self,
@@ -938,6 +1523,22 @@ class SensoryLoopbackService:
     @staticmethod
     def _mapping_has_exact_segment_keys(value: Any) -> bool:
         return isinstance(value, Mapping) and set(value) == SENSORY_LOOPBACK_BODY_MAP_SEGMENT_SET
+
+    def _normalize_shared_space_mode(self, value: Any, name: str) -> str:
+        normalized_value = self._normalize_non_empty_string(value, name)
+        if normalized_value not in SENSORY_LOOPBACK_SHARED_SPACE_MODES:
+            raise ValueError(
+                f"{name} must be one of {sorted(SENSORY_LOOPBACK_SHARED_SPACE_MODES)}",
+            )
+        return normalized_value
+
+    def _normalize_arbitration_status(self, value: Any, name: str) -> str:
+        normalized_value = self._normalize_non_empty_string(value, name)
+        if normalized_value not in SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES:
+            raise ValueError(
+                f"{name} must be one of {sorted(SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES)}",
+            )
+        return normalized_value
 
     @staticmethod
     def _default_body_map_alignment() -> Dict[str, float]:
@@ -986,6 +1587,10 @@ class SensoryLoopbackService:
         family_label: Any,
         scene_summaries: Sequence[Mapping[str, Any]],
         final_session_status: Any,
+        participant_identity_ids: Any,
+        shared_space_mode: Any,
+        shared_imc_session_id: Any,
+        shared_collective_id: Any,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -993,6 +1598,10 @@ class SensoryLoopbackService:
                     "session_id": session_id,
                     "family_label": family_label,
                     "policy_id": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,
+                    "participant_identity_ids": participant_identity_ids,
+                    "shared_space_mode": shared_space_mode,
+                    "shared_imc_session_id": shared_imc_session_id,
+                    "shared_collective_id": shared_collective_id,
                     "scene_summaries": list(scene_summaries),
                     "final_session_status": final_session_status,
                 }
