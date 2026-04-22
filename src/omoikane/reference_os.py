@@ -5451,6 +5451,52 @@ json.dump(response, sys.stdout)
             "device://lab-drone-arm-01",
             "inspection path to reposition a lantern without harming nearby humans",
         )
+        motor_plan = self.ewa.prepare_motor_plan(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            guardian_observed=True,
+            actuator_profile_id="device://lab-drone-arm-01/profile/articulated-inspection-arm-v1",
+            actuator_group="inspection-arm",
+            motion_profile="cartesian-reposition-v1",
+            target_pose_ref="pose://lantern/reposition-window-a",
+            safety_zone_ref="zone://inspection/perimeter-a",
+            rollback_vector_ref="rollback://lantern/reposition-window-a",
+            max_linear_speed_mps=0.08,
+            max_force_newton=6.5,
+            hold_timeout_ms=1200,
+        )
+        motor_plan_validation = self.ewa.validate_motor_plan(
+            motor_plan,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+        )
+        legal_execution = self.ewa.execute_legal_preflight(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            reversibility="reversible",
+            jurisdiction="JP-13",
+            legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-001",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            jurisdiction_bundle_status="ready",
+            notice_authority_ref="authority://jp-13/lab-robotics-oversight-desk",
+            liability_mode="joint",
+            escalation_contact="mailto:ewa-oversight@example.invalid",
+            valid_for_seconds=360,
+        )
+        legal_execution_validation = self.ewa.validate_legal_execution(
+            legal_execution,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+            reversibility="reversible",
+        )
         authorization = self.ewa.authorize(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -5458,18 +5504,16 @@ json.dump(response, sys.stdout)
             reversibility="reversible",
             intent_summary="reposition lantern for inspection without changing the environment permanently",
             ethics_attestation_id="ethics://ewa/approved-001",
+            motor_plan_id=motor_plan["plan_id"],
+            legal_execution_id=legal_execution["execution_id"],
             guardian_observed=True,
-            jurisdiction="JP-13",
-            legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
-            guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-001",
-            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
-            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
-            jurisdiction_bundle_status="ready",
             intent_confidence=0.96,
             valid_for_seconds=300,
         )
         authorization_validation = self.ewa.validate_authorization(
             authorization,
+            motor_plan=motor_plan,
+            legal_execution=legal_execution,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
@@ -5535,6 +5579,20 @@ json.dump(response, sys.stdout)
             and veto_handle_validation["instruction_digests_ok"],
             "irreversible_requires_unanimity": veto_handle_validation["irreversible_requires_unanimity"],
             "actuation_authorization_bound": handle_validation["actuation_authorization_bound"],
+            "motor_plan_ok": motor_plan_validation["ok"],
+            "motor_plan_bound": handle_validation["motor_plan_bound"]
+            and authorization_validation["motor_plan_bound"],
+            "legal_execution_ok": legal_execution_validation["ok"],
+            "legal_execution_bound": handle_validation["legal_execution_bound"]
+            and authorization_validation["legal_execution_bound"],
+            "approved_command_motor_plan_bound": (
+                approved_command["motor_plan_id"] == motor_plan["plan_id"]
+                and approved_command["motor_plan_digest"] == motor_plan["plan_digest"]
+            ),
+            "approved_command_legal_execution_bound": (
+                approved_command["legal_execution_id"] == legal_execution["execution_id"]
+                and approved_command["legal_execution_digest"] == legal_execution["digest"]
+            ),
             "released": handle_validation["released"],
             "veto_handle_released": veto_handle_validation["released"],
             "emergency_stop_release_sequence_valid": handle_validation[
@@ -5565,6 +5623,8 @@ json.dump(response, sys.stdout)
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]
+            and motor_plan_validation["ok"]
+            and legal_execution_validation["ok"]
             and authorization_validation["ok"]
             and emergency_stop_validation["ok"],
         }
@@ -5577,6 +5637,26 @@ json.dump(response, sys.stdout)
             category="interface-ewa",
             layer="L6",
             signature_roles=["self"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.motor_plan.prepared",
+            payload=motor_plan,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-plan",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.legal_execution.prepared",
+            payload=legal_execution,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-legal",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
             substrate="robotic-actuator",
         )
         self.ledger.append(
@@ -5668,6 +5748,10 @@ json.dump(response, sys.stdout)
             "profile": self.ewa.reference_profile(),
             "handle": final_handle,
             "handle_validation": handle_validation,
+            "motor_plan": motor_plan,
+            "motor_plan_validation": motor_plan_validation,
+            "legal_execution": legal_execution,
+            "legal_execution_validation": legal_execution_validation,
             "authorization": authorization,
             "authorization_validation": authorization_validation,
             "approved_command": approved_command,

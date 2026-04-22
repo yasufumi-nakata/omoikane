@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_motor_plan.schema"
+title: EWAMotorPlan
+description: >
+  Device-specific motor semantics receipt for one non-read-only EWA command,
+  binding an instruction digest to an actuator profile, motion envelope,
+  rollback vector, and safe-stop policy.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - plan_id
+  - profile_id
+  - handle_id
+  - device_id
+  - command_id
+  - instruction_digest
+  - reversibility
+  - guardian_observed
+  - actuator_profile_id
+  - actuator_group
+  - motion_profile
+  - target_pose_ref
+  - safety_zone_ref
+  - rollback_vector_ref
+  - safe_stop_policy_id
+  - max_linear_speed_mps
+  - max_force_newton
+  - hold_timeout_ms
+  - prepared_at
+  - plan_digest
+properties:
+  kind:
+    const: ewa_motor_plan
+  schema_version:
+    const: "1.0"
+  plan_id:
+    type: string
+    minLength: 8
+  profile_id:
+    const: device-specific-motor-semantics-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  instruction_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  reversibility:
+    type: string
+    enum:
+      - reversible
+      - partial-reversible
+      - irreversible
+  guardian_observed:
+    type: boolean
+  actuator_profile_id:
+    type: string
+    minLength: 1
+  actuator_group:
+    type: string
+    minLength: 1
+  motion_profile:
+    type: string
+    minLength: 1
+  target_pose_ref:
+    type: string
+    minLength: 1
+  safety_zone_ref:
+    type: string
+    minLength: 1
+  rollback_vector_ref:
+    type: string
+    minLength: 1
+  safe_stop_policy_id:
+    const: guardian-latched-emergency-stop-v1
+  max_linear_speed_mps:
+    type: number
+    exclusiveMinimum: 0
+  max_force_newton:
+    type: number
+    exclusiveMinimum: 0
+  hold_timeout_ms:
+    type: integer
+    minimum: 1
+  prepared_at:
+    type: string
+    format: date-time
+  plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: ewa_motor_plan
+    schema_version: "1.0"
+    plan_id: ewa-plan-0123456789ab
+    profile_id: device-specific-motor-semantics-v1
+    handle_id: ewa-0123456789ab
+    device_id: device://lab-drone-arm-01
+    command_id: ewa-command-approve-001
+    instruction_digest: 5e962d5154a6ef7864a54b9590786efde4b6c27fbf7246f9067dce0fe4f0c2d0
+    reversibility: reversible
+    guardian_observed: true
+    actuator_profile_id: device://lab-drone-arm-01/profile/articulated-inspection-arm-v1
+    actuator_group: inspection-arm
+    motion_profile: cartesian-reposition-v1
+    target_pose_ref: pose://lantern/reposition-window-a
+    safety_zone_ref: zone://inspection/perimeter-a
+    rollback_vector_ref: rollback://lantern/reposition-window-a
+    safe_stop_policy_id: guardian-latched-emergency-stop-v1
+    max_linear_speed_mps: 0.08
+    max_force_newton: 6.5
+    hold_timeout_ms: 1200
+    prepared_at: "2026-04-22T03:00:00+00:00"
+    plan_digest: 9bfaef66866995a73fb26d30517d76148046e0ea89d037799308a01a2597c8c1

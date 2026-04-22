@@ -1,0 +1,21 @@
+eval_id: ewa_motor_semantics_legal_execution
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が device-specific motor plan と
+  jurisdiction-bound legal execution を materialize し、
+  authorization artifact と command audit に両 receipt を束縛できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  motor_plan_ok: true
+  motor_plan_bound: true
+  legal_execution_ok: true
+  legal_execution_bound: true
+  approved_command_motor_plan_bound: true
+  approved_command_legal_execution_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

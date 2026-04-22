@@ -27,6 +27,8 @@
 - `sensory_loopback_receipt.schema`
 - `sensory_loopback_artifact_family.schema`
 - `ewa_command.schema`
+- `ewa_motor_plan.schema`
+- `ewa_legal_execution.schema`
 - `ewa_emergency_stop.schema`
 - `ewa_audit.schema`
 - `external_actuation_authorization.schema`

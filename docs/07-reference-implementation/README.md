@@ -497,10 +497,16 @@ collective dissolution を 1 シナリオで確認する。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、
-guardian-reviewed jurisdiction evidence に束縛された
+device-specific `ewa_motor_plan` が
+`actuator_profile_id` / `motion_profile` / `target_pose_ref` /
+`rollback_vector_ref` / `safe_stop_policy_id` を固定し、
+jurisdiction-bound `ewa_legal_execution` が
+`policy_ref` / `legal_basis_ref` / `notice_authority_ref` / `liability_mode` /
+fixed 5-control preflight を固定したうえで、
 `external_actuation_authorization` artifact が
-`instruction_digest` / `intent_summary_digest` / `legal_basis_ref` /
-`guardian_verification_ref` / `jurisdiction_bundle_status=ready` を固定したうえで、
+`instruction_digest` / `intent_summary_digest` / `motor_plan_id` /
+`legal_execution_id` / `guardian_verification_ref` /
+`jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 `watchdog-timeout` emergency stop が
 `command_id` / `bound_command_digest` / `bound_authorization_digest` /

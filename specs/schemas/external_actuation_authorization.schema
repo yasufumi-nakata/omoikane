@@ -3,7 +3,8 @@ $id: "https://omoikane.dev/specs/schemas/external_actuation_authorization.schema
 title: ExternalActuationAuthorization
 description: >
   Guardian-reviewed, jurisdiction-bound authorization artifact for one non-read-only
-  physical-world actuation command without storing raw instruction text.
+  physical-world actuation command without storing raw instruction text, while binding
+  device-specific motor semantics and jurisdiction-specific legal execution receipts.
 type: object
 additionalProperties: false
 required:
@@ -25,6 +26,14 @@ required:
   - jurisdiction_bundle_ref
   - jurisdiction_bundle_digest
   - jurisdiction_bundle_status
+  - motor_plan_id
+  - motor_plan_digest
+  - motor_profile_id
+  - legal_execution_id
+  - legal_execution_digest
+  - legal_execution_profile_id
+  - notice_authority_ref
+  - liability_mode
   - authorization_window_seconds
   - issued_at
   - expires_at
@@ -93,6 +102,33 @@ properties:
       - ready
       - stale
       - revoked
+  motor_plan_id:
+    type: string
+    minLength: 8
+  motor_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  motor_profile_id:
+    type: string
+    const: device-specific-motor-semantics-v1
+  legal_execution_id:
+    type: string
+    minLength: 8
+  legal_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  legal_execution_profile_id:
+    type: string
+    const: ewa-jurisdiction-legal-execution-v1
+  notice_authority_ref:
+    type: string
+    minLength: 1
+  liability_mode:
+    type: string
+    enum:
+      - individual
+      - institutional
+      - joint
   authorization_window_seconds:
     type: integer
     minimum: 60

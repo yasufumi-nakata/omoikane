@@ -18,6 +18,10 @@ required:
   - matched_tokens
   - reason
   - approval_path
+  - motor_plan_id
+  - motor_plan_digest
+  - legal_execution_id
+  - legal_execution_digest
   - audit_event_ref
 properties:
   schema_version:
@@ -120,6 +124,16 @@ properties:
         type: boolean
       authorization_id:
         type: string
+  motor_plan_id:
+    type: string
+  motor_plan_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  legal_execution_id:
+    type: string
+  legal_execution_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
   audit_event_ref:
     type: string
     minLength: 1

@@ -6,6 +6,8 @@ summary: Canonical L6 contract for ethics-first physical-world actuation through
 imports:
   ewa_command: ../schemas/ewa_command.schema
   ewa_audit: ../schemas/ewa_audit.schema
+  ewa_motor_plan: ../schemas/ewa_motor_plan.schema
+  ewa_legal_execution: ../schemas/ewa_legal_execution.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
 operations:
@@ -60,8 +62,105 @@ operations:
     guarantees:
       - no command may execute before acquire returns a live handle_id
       - acquire must append one audit entry immediately
-  authorize:
-    summary: Bind one non-read-only actuation command to guardian-reviewed jurisdiction evidence before execution.
+  prepare_motor_plan:
+    summary: Compile one device-specific motion envelope and rollback vector for a non-read-only EWA command.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - command
+          - actuator_profile_id
+          - actuator_group
+          - motion_profile
+          - target_pose_ref
+          - safety_zone_ref
+          - rollback_vector_ref
+          - max_linear_speed_mps
+          - max_force_newton
+          - hold_timeout_ms
+        properties:
+          command:
+            schema_ref: ewa_command
+          actuator_profile_id:
+            type: string
+            minLength: 1
+          actuator_group:
+            type: string
+            minLength: 1
+          motion_profile:
+            type: string
+            minLength: 1
+          target_pose_ref:
+            type: string
+            minLength: 1
+          safety_zone_ref:
+            type: string
+            minLength: 1
+          rollback_vector_ref:
+            type: string
+            minLength: 1
+          max_linear_speed_mps:
+            type: number
+            exclusiveMinimum: 0
+          max_force_newton:
+            type: number
+            exclusiveMinimum: 0
+          hold_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: ewa_motor_plan
+    guarantees:
+      - read-only commands must not prepare a motor plan
+      - motor plans must bind handle_id, device_id, command_id, instruction_digest, and reversibility
+      - safe_stop_policy_id must equal guardian-latched-emergency-stop-v1
+  validate_motor_plan:
+    summary: Validate one device-specific motor plan against the command it will authorize.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - plan
+          - command
+        properties:
+          plan:
+            schema_ref: ewa_motor_plan
+          command:
+            schema_ref: ewa_command
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - plan_ready
+          - profile_valid
+          - instruction_digest_matches
+          - safe_stop_policy_bound
+          - motion_limits_valid
+          - errors
+        properties:
+          ok:
+            type: boolean
+          plan_ready:
+            type: boolean
+          profile_valid:
+            type: boolean
+          instruction_digest_matches:
+            type: boolean
+          safe_stop_policy_bound:
+            type: boolean
+          motion_limits_valid:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+  execute_legal_preflight:
+    summary: Execute one jurisdiction-bound legal preflight before EWA actuation authorization is issued.
     input:
       inline_schema:
         type: object
@@ -74,6 +173,9 @@ operations:
           - jurisdiction_bundle_ref
           - jurisdiction_bundle_digest
           - jurisdiction_bundle_status
+          - notice_authority_ref
+          - liability_mode
+          - escalation_contact
         properties:
           command:
             schema_ref: ewa_command
@@ -98,6 +200,89 @@ operations:
               - ready
               - stale
               - revoked
+          notice_authority_ref:
+            type: string
+            minLength: 1
+          liability_mode:
+            type: string
+            enum:
+              - individual
+              - institutional
+              - joint
+          escalation_contact:
+            type: string
+            minLength: 1
+          valid_for_seconds:
+            type: integer
+            minimum: 60
+            maximum: 900
+    output:
+      schema_ref: ewa_legal_execution
+    guarantees:
+      - read-only commands must not execute a legal preflight
+      - stale or revoked jurisdiction bundles must fail closed before legal execution is issued
+      - legal execution must expose the fixed 5-control preflight set and one delivery_scope=physical-device-actuation
+  validate_legal_execution:
+    summary: Validate one jurisdiction-bound EWA legal preflight against the command it will authorize.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - execution
+          - command
+        properties:
+          execution:
+            schema_ref: ewa_legal_execution
+          command:
+            schema_ref: ewa_command
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - execution_ready
+          - profile_valid
+          - jurisdiction_bundle_ready
+          - controls_complete
+          - window_open
+          - errors
+        properties:
+          ok:
+            type: boolean
+          execution_ready:
+            type: boolean
+          profile_valid:
+            type: boolean
+          jurisdiction_bundle_ready:
+            type: boolean
+          controls_complete:
+            type: boolean
+          window_open:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+  authorize:
+    summary: Bind one non-read-only actuation command to its motor plan and legal execution receipts before execution.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - command
+          - motor_plan
+          - legal_execution
+        properties:
+          command:
+            schema_ref: ewa_command
+          motor_plan:
+            schema_ref: ewa_motor_plan
+          legal_execution:
+            schema_ref: ewa_legal_execution
           valid_for_seconds:
             type: integer
             minimum: 60
@@ -107,8 +292,8 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, and approval path
-      - stale or revoked jurisdiction bundles must fail closed before authorization is issued
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, legal_execution_id/digest, and approval path
+      - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
     input:
@@ -118,6 +303,7 @@ operations:
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
       - non-read-only commands require one active authorization_id whose digests match the command payload
+      - non-read-only audit entries must remain bound to one motor_plan receipt and one legal_execution receipt
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
@@ -147,6 +333,10 @@ operations:
           - instruction_digest_matches
           - intent_digest_matches
           - jurisdiction_bundle_ready
+          - motor_plan_ready
+          - legal_execution_ready
+          - motor_plan_bound
+          - legal_execution_bound
           - window_open
           - status_authorized
           - delivery_scope
@@ -163,6 +353,14 @@ operations:
           intent_digest_matches:
             type: boolean
           jurisdiction_bundle_ready:
+            type: boolean
+          motor_plan_ready:
+            type: boolean
+          legal_execution_ready:
+            type: boolean
+          motor_plan_bound:
+            type: boolean
+          legal_execution_bound:
             type: boolean
           window_open:
             type: boolean
@@ -356,6 +554,12 @@ events:
   ewa.command_authorized:
     payload:
       schema_ref: external_actuation_authorization
+  ewa.motor_plan_prepared:
+    payload:
+      schema_ref: ewa_motor_plan
+  ewa.legal_execution_prepared:
+    payload:
+      schema_ref: ewa_legal_execution
   ewa.command_recorded:
     payload:
       schema_ref: ewa_audit
@@ -368,5 +572,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves only bounded safety gating for physical actuation.
-    - Device-specific motor semantics and full jurisdiction-specific legal compliance execution remain future work.
+    - This contract proves bounded safety gating, device-specific motor semantics, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - Raw hardware buses, regulator APIs, and site-specific firmware adapters stay outside this reference runtime.

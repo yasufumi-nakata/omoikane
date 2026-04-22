@@ -101,11 +101,22 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["motor_plan_ok"])
+        self.assertTrue(result["validation"]["motor_plan_bound"])
+        self.assertTrue(result["validation"]["legal_execution_ok"])
+        self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["authorization_ok"])
         self.assertTrue(result["validation"]["authorization_ready"])
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertEqual(result["motor_plan"]["plan_id"], result["approved_command"]["motor_plan_id"])
+        self.assertEqual(
+            result["legal_execution"]["execution_id"],
+            result["approved_command"]["legal_execution_id"],
+        )
+        self.assertTrue(result["validation"]["approved_command_motor_plan_bound"])
+        self.assertTrue(result["validation"]["approved_command_legal_execution_bound"])
         self.assertTrue(result["validation"]["emergency_stop_ok"])
         self.assertTrue(result["validation"]["emergency_stop_latched"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])

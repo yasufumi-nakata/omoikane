@@ -85,11 +85,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_ewa_demo()
 
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["motor_plan_ok"])
+        self.assertTrue(result["validation"]["motor_plan_bound"])
+        self.assertTrue(result["validation"]["legal_execution_ok"])
+        self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["authorization_ok"])
         self.assertTrue(result["validation"]["authorization_ready"])
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
+        self.assertEqual(
+            result["motor_plan"]["plan_id"],
+            result["approved_command"]["motor_plan_id"],
+        )
+        self.assertEqual(
+            result["legal_execution"]["execution_id"],
+            result["approved_command"]["legal_execution_id"],
+        )
+        self.assertTrue(result["validation"]["approved_command_motor_plan_bound"])
+        self.assertTrue(result["validation"]["approved_command_legal_execution_bound"])
         self.assertTrue(result["validation"]["emergency_stop_ok"])
         self.assertTrue(result["validation"]["emergency_stop_latched"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])
@@ -108,6 +122,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"]["interface-ewa-authorization"],
         )
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-plan"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-legal"])
         self.assertEqual(6, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
         self.assertEqual(
