@@ -27,6 +27,10 @@ FUTURE_WORK_IGNORED_SNIPPETS = (
     "deferred surface",
     "deferred surfaces",
 )
+TRUTH_SOURCE_INVENTORY_SPECS = (
+    ("specs/interfaces/README.md", "specs/interfaces", (".idl",)),
+    ("specs/schemas/README.md", "specs/schemas", (".schema", ".yaml")),
+)
 
 
 class GapScanner:
@@ -40,6 +44,7 @@ class GapScanner:
         empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
         catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
+        inventory_drift_hits = self._inventory_drift_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
 
         prioritized_tasks: List[Dict[str, str]] = []
@@ -75,6 +80,14 @@ class GapScanner:
                     "summary": f"catalog の次優先ファイルが未実装です: {filename}",
                 }
             )
+        for hit in inventory_drift_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "inventory-drift",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in future_work_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -107,6 +120,7 @@ class GapScanner:
             "missing_required_reference_file_count": len(missing_reference_files),
             "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
+            "inventory_drift_count": len(inventory_drift_hits),
             "future_work_hit_count": len(future_work_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
@@ -115,6 +129,7 @@ class GapScanner:
             "catalog_pending_count": len(catalog_pending),
             "catalog_pending_files": catalog_pending,
             "placeholder_hits": placeholder_hits,
+            "inventory_drift_hits": inventory_drift_hits,
             "future_work_hits": future_work_hits,
             "prioritized_tasks": prioritized_tasks,
         }
@@ -230,6 +245,29 @@ class GapScanner:
                     continue
                 if any(marker in stripped for marker in PLACEHOLDER_MARKERS):
                     hits.append({"path": str(relative_path), "line": stripped})
+        return hits
+
+    def _inventory_drift_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        hits: List[Dict[str, str]] = []
+        for readme_name, directory_name, suffixes in TRUTH_SOURCE_INVENTORY_SPECS:
+            readme_path = repo_root / readme_name
+            directory_path = repo_root / directory_name
+            if not readme_path.exists() or not directory_path.exists():
+                continue
+            listed_entries = {path.name for path in self._extract_expected_paths(readme_path)}
+            actual_entries = {
+                path.name
+                for suffix in suffixes
+                for path in directory_path.glob(f"*{suffix}")
+                if path.is_file()
+            }
+            for missing_entry in sorted(actual_entries - listed_entries):
+                hits.append(
+                    {
+                        "path": readme_name,
+                        "line": f"`{missing_entry}` is implemented but missing from the README inventory",
+                    }
+                )
         return hits
 
     def _future_work_hits(self, repo_root: Path) -> List[Dict[str, str]]:

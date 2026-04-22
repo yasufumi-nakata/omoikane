@@ -238,6 +238,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["missing_required_reference_file_count"])
         self.assertEqual(0, report["empty_eval_surface_count"])
         self.assertEqual(0, report["catalog_pending_count"])
+        self.assertEqual(0, report["inventory_drift_count"])
 
     def test_naming_demo_returns_fixed_policy_and_aliases(self) -> None:
         runtime = OmoikaneReferenceOS()

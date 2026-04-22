@@ -79,6 +79,63 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "catalog-next-priority" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_interface_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            interfaces_root = repo_root / "specs" / "interfaces"
+            (interfaces_root / "README.md").write_text(
+                "# Interfaces\n\n- `kernel.identity.v0.idl`\n",
+                encoding="utf-8",
+            )
+            (interfaces_root / "kernel.identity.v0.idl").write_text(
+                "idl_version: 1\n",
+                encoding="utf-8",
+            )
+            (interfaces_root / "kernel.broker.v0.idl").write_text(
+                "idl_version: 1\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            self.assertEqual(
+                "specs/interfaces/README.md",
+                report["inventory_drift_hits"][0]["path"],
+            )
+            self.assertIn("kernel.broker.v0.idl", report["inventory_drift_hits"][0]["line"])
+            self.assertTrue(
+                any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_reports_schema_inventory_drift_for_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            schemas_root = repo_root / "specs" / "schemas"
+            (schemas_root / "README.md").write_text(
+                "# Schemas\n\n- `identity_record.schema`\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "identity_record.schema").write_text(
+                "{\n  \"type\": \"object\"\n}\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "build_request.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            self.assertEqual(
+                "specs/schemas/README.md",
+                report["inventory_drift_hits"][0]["path"],
+            )
+            self.assertIn("build_request.yaml", report["inventory_drift_hits"][0]["line"])
+
     def test_scan_reports_truth_source_future_work(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

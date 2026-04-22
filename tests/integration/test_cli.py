@@ -25,6 +25,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(0, result["missing_required_reference_file_count"])
         self.assertEqual([], result["missing_required_reference_files"])
         self.assertEqual(0, result["missing_expected_file_count"])
+        self.assertEqual(0, result["inventory_drift_count"])
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()
