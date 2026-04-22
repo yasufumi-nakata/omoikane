@@ -120,6 +120,47 @@ rollback-approved へ到達するか。
 ### Third-Party Witness Consistency
 立会第三者の観察記録との照合。
 
+## 実装済み eval
+
+- `builder_live_enactment_execution.yaml`
+- `builder_live_oversight_network.yaml`
+- `builder_rollback_execution.yaml`
+- `builder_rollback_oversight_network.yaml`
+- `builder_staged_rollout_execution.yaml`
+- `connectome_snapshot_contract.yaml`
+- `continuity_chain_self_modify.yaml`
+- `council_output_build_request_pipeline.yaml`
+- `design_reader_git_delta_scan.yaml`
+- `design_reader_handoff.yaml`
+- `diff_evaluator_direct_contract.yaml`
+- `differential_eval_execution_binding.yaml`
+- `episodic_stream_handoff.yaml`
+- `ledger_integrity.yaml`
+- `memory_crystal_compaction.yaml`
+- `memory_edit_recall_buffer.yaml`
+- `patch_generator_direct_contract.yaml`
+- `procedural_preview_contract.yaml`
+- `procedural_skill_enactment_execution.yaml`
+- `procedural_skill_execution_contract.yaml`
+- `procedural_writeback_contract.yaml`
+- `release_manifest_contract.yaml`
+- `scheduler_artifact_sync.yaml`
+- `scheduler_cancellation.yaml`
+- `scheduler_execution_receipt.yaml`
+- `scheduler_governance_artifacts.yaml`
+- `scheduler_live_verifier_connectivity.yaml`
+- `scheduler_method_b_broker_handoff.yaml`
+- `scheduler_method_profiles.yaml`
+- `scheduler_root_rotation.yaml`
+- `scheduler_stage_rollback.yaml`
+- `semantic_procedural_handoff.yaml`
+- `semantic_projection_contract.yaml`
+- `substrate_broker_attestation_chain.yaml`
+- `substrate_broker_attestation_stream.yaml`
+- `substrate_broker_dual_allocation_window.yaml`
+- `substrate_migration_continuity.yaml`
+- `termination_scheduler_cancellation.yaml`
+
 ## 失敗時
 
 - ギャップ検出 → 「主観時間の不確定区間」として永続マーク

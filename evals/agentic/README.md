@@ -58,3 +58,29 @@ network-attested reviewer quorum と Federation / Heritage returned result が
 cognitive audit follow-up に束縛され、
 review preserve / boundary preserve / human governance escalation を
 deterministic に切り替えられること。
+
+## 実装済み eval
+
+- `amendment_constitutional_freeze.yaml`
+- `cognitive_audit_governance_binding.yaml`
+- `cognitive_audit_loop.yaml`
+- `consensus_bus_delivery_guard.yaml`
+- `council_expedited_timeout_defer.yaml`
+- `council_guardian_veto.yaml`
+- `council_timeout_fallback.yaml`
+- `distributed_council_resolution.yaml`
+- `distributed_transport_authenticity.yaml`
+- `distributed_transport_authority_churn.yaml`
+- `distributed_transport_authority_cluster_discovery.yaml`
+- `distributed_transport_authority_plane.yaml`
+- `distributed_transport_authority_route_target_discovery.yaml`
+- `distributed_transport_authority_route_trace.yaml`
+- `distributed_transport_live_root_directory.yaml`
+- `distributed_transport_packet_capture_export.yaml`
+- `distributed_transport_privileged_capture_acquisition.yaml`
+- `distributed_transport_relay_telemetry.yaml`
+- `distributed_transport_rotation.yaml`
+- `multi_council_externalization.yaml`
+- `task_graph_complexity_guard.yaml`
+- `trust_score_update_guard.yaml`
+- `yaoyorozu_council_convocation.yaml`

@@ -136,6 +136,62 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertIn("build_request.yaml", report["inventory_drift_hits"][0]["line"])
 
+    def test_scan_reports_eval_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            eval_root = repo_root / "evals" / "continuity"
+            eval_root.mkdir(parents=True, exist_ok=True)
+            (eval_root / "README.md").write_text(
+                "# Continuity Evals\n\n- `ledger_integrity.yaml`\n",
+                encoding="utf-8",
+            )
+            (eval_root / "ledger_integrity.yaml").write_text(
+                "eval_id: ledger_integrity\n",
+                encoding="utf-8",
+            )
+            (eval_root / "scheduler_execution_receipt.yaml").write_text(
+                "eval_id: scheduler_execution_receipt\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            self.assertEqual(
+                "evals/continuity/README.md",
+                report["inventory_drift_hits"][0]["path"],
+            )
+            self.assertIn(
+                "scheduler_execution_receipt.yaml",
+                report["inventory_drift_hits"][0]["line"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_ignores_cross_surface_eval_references(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            eval_root = repo_root / "evals" / "cognitive"
+            eval_root.mkdir(parents=True, exist_ok=True)
+            (eval_root / "README.md").write_text(
+                "# Cognitive Evals\n\n"
+                "- `qualia_contract.yaml`\n"
+                "- `../agentic/cognitive_audit_governance_binding.yaml`\n",
+                encoding="utf-8",
+            )
+            (eval_root / "qualia_contract.yaml").write_text(
+                "eval_id: qualia_contract\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["inventory_drift_count"])
+            self.assertEqual([], report["inventory_drift_hits"])
+
     def test_scan_reports_truth_source_future_work(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

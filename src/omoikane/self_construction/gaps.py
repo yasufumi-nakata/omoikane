@@ -31,6 +31,7 @@ TRUTH_SOURCE_INVENTORY_SPECS = (
     ("specs/interfaces/README.md", "specs/interfaces", (".idl",)),
     ("specs/schemas/README.md", "specs/schemas", (".schema", ".yaml")),
 )
+EVAL_INVENTORY_GLOB = "evals/*/README.md"
 
 
 class GapScanner:
@@ -196,8 +197,11 @@ class GapScanner:
 
     @staticmethod
     def _extract_expected_paths(readme_path: Path) -> List[Path]:
-        expected: List[Path] = []
-        base_dir = readme_path.parent
+        return [readme_path.parent / candidate for candidate in GapScanner._extract_inventory_entries(readme_path)]
+
+    @staticmethod
+    def _extract_inventory_entries(readme_path: Path) -> List[str]:
+        entries: List[str] = []
         for line in readme_path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if not stripped.startswith("- "):
@@ -209,8 +213,8 @@ class GapScanner:
                 candidate = parts[index].strip()
                 if not candidate or "/" in candidate:
                     continue
-                expected.append(base_dir / candidate)
-        return expected
+                entries.append(candidate)
+        return entries
 
     @staticmethod
     def _empty_eval_surfaces(evals_root: Path) -> List[str]:
@@ -249,12 +253,23 @@ class GapScanner:
 
     def _inventory_drift_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
-        for readme_name, directory_name, suffixes in TRUTH_SOURCE_INVENTORY_SPECS:
+        inventory_specs = list(TRUTH_SOURCE_INVENTORY_SPECS)
+        for readme_path in sorted(repo_root.glob(EVAL_INVENTORY_GLOB)):
+            relative_path = readme_path.relative_to(repo_root)
+            inventory_specs.append(
+                (
+                    str(relative_path),
+                    str(relative_path.parent),
+                    (".yaml", ".yml"),
+                )
+            )
+
+        for readme_name, directory_name, suffixes in inventory_specs:
             readme_path = repo_root / readme_name
             directory_path = repo_root / directory_name
             if not readme_path.exists() or not directory_path.exists():
                 continue
-            listed_entries = {path.name for path in self._extract_expected_paths(readme_path)}
+            listed_entries = set(self._extract_inventory_entries(readme_path))
             actual_entries = {
                 path.name
                 for suffix in suffixes

@@ -20,3 +20,13 @@ malicious inject の guardian isolation をまとめて確認する。
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
+
+## 実装済み eval
+
+- `bdb_fail_safe_reversibility.yaml`
+- `collective_merge_reversibility.yaml`
+- `imc_disclosure_floor.yaml`
+- `sensory_loopback_artifact_family.yaml`
+- `sensory_loopback_guard.yaml`
+- `sensory_loopback_multi_self_arbitration.yaml`
+- `wms_private_reality_escape.yaml`

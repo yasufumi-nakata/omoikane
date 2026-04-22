@@ -83,7 +83,7 @@ python3 -m unittest discover -s tests -t .
 
 `gap-report` は open question / missing file / empty eval / placeholder に加えて、
 automation が前提にする repo-local `references/*.md` の欠落、
-`specs/interfaces/README.md` / `specs/schemas/README.md` の inventory drift、
+`specs/interfaces/README.md` / `specs/schemas/README.md` / `evals/*/README.md` の inventory drift、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
 residual `future work` も JSON で列挙する。
