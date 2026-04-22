@@ -8,6 +8,23 @@ from omoikane.self_construction.gaps import GapScanner
 
 
 class GapScannerTests(unittest.TestCase):
+    def test_scan_reports_missing_required_reference_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "references" / "verification-checklist.md").unlink()
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["missing_required_reference_file_count"])
+            self.assertEqual(
+                ["references/verification-checklist.md"],
+                report["missing_required_reference_files"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "missing-reference-file" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_reports_empty_eval_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -106,6 +123,14 @@ class GapScannerTests(unittest.TestCase):
     def _bootstrap_repo(repo_root: Path) -> None:
         (repo_root / "meta").mkdir(parents=True)
         (repo_root / "meta" / "open-questions.md").write_text("# Open Questions\n", encoding="utf-8")
+        references_root = repo_root / "references"
+        references_root.mkdir(parents=True, exist_ok=True)
+        for filename in (
+            "operating-playbook.md",
+            "repo-coverage-checklist.md",
+            "verification-checklist.md",
+        ):
+            (references_root / filename).write_text("# bootstrap\n", encoding="utf-8")
         for readme in (
             repo_root / "specs" / "interfaces" / "README.md",
             repo_root / "specs" / "schemas" / "README.md",

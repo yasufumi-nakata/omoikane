@@ -38,6 +38,7 @@ docs/03-protocols/    ── データ形式と通信規約
 docs/04-ai-governance/── AI が AI を統率する規約
 docs/05-research-frontiers/ ── 人間 yasufumi が研究する未解決領域
 docs/06-roadmap/      ── 依存関係と里程標
+references/          ── automation / builder 実行用の repo-local runbook
 specs/                ── 機械可読な仕様（Codex 入力用）
 agents/               ── 各サブエージェントの役割定義
 src/                  ── Reference runtime（安全な最小実装）

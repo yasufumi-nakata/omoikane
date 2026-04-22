@@ -81,6 +81,7 @@ python3 -m unittest discover -s tests -t .
 を JSON で可視化する。
 
 `gap-report` は open question / missing file / empty eval / placeholder に加えて、
+automation が前提にする repo-local `references/*.md` の欠落、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
 residual `future work` も JSON で列挙する。

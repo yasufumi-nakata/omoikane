@@ -76,6 +76,7 @@ status: decided | superseded
 - [2026-04-22_guardian-verifier-transport-exchange.md](2026-04-22_guardian-verifier-transport-exchange.md)
 - [2026-04-22_guardian-jurisdiction-legal-execution.md](2026-04-22_guardian-jurisdiction-legal-execution.md)
 - [2026-04-22_ewa-guardian-oversight-gate.md](2026-04-22_ewa-guardian-oversight-gate.md)
+- [2026-04-22_automation-reference-playbooks.md](2026-04-22_automation-reference-playbooks.md)
 - [2026-04-21_builder-rollback-external-observer-receipts.md](2026-04-21_builder-rollback-external-observer-receipts.md)
 - [2026-04-21_builder-rollback-current-worktree-direct-mutation.md](2026-04-21_builder-rollback-current-worktree-direct-mutation.md)
 - [2026-04-20_builder-sandbox-apply-rollout.md](2026-04-20_builder-sandbox-apply-rollout.md)

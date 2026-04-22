@@ -12,6 +12,11 @@ PLACEHOLDER_MARKERS = (
     "本体記述",
     "未生成",
 )
+REQUIRED_REFERENCE_FILES = (
+    "references/operating-playbook.md",
+    "references/repo-coverage-checklist.md",
+    "references/verification-checklist.md",
+)
 TRUTH_SOURCE_FUTURE_WORK_GLOBS = (
     "README.md",
     "docs/07-reference-implementation/README.md",
@@ -31,6 +36,7 @@ class GapScanner:
         repo_root = repo_root.resolve()
         open_questions = self._unchecked_items(repo_root / "meta" / "open-questions.md")
         missing_specs = self._missing_expected_files(repo_root / "specs")
+        missing_reference_files = self._missing_required_reference_files(repo_root)
         empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
         catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
@@ -43,6 +49,14 @@ class GapScanner:
                     "priority": "high",
                     "kind": "missing-spec",
                     "summary": f"期待される spec/eval ファイルが未作成です: {filename}",
+                }
+            )
+        for filename in missing_reference_files:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "missing-reference-file",
+                    "summary": f"automation 用 reference file が未作成です: {filename}",
                 }
             )
         for surface in empty_eval_surfaces:
@@ -90,11 +104,13 @@ class GapScanner:
             "repo_root": str(repo_root),
             "open_question_count": len(open_questions),
             "missing_expected_file_count": len(missing_specs),
+            "missing_required_reference_file_count": len(missing_reference_files),
             "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
             "future_work_hit_count": len(future_work_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
+            "missing_required_reference_files": missing_reference_files,
             "empty_eval_surfaces": empty_eval_surfaces,
             "catalog_pending_count": len(catalog_pending),
             "catalog_pending_files": catalog_pending,
@@ -153,6 +169,14 @@ class GapScanner:
             str(path.relative_to(specs_root.parent))
             for path in expected_paths
             if not path.exists()
+        ]
+
+    @staticmethod
+    def _missing_required_reference_files(repo_root: Path) -> List[str]:
+        return [
+            filename
+            for filename in REQUIRED_REFERENCE_FILES
+            if not (repo_root / filename).exists()
         ]
 
     @staticmethod

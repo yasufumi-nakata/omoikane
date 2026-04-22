@@ -235,6 +235,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertIn("open_question_count", report)
         self.assertEqual(0, report["open_question_count"])
         self.assertEqual(0, report["missing_expected_file_count"])
+        self.assertEqual(0, report["missing_required_reference_file_count"])
         self.assertEqual(0, report["empty_eval_surface_count"])
         self.assertEqual(0, report["catalog_pending_count"])
 

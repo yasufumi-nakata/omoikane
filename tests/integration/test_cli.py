@@ -4,12 +4,28 @@ import io
 import json
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from omoikane.cli import main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_gap_report_emits_reference_ready_json(self) -> None:
+        stdout = io.StringIO()
+        repo_root = Path(__file__).resolve().parents[2]
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "gap-report", "--repo-root", str(repo_root), "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(0, result["missing_required_reference_file_count"])
+        self.assertEqual([], result["missing_required_reference_files"])
+        self.assertEqual(0, result["missing_expected_file_count"])
+
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()
 
