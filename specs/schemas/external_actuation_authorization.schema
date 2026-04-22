@@ -22,7 +22,10 @@ required:
   - delivery_scope
   - jurisdiction
   - legal_basis_ref
+  - guardian_verification_id
   - guardian_verification_ref
+  - guardian_verifier_ref
+  - guardian_transport_profile
   - jurisdiction_bundle_ref
   - jurisdiction_bundle_digest
   - jurisdiction_bundle_status
@@ -35,6 +38,12 @@ required:
   - legal_execution_id
   - legal_execution_digest
   - legal_execution_profile_id
+  - guardian_oversight_gate_id
+  - guardian_oversight_gate_digest
+  - guardian_oversight_event_id
+  - guardian_oversight_status
+  - reviewer_binding_count
+  - reviewer_network_attested
   - notice_authority_ref
   - liability_mode
   - authorization_window_seconds
@@ -90,9 +99,17 @@ properties:
   legal_basis_ref:
     type: string
     minLength: 1
+  guardian_verification_id:
+    type: string
+    minLength: 8
   guardian_verification_ref:
     type: string
     minLength: 1
+  guardian_verifier_ref:
+    type: string
+    minLength: 1
+  guardian_transport_profile:
+    const: reviewer-live-proof-bridge-v1
   jurisdiction_bundle_ref:
     type: string
     minLength: 1
@@ -132,6 +149,22 @@ properties:
   legal_execution_profile_id:
     type: string
     const: ewa-jurisdiction-legal-execution-v1
+  guardian_oversight_gate_id:
+    type: string
+    minLength: 8
+  guardian_oversight_gate_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  guardian_oversight_event_id:
+    type: string
+    minLength: 8
+  guardian_oversight_status:
+    const: satisfied
+  reviewer_binding_count:
+    type: integer
+    minimum: 1
+  reviewer_network_attested:
+    const: true
   notice_authority_ref:
     type: string
     minLength: 1

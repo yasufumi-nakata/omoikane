@@ -30,6 +30,7 @@
 - `ewa_motor_plan.schema`
 - `ewa_stop_signal_path.schema`
 - `ewa_legal_execution.schema`
+- `ewa_guardian_oversight_gate.schema`
 - `ewa_emergency_stop.schema`
 - `ewa_audit.schema`
 - `external_actuation_authorization.schema`

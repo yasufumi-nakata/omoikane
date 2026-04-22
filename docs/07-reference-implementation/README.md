@@ -533,12 +533,18 @@ armed `ewa_stop_signal_path` が
 fixed 4 trigger binding (`guardian-manual-stop` / `watchdog-timeout` /
 `sensor-drift` / `emergency-disconnect`) を固定したうえで、
 jurisdiction-bound `ewa_legal_execution` が
-`policy_ref` / `legal_basis_ref` / `notice_authority_ref` / `liability_mode` /
+`policy_ref` / `legal_basis_ref` / `guardian_verification_id` /
+`guardian_verifier_ref` / `notice_authority_ref` / `liability_mode` /
 fixed 5-control preflight を固定したうえで、
+network-attested `ewa_guardian_oversight_gate` が
+`guardian_role=integrity` / `oversight_category=attest` /
+`oversight_event_id` / `reviewer_binding_count` /
+matched reviewer `verification_id` / `network_receipt_id` /
+`authority_chain_ref` / `trust_root_ref` を固定したうえで、
 `external_actuation_authorization` artifact が
 `instruction_digest` / `intent_summary_digest` / `motor_plan_id` / `stop_signal_path_id` /
 `legal_execution_id` / `guardian_verification_ref` /
-`jurisdiction_bundle_status=ready` を固定したうえで、
+`guardian_oversight_gate_id` / `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 `watchdog-timeout` emergency stop が
 `command_id` / `bound_command_digest` / `bound_authorization_digest` /

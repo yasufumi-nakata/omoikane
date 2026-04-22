@@ -1157,7 +1157,16 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one jurisdiction-bound EWA legal preflight with fixed control execution, notice authority, and liability mode.
+    rationale: Required to serialize one jurisdiction-bound EWA legal preflight with fixed control execution, notice authority, liability mode, and guardian verification provenance.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/ewa_guardian_oversight_gate.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/04-ai-governance/guardian-oversight.md
+      - reference-runtime
+    rationale: Required to serialize one network-attested guardian oversight gate that binds a satisfied human oversight event to the EWA legal execution before authorization is issued.
   - priority: P1
     kind: schema
     file: specs/schemas/external_actuation_authorization.schema
@@ -1166,7 +1175,7 @@ entries:
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/02-subsystems/mind-substrate/procedural-memory.md
       - reference-runtime
-    rationale: Required to serialize one guardian-reviewed, jurisdiction-bound physical actuation authorization bound to motor semantics, armed stop-signal routing, and legal preflight receipts without storing raw instruction text.
+    rationale: Required to serialize one guardian-reviewed, jurisdiction-bound physical actuation authorization bound to motor semantics, armed stop-signal routing, legal preflight, and network-attested guardian oversight gate receipts without storing raw instruction text.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_emergency_stop.schema
@@ -1190,7 +1199,7 @@ entries:
       - docs/02-subsystems/interface/README.md
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, armed stop-signal routing, legal preflight, authorization, emergency-stop, and forced-release safety gating before real device adapters land.
+    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, armed stop-signal routing, network-attested guardian oversight gating, legal preflight, authorization, emergency-stop, and forced-release safety gating before real device adapters land.
   - priority: P1
     kind: eval
     file: evals/interface/imc_disclosure_floor.yaml
@@ -1229,6 +1238,15 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
     rationale: Protects device-specific motor plan compilation, jurisdiction-bound legal preflight execution, and receipt binding into authorization and command audit at the EWA boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_guardian_oversight_gate.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/04-ai-governance/guardian-oversight.md
+    rationale: Protects network-attested reviewer quorum, guardian verification matching, and oversight-event binding before EWA authorization is issued.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_emergency_stop.yaml

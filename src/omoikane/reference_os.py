@@ -5675,13 +5675,63 @@ json.dump(response, sys.stdout)
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
         )
+        reviewer_alpha = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-ewa-001",
+            display_name="EWA Reviewer Alpha",
+            credential_id="credential-ewa-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://ewa-oversight/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-22T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://ewa-oversight/reviewer-alpha/v1",
+            escalation_contact="mailto:ewa-oversight-alpha@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_beta = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-ewa-002",
+            display_name="EWA Reviewer Beta",
+            credential_id="credential-ewa-beta",
+            attestation_type="live-session-attestation",
+            proof_ref="proof://ewa-oversight/reviewer-beta/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-22T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://ewa-oversight/reviewer-beta/v1",
+            escalation_contact="mailto:ewa-oversight-beta@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_alpha = self.oversight.verify_reviewer_from_network(
+            "human-reviewer-ewa-001",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-alpha",
+            challenge_ref="challenge://guardian-oversight/reviewer-alpha/2026-04-22T07:00:00Z",
+            challenge_digest="sha256:ewa-reviewer-alpha-20260422",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-22T07:00:00+00:00",
+            valid_until="2026-10-22T00:00:00+00:00",
+        )
+        reviewer_beta = self.oversight.verify_reviewer_from_network(
+            "human-reviewer-ewa-002",
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-beta",
+            challenge_ref="challenge://guardian-oversight/reviewer-beta/2026-04-22T07:02:00Z",
+            challenge_digest="sha256:ewa-reviewer-beta-20260422",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-22T07:02:00+00:00",
+            valid_until="2026-10-22T00:00:00+00:00",
+        )
         legal_execution = self.ewa.execute_legal_preflight(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
             reversibility="reversible",
             jurisdiction="JP-13",
             legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_id=reviewer_alpha["credential_verification"]["verification_id"],
             guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-001",
+            guardian_verifier_ref=reviewer_alpha["credential_verification"]["verifier_ref"],
             jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
             jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
             jurisdiction_bundle_status="ready",
@@ -5697,6 +5747,34 @@ json.dump(response, sys.stdout)
             command_id="ewa-command-approve-001",
             reversibility="reversible",
         )
+        guardian_oversight_event = self.oversight.record(
+            guardian_role="integrity",
+            category="attest",
+            payload_ref=f"ewa-legal://{legal_execution['execution_id']}/authorization-review",
+            escalation_path=["guardian-oversight.jp", "external-ethics-board"],
+        )
+        guardian_oversight_event = self.oversight.attest(
+            guardian_oversight_event["event_id"],
+            reviewer_id="human-reviewer-ewa-001",
+        )
+        guardian_oversight_event = self.oversight.attest(
+            guardian_oversight_event["event_id"],
+            reviewer_id="human-reviewer-ewa-002",
+        )
+        guardian_oversight_gate = self.ewa.prepare_guardian_oversight_gate(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            legal_execution_id=legal_execution["execution_id"],
+            oversight_event=guardian_oversight_event,
+        )
+        guardian_oversight_gate_validation = self.ewa.validate_guardian_oversight_gate(
+            guardian_oversight_gate,
+            legal_execution=legal_execution,
+            oversight_event=guardian_oversight_event,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+        )
         authorization = self.ewa.authorize(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -5707,6 +5785,7 @@ json.dump(response, sys.stdout)
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
             legal_execution_id=legal_execution["execution_id"],
+            guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
             intent_confidence=0.96,
             valid_for_seconds=300,
@@ -5716,6 +5795,7 @@ json.dump(response, sys.stdout)
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
             legal_execution=legal_execution,
+            guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
@@ -5790,6 +5870,11 @@ json.dump(response, sys.stdout)
             "legal_execution_ok": legal_execution_validation["ok"],
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
+            "guardian_oversight_gate_ok": guardian_oversight_gate_validation["ok"],
+            "guardian_oversight_gate_bound": authorization_validation[
+                "guardian_oversight_gate_bound"
+            ],
+            "reviewer_network_attested": authorization_validation["reviewer_network_attested"],
             "approved_command_motor_plan_bound": (
                 approved_command["motor_plan_id"] == motor_plan["plan_id"]
                 and approved_command["motor_plan_digest"] == motor_plan["plan_digest"]
@@ -5815,6 +5900,9 @@ json.dump(response, sys.stdout)
             and authorization_validation["intent_digest_matches"],
             "authorization_stop_signal_path_ready": authorization_validation[
                 "stop_signal_path_ready"
+            ],
+            "authorization_guardian_oversight_gate_ready": authorization_validation[
+                "guardian_oversight_gate_ready"
             ],
             "emergency_stop_ok": emergency_stop_validation["ok"],
             "emergency_stop_trigger_source_valid": emergency_stop_validation["trigger_source_valid"],
@@ -5847,6 +5935,7 @@ json.dump(response, sys.stdout)
             and motor_plan_validation["ok"]
             and stop_signal_path_validation["ok"]
             and legal_execution_validation["ok"]
+            and guardian_oversight_gate_validation["ok"]
             and authorization_validation["ok"]
             and emergency_stop_validation["ok"],
         }
@@ -5889,6 +5978,16 @@ json.dump(response, sys.stdout)
             category="interface-ewa-legal",
             layer="L6",
             signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.oversight.ewa-authorization.satisfied",
+            payload=guardian_oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
             substrate="robotic-actuator",
         )
         self.ledger.append(
@@ -5986,6 +6085,13 @@ json.dump(response, sys.stdout)
             "stop_signal_path_validation": stop_signal_path_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
+            "reviewers": {
+                "alpha": reviewer_alpha,
+                "beta": reviewer_beta,
+            },
+            "guardian_oversight_event": guardian_oversight_event,
+            "guardian_oversight_gate": guardian_oversight_gate,
+            "guardian_oversight_gate_validation": guardian_oversight_gate_validation,
             "authorization": authorization,
             "authorization_validation": authorization_validation,
             "approved_command": approved_command,

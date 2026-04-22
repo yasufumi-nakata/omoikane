@@ -6,6 +6,61 @@ from omoikane.interface.ewa import ExternalWorldAgentController
 
 
 class ExternalWorldAgentControllerTests(unittest.TestCase):
+    def _build_network_oversight_event(
+        self,
+        *,
+        command_id: str,
+        legal_execution: dict[str, object],
+    ) -> dict[str, object]:
+        return {
+            "event_id": "guardian-oversight-event-ewa-001",
+            "payload_ref": f"ledger://ewa/{command_id}/guardian-review",
+            "guardian_role": "integrity",
+            "category": "attest",
+            "human_attestation": {
+                "required_quorum": 2,
+                "received_quorum": 2,
+                "reviewers": ["human-reviewer-alpha", "human-reviewer-beta"],
+                "status": "satisfied",
+            },
+            "reviewer_bindings": [
+                {
+                    "reviewer_id": "human-reviewer-alpha",
+                    "verification_id": legal_execution["guardian_verification_id"],
+                    "verifier_ref": legal_execution["guardian_verifier_ref"],
+                    "network_receipt_id": "verifier-network-receipt-alpha",
+                    "transport_exchange_digest": "1" * 64,
+                    "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+                    "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+                    "trust_root_digest": "2" * 64,
+                    "legal_execution_id": "guardian-legal-execution-alpha",
+                    "legal_execution_digest": "3" * 64,
+                    "legal_policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+                    "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
+                    "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
+                    "guardian_role": "integrity",
+                    "category": "attest",
+                },
+                {
+                    "reviewer_id": "human-reviewer-beta",
+                    "verification_id": "reviewer-verification-beta",
+                    "verifier_ref": "verifier://guardian-oversight.jp/reviewer-beta",
+                    "network_receipt_id": "verifier-network-receipt-beta",
+                    "transport_exchange_digest": "4" * 64,
+                    "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+                    "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+                    "trust_root_digest": "5" * 64,
+                    "legal_execution_id": "guardian-legal-execution-beta",
+                    "legal_execution_digest": "6" * 64,
+                    "legal_policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+                    "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
+                    "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
+                    "guardian_role": "integrity",
+                    "category": "attest",
+                },
+            ],
+        }
+
     def _build_authorized_reversible_context(self) -> dict[str, object]:
         controller = ExternalWorldAgentController()
         handle = controller.acquire(
@@ -57,7 +112,9 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             reversibility="reversible",
             jurisdiction="JP-13",
             legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_id="reviewer-verification-ewa-001",
             guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-001",
+            guardian_verifier_ref="verifier://guardian-oversight.jp/reviewer-omega",
             jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
             jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
             jurisdiction_bundle_status="ready",
@@ -73,6 +130,24 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             command_id="ewa-command-approve-001",
             reversibility="reversible",
         )
+        oversight_event = self._build_network_oversight_event(
+            command_id="ewa-command-approve-001",
+            legal_execution=legal_execution,
+        )
+        guardian_oversight_gate = controller.prepare_guardian_oversight_gate(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            legal_execution_id=legal_execution["execution_id"],
+            oversight_event=oversight_event,
+        )
+        guardian_oversight_gate_validation = controller.validate_guardian_oversight_gate(
+            guardian_oversight_gate,
+            legal_execution=legal_execution,
+            oversight_event=oversight_event,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id="ewa-command-approve-001",
+        )
         authorization = controller.authorize(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -83,6 +158,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
             legal_execution_id=legal_execution["execution_id"],
+            guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
             intent_confidence=0.94,
         )
@@ -91,6 +167,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
             legal_execution=legal_execution,
+            guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
@@ -107,6 +184,9 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             "stop_signal_path_validation": stop_signal_path_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
+            "oversight_event": oversight_event,
+            "guardian_oversight_gate": guardian_oversight_gate,
+            "guardian_oversight_gate_validation": guardian_oversight_gate_validation,
             "authorization": authorization,
             "authorization_validation": authorization_validation,
         }
@@ -147,13 +227,18 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(context["stop_signal_path_validation"]["path_ready"])
         self.assertTrue(context["legal_execution_validation"]["ok"])
         self.assertTrue(context["legal_execution_validation"]["execution_ready"])
+        self.assertTrue(context["guardian_oversight_gate_validation"]["ok"])
+        self.assertTrue(context["guardian_oversight_gate_validation"]["gate_ready"])
         self.assertTrue(authorization_validation["ok"])
         self.assertTrue(authorization_validation["motor_plan_ready"])
         self.assertTrue(authorization_validation["stop_signal_path_ready"])
         self.assertTrue(authorization_validation["legal_execution_ready"])
+        self.assertTrue(authorization_validation["guardian_oversight_gate_ready"])
         self.assertTrue(authorization_validation["motor_plan_bound"])
         self.assertTrue(authorization_validation["stop_signal_path_bound"])
         self.assertTrue(authorization_validation["legal_execution_bound"])
+        self.assertTrue(authorization_validation["guardian_oversight_gate_bound"])
+        self.assertTrue(authorization_validation["reviewer_network_attested"])
         self.assertEqual("physical-device-actuation", authorization_validation["delivery_scope"])
         self.assertEqual("executed", approved["status"])
         self.assertEqual("reversible", approved["reversibility"])
@@ -264,7 +349,9 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             reversibility="reversible",
             jurisdiction="JP-13",
             legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_id="reviewer-verification-ewa-002",
             guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-002",
+            guardian_verifier_ref="verifier://guardian-oversight.jp/reviewer-omega",
             jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
             jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
             jurisdiction_bundle_status="ready",
@@ -272,6 +359,16 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             liability_mode="joint",
             escalation_contact="mailto:ewa-oversight@example.invalid",
             valid_for_seconds=360,
+        )
+        oversight_event = self._build_network_oversight_event(
+            command_id="ewa-command-authorize-001",
+            legal_execution=legal_execution,
+        )
+        guardian_oversight_gate = controller.prepare_guardian_oversight_gate(
+            handle["handle_id"],
+            command_id="ewa-command-authorize-001",
+            legal_execution_id=legal_execution["execution_id"],
+            oversight_event=oversight_event,
         )
         stop_signal_path = controller.prepare_stop_signal_path(
             handle["handle_id"],
@@ -293,6 +390,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 motor_plan_id=motor_plan["plan_id"],
                 stop_signal_path_id=stop_signal_path["path_id"],
                 legal_execution_id=legal_execution["execution_id"],
+                guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
                 guardian_observed=True,
                 intent_confidence=0.95,
             )
@@ -349,7 +447,9 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             reversibility="reversible",
             jurisdiction="JP-13",
             legal_basis_ref="legal://jp-13/ewa/inspection-safe-reposition/v1",
+            guardian_verification_id="reviewer-verification-ewa-005",
             guardian_verification_ref="oversight://guardian/reviewer-omega/verification-ewa-005",
+            guardian_verifier_ref="verifier://guardian-oversight.jp/reviewer-omega",
             jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
             jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
             jurisdiction_bundle_status="ready",
@@ -357,6 +457,16 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             liability_mode="joint",
             escalation_contact="mailto:ewa-oversight@example.invalid",
             valid_for_seconds=360,
+        )
+        oversight_event = self._build_network_oversight_event(
+            command_id="ewa-command-authorize-002",
+            legal_execution=legal_execution,
+        )
+        guardian_oversight_gate = controller.prepare_guardian_oversight_gate(
+            handle["handle_id"],
+            command_id="ewa-command-authorize-002",
+            legal_execution_id=legal_execution["execution_id"],
+            oversight_event=oversight_event,
         )
 
         with self.assertRaisesRegex(ValueError, "stop signal path command_id"):
@@ -370,6 +480,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 motor_plan_id=motor_plan["plan_id"],
                 stop_signal_path_id=stop_signal_path["path_id"],
                 legal_execution_id=legal_execution["execution_id"],
+                guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
                 guardian_observed=True,
                 intent_confidence=0.95,
             )

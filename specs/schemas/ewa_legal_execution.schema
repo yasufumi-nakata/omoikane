@@ -22,7 +22,10 @@ required:
   - policy_ref
   - policy_digest
   - legal_basis_ref
+  - guardian_verification_id
   - guardian_verification_ref
+  - guardian_verifier_ref
+  - guardian_transport_profile
   - jurisdiction_bundle_ref
   - jurisdiction_bundle_digest
   - jurisdiction_bundle_status
@@ -77,9 +80,17 @@ properties:
   legal_basis_ref:
     type: string
     minLength: 1
+  guardian_verification_id:
+    type: string
+    minLength: 8
   guardian_verification_ref:
     type: string
     minLength: 1
+  guardian_verifier_ref:
+    type: string
+    minLength: 1
+  guardian_transport_profile:
+    const: reviewer-live-proof-bridge-v1
   jurisdiction_bundle_ref:
     type: string
     minLength: 1
@@ -168,7 +179,10 @@ examples:
     policy_ref: policy://ewa/jp-13/physical-actuation-preflight/v1
     policy_digest: a6ec202d37fdf8c7e525f17f8bda3d7fb8b31f4e4e7ec9596cc9a1ddc3d7d854
     legal_basis_ref: legal://jp-13/ewa/inspection-safe-reposition/v1
+    guardian_verification_id: reviewer-verification-0123456789ab
     guardian_verification_ref: oversight://guardian/reviewer-omega/verification-ewa-001
+    guardian_verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+    guardian_transport_profile: reviewer-live-proof-bridge-v1
     jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
     jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
     jurisdiction_bundle_status: ready

@@ -35,6 +35,7 @@ ewa.acquire(device_id, intent_summary) → DeviceHandle
 ewa.prepare_motor_plan(handle, command, actuator_profile) → EWAMotorPlan
 ewa.prepare_stop_signal_path(handle, command, motor_plan) → EWAStopSignalPath
 ewa.execute_legal_preflight(handle, command, jurisdiction_evidence) → EWALegalExecution
+ewa.prepare_guardian_oversight_gate(handle, legal_execution, oversight_event) → EWAGuardianOversightGate
 ewa.authorize(command, motor_plan, stop_signal_path, legal_execution) → ExternalActuationAuthorization
 ewa.command(handle, instruction, authorization_id) → CommandOutcome | EthicsVeto
 ewa.emergency_stop(handle, trigger_source, reason) → EmergencyStopReceipt
@@ -70,18 +71,22 @@ external_actuation_authorization:
   intent_summary_digest: <sha256>
   jurisdiction: <JP-13 など>
   legal_basis_ref: <法的根拠 package ref>
+  guardian_verification_id: <reviewer verification id>
   guardian_verification_ref: <reviewer verification ref>
+  guardian_verifier_ref: <live verifier ref>
   jurisdiction_bundle_ref: <evidence bundle ref>
   jurisdiction_bundle_status: ready | stale | revoked
   motor_plan_id: <motor plan ref>
   stop_signal_path_id: <stop-signal path ref>
   legal_execution_id: <legal execution ref>
+  guardian_oversight_gate_id: <guardian oversight gate ref>
   authorization_window_seconds: 60..900
 ```
 
 `authorization` は **raw instruction を保存せず**、
 Guardian reviewer verification と jurisdiction evidence bundle が `ready` で、
-matching `motor_plan` / `stop_signal_path` / `legal_execution` receipt が揃った時だけ発行される。
+matching `motor_plan` / `stop_signal_path` / `legal_execution` / `guardian_oversight_gate`
+receipt が揃った時だけ発行される。
 
 `prepare_motor_plan` は device 固有の actuator semantics を次のように固定する:
 
@@ -146,7 +151,9 @@ ewa_legal_execution:
   execution_scope: physical-actuation-preflight
   policy_ref: <jurisdiction policy ref>
   legal_basis_ref: <legal basis ref>
+  guardian_verification_id: <reviewer verification id>
   guardian_verification_ref: <reviewer verification ref>
+  guardian_verifier_ref: <verifier ref>
   notice_authority_ref: <notice authority ref>
   liability_mode: individual | institutional | joint
   escalation_contact: <contact>
@@ -157,6 +164,37 @@ ewa_legal_execution:
     - notice-authority-bind
     - escalation-contact-bind
 ```
+
+`prepare_guardian_oversight_gate` は `GuardianOversightService` 側の
+network-attested `guardian_oversight_event` を EWA legal preflight に結び付け、
+authorization 前に次の digest-only gate を materialize する:
+
+```yaml
+ewa_guardian_oversight_gate:
+  gate_id: <uuid>
+  policy_id: guardian-network-attested-ewa-authorization-gate-v1
+  legal_execution_id: <ewa legal execution ref>
+  guardian_verification_id: <ewa legal execution verification id>
+  guardian_verifier_ref: <live verifier ref>
+  oversight_event_id: <guardian oversight event id>
+  guardian_role: integrity
+  oversight_category: attest
+  oversight_status: satisfied
+  reviewer_binding_count: 2
+  reviewer_network_attested: true
+  reviewer_network_bindings:
+    - verification_id: <reviewer verification id>
+      network_receipt_id: <verifier network receipt id>
+      authority_chain_ref: <authority chain ref>
+      trust_root_ref: <trust root ref>
+      legal_execution_id: <guardian legal execution id>
+      legal_policy_ref: <guardian legal policy ref>
+```
+
+gate は `integrity` Guardian に対する satisfied `attest` event だけを受け付け、
+all reviewer bindings が network receipt / transport exchange / trust root を持ち、
+少なくとも 1 件が EWA legal preflight の `guardian_verification_id` /
+`guardian_verifier_ref` と一致しない限り fail-closed に進めない。
 
 ## Emergency Stop
 
@@ -229,10 +267,11 @@ veto は **記録するだけ** ではなく、Council への自動 escalation �
   execute_legal_preflight / authorize / command / emergency_stop / observe / release`
   を machine-readable に固定
 - `ewa_command.schema` / `ewa_motor_plan.schema` / `ewa_stop_signal_path.schema` / `ewa_legal_execution.schema` /
-  `ewa_audit.schema` / `external_actuation_authorization.schema` /
+  `ewa_guardian_oversight_gate.schema` / `ewa_audit.schema` / `external_actuation_authorization.schema` /
   `ewa_emergency_stop.schema` を導入
 - `ewa-demo` を CLI に追加し、motor plan → stop-signal path arming →
-  legal preflight → authorize(reversible) →
+  legal preflight → network-attested guardian oversight gate →
+  authorize(reversible) →
   command(reversible) →
   `watchdog-timeout` emergency stop → forced release に加えて、
   別 handle 上で veto(irreversible 試行) を実行する
@@ -241,6 +280,8 @@ veto は **記録するだけ** ではなく、Council への自動 escalation �
 - `evals/safety/ewa_stop_signal_path_guard.yaml` で armed trigger coverage と authorization binding を保証
 - `evals/safety/ewa_motor_semantics_legal_execution.yaml` で motor plan / legal execution の
   receipt binding を保証
+- `evals/safety/ewa_guardian_oversight_gate.yaml` で network-attested reviewer quorum と
+  guardian oversight gate の binding を保証
 - `evals/safety/ewa_emergency_stop.yaml` で latched stop / safe-state interlock /
   stop-signal path binding / forced release を保証
 

@@ -1,0 +1,19 @@
+eval_id: ewa_guardian_oversight_gate
+target: interface.ewa
+level: L6
+description: >
+  External World Agent authorization must be gated by a network-attested guardian
+  oversight event whose reviewer bindings match the legal preflight verification
+  before physical actuation is authorized.
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  guardian_oversight_gate_ok: true
+  guardian_oversight_gate_bound: true
+  reviewer_network_attested: true
+  authorization_guardian_oversight_gate_ready: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

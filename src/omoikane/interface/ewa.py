@@ -38,6 +38,9 @@ EWA_LEGAL_EXECUTION_PROFILE_ID = "ewa-jurisdiction-legal-execution-v1"
 EWA_LEGAL_EXECUTION_SCOPE = "physical-actuation-preflight"
 EWA_STOP_SIGNAL_PATH_POLICY_ID = "guardian-latched-stop-signal-bus-v1"
 EWA_STOP_SIGNAL_BUS_PROFILE_ID = "bounded-hardware-kill-switch-bus-v1"
+EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID = "guardian-network-attested-ewa-authorization-gate-v1"
+EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE = "integrity"
+EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY = "attest"
 EWA_ALLOWED_LIABILITY_MODES = {"individual", "institutional", "joint"}
 EWA_LEGAL_EXECUTION_CONTROL_TYPES = (
     "bundle-ready-check",
@@ -97,6 +100,10 @@ def _stop_signal_path_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "path_digest"}
 
 
+def _oversight_gate_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "gate_digest"}
+
+
 class ExternalWorldAgentController:
     """Deterministic L6 physical-actuation boundary with ethics-first gating."""
 
@@ -107,6 +114,7 @@ class ExternalWorldAgentController:
         self.motor_plans: Dict[str, Dict[str, Any]] = {}
         self.legal_executions: Dict[str, Dict[str, Any]] = {}
         self.stop_signal_paths: Dict[str, Dict[str, Any]] = {}
+        self.guardian_oversight_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -148,6 +156,7 @@ class ExternalWorldAgentController:
                 "policy_id": EWA_AUTHORIZATION_POLICY_ID,
                 "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
                 "non_read_only_requires_authorization": True,
+                "non_read_only_requires_guardian_oversight_gate": True,
                 "guardian_verification_transport": "reviewer-live-proof-bridge-v1",
                 "required_jurisdiction_bundle_status": "ready",
                 "authorization_window_seconds": {
@@ -169,6 +178,14 @@ class ExternalWorldAgentController:
                 "required_bundle_status": "ready",
                 "allowed_liability_modes": sorted(EWA_ALLOWED_LIABILITY_MODES),
                 "required_controls": list(EWA_LEGAL_EXECUTION_CONTROL_TYPES),
+            },
+            "guardian_oversight_gate_policy": {
+                "policy_id": EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID,
+                "required_guardian_role": EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE,
+                "required_category": EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY,
+                "requires_network_attested_reviewers": True,
+                "requires_satisfied_quorum": True,
+                "required_transport_profile": "reviewer-live-proof-bridge-v1",
             },
             "stop_signal_bus_policy": {
                 "policy_id": EWA_STOP_SIGNAL_PATH_POLICY_ID,
@@ -670,13 +687,16 @@ class ExternalWorldAgentController:
         reversibility: str,
         jurisdiction: str,
         legal_basis_ref: str,
+        guardian_verification_id: str,
         guardian_verification_ref: str,
+        guardian_verifier_ref: str,
         jurisdiction_bundle_ref: str,
         jurisdiction_bundle_digest: str,
         jurisdiction_bundle_status: str = "ready",
         notice_authority_ref: str,
         liability_mode: str,
         escalation_contact: str,
+        guardian_transport_profile: str = "reviewer-live-proof-bridge-v1",
         valid_for_seconds: int = 360,
     ) -> Dict[str, Any]:
         handle = self._require_active_handle(handle_id)
@@ -708,7 +728,10 @@ class ExternalWorldAgentController:
                 "policy_ref": policy_ref,
             },
             "guardian-review-bind": {
+                "guardian_verification_id": guardian_verification_id,
                 "guardian_verification_ref": guardian_verification_ref,
+                "guardian_verifier_ref": guardian_verifier_ref,
+                "guardian_transport_profile": guardian_transport_profile,
                 "command_id": command_id,
             },
             "notice-authority-bind": {
@@ -751,9 +774,21 @@ class ExternalWorldAgentController:
                 legal_basis_ref,
                 "legal_basis_ref",
             ),
+            "guardian_verification_id": self._normalize_non_empty_string(
+                guardian_verification_id,
+                "guardian_verification_id",
+            ),
             "guardian_verification_ref": self._normalize_non_empty_string(
                 guardian_verification_ref,
                 "guardian_verification_ref",
+            ),
+            "guardian_verifier_ref": self._normalize_non_empty_string(
+                guardian_verifier_ref,
+                "guardian_verifier_ref",
+            ),
+            "guardian_transport_profile": self._normalize_non_empty_string(
+                guardian_transport_profile,
+                "guardian_transport_profile",
             ),
             "jurisdiction_bundle_ref": self._normalize_non_empty_string(
                 jurisdiction_bundle_ref,
@@ -808,7 +843,10 @@ class ExternalWorldAgentController:
             "policy_ref",
             "policy_digest",
             "legal_basis_ref",
+            "guardian_verification_id",
             "guardian_verification_ref",
+            "guardian_verifier_ref",
+            "guardian_transport_profile",
             "jurisdiction_bundle_ref",
             "jurisdiction_bundle_digest",
             "notice_authority_ref",
@@ -830,6 +868,8 @@ class ExternalWorldAgentController:
             errors.append(f"execution_scope must be {EWA_LEGAL_EXECUTION_SCOPE}")
         if execution.get("delivery_scope") != EWA_AUTHORIZATION_DELIVERY_SCOPE:
             errors.append(f"delivery_scope must be {EWA_AUTHORIZATION_DELIVERY_SCOPE}")
+        if execution.get("guardian_transport_profile") != "reviewer-live-proof-bridge-v1":
+            errors.append("guardian_transport_profile must be reviewer-live-proof-bridge-v1")
         if execution.get("reversibility") not in EWA_ALLOWED_REVERSIBILITY - {"read-only"}:
             errors.append("legal execution reversibility must be a non-read-only EWA mode")
         if execution.get("jurisdiction_bundle_status") not in EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES:
@@ -942,6 +982,495 @@ class ExternalWorldAgentController:
             ),
         }
 
+    def prepare_guardian_oversight_gate(
+        self,
+        handle_id: str,
+        *,
+        command_id: str,
+        legal_execution_id: str,
+        oversight_event: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        handle = self._require_active_handle(handle_id)
+        normalized_command_id = self._normalize_non_empty_string(command_id, "command_id")
+        legal_execution = self._require_legal_execution(legal_execution_id)
+        legal_execution_validation = self.validate_legal_execution(
+            legal_execution,
+            handle_id=handle_id,
+            device_id=handle["device_id"],
+            command_id=normalized_command_id,
+            reversibility=str(legal_execution.get("reversibility", "")),
+        )
+        if not legal_execution_validation["ok"]:
+            raise ValueError(legal_execution_validation["errors"][0])
+        if not isinstance(oversight_event, Mapping):
+            raise ValueError("oversight_event must be a mapping")
+
+        event_id = self._normalize_non_empty_string(oversight_event.get("event_id"), "event_id")
+        payload_ref = self._normalize_non_empty_string(
+            oversight_event.get("payload_ref"),
+            "payload_ref",
+        )
+        guardian_role = self._normalize_non_empty_string(
+            oversight_event.get("guardian_role"),
+            "guardian_role",
+        )
+        if guardian_role != EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE:
+            raise ValueError(
+                f"guardian_role must be {EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE} for EWA authorization"
+            )
+        oversight_category = self._normalize_non_empty_string(
+            oversight_event.get("category"),
+            "category",
+        )
+        if oversight_category != EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY:
+            raise ValueError(
+                f"category must be {EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY} for EWA authorization"
+            )
+
+        human_attestation = oversight_event.get("human_attestation")
+        if not isinstance(human_attestation, Mapping):
+            raise ValueError("oversight_event human_attestation must be a mapping")
+        required_quorum = human_attestation.get("required_quorum")
+        received_quorum = human_attestation.get("received_quorum")
+        if not isinstance(required_quorum, int) or required_quorum < 1:
+            raise ValueError("human_attestation.required_quorum must be a positive integer")
+        if not isinstance(received_quorum, int) or received_quorum < required_quorum:
+            raise ValueError("human_attestation.received_quorum must satisfy the required quorum")
+        oversight_status = self._normalize_non_empty_string(
+            human_attestation.get("status"),
+            "human_attestation.status",
+        )
+        if oversight_status != "satisfied":
+            raise ValueError("oversight_event must be satisfied before EWA authorization")
+
+        reviewer_bindings = oversight_event.get("reviewer_bindings")
+        if not isinstance(reviewer_bindings, list) or len(reviewer_bindings) < required_quorum:
+            raise ValueError("oversight_event reviewer_bindings must satisfy the required quorum")
+
+        reviewer_network_bindings: List[Dict[str, Any]] = []
+        matched_binding: Dict[str, Any] | None = None
+        for index, binding in enumerate(reviewer_bindings):
+            if not isinstance(binding, Mapping):
+                raise ValueError("reviewer_bindings entries must be mappings")
+            binding_guardian_role = self._normalize_non_empty_string(
+                binding.get("guardian_role"),
+                f"reviewer_bindings[{index}].guardian_role",
+            )
+            if binding_guardian_role != guardian_role:
+                raise ValueError("reviewer binding guardian_role must match the oversight event")
+            binding_category = self._normalize_non_empty_string(
+                binding.get("category"),
+                f"reviewer_bindings[{index}].category",
+            )
+            if binding_category != oversight_category:
+                raise ValueError("reviewer binding category must match the oversight event")
+            binding_bundle_ref = self._normalize_non_empty_string(
+                binding.get("jurisdiction_bundle_ref"),
+                f"reviewer_bindings[{index}].jurisdiction_bundle_ref",
+            )
+            binding_bundle_digest = self._normalize_non_empty_string(
+                binding.get("jurisdiction_bundle_digest"),
+                f"reviewer_bindings[{index}].jurisdiction_bundle_digest",
+            )
+            if binding_bundle_ref != legal_execution["jurisdiction_bundle_ref"]:
+                raise ValueError(
+                    "reviewer binding jurisdiction_bundle_ref must match the EWA legal execution"
+                )
+            if binding_bundle_digest != legal_execution["jurisdiction_bundle_digest"]:
+                raise ValueError(
+                    "reviewer binding jurisdiction_bundle_digest must match the EWA legal execution"
+                )
+
+            network_receipt_id = self._normalize_non_empty_string(
+                binding.get("network_receipt_id"),
+                f"reviewer_bindings[{index}].network_receipt_id",
+            )
+            transport_exchange_digest = self._normalize_non_empty_string(
+                binding.get("transport_exchange_digest"),
+                f"reviewer_bindings[{index}].transport_exchange_digest",
+            )
+            authority_chain_ref = self._normalize_non_empty_string(
+                binding.get("authority_chain_ref"),
+                f"reviewer_bindings[{index}].authority_chain_ref",
+            )
+            trust_root_ref = self._normalize_non_empty_string(
+                binding.get("trust_root_ref"),
+                f"reviewer_bindings[{index}].trust_root_ref",
+            )
+            trust_root_digest = self._normalize_non_empty_string(
+                binding.get("trust_root_digest"),
+                f"reviewer_bindings[{index}].trust_root_digest",
+            )
+
+            reviewer_network_bindings.append(
+                {
+                    "reviewer_id": self._normalize_non_empty_string(
+                        binding.get("reviewer_id"),
+                        f"reviewer_bindings[{index}].reviewer_id",
+                    ),
+                    "verification_id": self._normalize_non_empty_string(
+                        binding.get("verification_id"),
+                        f"reviewer_bindings[{index}].verification_id",
+                    ),
+                    "verifier_ref": self._normalize_non_empty_string(
+                        binding.get("verifier_ref"),
+                        f"reviewer_bindings[{index}].verifier_ref",
+                    ),
+                    "network_receipt_id": network_receipt_id,
+                    "transport_exchange_digest": transport_exchange_digest,
+                    "authority_chain_ref": authority_chain_ref,
+                    "trust_root_ref": trust_root_ref,
+                    "trust_root_digest": trust_root_digest,
+                    "legal_execution_id": self._normalize_non_empty_string(
+                        binding.get("legal_execution_id"),
+                        f"reviewer_bindings[{index}].legal_execution_id",
+                    ),
+                    "legal_execution_digest": self._normalize_non_empty_string(
+                        binding.get("legal_execution_digest"),
+                        f"reviewer_bindings[{index}].legal_execution_digest",
+                    ),
+                    "legal_policy_ref": self._normalize_non_empty_string(
+                        binding.get("legal_policy_ref"),
+                        f"reviewer_bindings[{index}].legal_policy_ref",
+                    ),
+                    "jurisdiction_bundle_ref": binding_bundle_ref,
+                    "jurisdiction_bundle_digest": binding_bundle_digest,
+                }
+            )
+            if (
+                reviewer_network_bindings[-1]["verification_id"]
+                == legal_execution["guardian_verification_id"]
+                and reviewer_network_bindings[-1]["verifier_ref"]
+                == legal_execution["guardian_verifier_ref"]
+            ):
+                matched_binding = reviewer_network_bindings[-1]
+
+        if matched_binding is None:
+            raise ValueError(
+                "oversight_event reviewer_bindings must include the legal execution guardian verification"
+            )
+
+        gate = {
+            "kind": "ewa_guardian_oversight_gate",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "gate_id": new_id("ewa-oversight-gate"),
+            "policy_id": EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID,
+            "handle_id": handle_id,
+            "device_id": handle["device_id"],
+            "command_id": normalized_command_id,
+            "legal_execution_id": legal_execution["execution_id"],
+            "legal_execution_digest": legal_execution["digest"],
+            "legal_execution_profile_id": legal_execution["execution_profile_id"],
+            "guardian_verification_id": legal_execution["guardian_verification_id"],
+            "guardian_verification_ref": legal_execution["guardian_verification_ref"],
+            "guardian_verifier_ref": legal_execution["guardian_verifier_ref"],
+            "guardian_transport_profile": legal_execution["guardian_transport_profile"],
+            "jurisdiction": legal_execution["jurisdiction"],
+            "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
+            "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
+            "guardian_role": guardian_role,
+            "oversight_category": oversight_category,
+            "oversight_event_id": event_id,
+            "oversight_payload_ref": payload_ref,
+            "oversight_status": oversight_status,
+            "required_quorum": required_quorum,
+            "received_quorum": received_quorum,
+            "reviewer_binding_count": len(reviewer_network_bindings),
+            "reviewer_network_attested": True,
+            "matched_reviewer_id": matched_binding["reviewer_id"],
+            "matched_reviewer_legal_execution_id": matched_binding["legal_execution_id"],
+            "matched_reviewer_legal_execution_digest": matched_binding["legal_execution_digest"],
+            "matched_reviewer_legal_policy_ref": matched_binding["legal_policy_ref"],
+            "reviewer_network_bindings": reviewer_network_bindings,
+            "compiled_at": utc_now_iso(),
+        }
+        gate["gate_digest"] = sha256_text(canonical_json(_oversight_gate_digest_payload(gate)))
+        self.guardian_oversight_gates[gate["gate_id"]] = gate
+        return deepcopy(gate)
+
+    def validate_guardian_oversight_gate(
+        self,
+        gate: Mapping[str, Any],
+        *,
+        legal_execution: Mapping[str, Any] | None = None,
+        oversight_event: Mapping[str, Any] | None = None,
+        handle_id: str | None = None,
+        device_id: str | None = None,
+        command_id: str | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(gate, Mapping):
+            raise ValueError("gate must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "gate_id",
+            "handle_id",
+            "device_id",
+            "command_id",
+            "legal_execution_id",
+            "legal_execution_digest",
+            "legal_execution_profile_id",
+            "guardian_verification_id",
+            "guardian_verification_ref",
+            "guardian_verifier_ref",
+            "guardian_transport_profile",
+            "jurisdiction",
+            "jurisdiction_bundle_ref",
+            "jurisdiction_bundle_digest",
+            "guardian_role",
+            "oversight_category",
+            "oversight_event_id",
+            "oversight_payload_ref",
+            "oversight_status",
+            "matched_reviewer_id",
+            "matched_reviewer_legal_execution_id",
+            "matched_reviewer_legal_execution_digest",
+            "matched_reviewer_legal_policy_ref",
+            "gate_digest",
+        ):
+            self._check_non_empty_string(gate.get(field_name), field_name, errors)
+
+        if gate.get("kind") != "ewa_guardian_oversight_gate":
+            errors.append("kind must be ewa_guardian_oversight_gate")
+        if gate.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if gate.get("policy_id") != EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID:
+            errors.append(f"policy_id must be {EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID}")
+        if gate.get("legal_execution_profile_id") != EWA_LEGAL_EXECUTION_PROFILE_ID:
+            errors.append(
+                f"legal_execution_profile_id must be {EWA_LEGAL_EXECUTION_PROFILE_ID}"
+            )
+        if gate.get("guardian_transport_profile") != "reviewer-live-proof-bridge-v1":
+            errors.append("guardian_transport_profile must be reviewer-live-proof-bridge-v1")
+        if gate.get("guardian_role") != EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE:
+            errors.append(
+                f"guardian_role must be {EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE}"
+            )
+        if gate.get("oversight_category") != EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY:
+            errors.append(
+                f"oversight_category must be {EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY}"
+            )
+        if gate.get("oversight_status") != "satisfied":
+            errors.append("oversight_status must be satisfied")
+
+        reviewer_quorum_satisfied = True
+        required_quorum = gate.get("required_quorum")
+        received_quorum = gate.get("received_quorum")
+        reviewer_binding_count = gate.get("reviewer_binding_count")
+        if not isinstance(required_quorum, int) or required_quorum < 1:
+            reviewer_quorum_satisfied = False
+            errors.append("required_quorum must be a positive integer")
+        if not isinstance(received_quorum, int) or (
+            isinstance(required_quorum, int) and received_quorum < required_quorum
+        ):
+            reviewer_quorum_satisfied = False
+            errors.append("received_quorum must satisfy required_quorum")
+        if not isinstance(reviewer_binding_count, int) or (
+            isinstance(received_quorum, int) and reviewer_binding_count < received_quorum
+        ):
+            reviewer_quorum_satisfied = False
+            errors.append("reviewer_binding_count must cover the satisfied quorum")
+
+        reviewer_network_bindings = gate.get("reviewer_network_bindings")
+        reviewer_network_attested = bool(gate.get("reviewer_network_attested"))
+        matched_guardian_verification = False
+        if not isinstance(reviewer_network_bindings, list) or not reviewer_network_bindings:
+            reviewer_network_attested = False
+            errors.append("reviewer_network_bindings must be a non-empty list")
+            reviewer_network_bindings = []
+        for index, binding in enumerate(reviewer_network_bindings):
+            if not isinstance(binding, Mapping):
+                reviewer_network_attested = False
+                errors.append("reviewer_network_bindings entries must be mappings")
+                continue
+            for field_name in (
+                "reviewer_id",
+                "verification_id",
+                "verifier_ref",
+                "network_receipt_id",
+                "transport_exchange_digest",
+                "authority_chain_ref",
+                "trust_root_ref",
+                "trust_root_digest",
+                "legal_execution_id",
+                "legal_execution_digest",
+                "legal_policy_ref",
+                "jurisdiction_bundle_ref",
+                "jurisdiction_bundle_digest",
+            ):
+                self._check_non_empty_string(
+                    binding.get(field_name),
+                    f"reviewer_network_bindings[{index}].{field_name}",
+                    errors,
+                )
+            if binding.get("jurisdiction_bundle_ref") != gate.get("jurisdiction_bundle_ref"):
+                reviewer_network_attested = False
+                errors.append(
+                    "reviewer_network_bindings jurisdiction_bundle_ref must match the gate"
+                )
+            if binding.get("jurisdiction_bundle_digest") != gate.get("jurisdiction_bundle_digest"):
+                reviewer_network_attested = False
+                errors.append(
+                    "reviewer_network_bindings jurisdiction_bundle_digest must match the gate"
+                )
+            if (
+                binding.get("verification_id") == gate.get("guardian_verification_id")
+                and binding.get("verifier_ref") == gate.get("guardian_verifier_ref")
+            ):
+                matched_guardian_verification = True
+                if binding.get("reviewer_id") != gate.get("matched_reviewer_id"):
+                    errors.append("matched_reviewer_id must match the selected reviewer binding")
+                if binding.get("legal_execution_id") != gate.get(
+                    "matched_reviewer_legal_execution_id"
+                ):
+                    errors.append(
+                        "matched_reviewer_legal_execution_id must match the selected reviewer binding"
+                    )
+                if binding.get("legal_execution_digest") != gate.get(
+                    "matched_reviewer_legal_execution_digest"
+                ):
+                    errors.append(
+                        "matched_reviewer_legal_execution_digest must match the selected reviewer binding"
+                    )
+                if binding.get("legal_policy_ref") != gate.get("matched_reviewer_legal_policy_ref"):
+                    errors.append(
+                        "matched_reviewer_legal_policy_ref must match the selected reviewer binding"
+                    )
+        if not reviewer_network_attested:
+            errors.append("guardian oversight gate requires network-attested reviewer bindings")
+        if not matched_guardian_verification:
+            errors.append(
+                "guardian oversight gate must include the EWA legal execution guardian verification"
+            )
+
+        if handle_id is not None and gate.get("handle_id") != handle_id:
+            errors.append("guardian oversight gate handle_id does not match the command handle_id")
+        if device_id is not None and gate.get("device_id") != device_id:
+            errors.append("guardian oversight gate device_id does not match the command device_id")
+        if command_id is not None and gate.get("command_id") != command_id:
+            errors.append("guardian oversight gate command_id does not match the command command_id")
+
+        legal_execution_bound = True
+        try:
+            bound_legal_execution = (
+                dict(legal_execution)
+                if legal_execution is not None
+                else self._require_legal_execution(str(gate.get("legal_execution_id", "")))
+            )
+        except (KeyError, ValueError):
+            legal_execution_bound = False
+            errors.append("guardian oversight gate must reference a known legal execution")
+            bound_legal_execution = {}
+        if bound_legal_execution:
+            if bound_legal_execution.get("execution_id") != gate.get("legal_execution_id"):
+                legal_execution_bound = False
+                errors.append("guardian oversight gate legal_execution_id must match the legal execution")
+            if bound_legal_execution.get("digest") != gate.get("legal_execution_digest"):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate legal_execution_digest must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_verification_id") != gate.get(
+                "guardian_verification_id"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate guardian_verification_id must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_verification_ref") != gate.get(
+                "guardian_verification_ref"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate guardian_verification_ref must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_verifier_ref") != gate.get(
+                "guardian_verifier_ref"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate guardian_verifier_ref must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_transport_profile") != gate.get(
+                "guardian_transport_profile"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate guardian_transport_profile must match the legal execution"
+                )
+            if bound_legal_execution.get("jurisdiction_bundle_ref") != gate.get(
+                "jurisdiction_bundle_ref"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate jurisdiction_bundle_ref must match the legal execution"
+                )
+            if bound_legal_execution.get("jurisdiction_bundle_digest") != gate.get(
+                "jurisdiction_bundle_digest"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate jurisdiction_bundle_digest must match the legal execution"
+                )
+            if bound_legal_execution.get("jurisdiction") != gate.get("jurisdiction"):
+                legal_execution_bound = False
+                errors.append(
+                    "guardian oversight gate jurisdiction must match the legal execution"
+                )
+
+        oversight_event_bound = True
+        if oversight_event is not None:
+            if not isinstance(oversight_event, Mapping):
+                oversight_event_bound = False
+                errors.append("oversight_event must be a mapping")
+            else:
+                if oversight_event.get("event_id") != gate.get("oversight_event_id"):
+                    oversight_event_bound = False
+                    errors.append(
+                        "guardian oversight gate oversight_event_id must match the oversight event"
+                    )
+                if oversight_event.get("payload_ref") != gate.get("oversight_payload_ref"):
+                    oversight_event_bound = False
+                    errors.append(
+                        "guardian oversight gate oversight_payload_ref must match the oversight event"
+                    )
+                if oversight_event.get("guardian_role") != gate.get("guardian_role"):
+                    oversight_event_bound = False
+                    errors.append(
+                        "guardian oversight gate guardian_role must match the oversight event"
+                    )
+                if oversight_event.get("category") != gate.get("oversight_category"):
+                    oversight_event_bound = False
+                    errors.append(
+                        "guardian oversight gate oversight_category must match the oversight event"
+                    )
+
+        compiled_at = self._parse_datetime(gate.get("compiled_at"), "compiled_at", errors)
+        gate_digest_matches = gate.get("gate_digest") == sha256_text(
+            canonical_json(_oversight_gate_digest_payload(dict(gate)))
+        )
+        if not gate_digest_matches:
+            errors.append("gate_digest must match the canonical guardian oversight gate payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "reviewer_quorum_satisfied": reviewer_quorum_satisfied,
+            "reviewer_network_attested": reviewer_network_attested,
+            "matched_guardian_verification": matched_guardian_verification,
+            "legal_execution_bound": legal_execution_bound,
+            "oversight_event_bound": oversight_event_bound,
+            "gate_ready": (
+                reviewer_quorum_satisfied
+                and reviewer_network_attested
+                and matched_guardian_verification
+                and legal_execution_bound
+                and oversight_event_bound
+                and compiled_at is not None
+                and gate_digest_matches
+            ),
+        }
+
     def authorize(
         self,
         handle_id: str,
@@ -954,6 +1483,7 @@ class ExternalWorldAgentController:
         motor_plan_id: str,
         stop_signal_path_id: str,
         legal_execution_id: str,
+        guardian_oversight_gate_id: str,
         council_attestation_id: str = "",
         council_attestation_mode: str = "none",
         guardian_observed: bool = False,
@@ -986,6 +1516,10 @@ class ExternalWorldAgentController:
         normalized_legal_execution_id = self._normalize_non_empty_string(
             legal_execution_id,
             "legal_execution_id",
+        )
+        normalized_guardian_oversight_gate_id = self._normalize_non_empty_string(
+            guardian_oversight_gate_id,
+            "guardian_oversight_gate_id",
         )
         normalized_council_attestation = council_attestation_id.strip()
         normalized_council_mode = self._normalize_council_mode(council_attestation_mode)
@@ -1067,6 +1601,19 @@ class ExternalWorldAgentController:
         if not legal_execution_validation["ok"]:
             raise ValueError(legal_execution_validation["errors"][0])
 
+        guardian_oversight_gate = self._require_guardian_oversight_gate(
+            normalized_guardian_oversight_gate_id
+        )
+        guardian_oversight_gate_validation = self.validate_guardian_oversight_gate(
+            guardian_oversight_gate,
+            legal_execution=legal_execution,
+            handle_id=handle_id,
+            device_id=handle["device_id"],
+            command_id=normalized_command_id,
+        )
+        if not guardian_oversight_gate_validation["ok"]:
+            raise ValueError(guardian_oversight_gate_validation["errors"][0])
+
         authorization_id = new_id("ewa-authz")
         issued_at_dt = datetime.now(timezone.utc).replace(microsecond=0)
         expires_at_dt = issued_at_dt + timedelta(seconds=normalized_valid_for_seconds)
@@ -1103,7 +1650,10 @@ class ExternalWorldAgentController:
             "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
             "jurisdiction": legal_execution["jurisdiction"],
             "legal_basis_ref": legal_execution["legal_basis_ref"],
+            "guardian_verification_id": legal_execution["guardian_verification_id"],
             "guardian_verification_ref": legal_execution["guardian_verification_ref"],
+            "guardian_verifier_ref": legal_execution["guardian_verifier_ref"],
+            "guardian_transport_profile": legal_execution["guardian_transport_profile"],
             "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
             "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
             "jurisdiction_bundle_status": legal_execution["jurisdiction_bundle_status"],
@@ -1116,6 +1666,12 @@ class ExternalWorldAgentController:
             "legal_execution_id": legal_execution["execution_id"],
             "legal_execution_digest": legal_execution["digest"],
             "legal_execution_profile_id": legal_execution["execution_profile_id"],
+            "guardian_oversight_gate_id": guardian_oversight_gate["gate_id"],
+            "guardian_oversight_gate_digest": guardian_oversight_gate["gate_digest"],
+            "guardian_oversight_event_id": guardian_oversight_gate["oversight_event_id"],
+            "guardian_oversight_status": guardian_oversight_gate["oversight_status"],
+            "reviewer_binding_count": guardian_oversight_gate["reviewer_binding_count"],
+            "reviewer_network_attested": guardian_oversight_gate["reviewer_network_attested"],
             "notice_authority_ref": legal_execution["notice_authority_ref"],
             "liability_mode": legal_execution["liability_mode"],
             "authorization_window_seconds": normalized_valid_for_seconds,
@@ -1561,6 +2117,9 @@ class ExternalWorldAgentController:
     def snapshot_stop_signal_path(self, path_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_stop_signal_path(path_id))
 
+    def snapshot_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_guardian_oversight_gate(gate_id))
+
     def validate_authorization(
         self,
         authorization: Mapping[str, Any],
@@ -1568,6 +2127,7 @@ class ExternalWorldAgentController:
         motor_plan: Mapping[str, Any] | None = None,
         stop_signal_path: Mapping[str, Any] | None = None,
         legal_execution: Mapping[str, Any] | None = None,
+        guardian_oversight_gate: Mapping[str, Any] | None = None,
         handle_id: str | None = None,
         device_id: str | None = None,
         command_id: str | None = None,
@@ -1592,8 +2152,23 @@ class ExternalWorldAgentController:
         self._check_non_empty_string(authorization.get("jurisdiction"), "jurisdiction", errors)
         self._check_non_empty_string(authorization.get("legal_basis_ref"), "legal_basis_ref", errors)
         self._check_non_empty_string(
+            authorization.get("guardian_verification_id"),
+            "guardian_verification_id",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("guardian_verification_ref"),
             "guardian_verification_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("guardian_verifier_ref"),
+            "guardian_verifier_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("guardian_transport_profile"),
+            "guardian_transport_profile",
             errors,
         )
         self._check_non_empty_string(
@@ -1648,6 +2223,26 @@ class ExternalWorldAgentController:
             errors,
         )
         self._check_non_empty_string(
+            authorization.get("guardian_oversight_gate_id"),
+            "guardian_oversight_gate_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("guardian_oversight_gate_digest"),
+            "guardian_oversight_gate_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("guardian_oversight_event_id"),
+            "guardian_oversight_event_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("guardian_oversight_status"),
+            "guardian_oversight_status",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("notice_authority_ref"),
             "notice_authority_ref",
             errors,
@@ -1676,6 +2271,10 @@ class ExternalWorldAgentController:
             errors.append(
                 f"legal_execution_profile_id must be {EWA_LEGAL_EXECUTION_PROFILE_ID}"
             )
+        if authorization.get("guardian_transport_profile") != "reviewer-live-proof-bridge-v1":
+            errors.append("guardian_transport_profile must be reviewer-live-proof-bridge-v1")
+        if authorization.get("guardian_oversight_status") != "satisfied":
+            errors.append("guardian_oversight_status must be satisfied")
         if authorization.get("liability_mode") not in EWA_ALLOWED_LIABILITY_MODES:
             errors.append(
                 f"liability_mode must be one of {sorted(EWA_ALLOWED_LIABILITY_MODES)}"
@@ -1701,6 +2300,12 @@ class ExternalWorldAgentController:
                 errors.append(
                     f"authorization_window_seconds must be <= {EWA_AUTHORIZATION_MAX_WINDOW_SECONDS}"
                 )
+        if not isinstance(authorization.get("reviewer_binding_count"), int) or authorization.get(
+            "reviewer_binding_count"
+        ) < 1:
+            errors.append("reviewer_binding_count must be a positive integer")
+        if not isinstance(authorization.get("reviewer_network_attested"), bool):
+            errors.append("reviewer_network_attested must be a boolean")
 
         approval_path_valid = True
         approval_path = authorization.get("approval_path")
@@ -1861,6 +2466,13 @@ class ExternalWorldAgentController:
                 errors.append(
                     "authorization legal_execution_profile_id must match the legal execution"
                 )
+            if bound_legal_execution.get("guardian_verification_id") != authorization.get(
+                "guardian_verification_id"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "authorization guardian_verification_id must match the legal execution"
+                )
             if bound_legal_execution.get("jurisdiction") != authorization.get("jurisdiction"):
                 legal_execution_bound = False
                 errors.append("authorization jurisdiction must match the legal execution")
@@ -1873,6 +2485,20 @@ class ExternalWorldAgentController:
                 legal_execution_bound = False
                 errors.append(
                     "authorization guardian_verification_ref must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_verifier_ref") != authorization.get(
+                "guardian_verifier_ref"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "authorization guardian_verifier_ref must match the legal execution"
+                )
+            if bound_legal_execution.get("guardian_transport_profile") != authorization.get(
+                "guardian_transport_profile"
+            ):
+                legal_execution_bound = False
+                errors.append(
+                    "authorization guardian_transport_profile must match the legal execution"
                 )
             if bound_legal_execution.get("jurisdiction_bundle_ref") != authorization.get(
                 "jurisdiction_bundle_ref"
@@ -1909,6 +2535,74 @@ class ExternalWorldAgentController:
                 legal_execution_bound = False
                 errors.extend(legal_execution_validation["errors"])
 
+        guardian_oversight_gate_bound = True
+        guardian_oversight_gate_validation: Dict[str, Any] = {"gate_ready": False}
+        try:
+            bound_guardian_oversight_gate = (
+                dict(guardian_oversight_gate)
+                if guardian_oversight_gate is not None
+                else self._require_guardian_oversight_gate(
+                    str(authorization.get("guardian_oversight_gate_id", ""))
+                )
+            )
+        except (KeyError, ValueError):
+            guardian_oversight_gate_bound = False
+            errors.append("authorization must reference a known guardian oversight gate")
+            bound_guardian_oversight_gate = {}
+        if bound_guardian_oversight_gate:
+            if bound_guardian_oversight_gate.get("gate_id") != authorization.get(
+                "guardian_oversight_gate_id"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization guardian_oversight_gate_id must match the guardian oversight gate"
+                )
+            if bound_guardian_oversight_gate.get("gate_digest") != authorization.get(
+                "guardian_oversight_gate_digest"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization guardian_oversight_gate_digest must match the guardian oversight gate"
+                )
+            if bound_guardian_oversight_gate.get("oversight_event_id") != authorization.get(
+                "guardian_oversight_event_id"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization guardian_oversight_event_id must match the guardian oversight gate"
+                )
+            if bound_guardian_oversight_gate.get("oversight_status") != authorization.get(
+                "guardian_oversight_status"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization guardian_oversight_status must match the guardian oversight gate"
+                )
+            if bound_guardian_oversight_gate.get("reviewer_binding_count") != authorization.get(
+                "reviewer_binding_count"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization reviewer_binding_count must match the guardian oversight gate"
+                )
+            if bound_guardian_oversight_gate.get("reviewer_network_attested") != authorization.get(
+                "reviewer_network_attested"
+            ):
+                guardian_oversight_gate_bound = False
+                errors.append(
+                    "authorization reviewer_network_attested must match the guardian oversight gate"
+                )
+            guardian_oversight_gate_validation = self.validate_guardian_oversight_gate(
+                bound_guardian_oversight_gate,
+                legal_execution=bound_legal_execution if bound_legal_execution else None,
+                handle_id=str(authorization.get("handle_id", "")),
+                device_id=str(authorization.get("device_id", "")),
+                command_id=str(authorization.get("command_id", "")),
+            )
+            if not guardian_oversight_gate_validation["ok"]:
+                guardian_oversight_gate_bound = False
+                errors.extend(guardian_oversight_gate_validation["errors"])
+
         status_authorized = authorization.get("status") == "authorized"
         if not status_authorized:
             errors.append("authorization status must be authorized")
@@ -1942,9 +2636,18 @@ class ExternalWorldAgentController:
             "motor_plan_ready": plan_validation.get("plan_ready", False),
             "stop_signal_path_ready": stop_signal_path_validation.get("path_ready", False),
             "legal_execution_ready": legal_execution_validation.get("execution_ready", False),
+            "guardian_oversight_gate_ready": guardian_oversight_gate_validation.get(
+                "gate_ready",
+                False,
+            ),
             "motor_plan_bound": motor_plan_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
             "legal_execution_bound": legal_execution_bound,
+            "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
+            "reviewer_network_attested": guardian_oversight_gate_validation.get(
+                "reviewer_network_attested",
+                bool(authorization.get("reviewer_network_attested")),
+            ),
             "window_open": window_open,
             "status_authorized": status_authorized,
             "delivery_scope": authorization.get("delivery_scope"),
@@ -1956,9 +2659,11 @@ class ExternalWorldAgentController:
                 and plan_validation.get("plan_ready", False)
                 and stop_signal_path_validation.get("path_ready", False)
                 and legal_execution_validation.get("execution_ready", False)
+                and guardian_oversight_gate_validation.get("gate_ready", False)
                 and motor_plan_bound
                 and stop_signal_path_bound
                 and legal_execution_bound
+                and guardian_oversight_gate_bound
                 and window_open
                 and status_authorized
                 and digest_matches
@@ -2477,6 +3182,13 @@ class ExternalWorldAgentController:
             return self.legal_executions[normalized_execution_id]
         except KeyError as exc:
             raise KeyError(f"unknown execution_id: {normalized_execution_id}") from exc
+
+    def _require_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
+        normalized_gate_id = self._normalize_non_empty_string(gate_id, "gate_id")
+        try:
+            return self.guardian_oversight_gates[normalized_gate_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown gate_id: {normalized_gate_id}") from exc
 
     def _require_active_handle(self, handle_id: str) -> Dict[str, Any]:
         handle = self._require_handle(handle_id)

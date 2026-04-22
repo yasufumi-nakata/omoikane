@@ -1,0 +1,237 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_guardian_oversight_gate.schema"
+title: EWAGuardianOversightGate
+description: >
+  Network-attested guardian oversight gate that binds one EWA legal execution to one
+  satisfied human oversight event before physical actuation authorization is issued.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - gate_id
+  - policy_id
+  - handle_id
+  - device_id
+  - command_id
+  - legal_execution_id
+  - legal_execution_digest
+  - legal_execution_profile_id
+  - guardian_verification_id
+  - guardian_verification_ref
+  - guardian_verifier_ref
+  - guardian_transport_profile
+  - jurisdiction
+  - jurisdiction_bundle_ref
+  - jurisdiction_bundle_digest
+  - guardian_role
+  - oversight_category
+  - oversight_event_id
+  - oversight_payload_ref
+  - oversight_status
+  - required_quorum
+  - received_quorum
+  - reviewer_binding_count
+  - reviewer_network_attested
+  - matched_reviewer_id
+  - matched_reviewer_legal_execution_id
+  - matched_reviewer_legal_execution_digest
+  - matched_reviewer_legal_policy_ref
+  - reviewer_network_bindings
+  - compiled_at
+  - gate_digest
+properties:
+  kind:
+    const: ewa_guardian_oversight_gate
+  schema_version:
+    const: "1.0"
+  gate_id:
+    type: string
+    minLength: 8
+  policy_id:
+    const: guardian-network-attested-ewa-authorization-gate-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  legal_execution_id:
+    type: string
+    minLength: 8
+  legal_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  legal_execution_profile_id:
+    const: ewa-jurisdiction-legal-execution-v1
+  guardian_verification_id:
+    type: string
+    minLength: 8
+  guardian_verification_ref:
+    type: string
+    minLength: 1
+  guardian_verifier_ref:
+    type: string
+    minLength: 1
+  guardian_transport_profile:
+    const: reviewer-live-proof-bridge-v1
+  jurisdiction:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_digest:
+    type: string
+    minLength: 1
+  guardian_role:
+    const: integrity
+  oversight_category:
+    const: attest
+  oversight_event_id:
+    type: string
+    minLength: 8
+  oversight_payload_ref:
+    type: string
+    minLength: 1
+  oversight_status:
+    const: satisfied
+  required_quorum:
+    type: integer
+    minimum: 1
+  received_quorum:
+    type: integer
+    minimum: 1
+  reviewer_binding_count:
+    type: integer
+    minimum: 1
+  reviewer_network_attested:
+    const: true
+  matched_reviewer_id:
+    type: string
+    minLength: 1
+  matched_reviewer_legal_execution_id:
+    type: string
+    minLength: 1
+  matched_reviewer_legal_execution_digest:
+    type: string
+    minLength: 1
+  matched_reviewer_legal_policy_ref:
+    type: string
+    minLength: 1
+  reviewer_network_bindings:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - reviewer_id
+        - verification_id
+        - verifier_ref
+        - network_receipt_id
+        - transport_exchange_digest
+        - authority_chain_ref
+        - trust_root_ref
+        - trust_root_digest
+        - legal_execution_id
+        - legal_execution_digest
+        - legal_policy_ref
+        - jurisdiction_bundle_ref
+        - jurisdiction_bundle_digest
+      properties:
+        reviewer_id:
+          type: string
+          minLength: 1
+        verification_id:
+          type: string
+          minLength: 8
+        verifier_ref:
+          type: string
+          minLength: 1
+        network_receipt_id:
+          type: string
+          minLength: 1
+        transport_exchange_digest:
+          type: string
+          minLength: 1
+        authority_chain_ref:
+          type: string
+          minLength: 1
+        trust_root_ref:
+          type: string
+          minLength: 1
+        trust_root_digest:
+          type: string
+          minLength: 1
+        legal_execution_id:
+          type: string
+          minLength: 1
+        legal_execution_digest:
+          type: string
+          minLength: 1
+        legal_policy_ref:
+          type: string
+          minLength: 1
+        jurisdiction_bundle_ref:
+          type: string
+          minLength: 1
+        jurisdiction_bundle_digest:
+          type: string
+          minLength: 1
+  compiled_at:
+    type: string
+    format: date-time
+  gate_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: ewa_guardian_oversight_gate
+    schema_version: "1.0"
+    gate_id: ewa-oversight-gate-0123456789ab
+    policy_id: guardian-network-attested-ewa-authorization-gate-v1
+    handle_id: ewa-0123456789ab
+    device_id: device://lab-drone-arm-01
+    command_id: ewa-command-approve-001
+    legal_execution_id: ewa-legal-0123456789ab
+    legal_execution_digest: 4d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6b
+    legal_execution_profile_id: ewa-jurisdiction-legal-execution-v1
+    guardian_verification_id: reviewer-verification-0123456789ab
+    guardian_verification_ref: oversight://guardian/reviewer-omega/verification-ewa-001
+    guardian_verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+    guardian_transport_profile: reviewer-live-proof-bridge-v1
+    jurisdiction: JP-13
+    jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+    jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
+    guardian_role: integrity
+    oversight_category: attest
+    oversight_event_id: guardian-oversight-event-0123456789ab
+    oversight_payload_ref: ewa-legal://ewa-legal-0123456789ab/authorization-review
+    oversight_status: satisfied
+    required_quorum: 2
+    received_quorum: 2
+    reviewer_binding_count: 2
+    reviewer_network_attested: true
+    matched_reviewer_id: human-reviewer-alpha
+    matched_reviewer_legal_execution_id: guardian-legal-execution-alpha
+    matched_reviewer_legal_execution_digest: 3d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6a
+    matched_reviewer_legal_policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+    reviewer_network_bindings:
+      - reviewer_id: human-reviewer-alpha
+        verification_id: reviewer-verification-0123456789ab
+        verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+        network_receipt_id: verifier-network-receipt-alpha
+        transport_exchange_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+        trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+        trust_root_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        legal_execution_id: guardian-legal-execution-alpha
+        legal_execution_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+        legal_policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
+        jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
+        jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
+    compiled_at: "2026-04-22T07:05:00+00:00"
+    gate_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd

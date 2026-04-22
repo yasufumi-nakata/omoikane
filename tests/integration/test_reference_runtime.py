@@ -91,10 +91,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["stop_signal_path_bound"])
         self.assertTrue(result["validation"]["legal_execution_ok"])
         self.assertTrue(result["validation"]["legal_execution_bound"])
+        self.assertTrue(result["validation"]["guardian_oversight_gate_ok"])
+        self.assertTrue(result["validation"]["guardian_oversight_gate_bound"])
+        self.assertTrue(result["validation"]["reviewer_network_attested"])
         self.assertTrue(result["validation"]["authorization_ok"])
         self.assertTrue(result["validation"]["authorization_ready"])
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertTrue(result["validation"]["authorization_stop_signal_path_ready"])
+        self.assertTrue(result["validation"]["authorization_guardian_oversight_gate_ready"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
         self.assertEqual(
@@ -108,6 +112,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             result["legal_execution"]["execution_id"],
             result["approved_command"]["legal_execution_id"],
+        )
+        self.assertEqual(
+            result["guardian_oversight_gate"]["gate_id"],
+            result["authorization"]["guardian_oversight_gate_id"],
+        )
+        self.assertEqual(
+            result["guardian_oversight_event"]["event_id"],
+            result["authorization"]["guardian_oversight_event_id"],
+        )
+        self.assertEqual(
+            "human-reviewer-ewa-001",
+            result["guardian_oversight_gate"]["matched_reviewer_id"],
         )
         self.assertTrue(result["validation"]["approved_command_motor_plan_bound"])
         self.assertTrue(result["validation"]["approved_command_stop_signal_path_bound"])
@@ -138,6 +154,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-plan"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-legal"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
         self.assertEqual(6, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
         self.assertEqual(

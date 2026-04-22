@@ -9,8 +9,10 @@ imports:
   ewa_motor_plan: ../schemas/ewa_motor_plan.schema
   ewa_stop_signal_path: ../schemas/ewa_stop_signal_path.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
+  ewa_guardian_oversight_gate: ../schemas/ewa_guardian_oversight_gate.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
+  guardian_oversight_event: ../schemas/guardian_oversight_event.schema
 operations:
   acquire:
     summary: Acquire one device handle before any physical-world operation is attempted.
@@ -247,7 +249,9 @@ operations:
           - command
           - jurisdiction
           - legal_basis_ref
+          - guardian_verification_id
           - guardian_verification_ref
+          - guardian_verifier_ref
           - jurisdiction_bundle_ref
           - jurisdiction_bundle_digest
           - jurisdiction_bundle_status
@@ -263,7 +267,13 @@ operations:
           legal_basis_ref:
             type: string
             minLength: 1
+          guardian_verification_id:
+            type: string
+            minLength: 8
           guardian_verification_ref:
+            type: string
+            minLength: 1
+          guardian_verifier_ref:
             type: string
             minLength: 1
           jurisdiction_bundle_ref:
@@ -300,6 +310,7 @@ operations:
       - read-only commands must not execute a legal preflight
       - stale or revoked jurisdiction bundles must fail closed before legal execution is issued
       - legal execution must expose the fixed 5-control preflight set and one delivery_scope=physical-device-actuation
+      - legal execution must retain guardian_verification_id, guardian_verification_ref, and guardian_verifier_ref for downstream oversight binding
   validate_legal_execution:
     summary: Validate one jurisdiction-bound EWA legal preflight against the command it will authorize.
     input:
@@ -344,6 +355,81 @@ operations:
             items:
               type: string
               minLength: 1
+  prepare_guardian_oversight_gate:
+    summary: Compile one network-attested guardian oversight gate that binds a satisfied oversight event to one EWA legal execution before authorization.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - command
+          - legal_execution
+          - oversight_event
+        properties:
+          command:
+            schema_ref: ewa_command
+          legal_execution:
+            schema_ref: ewa_legal_execution
+          oversight_event:
+            schema_ref: guardian_oversight_event
+    output:
+      schema_ref: ewa_guardian_oversight_gate
+    guarantees:
+      - oversight_event must be a satisfied integrity/attest event before authorization can proceed
+      - reviewer bindings must be network-attested and share the same jurisdiction bundle as the legal execution
+      - the gate must include the reviewer binding that matches guardian_verification_id and guardian_verifier_ref from the EWA legal execution
+  validate_guardian_oversight_gate:
+    summary: Validate one guardian oversight gate against the command and legal execution it will authorize.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - gate
+          - command
+          - legal_execution
+        properties:
+          gate:
+            schema_ref: ewa_guardian_oversight_gate
+          command:
+            schema_ref: ewa_command
+          legal_execution:
+            schema_ref: ewa_legal_execution
+          oversight_event:
+            schema_ref: guardian_oversight_event
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - gate_ready
+          - reviewer_quorum_satisfied
+          - reviewer_network_attested
+          - matched_guardian_verification
+          - legal_execution_bound
+          - oversight_event_bound
+          - errors
+        properties:
+          ok:
+            type: boolean
+          gate_ready:
+            type: boolean
+          reviewer_quorum_satisfied:
+            type: boolean
+          reviewer_network_attested:
+            type: boolean
+          matched_guardian_verification:
+            type: boolean
+          legal_execution_bound:
+            type: boolean
+          oversight_event_bound:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   authorize:
     summary: Bind one non-read-only actuation command to its motor plan and legal execution receipts before execution.
     input:
@@ -355,6 +441,7 @@ operations:
           - motor_plan
           - stop_signal_path
           - legal_execution
+          - guardian_oversight_gate
         properties:
           command:
             schema_ref: ewa_command
@@ -364,6 +451,8 @@ operations:
             schema_ref: ewa_stop_signal_path
           legal_execution:
             schema_ref: ewa_legal_execution
+          guardian_oversight_gate:
+            schema_ref: ewa_guardian_oversight_gate
           valid_for_seconds:
             type: integer
             minimum: 60
@@ -373,7 +462,7 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, legal_execution_id/digest, and approval path
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
       - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
@@ -384,7 +473,7 @@ operations:
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
       - non-read-only commands require one active authorization_id whose digests match the command payload
-      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, and one legal_execution receipt
+      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, one legal_execution receipt, and one guardian oversight-gated authorization artifact
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
@@ -660,6 +749,9 @@ events:
   ewa.legal_execution_prepared:
     payload:
       schema_ref: ewa_legal_execution
+  ewa.guardian_oversight_gate_prepared:
+    payload:
+      schema_ref: ewa_guardian_oversight_gate
   ewa.command_recorded:
     payload:
       schema_ref: ewa_audit
@@ -672,5 +764,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
     - Raw regulator APIs and site-specific firmware adapters stay outside this reference runtime; only digest-bound stop-signal bus arming is modeled here.
