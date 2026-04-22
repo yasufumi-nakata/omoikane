@@ -1366,10 +1366,16 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["workspace_discovery"]["validation"]["ok"])
         self.assertTrue(result["convocation"]["validation"]["builder_handoff_coverage_ok"])
         self.assertTrue(result["dispatch_plan"]["validation"]["ok"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["ok"])
         self.assertTrue(result["consensus_dispatch"]["validation"]["ok"])
+        self.assertEqual(3, result["validation"]["workspace_count"])
+        self.assertEqual(2, result["validation"]["non_source_workspace_count"])
+        self.assertTrue(result["validation"]["workspace_discovery_ok"])
+        self.assertTrue(result["validation"]["workspace_review_budget_respected"])
+        self.assertTrue(result["validation"]["cross_workspace_coverage_complete"])
         self.assertEqual(
             "selected",
             result["convocation"]["standing_roles"]["guardian_liaison"]["status"],

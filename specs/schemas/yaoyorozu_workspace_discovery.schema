@@ -1,0 +1,447 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_workspace_discovery.schema"
+title: YaoyorozuWorkspaceDiscovery
+description: Bounded same-host local workspace discovery catalog for cross-workspace Yaoyorozu builders.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - discovery_id
+  - discovered_at
+  - discovery_digest
+  - discovery_profile
+  - discovery_scope
+  - source_workspace_ref
+  - host_ref
+  - review_budget
+  - workspace_roots
+  - accepted_workspace_refs
+  - coverage_summary
+  - workspaces
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_workspace_discovery
+  schema_version:
+    const: 1.0.0
+  discovery_id:
+    type: string
+    pattern: "^yaoyorozu-workspace-discovery-[a-f0-9]{12}$"
+  discovered_at:
+    type: string
+    format: date-time
+  discovery_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  discovery_profile:
+    const: same-host-local-workspace-discovery-v1
+  discovery_scope:
+    const: same-host-local-workspace-catalog
+  source_workspace_ref:
+    type: string
+    pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+  host_ref:
+    const: host://local-loopback
+  review_budget:
+    type: integer
+    minimum: 2
+    maximum: 3
+  workspace_roots:
+    type: array
+    minItems: 2
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  accepted_workspace_refs:
+    type: array
+    minItems: 2
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+  coverage_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - required_coverage_areas
+      - supported_coverage_areas
+      - missing_coverage_areas
+      - non_source_supported_coverage_areas
+      - non_source_missing_coverage_areas
+      - coverage_to_workspace_refs
+      - non_source_coverage_to_workspace_refs
+      - workspace_count
+      - non_source_workspace_count
+      - builder_workspace_count
+    properties:
+      required_coverage_areas:
+        type: array
+        minItems: 4
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      supported_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      missing_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      non_source_supported_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      non_source_missing_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      coverage_to_workspace_refs:
+        type: object
+        additionalProperties: false
+        required:
+          - runtime
+          - schema
+          - eval
+          - docs
+        properties:
+          runtime:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          schema:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          eval:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          docs:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+      non_source_coverage_to_workspace_refs:
+        type: object
+        additionalProperties: false
+        required:
+          - runtime
+          - schema
+          - eval
+          - docs
+        properties:
+          runtime:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          schema:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          eval:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+          docs:
+            type: array
+            items:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+      workspace_count:
+        type: integer
+        minimum: 2
+        maximum: 3
+      non_source_workspace_count:
+        type: integer
+        minimum: 1
+        maximum: 2
+      builder_workspace_count:
+        type: integer
+        minimum: 2
+        maximum: 3
+  workspaces:
+    type: array
+    minItems: 2
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - workspace_ref
+        - workspace_name
+        - workspace_root
+        - registry_source_root
+        - workspace_order
+        - workspace_role
+        - source_kind
+        - workspace_digest
+        - agent_count
+        - builder_agent_ids
+        - role_index
+        - capability_index
+        - supported_coverage_areas
+        - missing_coverage_areas
+        - proposal_profiles
+        - validation
+      properties:
+        workspace_ref:
+          type: string
+          pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+        workspace_name:
+          type: string
+          minLength: 1
+        workspace_root:
+          type: string
+          minLength: 1
+        registry_source_root:
+          type: string
+          minLength: 1
+        workspace_order:
+          type: integer
+          minimum: 1
+          maximum: 3
+        workspace_role:
+          type: string
+          enum:
+            - source
+            - candidate
+        source_kind:
+          const: local-workspace
+        workspace_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        agent_count:
+          type: integer
+          minimum: 1
+        builder_agent_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+        role_index:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              minLength: 1
+        capability_index:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              minLength: 1
+        supported_coverage_areas:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - runtime
+              - schema
+              - eval
+              - docs
+        missing_coverage_areas:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - runtime
+              - schema
+              - eval
+              - docs
+        proposal_profiles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            const: self-modify-patch-v1
+        validation:
+          type: object
+          additionalProperties: false
+          required:
+            - has_agents_root
+            - builder_roles_present
+            - coverage_summary_machine_readable
+            - same_host_local
+            - ok
+          properties:
+            has_agents_root:
+              const: true
+            builder_roles_present:
+              const: true
+            coverage_summary_machine_readable:
+              const: true
+            same_host_local:
+              const: true
+            ok:
+              const: true
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - review_budget_respected
+      - workspace_roots_distinct
+      - source_workspace_bound
+      - same_host_local
+      - accepted_workspaces_have_builders
+      - coverage_summary_machine_readable
+      - cross_workspace_ready
+      - cross_workspace_coverage_complete
+      - ok
+    properties:
+      review_budget_respected:
+        const: true
+      workspace_roots_distinct:
+        const: true
+      source_workspace_bound:
+        const: true
+      same_host_local:
+        const: true
+      accepted_workspaces_have_builders:
+        const: true
+      coverage_summary_machine_readable:
+        const: true
+      cross_workspace_ready:
+        const: true
+      cross_workspace_coverage_complete:
+        const: true
+      ok:
+        const: true
+examples:
+  - kind: yaoyorozu_workspace_discovery
+    schema_version: 1.0.0
+    discovery_id: yaoyorozu-workspace-discovery-0123456789ab
+    discovered_at: "2026-04-23T08:20:00Z"
+    discovery_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    discovery_profile: same-host-local-workspace-discovery-v1
+    discovery_scope: same-host-local-workspace-catalog
+    source_workspace_ref: workspace://omoikane-0123abcd
+    host_ref: host://local-loopback
+    review_budget: 3
+    workspace_roots:
+      - /Users/example/omoikane
+      - /tmp/omoikane-yaoyorozu-demo/ritual-atelier
+      - /tmp/omoikane-yaoyorozu-demo/evidence-foundry
+    accepted_workspace_refs:
+      - workspace://omoikane-0123abcd
+      - workspace://ritual-atelier-89abcdef
+      - workspace://evidence-foundry-fedcba98
+    coverage_summary:
+      required_coverage_areas: [runtime, schema, eval, docs]
+      supported_coverage_areas: [runtime, schema, eval, docs]
+      missing_coverage_areas: []
+      non_source_supported_coverage_areas: [runtime, schema, eval, docs]
+      non_source_missing_coverage_areas: []
+      coverage_to_workspace_refs:
+        runtime:
+          - workspace://omoikane-0123abcd
+          - workspace://ritual-atelier-89abcdef
+        schema:
+          - workspace://omoikane-0123abcd
+          - workspace://evidence-foundry-fedcba98
+        eval:
+          - workspace://omoikane-0123abcd
+          - workspace://evidence-foundry-fedcba98
+        docs:
+          - workspace://omoikane-0123abcd
+          - workspace://ritual-atelier-89abcdef
+      non_source_coverage_to_workspace_refs:
+        runtime:
+          - workspace://ritual-atelier-89abcdef
+        schema:
+          - workspace://evidence-foundry-fedcba98
+        eval:
+          - workspace://evidence-foundry-fedcba98
+        docs:
+          - workspace://ritual-atelier-89abcdef
+      workspace_count: 3
+      non_source_workspace_count: 2
+      builder_workspace_count: 3
+    workspaces:
+      - workspace_ref: workspace://omoikane-0123abcd
+        workspace_name: omoikane
+        workspace_root: /Users/example/omoikane
+        registry_source_root: /Users/example/omoikane/agents
+        workspace_order: 1
+        workspace_role: source
+        source_kind: local-workspace
+        workspace_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        agent_count: 16
+        builder_agent_ids:
+          - codex-builder
+          - schema-builder
+          - eval-builder
+          - doc-sync-builder
+        role_index:
+          builder:
+            - codex-builder
+        capability_index:
+          code.generate:
+            - codex-builder
+        supported_coverage_areas: [runtime, schema, eval, docs]
+        missing_coverage_areas: []
+        proposal_profiles:
+          - self-modify-patch-v1
+        validation:
+          has_agents_root: true
+          builder_roles_present: true
+          coverage_summary_machine_readable: true
+          same_host_local: true
+          ok: true
+    validation:
+      review_budget_respected: true
+      workspace_roots_distinct: true
+      source_workspace_bound: true
+      same_host_local: true
+      accepted_workspaces_have_builders: true
+      coverage_summary_machine_readable: true
+      cross_workspace_ready: true
+      cross_workspace_coverage_complete: true
+      ok: true

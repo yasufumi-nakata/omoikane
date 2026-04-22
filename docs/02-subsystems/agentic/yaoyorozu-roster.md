@@ -73,6 +73,8 @@ prompt_or_policy_ref: <agents/.../policy.md>
 
 新規 Agent タイプの追加は Council 承認＋ docs 更新を経て YaoyorozuRegistry に登録する。
 reference runtime では `yaoyorozu-demo` が
+source workspace に加えて bounded same-host local candidate workspace catalog を
+`yaoyorozu_workspace_discovery` として記録し、
 repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
 および runtime / schema / eval / docs の 4 coverage を持つ

@@ -449,6 +449,66 @@ class OmoikaneReferenceOS:
             )
             yield repo_root
 
+    @contextmanager
+    def _yaoyorozu_demo_workspaces(self):
+        with tempfile.TemporaryDirectory(prefix="omoikane-yaoyorozu-workspaces-") as temp_dir:
+            catalog = {
+                "ritual-atelier": {
+                    "agents/builders/ritual-runtime-builder.yaml": (
+                        "name: ritual-runtime-builder\n"
+                        "role: builder\n"
+                        "version: 0.1.0\n"
+                        "capabilities:\n"
+                        "  - code.generate\n"
+                        "  - code.refactor\n"
+                        "trust_floor: 0.56\n"
+                        "prompt_or_policy_ref: agents/builders/ritual-runtime-builder.policy.md\n"
+                    ),
+                    "agents/builders/ritual-doc-sync-builder.yaml": (
+                        "name: ritual-doc-sync-builder\n"
+                        "role: builder\n"
+                        "version: 0.1.0\n"
+                        "capabilities:\n"
+                        "  - design.delta.read\n"
+                        "  - sync.docs-to-impl\n"
+                        "trust_floor: 0.58\n"
+                        "prompt_or_policy_ref: agents/builders/ritual-doc-sync-builder.policy.md\n"
+                    ),
+                },
+                "evidence-foundry": {
+                    "agents/builders/evidence-schema-builder.yaml": (
+                        "name: evidence-schema-builder\n"
+                        "role: builder\n"
+                        "version: 0.1.0\n"
+                        "capabilities:\n"
+                        "  - schema.generate\n"
+                        "  - schema.validate\n"
+                        "trust_floor: 0.57\n"
+                        "prompt_or_policy_ref: agents/builders/evidence-schema-builder.policy.md\n"
+                    ),
+                    "agents/builders/evidence-eval-builder.yaml": (
+                        "name: evidence-eval-builder\n"
+                        "role: builder\n"
+                        "version: 0.1.0\n"
+                        "capabilities:\n"
+                        "  - eval.generate\n"
+                        "  - eval.run\n"
+                        "trust_floor: 0.59\n"
+                        "prompt_or_policy_ref: agents/builders/evidence-eval-builder.policy.md\n"
+                    ),
+                },
+            }
+            workspace_roots = [self.repo_root]
+            temp_root = Path(temp_dir)
+            for workspace_name, files in catalog.items():
+                workspace_root = temp_root / workspace_name
+                for relative_path, contents in files.items():
+                    target_path = workspace_root / relative_path
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    target_path.write_text(contents, encoding="utf-8")
+                workspace_roots.append(workspace_root)
+            yield workspace_roots
+
     @staticmethod
     def _run_repo_command(repo_root: Path, argv: List[str]) -> None:
         completed = subprocess.run(
@@ -3446,6 +3506,11 @@ json.dump(response, sys.stdout)
         for seed in demo_trust:
             self.trust.register_agent(**seed)
 
+        with self._yaoyorozu_demo_workspaces() as workspace_roots:
+            workspace_discovery = self.yaoyorozu.discover_workspace_workers(workspace_roots)
+        workspace_discovery_validation = self.yaoyorozu.validate_workspace_discovery(
+            workspace_discovery
+        )
         registry_snapshot = self.yaoyorozu.sync_from_agents_directory(self.repo_root / "agents")
         convocation = self.yaoyorozu.prepare_council_convocation(
             proposal_profile="self-modify-patch-v1",
@@ -3560,6 +3625,15 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="yaoyorozu.workspace_discovered",
+            payload=workspace_discovery,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="yaoyorozu.registry.synced",
             payload=registry_snapshot,
             actor="YaoyorozuRegistryService",
@@ -3639,6 +3713,7 @@ json.dump(response, sys.stdout)
                 "lineage_id": identity.lineage_id,
             },
             "policy": self.yaoyorozu.policy_snapshot(),
+            "workspace_discovery": workspace_discovery,
             "registry": registry_snapshot,
             "convocation": convocation,
             "dispatch_plan": dispatch_plan,
@@ -3646,6 +3721,17 @@ json.dump(response, sys.stdout)
             "consensus_dispatch": consensus_dispatch,
             "task_graph_binding": task_graph_binding,
             "validation": {
+                "workspace_discovery_ok": workspace_discovery_validation["ok"],
+                "workspace_count": workspace_discovery_validation["workspace_count"],
+                "non_source_workspace_count": workspace_discovery_validation[
+                    "non_source_workspace_count"
+                ],
+                "workspace_review_budget_respected": workspace_discovery_validation[
+                    "review_budget_respected"
+                ],
+                "cross_workspace_coverage_complete": workspace_discovery_validation[
+                    "cross_workspace_coverage_complete"
+                ],
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
                 "weighted_vote_ready_count": registry_snapshot["selection_ready_counts"][
@@ -3692,6 +3778,8 @@ json.dump(response, sys.stdout)
                     "coverage_grouping_ok"
                 ],
                 "ok": (
+                    workspace_discovery_validation["ok"]
+                    and
                     convocation["validation"]["ok"]
                     and dispatch_plan_validation["ok"]
                     and dispatch_receipt_validation["ok"]

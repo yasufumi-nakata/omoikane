@@ -1757,6 +1757,17 @@ entries:
     rationale: Required to serialize one repo-local agent definition together with its trust-bound eligibility state.
   - priority: P1
     kind: schema
+    file: specs/schemas/yaoyorozu_workspace_discovery.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize one bounded same-host workspace catalog with builder-capable agent registries, coverage summaries, and review-budgeted discovery order before any cross-workspace Yaoyorozu handoff.
+  - priority: P1
+    kind: schema
     file: specs/schemas/yaoyorozu_registry_snapshot.schema
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
@@ -1822,6 +1833,13 @@ entries:
       - docs/07-reference-implementation/README.md
       - reference-runtime
     rationale: Required to make repo-local registry sync, bounded Council convocation, same-session ConsensusBus/TaskGraph handoff binding, and local worker dispatch machine-readable across docs and runtime.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_workspace_discovery.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects bounded same-host workspace discovery, review-budget compliance, and aggregate non-source coverage for cross-workspace Yaoyorozu builders.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_council_convocation.yaml

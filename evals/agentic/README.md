@@ -64,6 +64,11 @@ repo-local `agents/` から選んだ builder handoff が
 runtime / schema / eval / docs の 4 coverage へ分解され、
 actual subprocess worker receipt として machine-checkable に実行されること。
 
+### Yaoyorozu Workspace Discovery
+same-host local workspace catalog が bounded `review_budget` 内で走査され、
+non-source workspace 群だけでも runtime / schema / eval / docs の coverage を
+machine-readable に示せること。
+
 ### Yaoyorozu TaskGraph Binding
 coverage-complete な worker dispatch が
 `runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle に畳まれ、
@@ -97,3 +102,4 @@ coverage-complete な worker dispatch が
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
 - `yaoyorozu_task_graph_binding.yaml`
+- `yaoyorozu_workspace_discovery.yaml`

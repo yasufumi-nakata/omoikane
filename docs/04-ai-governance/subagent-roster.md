@@ -48,7 +48,8 @@
 5. Builder の書き込み先は `src/`, `tests/`, `specs/`, `evals/` に限定する
 
 reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json`
-により、この roster が trust-bound registry snapshot と
+により、この roster が bounded same-host local workspace catalog
+(`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
 `Self-Modify Patch` 向け Council / builder handoff plan に materialize され、
 selected builder 群が repo-local worker dispatch receipt として実行される。
 そのうえで同じ Council session 上の `ConsensusBus` transcript が

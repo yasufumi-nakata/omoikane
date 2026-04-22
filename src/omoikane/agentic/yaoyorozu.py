@@ -21,6 +21,10 @@ YAOYOROZU_WORKER_DISPATCH_PROFILE = "repo-local-subprocess-worker-dispatch-v1"
 YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
 YAOYOROZU_CONSENSUS_BINDING_PROFILE = "repo-local-yaoyorozu-consensus-bus-binding-v1"
 YAOYOROZU_TASK_GRAPH_BINDING_PROFILE = "repo-local-yaoyorozu-task-graph-binding-v1"
+YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE = "same-host-local-workspace-discovery-v1"
+YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE = "same-host-local-workspace-catalog"
+YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF = "host://local-loopback"
+YAOYOROZU_WORKSPACE_DISCOVERY_MAX_WORKSPACES = 3
 YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
@@ -30,6 +34,12 @@ YAOYOROZU_WORKER_TARGET_PATHS = {
     "schema": ["specs/interfaces/", "specs/schemas/"],
     "eval": ["evals/"],
     "docs": ["docs/", "meta/decision-log/"],
+}
+YAOYOROZU_WORKSPACE_COVERAGE_CAPABILITY_RULES = {
+    "runtime": ("code.generate", "code.refactor", "code.test"),
+    "schema": ("schema.generate", "schema.validate"),
+    "eval": ("eval.generate", "eval.run"),
+    "docs": ("design.delta.read", "sync.docs-to-impl", "sync.impl-to-docs"),
 }
 YAOYOROZU_WORKER_REPORT_KIND = "yaoyorozu_local_worker_report"
 YAOYOROZU_WORKER_REPORT_FIELDS = [
@@ -244,6 +254,55 @@ def _task_graph_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, 
     }
 
 
+def _workspace_ref_from_root(workspace_root: Path) -> str:
+    normalized_name = "".join(
+        character.lower() if character.isalnum() else "-"
+        for character in workspace_root.name.strip()
+    ).strip("-")
+    while "--" in normalized_name:
+        normalized_name = normalized_name.replace("--", "-")
+    if not normalized_name:
+        normalized_name = "workspace"
+    suffix = sha256_text(str(workspace_root.resolve()))[:8]
+    return f"workspace://{normalized_name}-{suffix}"
+
+
+def _workspace_summary_digest_payload(summary: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "workspace_ref": summary["workspace_ref"],
+        "workspace_name": summary["workspace_name"],
+        "workspace_root": summary["workspace_root"],
+        "registry_source_root": summary["registry_source_root"],
+        "workspace_order": summary["workspace_order"],
+        "workspace_role": summary["workspace_role"],
+        "source_kind": summary["source_kind"],
+        "agent_count": summary["agent_count"],
+        "builder_agent_ids": summary["builder_agent_ids"],
+        "role_index": summary["role_index"],
+        "capability_index": summary["capability_index"],
+        "supported_coverage_areas": summary["supported_coverage_areas"],
+        "missing_coverage_areas": summary["missing_coverage_areas"],
+        "proposal_profiles": summary["proposal_profiles"],
+        "validation": summary["validation"],
+    }
+
+
+def _workspace_discovery_digest_payload(discovery: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": discovery["schema_version"],
+        "discovery_profile": discovery["discovery_profile"],
+        "discovery_scope": discovery["discovery_scope"],
+        "source_workspace_ref": discovery["source_workspace_ref"],
+        "host_ref": discovery["host_ref"],
+        "review_budget": discovery["review_budget"],
+        "workspace_roots": discovery["workspace_roots"],
+        "accepted_workspace_refs": discovery["accepted_workspace_refs"],
+        "coverage_summary": discovery["coverage_summary"],
+        "workspaces": discovery["workspaces"],
+        "validation": discovery["validation"],
+    }
+
+
 @dataclass(frozen=True)
 class YaoyorozuRegistryEntry:
     """One repo-local agent definition with trust-bound runtime metadata."""
@@ -295,12 +354,22 @@ class YaoyorozuRegistryPolicy:
     worker_sandbox_mode: str = YAOYOROZU_WORKER_SANDBOX_MODE
     worker_entrypoint_ref: str = YAOYOROZU_WORKER_ENTRYPOINT_REF
     worker_workspace_scope: str = YAOYOROZU_WORKSPACE_SCOPE
+    workspace_discovery_profile: str = YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE
+    workspace_discovery_scope: str = YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE
+    workspace_discovery_host_ref: str = YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF
+    workspace_review_budget: int = YAOYOROZU_WORKSPACE_DISCOVERY_MAX_WORKSPACES
     task_graph_binding_profile: str = YAOYOROZU_TASK_GRAPH_BINDING_PROFILE
     top_k_per_role: int = 1
     worker_target_paths: Dict[str, List[str]] = field(
         default_factory=lambda: {
             coverage_area: list(paths)
             for coverage_area, paths in YAOYOROZU_WORKER_TARGET_PATHS.items()
+        }
+    )
+    workspace_coverage_capability_rules: Dict[str, List[str]] = field(
+        default_factory=lambda: {
+            coverage_area: [str(capability) for capability in capabilities]
+            for coverage_area, capabilities in YAOYOROZU_WORKSPACE_COVERAGE_CAPABILITY_RULES.items()
         }
     )
     task_graph_root_bundles: List[Dict[str, Any]] = field(
@@ -388,6 +457,308 @@ class YaoyorozuRegistryService:
 
     def policy_snapshot(self) -> Dict[str, Any]:
         return self._policy.to_dict()
+
+    def discover_workspace_workers(
+        self,
+        workspace_roots: Sequence[str | Path],
+        *,
+        review_budget: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if len(workspace_roots) < 2:
+            raise ValueError("workspace_roots must contain at least two local workspaces")
+        budget = review_budget or self._policy.workspace_review_budget
+        if budget < 2 or budget > self._policy.workspace_review_budget:
+            raise ValueError(
+                f"review_budget must be between 2 and {self._policy.workspace_review_budget}"
+            )
+
+        normalized_roots = [
+            Path(_non_empty_string(str(root), "workspace_root")).resolve()
+            for root in workspace_roots
+        ]
+        if len(normalized_roots) > budget:
+            raise ValueError("workspace_roots must not exceed review_budget")
+        if len({str(root) for root in normalized_roots}) != len(normalized_roots):
+            raise ValueError("workspace_roots must be distinct")
+
+        required_coverage = list(self._policy.worker_target_paths)
+        coverage_rules = {
+            coverage_area: set(capabilities)
+            for coverage_area, capabilities in self._policy.workspace_coverage_capability_rules.items()
+        }
+        coverage_to_workspace_refs = {coverage_area: [] for coverage_area in required_coverage}
+        non_source_coverage_to_workspace_refs = {
+            coverage_area: [] for coverage_area in required_coverage
+        }
+        workspaces: List[Dict[str, Any]] = []
+        for workspace_index, workspace_root in enumerate(normalized_roots, start=1):
+            agents_root = workspace_root / "agents"
+            if not agents_root.is_dir():
+                raise ValueError(f"workspace_root must contain agents/: {workspace_root}")
+
+            role_index: Dict[str, List[str]] = {}
+            capability_index: Dict[str, List[str]] = {}
+            builder_agent_ids: List[str] = []
+            builder_capabilities: set[str] = set()
+            agent_count = 0
+            for definition_path in sorted(agents_root.rglob("*.yaml")):
+                parsed = _parse_agent_definition(definition_path)
+                agent_id = str(parsed.get("name") or definition_path.stem).strip()
+                role = str(parsed.get("role", "unknown")).strip() or "unknown"
+                capabilities = _normalize_string_list(parsed.get("capabilities", []))
+                role_index.setdefault(role, []).append(agent_id)
+                for capability in capabilities:
+                    capability_index.setdefault(capability, []).append(agent_id)
+                if role == "builder":
+                    builder_agent_ids.append(agent_id)
+                    builder_capabilities.update(capabilities)
+                agent_count += 1
+
+            supported_coverage_areas = [
+                coverage_area
+                for coverage_area in required_coverage
+                if builder_capabilities.intersection(coverage_rules[coverage_area])
+            ]
+            if agent_count == 0:
+                raise ValueError(f"workspace_root must contain at least one agent definition: {workspace_root}")
+            if not builder_agent_ids:
+                raise ValueError(f"workspace_root must expose at least one builder agent: {workspace_root}")
+            if not supported_coverage_areas:
+                raise ValueError(
+                    f"workspace_root builders must advertise at least one supported coverage area: {workspace_root}"
+                )
+            missing_coverage_areas = [
+                coverage_area
+                for coverage_area in required_coverage
+                if coverage_area not in supported_coverage_areas
+            ]
+            workspace = {
+                "workspace_ref": _workspace_ref_from_root(workspace_root),
+                "workspace_name": workspace_root.name,
+                "workspace_root": str(workspace_root),
+                "registry_source_root": str(agents_root),
+                "workspace_order": workspace_index,
+                "workspace_role": "source" if workspace_index == 1 else "candidate",
+                "source_kind": "local-workspace",
+                "agent_count": agent_count,
+                "builder_agent_ids": builder_agent_ids,
+                "role_index": role_index,
+                "capability_index": capability_index,
+                "supported_coverage_areas": supported_coverage_areas,
+                "missing_coverage_areas": missing_coverage_areas,
+                "proposal_profiles": ["self-modify-patch-v1"] if builder_agent_ids else [],
+                "validation": {
+                    "has_agents_root": True,
+                    "builder_roles_present": bool(builder_agent_ids),
+                    "coverage_summary_machine_readable": sorted(
+                        {*supported_coverage_areas, *missing_coverage_areas}
+                    )
+                    == sorted(required_coverage),
+                    "same_host_local": True,
+                },
+            }
+            workspace["validation"]["ok"] = all(workspace["validation"].values())
+            workspace["workspace_digest"] = sha256_text(
+                canonical_json(_workspace_summary_digest_payload(workspace))
+            )
+            workspaces.append(workspace)
+            for coverage_area in supported_coverage_areas:
+                coverage_to_workspace_refs[coverage_area].append(workspace["workspace_ref"])
+                if workspace_index > 1:
+                    non_source_coverage_to_workspace_refs[coverage_area].append(
+                        workspace["workspace_ref"]
+                    )
+
+        supported_coverage_areas = [
+            coverage_area
+            for coverage_area in required_coverage
+            if coverage_to_workspace_refs[coverage_area]
+        ]
+        missing_coverage_areas = [
+            coverage_area
+            for coverage_area in required_coverage
+            if coverage_area not in supported_coverage_areas
+        ]
+        non_source_supported_coverage_areas = [
+            coverage_area
+            for coverage_area in required_coverage
+            if non_source_coverage_to_workspace_refs[coverage_area]
+        ]
+        non_source_missing_coverage_areas = [
+            coverage_area
+            for coverage_area in required_coverage
+            if coverage_area not in non_source_supported_coverage_areas
+        ]
+        coverage_summary = {
+            "required_coverage_areas": required_coverage,
+            "supported_coverage_areas": supported_coverage_areas,
+            "missing_coverage_areas": missing_coverage_areas,
+            "non_source_supported_coverage_areas": non_source_supported_coverage_areas,
+            "non_source_missing_coverage_areas": non_source_missing_coverage_areas,
+            "coverage_to_workspace_refs": coverage_to_workspace_refs,
+            "non_source_coverage_to_workspace_refs": non_source_coverage_to_workspace_refs,
+            "workspace_count": len(workspaces),
+            "non_source_workspace_count": max(len(workspaces) - 1, 0),
+            "builder_workspace_count": sum(1 for workspace in workspaces if workspace["builder_agent_ids"]),
+        }
+        validation = {
+            "review_budget_respected": len(workspaces) <= budget,
+            "workspace_roots_distinct": len({workspace["workspace_root"] for workspace in workspaces})
+            == len(workspaces),
+            "source_workspace_bound": workspaces[0]["workspace_role"] == "source",
+            "same_host_local": all(
+                workspace["validation"]["same_host_local"] for workspace in workspaces
+            ),
+            "accepted_workspaces_have_builders": all(
+                workspace["validation"]["builder_roles_present"] for workspace in workspaces
+            ),
+            "coverage_summary_machine_readable": (
+                sorted(
+                    {
+                        *coverage_summary["supported_coverage_areas"],
+                        *coverage_summary["missing_coverage_areas"],
+                    }
+                )
+                == sorted(required_coverage)
+                and sorted(
+                    {
+                        *coverage_summary["non_source_supported_coverage_areas"],
+                        *coverage_summary["non_source_missing_coverage_areas"],
+                    }
+                )
+                == sorted(required_coverage)
+            ),
+            "cross_workspace_ready": coverage_summary["non_source_workspace_count"] >= 1,
+            "cross_workspace_coverage_complete": not non_source_missing_coverage_areas,
+        }
+        validation["ok"] = all(validation.values())
+        discovery = {
+            "kind": "yaoyorozu_workspace_discovery",
+            "schema_version": "1.0.0",
+            "discovery_id": new_id("yaoyorozu-workspace-discovery"),
+            "discovered_at": utc_now_iso(),
+            "discovery_profile": self._policy.workspace_discovery_profile,
+            "discovery_scope": self._policy.workspace_discovery_scope,
+            "source_workspace_ref": workspaces[0]["workspace_ref"],
+            "host_ref": self._policy.workspace_discovery_host_ref,
+            "review_budget": budget,
+            "workspace_roots": [str(workspace_root) for workspace_root in normalized_roots],
+            "accepted_workspace_refs": [
+                str(workspace["workspace_ref"]) for workspace in workspaces
+            ],
+            "coverage_summary": coverage_summary,
+            "workspaces": workspaces,
+            "validation": validation,
+        }
+        discovery["discovery_digest"] = sha256_text(
+            canonical_json(_workspace_discovery_digest_payload(discovery))
+        )
+        return discovery
+
+    def validate_workspace_discovery(
+        self,
+        workspace_discovery: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if workspace_discovery.get("kind") != "yaoyorozu_workspace_discovery":
+            errors.append("kind must equal yaoyorozu_workspace_discovery")
+        if (
+            workspace_discovery.get("discovery_profile")
+            != self._policy.workspace_discovery_profile
+        ):
+            errors.append("discovery_profile mismatch")
+        if (
+            workspace_discovery.get("discovery_scope")
+            != self._policy.workspace_discovery_scope
+        ):
+            errors.append("discovery_scope mismatch")
+        if workspace_discovery.get("host_ref") != self._policy.workspace_discovery_host_ref:
+            errors.append("host_ref mismatch")
+
+        review_budget = workspace_discovery.get("review_budget")
+        if (
+            not isinstance(review_budget, int)
+            or review_budget < 2
+            or review_budget > self._policy.workspace_review_budget
+        ):
+            errors.append("review_budget must stay within the bounded workspace review budget")
+        workspace_roots = workspace_discovery.get("workspace_roots", [])
+        if not isinstance(workspace_roots, list) or len(workspace_roots) < 2:
+            errors.append("workspace_roots must list at least two workspaces")
+            workspace_roots = []
+        workspaces = workspace_discovery.get("workspaces", [])
+        if not isinstance(workspaces, list) or len(workspaces) < 2:
+            errors.append("workspaces must contain at least two accepted workspaces")
+            workspaces = []
+
+        required_coverage = list(self._policy.worker_target_paths)
+        source_workspace_ref = workspace_discovery.get("source_workspace_ref")
+        coverage_summary = workspace_discovery.get("coverage_summary", {})
+        if not isinstance(coverage_summary, Mapping):
+            errors.append("coverage_summary must be a mapping")
+            coverage_summary = {}
+
+        previous_order = 0
+        builder_workspace_count = 0
+        for workspace in workspaces:
+            if not isinstance(workspace, Mapping):
+                errors.append("workspaces entries must be mappings")
+                continue
+            if workspace.get("workspace_order", 0) <= previous_order:
+                errors.append("workspace_order must remain strictly increasing")
+            previous_order = int(workspace.get("workspace_order", 0))
+            if workspace.get("workspace_role") == "source" and workspace.get("workspace_ref") != source_workspace_ref:
+                errors.append("source workspace ref must match the first accepted workspace")
+            if workspace.get("source_kind") != "local-workspace":
+                errors.append("workspace source_kind must remain local-workspace")
+            if not isinstance(workspace.get("builder_agent_ids"), list) or not workspace.get(
+                "builder_agent_ids"
+            ):
+                errors.append("accepted workspaces must expose builder_agent_ids")
+            else:
+                builder_workspace_count += 1
+            supported_coverage_areas = workspace.get("supported_coverage_areas", [])
+            missing_coverage_areas = workspace.get("missing_coverage_areas", [])
+            if sorted({*supported_coverage_areas, *missing_coverage_areas}) != sorted(required_coverage):
+                errors.append("workspace coverage summary must partition the required coverage areas")
+            validation = workspace.get("validation", {})
+            if not isinstance(validation, Mapping) or validation.get("ok") is not True:
+                errors.append("workspace validation must be ok")
+
+        accepted_workspace_refs = workspace_discovery.get("accepted_workspace_refs", [])
+        if accepted_workspace_refs != [
+            workspace.get("workspace_ref")
+            for workspace in workspaces
+            if isinstance(workspace, Mapping)
+        ]:
+            errors.append("accepted_workspace_refs must preserve accepted workspace order")
+
+        supported_coverage_areas = coverage_summary.get("supported_coverage_areas", [])
+        missing_coverage_areas = coverage_summary.get("missing_coverage_areas", [])
+        non_source_supported = coverage_summary.get("non_source_supported_coverage_areas", [])
+        non_source_missing = coverage_summary.get("non_source_missing_coverage_areas", [])
+        if sorted({*supported_coverage_areas, *missing_coverage_areas}) != sorted(required_coverage):
+            errors.append("coverage_summary must partition the required coverage areas")
+        if sorted({*non_source_supported, *non_source_missing}) != sorted(required_coverage):
+            errors.append("non_source coverage summary must partition the required coverage areas")
+        if coverage_summary.get("workspace_count") != len(workspaces):
+            errors.append("coverage_summary.workspace_count must match accepted workspaces")
+        if coverage_summary.get("non_source_workspace_count") != max(len(workspaces) - 1, 0):
+            errors.append(
+                "coverage_summary.non_source_workspace_count must match accepted non-source workspaces"
+            )
+        if coverage_summary.get("builder_workspace_count") != builder_workspace_count:
+            errors.append("coverage_summary.builder_workspace_count must match builder-ready workspaces")
+
+        return {
+            "ok": not errors,
+            "workspace_count": len(workspaces),
+            "non_source_workspace_count": max(len(workspaces) - 1, 0),
+            "builder_workspace_count": builder_workspace_count,
+            "review_budget_respected": len(workspaces) <= int(review_budget or 0),
+            "cross_workspace_coverage_complete": not non_source_missing,
+            "errors": errors,
+        }
 
     def sync_from_agents_directory(self, agents_root: Path) -> Dict[str, Any]:
         repo_root = agents_root.resolve().parent

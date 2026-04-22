@@ -2182,6 +2182,12 @@ class TrustServiceTests(unittest.TestCase):
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):
+    @staticmethod
+    def _write_workspace_agent(workspace_root: Path, relative_path: str, contents: str) -> None:
+        target_path = workspace_root / relative_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(contents, encoding="utf-8")
+
     def test_sync_repo_agents_materializes_registry_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         trust = TrustService()
@@ -2210,6 +2216,83 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertIn("councilor", snapshot["role_index"])
         self.assertIn("docs.propose-change", snapshot["capability_index"])
         self.assertGreaterEqual(snapshot["selection_ready_counts"]["guardian_ready"], 1)
+
+    def test_discover_workspace_workers_returns_bounded_cross_workspace_catalog(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-yaoyorozu-unit-") as temp_dir:
+            ritual_root = Path(temp_dir) / "ritual-atelier"
+            evidence_root = Path(temp_dir) / "evidence-foundry"
+            self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-runtime-builder.yaml",
+                (
+                    "name: ritual-runtime-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - code.generate\n"
+                    "  - code.refactor\n"
+                    "trust_floor: 0.56\n"
+                ),
+            )
+            self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-doc-sync-builder.yaml",
+                (
+                    "name: ritual-doc-sync-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - design.delta.read\n"
+                    "  - sync.docs-to-impl\n"
+                    "trust_floor: 0.58\n"
+                ),
+            )
+            self._write_workspace_agent(
+                evidence_root,
+                "agents/builders/evidence-schema-builder.yaml",
+                (
+                    "name: evidence-schema-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - schema.generate\n"
+                    "  - schema.validate\n"
+                    "trust_floor: 0.57\n"
+                ),
+            )
+            self._write_workspace_agent(
+                evidence_root,
+                "agents/builders/evidence-eval-builder.yaml",
+                (
+                    "name: evidence-eval-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - eval.generate\n"
+                    "  - eval.run\n"
+                    "trust_floor: 0.59\n"
+                ),
+            )
+
+            discovery = service.discover_workspace_workers([repo_root, ritual_root, evidence_root])
+            validation = service.validate_workspace_discovery(discovery)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(3, validation["workspace_count"])
+        self.assertEqual(2, validation["non_source_workspace_count"])
+        self.assertTrue(validation["cross_workspace_coverage_complete"])
+        self.assertEqual(
+            [],
+            discovery["coverage_summary"]["non_source_missing_coverage_areas"],
+        )
+        self.assertEqual("source", discovery["workspaces"][0]["workspace_role"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            discovery["coverage_summary"]["non_source_supported_coverage_areas"],
+        )
 
     def test_prepare_self_modify_convocation_selects_required_roles(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]

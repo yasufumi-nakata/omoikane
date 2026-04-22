@@ -52,6 +52,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["registry"],
         )
 
+    def test_workspace_discovery_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_workspace_discovery.schema",
+            result["workspace_discovery"],
+        )
+
     def test_council_convocation_session_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
 

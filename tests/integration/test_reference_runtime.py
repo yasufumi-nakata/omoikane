@@ -1513,9 +1513,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_yaoyorozu_demo()
 
         self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["workspace_discovery"]["validation"]["ok"])
         self.assertTrue(result["dispatch_plan"]["validation"]["ok"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["ok"])
         self.assertTrue(result["consensus_dispatch"]["validation"]["ok"])
+        self.assertEqual(3, result["validation"]["workspace_count"])
+        self.assertEqual(2, result["validation"]["non_source_workspace_count"])
+        self.assertTrue(result["validation"]["workspace_discovery_ok"])
+        self.assertTrue(result["validation"]["workspace_review_budget_respected"])
+        self.assertTrue(result["validation"]["cross_workspace_coverage_complete"])
         self.assertEqual(4, result["validation"]["dispatch_unit_count"])
         self.assertEqual(4, result["validation"]["dispatch_success_count"])
         self.assertEqual(7, result["validation"]["consensus_message_count"])
@@ -1540,6 +1546,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 process["report"]["workspace_scope"] == "repo-local"
                 for process in result["dispatch_receipt"]["results"]
             )
+        )
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["workspace_discovery"]["coverage_summary"]["non_source_supported_coverage_areas"],
         )
 
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:
