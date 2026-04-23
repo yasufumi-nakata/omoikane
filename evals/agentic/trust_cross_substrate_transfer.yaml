@@ -3,7 +3,7 @@ target: agentic.trust
 description: >
   Trust snapshot が guardian/human quorum 付きの digest-bound receipt として
   substrate 境界を越えて export/import され、live remote verifier federation と
-  fixed re-attestation cadence、destination renewal/revocation lifecycle、
+  fixed re-attestation cadence、destination renewal/revocation/recovery lifecycle、
   verifier disclosure floor を保持しつつ history・thresholds・eligibility を
   崩さず保持すること。
 scenarios:
@@ -29,6 +29,7 @@ checks:
   destination_lifecycle_disclosure_bound: true
   destination_renewal_history_bound: true
   destination_revocation_history_bound: true
+  destination_recovery_history_bound: true
   destination_current: true
   destination_seeded: true
   receipt_digest_bound: true

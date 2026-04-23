@@ -136,14 +136,14 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
   verifier freshness timing / transport digest / sealed receipt digest だけを公開し、
   challenge / payload exchange detail は `redacted_fields` へ退避する
 - 同じ redacted profile では `trust_redacted_destination_lifecycle` が
-  destination 側の `imported -> renewed -> revocation-cleared` current path を
+  destination 側の `imported -> renewed -> revoked -> recovered` branch を
   sequence / status / timing / federation digest / cadence digest /
   covered verifier receipt commitment digest へ縮約し、
   entry ref / verifier receipt ids / rationale は `redacted_fields` へ退避する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 - `bounded-trust-transfer-destination-lifecycle-v1` による
-  `imported -> renewed -> revocation-cleared` append-only history と
+  `imported -> renewed -> revoked -> recovered` append-only history と
   revocation fail-closed action の固定
 
 full-clone profile の `remote_verifier_federation` は
@@ -168,8 +168,8 @@ reference runtime では `renew_after + grace_window <= valid_until` を
 full-clone profile の `destination_lifecycle` は top-level snapshot を変えずに
 destination 側の post-import state を append-only ledger として保持する。
 reference runtime では import 時の federation/cadence、renew 後の federation/cadence、
-そして destination usage を解放する前の `revocation-cleared` check を
-同じ ledger に束ね、`current | revoked` の fail-closed state を
+revocation 発火で一度 trust usage を fail-closed に落とした `revoked` entry と、
+再 attestation 後に復帰する `recovered` entry を同じ ledger に束ね、`current | revoked` の fail-closed state を
 `destination_current` で machine-checkable にする。
 
 redacted profile の `destination_lifecycle` は

@@ -1439,11 +1439,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_renewal_history_bound"])
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(result["validation"]["destination_recovery_history_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertEqual("current", result["transfer"]["destination_lifecycle"]["current_status"])
         self.assertEqual(
-            "revocation-cleared",
-            result["transfer"]["destination_lifecycle"]["history"][-1]["event_type"],
+            ["imported", "renewed", "revoked", "recovered"],
+            [
+                entry["event_type"]
+                for entry in result["transfer"]["destination_lifecycle"]["history"]
+            ],
         )
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
@@ -1487,6 +1491,13 @@ class CliIntegrationTests(unittest.TestCase):
             result["transfer"]["destination_lifecycle"]["kind"],
         )
         self.assertNotIn("history", result["transfer"]["destination_lifecycle"])
+        self.assertEqual(
+            ["imported", "renewed", "revoked", "recovered"],
+            [
+                entry["event_type"]
+                for entry in result["transfer"]["destination_lifecycle"]["history_summaries"]
+            ],
+        )
         self.assertNotIn(
             "verifier_receipts",
             result["transfer"]["federation_attestation"]["remote_verifier_federation"],

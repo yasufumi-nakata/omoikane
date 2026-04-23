@@ -11,7 +11,7 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.5.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.6.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
 TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID = "snapshot-clone-with-history"
@@ -29,7 +29,7 @@ TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID = (
 TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID = (
     "bounded-trust-transfer-redacted-verifier-receipt-summary-v1"
 )
-TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION = "1.1.0"
 TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_PROFILE_ID = (
     "bounded-trust-transfer-redacted-destination-lifecycle-v1"
 )
@@ -58,6 +58,7 @@ TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION = (
     "disable-destination-trust-usage"
 )
 TRUST_TRANSFER_DESTINATION_REVOCATION_CHECK_OFFSET_SECONDS = 60
+TRUST_TRANSFER_DESTINATION_RECOVERY_ATTESTATION_OFFSET_SECONDS = 120
 TRUST_TRANSFER_REQUIRED_ATTESTATION_ROLES = (
     "source-guardian",
     "destination-guardian",
@@ -862,36 +863,59 @@ class TrustService:
                 )["renew_after"]
             ),
         )
-        current_remote_verifier_federation = self._build_remote_verifier_federation(
+        renewed_remote_verifier_federation = self._build_remote_verifier_federation(
             human_reviewer_ref=normalized_human_reviewer,
             route_digest=route_digest,
             verifier_receipts=renewed_remote_verifier_receipts,
         )
+        renewed_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=renewed_remote_verifier_federation
+        )
+        recovered_remote_verifier_receipts = self._renew_remote_verifier_receipts(
+            verifier_receipts=renewed_remote_verifier_receipts,
+            renewed_at=str(renewed_re_attestation_cadence["renew_after"]),
+        )
+        recovered_remote_verifier_federation = self._build_remote_verifier_federation(
+            human_reviewer_ref=normalized_human_reviewer,
+            route_digest=route_digest,
+            verifier_receipts=recovered_remote_verifier_receipts,
+        )
         initial_public_remote_verifier_federation = initial_remote_verifier_federation
-        current_public_remote_verifier_federation = current_remote_verifier_federation
+        renewed_public_remote_verifier_federation = renewed_remote_verifier_federation
+        recovered_public_remote_verifier_federation = recovered_remote_verifier_federation
         if normalized_export_profile == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
             initial_public_remote_verifier_federation = (
                 self._build_redacted_verifier_federation_summary(
                     initial_remote_verifier_federation
                 )
             )
-            current_public_remote_verifier_federation = (
+            renewed_public_remote_verifier_federation = (
                 self._build_redacted_verifier_federation_summary(
-                    current_remote_verifier_federation
+                    renewed_remote_verifier_federation
+                )
+            )
+            recovered_public_remote_verifier_federation = (
+                self._build_redacted_verifier_federation_summary(
+                    recovered_remote_verifier_federation
                 )
             )
         initial_re_attestation_cadence = self._build_re_attestation_cadence(
             federation=initial_public_remote_verifier_federation
         )
-        current_re_attestation_cadence = self._build_re_attestation_cadence(
-            federation=current_public_remote_verifier_federation
+        renewed_public_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=renewed_public_remote_verifier_federation
+        )
+        recovered_public_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=recovered_public_remote_verifier_federation
         )
         destination_lifecycle = self._build_destination_lifecycle(
             destination_snapshot_digest=destination_snapshot_digest,
             initial_federation=initial_public_remote_verifier_federation,
             initial_cadence=initial_re_attestation_cadence,
-            current_federation=current_public_remote_verifier_federation,
-            current_cadence=current_re_attestation_cadence,
+            renewed_federation=renewed_public_remote_verifier_federation,
+            renewed_cadence=renewed_public_re_attestation_cadence,
+            recovered_federation=recovered_public_remote_verifier_federation,
+            recovered_cadence=recovered_public_re_attestation_cadence,
         )
         public_destination_lifecycle = destination_lifecycle
         if normalized_export_profile == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
@@ -939,8 +963,8 @@ class TrustService:
                 "quorum_received": len(received_roles),
                 "route_ref": f"trust-transfer-route://{normalized_agent_id}",
                 "route_digest": route_digest,
-                "remote_verifier_federation": current_public_remote_verifier_federation,
-                "re_attestation_cadence": current_re_attestation_cadence,
+                "remote_verifier_federation": recovered_public_remote_verifier_federation,
+                "re_attestation_cadence": recovered_public_re_attestation_cadence,
                 "cross_substrate_attested": True,
             },
             "import_receipt": {
@@ -2072,6 +2096,7 @@ class TrustService:
         destination_lifecycle_disclosure_bound = False
         destination_renewal_history_bound = False
         destination_revocation_history_bound = False
+        destination_recovery_history_bound = False
         destination_current = False
         if isinstance(federation_attestation, Mapping):
             attestors = federation_attestation.get("attestors", [])
@@ -2418,14 +2443,15 @@ class TrustService:
                 )
                 if destination_lifecycle_bound and isinstance(final_entry, Mapping):
                     sequences = [entry.get("sequence") for entry in history_entries]
-                    imported_entries = [
-                        entry for entry in history_entries if entry.get("event_type") == "imported"
+                    history_event_types = [
+                        entry.get("event_type") for entry in history_entries
                     ]
-                    renewed_entries = [
-                        entry for entry in history_entries if entry.get("event_type") == "renewed"
-                    ]
-                    imported_entry = imported_entries[0] if len(imported_entries) == 1 else None
-                    latest_renewed_entry = renewed_entries[-1] if renewed_entries else None
+                    imported_entry = history_entries[0] if len(history_entries) > 0 else None
+                    latest_renewed_entry = (
+                        history_entries[1] if len(history_entries) > 1 else None
+                    )
+                    revoked_entry = history_entries[2] if len(history_entries) > 2 else None
+                    recovered_entry = history_entries[3] if len(history_entries) > 3 else None
                     try:
                         imported_recorded_at = (
                             _parse_datetime(
@@ -2451,40 +2477,58 @@ class TrustService:
                             if isinstance(latest_renewed_entry, Mapping)
                             else None
                         )
-                        final_recorded_at = _parse_datetime(
-                            str(final_entry.get("recorded_at", "")),
-                            "destination_lifecycle.history[].recorded_at",
+                        revoked_recorded_at = (
+                            _parse_datetime(
+                                str(revoked_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history[].recorded_at",
+                            )
+                            if isinstance(revoked_entry, Mapping)
+                            else None
                         )
-                        final_valid_until = _parse_datetime(
-                            str(final_entry.get("valid_until", "")),
-                            "destination_lifecycle.history[].valid_until",
+                        revoked_valid_until = (
+                            _parse_datetime(
+                                str(revoked_entry.get("valid_until", "")),
+                                "destination_lifecycle.history[].valid_until",
+                            )
+                            if isinstance(revoked_entry, Mapping)
+                            else None
+                        )
+                        recovered_recorded_at = (
+                            _parse_datetime(
+                                str(recovered_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history[].recorded_at",
+                            )
+                            if isinstance(recovered_entry, Mapping)
+                            else None
+                        )
+                        recovered_valid_until = (
+                            _parse_datetime(
+                                str(recovered_entry.get("valid_until", "")),
+                                "destination_lifecycle.history[].valid_until",
+                            )
+                            if isinstance(recovered_entry, Mapping)
+                            else None
                         )
                     except (TypeError, ValueError):
                         imported_recorded_at = None
                         imported_valid_until = None
                         latest_renewed_recorded_at = None
-                        final_recorded_at = None
-                        final_valid_until = None
+                        revoked_recorded_at = None
+                        revoked_valid_until = None
+                        recovered_recorded_at = None
+                        recovered_valid_until = None
 
                     destination_renewal_history_bound = (
                         sequences == list(range(len(history_entries)))
+                        and len(history_entries) == 4
+                        and history_event_types
+                        == ["imported", "renewed", "revoked", "recovered"]
                         and isinstance(imported_entry, Mapping)
                         and isinstance(latest_renewed_entry, Mapping)
-                        and history_entries[0].get("event_type") == "imported"
                         and imported_entry.get("status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
                         and latest_renewed_entry.get("status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
-                        and latest_renewed_entry.get("federation_ref")
-                        == destination_lifecycle.get("latest_federation_ref")
-                        and latest_renewed_entry.get("federation_digest")
-                        == destination_lifecycle.get("latest_federation_digest")
-                        and latest_renewed_entry.get("cadence_ref")
-                        == destination_lifecycle.get("latest_cadence_ref")
-                        and latest_renewed_entry.get("cadence_digest")
-                        == destination_lifecycle.get("latest_cadence_digest")
-                        and latest_renewed_entry.get("covered_verifier_receipt_ids")
-                        == re_attestation_cadence.get("covered_verifier_receipt_ids")
                         and imported_entry.get("destination_snapshot_digest")
                         == receipt.get("destination_snapshot_digest")
                         and all(
@@ -2511,7 +2555,30 @@ class TrustService:
                     )
                     destination_revocation_history_bound = (
                         destination_renewal_history_bound
-                        and final_entry.get("entry_ref") == destination_lifecycle.get("active_entry_ref")
+                        and isinstance(revoked_entry, Mapping)
+                        and revoked_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_REVOKED_STATUS
+                        and revoked_entry.get("federation_ref")
+                        == latest_renewed_entry.get("federation_ref")
+                        and revoked_entry.get("federation_digest")
+                        == latest_renewed_entry.get("federation_digest")
+                        and revoked_entry.get("cadence_ref")
+                        == latest_renewed_entry.get("cadence_ref")
+                        and revoked_entry.get("cadence_digest")
+                        == latest_renewed_entry.get("cadence_digest")
+                        and revoked_entry.get("covered_verifier_receipt_ids")
+                        == latest_renewed_entry.get("covered_verifier_receipt_ids")
+                        and latest_renewed_recorded_at is not None
+                        and revoked_recorded_at is not None
+                        and revoked_valid_until is not None
+                        and latest_renewed_recorded_at <= revoked_recorded_at <= revoked_valid_until
+                    )
+                    destination_recovery_history_bound = (
+                        destination_revocation_history_bound
+                        and isinstance(recovered_entry, Mapping)
+                        and recovered_entry == final_entry
+                        and final_entry.get("entry_ref")
+                        == destination_lifecycle.get("active_entry_ref")
                         and final_entry.get("federation_ref")
                         == destination_lifecycle.get("latest_federation_ref")
                         and final_entry.get("federation_digest")
@@ -2520,25 +2587,22 @@ class TrustService:
                         == destination_lifecycle.get("latest_cadence_ref")
                         and final_entry.get("cadence_digest")
                         == destination_lifecycle.get("latest_cadence_digest")
-                        and (
-                            (
-                                final_entry.get("event_type") == "revocation-cleared"
-                                and final_entry.get("status")
-                                == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
-                            )
-                            or (
-                                final_entry.get("event_type") == "revoked"
-                                and final_entry.get("status")
-                                == TRUST_TRANSFER_DESTINATION_REVOKED_STATUS
-                            )
-                        )
-                        and latest_renewed_recorded_at is not None
-                        and final_recorded_at is not None
-                        and final_valid_until is not None
-                        and latest_renewed_recorded_at <= final_recorded_at <= final_valid_until
+                        and final_entry.get("covered_verifier_receipt_ids")
+                        == re_attestation_cadence.get("covered_verifier_receipt_ids")
+                        and final_entry.get("event_type") == "recovered"
+                        and final_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and final_entry.get("federation_digest")
+                        != revoked_entry.get("federation_digest")
+                        and final_entry.get("cadence_digest")
+                        != revoked_entry.get("cadence_digest")
+                        and revoked_recorded_at is not None
+                        and recovered_recorded_at is not None
+                        and recovered_valid_until is not None
+                        and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
                     )
                     destination_current = (
-                        destination_revocation_history_bound
+                        destination_recovery_history_bound
                         and destination_lifecycle.get("current_status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
                         and final_entry.get("status")
@@ -2620,18 +2684,15 @@ class TrustService:
                 )
                 if destination_lifecycle_bound and isinstance(final_entry, Mapping):
                     sequences = [entry.get("sequence") for entry in history_entries]
-                    imported_entries = [
-                        entry
-                        for entry in history_entries
-                        if entry.get("event_type") == "imported"
+                    history_event_types = [
+                        entry.get("event_type") for entry in history_entries
                     ]
-                    renewed_entries = [
-                        entry
-                        for entry in history_entries
-                        if entry.get("event_type") == "renewed"
-                    ]
-                    imported_entry = imported_entries[0] if len(imported_entries) == 1 else None
-                    latest_renewed_entry = renewed_entries[-1] if renewed_entries else None
+                    imported_entry = history_entries[0] if len(history_entries) > 0 else None
+                    latest_renewed_entry = (
+                        history_entries[1] if len(history_entries) > 1 else None
+                    )
+                    revoked_entry = history_entries[2] if len(history_entries) > 2 else None
+                    recovered_entry = history_entries[3] if len(history_entries) > 3 else None
                     try:
                         imported_recorded_at = (
                             _parse_datetime(
@@ -2657,34 +2718,58 @@ class TrustService:
                             if isinstance(latest_renewed_entry, Mapping)
                             else None
                         )
-                        final_recorded_at = _parse_datetime(
-                            str(final_entry.get("recorded_at", "")),
-                            "destination_lifecycle.history_summaries[].recorded_at",
+                        revoked_recorded_at = (
+                            _parse_datetime(
+                                str(revoked_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history_summaries[].recorded_at",
+                            )
+                            if isinstance(revoked_entry, Mapping)
+                            else None
                         )
-                        final_valid_until = _parse_datetime(
-                            str(final_entry.get("valid_until", "")),
-                            "destination_lifecycle.history_summaries[].valid_until",
+                        revoked_valid_until = (
+                            _parse_datetime(
+                                str(revoked_entry.get("valid_until", "")),
+                                "destination_lifecycle.history_summaries[].valid_until",
+                            )
+                            if isinstance(revoked_entry, Mapping)
+                            else None
+                        )
+                        recovered_recorded_at = (
+                            _parse_datetime(
+                                str(recovered_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history_summaries[].recorded_at",
+                            )
+                            if isinstance(recovered_entry, Mapping)
+                            else None
+                        )
+                        recovered_valid_until = (
+                            _parse_datetime(
+                                str(recovered_entry.get("valid_until", "")),
+                                "destination_lifecycle.history_summaries[].valid_until",
+                            )
+                            if isinstance(recovered_entry, Mapping)
+                            else None
                         )
                     except (TypeError, ValueError):
                         imported_recorded_at = None
                         imported_valid_until = None
                         latest_renewed_recorded_at = None
-                        final_recorded_at = None
-                        final_valid_until = None
+                        revoked_recorded_at = None
+                        revoked_valid_until = None
+                        recovered_recorded_at = None
+                        recovered_valid_until = None
 
                     destination_renewal_history_bound = (
                         sequences == list(range(len(history_entries)))
+                        and len(history_entries) == 4
+                        and history_event_types
+                        == ["imported", "renewed", "revoked", "recovered"]
                         and isinstance(imported_entry, Mapping)
                         and isinstance(latest_renewed_entry, Mapping)
-                        and history_entries[0].get("event_type") == "imported"
                         and imported_entry.get("status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
                         and latest_renewed_entry.get("status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
-                        and latest_renewed_entry.get("federation_digest")
-                        == destination_lifecycle.get("latest_federation_digest")
-                        and latest_renewed_entry.get("cadence_digest")
-                        == destination_lifecycle.get("latest_cadence_digest")
                         and imported_entry.get("destination_snapshot_digest")
                         == receipt.get("destination_snapshot_digest")
                         and all(
@@ -2701,10 +2786,6 @@ class TrustService:
                             for entry in history_entries
                         )
                         and current_verifier_receipt_commitment_digest is not None
-                        and latest_renewed_entry.get(
-                            "covered_verifier_receipt_commitment_digest"
-                        )
-                        == current_verifier_receipt_commitment_digest
                         and imported_recorded_at is not None
                         and imported_valid_until is not None
                         and latest_renewed_recorded_at is not None
@@ -2716,6 +2797,28 @@ class TrustService:
                     )
                     destination_revocation_history_bound = (
                         destination_renewal_history_bound
+                        and isinstance(revoked_entry, Mapping)
+                        and revoked_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_REVOKED_STATUS
+                        and revoked_entry.get("federation_digest")
+                        == latest_renewed_entry.get("federation_digest")
+                        and revoked_entry.get("cadence_digest")
+                        == latest_renewed_entry.get("cadence_digest")
+                        and revoked_entry.get(
+                            "covered_verifier_receipt_commitment_digest"
+                        )
+                        == latest_renewed_entry.get(
+                            "covered_verifier_receipt_commitment_digest"
+                        )
+                        and latest_renewed_recorded_at is not None
+                        and revoked_recorded_at is not None
+                        and revoked_valid_until is not None
+                        and latest_renewed_recorded_at <= revoked_recorded_at <= revoked_valid_until
+                    )
+                    destination_recovery_history_bound = (
+                        destination_revocation_history_bound
+                        and isinstance(recovered_entry, Mapping)
+                        and recovered_entry == final_entry
                         and final_entry.get("sequence")
                         == destination_lifecycle.get("active_sequence")
                         and final_entry.get("entry_digest")
@@ -2729,25 +2832,20 @@ class TrustService:
                             "covered_verifier_receipt_commitment_digest"
                         )
                         == current_verifier_receipt_commitment_digest
-                        and (
-                            (
-                                final_entry.get("event_type") == "revocation-cleared"
-                                and final_entry.get("status")
-                                == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
-                            )
-                            or (
-                                final_entry.get("event_type") == "revoked"
-                                and final_entry.get("status")
-                                == TRUST_TRANSFER_DESTINATION_REVOKED_STATUS
-                            )
-                        )
-                        and latest_renewed_recorded_at is not None
-                        and final_recorded_at is not None
-                        and final_valid_until is not None
-                        and latest_renewed_recorded_at <= final_recorded_at <= final_valid_until
+                        and final_entry.get("event_type") == "recovered"
+                        and final_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and final_entry.get("federation_digest")
+                        != revoked_entry.get("federation_digest")
+                        and final_entry.get("cadence_digest")
+                        != revoked_entry.get("cadence_digest")
+                        and revoked_recorded_at is not None
+                        and recovered_recorded_at is not None
+                        and recovered_valid_until is not None
+                        and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
                     )
                     destination_current = (
-                        destination_revocation_history_bound
+                        destination_recovery_history_bound
                         and destination_lifecycle.get("current_status")
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
                         and final_entry.get("status")
@@ -2785,6 +2883,7 @@ class TrustService:
             "destination_lifecycle_disclosure_bound": destination_lifecycle_disclosure_bound,
             "destination_renewal_history_bound": destination_renewal_history_bound,
             "destination_revocation_history_bound": destination_revocation_history_bound,
+            "destination_recovery_history_bound": destination_recovery_history_bound,
             "destination_current": destination_current,
             "destination_seeded": destination_seeded,
             "receipt_digest_bound": receipt_digest_bound,
@@ -3087,15 +3186,24 @@ class TrustService:
         destination_snapshot_digest: str,
         initial_federation: Mapping[str, Any],
         initial_cadence: Mapping[str, Any],
-        current_federation: Mapping[str, Any],
-        current_cadence: Mapping[str, Any],
+        renewed_federation: Mapping[str, Any],
+        renewed_cadence: Mapping[str, Any],
+        recovered_federation: Mapping[str, Any],
+        recovered_cadence: Mapping[str, Any],
     ) -> Dict[str, Any]:
-        revocation_checked_at = (
+        revoked_at = (
             _parse_datetime(
-                str(current_cadence["attested_at"]),
-                "current_cadence.attested_at",
+                str(renewed_cadence["attested_at"]),
+                "renewed_cadence.attested_at",
             )
             + timedelta(seconds=TRUST_TRANSFER_DESTINATION_REVOCATION_CHECK_OFFSET_SECONDS)
+        ).isoformat()
+        recovered_at = (
+            _parse_datetime(
+                str(recovered_cadence["attested_at"]),
+                "recovered_cadence.attested_at",
+            )
+            + timedelta(seconds=TRUST_TRANSFER_DESTINATION_RECOVERY_ATTESTATION_OFFSET_SECONDS)
         ).isoformat()
         history = [
             {
@@ -3125,17 +3233,17 @@ class TrustService:
                 "entry_ref": "trust-destination-entry://renewed",
                 "event_type": "renewed",
                 "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
-                "recorded_at": current_cadence["attested_at"],
-                "attested_at": current_cadence["attested_at"],
-                "valid_until": current_cadence["valid_until"],
-                "federation_ref": current_federation["federation_ref"],
+                "recorded_at": renewed_cadence["attested_at"],
+                "attested_at": renewed_cadence["attested_at"],
+                "valid_until": renewed_cadence["valid_until"],
+                "federation_ref": renewed_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
-                    current_federation
+                    renewed_federation
                 ),
-                "cadence_ref": current_cadence["cadence_ref"],
-                "cadence_digest": current_cadence["receipt_digest"],
+                "cadence_ref": renewed_cadence["cadence_ref"],
+                "cadence_digest": renewed_cadence["receipt_digest"],
                 "covered_verifier_receipt_ids": list(
-                    current_cadence["covered_verifier_receipt_ids"]
+                    renewed_cadence["covered_verifier_receipt_ids"]
                 ),
                 "destination_snapshot_digest": destination_snapshot_digest,
                 "rationale": "destination verifier federation renewed before freshness expiry",
@@ -3143,39 +3251,60 @@ class TrustService:
             {
                 "sequence": 2,
                 "entry_id": new_id("trust-destination-entry"),
-                "entry_ref": "trust-destination-entry://revocation-cleared",
-                "event_type": "revocation-cleared",
-                "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
-                "recorded_at": revocation_checked_at,
-                "attested_at": current_cadence["attested_at"],
-                "valid_until": current_cadence["valid_until"],
-                "federation_ref": current_federation["federation_ref"],
+                "entry_ref": "trust-destination-entry://revoked",
+                "event_type": "revoked",
+                "status": TRUST_TRANSFER_DESTINATION_REVOKED_STATUS,
+                "recorded_at": revoked_at,
+                "attested_at": renewed_cadence["attested_at"],
+                "valid_until": renewed_cadence["valid_until"],
+                "federation_ref": renewed_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
-                    current_federation
+                    renewed_federation
                 ),
-                "cadence_ref": current_cadence["cadence_ref"],
-                "cadence_digest": current_cadence["receipt_digest"],
+                "cadence_ref": renewed_cadence["cadence_ref"],
+                "cadence_digest": renewed_cadence["receipt_digest"],
                 "covered_verifier_receipt_ids": list(
-                    current_cadence["covered_verifier_receipt_ids"]
+                    renewed_cadence["covered_verifier_receipt_ids"]
                 ),
                 "destination_snapshot_digest": destination_snapshot_digest,
-                "rationale": "destination revocation check cleared and trust remains current",
+                "rationale": "destination revocation signal raised and trust usage was disabled fail-closed",
+            },
+            {
+                "sequence": 3,
+                "entry_id": new_id("trust-destination-entry"),
+                "entry_ref": "trust-destination-entry://recovered",
+                "event_type": "recovered",
+                "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
+                "recorded_at": recovered_at,
+                "attested_at": recovered_cadence["attested_at"],
+                "valid_until": recovered_cadence["valid_until"],
+                "federation_ref": recovered_federation["federation_ref"],
+                "federation_digest": _trust_transfer_federation_binding_digest(
+                    recovered_federation
+                ),
+                "cadence_ref": recovered_cadence["cadence_ref"],
+                "cadence_digest": recovered_cadence["receipt_digest"],
+                "covered_verifier_receipt_ids": list(
+                    recovered_cadence["covered_verifier_receipt_ids"]
+                ),
+                "destination_snapshot_digest": destination_snapshot_digest,
+                "rationale": "destination trust was re-enabled after renewed verifier attestation cleared recovery review",
             },
         ]
         lifecycle = {
             "lifecycle_id": new_id("trust-destination-lifecycle"),
             "lifecycle_ref": (
-                f"trust-destination-lifecycle://{current_federation['federation_id']}"
+                f"trust-destination-lifecycle://{recovered_federation['federation_id']}"
             ),
             "lifecycle_policy_id": TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID,
             "current_status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
             "active_entry_ref": history[-1]["entry_ref"],
-            "latest_federation_ref": current_federation["federation_ref"],
+            "latest_federation_ref": recovered_federation["federation_ref"],
             "latest_federation_digest": _trust_transfer_federation_binding_digest(
-                current_federation
+                recovered_federation
             ),
-            "latest_cadence_ref": current_cadence["cadence_ref"],
-            "latest_cadence_digest": current_cadence["receipt_digest"],
+            "latest_cadence_ref": recovered_cadence["cadence_ref"],
+            "latest_cadence_digest": recovered_cadence["receipt_digest"],
             "revocation_fail_closed_action": (
                 TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION
             ),

@@ -2401,15 +2401,20 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["destination_lifecycle_bound"])
         self.assertTrue(receipt["validation"]["destination_renewal_history_bound"])
         self.assertTrue(receipt["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(receipt["validation"]["destination_recovery_history_bound"])
         self.assertTrue(receipt["validation"]["destination_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
         self.assertEqual("current", receipt["destination_lifecycle"]["current_status"])
         self.assertEqual(
-            ["imported", "renewed", "revocation-cleared"],
+            ["imported", "renewed", "revoked", "recovered"],
             [
                 entry["event_type"]
                 for entry in receipt["destination_lifecycle"]["history"]
             ],
+        )
+        self.assertEqual(
+            "revoked",
+            receipt["destination_lifecycle"]["history"][2]["status"],
         )
         self.assertEqual(
             receipt["source_snapshot_digest"],
@@ -2467,6 +2472,13 @@ class TrustServiceTests(unittest.TestCase):
                     "verifier_receipt_summaries"
                 ]
             ),
+        )
+        self.assertEqual(
+            ["imported", "renewed", "revoked", "recovered"],
+            [
+                entry["event_type"]
+                for entry in receipt["destination_lifecycle"]["history_summaries"]
+            ],
         )
         self.assertEqual(
             receipt["source_snapshot_redacted"]["sealed_snapshot_digest"],
@@ -2568,6 +2580,7 @@ class TrustServiceTests(unittest.TestCase):
 
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["destination_revocation_history_bound"])
+        self.assertFalse(validation["destination_recovery_history_bound"])
         self.assertFalse(validation["destination_current"])
         self.assertIn("destination_lifecycle.lifecycle_digest mismatch", validation["errors"])
 

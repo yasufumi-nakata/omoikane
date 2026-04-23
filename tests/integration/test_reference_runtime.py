@@ -1521,13 +1521,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_renewal_history_bound"])
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(result["validation"]["destination_recovery_history_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
         self.assertEqual("current", result["transfer"]["destination_lifecycle"]["current_status"])
         self.assertEqual(
-            ["imported", "renewed", "revocation-cleared"],
+            ["imported", "renewed", "revoked", "recovered"],
             [
                 entry["event_type"]
                 for entry in result["transfer"]["destination_lifecycle"]["history"]
@@ -1566,8 +1567,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertNotIn("history", result["transfer"]["destination_lifecycle"])
         self.assertEqual(
-            3,
+            4,
             len(result["transfer"]["destination_lifecycle"]["history_summaries"]),
+        )
+        self.assertEqual(
+            ["imported", "renewed", "revoked", "recovered"],
+            [
+                entry["event_type"]
+                for entry in result["transfer"]["destination_lifecycle"]["history_summaries"]
+            ],
         )
         self.assertNotIn(
             "verifier_receipts",

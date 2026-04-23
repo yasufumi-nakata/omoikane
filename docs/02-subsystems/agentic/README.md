@@ -23,7 +23,7 @@
   self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
   guardian / human quorum 付きの cross-substrate trust export/import receipt に
   live remote verifier federation、fixed re-attestation cadence、
-  append-only destination lifecycle (`imported -> renewed -> revocation-cleared`) に加えて
+  append-only destination lifecycle (`imported -> renewed -> revoked -> recovered`) に加えて
   full-clone / redacted の public export profile 分岐と
   `trust_redacted_snapshot` projection と
   `trust_redacted_verifier_federation` summary、

@@ -464,7 +464,7 @@ properties:
             const: disable-destination-trust-usage
           history:
             type: array
-            minItems: 3
+            minItems: 4
             items:
               type: object
               additionalProperties: false
@@ -499,8 +499,8 @@ properties:
                   enum:
                     - imported
                     - renewed
-                    - revocation-cleared
                     - revoked
+                    - recovered
                 status:
                   type: string
                   enum:
@@ -567,6 +567,7 @@ properties:
       - destination_lifecycle_disclosure_bound
       - destination_renewal_history_bound
       - destination_revocation_history_bound
+      - destination_recovery_history_bound
       - destination_current
       - destination_seeded
       - receipt_digest_bound
@@ -607,6 +608,8 @@ properties:
       destination_renewal_history_bound:
         type: boolean
       destination_revocation_history_bound:
+        type: boolean
+      destination_recovery_history_bound:
         type: boolean
       destination_current:
         type: boolean
@@ -666,7 +669,7 @@ oneOf:
         const: bounded-trust-transfer-redacted-export-v1
 examples:
   - kind: trust_transfer_receipt
-    schema_version: 1.5.0
+    schema_version: 1.6.0
     receipt_id: trust-transfer-0123456789ab
     transfer_policy_id: bounded-cross-substrate-trust-transfer-v1
     attestation_policy_id: bounded-trust-transfer-attestation-federation-v1
@@ -871,22 +874,22 @@ examples:
           - authority://guardian-oversight.jp/reviewer-attestation
         reviewer_binding_digest: "1212121212121212121212121212121212121212121212121212121212121212"
         federation_status: verified
-        receipt_digest: "1313131313131313131313131313131313131313131313131313131313131313"
+        receipt_digest: "1515151515151515151515151515151515151515151515151515151515151515"
       re_attestation_cadence:
         cadence_id: trust-re-attestation-0123456789ab
         cadence_ref: trust-re-attestation://trust-verifier-federation-0123456789ab
         cadence_policy_id: bounded-trust-transfer-re-attestation-cadence-v1
-        attested_at: "2026-04-24T00:00:00+00:00"
-        renew_after: "2026-04-24T00:10:00+00:00"
-        valid_until: "2026-04-24T00:15:00+00:00"
+        attested_at: "2026-04-24T00:20:00+00:00"
+        renew_after: "2026-04-24T00:30:00+00:00"
+        valid_until: "2026-04-24T00:35:00+00:00"
         grace_window_seconds: 240
         covered_verifier_receipt_ids:
-          - verifier-network-receipt-aaaaaaaaaaaa
-          - verifier-network-receipt-bbbbbbbbbbbb
+          - verifier-network-receipt-cccccccccccc
+          - verifier-network-receipt-dddddddddddd
         bound_federation_ref: trust-verifier-federation://4c38ec8f5f8a
-        bound_federation_digest: "1313131313131313131313131313131313131313131313131313131313131313"
+        bound_federation_digest: "1515151515151515151515151515151515151515151515151515151515151515"
         cadence_status: scheduled
-        receipt_digest: "1414141414141414141414141414141414141414141414141414141414141414"
+        receipt_digest: "1616161616161616161616161616161616161616161616161616161616161616"
       cross_substrate_attested: true
     import_receipt:
       import_id: trust-import-0123456789ab
@@ -905,11 +908,11 @@ examples:
       lifecycle_ref: trust-destination-lifecycle://trust-verifier-federation-0123456789ab
       lifecycle_policy_id: bounded-trust-transfer-destination-lifecycle-v1
       current_status: current
-      active_entry_ref: trust-destination-entry://revocation-cleared
+      active_entry_ref: trust-destination-entry://recovered
       latest_federation_ref: trust-verifier-federation://4c38ec8f5f8a
-      latest_federation_digest: "1313131313131313131313131313131313131313131313131313131313131313"
+      latest_federation_digest: "1515151515151515151515151515151515151515151515151515151515151515"
       latest_cadence_ref: trust-re-attestation://trust-verifier-federation-0123456789ab
-      latest_cadence_digest: "1414141414141414141414141414141414141414141414141414141414141414"
+      latest_cadence_digest: "1616161616161616161616161616161616161616161616161616161616161616"
       revocation_fail_closed_action: disable-destination-trust-usage
       history:
         - sequence: 0
@@ -948,9 +951,9 @@ examples:
           rationale: destination verifier federation renewed before freshness expiry
         - sequence: 2
           entry_id: trust-destination-entry-cccccccccccc
-          entry_ref: trust-destination-entry://revocation-cleared
-          event_type: revocation-cleared
-          status: current
+          entry_ref: trust-destination-entry://revoked
+          event_type: revoked
+          status: revoked
           recorded_at: "2026-04-24T00:11:00+00:00"
           attested_at: "2026-04-24T00:10:00+00:00"
           valid_until: "2026-04-24T00:25:00+00:00"
@@ -962,7 +965,24 @@ examples:
             - verifier-network-receipt-aaaaaaaaaaaa
             - verifier-network-receipt-bbbbbbbbbbbb
           destination_snapshot_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-          rationale: destination revocation check cleared and trust remains current
+          rationale: destination revocation signal raised and trust usage was disabled fail-closed
+        - sequence: 3
+          entry_id: trust-destination-entry-dddddddddddd
+          entry_ref: trust-destination-entry://recovered
+          event_type: recovered
+          status: current
+          recorded_at: "2026-04-24T00:22:00+00:00"
+          attested_at: "2026-04-24T00:20:00+00:00"
+          valid_until: "2026-04-24T00:35:00+00:00"
+          federation_ref: trust-verifier-federation://4c38ec8f5f8a
+          federation_digest: "1515151515151515151515151515151515151515151515151515151515151515"
+          cadence_ref: trust-re-attestation://trust-verifier-federation-0123456789ab
+          cadence_digest: "1616161616161616161616161616161616161616161616161616161616161616"
+          covered_verifier_receipt_ids:
+            - verifier-network-receipt-cccccccccccc
+            - verifier-network-receipt-dddddddddddd
+          destination_snapshot_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          rationale: destination trust was re-enabled after renewed verifier attestation cleared recovery review
       lifecycle_digest: "abababababababababababababababababababababababababababababababab"
     validation:
       source_snapshot_digest_bound: true
@@ -983,6 +1003,7 @@ examples:
       destination_lifecycle_disclosure_bound: true
       destination_renewal_history_bound: true
       destination_revocation_history_bound: true
+      destination_recovery_history_bound: true
       destination_current: true
       destination_seeded: true
       receipt_digest_bound: true

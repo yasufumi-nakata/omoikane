@@ -168,7 +168,7 @@ operations:
       - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
       - two live remote verifier receipts must bind the human reviewer attestation with distinct verifier refs before import completes
       - fixed re-attestation cadence must renew before the minimum verifier freshness window expires
-      - destination lifecycle must preserve imported, renewed, and revocation-cleared history entries as one append-only ledger
+      - destination lifecycle must preserve imported, renewed, revoked, and recovered history entries as one append-only ledger
       - import must preserve thresholds, provenance policy, eligibility flags, and append-only history without mutation
       - export_receipt and import_receipt must keep one shared history commitment digest across the selected export profile
       - receipt_digest must stay stable for the fixed export/import/attestation payload family
@@ -204,6 +204,7 @@ operations:
           - destination_lifecycle_disclosure_bound
           - destination_renewal_history_bound
           - destination_revocation_history_bound
+          - destination_recovery_history_bound
           - destination_current
           - destination_seeded
           - receipt_digest_bound
@@ -245,6 +246,8 @@ operations:
           destination_renewal_history_bound:
             type: boolean
           destination_revocation_history_bound:
+            type: boolean
+          destination_recovery_history_bound:
             type: boolean
           destination_current:
             type: boolean
