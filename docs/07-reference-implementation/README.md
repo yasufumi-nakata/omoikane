@@ -50,6 +50,7 @@ PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json
 PYTHONPATH=src python3 -m omoikane.cli episodic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-demo --json
+PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
 PYTHONPATH=src python3 -m omoikane.cli memory-edit-demo --json
 PYTHONPATH=src python3 -m omoikane.cli semantic-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
@@ -436,6 +437,16 @@ source event を保持したまま最大 3 件ずつ segment 化する manifest 
 `crystal-commit` ledger event を確認する。
 入力 source event は `EpisodicStream` の handoff window から取り込み、
 `compaction_candidate_ids` をそのまま payload に残す。
+
+`memory-replication-demo` は L2 MemoryCrystal replication の reference contract
+(`mind.memory_replication.v0`) を JSON で可視化し、
+同一 manifest を `primary` / `mirror` / `coldstore` / `trustee` の
+fixed four-target set へ束縛しつつ、
+`encrypted-content-plus-plaintext-metadata` diff transfer、
+random-block Merkle audit、
+`trustee` mismatch を latest consensus digest に戻して council escalation へ渡す
+bounded reconciliation、
+`memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract
 (`mind.memory_edit.v0`) を JSON で可視化し、

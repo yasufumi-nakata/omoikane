@@ -1,0 +1,20 @@
+eval_id: memory_replication_quorum
+target: mind.memory_replication
+summary: >
+  MemoryCrystal replication が four-target placement、random-block Merkle audit、
+  quorum-bound reconcile、council escalation を digest-bound に返すこと
+checks:
+  - name: memory replication demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
+expect:
+  manifest_ok: true
+  replication_ok: true
+  consensus_quorum_ok: true
+  consensus_target_ids:
+    - coldstore
+    - mirror
+    - primary
+  mismatch_target_ids:
+    - trustee
+  resync_required: true
+  memory_replication_ledger_count: 1

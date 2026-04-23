@@ -1,0 +1,101 @@
+idl_version: 1
+kind: service
+namespace: mind.memory_replication.v0
+service: MemoryReplicationService
+summary: >
+  Deterministic four-target MemoryCrystal replication contract with plaintext
+  metadata plus encrypted payload transfer, random-block Merkle audit, and
+  council-escalated reconciliation.
+imports:
+  memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
+  memory_replication_session: ../schemas/memory_replication_session.schema
+operations:
+  replicate:
+    summary: Build one quorum-bound replication session from a validated MemoryCrystal manifest.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - manifest
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          manifest:
+            schema_ref: memory_crystal_manifest
+    output:
+      schema_ref: memory_replication_session
+    guarantees:
+      - source manifest must remain append-only and digest-bound throughout replication
+      - required_targets must equal primary, mirror, coldstore, trustee
+      - immediate targets must be primary and mirror, while coldstore and trustee remain delayed targets
+      - verification audit must compare all targets and bind one consensus Merkle root before reconcile
+      - any mismatch must escalate to council with one bounded rollback point and resync requirement
+  validate_session:
+    summary: Validate one replication session against the fixed quorum and reconciliation policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - session
+        properties:
+          session:
+            schema_ref: memory_replication_session
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - immediate_target_ids
+          - delayed_target_ids
+          - consensus_target_ids
+          - mismatch_target_ids
+          - quorum_ok
+          - council_escalated
+          - resync_required
+          - manifest_digest_bound
+          - errors
+        properties:
+          ok:
+            type: boolean
+          immediate_target_ids:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          delayed_target_ids:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          consensus_target_ids:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          mismatch_target_ids:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          quorum_ok:
+            type: boolean
+          council_escalated:
+            type: boolean
+          resync_required:
+            type: boolean
+          manifest_digest_bound:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+events:
+  mind.memory.replication_reconciled:
+    payload:
+      schema_ref: memory_replication_session

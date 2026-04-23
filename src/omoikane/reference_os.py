@@ -98,6 +98,7 @@ from .mind.memory import (
     EpisodicStream,
     MemoryEditingService,
     MemoryCrystalStore,
+    MemoryReplicationService,
     ProceduralMemoryProjector,
     ProceduralSkillEnactmentService,
     ProceduralSkillExecutor,
@@ -141,6 +142,7 @@ class OmoikaneReferenceOS:
         self.connectome = ConnectomeModel()
         self.episodic = EpisodicStream()
         self.memory = MemoryCrystalStore()
+        self.memory_replication = MemoryReplicationService()
         self.semantic = SemanticMemoryProjector()
         self.memory_edit = MemoryEditingService()
         self.procedural = ProceduralMemoryProjector()
@@ -7394,6 +7396,82 @@ json.dump(response, sys.stdout)
                 "manifest": manifest,
             },
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_memory_replication_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://memory-replication-demo/v1",
+            metadata={"display_name": "Memory Replication Sandbox"},
+        )
+        episodic_snapshot = self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
+        manifest = self.memory.compact(identity.identity_id, source_events)
+        manifest_validation = self.memory.validate(manifest)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.crystal_compacted",
+            payload={
+                "strategy_id": manifest["compaction_strategy"]["strategy_id"],
+                "source_event_count": manifest["source_event_count"],
+                "segment_count": manifest["segment_count"],
+                "source_event_ids": episodic_snapshot["compaction_candidate_ids"],
+                "manifest_digest": sha256_text(canonical_json(manifest)),
+            },
+            actor="MemoryCrystalStore",
+            category="crystal-commit",
+            layer="L2",
+            signature_roles=["self", "council"],
+            substrate="classical-silicon",
+        )
+        replication_session = self.memory_replication.replicate(
+            identity.identity_id,
+            manifest,
+        )
+        replication_validation = self.memory_replication.validate_session(
+            replication_session,
+            manifest=manifest,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="mind.memory.replication_reconciled",
+            payload={
+                "policy_id": replication_session["replication_policy"]["policy_id"],
+                "source_manifest_digest": replication_session["source_manifest_digest"],
+                "consensus_target_ids": replication_validation["consensus_target_ids"],
+                "mismatch_target_ids": replication_validation["mismatch_target_ids"],
+                "guardian_alert_ref": replication_session["verification_audit"]["guardian_alert_ref"],
+                "council_escalation_ref": replication_session["reconciliation"]["council_escalation_ref"],
+                "resync_required": replication_validation["resync_required"],
+                "session_digest": replication_session["digest"],
+            },
+            actor="MemoryReplicationService",
+            category="memory-replication",
+            layer="L2",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "memory_replication": {
+                "policy": self.memory_replication.profile(),
+                "episodic_stream": episodic_snapshot,
+                "source_events": source_events,
+                "manifest": manifest,
+                "session": replication_session,
+            },
+            "validation": {
+                "manifest": manifest_validation,
+                "replication": replication_validation,
+                "consensus_quorum_ok": replication_validation["quorum_ok"],
+                "resync_required": replication_validation["resync_required"],
+                "ok": manifest_validation["ok"] and replication_validation["ok"],
+            },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

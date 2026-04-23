@@ -1,0 +1,340 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/memory_replication_session.schema"
+title: MemoryReplicationSession
+description: >
+  Quorum-bound MemoryCrystal replication session that fixes four-target
+  placement, plaintext metadata plus encrypted payload transfer, random-block
+  Merkle audit, and council-escalated reconciliation without mutating the
+  source manifest.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - replication_session_id
+  - identity_id
+  - generated_at
+  - replication_policy
+  - source_manifest_ref
+  - source_manifest_digest
+  - source_segment_ids
+  - diff_transfer
+  - replica_targets
+  - verification_audit
+  - reconciliation
+  - status
+  - digest
+properties:
+  kind:
+    type: string
+    const: memory_replication_session
+  schema_version:
+    type: string
+    const: "1.0"
+  replication_session_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  generated_at:
+    type: string
+    format: date-time
+  replication_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - required_targets
+      - immediate_targets
+      - delayed_targets
+      - content_encryption_mode
+      - metadata_visibility
+      - key_sharing_scheme
+      - key_shard_catalog_ref
+      - recovery_threshold
+      - share_count
+      - verify_policy_id
+      - reconcile_policy_id
+      - minimum_consensus_targets
+    properties:
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: quad-store-memory-replication-v1
+      required_targets:
+        type: array
+        minItems: 4
+        maxItems: 4
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      immediate_targets:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [primary, mirror]
+      delayed_targets:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [coldstore, trustee]
+      content_encryption_mode:
+        type: string
+        const: identity-key-encrypted-payload
+      metadata_visibility:
+        type: string
+        const: manifest-metadata-plaintext
+      key_sharing_scheme:
+        type: string
+        const: shamir-3-of-5
+      key_shard_catalog_ref:
+        type: string
+        minLength: 1
+      recovery_threshold:
+        type: integer
+        const: 3
+      share_count:
+        type: integer
+        const: 5
+      verify_policy_id:
+        type: string
+        const: merkle-random-block-audit-v1
+      reconcile_policy_id:
+        type: string
+        const: latest-consensus-point-rollback-v1
+      minimum_consensus_targets:
+        type: integer
+        const: 3
+  source_manifest_ref:
+    type: string
+    minLength: 1
+  source_manifest_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_segment_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  diff_transfer:
+    type: object
+    additionalProperties: false
+    required:
+      - transfer_id
+      - mode
+      - metadata_kind
+      - encrypted_bundle_ref
+      - metadata_digest
+      - source_event_count
+      - source_event_retention
+      - retains_traceability
+    properties:
+      transfer_id:
+        type: string
+        minLength: 1
+      mode:
+        type: string
+        const: encrypted-content-plus-plaintext-metadata
+      metadata_kind:
+        type: string
+        const: MemoryCrystalManifest
+      encrypted_bundle_ref:
+        type: string
+        minLength: 1
+      metadata_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      source_event_count:
+        type: integer
+        minimum: 1
+      source_event_retention:
+        type: string
+        const: source_event_ids_and_source_refs
+      retains_traceability:
+        type: boolean
+        const: true
+  replica_targets:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      $ref: "#/$defs/replica_target"
+  verification_audit:
+    $ref: "#/$defs/verification_audit"
+  reconciliation:
+    $ref: "#/$defs/reconciliation"
+  status:
+    type: string
+    enum:
+      - clean
+      - degraded-but-recoverable
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+$defs:
+  replica_target_id:
+    type: string
+    enum:
+      - primary
+      - mirror
+      - coldstore
+      - trustee
+  replica_target:
+    type: object
+    additionalProperties: false
+    required:
+      - target_id
+      - storage_role
+      - sync_tier
+      - sync_status
+      - substrate_ref
+      - encrypted_bundle_ref
+      - metadata_digest
+      - merkle_root
+      - replication_lag_seconds
+      - attestation_ref
+    properties:
+      target_id:
+        $ref: "#/$defs/replica_target_id"
+      storage_role:
+        $ref: "#/$defs/replica_target_id"
+      sync_tier:
+        type: string
+        enum:
+          - immediate
+          - delayed
+      sync_status:
+        type: string
+        enum:
+          - current
+          - mismatch-detected
+      substrate_ref:
+        type: string
+        minLength: 1
+      encrypted_bundle_ref:
+        type: string
+        minLength: 1
+      metadata_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      merkle_root:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      replication_lag_seconds:
+        type: integer
+        minimum: 0
+      attestation_ref:
+        type: string
+        minLength: 1
+  verification_audit:
+    type: object
+    additionalProperties: false
+    required:
+      - audit_id
+      - policy_id
+      - compared_target_ids
+      - sampled_block_refs
+      - consensus_merkle_root
+      - consensus_target_ids
+      - mismatch_target_ids
+      - guardian_alert_ref
+      - status
+    properties:
+      audit_id:
+        type: string
+        minLength: 1
+      policy_id:
+        type: string
+        const: merkle-random-block-audit-v1
+      compared_target_ids:
+        type: array
+        minItems: 4
+        maxItems: 4
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      sampled_block_refs:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      consensus_merkle_root:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      consensus_target_ids:
+        type: array
+        minItems: 3
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      mismatch_target_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      guardian_alert_ref:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        const: mismatch-detected
+  reconciliation:
+    type: object
+    additionalProperties: false
+    required:
+      - reconcile_id
+      - policy_id
+      - latest_consensus_manifest_digest
+      - consensus_target_ids
+      - isolated_target_ids
+      - rollback_point_ref
+      - resync_required
+      - council_escalation_ref
+      - status
+    properties:
+      reconcile_id:
+        type: string
+        minLength: 1
+      policy_id:
+        type: string
+        const: latest-consensus-point-rollback-v1
+      latest_consensus_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      consensus_target_ids:
+        type: array
+        minItems: 3
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      isolated_target_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/replica_target_id"
+      rollback_point_ref:
+        type: string
+        minLength: 1
+      resync_required:
+        type: boolean
+        const: true
+      council_escalation_ref:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        const: council-escalated

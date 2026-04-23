@@ -38,6 +38,25 @@
 - ランダムなブロックを取り出し、全保管先で hash 照合
 - 不一致を検出したら Guardian へ即時通報
 
+## Reference Runtime v0
+
+reference runtime ではこの protocol を
+`quad-store-memory-replication-v1` として bounded contract 化し、
+`PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json`
+で次の 1 シナリオを確認する。
+
+- `primary` / `mirror` / `coldstore` / `trustee` の fixed four-target placement
+- `encrypted-content-plus-plaintext-metadata` による payload / metadata 分離
+- random-block Merkle audit による全 target 比較
+- `trustee` mismatch を `primary` / `mirror` / `coldstore` の latest consensus digest に戻して
+  `Guardian alert + Council escalation + resync_required=true` へ束縛する bounded reconcile
+
+canonical schema:
+[specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)
+
+IDL:
+[specs/interfaces/mind.memory_replication.v0.idl](../../specs/interfaces/mind.memory_replication.v0.idl)
+
 ## 攻撃モデル
 
 | 攻撃 | 対策 |

@@ -253,6 +253,34 @@ class CliIntegrationTests(unittest.TestCase):
             len(result["memory"]["episodic_stream"]["compaction_candidate_ids"]),
         )
 
+    def test_memory_replication_demo_emits_quorum_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "memory-replication-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["manifest"]["ok"])
+        self.assertTrue(result["validation"]["replication"]["ok"])
+        self.assertTrue(result["validation"]["consensus_quorum_ok"])
+        self.assertTrue(result["validation"]["resync_required"])
+        self.assertEqual(
+            ["coldstore", "mirror", "primary"],
+            result["validation"]["replication"]["consensus_target_ids"],
+        )
+        self.assertEqual(
+            ["trustee"],
+            result["validation"]["replication"]["mismatch_target_ids"],
+        )
+        self.assertEqual(
+            "degraded-but-recoverable",
+            result["memory_replication"]["session"]["status"],
+        )
+
     def test_memory_edit_demo_emits_reversible_buffer_json(self) -> None:
         stdout = io.StringIO()
 

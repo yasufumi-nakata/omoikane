@@ -31,8 +31,15 @@ canonical schema: [specs/schemas/connectome_document.schema](../../../specs/sche
 - reference runtime では `chronological-primary-tag` による
   `append-only-segment-rollup-v1` compaction を採用し、
   元イベントは保持したまま最大 3 件の source event を 1 segment へ要約する
+- さらに `quad-store-memory-replication-v1` として
+  `primary` / `mirror` / `coldstore` / `trustee` への固定 four-target placement、
+  plaintext metadata + encrypted payload transfer、
+  random-block Merkle audit、
+  council-escalated reconcile を machine-checkable に固定する
 canonical schema:
 [specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
+and
+[specs/schemas/memory_replication_session.schema](../../../specs/schemas/memory_replication_session.schema)
 
 ### EpisodicStream
 エピソード記憶の時系列ストリーム。

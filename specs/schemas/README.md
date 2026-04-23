@@ -84,6 +84,7 @@
 - `language_shift.schema`
 - `memory_crystal_manifest.schema`
 - `memory_edit_session.schema`
+- `memory_replication_session.schema`
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

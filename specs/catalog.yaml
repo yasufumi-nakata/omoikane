@@ -1562,6 +1562,30 @@ entries:
     rationale: Required to fix the append-only MemoryCrystal compaction strategy across runtime, docs, and evals.
   - priority: P1
     kind: schema
+    file: specs/schemas/memory_replication_session.schema
+    consumers:
+      - specs/interfaces/mind.memory_replication.v0.idl
+      - docs/03-protocols/memory-replication.md
+      - docs/02-subsystems/mind-substrate/memory-model.md
+      - reference-runtime
+    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, and council-escalated reconcile without mutating the source manifest.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/mind.memory_replication.v0.idl
+    consumers:
+      - docs/03-protocols/memory-replication.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to make the L2 MemoryCrystal replication quorum and reconciliation contract machine-readable.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/memory_replication_quorum.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects four-target placement, quorum-bound Merkle audit, and council-escalated reconciliation.
+  - priority: P1
+    kind: schema
     file: specs/schemas/semantic_memory_snapshot.schema
     consumers:
       - specs/interfaces/mind.semantic.v0.idl

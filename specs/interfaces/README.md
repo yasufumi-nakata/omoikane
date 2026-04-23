@@ -34,6 +34,7 @@
 - `kernel.scheduler.v0.idl`
 - `kernel.termination.v0.idl`
 - `mind.memory.v0.idl`
+- `mind.memory_replication.v0.idl`
 - `mind.memory_edit.v0.idl`
 - `mind.procedural.v0.idl`
 - `mind.procedural_writeback.v0.idl`

@@ -65,6 +65,25 @@ reference runtime では MemoryCrystal の compaction を
 canonical schema:
 [specs/schemas/memory_crystal_manifest.schema](../../../specs/schemas/memory_crystal_manifest.schema)
 
+## Reference runtime の replication quorum
+
+reference runtime では `MemoryCrystal` manifest の保管を
+`quad-store-memory-replication-v1` として固定する。
+
+- `primary` / `mirror` は immediate target、`coldstore` / `trustee` は delayed target として扱う
+- payload は本人鍵で暗号化しつつ、manifest metadata は plaintext digest として carry する
+- random-block Merkle audit で 4 target を比較し、
+  `trustee` mismatch が見つかった場合でも `primary` / `mirror` / `coldstore` の
+  latest consensus digest を rollback point として固定する
+- mismatch は Guardian alert と Council escalation を必須とし、
+  source manifest 自体は不変のまま `resync_required=true` で隔離 target を再同期する
+
+canonical schema:
+[specs/schemas/memory_replication_session.schema](../../../specs/schemas/memory_replication_session.schema)
+
+IDL:
+[specs/interfaces/mind.memory_replication.v0.idl](../../../specs/interfaces/mind.memory_replication.v0.idl)
+
 ## Reference runtime の semantic projection
 
 reference runtime では MemoryCrystal manifest の各 segment を

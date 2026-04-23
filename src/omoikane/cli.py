@@ -84,6 +84,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     memory_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    memory_replication_parser = subparsers.add_parser(
+        "memory-replication-demo",
+        help="Run the L2 MemoryCrystal replication quorum, audit, and reconciliation scenario",
+    )
+    memory_replication_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     memory_edit_parser = subparsers.add_parser(
         "memory-edit-demo",
         help="Run the reversible recall-affect buffer scenario without mutating source memory",
@@ -429,6 +435,10 @@ def main() -> None:
 
     if args.command == "memory-demo":
         _print_result(runtime.run_memory_demo(), args.json)
+        return
+
+    if args.command == "memory-replication-demo":
+        _print_result(runtime.run_memory_replication_demo(), args.json)
         return
 
     if args.command == "memory-edit-demo":

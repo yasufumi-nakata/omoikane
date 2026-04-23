@@ -48,6 +48,17 @@ MEMORY_EDIT_PROHIBITED_OPERATIONS = [
 ]
 MEMORY_EDIT_DISCLOSURE_SCOPE = "self-only"
 MEMORY_EDIT_SOURCE_SURFACE = "semantic-memory-read-only"
+MEMORY_REPLICATION_SCHEMA_VERSION = "1.0"
+MEMORY_REPLICATION_POLICY_ID = "quad-store-memory-replication-v1"
+MEMORY_REPLICATION_VERIFY_POLICY_ID = "merkle-random-block-audit-v1"
+MEMORY_REPLICATION_RECONCILE_POLICY_ID = "latest-consensus-point-rollback-v1"
+MEMORY_REPLICATION_REQUIRED_TARGETS = ("primary", "mirror", "coldstore", "trustee")
+MEMORY_REPLICATION_IMMEDIATE_TARGETS = ("primary", "mirror")
+MEMORY_REPLICATION_DELAYED_TARGETS = ("coldstore", "trustee")
+MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS = 3
+MEMORY_REPLICATION_ALLOWED_STATUS = {"clean", "degraded-but-recoverable"}
+MEMORY_REPLICATION_ALLOWED_SYNC_TIERS = {"immediate", "delayed"}
+MEMORY_REPLICATION_ALLOWED_SYNC_STATUS = {"current", "mismatch-detected"}
 PROCEDURAL_MEMORY_SCHEMA_VERSION = "1.0"
 PROCEDURAL_PREVIEW_POLICY_ID = "connectome-coupled-procedural-preview-v1"
 PROCEDURAL_MAX_WEIGHT_DELTA = 0.08
@@ -110,6 +121,10 @@ def _procedural_execution_digest_payload(record: Dict[str, Any]) -> Dict[str, An
 
 def _procedural_enactment_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "digest"}
+
+
+def _memory_replication_session_digest_payload(session: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in session.items() if key != "digest"}
 
 
 def _slugify_text(value: str) -> str:
@@ -845,6 +860,654 @@ class MemoryCrystalStore:
         }
         segment["digest"] = sha256_text(canonical_json(_segment_digest_payload(segment)))
         return segment
+
+
+class MemoryReplicationService:
+    """Deterministic MemoryCrystal replication policy with bounded quorum recovery."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
+            "policy_id": MEMORY_REPLICATION_POLICY_ID,
+            "required_targets": list(MEMORY_REPLICATION_REQUIRED_TARGETS),
+            "immediate_targets": list(MEMORY_REPLICATION_IMMEDIATE_TARGETS),
+            "delayed_targets": list(MEMORY_REPLICATION_DELAYED_TARGETS),
+            "content_encryption_mode": "identity-key-encrypted-payload",
+            "metadata_visibility": "manifest-metadata-plaintext",
+            "key_sharing_scheme": "shamir-3-of-5",
+            "key_shard_catalog_ref": "shamir://memory-replication/reference-catalog-v1",
+            "recovery_threshold": 3,
+            "share_count": 5,
+            "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
+            "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
+            "minimum_consensus_targets": MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
+        }
+
+    def build_reference_session(self, identity_id: str) -> Dict[str, Any]:
+        manifest = MemoryCrystalStore().build_reference_manifest(identity_id)
+        return self.replicate(identity_id, manifest)
+
+    def replicate(self, identity_id: str, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        if manifest.get("identity_id") != identity_id:
+            raise ValueError("manifest.identity_id must match identity_id")
+
+        manifest_validation = MemoryCrystalStore().validate(manifest)
+        if not manifest_validation["ok"]:
+            raise ValueError(
+                f"memory replication requires a valid manifest: {manifest_validation['errors']}"
+            )
+
+        source_manifest_digest = sha256_text(canonical_json(manifest))
+        source_segment_ids = [segment["segment_id"] for segment in manifest["segments"]]
+        source_event_ids = _dedupe_preserve_order(
+            [
+                event_id
+                for segment in manifest["segments"]
+                for event_id in segment["source_event_ids"]
+            ]
+        )
+        encrypted_bundle_ref = (
+            f"cipher://memory-crystal/{source_manifest_digest[:16]}/segment-bundle"
+        )
+        consensus_merkle_root = self._build_merkle_root(
+            source_manifest_digest,
+            source_segment_ids,
+            status="consensus",
+        )
+        mismatch_merkle_root = self._build_merkle_root(
+            source_manifest_digest,
+            source_segment_ids,
+            status="trustee-mismatch",
+        )
+        diff_transfer = {
+            "transfer_id": new_id("memory-replication-transfer"),
+            "mode": "encrypted-content-plus-plaintext-metadata",
+            "metadata_kind": "MemoryCrystalManifest",
+            "encrypted_bundle_ref": encrypted_bundle_ref,
+            "metadata_digest": source_manifest_digest,
+            "source_event_count": len(source_event_ids),
+            "source_event_retention": "source_event_ids_and_source_refs",
+            "retains_traceability": True,
+        }
+        replica_targets = [
+            self._build_replica_target(
+                target_id="primary",
+                sync_tier="immediate",
+                sync_status="current",
+                substrate_ref="substrate://classical-silicon/primary",
+                encrypted_bundle_ref=f"{encrypted_bundle_ref}/primary",
+                metadata_digest=source_manifest_digest,
+                merkle_root=consensus_merkle_root,
+                replication_lag_seconds=0,
+            ),
+            self._build_replica_target(
+                target_id="mirror",
+                sync_tier="immediate",
+                sync_status="current",
+                substrate_ref="substrate://classical-silicon/mirror",
+                encrypted_bundle_ref=f"{encrypted_bundle_ref}/mirror",
+                metadata_digest=source_manifest_digest,
+                merkle_root=consensus_merkle_root,
+                replication_lag_seconds=2,
+            ),
+            self._build_replica_target(
+                target_id="coldstore",
+                sync_tier="delayed",
+                sync_status="current",
+                substrate_ref="substrate://optical-archive/coldstore",
+                encrypted_bundle_ref=f"{encrypted_bundle_ref}/coldstore",
+                metadata_digest=source_manifest_digest,
+                merkle_root=consensus_merkle_root,
+                replication_lag_seconds=900,
+            ),
+            self._build_replica_target(
+                target_id="trustee",
+                sync_tier="delayed",
+                sync_status="mismatch-detected",
+                substrate_ref="substrate://third-party-escrow/trustee",
+                encrypted_bundle_ref=f"{encrypted_bundle_ref}/trustee",
+                metadata_digest=source_manifest_digest,
+                merkle_root=mismatch_merkle_root,
+                replication_lag_seconds=1800,
+            ),
+        ]
+        verification_audit = {
+            "audit_id": new_id("memory-replication-audit"),
+            "policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
+            "compared_target_ids": list(MEMORY_REPLICATION_REQUIRED_TARGETS),
+            "sampled_block_refs": [
+                f"segment://{segment_id}/block-0"
+                for segment_id in source_segment_ids[: max(2, len(source_segment_ids))]
+            ],
+            "consensus_merkle_root": consensus_merkle_root,
+            "consensus_target_ids": ["primary", "mirror", "coldstore"],
+            "mismatch_target_ids": ["trustee"],
+            "guardian_alert_ref": "guardian://memory-replication/mismatch-alert-001",
+            "status": "mismatch-detected",
+        }
+        source_manifest_ref = f"memory-crystal://manifest/{source_manifest_digest}"
+        reconciliation = {
+            "reconcile_id": new_id("memory-replication-reconcile"),
+            "policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
+            "latest_consensus_manifest_digest": source_manifest_digest,
+            "consensus_target_ids": ["primary", "mirror", "coldstore"],
+            "isolated_target_ids": ["trustee"],
+            "rollback_point_ref": source_manifest_ref,
+            "resync_required": True,
+            "council_escalation_ref": "council://memory-replication/reconcile-001",
+            "status": "council-escalated",
+        }
+        session = {
+            "kind": "memory_replication_session",
+            "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
+            "replication_session_id": new_id("memory-replication"),
+            "identity_id": identity_id,
+            "generated_at": utc_now_iso(),
+            "replication_policy": self.profile(),
+            "source_manifest_ref": source_manifest_ref,
+            "source_manifest_digest": source_manifest_digest,
+            "source_segment_ids": source_segment_ids,
+            "diff_transfer": diff_transfer,
+            "replica_targets": replica_targets,
+            "verification_audit": verification_audit,
+            "reconciliation": reconciliation,
+            "status": "degraded-but-recoverable",
+        }
+        session["digest"] = sha256_text(
+            canonical_json(_memory_replication_session_digest_payload(session))
+        )
+        validation = self.validate_session(session, manifest=manifest)
+        if not validation["ok"]:
+            raise ValueError(
+                f"reference memory replication session failed validation: {validation['errors']}"
+            )
+        return session
+
+    def validate_session(
+        self,
+        session: Dict[str, Any],
+        *,
+        manifest: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(session, dict):
+            raise ValueError("session must be a mapping")
+
+        errors: List[str] = []
+        if session.get("kind") != "memory_replication_session":
+            errors.append("kind must equal 'memory_replication_session'")
+        if session.get("schema_version") != MEMORY_REPLICATION_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must equal {MEMORY_REPLICATION_SCHEMA_VERSION}"
+            )
+        self._require_non_empty_string(
+            session.get("replication_session_id"),
+            "replication_session_id",
+            errors,
+        )
+        self._require_non_empty_string(session.get("identity_id"), "identity_id", errors)
+        self._require_non_empty_string(session.get("generated_at"), "generated_at", errors)
+        self._require_non_empty_string(
+            session.get("source_manifest_ref"),
+            "source_manifest_ref",
+            errors,
+        )
+
+        source_manifest_digest = session.get("source_manifest_digest")
+        self._require_digest(source_manifest_digest, "source_manifest_digest", errors)
+        source_segment_ids = self._validate_string_list(
+            session.get("source_segment_ids"),
+            "source_segment_ids",
+            errors,
+            unique=True,
+        )
+        manifest_digest_bound = True
+        if manifest is not None:
+            manifest_validation = MemoryCrystalStore().validate(manifest)
+            if not manifest_validation["ok"]:
+                errors.append("manifest must satisfy MemoryCrystal validation")
+                manifest_digest_bound = False
+            else:
+                expected_manifest_digest = sha256_text(canonical_json(manifest))
+                if source_manifest_digest != expected_manifest_digest:
+                    errors.append("source_manifest_digest must match supplied manifest")
+                    manifest_digest_bound = False
+                expected_segment_ids = [
+                    segment["segment_id"] for segment in manifest["segments"]
+                ]
+                if source_segment_ids != expected_segment_ids:
+                    errors.append("source_segment_ids must match supplied manifest segment order")
+                    manifest_digest_bound = False
+
+        policy = session.get("replication_policy")
+        minimum_consensus_targets = MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS
+        if not isinstance(policy, dict):
+            errors.append("replication_policy must be an object")
+        else:
+            if policy.get("policy_id") != MEMORY_REPLICATION_POLICY_ID:
+                errors.append("replication_policy.policy_id mismatch")
+            if policy.get("schema_version") != MEMORY_REPLICATION_SCHEMA_VERSION:
+                errors.append("replication_policy.schema_version mismatch")
+            required_targets = self._validate_target_list(
+                policy.get("required_targets"),
+                "replication_policy.required_targets",
+                errors,
+            )
+            immediate_targets = self._validate_target_list(
+                policy.get("immediate_targets"),
+                "replication_policy.immediate_targets",
+                errors,
+            )
+            delayed_targets = self._validate_target_list(
+                policy.get("delayed_targets"),
+                "replication_policy.delayed_targets",
+                errors,
+            )
+            if set(required_targets) != set(MEMORY_REPLICATION_REQUIRED_TARGETS):
+                errors.append("replication_policy.required_targets must list the fixed 4 targets")
+            if set(immediate_targets) != set(MEMORY_REPLICATION_IMMEDIATE_TARGETS):
+                errors.append("replication_policy.immediate_targets must equal primary+mirror")
+            if set(delayed_targets) != set(MEMORY_REPLICATION_DELAYED_TARGETS):
+                errors.append("replication_policy.delayed_targets must equal coldstore+trustee")
+            if policy.get("content_encryption_mode") != "identity-key-encrypted-payload":
+                errors.append("replication_policy.content_encryption_mode mismatch")
+            if policy.get("metadata_visibility") != "manifest-metadata-plaintext":
+                errors.append("replication_policy.metadata_visibility mismatch")
+            if policy.get("key_sharing_scheme") != "shamir-3-of-5":
+                errors.append("replication_policy.key_sharing_scheme mismatch")
+            if policy.get("recovery_threshold") != 3:
+                errors.append("replication_policy.recovery_threshold must equal 3")
+            if policy.get("share_count") != 5:
+                errors.append("replication_policy.share_count must equal 5")
+            if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
+                errors.append("replication_policy.verify_policy_id mismatch")
+            if policy.get("reconcile_policy_id") != MEMORY_REPLICATION_RECONCILE_POLICY_ID:
+                errors.append("replication_policy.reconcile_policy_id mismatch")
+            minimum_consensus_targets = int(
+                policy.get("minimum_consensus_targets", MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS)
+            )
+            if minimum_consensus_targets != MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS:
+                errors.append("replication_policy.minimum_consensus_targets mismatch")
+
+        diff_transfer = session.get("diff_transfer")
+        if not isinstance(diff_transfer, dict):
+            errors.append("diff_transfer must be an object")
+        else:
+            self._require_non_empty_string(
+                diff_transfer.get("transfer_id"),
+                "diff_transfer.transfer_id",
+                errors,
+            )
+            if diff_transfer.get("mode") != "encrypted-content-plus-plaintext-metadata":
+                errors.append("diff_transfer.mode mismatch")
+            if diff_transfer.get("metadata_kind") != "MemoryCrystalManifest":
+                errors.append("diff_transfer.metadata_kind mismatch")
+            self._require_non_empty_string(
+                diff_transfer.get("encrypted_bundle_ref"),
+                "diff_transfer.encrypted_bundle_ref",
+                errors,
+            )
+            self._require_digest(
+                diff_transfer.get("metadata_digest"),
+                "diff_transfer.metadata_digest",
+                errors,
+            )
+            if (
+                isinstance(source_manifest_digest, str)
+                and diff_transfer.get("metadata_digest") != source_manifest_digest
+            ):
+                errors.append("diff_transfer.metadata_digest must equal source_manifest_digest")
+                manifest_digest_bound = False
+            if diff_transfer.get("source_event_retention") != "source_event_ids_and_source_refs":
+                errors.append("diff_transfer.source_event_retention mismatch")
+            if diff_transfer.get("retains_traceability") is not True:
+                errors.append("diff_transfer.retains_traceability must be true")
+
+        replica_targets = session.get("replica_targets")
+        target_ids: List[str] = []
+        immediate_target_ids: List[str] = []
+        delayed_target_ids: List[str] = []
+        mismatch_target_ids: List[str] = []
+        merkle_roots: Dict[str, str] = {}
+        if not isinstance(replica_targets, list) or not replica_targets:
+            errors.append("replica_targets must be a non-empty list")
+            replica_targets = []
+        for index, target in enumerate(replica_targets):
+            if not isinstance(target, dict):
+                errors.append(f"replica_targets[{index}] must be an object")
+                continue
+            target_id = target.get("target_id")
+            self._require_non_empty_string(
+                target_id,
+                f"replica_targets[{index}].target_id",
+                errors,
+            )
+            if isinstance(target_id, str) and target_id:
+                target_ids.append(target_id)
+                if target_id not in MEMORY_REPLICATION_REQUIRED_TARGETS:
+                    errors.append(
+                        f"replica_targets[{index}].target_id must be one of the fixed replication targets"
+                    )
+            if target.get("storage_role") != target_id:
+                errors.append(f"replica_targets[{index}].storage_role must equal target_id")
+            sync_tier = target.get("sync_tier")
+            if sync_tier not in MEMORY_REPLICATION_ALLOWED_SYNC_TIERS:
+                errors.append(
+                    f"replica_targets[{index}].sync_tier must be one of {sorted(MEMORY_REPLICATION_ALLOWED_SYNC_TIERS)}"
+                )
+            elif sync_tier == "immediate" and isinstance(target_id, str):
+                immediate_target_ids.append(target_id)
+            elif sync_tier == "delayed" and isinstance(target_id, str):
+                delayed_target_ids.append(target_id)
+            sync_status = target.get("sync_status")
+            if sync_status not in MEMORY_REPLICATION_ALLOWED_SYNC_STATUS:
+                errors.append(
+                    f"replica_targets[{index}].sync_status must be one of {sorted(MEMORY_REPLICATION_ALLOWED_SYNC_STATUS)}"
+                )
+            elif sync_status == "mismatch-detected" and isinstance(target_id, str):
+                mismatch_target_ids.append(target_id)
+            self._require_non_empty_string(
+                target.get("substrate_ref"),
+                f"replica_targets[{index}].substrate_ref",
+                errors,
+            )
+            self._require_non_empty_string(
+                target.get("encrypted_bundle_ref"),
+                f"replica_targets[{index}].encrypted_bundle_ref",
+                errors,
+            )
+            metadata_digest = target.get("metadata_digest")
+            self._require_digest(
+                metadata_digest,
+                f"replica_targets[{index}].metadata_digest",
+                errors,
+            )
+            if isinstance(diff_transfer, dict) and metadata_digest != diff_transfer.get("metadata_digest"):
+                errors.append(
+                    f"replica_targets[{index}].metadata_digest must equal diff_transfer.metadata_digest"
+                )
+            merkle_root = target.get("merkle_root")
+            self._require_digest(
+                merkle_root,
+                f"replica_targets[{index}].merkle_root",
+                errors,
+            )
+            if isinstance(target_id, str) and isinstance(merkle_root, str):
+                merkle_roots[target_id] = merkle_root
+            replication_lag_seconds = target.get("replication_lag_seconds")
+            if not isinstance(replication_lag_seconds, int) or replication_lag_seconds < 0:
+                errors.append(
+                    f"replica_targets[{index}].replication_lag_seconds must be a non-negative integer"
+                )
+            self._require_non_empty_string(
+                target.get("attestation_ref"),
+                f"replica_targets[{index}].attestation_ref",
+                errors,
+            )
+
+        if len(set(target_ids)) != len(target_ids):
+            errors.append("replica_targets must not repeat target_id")
+        if set(target_ids) != set(MEMORY_REPLICATION_REQUIRED_TARGETS):
+            errors.append("replica_targets must include primary, mirror, coldstore, trustee exactly once")
+        if set(immediate_target_ids) != set(MEMORY_REPLICATION_IMMEDIATE_TARGETS):
+            errors.append("replica_targets immediate tier must cover primary+mirror")
+        if set(delayed_target_ids) != set(MEMORY_REPLICATION_DELAYED_TARGETS):
+            errors.append("replica_targets delayed tier must cover coldstore+trustee")
+
+        verification_audit = session.get("verification_audit")
+        consensus_target_ids: List[str] = []
+        if not isinstance(verification_audit, dict):
+            errors.append("verification_audit must be an object")
+        else:
+            self._require_non_empty_string(
+                verification_audit.get("audit_id"),
+                "verification_audit.audit_id",
+                errors,
+            )
+            if verification_audit.get("policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
+                errors.append("verification_audit.policy_id mismatch")
+            compared_target_ids = self._validate_target_list(
+                verification_audit.get("compared_target_ids"),
+                "verification_audit.compared_target_ids",
+                errors,
+            )
+            if set(compared_target_ids) != set(MEMORY_REPLICATION_REQUIRED_TARGETS):
+                errors.append("verification_audit.compared_target_ids must cover all replica targets")
+            self._validate_string_list(
+                verification_audit.get("sampled_block_refs"),
+                "verification_audit.sampled_block_refs",
+                errors,
+                unique=True,
+                minimum=2,
+            )
+            consensus_merkle_root = verification_audit.get("consensus_merkle_root")
+            self._require_digest(
+                consensus_merkle_root,
+                "verification_audit.consensus_merkle_root",
+                errors,
+            )
+            consensus_target_ids = self._validate_target_list(
+                verification_audit.get("consensus_target_ids"),
+                "verification_audit.consensus_target_ids",
+                errors,
+                minimum=MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
+            )
+            audit_mismatch_target_ids = self._validate_target_list(
+                verification_audit.get("mismatch_target_ids"),
+                "verification_audit.mismatch_target_ids",
+                errors,
+                minimum=1,
+            )
+            if set(audit_mismatch_target_ids) != set(mismatch_target_ids):
+                errors.append(
+                    "verification_audit.mismatch_target_ids must match replica_targets mismatch status"
+                )
+            for target_id in consensus_target_ids:
+                if merkle_roots.get(target_id) != consensus_merkle_root:
+                    errors.append(
+                        f"verification_audit consensus root must match replica_targets merkle_root for {target_id}"
+                    )
+            for target_id in audit_mismatch_target_ids:
+                if merkle_roots.get(target_id) == consensus_merkle_root:
+                    errors.append(
+                        f"verification_audit mismatch target {target_id} must diverge from consensus_merkle_root"
+                    )
+            self._require_non_empty_string(
+                verification_audit.get("guardian_alert_ref"),
+                "verification_audit.guardian_alert_ref",
+                errors,
+            )
+            if verification_audit.get("status") != "mismatch-detected":
+                errors.append("verification_audit.status must equal 'mismatch-detected'")
+
+        reconciliation = session.get("reconciliation")
+        council_escalated = False
+        resync_required = False
+        if not isinstance(reconciliation, dict):
+            errors.append("reconciliation must be an object")
+        else:
+            self._require_non_empty_string(
+                reconciliation.get("reconcile_id"),
+                "reconciliation.reconcile_id",
+                errors,
+            )
+            if reconciliation.get("policy_id") != MEMORY_REPLICATION_RECONCILE_POLICY_ID:
+                errors.append("reconciliation.policy_id mismatch")
+            if reconciliation.get("latest_consensus_manifest_digest") != source_manifest_digest:
+                errors.append(
+                    "reconciliation.latest_consensus_manifest_digest must equal source_manifest_digest"
+                )
+                manifest_digest_bound = False
+            reconcile_consensus_target_ids = self._validate_target_list(
+                reconciliation.get("consensus_target_ids"),
+                "reconciliation.consensus_target_ids",
+                errors,
+                minimum=MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
+            )
+            if set(reconcile_consensus_target_ids) != set(consensus_target_ids):
+                errors.append(
+                    "reconciliation.consensus_target_ids must match verification_audit.consensus_target_ids"
+                )
+            isolated_target_ids = self._validate_target_list(
+                reconciliation.get("isolated_target_ids"),
+                "reconciliation.isolated_target_ids",
+                errors,
+                minimum=1,
+            )
+            if set(isolated_target_ids) != set(mismatch_target_ids):
+                errors.append("reconciliation.isolated_target_ids must match mismatch target set")
+            self._require_non_empty_string(
+                reconciliation.get("rollback_point_ref"),
+                "reconciliation.rollback_point_ref",
+                errors,
+            )
+            resync_required = reconciliation.get("resync_required") is True
+            if not resync_required:
+                errors.append("reconciliation.resync_required must be true")
+            self._require_non_empty_string(
+                reconciliation.get("council_escalation_ref"),
+                "reconciliation.council_escalation_ref",
+                errors,
+            )
+            if reconciliation.get("status") != "council-escalated":
+                errors.append("reconciliation.status must equal 'council-escalated'")
+            council_escalated = (
+                isinstance(reconciliation.get("council_escalation_ref"), str)
+                and bool(reconciliation["council_escalation_ref"].strip())
+                and reconciliation.get("status") == "council-escalated"
+            )
+
+        quorum_ok = len(consensus_target_ids) >= minimum_consensus_targets
+        if not quorum_ok:
+            errors.append("verification_audit.consensus_target_ids must satisfy minimum_consensus_targets")
+
+        status = session.get("status")
+        if status not in MEMORY_REPLICATION_ALLOWED_STATUS:
+            errors.append(f"status must be one of {sorted(MEMORY_REPLICATION_ALLOWED_STATUS)}")
+        elif mismatch_target_ids and status != "degraded-but-recoverable":
+            errors.append("status must be degraded-but-recoverable when mismatch_target_ids are present")
+
+        digest = session.get("digest")
+        self._require_digest(digest, "digest", errors)
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(_memory_replication_session_digest_payload(session))
+            )
+            if digest != expected_digest:
+                errors.append("digest mismatch")
+
+        return {
+            "ok": not errors,
+            "immediate_target_ids": list(MEMORY_REPLICATION_IMMEDIATE_TARGETS),
+            "delayed_target_ids": list(MEMORY_REPLICATION_DELAYED_TARGETS),
+            "consensus_target_ids": sorted(consensus_target_ids),
+            "mismatch_target_ids": sorted(mismatch_target_ids),
+            "quorum_ok": quorum_ok,
+            "council_escalated": council_escalated,
+            "resync_required": resync_required,
+            "manifest_digest_bound": manifest_digest_bound,
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _build_replica_target(
+        *,
+        target_id: str,
+        sync_tier: str,
+        sync_status: str,
+        substrate_ref: str,
+        encrypted_bundle_ref: str,
+        metadata_digest: str,
+        merkle_root: str,
+        replication_lag_seconds: int,
+    ) -> Dict[str, Any]:
+        return {
+            "target_id": target_id,
+            "storage_role": target_id,
+            "sync_tier": sync_tier,
+            "sync_status": sync_status,
+            "substrate_ref": substrate_ref,
+            "encrypted_bundle_ref": encrypted_bundle_ref,
+            "metadata_digest": metadata_digest,
+            "merkle_root": merkle_root,
+            "replication_lag_seconds": replication_lag_seconds,
+            "attestation_ref": f"replica://{target_id}/attestation-001",
+        }
+
+    @staticmethod
+    def _build_merkle_root(
+        source_manifest_digest: str,
+        source_segment_ids: Sequence[str],
+        *,
+        status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "source_manifest_digest": source_manifest_digest,
+                    "source_segment_ids": list(source_segment_ids),
+                    "status": status,
+                }
+            )
+        )
+
+    @staticmethod
+    def _require_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{field_name} must be a non-empty string")
+
+    @staticmethod
+    def _require_digest(value: Any, field_name: str, errors: List[str]) -> None:
+        if not isinstance(value, str) or len(value) != 64 or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            errors.append(f"{field_name} must be a 64-character lowercase sha256 digest")
+
+    def _validate_string_list(
+        self,
+        value: Any,
+        field_name: str,
+        errors: List[str],
+        *,
+        unique: bool = True,
+        minimum: int = 1,
+    ) -> List[str]:
+        if not isinstance(value, list) or len(value) < minimum:
+            errors.append(f"{field_name} must be a list with at least {minimum} items")
+            return []
+        normalized: List[str] = []
+        seen = set()
+        for index, item in enumerate(value):
+            if not isinstance(item, str) or not item.strip():
+                errors.append(f"{field_name}[{index}] must be a non-empty string")
+                continue
+            normalized.append(item)
+            if unique and item in seen:
+                errors.append(f"{field_name} must not contain duplicates")
+            seen.add(item)
+        return normalized
+
+    def _validate_target_list(
+        self,
+        value: Any,
+        field_name: str,
+        errors: List[str],
+        *,
+        minimum: int = 1,
+    ) -> List[str]:
+        values = self._validate_string_list(
+            value,
+            field_name,
+            errors,
+            minimum=minimum,
+        )
+        for target_id in values:
+            if target_id not in MEMORY_REPLICATION_REQUIRED_TARGETS:
+                errors.append(
+                    f"{field_name} entries must be drawn from the fixed replication targets"
+                )
+        return values
 
 
 class SemanticMemoryProjector:

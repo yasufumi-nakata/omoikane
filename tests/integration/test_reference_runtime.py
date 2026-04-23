@@ -273,6 +273,37 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["segment_count"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["crystal-commit"])
 
+    def test_memory_replication_demo_returns_quorum_bound_reconcile_session(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_memory_replication_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["manifest"]["ok"])
+        self.assertTrue(result["validation"]["replication"]["ok"])
+        self.assertTrue(result["validation"]["consensus_quorum_ok"])
+        self.assertTrue(result["validation"]["resync_required"])
+        self.assertEqual(
+            ["primary", "mirror"],
+            result["validation"]["replication"]["immediate_target_ids"],
+        )
+        self.assertEqual(
+            ["coldstore", "mirror", "primary"],
+            result["validation"]["replication"]["consensus_target_ids"],
+        )
+        self.assertEqual(
+            ["trustee"],
+            result["validation"]["replication"]["mismatch_target_ids"],
+        )
+        self.assertEqual(
+            "degraded-but-recoverable",
+            result["memory_replication"]["session"]["status"],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["memory-replication"],
+        )
+
     def test_memory_edit_demo_returns_reversible_buffer_session(self) -> None:
         runtime = OmoikaneReferenceOS()
 
