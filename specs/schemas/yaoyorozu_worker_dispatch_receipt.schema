@@ -65,6 +65,8 @@ properties:
         - stdout_digest
         - stderr_digest
         - report_digest
+        - report_binding_ok
+        - target_paths_ready
         - report
       properties:
         unit_id:
@@ -111,22 +113,36 @@ properties:
         report_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        report_binding_ok:
+          const: true
+        target_paths_ready:
+          const: true
         report:
           type: object
           additionalProperties: false
           required:
             - kind
+            - report_profile
             - agent_id
             - role_id
             - coverage_area
             - dispatch_profile
             - workspace_scope
+            - dispatch_plan_ref
+            - dispatch_unit_ref
             - source_ref
             - target_paths
+            - workspace_root
+            - workspace_root_digest
+            - invocation_digest
+            - target_path_observations
+            - coverage_evidence
             - status
           properties:
             kind:
               const: yaoyorozu_local_worker_report
+            report_profile:
+              const: repo-local-path-bound-worker-report-v1
             agent_id:
               type: string
               minLength: 1
@@ -144,6 +160,12 @@ properties:
               const: repo-local-subprocess-worker-dispatch-v1
             workspace_scope:
               const: repo-local
+            dispatch_plan_ref:
+              type: string
+              pattern: "^dispatch://"
+            dispatch_unit_ref:
+              type: string
+              pattern: "^worker-dispatch-[a-f0-9]{12}$"
             source_ref:
               type: string
               minLength: 1
@@ -153,6 +175,83 @@ properties:
               items:
                 type: string
                 minLength: 1
+            workspace_root:
+              type: string
+              minLength: 1
+            workspace_root_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            invocation_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            target_path_observations:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - target_path
+                  - resolved_path
+                  - exists
+                  - path_kind
+                  - within_workspace
+                  - entry_count
+                  - sample_entries
+                  - observation_digest
+                properties:
+                  target_path:
+                    type: string
+                    minLength: 1
+                  resolved_path:
+                    type: string
+                    minLength: 1
+                  exists:
+                    const: true
+                  path_kind:
+                    type: string
+                    enum:
+                      - directory
+                      - file
+                  within_workspace:
+                    const: true
+                  entry_count:
+                    type: integer
+                    minimum: 0
+                  sample_entries:
+                    type: array
+                    items:
+                      type: string
+                      minLength: 1
+                  observation_digest:
+                    type: string
+                    pattern: "^[a-f0-9]{64}$"
+            coverage_evidence:
+              type: object
+              additionalProperties: false
+              required:
+                - expected_target_count
+                - observed_target_count
+                - existing_target_count
+                - all_targets_exist
+                - all_targets_within_workspace
+                - ready_gate
+              properties:
+                expected_target_count:
+                  type: integer
+                  minimum: 1
+                observed_target_count:
+                  type: integer
+                  minimum: 1
+                existing_target_count:
+                  type: integer
+                  minimum: 1
+                all_targets_exist:
+                  const: true
+                all_targets_within_workspace:
+                  const: true
+                ready_gate:
+                  const: path-bound-target-scan-v1
             status:
               const: ready
   execution_summary:
@@ -164,6 +263,8 @@ properties:
       - successful_process_count
       - failed_role_ids
       - coverage_areas
+      - target_ready_count
+      - ready_gate_profile
     properties:
       launched_process_count:
         type: integer
@@ -188,6 +289,11 @@ properties:
             - schema
             - eval
             - docs
+      target_ready_count:
+        type: integer
+        minimum: 0
+      ready_gate_profile:
+        const: path-bound-target-scan-v1
   validation:
     type: object
     additionalProperties: false
@@ -196,6 +302,8 @@ properties:
       - all_processes_exited_zero
       - all_reports_ready
       - coverage_complete
+      - all_reports_bound_to_dispatch
+      - all_target_paths_ready
       - ok
     properties:
       command_digests_match:
@@ -205,6 +313,10 @@ properties:
       all_reports_ready:
         const: true
       coverage_complete:
+        const: true
+      all_reports_bound_to_dispatch:
+        const: true
+      all_target_paths_ready:
         const: true
       ok:
         const: true
@@ -233,18 +345,42 @@ examples:
         stdout_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
         report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        report_binding_ok: true
+        target_paths_ready: true
         report:
           kind: yaoyorozu_local_worker_report
+          report_profile: repo-local-path-bound-worker-report-v1
           agent_id: codex-builder
           role_id: builder-runtime
           coverage_area: runtime
           dispatch_profile: repo-local-subprocess-worker-dispatch-v1
           workspace_scope: repo-local
+          dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+          dispatch_unit_ref: worker-dispatch-0123456789ab
           source_ref: agents/builders/codex-builder.yaml
           target_paths:
             - src/omoikane/
             - tests/unit/
             - tests/integration/
+          workspace_root: /Users/example/omoikane
+          workspace_root_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          invocation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          target_path_observations:
+            - target_path: src/omoikane/
+              resolved_path: /Users/example/omoikane/src/omoikane
+              exists: true
+              path_kind: directory
+              within_workspace: true
+              entry_count: 8
+              sample_entries: [agentic, cognitive, kernel]
+              observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          coverage_evidence:
+            expected_target_count: 3
+            observed_target_count: 3
+            existing_target_count: 3
+            all_targets_exist: true
+            all_targets_within_workspace: true
+            ready_gate: path-bound-target-scan-v1
           status: ready
     execution_summary:
       launched_process_count: 4
@@ -252,9 +388,13 @@ examples:
       successful_process_count: 4
       failed_role_ids: []
       coverage_areas: [docs, eval, runtime, schema]
+      target_ready_count: 4
+      ready_gate_profile: path-bound-target-scan-v1
     validation:
       command_digests_match: true
       all_processes_exited_zero: true
       all_reports_ready: true
       coverage_complete: true
+      all_reports_bound_to_dispatch: true
+      all_target_paths_ready: true
       ok: true

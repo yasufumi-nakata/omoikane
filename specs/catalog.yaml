@@ -1792,7 +1792,7 @@ entries:
       - docs/02-subsystems/agentic/README.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to serialize one repo-local builder handoff dispatch plan with fixed coverage areas and subprocess command previews.
+    rationale: Required to serialize one repo-local builder handoff dispatch plan with fixed coverage areas, subprocess command previews, and explicit dispatch/unit report bindings.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -1801,7 +1801,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports.
+    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, and workspace-bounded target path observations.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_consensus_dispatch_binding.schema

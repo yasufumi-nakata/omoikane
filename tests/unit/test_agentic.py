@@ -2486,6 +2486,15 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             validation["unique_coverage_areas"],
         )
         self.assertTrue(plan["validation"]["repo_local_scope_only"])
+        self.assertTrue(
+            all(
+                "dispatch_plan_ref" in unit["expected_report_fields"]
+                and "dispatch_unit_ref" in unit["expected_report_fields"]
+                and "target_path_observations" in unit["expected_report_fields"]
+                and "coverage_evidence" in unit["expected_report_fields"]
+                for unit in plan["dispatch_units"]
+            )
+        )
 
     def test_execute_worker_dispatch_returns_completed_receipt(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
@@ -2525,8 +2534,22 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(validation["coverage_complete"])
         self.assertEqual([], validation["missing_coverage"])
         self.assertEqual(4, receipt["execution_summary"]["successful_process_count"])
+        self.assertEqual(4, receipt["execution_summary"]["target_ready_count"])
+        self.assertEqual("path-bound-target-scan-v1", receipt["execution_summary"]["ready_gate_profile"])
+        self.assertTrue(receipt["validation"]["all_reports_bound_to_dispatch"])
+        self.assertTrue(receipt["validation"]["all_target_paths_ready"])
         self.assertTrue(
             all(result["report"]["kind"] == "yaoyorozu_local_worker_report" for result in receipt["results"])
+        )
+        self.assertTrue(all(result["report_binding_ok"] for result in receipt["results"]))
+        self.assertTrue(all(result["target_paths_ready"] for result in receipt["results"]))
+        self.assertTrue(
+            all(
+                result["report"]["coverage_evidence"]["ready_gate"] == "path-bound-target-scan-v1"
+                and result["report"]["coverage_evidence"]["all_targets_exist"]
+                and result["report"]["coverage_evidence"]["all_targets_within_workspace"]
+                for result in receipt["results"]
+            )
         )
 
     def test_task_graph_binding_groups_eval_and_docs_under_complexity_ceiling(self) -> None:

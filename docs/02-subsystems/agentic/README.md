@@ -24,7 +24,8 @@
   `yaoyorozu_workspace_discovery` として cross-workspace builder coverage を machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
   `self-modify-patch-v1` / `memory-edit-v1` の Council convocation / builder handoff plan を materialize し、
-  selected builder handoff を repo-local subprocess worker dispatch receipt まで実行しつつ、
+  selected builder handoff を dispatch/unit binding と workspace target 観測を持つ
+  repo-local subprocess worker dispatch receipt まで実行しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
   `yaoyorozu_consensus_dispatch_binding` として束縛する。
   さらに fixed `max_parallelism=3` を守るため、

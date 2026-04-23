@@ -51,7 +51,8 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 により、この roster が bounded same-host local workspace catalog
 (`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
-selected builder 群が repo-local worker dispatch receipt として実行される。
+selected builder 群が dispatch/unit binding と workspace target 観測を伴う
+repo-local worker dispatch receipt として実行される。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
 さらに `--proposal-profile fork-request-v1` により

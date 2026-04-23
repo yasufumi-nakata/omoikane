@@ -292,7 +292,9 @@ repo-local `agents/` から materialize した trust-bound registry snapshot、
 runtime / schema / eval / docs を覆う builder handoff coverage、
 さらにそれを repo-local subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
-同一 convocation session に束縛されることを確認する。
+同一 convocation session に束縛されること、
+さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
+target path observation を返すことを確認する。
 CLI は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch chain へ切り替えられる。
 同じ CLI は `--proposal-profile fork-request-v1` により

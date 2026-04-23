@@ -13,6 +13,12 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
+from .local_worker_stub import (
+    YAOYOROZU_WORKER_READY_GATE_PROFILE,
+    YAOYOROZU_WORKER_REPORT_KIND,
+    YAOYOROZU_WORKER_REPORT_PROFILE,
+    build_worker_report_binding_digest,
+)
 from .task_graph import TaskGraphService
 from .trust import TrustService
 
@@ -46,16 +52,23 @@ YAOYOROZU_WORKSPACE_COVERAGE_CAPABILITY_RULES = {
     "eval": ("eval.generate", "eval.run"),
     "docs": ("design.delta.read", "sync.docs-to-impl", "sync.impl-to-docs"),
 }
-YAOYOROZU_WORKER_REPORT_KIND = "yaoyorozu_local_worker_report"
 YAOYOROZU_WORKER_REPORT_FIELDS = [
     "kind",
+    "report_profile",
     "agent_id",
     "role_id",
     "coverage_area",
     "dispatch_profile",
     "workspace_scope",
+    "dispatch_plan_ref",
+    "dispatch_unit_ref",
     "source_ref",
     "target_paths",
+    "workspace_root",
+    "workspace_root_digest",
+    "invocation_digest",
+    "target_path_observations",
+    "coverage_evidence",
     "status",
 ]
 YAOYOROZU_TASK_GRAPH_ROOT_BUNDLES = (
@@ -1068,6 +1081,8 @@ class YaoyorozuRegistryService:
             raise ValueError("convocation_session.builder_handoff must be a list")
 
         repo_root = self._agents_root.parent
+        dispatch_id = new_id("yaoyorozu-dispatch")
+        dispatch_plan_ref = f"dispatch://{dispatch_id}"
         dispatch_units: List[Dict[str, Any]] = []
         selected_coverage: List[str] = []
         for selection in builder_handoff:
@@ -1080,6 +1095,7 @@ class YaoyorozuRegistryService:
                 continue
 
             target_paths = list(self._policy.worker_target_paths[coverage_area])
+            unit_id = new_id("worker-dispatch")
             command_preview = [
                 "python3",
                 "-m",
@@ -1094,6 +1110,12 @@ class YaoyorozuRegistryService:
                 self._policy.worker_dispatch_profile,
                 "--workspace-scope",
                 self._policy.worker_workspace_scope,
+                "--dispatch-plan-ref",
+                dispatch_plan_ref,
+                "--dispatch-unit-ref",
+                unit_id,
+                "--workspace-root",
+                str(repo_root),
                 "--source-ref",
                 _non_empty_string(selection.get("source_ref"), "builder_handoff.source_ref"),
             ]
@@ -1101,7 +1123,7 @@ class YaoyorozuRegistryService:
                 command_preview.extend(["--target-path", target_path])
 
             unit = {
-                "unit_id": new_id("worker-dispatch"),
+                "unit_id": unit_id,
                 "role_id": _non_empty_string(selection.get("role_id"), "builder_handoff.role_id"),
                 "coverage_area": coverage_area,
                 "selected_agent_id": _non_empty_string(
@@ -1175,7 +1197,7 @@ class YaoyorozuRegistryService:
         dispatch = {
             "kind": "yaoyorozu_worker_dispatch_plan",
             "schema_version": "1.0.0",
-            "dispatch_id": new_id("yaoyorozu-dispatch"),
+            "dispatch_id": dispatch_id,
             "planned_at": utc_now_iso(),
             **dispatch_body,
         }
@@ -1213,6 +1235,11 @@ class YaoyorozuRegistryService:
                 errors.append("dispatch unit workspace_scope must be repo-local")
             if unit.get("entrypoint_ref") != self._policy.worker_entrypoint_ref:
                 errors.append("dispatch unit entrypoint_ref mismatch")
+            command_preview = unit.get("command_preview", [])
+            if f"dispatch://{dispatch_plan.get('dispatch_id', '')}" not in command_preview:
+                errors.append("dispatch unit command preview must bind the dispatch plan ref")
+            if str(unit.get("unit_id", "")) not in command_preview:
+                errors.append("dispatch unit command preview must bind the dispatch unit ref")
 
         missing_coverage = [
             coverage for coverage in self._policy.worker_target_paths if coverage not in coverage_areas
@@ -1236,6 +1263,7 @@ class YaoyorozuRegistryService:
         repo_root = Path(
             _non_empty_string(dispatch_plan.get("workspace_root"), "dispatch_plan.workspace_root")
         ).resolve()
+        dispatch_plan_ref = f"dispatch://{dispatch_plan['dispatch_id']}"
         units = dispatch_plan.get("dispatch_units", [])
         if not isinstance(units, list) or not units:
             raise ValueError("dispatch_plan.dispatch_units must be a non-empty list")
@@ -1275,18 +1303,64 @@ class YaoyorozuRegistryService:
                 report = loaded if isinstance(loaded, dict) else {}
             except json.JSONDecodeError:
                 report = {}
+            expected_binding_digest = build_worker_report_binding_digest(
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=str(unit["unit_id"]),
+                agent_id=str(unit["selected_agent_id"]),
+                role_id=str(unit["role_id"]),
+                coverage_area=str(unit["coverage_area"]),
+                dispatch_profile=str(dispatch_plan["dispatch_profile"]),
+                workspace_scope=self._policy.worker_workspace_scope,
+                source_ref=str(unit["source_ref"]),
+                workspace_root=str(repo_root),
+                target_paths=list(unit["target_paths"]),
+            )
             if not report:
                 report = {
                     "kind": YAOYOROZU_WORKER_REPORT_KIND,
+                    "report_profile": YAOYOROZU_WORKER_REPORT_PROFILE,
                     "agent_id": unit["selected_agent_id"],
                     "role_id": unit["role_id"],
                     "coverage_area": unit["coverage_area"],
                     "dispatch_profile": dispatch_plan["dispatch_profile"],
                     "workspace_scope": self._policy.worker_workspace_scope,
+                    "dispatch_plan_ref": dispatch_plan_ref,
+                    "dispatch_unit_ref": unit["unit_id"],
                     "source_ref": unit["source_ref"],
                     "target_paths": list(unit["target_paths"]),
+                    "workspace_root": str(repo_root),
+                    "workspace_root_digest": sha256_text(str(repo_root)),
+                    "invocation_digest": expected_binding_digest,
+                    "target_path_observations": [],
+                    "coverage_evidence": {
+                        "expected_target_count": len(unit["target_paths"]),
+                        "observed_target_count": 0,
+                        "existing_target_count": 0,
+                        "all_targets_exist": False,
+                        "all_targets_within_workspace": False,
+                        "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
+                    },
                     "status": "failed",
                 }
+            coverage_evidence = report.get("coverage_evidence", {})
+            report_binding_ok = (
+                report.get("report_profile") == YAOYOROZU_WORKER_REPORT_PROFILE
+                and report.get("dispatch_plan_ref") == dispatch_plan_ref
+                and report.get("dispatch_unit_ref") == unit["unit_id"]
+                and report.get("workspace_root") == str(repo_root)
+                and report.get("invocation_digest") == expected_binding_digest
+                and report.get("source_ref") == unit["source_ref"]
+                and report.get("target_paths") == unit["target_paths"]
+            )
+            target_paths_ready = (
+                isinstance(coverage_evidence, Mapping)
+                and coverage_evidence.get("expected_target_count") == len(unit["target_paths"])
+                and coverage_evidence.get("observed_target_count") == len(unit["target_paths"])
+                and coverage_evidence.get("existing_target_count") == len(unit["target_paths"])
+                and coverage_evidence.get("all_targets_exist") is True
+                and coverage_evidence.get("all_targets_within_workspace") is True
+                and coverage_evidence.get("ready_gate") == YAOYOROZU_WORKER_READY_GATE_PROFILE
+            )
 
             result = {
                 "unit_id": unit["unit_id"],
@@ -1302,9 +1376,16 @@ class YaoyorozuRegistryService:
                 "stdout_digest": sha256_text(stdout_text),
                 "stderr_digest": sha256_text(stderr_text),
                 "report_digest": sha256_text(canonical_json(report)),
+                "report_binding_ok": report_binding_ok,
+                "target_paths_ready": target_paths_ready,
                 "report": report,
             }
-            if process.returncode != 0 or report.get("status") != "ready":
+            if (
+                process.returncode != 0
+                or report.get("status") != "ready"
+                or not report_binding_ok
+                or not target_paths_ready
+            ):
                 failed_role_ids.append(str(unit["role_id"]))
             results.append(result)
 
@@ -1319,9 +1400,13 @@ class YaoyorozuRegistryService:
                 if result["process_status"] == "completed"
                 and result["exit_code"] == 0
                 and result["reported_status"] == "ready"
+                and result["report_binding_ok"]
+                and result["target_paths_ready"]
             ),
             "failed_role_ids": failed_role_ids,
             "coverage_areas": [str(result["coverage_area"]) for result in results],
+            "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
+            "ready_gate_profile": YAOYOROZU_WORKER_READY_GATE_PROFILE,
         }
         validation = {
             "command_digests_match": all(
@@ -1343,6 +1428,10 @@ class YaoyorozuRegistryService:
                     if isinstance(unit, Mapping)
                 ]
             ),
+            "all_reports_bound_to_dispatch": all(
+                result["report_binding_ok"] for result in results
+            ),
+            "all_target_paths_ready": all(result["target_paths_ready"] for result in results),
         }
         validation["ok"] = all(validation.values())
         receipt = {
@@ -1390,12 +1479,30 @@ class YaoyorozuRegistryService:
                 continue
             if report.get("kind") != YAOYOROZU_WORKER_REPORT_KIND:
                 errors.append("worker report kind mismatch")
+            if report.get("report_profile") != YAOYOROZU_WORKER_REPORT_PROFILE:
+                errors.append("worker report profile mismatch")
             if report.get("status") != "ready":
                 errors.append("worker report status must be ready")
             if report.get("workspace_scope") != self._policy.worker_workspace_scope:
                 errors.append("worker report workspace_scope must be repo-local")
             if report.get("dispatch_profile") != self._policy.worker_dispatch_profile:
                 errors.append("worker report dispatch_profile mismatch")
+            if report.get("dispatch_plan_ref") != dispatch_receipt.get("dispatch_plan_ref"):
+                errors.append("worker report dispatch_plan_ref must match receipt")
+            if result.get("report_binding_ok") is not True:
+                errors.append("worker report must remain bound to the dispatch unit")
+            if result.get("target_paths_ready") is not True:
+                errors.append("worker report must prove target path readiness")
+            coverage_evidence = report.get("coverage_evidence", {})
+            if not isinstance(coverage_evidence, Mapping):
+                errors.append("worker report coverage_evidence must be a mapping")
+            else:
+                if coverage_evidence.get("ready_gate") != YAOYOROZU_WORKER_READY_GATE_PROFILE:
+                    errors.append("worker report ready_gate mismatch")
+                if coverage_evidence.get("all_targets_exist") is not True:
+                    errors.append("worker report must confirm all target paths exist")
+                if coverage_evidence.get("all_targets_within_workspace") is not True:
+                    errors.append("worker report must confirm workspace-bounded target paths")
             if result.get("exit_code") != 0:
                 errors.append("worker process exit_code must be 0")
 

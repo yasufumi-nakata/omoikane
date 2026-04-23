@@ -1397,6 +1397,9 @@ class CliIntegrationTests(unittest.TestCase):
             result["consensus_dispatch"]["consensus_session_id"],
         )
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_reports_bound_to_dispatch"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_target_paths_ready"])
+        self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
         self.assertEqual(
             ["docs", "eval"],
             sorted(

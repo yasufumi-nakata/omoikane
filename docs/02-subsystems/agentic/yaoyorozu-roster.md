@@ -80,6 +80,8 @@ trust-bound registry snapshot、bounded convocation plan、
 `self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` を切り替え可能な
 bounded proposal profile catalog、および runtime / schema / eval / docs の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
+各 worker report は dispatch plan / dispatch unit に束縛され、
+workspace 内 target path の存在確認と bounded sample observation を返す。
 同じ demo は builder report / guardian gate / final resolve を
 `ConsensusBus` transcript として監査し、
 blocked direct builder handoff と worker claim chain を

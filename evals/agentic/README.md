@@ -74,6 +74,10 @@ coverage-complete な worker dispatch が
 `runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle に畳まれ、
 同じ ConsensusBus session と guardian gate digest に束縛されること。
 
+### Yaoyorozu Local Worker Dispatch
+repo-local worker dispatch が ready report だけでなく、
+dispatch/unit binding と workspace-bounded target path observation を返すこと。
+
 ### Yaoyorozu Memory Edit Profile
 `memory-edit-v1` の reversible memory-edit convocation が
 `MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
