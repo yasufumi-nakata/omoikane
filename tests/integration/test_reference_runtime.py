@@ -1523,6 +1523,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
         self.assertTrue(result["validation"]["destination_recovery_history_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
+        self.assertTrue(result["validation"]["recovery_review_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
@@ -1559,6 +1560,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "jurisdiction_quorum"
             ],
         )
+        self.assertEqual(
+            "trust_recovery_review",
+            result["transfer"]["destination_lifecycle"]["history"][-1]["recovery_review"]["kind"],
+        )
 
     def test_trust_transfer_demo_can_emit_redacted_export_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -1576,6 +1581,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
+        self.assertTrue(result["validation"]["recovery_review_bound"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
@@ -1618,6 +1624,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "bounded-trust-transfer-history-redaction-v1",
             result["transfer"]["export_receipt"]["redaction_policy_id"],
+        )
+        self.assertEqual(
+            "trust_redacted_destination_recovery_summary",
+            result["transfer"]["destination_lifecycle"]["recovery_summary"]["kind"],
+        )
+        self.assertEqual(
+            result["transfer"]["destination_lifecycle"]["active_entry_digest"],
+            result["transfer"]["destination_lifecycle"]["recovery_summary"]["bound_entry_digest"],
         )
         self.assertEqual(
             result["transfer"]["source_snapshot_redacted"]["sealed_snapshot_digest"],

@@ -1,0 +1,153 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_redacted_destination_recovery_summary.schema"
+title: TrustRedactedDestinationRecoverySummary
+description: >
+  Public redacted recovery-review summary bound to the recovered destination
+  lifecycle entry, exposing rationale and legal proof summaries while sealing
+  raw rationale text and legal acknowledgement refs.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - summary_id
+  - summary_ref
+  - summary_profile_id
+  - bound_sequence
+  - bound_entry_digest
+  - sealed_recovery_review_digest
+  - recovery_rationale_summary
+  - legal_proof_summary
+  - redaction_policy_id
+  - redacted_fields
+  - summary_digest
+properties:
+  kind:
+    const: trust_redacted_destination_recovery_summary
+  schema_version:
+    const: 1.0.0
+  summary_id:
+    type: string
+    pattern: "^trust-recovery-summary-[a-f0-9]{12}$"
+  summary_ref:
+    type: string
+    minLength: 1
+  summary_profile_id:
+    const: bounded-trust-transfer-redacted-destination-recovery-summary-v1
+  bound_sequence:
+    type: integer
+    minimum: 0
+  bound_entry_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  sealed_recovery_review_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  recovery_rationale_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - reason_codes
+      - summary_text
+      - rationale_digest
+    properties:
+      reason_codes:
+        type: array
+        minItems: 3
+        maxItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - revocation-signal-cleared
+            - multi-root-quorum-restored
+            - cross-jurisdiction-legal-review-cleared
+      summary_text:
+        type: string
+        minLength: 1
+      rationale_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  legal_proof_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_refs
+      - jurisdiction_bundle_refs
+      - liability_mode
+      - reviewer_binding_digest
+      - legal_ack_commitment_digest
+      - legal_proof_digest
+    properties:
+      policy_refs:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      jurisdiction_bundle_refs:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
+      liability_mode:
+        const: joint
+      reviewer_binding_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      legal_ack_commitment_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      legal_proof_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  redaction_policy_id:
+    const: bounded-trust-transfer-destination-recovery-summary-redaction-v1
+  redacted_fields:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  summary_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_redacted_destination_recovery_summary
+    schema_version: 1.0.0
+    summary_id: trust-recovery-summary-0123456789ab
+    summary_ref: trust-redacted-recovery-summary://0123456789ab
+    summary_profile_id: bounded-trust-transfer-redacted-destination-recovery-summary-v1
+    bound_sequence: 3
+    bound_entry_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    sealed_recovery_review_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    recovery_rationale_summary:
+      reason_codes:
+        - revocation-signal-cleared
+        - multi-root-quorum-restored
+        - cross-jurisdiction-legal-review-cleared
+      summary_text: Destination trust was re-enabled after the revoked branch cleared review.
+      rationale_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    legal_proof_summary:
+      policy_refs:
+        - policy://guardian-oversight/jp-13/trust-transfer-recovery/v1
+        - policy://guardian-oversight/us-ca/trust-transfer-recovery/v1
+        - policy://guardian-oversight/eu-de/trust-transfer-recovery/v1
+      jurisdiction_bundle_refs:
+        - legal://jp-13/guardian-oversight/v1
+        - legal://us-ca/guardian-oversight/v1
+        - legal://eu-de/guardian-oversight/v1
+      liability_mode: joint
+      reviewer_binding_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+      legal_ack_commitment_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      legal_proof_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    redaction_policy_id: bounded-trust-transfer-destination-recovery-summary-redaction-v1
+    redacted_fields:
+      - destination_lifecycle.history[].recovery_review.review_id
+      - destination_lifecycle.history[].recovery_review.review_ref
+      - destination_lifecycle.history[].recovery_review.rationale
+      - destination_lifecycle.history[].recovery_review.legal_ack_refs
+    summary_digest: 1212121212121212121212121212121212121212121212121212121212121212

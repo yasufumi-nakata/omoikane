@@ -112,7 +112,7 @@ operations:
     output:
       schema_ref: trust_snapshot
   transfer_snapshot:
-    summary: Export one trust snapshot across a substrate boundary and seed it on the destination with bounded guardian/human attestation, live remote verifier federation, fixed re-attestation cadence, append-only destination lifecycle history, and a selectable public export profile plus verifier disclosure floor.
+    summary: Export one trust snapshot across a substrate boundary and seed it on the destination with bounded guardian/human attestation, live remote verifier federation, fixed re-attestation cadence, append-only destination lifecycle history, and a selectable public export profile plus verifier and recovery-review disclosure floors.
     input:
       inline_schema:
         type: object
@@ -163,6 +163,7 @@ operations:
       - redacted export emits source_snapshot_redacted and destination_snapshot_redacted that bind sealed snapshot refs, sealed snapshot digests, and history commitments without exposing raw event payloads
       - redacted export replaces full remote verifier receipts with redacted verifier federation summaries that keep freshness timing and digest commitments while sealing challenge and payload exchange details
       - redacted export replaces the full destination lifecycle ledger with a redacted summary that keeps status transitions, timing, and digest commitments while sealing entry refs, verifier receipt ids, and rationale text
+      - recovered destination trust must bind one full recovery_review in the append-only lifecycle and one redacted recovery summary in the redacted export profile
       - source_snapshot_digest and destination_snapshot_digest must bind the exported and imported snapshot payload family selected by export_profile_id
       - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
       - two live remote verifier receipts must bind the human reviewer attestation with distinct verifier refs before import completes
@@ -205,6 +206,8 @@ operations:
           - destination_renewal_history_bound
           - destination_revocation_history_bound
           - destination_recovery_history_bound
+          - recovery_quorum_bound
+          - recovery_review_bound
           - destination_current
           - destination_seeded
           - receipt_digest_bound
@@ -250,6 +253,8 @@ operations:
           destination_recovery_history_bound:
             type: boolean
           recovery_quorum_bound:
+            type: boolean
+          recovery_review_bound:
             type: boolean
           destination_current:
             type: boolean

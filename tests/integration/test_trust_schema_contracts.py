@@ -63,6 +63,10 @@ class TrustSchemaContractTests(unittest.TestCase):
             "specs/schemas/trust_transfer_receipt.schema",
             result["transfer"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/trust_recovery_review.schema",
+            result["transfer"]["destination_lifecycle"]["history"][-1]["recovery_review"],
+        )
 
     def test_trust_transfer_demo_redacted_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_trust_transfer_demo(
@@ -88,6 +92,10 @@ class TrustSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/trust_redacted_destination_lifecycle.schema",
             result["transfer"]["destination_lifecycle"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/trust_redacted_destination_recovery_summary.schema",
+            result["transfer"]["destination_lifecycle"]["recovery_summary"],
         )
         for summary in result["transfer"]["federation_attestation"][
             "remote_verifier_federation"

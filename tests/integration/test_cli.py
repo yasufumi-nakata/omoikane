@@ -1441,6 +1441,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
         self.assertTrue(result["validation"]["destination_recovery_history_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
+        self.assertTrue(result["validation"]["recovery_review_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertEqual("current", result["transfer"]["destination_lifecycle"]["current_status"])
         self.assertEqual(
@@ -1457,6 +1458,10 @@ class CliIntegrationTests(unittest.TestCase):
             result["transfer"]["federation_attestation"]["remote_verifier_federation"][
                 "received_verifier_count"
             ],
+        )
+        self.assertEqual(
+            "trust_recovery_review",
+            result["transfer"]["destination_lifecycle"]["history"][-1]["recovery_review"]["kind"],
         )
 
     def test_trust_transfer_demo_emits_redacted_export_profile_json(self) -> None:
@@ -1484,6 +1489,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
+        self.assertTrue(result["validation"]["recovery_review_bound"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
         self.assertIn("source_snapshot_redacted", result["transfer"])
@@ -1511,6 +1517,10 @@ class CliIntegrationTests(unittest.TestCase):
                     "remote_verifier_federation"
                 ]["verifier_receipt_summaries"]
             ),
+        )
+        self.assertEqual(
+            "trust_redacted_destination_recovery_summary",
+            result["transfer"]["destination_lifecycle"]["recovery_summary"]["kind"],
         )
         self.assertEqual(
             3,

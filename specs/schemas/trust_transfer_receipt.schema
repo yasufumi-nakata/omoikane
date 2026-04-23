@@ -5,7 +5,8 @@ description: >
   Digest-bound cross-substrate trust export/import receipt with fixed
   guardian/human quorum, live remote verifier federation, re-attestation
   cadence, destination lifecycle history, and a selectable public export
-  profile with verifier and destination lifecycle disclosure-floor branching.
+  profile with verifier, destination lifecycle, and recovery-review
+  disclosure-floor branching.
 type: object
 additionalProperties: false
 required:
@@ -590,6 +591,8 @@ properties:
                 rationale:
                   type: string
                   minLength: 1
+                recovery_review:
+                  $ref: "./trust_recovery_review.schema"
           lifecycle_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
@@ -618,6 +621,7 @@ properties:
       - destination_revocation_history_bound
       - destination_recovery_history_bound
       - recovery_quorum_bound
+      - recovery_review_bound
       - destination_current
       - destination_seeded
       - receipt_digest_bound
@@ -662,6 +666,8 @@ properties:
       destination_recovery_history_bound:
         type: boolean
       recovery_quorum_bound:
+        type: boolean
+      recovery_review_bound:
         type: boolean
       destination_current:
         type: boolean
@@ -721,7 +727,7 @@ oneOf:
         const: bounded-trust-transfer-redacted-export-v1
 examples:
   - kind: trust_transfer_receipt
-    schema_version: 1.6.0
+    schema_version: 1.7.0
     receipt_id: trust-transfer-0123456789ab
     transfer_policy_id: bounded-cross-substrate-trust-transfer-v1
     attestation_policy_id: bounded-trust-transfer-attestation-federation-v1

@@ -11,7 +11,7 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.6.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.7.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
 TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID = "snapshot-clone-with-history"
@@ -29,15 +29,23 @@ TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID = (
 TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID = (
     "bounded-trust-transfer-redacted-verifier-receipt-summary-v1"
 )
-TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION = "1.1.0"
+TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION = "1.2.0"
 TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_PROFILE_ID = (
     "bounded-trust-transfer-redacted-destination-lifecycle-v1"
+)
+TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_PROFILE_ID = (
+    "bounded-trust-transfer-redacted-destination-recovery-summary-v1"
 )
 TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID = (
     "bounded-trust-transfer-verifier-summary-redaction-v1"
 )
 TRUST_TRANSFER_DESTINATION_LIFECYCLE_SUMMARY_REDACTION_POLICY_ID = (
     "bounded-trust-transfer-destination-lifecycle-summary-redaction-v1"
+)
+TRUST_TRANSFER_DESTINATION_RECOVERY_SUMMARY_REDACTION_POLICY_ID = (
+    "bounded-trust-transfer-destination-recovery-summary-redaction-v1"
 )
 TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID = (
     "bounded-live-trust-transfer-verifier-federation-v1"
@@ -63,6 +71,32 @@ TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS = 240
 TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID = (
     "bounded-trust-transfer-destination-lifecycle-v1"
 )
+TRUST_TRANSFER_RECOVERY_REVIEW_SCOPE = "destination-trust-recovery-review"
+TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE = "joint"
+TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES = (
+    "revocation-signal-cleared",
+    "multi-root-quorum-restored",
+    "cross-jurisdiction-legal-review-cleared",
+)
+TRUST_TRANSFER_RECOVERY_RATIONALE_SUMMARY_TEXT = (
+    "Destination trust was re-enabled after the revoked branch cleared a "
+    "multi-root, cross-jurisdiction recovery review."
+)
+TRUST_TRANSFER_RECOVERY_POLICY_REFS = {
+    "EU-DE": "policy://guardian-oversight/eu-de/trust-transfer-recovery/v1",
+    "JP-13": "policy://guardian-oversight/jp-13/trust-transfer-recovery/v1",
+    "US-CA": "policy://guardian-oversight/us-ca/trust-transfer-recovery/v1",
+}
+TRUST_TRANSFER_RECOVERY_JURISDICTION_BUNDLE_REFS = {
+    "EU-DE": "legal://eu-de/guardian-oversight/v1",
+    "JP-13": "legal://jp-13/guardian-oversight/v1",
+    "US-CA": "legal://us-ca/guardian-oversight/v1",
+}
+TRUST_TRANSFER_RECOVERY_LEGAL_ACK_REFS = {
+    "EU-DE": "legal://trust-transfer/recovery/eu-de/reviewer-gamma/v1",
+    "JP-13": "legal://trust-transfer/recovery/jp-13/reviewer-alpha/v1",
+    "US-CA": "legal://trust-transfer/recovery/us-ca/reviewer-beta/v1",
+}
 TRUST_TRANSFER_DESTINATION_CURRENT_STATUS = "current"
 TRUST_TRANSFER_DESTINATION_REVOKED_STATUS = "revoked"
 TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION = (
@@ -117,6 +151,12 @@ TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_FIELDS = (
     "destination_lifecycle.history[].cadence_ref",
     "destination_lifecycle.history[].covered_verifier_receipt_ids",
     "destination_lifecycle.history[].rationale",
+)
+TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_FIELDS = (
+    "destination_lifecycle.history[].recovery_review.review_id",
+    "destination_lifecycle.history[].recovery_review.review_ref",
+    "destination_lifecycle.history[].recovery_review.rationale",
+    "destination_lifecycle.history[].recovery_review.legal_ack_refs",
 )
 TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES = (
     TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
@@ -364,6 +404,128 @@ def _trust_transfer_destination_lifecycle_digest_payload(
     }
 
 
+def _trust_transfer_recovery_review_policy_refs(
+    jurisdictions: List[str],
+) -> List[str]:
+    refs: List[str] = []
+    for jurisdiction in jurisdictions:
+        ref = TRUST_TRANSFER_RECOVERY_POLICY_REFS.get(str(jurisdiction))
+        if not ref:
+            raise ValueError(f"unsupported trust recovery policy jurisdiction: {jurisdiction}")
+        refs.append(ref)
+    return refs
+
+
+def _trust_transfer_recovery_jurisdiction_bundle_refs(
+    jurisdictions: List[str],
+) -> List[str]:
+    refs: List[str] = []
+    for jurisdiction in jurisdictions:
+        ref = TRUST_TRANSFER_RECOVERY_JURISDICTION_BUNDLE_REFS.get(str(jurisdiction))
+        if not ref:
+            raise ValueError(
+                f"unsupported trust recovery jurisdiction bundle: {jurisdiction}"
+            )
+        refs.append(ref)
+    return refs
+
+
+def _trust_transfer_recovery_legal_ack_refs(
+    jurisdictions: List[str],
+) -> List[str]:
+    refs: List[str] = []
+    for jurisdiction in jurisdictions:
+        ref = TRUST_TRANSFER_RECOVERY_LEGAL_ACK_REFS.get(str(jurisdiction))
+        if not ref:
+            raise ValueError(f"unsupported trust recovery legal ack jurisdiction: {jurisdiction}")
+        refs.append(ref)
+    return refs
+
+
+def _trust_transfer_recovery_review_digest_payload(
+    review: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": review["kind"],
+        "schema_version": review["schema_version"],
+        "review_id": review["review_id"],
+        "review_ref": review["review_ref"],
+        "review_scope": review["review_scope"],
+        "reviewer_binding_digest": review["reviewer_binding_digest"],
+        "liability_mode": review["liability_mode"],
+        "reason_codes": review["reason_codes"],
+        "rationale": review["rationale"],
+        "policy_refs": review["policy_refs"],
+        "jurisdiction_bundle_refs": review["jurisdiction_bundle_refs"],
+        "legal_ack_refs": review["legal_ack_refs"],
+    }
+
+
+def _trust_transfer_recovery_review_digest(
+    review: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(_trust_transfer_recovery_review_digest_payload(review))
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_recovery_rationale_digest(
+    review: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(
+                {
+                    "reason_codes": review["reason_codes"],
+                    "rationale": review["rationale"],
+                }
+            )
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_recovery_legal_proof_digest(
+    review: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(
+                {
+                    "policy_refs": review["policy_refs"],
+                    "jurisdiction_bundle_refs": review["jurisdiction_bundle_refs"],
+                    "legal_ack_refs": review["legal_ack_refs"],
+                    "liability_mode": review["liability_mode"],
+                    "reviewer_binding_digest": review["reviewer_binding_digest"],
+                }
+            )
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_redacted_destination_recovery_summary_digest_payload(
+    summary: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": summary["kind"],
+        "schema_version": summary["schema_version"],
+        "summary_id": summary["summary_id"],
+        "summary_ref": summary["summary_ref"],
+        "summary_profile_id": summary["summary_profile_id"],
+        "bound_sequence": summary["bound_sequence"],
+        "bound_entry_digest": summary["bound_entry_digest"],
+        "sealed_recovery_review_digest": summary["sealed_recovery_review_digest"],
+        "recovery_rationale_summary": summary["recovery_rationale_summary"],
+        "legal_proof_summary": summary["legal_proof_summary"],
+        "redaction_policy_id": summary["redaction_policy_id"],
+        "redacted_fields": summary["redacted_fields"],
+    }
+
+
 def _trust_transfer_redacted_snapshot_digest_payload(
     projection: Mapping[str, Any],
 ) -> Dict[str, Any]:
@@ -593,6 +755,7 @@ def _trust_transfer_redacted_destination_lifecycle_digest_payload(
         "latest_cadence_digest": lifecycle["latest_cadence_digest"],
         "revocation_fail_closed_action": lifecycle["revocation_fail_closed_action"],
         "history_summaries": lifecycle["history_summaries"],
+        "recovery_summary": lifecycle["recovery_summary"],
         "history_summary_commitment_digest": lifecycle[
             "history_summary_commitment_digest"
         ],
@@ -1449,6 +1612,62 @@ class TrustService:
                     "destination_lifecycle.sealed_lifecycle_digest",
                     errors,
                 )
+                recovery_summary = destination_lifecycle.get("recovery_summary")
+                if not isinstance(recovery_summary, Mapping):
+                    errors.append("destination_lifecycle.recovery_summary must be a mapping")
+                else:
+                    if (
+                        recovery_summary.get("kind")
+                        != "trust_redacted_destination_recovery_summary"
+                    ):
+                        errors.append("destination_lifecycle.recovery_summary.kind mismatch")
+                    if (
+                        recovery_summary.get("schema_version")
+                        != TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION
+                    ):
+                        errors.append(
+                            "destination_lifecycle.recovery_summary.schema_version mismatch"
+                        )
+                    if (
+                        recovery_summary.get("summary_profile_id")
+                        != TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_PROFILE_ID
+                    ):
+                        errors.append(
+                            "destination_lifecycle.recovery_summary.summary_profile_id mismatch"
+                        )
+                    if (
+                        recovery_summary.get("redaction_policy_id")
+                        != TRUST_TRANSFER_DESTINATION_RECOVERY_SUMMARY_REDACTION_POLICY_ID
+                    ):
+                        errors.append(
+                            "destination_lifecycle.recovery_summary.redaction_policy_id mismatch"
+                        )
+                    if recovery_summary.get("redacted_fields") != list(
+                        TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_FIELDS
+                    ):
+                        errors.append(
+                            "destination_lifecycle.recovery_summary.redacted_fields mismatch"
+                        )
+                    try:
+                        expected_recovery_summary_digest = sha256_text(
+                            canonical_json(
+                                _trust_transfer_redacted_destination_recovery_summary_digest_payload(
+                                    recovery_summary
+                                )
+                            )
+                        )
+                    except KeyError:
+                        errors.append(
+                            "destination_lifecycle.recovery_summary.summary_digest mismatch"
+                        )
+                    else:
+                        if (
+                            recovery_summary.get("summary_digest")
+                            != expected_recovery_summary_digest
+                        ):
+                            errors.append(
+                                "destination_lifecycle.recovery_summary.summary_digest mismatch"
+                            )
             else:
                 errors.append(
                     "destination_lifecycle must expose history or history_summaries"
@@ -1474,6 +1693,10 @@ class TrustService:
         if not summary["recovery_quorum_bound"]:
             errors.append(
                 "recovery quorum must satisfy the multi-root, cross-jurisdiction contract"
+            )
+        if not summary["recovery_review_bound"]:
+            errors.append(
+                "recovered destination lifecycle must bind the fixed recovery review surface"
             )
 
         if isinstance(source_snapshot, Mapping) and isinstance(destination_snapshot, Mapping):
@@ -1551,6 +1774,53 @@ class TrustService:
             else:
                 if destination_lifecycle.get("lifecycle_digest") != expected_lifecycle_digest:
                     errors.append("destination_lifecycle.lifecycle_digest mismatch")
+            history = destination_lifecycle.get("history", [])
+            if len(history) >= 4 and isinstance(history[3], Mapping):
+                recovery_review = history[3].get("recovery_review")
+                if not isinstance(recovery_review, Mapping):
+                    errors.append(
+                        "destination_lifecycle.history[3].recovery_review must be a mapping"
+                    )
+                else:
+                    if recovery_review.get("kind") != "trust_recovery_review":
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.kind mismatch"
+                        )
+                    if (
+                        recovery_review.get("schema_version")
+                        != TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION
+                    ):
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.schema_version mismatch"
+                        )
+                    if (
+                        recovery_review.get("review_scope")
+                        != TRUST_TRANSFER_RECOVERY_REVIEW_SCOPE
+                    ):
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.review_scope mismatch"
+                        )
+                    if (
+                        recovery_review.get("liability_mode")
+                        != TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE
+                    ):
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.liability_mode mismatch"
+                        )
+                    if (
+                        recovery_review.get("reason_codes")
+                        != list(TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES)
+                    ):
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.reason_codes mismatch"
+                        )
+                    if (
+                        recovery_review.get("review_digest")
+                        != _trust_transfer_recovery_review_digest(recovery_review)
+                    ):
+                        errors.append(
+                            "destination_lifecycle.history[3].recovery_review.review_digest mismatch"
+                        )
 
         federation_attestation = receipt.get("federation_attestation", {})
         if isinstance(federation_attestation, Mapping):
@@ -2271,6 +2541,7 @@ class TrustService:
         destination_revocation_history_bound = False
         destination_recovery_history_bound = False
         recovery_quorum_bound = False
+        recovery_review_bound = False
         destination_current = False
         if isinstance(federation_attestation, Mapping):
             attestors = federation_attestation.get("attestors", [])
@@ -2830,6 +3101,51 @@ class TrustService:
                         and recovered_valid_until is not None
                         and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
                     )
+                    try:
+                        expected_policy_refs = (
+                            _trust_transfer_recovery_review_policy_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                        expected_bundle_refs = (
+                            _trust_transfer_recovery_jurisdiction_bundle_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                        expected_legal_ack_refs = _trust_transfer_recovery_legal_ack_refs(
+                            list(remote_verifier_federation.get("jurisdictions", []))
+                        )
+                    except ValueError:
+                        expected_policy_refs = []
+                        expected_bundle_refs = []
+                        expected_legal_ack_refs = []
+                    recovery_review = (
+                        recovered_entry.get("recovery_review")
+                        if isinstance(recovered_entry, Mapping)
+                        else None
+                    )
+                    recovery_review_bound = (
+                        destination_recovery_history_bound
+                        and isinstance(recovery_review, Mapping)
+                        and recovery_review.get("kind") == "trust_recovery_review"
+                        and recovery_review.get("schema_version")
+                        == TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION
+                        and recovery_review.get("review_scope")
+                        == TRUST_TRANSFER_RECOVERY_REVIEW_SCOPE
+                        and recovery_review.get("reviewer_binding_digest")
+                        == remote_verifier_federation.get("reviewer_binding_digest")
+                        and recovery_review.get("liability_mode")
+                        == TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE
+                        and recovery_review.get("reason_codes")
+                        == list(TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES)
+                        and recovery_review.get("policy_refs") == expected_policy_refs
+                        and recovery_review.get("jurisdiction_bundle_refs")
+                        == expected_bundle_refs
+                        and recovery_review.get("legal_ack_refs") == expected_legal_ack_refs
+                        and bool(recovery_review.get("rationale"))
+                        and recovery_review.get("review_digest")
+                        == _trust_transfer_recovery_review_digest(recovery_review)
+                    )
                     recovery_quorum_bound = (
                         destination_recovery_history_bound
                         and remote_verifier_federation.get("quorum_policy_id")
@@ -3101,6 +3417,79 @@ class TrustService:
                         and recovered_valid_until is not None
                         and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
                     )
+                    try:
+                        expected_policy_refs = (
+                            _trust_transfer_recovery_review_policy_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                        expected_bundle_refs = (
+                            _trust_transfer_recovery_jurisdiction_bundle_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                    except ValueError:
+                        expected_policy_refs = []
+                        expected_bundle_refs = []
+                    recovery_summary = destination_lifecycle.get("recovery_summary")
+                    if isinstance(recovery_summary, Mapping):
+                        recovery_rationale_summary = recovery_summary.get(
+                            "recovery_rationale_summary",
+                            {},
+                        )
+                        legal_proof_summary = recovery_summary.get(
+                            "legal_proof_summary",
+                            {},
+                        )
+                        try:
+                            recovery_summary_digest = sha256_text(
+                                canonical_json(
+                                    _trust_transfer_redacted_destination_recovery_summary_digest_payload(
+                                        recovery_summary
+                                    )
+                                )
+                            )
+                        except KeyError:
+                            recovery_summary_digest = ""
+                        recovery_review_bound = (
+                            destination_recovery_history_bound
+                            and recovery_summary.get("kind")
+                            == "trust_redacted_destination_recovery_summary"
+                            and recovery_summary.get("schema_version")
+                            == TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION
+                            and recovery_summary.get("summary_profile_id")
+                            == TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_PROFILE_ID
+                            and recovery_summary.get("bound_sequence")
+                            == final_entry.get("sequence")
+                            and recovery_summary.get("bound_entry_digest")
+                            == final_entry.get("entry_digest")
+                            and recovery_summary.get("redaction_policy_id")
+                            == TRUST_TRANSFER_DESTINATION_RECOVERY_SUMMARY_REDACTION_POLICY_ID
+                            and recovery_summary.get("redacted_fields")
+                            == list(TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_FIELDS)
+                            and bool(recovery_summary.get("sealed_recovery_review_digest"))
+                            and recovery_summary.get("summary_digest")
+                            == recovery_summary_digest
+                            and isinstance(recovery_rationale_summary, Mapping)
+                            and recovery_rationale_summary.get("reason_codes")
+                            == list(TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES)
+                            and recovery_rationale_summary.get("summary_text")
+                            == TRUST_TRANSFER_RECOVERY_RATIONALE_SUMMARY_TEXT
+                            and bool(recovery_rationale_summary.get("rationale_digest"))
+                            and isinstance(legal_proof_summary, Mapping)
+                            and legal_proof_summary.get("policy_refs")
+                            == expected_policy_refs
+                            and legal_proof_summary.get("jurisdiction_bundle_refs")
+                            == expected_bundle_refs
+                            and legal_proof_summary.get("liability_mode")
+                            == TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE
+                            and legal_proof_summary.get("reviewer_binding_digest")
+                            == remote_verifier_federation.get("reviewer_binding_digest")
+                            and bool(
+                                legal_proof_summary.get("legal_ack_commitment_digest")
+                            )
+                            and bool(legal_proof_summary.get("legal_proof_digest"))
+                        )
                     recovery_quorum_bound = (
                         destination_recovery_history_bound
                         and remote_verifier_federation.get("quorum_policy_id")
@@ -3164,6 +3553,7 @@ class TrustService:
             "destination_revocation_history_bound": destination_revocation_history_bound,
             "destination_recovery_history_bound": destination_recovery_history_bound,
             "recovery_quorum_bound": recovery_quorum_bound,
+            "recovery_review_bound": recovery_review_bound,
             "destination_current": destination_current,
             "destination_seeded": destination_seeded,
             "receipt_digest_bound": receipt_digest_bound,
@@ -3671,6 +4061,40 @@ class TrustService:
             )
             + timedelta(seconds=TRUST_TRANSFER_DESTINATION_RECOVERY_ATTESTATION_OFFSET_SECONDS)
         ).isoformat()
+        recovered_jurisdictions = list(recovered_federation.get("jurisdictions", []))
+        recovery_review = {
+            "kind": "trust_recovery_review",
+            "schema_version": TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION,
+            "review_id": new_id("trust-recovery-review"),
+            "review_ref": (
+                "trust-recovery-review://"
+                f"{sha256_text(str(recovered_federation['federation_ref']))[:12]}"
+            ),
+            "review_scope": TRUST_TRANSFER_RECOVERY_REVIEW_SCOPE,
+            "reviewer_binding_digest": recovered_federation["reviewer_binding_digest"],
+            "liability_mode": TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE,
+            "reason_codes": list(TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES),
+            "rationale": (
+                "destination trust was re-enabled after the revoked branch cleared "
+                "multi-root verifier quorum recovery review and cross-jurisdiction "
+                "guardian legal acknowledgements"
+            ),
+            "policy_refs": _trust_transfer_recovery_review_policy_refs(
+                recovered_jurisdictions
+            ),
+            "jurisdiction_bundle_refs": (
+                _trust_transfer_recovery_jurisdiction_bundle_refs(
+                    recovered_jurisdictions
+                )
+            ),
+            "legal_ack_refs": _trust_transfer_recovery_legal_ack_refs(
+                recovered_jurisdictions
+            ),
+            "review_digest": "",
+        }
+        recovery_review["review_digest"] = str(
+            _trust_transfer_recovery_review_digest(recovery_review)
+        )
         history = [
             {
                 "sequence": 0,
@@ -3778,6 +4202,7 @@ class TrustService:
                     "destination trust was re-enabled after multi-root, cross-jurisdiction "
                     "verifier quorum cleared recovery review"
                 ),
+                "recovery_review": recovery_review,
             },
         ]
         lifecycle = {
@@ -3856,7 +4281,63 @@ class TrustService:
             )
             history_summaries.append(entry_summary)
 
+        recovered_entry = history[-1]
+        if not isinstance(recovered_entry, Mapping):
+            raise ValueError("destination lifecycle summary requires recovered entry mapping")
+        recovery_review = recovered_entry.get("recovery_review")
+        if not isinstance(recovery_review, Mapping):
+            raise ValueError("destination lifecycle summary requires recovery_review")
         active_entry = history_summaries[-1]
+        recovery_summary = {
+            "kind": "trust_redacted_destination_recovery_summary",
+            "schema_version": (
+                TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION
+            ),
+            "summary_id": new_id("trust-recovery-summary"),
+            "summary_ref": (
+                "trust-redacted-recovery-summary://"
+                f"{sha256_text(str(recovery_review['review_ref']))[:12]}"
+            ),
+            "summary_profile_id": (
+                TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_PROFILE_ID
+            ),
+            "bound_sequence": active_entry["sequence"],
+            "bound_entry_digest": active_entry["entry_digest"],
+            "sealed_recovery_review_digest": recovery_review["review_digest"],
+            "recovery_rationale_summary": {
+                "reason_codes": list(recovery_review["reason_codes"]),
+                "summary_text": TRUST_TRANSFER_RECOVERY_RATIONALE_SUMMARY_TEXT,
+                "rationale_digest": str(
+                    _trust_transfer_recovery_rationale_digest(recovery_review)
+                ),
+            },
+            "legal_proof_summary": {
+                "policy_refs": list(recovery_review["policy_refs"]),
+                "jurisdiction_bundle_refs": list(
+                    recovery_review["jurisdiction_bundle_refs"]
+                ),
+                "liability_mode": recovery_review["liability_mode"],
+                "reviewer_binding_digest": recovery_review["reviewer_binding_digest"],
+                "legal_ack_commitment_digest": sha256_text(
+                    canonical_json(list(recovery_review["legal_ack_refs"]))
+                ),
+                "legal_proof_digest": str(
+                    _trust_transfer_recovery_legal_proof_digest(recovery_review)
+                ),
+            },
+            "redaction_policy_id": (
+                TRUST_TRANSFER_DESTINATION_RECOVERY_SUMMARY_REDACTION_POLICY_ID
+            ),
+            "redacted_fields": list(TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_FIELDS),
+            "summary_digest": "",
+        }
+        recovery_summary["summary_digest"] = sha256_text(
+            canonical_json(
+                _trust_transfer_redacted_destination_recovery_summary_digest_payload(
+                    recovery_summary
+                )
+            )
+        )
         summary = {
             "kind": "trust_redacted_destination_lifecycle",
             "schema_version": TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION,
@@ -3871,6 +4352,7 @@ class TrustService:
             "latest_cadence_digest": lifecycle["latest_cadence_digest"],
             "revocation_fail_closed_action": lifecycle["revocation_fail_closed_action"],
             "history_summaries": history_summaries,
+            "recovery_summary": recovery_summary,
             "history_summary_commitment_digest": (
                 _trust_transfer_redacted_destination_lifecycle_history_commitment_digest(
                     history_summaries

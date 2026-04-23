@@ -2403,6 +2403,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["destination_revocation_history_bound"])
         self.assertTrue(receipt["validation"]["destination_recovery_history_bound"])
         self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
+        self.assertTrue(receipt["validation"]["recovery_review_bound"])
         self.assertTrue(receipt["validation"]["destination_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
         self.assertEqual("current", receipt["destination_lifecycle"]["current_status"])
@@ -2436,6 +2437,18 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(
             3,
             len(receipt["destination_lifecycle"]["history"][-1]["covered_verifier_receipt_ids"]),
+        )
+        self.assertEqual(
+            "trust_recovery_review",
+            receipt["destination_lifecycle"]["history"][-1]["recovery_review"]["kind"],
+        )
+        self.assertEqual(
+            "destination-trust-recovery-review",
+            receipt["destination_lifecycle"]["history"][-1]["recovery_review"]["review_scope"],
+        )
+        self.assertEqual(
+            "joint",
+            receipt["destination_lifecycle"]["history"][-1]["recovery_review"]["liability_mode"],
         )
         self.assertEqual(
             receipt["source_snapshot_digest"],
@@ -2475,6 +2488,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["history_commitment_bound"])
         self.assertTrue(receipt["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
+        self.assertTrue(receipt["validation"]["recovery_review_bound"])
         self.assertNotIn("source_snapshot", receipt)
         self.assertNotIn("destination_snapshot", receipt)
         self.assertIn("source_snapshot_redacted", receipt)
@@ -2529,6 +2543,18 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(
             2,
             receipt["destination_lifecycle"]["history_summaries"][-1]["jurisdiction_quorum"],
+        )
+        self.assertEqual(
+            "trust_redacted_destination_recovery_summary",
+            receipt["destination_lifecycle"]["recovery_summary"]["kind"],
+        )
+        self.assertEqual(
+            receipt["destination_lifecycle"]["active_entry_digest"],
+            receipt["destination_lifecycle"]["recovery_summary"]["bound_entry_digest"],
+        )
+        self.assertEqual(
+            "joint",
+            receipt["destination_lifecycle"]["recovery_summary"]["legal_proof_summary"]["liability_mode"],
         )
         self.assertTrue(destination.has_agent("design-architect"))
 
@@ -2705,6 +2731,37 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["recovery_quorum_bound"])
         self.assertIn(
             "destination_lifecycle.lifecycle_digest mismatch",
+            validation["errors"],
+        )
+
+    def test_validate_transfer_receipt_rejects_redacted_recovery_summary_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+            export_profile_id=TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["destination_lifecycle"]["recovery_summary"]["legal_proof_summary"][
+            "reviewer_binding_digest"
+        ] = "0" * 64
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["recovery_review_bound"])
+        self.assertIn(
+            "recovered destination lifecycle must bind the fixed recovery review surface",
             validation["errors"],
         )
 

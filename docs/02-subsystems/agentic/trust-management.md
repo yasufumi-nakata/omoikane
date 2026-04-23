@@ -144,6 +144,12 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
   sequence / status / timing / `quorum_policy_id` / federation digest / cadence digest /
   `trust_root_quorum` / `jurisdiction_quorum` / covered verifier receipt commitment digest へ縮約し、
   entry ref / verifier receipt ids / rationale は `redacted_fields` へ退避する
+- 同じ redacted profile では `trust_redacted_destination_recovery_summary` が
+  recovered branch の `recovery_review` から
+  `reason_codes` / summary text / rationale digest と、
+  `policy_refs` / `jurisdiction_bundle_refs` / `liability_mode` /
+  `reviewer_binding_digest` / legal-proof digests だけを公開し、
+  raw rationale と `legal_ack_refs` は `redacted_fields` へ退避する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 - `bounded-trust-transfer-destination-lifecycle-v1` による
@@ -179,6 +185,11 @@ reference runtime では import 時の federation/cadence、renew 後の federat
 revocation 発火で一度 trust usage を fail-closed に落とした `revoked` entry と、
 再 attestation 後に復帰する `recovered` entry を同じ ledger に束ね、`current | revoked` の fail-closed state を
 `destination_current` で machine-checkable にする。
+recovered entry は full `trust_recovery_review` を保持し、
+`review_scope=destination-trust-recovery-review`、
+`reason_codes=[revocation-signal-cleared, multi-root-quorum-restored, cross-jurisdiction-legal-review-cleared]`、
+jurisdiction policy / bundle refs、reviewer binding digest、
+sealed `legal_ack_refs`、raw rationale を 1 object に束ねる。
 
 redacted profile の `destination_lifecycle` は
 `trust_redacted_destination_lifecycle` summary に切り替わり、
@@ -186,8 +197,12 @@ history entry ごとの `sequence` / `event_type` / `status` / `recorded_at` /
 `valid_until` / `quorum_policy_id` / federation digest / cadence digest /
 `trust_root_quorum` / `jurisdiction_quorum` / covered verifier receipt commitment digest / destination snapshot digest
 だけを公開する。append-only ledger 本体は `sealed_lifecycle_digest` に封じ、
-validator は `destination_lifecycle_disclosure_bound` と `recovery_quorum_bound` により
-selected export profile と disclosure floor の一致を継続検証する。
+`recovery_summary` は active recovered entry に束縛された
+`trust_redacted_destination_recovery_summary` として公開され、
+reason code / rationale digest / legal proof digest / jurisdiction policy refs /
+liability mode だけを公開する。validator は
+`destination_lifecycle_disclosure_bound` / `recovery_quorum_bound` /
+`recovery_review_bound` により selected export profile と disclosure floor の一致を継続検証する。
 
 ## Reference runtime surface
 
@@ -196,11 +211,11 @@ selected export profile と disclosure floor の一致を継続検証する。
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --export-profile bounded-trust-transfer-redacted-export-v1 --json`
 - Oversight: `PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json`
 - Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`, `specs/schemas/trust_redacted_snapshot.schema`, `specs/schemas/trust_transfer_receipt.schema`
-- Schema: `specs/schemas/trust_redacted_destination_lifecycle.schema`
+- Schema: `specs/schemas/trust_recovery_review.schema`, `specs/schemas/trust_redacted_destination_lifecycle.schema`, `specs/schemas/trust_redacted_destination_recovery_summary.schema`
 - Schema: `specs/schemas/trust_redacted_verifier_receipt_summary.schema`, `specs/schemas/trust_redacted_verifier_federation.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
   - trust transfer では guardian/human quorum、remote verifier federation、re-attestation cadence、
-    destination lifecycle、multi-root recovery quorum、digest binding、snapshot preserve、
+    destination lifecycle、multi-root recovery quorum、recovered-branch review summary、digest binding、snapshot preserve、
     verifier / lifecycle disclosure floor を継続検証する

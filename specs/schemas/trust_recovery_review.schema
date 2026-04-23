@@ -1,0 +1,105 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_recovery_review.schema"
+title: TrustRecoveryReview
+description: >
+  Full destination-side recovery review bound to the recovered trust-transfer
+  branch, including rationale, jurisdiction policy refs, and sealed legal
+  acknowledgement refs.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - review_id
+  - review_ref
+  - review_scope
+  - reviewer_binding_digest
+  - liability_mode
+  - reason_codes
+  - rationale
+  - policy_refs
+  - jurisdiction_bundle_refs
+  - legal_ack_refs
+  - review_digest
+properties:
+  kind:
+    const: trust_recovery_review
+  schema_version:
+    const: 1.0.0
+  review_id:
+    type: string
+    pattern: "^trust-recovery-review-[a-f0-9]{12}$"
+  review_ref:
+    type: string
+    minLength: 1
+  review_scope:
+    const: destination-trust-recovery-review
+  reviewer_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  liability_mode:
+    const: joint
+  reason_codes:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - revocation-signal-cleared
+        - multi-root-quorum-restored
+        - cross-jurisdiction-legal-review-cleared
+  rationale:
+    type: string
+    minLength: 1
+  policy_refs:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: string
+      minLength: 1
+  jurisdiction_bundle_refs:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: string
+      minLength: 1
+  legal_ack_refs:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: string
+      minLength: 1
+  review_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_recovery_review
+    schema_version: 1.0.0
+    review_id: trust-recovery-review-0123456789ab
+    review_ref: trust-recovery-review://0123456789ab
+    review_scope: destination-trust-recovery-review
+    reviewer_binding_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    liability_mode: joint
+    reason_codes:
+      - revocation-signal-cleared
+      - multi-root-quorum-restored
+      - cross-jurisdiction-legal-review-cleared
+    rationale: destination trust was re-enabled after the recovery branch cleared review
+    policy_refs:
+      - policy://guardian-oversight/jp-13/trust-transfer-recovery/v1
+      - policy://guardian-oversight/us-ca/trust-transfer-recovery/v1
+      - policy://guardian-oversight/eu-de/trust-transfer-recovery/v1
+    jurisdiction_bundle_refs:
+      - legal://jp-13/guardian-oversight/v1
+      - legal://us-ca/guardian-oversight/v1
+      - legal://eu-de/guardian-oversight/v1
+    legal_ack_refs:
+      - legal://trust-transfer/recovery/jp-13/reviewer-alpha/v1
+      - legal://trust-transfer/recovery/us-ca/reviewer-beta/v1
+      - legal://trust-transfer/recovery/eu-de/reviewer-gamma/v1
+    review_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
