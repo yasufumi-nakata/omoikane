@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 PLACEHOLDER_MARKERS = (
@@ -18,7 +19,17 @@ DECISION_LOG_RESIDUAL_MARKERS = (
     "residual scope",
     "unresolved gap",
 )
+DECISION_LOG_FRONTIER_MARKERS = (
+    "next-stage frontier",
+    "次段の frontier",
+)
+DECISION_LOG_GAP_MARKER_RULES = (
+    ("decision-log-residual", DECISION_LOG_RESIDUAL_MARKERS),
+    ("decision-log-frontier", DECISION_LOG_FRONTIER_MARKERS),
+)
 DECISION_LOG_IGNORED_NAME_SNIPPETS = ("gap-report",)
+DECISION_LOG_NEXT_GAP_IDS_KEY = "next_gap_ids"
+DECISION_LOG_CLOSES_NEXT_GAPS_KEY = "closes_next_gaps"
 REQUIRED_REFERENCE_FILES = (
     "references/operating-playbook.md",
     "references/repo-coverage-checklist.md",
@@ -54,7 +65,13 @@ class GapScanner:
         placeholder_hits = self._placeholder_hits(repo_root)
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
-        decision_log_residual_hits = self._decision_log_residual_hits(repo_root)
+        decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
+        decision_log_residual_hits = [
+            hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-residual"
+        ]
+        decision_log_frontier_hits = [
+            hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-frontier"
+        ]
 
         prioritized_tasks: List[Dict[str, str]] = []
         for filename in missing_specs:
@@ -105,6 +122,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in decision_log_frontier_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "medium",
+                    "kind": "decision-log-frontier",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_residual_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -140,6 +165,7 @@ class GapScanner:
             "inventory_drift_count": len(inventory_drift_hits),
             "future_work_hit_count": len(future_work_hits),
             "decision_log_residual_count": len(decision_log_residual_hits),
+            "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
             "missing_required_reference_files": missing_reference_files,
@@ -150,6 +176,7 @@ class GapScanner:
             "inventory_drift_hits": inventory_drift_hits,
             "future_work_hits": future_work_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
+            "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
         }
 
@@ -337,10 +364,11 @@ class GapScanner:
                 hits.append({"path": str(relative_path), "line": stripped})
         return hits
 
-    def _decision_log_residual_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+    def _decision_log_gap_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
         seen = set()
         decision_logs = self._latest_decision_logs(repo_root / "meta" / "decision-log")
+        closed_gap_refs = self._closed_decision_log_gap_refs(decision_logs)
         for path in decision_logs:
             if any(snippet in path.name for snippet in DECISION_LOG_IGNORED_NAME_SNIPPETS):
                 continue
@@ -349,7 +377,11 @@ class GapScanner:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
+            next_gap_ids = self._decision_log_frontmatter_string_list(
+                path, DECISION_LOG_NEXT_GAP_IDS_KEY
+            )
             in_consequences = False
+            matched_gap_count = 0
             for line in text.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("## "):
@@ -360,20 +392,64 @@ class GapScanner:
                 lowered = stripped.lower()
                 if not stripped.startswith("- "):
                     continue
-                if not any(marker in lowered for marker in DECISION_LOG_RESIDUAL_MARKERS):
+                hit_kind = self._decision_log_hit_kind(lowered)
+                if hit_kind is None:
                     continue
-                key = (str(relative_path), stripped)
+                next_gap_id = (
+                    next_gap_ids[matched_gap_count]
+                    if matched_gap_count < len(next_gap_ids)
+                    else f"gap-{matched_gap_count + 1}"
+                )
+                matched_gap_count += 1
+                next_gap_ref = f"{path.name}#{next_gap_id}"
+                if next_gap_ref in closed_gap_refs:
+                    continue
+                key = (str(relative_path), stripped, hit_kind)
                 if key in seen:
                     continue
                 seen.add(key)
                 hits.append(
                     {
+                        "kind": hit_kind,
                         "path": str(relative_path),
                         "line": stripped,
                         "decision_date": path.name[:10],
+                        "next_gap_ref": next_gap_ref,
                     }
                 )
         return hits
+
+    @staticmethod
+    def _decision_log_hit_kind(line_lowered: str) -> str | None:
+        for hit_kind, markers in DECISION_LOG_GAP_MARKER_RULES:
+            if any(marker in line_lowered for marker in markers):
+                return hit_kind
+        return None
+
+    def _closed_decision_log_gap_refs(self, decision_logs: List[Path]) -> set[str]:
+        closed_refs: set[str] = set()
+        for path in decision_logs:
+            for entry in self._decision_log_frontmatter_string_list(
+                path, DECISION_LOG_CLOSES_NEXT_GAPS_KEY
+            ):
+                normalized = self._normalize_decision_log_gap_ref(entry)
+                if normalized:
+                    closed_refs.add(normalized)
+        return closed_refs
+
+    @staticmethod
+    def _normalize_decision_log_gap_ref(value: str) -> str:
+        text = str(value).strip()
+        if not text or "#" not in text:
+            return ""
+        path_part, _, gap_id = text.partition("#")
+        normalized_gap_id = gap_id.strip()
+        if not normalized_gap_id:
+            return ""
+        normalized_name = Path(path_part.strip()).name
+        if not normalized_name:
+            return ""
+        return f"{normalized_name}#{normalized_gap_id}"
 
     @staticmethod
     def _latest_decision_logs(decision_log_root: Path) -> List[Path]:
@@ -399,19 +475,75 @@ class GapScanner:
 
     @staticmethod
     def _decision_log_status(path: Path) -> str:
+        metadata = GapScanner._decision_log_frontmatter(path)
+        status = metadata.get("status")
+        if not isinstance(status, str) or not status.strip():
+            return "decided"
+        return status.strip().lower()
+
+    @staticmethod
+    def _decision_log_frontmatter(path: Path) -> Dict[str, Any]:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:
-            return "decided"
+            return {}
         if not lines or lines[0].strip() != "---":
-            return "decided"
-        for line in lines[1:]:
-            stripped = line.strip()
+            return {}
+
+        metadata: Dict[str, Any] = {}
+        index = 1
+        while index < len(lines):
+            stripped = lines[index].strip()
             if stripped == "---":
                 break
-            if stripped.startswith("status:"):
-                return stripped.partition(":")[2].strip().lower()
-        return "decided"
+            if not stripped or ":" not in stripped:
+                index += 1
+                continue
+            key, _, value = stripped.partition(":")
+            normalized_key = key.strip()
+            normalized_value = value.strip()
+            if normalized_value:
+                metadata[normalized_key] = GapScanner._parse_frontmatter_scalar(normalized_value)
+                index += 1
+                continue
+
+            items: List[str] = []
+            index += 1
+            while index < len(lines):
+                child = lines[index]
+                child_stripped = child.strip()
+                if child_stripped == "---":
+                    break
+                if not child_stripped:
+                    index += 1
+                    continue
+                if not child.startswith("  - ") and not child.startswith("- "):
+                    break
+                items.append(child_stripped[2:].strip().strip("'\""))
+                index += 1
+            metadata[normalized_key] = items
+        return metadata
+
+    @staticmethod
+    def _parse_frontmatter_scalar(value: str) -> Any:
+        candidate = value.strip()
+        if candidate.startswith("[") and candidate.endswith("]"):
+            try:
+                parsed = ast.literal_eval(candidate)
+            except (SyntaxError, ValueError):
+                return candidate.strip("'\"")
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        return candidate.strip("'\"")
+
+    @staticmethod
+    def _decision_log_frontmatter_string_list(path: Path, key: str) -> List[str]:
+        value = GapScanner._decision_log_frontmatter(path).get(key, [])
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str) and value.strip():
+            return [value.strip()]
+        return []
 
     @staticmethod
     def _looks_like_iso_date(value: str) -> bool:

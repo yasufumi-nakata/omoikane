@@ -95,6 +95,11 @@ current truth-source (`README.md` / `docs/07-reference-implementation/README.md`
 residual `future work` に加え、
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
 `decision_log_residual_hits` として JSON で列挙する。
+同じ最新日付の後続 decision log が `closes_next_gaps` で閉じた item は除外され、
+`next-stage frontier` bullet は `decision_log_frontier_hits` として別枠で surfacing する。
+decision log 側で append-only に gap chain を保つ時は、
+frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
+
 
 `identity-demo` は L1 IdentityRegistry の reference contract
 (`kernel.identity.v0`) を JSON で可視化し、

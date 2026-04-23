@@ -13,6 +13,10 @@ related_docs:
   - evals/agentic/yaoyorozu_memory_edit_profile.yaml
   - evals/agentic/yaoyorozu_fork_request_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-profile-aware-task-graph-bundles.md#yaoyorozu.profile.workspace-policy
+next_gap_ids:
+  - yaoyorozu.profile.dispatch-coverage
 ---
 
 # Decision: Yaoyorozu workspace review を proposal-profile-aware policy へ昇格する

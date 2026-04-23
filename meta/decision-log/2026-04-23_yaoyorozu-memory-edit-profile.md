@@ -13,6 +13,10 @@ related_docs:
   - specs/schemas/yaoyorozu_workspace_discovery.schema
   - evals/agentic/yaoyorozu_memory_edit_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-local-worker-dispatch.md#yaoyorozu.local-worker.repo-local-only
+next_gap_ids:
+  - yaoyorozu.catalog.additional-profiles
 ---
 
 # Decision: Yaoyorozu proposal profile catalog を `memory-edit-v1` まで昇格する

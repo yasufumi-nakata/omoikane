@@ -12,6 +12,10 @@ related_docs:
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - evals/agentic/yaoyorozu_worker_patch_candidate_receipt.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-worker-delta-receipt.md#yaoyorozu.worker.patch-candidate
+next_gap_ids:
+  - yaoyorozu.worker.same-digest-builder-handoff
 ---
 
 # Decision: Yaoyorozu local worker report を patch_descriptor-compatible candidate receipt へ昇格する

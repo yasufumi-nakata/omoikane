@@ -11,6 +11,10 @@ related_docs:
   - specs/schemas/yaoyorozu_worker_workspace_delta_receipt.schema
   - evals/agentic/yaoyorozu_worker_delta_receipt.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-path-bound-worker-report.md#yaoyorozu.worker.delta-evidence
+next_gap_ids:
+  - yaoyorozu.worker.patch-candidate
 ---
 
 # Decision: Yaoyorozu worker report を git-bound target-path delta receipt まで昇格する

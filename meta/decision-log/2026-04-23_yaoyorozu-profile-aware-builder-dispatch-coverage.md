@@ -14,6 +14,10 @@ related_docs:
   - evals/agentic/yaoyorozu_memory_edit_profile.yaml
   - evals/agentic/yaoyorozu_fork_request_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-profile-aware-workspace-review-policy.md#yaoyorozu.profile.dispatch-coverage
+next_gap_ids:
+  - yaoyorozu.profile.remote-dispatch-policy
 ---
 
 # Decision: Yaoyorozu actual builder dispatch coverage を proposal-profile-aware required setへ縮退する

@@ -10,6 +10,10 @@ related_docs:
   - specs/schemas/yaoyorozu_workspace_discovery.schema
   - evals/agentic/yaoyorozu_workspace_discovery.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-local-worker-dispatch.md#yaoyorozu.local-worker.repo-local-only
+next_gap_ids:
+  - yaoyorozu.workspace.external-execution
 ---
 
 # Decision: Yaoyorozu cross-workspace worker discovery を bounded same-host catalog に昇格する

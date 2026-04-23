@@ -31,6 +31,11 @@ class CliIntegrationTests(unittest.TestCase):
             result["decision_log_residual_count"],
             len(result["decision_log_residual_hits"]),
         )
+        self.assertIn("decision_log_frontier_count", result)
+        self.assertEqual(
+            result["decision_log_frontier_count"],
+            len(result["decision_log_frontier_hits"]),
+        )
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

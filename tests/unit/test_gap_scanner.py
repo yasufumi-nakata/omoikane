@@ -281,6 +281,75 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "decision-log-residual" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_suppresses_closed_latest_decision_log_residuals(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-23_earlier-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "next_gap_ids:\n"
+                "  - yaoyorozu.worker.delta-only\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- residual gap は generic な worker visibility ではなく、 patch candidate handoff へ縮小する\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_later-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "closes_next_gaps:\n"
+                "  - 2026-04-23_earlier-gap.md#yaoyorozu.worker.delta-only\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- next-stage frontier は generic な dispatch 不在ではなく、 build_request execution chain へ縮小する\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["decision_log_residual_count"])
+            self.assertEqual([], report["decision_log_residual_hits"])
+            self.assertEqual(1, report["decision_log_frontier_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-23_later-gap.md",
+                report["decision_log_frontier_hits"][0]["path"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "decision-log-frontier" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_reports_latest_decision_log_frontiers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-23_frontier-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- next-stage frontier は broad な L4/L5 separation ではなく、 same-digest builder chain へ縮小する\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["decision_log_residual_count"])
+            self.assertEqual(1, report["decision_log_frontier_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-23_frontier-gap.md",
+                report["decision_log_frontier_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "2026-04-23",
+                report["decision_log_frontier_hits"][0]["decision_date"],
+            )
+
     def test_scan_ignores_superseded_latest_decision_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

@@ -10,6 +10,10 @@ related_docs:
   - specs/schemas/yaoyorozu_task_graph_binding.schema
   - evals/agentic/yaoyorozu_task_graph_binding.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-consensus-dispatch-binding.md#yaoyorozu.consensus.to-taskgraph
+next_gap_ids:
+  - yaoyorozu.taskgraph.profile-aware-bundles
 ---
 
 # Decision: Yaoyorozu worker dispatch を three-root TaskGraph execution bundle に束縛する

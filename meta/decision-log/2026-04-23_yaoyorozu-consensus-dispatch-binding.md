@@ -11,6 +11,10 @@ related_docs:
   - specs/schemas/yaoyorozu_consensus_dispatch_binding.schema
   - evals/agentic/yaoyorozu_consensus_dispatch.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-local-worker-dispatch.md#yaoyorozu.local-worker.repo-local-only
+next_gap_ids:
+  - yaoyorozu.consensus.to-taskgraph
 ---
 
 # Decision: Yaoyorozu builder handoff を same-session ConsensusBus binding まで昇格する

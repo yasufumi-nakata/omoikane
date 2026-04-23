@@ -11,6 +11,8 @@ related_docs:
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
 status: decided
+next_gap_ids:
+  - yaoyorozu.worker.delta-evidence
 ---
 
 # Decision: Yaoyorozu local worker report を path-bound workspace observation へ昇格する

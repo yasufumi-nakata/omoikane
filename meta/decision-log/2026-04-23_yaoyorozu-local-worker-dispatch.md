@@ -11,6 +11,8 @@ related_docs:
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
 status: decided
+next_gap_ids:
+  - yaoyorozu.local-worker.repo-local-only
 ---
 
 # Decision: Yaoyorozu builder handoff を repo-local worker dispatch receipt まで昇格する

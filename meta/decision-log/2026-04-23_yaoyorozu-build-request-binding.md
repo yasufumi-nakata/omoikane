@@ -11,6 +11,10 @@ related_docs:
   - specs/schemas/yaoyorozu_build_request_binding.schema
   - evals/agentic/yaoyorozu_build_request_binding.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-worker-patch-candidate-receipt.md#yaoyorozu.worker.same-digest-builder-handoff
+next_gap_ids:
+  - yaoyorozu.build-request.execution-chain
 ---
 
 # Decision: Yaoyorozu execution bundle を L5 build_request handoff へ束縛する

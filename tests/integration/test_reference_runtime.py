@@ -244,6 +244,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
             report["decision_log_residual_count"],
             len(report["decision_log_residual_hits"]),
         )
+        self.assertIn("decision_log_frontier_count", report)
+        self.assertEqual(
+            report["decision_log_frontier_count"],
+            len(report["decision_log_frontier_hits"]),
+        )
 
     def test_naming_demo_returns_fixed_policy_and_aliases(self) -> None:
         runtime = OmoikaneReferenceOS()

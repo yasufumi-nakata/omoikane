@@ -12,6 +12,10 @@ related_docs:
   - evals/agentic/yaoyorozu_memory_edit_profile.yaml
   - evals/agentic/yaoyorozu_fork_request_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-task-graph-binding.md#yaoyorozu.taskgraph.profile-aware-bundles
+next_gap_ids:
+  - yaoyorozu.profile.workspace-policy
 ---
 
 # Decision: Yaoyorozu TaskGraph binding を proposal profile ごとの three-root bundle strategy へ昇格する

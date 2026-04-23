@@ -15,6 +15,10 @@ related_docs:
   - specs/schemas/yaoyorozu_task_graph_binding.schema
   - evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-fork-request-profile.md#yaoyorozu.catalog.inter-mind-negotiation
+next_gap_ids:
+  - yaoyorozu.catalog.v-next-or-remote
 ---
 
 # Decision: Yaoyorozu proposal catalog に `inter-mind-negotiation-v1` を追加する

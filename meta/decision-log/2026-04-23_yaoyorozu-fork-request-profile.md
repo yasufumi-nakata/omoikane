@@ -12,6 +12,10 @@ related_docs:
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
   - evals/agentic/yaoyorozu_fork_request_profile.yaml
 status: decided
+closes_next_gaps:
+  - 2026-04-23_yaoyorozu-memory-edit-profile.md#yaoyorozu.catalog.additional-profiles
+next_gap_ids:
+  - yaoyorozu.catalog.inter-mind-negotiation
 ---
 
 # Decision: Yaoyorozu proposal profile catalog を `fork-request-v1` まで昇格する
