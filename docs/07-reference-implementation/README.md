@@ -34,7 +34,9 @@ PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --json
+PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --include-optional-coverage schema --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile fork-request-v1 --json
+PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile fork-request-v1 --include-optional-coverage eval --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile inter-mind-negotiation-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-network-demo --json
@@ -308,6 +310,9 @@ same-session Council artifact に束縛すること、
 `fork-request-v1` では `runtime/schema/docs`、
 `inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
 を覆う builder handoff coverage、
+さらに `memory-edit-v1` は `--include-optional-coverage schema`、
+`fork-request-v1` は `--include-optional-coverage eval` により
+optional coverage を requested dispatch として追加できること、
 さらにそれを repo-local subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されること、
@@ -318,6 +323,9 @@ CLI は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch chain へ切り替えられる。
 同じ CLI は `--proposal-profile fork-request-v1` により
 identity fork の triple-approval review 向け convocation / dispatch chain へ切り替えられる。
+同じ CLI は `--include-optional-coverage schema` /
+`--include-optional-coverage eval` により
+profile optional coverage だけを on-demand dispatch へ昇格できる。
 同じ CLI は `--proposal-profile inter-mind-negotiation-v1` により
 disclosure / merge / collective contract review 向け convocation / dispatch chain へ切り替えられる。
 さらに同じ session 上で `ConsensusBus` が builder report / guardian gate /
@@ -335,6 +343,10 @@ final resolve を監査し、blocked direct handoff と worker claim chain を
 の 3 root bundle strategy へ畳み込んだ `TaskGraph` が、
 同じ session 上の worker claim / guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として束縛することを確認する。
+optional dispatch を要求した場合は
+`memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
+`fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ
+deterministic に切り替わる。
 
 `oversight-demo` は L4 Guardian human oversight channel を JSON で可視化し、
 registered reviewer の `proof_ref` / `legal_ack_ref` / liability scope に加えて、

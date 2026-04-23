@@ -89,6 +89,10 @@ bounded proposal profile catalog、および
 `fork-request-v1` では `runtime/schema/docs` の 3 coverage、
 `inter-mind-negotiation-v1` では `runtime/schema/eval/docs` の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
+必要時だけ `memory-edit-v1` は `schema` を、
+`fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
+`requested_optional_builder_coverage_areas` /
+`dispatch_builder_coverage_areas` が same-session artifact に残る。
 各 worker report は dispatch plan / dispatch unit に束縛され、
 workspace 内 target path の存在確認と bounded sample observation に加え、
 同じ target path scope に閉じた git-bound delta receipt と、
@@ -108,3 +112,7 @@ same-session artifact として固定する。
 の 3 root bundle strategy へ畳み、
 worker dispatch receipt と guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として固定する。
+optional dispatch を要求した場合は
+`memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
+`fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ
+deterministic に切り替わる。

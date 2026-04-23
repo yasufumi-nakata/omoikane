@@ -338,6 +338,12 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=YAOYOROZU_PROPOSAL_PROFILES,
         help="Select the bounded Yaoyorozu proposal profile to materialize",
     )
+    yaoyorozu_parser.add_argument(
+        "--include-optional-coverage",
+        action="append",
+        choices=["runtime", "schema", "eval", "docs"],
+        help="Opt into proposal-profile optional worker coverage for this demo run",
+    )
     yaoyorozu_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
     oversight_parser = subparsers.add_parser(
@@ -599,7 +605,10 @@ def main() -> None:
 
     if args.command == "yaoyorozu-demo":
         _print_result(
-            runtime.run_yaoyorozu_demo(proposal_profile=args.proposal_profile),
+            runtime.run_yaoyorozu_demo(
+                proposal_profile=args.proposal_profile,
+                include_optional_coverage=args.include_optional_coverage,
+            ),
             args.json,
         )
         return

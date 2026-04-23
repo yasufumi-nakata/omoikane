@@ -89,6 +89,12 @@ repo-local worker dispatch が git-bound delta receipt に加えて、
 `MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
 panel と `runtime/eval/docs` の required worker dispatch を維持すること。
 
+### Yaoyorozu Optional Coverage Dispatch
+`memory-edit-v1` が `schema` を、
+`fork-request-v1` が `eval` を
+explicit request 時だけ optional dispatch として追加し、
+3 root TaskGraph ceiling を保ったまま deterministic bundle へ畳まれること。
+
 ### Yaoyorozu Fork Request Profile
 `fork-request-v1` の identity fork convocation が
 `IdentityProtector` / `LegalScholar` / `ConservatismAdvocate` / `EthicsCommittee`
@@ -129,8 +135,10 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_fork_request_profile.yaml`
 - `yaoyorozu_inter_mind_negotiation_profile.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
+- `yaoyorozu_memory_edit_optional_schema_dispatch.yaml`
 - `yaoyorozu_worker_patch_candidate_receipt.yaml`
 - `yaoyorozu_worker_delta_receipt.yaml`
 - `yaoyorozu_memory_edit_profile.yaml`
+- `yaoyorozu_fork_request_optional_eval_dispatch.yaml`
 - `yaoyorozu_task_graph_binding.yaml`
 - `yaoyorozu_workspace_discovery.yaml`

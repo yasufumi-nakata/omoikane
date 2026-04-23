@@ -1563,6 +1563,46 @@ class CliIntegrationTests(unittest.TestCase):
             ),
         )
 
+    def test_yaoyorozu_demo_supports_memory_edit_optional_schema_dispatch(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "yaoyorozu-demo",
+                "--proposal-profile",
+                "memory-edit-v1",
+                "--include-optional-coverage",
+                "schema",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            ["schema"],
+            result["validation"]["requested_optional_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "eval", "docs", "schema"],
+            result["validation"]["dispatch_builder_coverage_areas"],
+        )
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(
+            "memory-edit-optional-schema-dispatch-three-root-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(
+            [["docs"], ["eval", "schema"], ["runtime"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
+
     def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
         stdout = io.StringIO()
 
@@ -1625,6 +1665,46 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "legal-scholar",
             result["convocation"]["council_panel"][1]["selected_agent_id"],
+        )
+
+    def test_yaoyorozu_demo_supports_fork_request_optional_eval_dispatch(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "yaoyorozu-demo",
+                "--proposal-profile",
+                "fork-request-v1",
+                "--include-optional-coverage",
+                "eval",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            ["eval"],
+            result["validation"]["requested_optional_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "schema", "docs", "eval"],
+            result["validation"]["dispatch_builder_coverage_areas"],
+        )
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(
+            "fork-request-optional-eval-dispatch-three-root-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(
+            [["docs", "eval"], ["runtime"], ["schema"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
         )
 
     def test_yaoyorozu_demo_supports_inter_mind_negotiation_profile(self) -> None:

@@ -151,6 +151,46 @@ YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES = {
         ),
     },
 }
+YAOYOROZU_OPTIONAL_DISPATCH_BUNDLE_STRATEGY_OVERRIDES = {
+    "memory-edit-v1": {
+        ("schema",): {
+            "strategy_id": "memory-edit-optional-schema-dispatch-three-root-v1",
+            "root_bundles": (
+                {
+                    "bundle_role": "memory-runtime-bundle",
+                    "coverage_areas": ("runtime",),
+                },
+                {
+                    "bundle_role": "memory-contract-eval-bundle",
+                    "coverage_areas": ("eval", "schema"),
+                },
+                {
+                    "bundle_role": "memory-docs-bundle",
+                    "coverage_areas": ("docs",),
+                },
+            ),
+        }
+    },
+    "fork-request-v1": {
+        ("eval",): {
+            "strategy_id": "fork-request-optional-eval-dispatch-three-root-v1",
+            "root_bundles": (
+                {
+                    "bundle_role": "identity-runtime-bundle",
+                    "coverage_areas": ("runtime",),
+                },
+                {
+                    "bundle_role": "fork-schema-bundle",
+                    "coverage_areas": ("schema",),
+                },
+                {
+                    "bundle_role": "fork-evidence-docs-bundle",
+                    "coverage_areas": ("docs", "eval"),
+                },
+            ),
+        }
+    },
+}
 YAOYOROZU_PROPOSAL_PROFILES = tuple(YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES)
 
 
@@ -710,6 +750,41 @@ class YaoyorozuRegistryService:
     def policy_snapshot(self) -> Dict[str, Any]:
         return self._policy.to_dict()
 
+    def _normalize_requested_optional_coverage_areas(
+        self,
+        proposal_profile: str,
+        requested_optional_coverage_areas: Optional[Sequence[str]] = None,
+    ) -> List[str]:
+        profile_policy = self._proposal_profile_policy(proposal_profile)
+        allowed_optional = list(profile_policy["optional_worker_coverage_areas"])
+        if requested_optional_coverage_areas is None:
+            return []
+
+        requested = [
+            _non_empty_string(str(area), "requested_optional_coverage_area")
+            for area in requested_optional_coverage_areas
+        ]
+        if len(set(requested)) != len(requested):
+            raise ValueError("requested_optional_coverage_areas must remain unique")
+        invalid = [area for area in requested if area not in allowed_optional]
+        if invalid:
+            raise ValueError(
+                "requested_optional_coverage_areas must stay within the proposal profile's optional worker coverage"
+            )
+        return [area for area in allowed_optional if area in requested]
+
+    def _dispatch_coverage_areas(
+        self,
+        proposal_profile: str,
+        requested_optional_coverage_areas: Optional[Sequence[str]] = None,
+    ) -> List[str]:
+        profile_policy = self._proposal_profile_policy(proposal_profile)
+        requested_optional = self._normalize_requested_optional_coverage_areas(
+            proposal_profile,
+            requested_optional_coverage_areas,
+        )
+        return list(profile_policy["required_worker_coverage_areas"]) + requested_optional
+
     def _proposal_profile_policy(self, proposal_profile: str) -> Dict[str, Any]:
         profile = self._policy.council_profiles.get(proposal_profile)
         if not isinstance(profile, Mapping):
@@ -759,10 +834,31 @@ class YaoyorozuRegistryService:
             ),
         }
 
-    def _task_graph_bundle_strategy(self, proposal_profile: str) -> Dict[str, Any]:
-        strategy = self._policy.task_graph_bundle_strategies.get(proposal_profile)
+    def _task_graph_bundle_strategy(
+        self,
+        proposal_profile: str,
+        requested_optional_coverage_areas: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Any]:
+        requested_optional = self._normalize_requested_optional_coverage_areas(
+            proposal_profile,
+            requested_optional_coverage_areas,
+        )
+        requested_optional_key = tuple(requested_optional)
+        strategy = None
+        if requested_optional_key:
+            strategy = (
+                YAOYOROZU_OPTIONAL_DISPATCH_BUNDLE_STRATEGY_OVERRIDES.get(proposal_profile, {})
+            ).get(requested_optional_key)
+            if not isinstance(strategy, Mapping):
+                raise ValueError(
+                    "unsupported optional dispatch coverage for the selected proposal profile"
+                )
+        if strategy is None:
+            strategy = self._policy.task_graph_bundle_strategies.get(proposal_profile)
         if not isinstance(strategy, Mapping):
-            raise ValueError(f"unsupported TaskGraph bundle strategy for proposal profile: {proposal_profile}")
+            raise ValueError(
+                f"unsupported TaskGraph bundle strategy for proposal profile: {proposal_profile}"
+            )
 
         root_bundles = [
             {
@@ -778,17 +874,22 @@ class YaoyorozuRegistryService:
         if len(root_bundles) != 3:
             raise ValueError("TaskGraph bundle strategy must expose exactly 3 root bundles")
         profile_policy = self._proposal_profile_policy(proposal_profile)
-        expected_coverage = list(profile_policy["required_worker_coverage_areas"])
+        expected_coverage = self._dispatch_coverage_areas(
+            proposal_profile,
+            requested_optional,
+        )
         flat_coverage = [area for bundle in root_bundles for area in bundle["coverage_areas"]]
         if sorted(flat_coverage) != sorted(expected_coverage):
             raise ValueError(
-                "TaskGraph bundle strategy must cover the proposal profile's required worker coverage exactly once"
+                "TaskGraph bundle strategy must cover the selected dispatch coverage exactly once"
             )
         if len(set(flat_coverage)) != len(flat_coverage):
             raise ValueError("TaskGraph bundle strategy coverage_areas must remain unique")
         return {
             "strategy_id": _non_empty_string(strategy.get("strategy_id"), "strategy_id"),
             "proposal_profile": proposal_profile,
+            "requested_optional_coverage_areas": requested_optional,
+            "dispatch_coverage_areas": expected_coverage,
             "root_bundle_count": len(root_bundles),
             "max_parallelism": 3,
             "root_bundles": root_bundles,
@@ -1323,6 +1424,7 @@ class YaoyorozuRegistryService:
         session_mode: str = "standard",
         target_identity_ref: str = "identity://primary",
         workspace_discovery: Optional[Mapping[str, Any]] = None,
+        requested_optional_builder_coverage_areas: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
         if not self._entries:
             raise ValueError("registry must be synced before preparing a convocation")
@@ -1334,6 +1436,14 @@ class YaoyorozuRegistryService:
         profile_policy = self._proposal_profile_policy(profile_id)
         required_builder_coverage = list(profile_policy["required_worker_coverage_areas"])
         optional_builder_coverage = list(profile_policy["optional_worker_coverage_areas"])
+        requested_optional_builder_coverage = self._normalize_requested_optional_coverage_areas(
+            profile_id,
+            requested_optional_builder_coverage_areas,
+        )
+        dispatch_builder_coverage = self._dispatch_coverage_areas(
+            profile_id,
+            requested_optional_builder_coverage,
+        )
         workspace_discovery_binding: Dict[str, Any] | None = None
         workspace_profile_policy_ready = True
         if workspace_discovery is not None:
@@ -1434,7 +1544,7 @@ class YaoyorozuRegistryService:
                 coverage_area=str(spec["coverage_area"]),
             )
             for spec in profile["builder_handoff"]
-            if str(spec["coverage_area"]) in required_builder_coverage
+            if str(spec["coverage_area"]) in dispatch_builder_coverage
         ]
 
         missing_council_roles = [
@@ -1464,7 +1574,12 @@ class YaoyorozuRegistryService:
                 for selection in builder_handoff
                 if isinstance(selection, Mapping) and selection.get("coverage_area")
             )
-            == sorted(required_builder_coverage),
+            == sorted(dispatch_builder_coverage)
+            and requested_optional_builder_coverage
+            == self._normalize_requested_optional_coverage_areas(
+                profile_id,
+                requested_optional_builder_coverage,
+            ),
             "workspace_discovery_bound": workspace_discovery_binding is not None,
             "workspace_profile_policy_ready": workspace_profile_policy_ready,
         }
@@ -1491,6 +1606,10 @@ class YaoyorozuRegistryService:
                 "weighted_vote_ready_count": weighted_vote_ready_count,
                 "required_builder_coverage_areas": list(required_builder_coverage),
                 "optional_builder_coverage_areas": list(optional_builder_coverage),
+                "requested_optional_builder_coverage_areas": list(
+                    requested_optional_builder_coverage
+                ),
+                "dispatch_builder_coverage_areas": list(dispatch_builder_coverage),
                 "selected_builder_coverage_count": len(builder_handoff) - len(missing_builder_coverage),
                 "missing_council_roles": missing_council_roles,
                 "missing_builder_coverage": missing_builder_coverage,
@@ -1599,13 +1718,32 @@ class YaoyorozuRegistryService:
             if isinstance(selection_summary, Mapping)
             else []
         )
+        requested_optional_coverage = (
+            list(selection_summary.get("requested_optional_builder_coverage_areas", []))
+            if isinstance(selection_summary, Mapping)
+            else []
+        )
+        dispatch_coverage = (
+            list(selection_summary.get("dispatch_builder_coverage_areas", []))
+            if isinstance(selection_summary, Mapping)
+            else []
+        )
         if not required_coverage:
             required_coverage = list(profile_policy["required_worker_coverage_areas"])
         if not optional_coverage:
             optional_coverage = list(profile_policy["optional_worker_coverage_areas"])
-        missing_coverage = [coverage for coverage in required_coverage if coverage not in selected_coverage]
+        normalized_requested_optional_coverage = self._normalize_requested_optional_coverage_areas(
+            proposal_profile,
+            requested_optional_coverage,
+        )
+        if not dispatch_coverage:
+            dispatch_coverage = self._dispatch_coverage_areas(
+                proposal_profile,
+                normalized_requested_optional_coverage,
+            )
+        missing_coverage = [coverage for coverage in dispatch_coverage if coverage not in selected_coverage]
         unexpected_coverage = [
-            coverage for coverage in selected_coverage if coverage not in required_coverage
+            coverage for coverage in selected_coverage if coverage not in dispatch_coverage
         ]
         unique_command_digests = len({unit["command_digest"] for unit in dispatch_units}) == len(dispatch_units)
         validation = {
@@ -1614,7 +1752,7 @@ class YaoyorozuRegistryService:
             "builder_coverage_ok": (
                 not missing_coverage
                 and not unexpected_coverage
-                and len(dispatch_units) == len(required_coverage)
+                and len(dispatch_units) == len(dispatch_coverage)
             ),
             "unique_command_digests": unique_command_digests,
             "repo_local_scope_only": all(
@@ -1625,6 +1763,12 @@ class YaoyorozuRegistryService:
             "profile_policy_ready": (
                 required_coverage == list(profile_policy["required_worker_coverage_areas"])
                 and optional_coverage == list(profile_policy["optional_worker_coverage_areas"])
+                and normalized_requested_optional_coverage == requested_optional_coverage
+                and dispatch_coverage
+                == self._dispatch_coverage_areas(
+                    proposal_profile,
+                    normalized_requested_optional_coverage,
+                )
             ),
         }
         validation["ok"] = all(validation.values())
@@ -1657,6 +1801,8 @@ class YaoyorozuRegistryService:
                 "required_worker_count": len(required_coverage),
                 "required_coverage_areas": list(required_coverage),
                 "optional_coverage_areas": list(optional_coverage),
+                "requested_optional_coverage_areas": list(normalized_requested_optional_coverage),
+                "dispatch_coverage_areas": list(dispatch_coverage),
                 "selected_worker_count": len(dispatch_units),
                 "unique_coverage_areas": sorted(set(selected_coverage)),
                 "missing_coverage": missing_coverage,
@@ -1697,17 +1843,38 @@ class YaoyorozuRegistryService:
 
         required_coverage = selection_summary.get("required_coverage_areas", [])
         optional_coverage = selection_summary.get("optional_coverage_areas", [])
+        requested_optional_coverage = selection_summary.get("requested_optional_coverage_areas", [])
+        dispatch_coverage = selection_summary.get("dispatch_coverage_areas", [])
         if not isinstance(required_coverage, list) or not required_coverage:
             errors.append("selection_summary.required_coverage_areas must be a non-empty list")
             required_coverage = []
         if not isinstance(optional_coverage, list):
             errors.append("selection_summary.optional_coverage_areas must be a list")
             optional_coverage = []
+        if not isinstance(requested_optional_coverage, list):
+            errors.append("selection_summary.requested_optional_coverage_areas must be a list")
+            requested_optional_coverage = []
+        if not isinstance(dispatch_coverage, list) or not dispatch_coverage:
+            errors.append("selection_summary.dispatch_coverage_areas must be a non-empty list")
+            dispatch_coverage = []
         if expected_profile_policy:
             if required_coverage != expected_profile_policy["required_worker_coverage_areas"]:
                 errors.append("selection_summary.required_coverage_areas mismatch")
             if optional_coverage != expected_profile_policy["optional_worker_coverage_areas"]:
                 errors.append("selection_summary.optional_coverage_areas mismatch")
+            normalized_requested_optional = self._normalize_requested_optional_coverage_areas(
+                str(proposal_profile),
+                requested_optional_coverage,
+            )
+            if requested_optional_coverage != normalized_requested_optional:
+                errors.append("selection_summary.requested_optional_coverage_areas mismatch")
+            if dispatch_coverage != self._dispatch_coverage_areas(
+                str(proposal_profile),
+                requested_optional_coverage,
+            ):
+                errors.append("selection_summary.dispatch_coverage_areas mismatch")
+        else:
+            normalized_requested_optional = []
 
         coverage_areas: List[str] = []
         digests: List[str] = []
@@ -1735,9 +1902,9 @@ class YaoyorozuRegistryService:
             if str(unit.get("unit_id", "")) not in command_preview:
                 errors.append("dispatch unit command preview must bind the dispatch unit ref")
 
-        missing_coverage = [coverage for coverage in required_coverage if coverage not in coverage_areas]
+        missing_coverage = [coverage for coverage in dispatch_coverage if coverage not in coverage_areas]
         unexpected_coverage = [
-            coverage for coverage in coverage_areas if coverage not in required_coverage
+            coverage for coverage in coverage_areas if coverage not in dispatch_coverage
         ]
         if len(set(digests)) != len(digests):
             errors.append("dispatch unit command digests must be unique")
@@ -1758,6 +1925,8 @@ class YaoyorozuRegistryService:
             "unexpected_coverage": unexpected_coverage,
             "required_coverage_areas": list(required_coverage),
             "optional_coverage_areas": list(optional_coverage),
+            "requested_optional_coverage_areas": list(normalized_requested_optional),
+            "dispatch_coverage_areas": list(dispatch_coverage),
             "runtime_exec_ready": bool(units),
             "errors": errors,
         }
@@ -2038,6 +2207,12 @@ class YaoyorozuRegistryService:
             "failed_role_ids": failed_role_ids,
             "required_coverage_areas": list(dispatch_plan["selection_summary"]["required_coverage_areas"]),
             "optional_coverage_areas": list(dispatch_plan["selection_summary"]["optional_coverage_areas"]),
+            "requested_optional_coverage_areas": list(
+                dispatch_plan["selection_summary"]["requested_optional_coverage_areas"]
+            ),
+            "dispatch_coverage_areas": list(
+                dispatch_plan["selection_summary"]["dispatch_coverage_areas"]
+            ),
             "coverage_areas": [str(result["coverage_area"]) for result in results],
             "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
             "delta_bound_count": sum(1 for result in results if result["delta_receipt_ok"]),
@@ -2068,9 +2243,13 @@ class YaoyorozuRegistryService:
                 == list(dispatch_plan["selection_summary"]["required_coverage_areas"])
                 and execution_summary["optional_coverage_areas"]
                 == list(dispatch_plan["selection_summary"]["optional_coverage_areas"])
+                and execution_summary["requested_optional_coverage_areas"]
+                == list(dispatch_plan["selection_summary"]["requested_optional_coverage_areas"])
+                and execution_summary["dispatch_coverage_areas"]
+                == list(dispatch_plan["selection_summary"]["dispatch_coverage_areas"])
             ),
             "coverage_complete": sorted(execution_summary["coverage_areas"])
-            == sorted(execution_summary["required_coverage_areas"]),
+            == sorted(execution_summary["dispatch_coverage_areas"]),
             "all_reports_bound_to_dispatch": all(
                 result["report_binding_ok"] for result in results
             ),
@@ -2128,17 +2307,38 @@ class YaoyorozuRegistryService:
             execution_summary = {}
         required_coverage = execution_summary.get("required_coverage_areas", [])
         optional_coverage = execution_summary.get("optional_coverage_areas", [])
+        requested_optional_coverage = execution_summary.get("requested_optional_coverage_areas", [])
+        dispatch_coverage = execution_summary.get("dispatch_coverage_areas", [])
         if not isinstance(required_coverage, list) or not required_coverage:
             errors.append("execution_summary.required_coverage_areas must be a non-empty list")
             required_coverage = []
         if not isinstance(optional_coverage, list):
             errors.append("execution_summary.optional_coverage_areas must be a list")
             optional_coverage = []
+        if not isinstance(requested_optional_coverage, list):
+            errors.append("execution_summary.requested_optional_coverage_areas must be a list")
+            requested_optional_coverage = []
+        if not isinstance(dispatch_coverage, list) or not dispatch_coverage:
+            errors.append("execution_summary.dispatch_coverage_areas must be a non-empty list")
+            dispatch_coverage = []
         if expected_profile_policy:
             if required_coverage != expected_profile_policy["required_worker_coverage_areas"]:
                 errors.append("execution_summary.required_coverage_areas mismatch")
             if optional_coverage != expected_profile_policy["optional_worker_coverage_areas"]:
                 errors.append("execution_summary.optional_coverage_areas mismatch")
+            normalized_requested_optional = self._normalize_requested_optional_coverage_areas(
+                str(proposal_profile),
+                requested_optional_coverage,
+            )
+            if requested_optional_coverage != normalized_requested_optional:
+                errors.append("execution_summary.requested_optional_coverage_areas mismatch")
+            if dispatch_coverage != self._dispatch_coverage_areas(
+                str(proposal_profile),
+                requested_optional_coverage,
+            ):
+                errors.append("execution_summary.dispatch_coverage_areas mismatch")
+        else:
+            normalized_requested_optional = []
 
         coverage_areas: List[str] = []
         for result in results:
@@ -2311,9 +2511,9 @@ class YaoyorozuRegistryService:
             if result.get("exit_code") != 0:
                 errors.append("worker process exit_code must be 0")
 
-        missing_coverage = [coverage for coverage in required_coverage if coverage not in coverage_areas]
+        missing_coverage = [coverage for coverage in dispatch_coverage if coverage not in coverage_areas]
         unexpected_coverage = [
-            coverage for coverage in coverage_areas if coverage not in required_coverage
+            coverage for coverage in coverage_areas if coverage not in dispatch_coverage
         ]
         if execution_summary.get("coverage_areas") != coverage_areas:
             errors.append("execution_summary.coverage_areas must match result coverage order")
@@ -2383,6 +2583,10 @@ class YaoyorozuRegistryService:
             "coverage_complete": not missing_coverage and not unexpected_coverage,
             "missing_coverage": missing_coverage,
             "unexpected_coverage": unexpected_coverage,
+            "required_coverage_areas": list(required_coverage),
+            "optional_coverage_areas": list(optional_coverage),
+            "requested_optional_coverage_areas": list(normalized_requested_optional),
+            "dispatch_coverage_areas": list(dispatch_coverage),
             "all_reports_bound_to_dispatch": all(
                 isinstance(result, Mapping) and result.get("report_binding_ok") is True
                 for result in results
@@ -2647,7 +2851,25 @@ class YaoyorozuRegistryService:
             convocation_session.get("proposal_profile"),
             "convocation_session.proposal_profile",
         )
-        bundle_strategy = self._task_graph_bundle_strategy(proposal_profile)
+        requested_optional_coverage = (
+            convocation_session.get("selection_summary", {}).get(
+                "requested_optional_builder_coverage_areas",
+                [],
+            )
+            if isinstance(convocation_session.get("selection_summary"), Mapping)
+            else []
+        )
+        if (
+            dispatch_plan.get("selection_summary", {}).get("requested_optional_coverage_areas", [])
+            != requested_optional_coverage
+        ):
+            raise ValueError(
+                "dispatch plan requested_optional_coverage_areas must match the convocation session"
+            )
+        bundle_strategy = self._task_graph_bundle_strategy(
+            proposal_profile,
+            requested_optional_coverage,
+        )
 
         messages = consensus_binding.get("messages", [])
         if not isinstance(messages, list) or not messages:
@@ -2898,8 +3120,15 @@ class YaoyorozuRegistryService:
             "dispatch_units_bound": actual_dispatch_unit_ids == expected_dispatch_unit_ids,
             "bundle_strategy_ok": (
                 bundle_strategy["strategy_id"]
-                == self._task_graph_bundle_strategy(proposal_profile)["strategy_id"]
+                == self._task_graph_bundle_strategy(
+                    proposal_profile,
+                    requested_optional_coverage,
+                )["strategy_id"]
                 and bundle_strategy["proposal_profile"] == proposal_profile
+                and bundle_strategy["requested_optional_coverage_areas"]
+                == list(requested_optional_coverage)
+                and bundle_strategy["dispatch_coverage_areas"]
+                == list(dispatch_plan["selection_summary"]["dispatch_coverage_areas"])
                 and bundle_strategy["root_bundle_count"] == len(bundle_specs)
                 and bundle_strategy["max_parallelism"] == graph["complexity_policy"]["max_parallelism"]
                 and task_graph_validation["root_count"] == bundle_strategy["root_bundle_count"]
@@ -2994,7 +3223,14 @@ class YaoyorozuRegistryService:
             errors.append("proposal_profile must map to one supported TaskGraph bundle strategy")
             expected_bundle_strategy = {}
         else:
-            expected_bundle_strategy = self._task_graph_bundle_strategy(str(proposal_profile))
+            requested_optional_coverage = binding.get("bundle_strategy", {}).get(
+                "requested_optional_coverage_areas",
+                [],
+            )
+            expected_bundle_strategy = self._task_graph_bundle_strategy(
+                str(proposal_profile),
+                requested_optional_coverage,
+            )
         bundle_strategy = binding.get("bundle_strategy", {})
         if not isinstance(bundle_strategy, Mapping):
             errors.append("bundle_strategy must be a mapping")
@@ -3010,6 +3246,16 @@ class YaoyorozuRegistryService:
                 errors.append("bundle_strategy.max_parallelism mismatch")
             if bundle_strategy.get("root_bundles") != expected_bundle_strategy["root_bundles"]:
                 errors.append("bundle_strategy.root_bundles mismatch")
+            if (
+                bundle_strategy.get("requested_optional_coverage_areas")
+                != expected_bundle_strategy["requested_optional_coverage_areas"]
+            ):
+                errors.append("bundle_strategy.requested_optional_coverage_areas mismatch")
+            if (
+                bundle_strategy.get("dispatch_coverage_areas")
+                != expected_bundle_strategy["dispatch_coverage_areas"]
+            ):
+                errors.append("bundle_strategy.dispatch_coverage_areas mismatch")
 
         task_graph = binding.get("task_graph", {})
         task_graph_validation = binding.get("task_graph_validation", {})

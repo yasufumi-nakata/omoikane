@@ -60,6 +60,10 @@ actual builder dispatch も
 `fork-request-v1` では `runtime/schema/docs`、
 `inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
 の required coverage だけへ縮退しつつ、
+必要時だけ `memory-edit-v1` は `schema` を、
+`fork-request-v1` は `eval` を optional dispatch として加えられ、
+request 内容は `requested_optional_builder_coverage_areas` /
+`dispatch_builder_coverage_areas` に first-class で残る。
 selected builder 群が dispatch/unit binding と workspace target 観測を伴う
 git-bound delta receipt と patch candidate receipt 付きの
 repo-local worker dispatch receipt として実行される。
@@ -67,6 +71,9 @@ repo-local worker dispatch receipt として実行される。
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
 さらに `--proposal-profile fork-request-v1` により
 identity fork の triple-approval review 向け convocation / dispatch へ切り替えられる。
+同じ CLI に `--include-optional-coverage schema` または
+`--include-optional-coverage eval` を重ねると、
+profile optional coverage だけを on-demand で追加 dispatch できる。
 さらに `--proposal-profile inter-mind-negotiation-v1` により
 disclosure / merge / collective contract review 向け convocation / dispatch へ切り替えられる。
 そのうえで同じ Council session 上の `ConsensusBus` transcript が

@@ -1,0 +1,30 @@
+eval_id: yaoyorozu_fork_request_optional_eval_dispatch
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu must allow `fork-request-v1` to opt into `eval` as requested optional coverage while keeping a deterministic 3-root TaskGraph bundle.
+inputs:
+  - source_root: agents
+  - proposal_profile: fork-request-v1
+  - requested_optional_builder_coverage_areas:
+      - eval
+  - session_mode: standard
+expected:
+  standing_roles_ready: true
+  council_role_coverage_ok: true
+  builder_handoff_coverage_ok: true
+  builder_profile_policy_ready: true
+  requested_optional_builder_coverage_areas:
+    - eval
+  dispatch_builder_coverage_areas:
+    - runtime
+    - schema
+    - docs
+    - eval
+  selected_builder_coverage_count: 4
+  dispatch_unit_count: 4
+  worker_dispatch_coverage_complete: true
+  task_graph_bundle_strategy_ok: true
+  task_graph_bundle_strategy_id: fork-request-optional-eval-dispatch-three-root-v1
+metric: equality
+threshold: 1.0
+ethics_check: true

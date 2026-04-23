@@ -1751,6 +1751,42 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ),
         )
 
+    def test_yaoyorozu_demo_supports_memory_edit_optional_schema_dispatch(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo(
+            proposal_profile="memory-edit-v1",
+            include_optional_coverage=["schema"],
+        )
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            ["schema"],
+            result["validation"]["requested_optional_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "eval", "docs", "schema"],
+            result["validation"]["dispatch_builder_coverage_areas"],
+        )
+        self.assertEqual(4, result["validation"]["builder_coverage_count"])
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(4, result["validation"]["dispatch_success_count"])
+        self.assertEqual(
+            ["schema"],
+            result["dispatch_plan"]["selection_summary"]["requested_optional_coverage_areas"],
+        )
+        self.assertEqual(
+            "memory-edit-optional-schema-dispatch-three-root-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(
+            [["docs"], ["eval", "schema"], ["runtime"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
+
     def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
 
@@ -1810,6 +1846,42 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             [["docs"], ["runtime"], ["schema"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
+
+    def test_yaoyorozu_demo_supports_fork_request_optional_eval_dispatch(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo(
+            proposal_profile="fork-request-v1",
+            include_optional_coverage=["eval"],
+        )
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            ["eval"],
+            result["validation"]["requested_optional_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "schema", "docs", "eval"],
+            result["validation"]["dispatch_builder_coverage_areas"],
+        )
+        self.assertEqual(4, result["validation"]["builder_coverage_count"])
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(4, result["validation"]["dispatch_success_count"])
+        self.assertEqual(
+            ["eval"],
+            result["dispatch_plan"]["selection_summary"]["requested_optional_coverage_areas"],
+        )
+        self.assertEqual(
+            "fork-request-optional-eval-dispatch-three-root-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(
+            [["docs", "eval"], ["runtime"], ["schema"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]

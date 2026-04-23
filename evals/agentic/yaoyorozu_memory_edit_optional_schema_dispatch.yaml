@@ -1,0 +1,30 @@
+eval_id: yaoyorozu_memory_edit_optional_schema_dispatch
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu must allow `memory-edit-v1` to opt into `schema` as requested optional coverage while keeping a deterministic 3-root TaskGraph bundle.
+inputs:
+  - source_root: agents
+  - proposal_profile: memory-edit-v1
+  - requested_optional_builder_coverage_areas:
+      - schema
+  - session_mode: standard
+expected:
+  standing_roles_ready: true
+  council_role_coverage_ok: true
+  builder_handoff_coverage_ok: true
+  builder_profile_policy_ready: true
+  requested_optional_builder_coverage_areas:
+    - schema
+  dispatch_builder_coverage_areas:
+    - runtime
+    - eval
+    - docs
+    - schema
+  selected_builder_coverage_count: 4
+  dispatch_unit_count: 4
+  worker_dispatch_coverage_complete: true
+  task_graph_bundle_strategy_ok: true
+  task_graph_bundle_strategy_id: memory-edit-optional-schema-dispatch-three-root-v1
+metric: equality
+threshold: 1.0
+ethics_check: true

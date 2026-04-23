@@ -144,6 +144,29 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["task_graph_binding"],
         )
 
+    def test_memory_edit_optional_schema_dispatch_matches_public_schemas(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo(
+            proposal_profile="memory-edit-v1",
+            include_optional_coverage=["schema"],
+        )
+
+        self._assert_schema_valid(
+            "specs/schemas/council_convocation_session.schema",
+            result["convocation"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
+            result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
+        )
+
     def test_fork_request_profile_matches_public_schemas(self) -> None:
         result = self.runtime.run_yaoyorozu_demo(proposal_profile="fork-request-v1")
 
@@ -166,6 +189,29 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
             result["consensus_dispatch"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
+        )
+
+    def test_fork_request_optional_eval_dispatch_matches_public_schemas(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo(
+            proposal_profile="fork-request-v1",
+            include_optional_coverage=["eval"],
+        )
+
+        self._assert_schema_valid(
+            "specs/schemas/council_convocation_session.schema",
+            result["convocation"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
+            result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
         )
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",

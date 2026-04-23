@@ -339,6 +339,8 @@ properties:
       - failed_role_ids
       - required_coverage_areas
       - optional_coverage_areas
+      - requested_optional_coverage_areas
+      - dispatch_coverage_areas
       - coverage_areas
       - target_ready_count
       - delta_bound_count
@@ -378,6 +380,28 @@ properties:
             - docs
       optional_coverage_areas:
         type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      requested_optional_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      dispatch_coverage_areas:
+        type: array
+        minItems: 1
+        maxItems: 4
         uniqueItems: true
         items:
           type: string
@@ -648,6 +672,8 @@ examples:
       failed_role_ids: []
       required_coverage_areas: [runtime, schema, eval, docs]
       optional_coverage_areas: []
+      requested_optional_coverage_areas: []
+      dispatch_coverage_areas: [runtime, schema, eval, docs]
       coverage_areas: [docs, eval, runtime, schema]
       target_ready_count: 4
       delta_bound_count: 4

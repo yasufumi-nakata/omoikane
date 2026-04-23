@@ -24,6 +24,11 @@ expected:
     - docs
   optional_builder_coverage_areas:
     - schema
+  requested_optional_builder_coverage_areas: []
+  dispatch_builder_coverage_areas:
+    - runtime
+    - eval
+    - docs
   selected_builder_coverage_count: 3
   dispatch_unit_count: 3
   worker_dispatch_coverage_complete: true

@@ -3531,6 +3531,7 @@ json.dump(response, sys.stdout)
         self,
         *,
         proposal_profile: str = "self-modify-patch-v1",
+        include_optional_coverage: List[str] | None = None,
     ) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://yaoyorozu-demo/v1",
@@ -3595,6 +3596,7 @@ json.dump(response, sys.stdout)
             session_mode="standard",
             target_identity_ref=identity.identity_id,
             workspace_discovery=workspace_discovery,
+            requested_optional_builder_coverage_areas=include_optional_coverage,
         )
         dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(convocation)
         dispatch_plan_validation = self.yaoyorozu.validate_worker_dispatch_plan(dispatch_plan)
@@ -3834,6 +3836,12 @@ json.dump(response, sys.stdout)
                 ],
                 "optional_builder_coverage_areas": convocation["selection_summary"][
                     "optional_builder_coverage_areas"
+                ],
+                "requested_optional_builder_coverage_areas": convocation["selection_summary"][
+                    "requested_optional_builder_coverage_areas"
+                ],
+                "dispatch_builder_coverage_areas": convocation["selection_summary"][
+                    "dispatch_builder_coverage_areas"
                 ],
                 "dispatch_unit_count": dispatch_plan_validation["dispatch_unit_count"],
                 "dispatch_success_count": dispatch_receipt_validation["success_count"],

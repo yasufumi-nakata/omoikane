@@ -57,9 +57,11 @@ profile-aware catalog の意味が dispatch surface で薄れていました。
 - `TaskGraph` は fixed `max_parallelism=3` を維持したまま、
   `memory-edit-v1` と `fork-request-v1` を
   required coverage 1 surface = 1 root node の 3 root strategy へ単純化する
-- residual gap は generic な profile-unaware dispatch ではなく、
-  optional coverage を条件付きで on-demand dispatch するか、
-  remote worker runtime へ同じ policy を持ち込むかへ縮小する
+- follow-up closure として optional coverage の requested dispatch path を追加し、
+  repo-local runtime では `memory-edit-v1` の `schema` と
+  `fork-request-v1` の `eval` を deterministic な on-demand dispatch へ昇格できるようにする
+- 次段の frontier は remote worker runtime / brokered sandbox へ
+  同じ policy を持ち込むかに縮小する
 
 ## Revisit triggers
 
