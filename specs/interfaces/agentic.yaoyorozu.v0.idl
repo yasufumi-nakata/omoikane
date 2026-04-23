@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, and an L5 build_request-ready handoff binding.
+summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
@@ -12,7 +12,13 @@ imports:
   yaoyorozu_consensus_dispatch_binding: ../schemas/yaoyorozu_consensus_dispatch_binding.schema
   yaoyorozu_task_graph_binding: ../schemas/yaoyorozu_task_graph_binding.schema
   yaoyorozu_build_request_binding: ../schemas/yaoyorozu_build_request_binding.schema
+  yaoyorozu_execution_chain_binding: ../schemas/yaoyorozu_execution_chain_binding.schema
   build_request: ../schemas/build_request.yaml
+  build_artifact: ../schemas/build_artifact.yaml
+  sandbox_apply_receipt: ../schemas/sandbox_apply_receipt.schema
+  builder_live_enactment_session: ../schemas/builder_live_enactment_session.schema
+  staged_rollout_session: ../schemas/staged_rollout_session.schema
+  builder_rollback_session: ../schemas/builder_rollback_session.schema
   consensus_message: ../schemas/consensus_message.schema
 operations:
   discover_workspace_workers:
@@ -298,6 +304,41 @@ operations:
       - build_request allowed_write_paths and output_paths must remain within the bounded repo-local workspace_scope while staying patch-generator-ready
       - the emitted build_request must keep `evals/continuity/council_output_build_request_pipeline.yaml` plus one proposal-profile-aware Yaoyorozu eval in must_pass
       - selected patch candidates, when present, must preserve deterministic priority order and remain bound to the same dispatch receipt digests exposed to builder review
+  bind_execution_chain:
+    summary: >
+      Extend one same-session Yaoyorozu build_request handoff into a reviewer-facing builder
+      execution chain that binds build artifact, sandbox apply, live enactment, staged rollout,
+      and rollback witness artifacts under the same digest family.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - build_request_binding
+          - build_artifact
+          - sandbox_apply_receipt
+          - live_enactment_session
+          - rollout_session
+          - rollback_session
+        properties:
+          build_request_binding:
+            schema_ref: yaoyorozu_build_request_binding
+          build_artifact:
+            schema_ref: build_artifact
+          sandbox_apply_receipt:
+            schema_ref: sandbox_apply_receipt
+          live_enactment_session:
+            schema_ref: builder_live_enactment_session
+          rollout_session:
+            schema_ref: staged_rollout_session
+          rollback_session:
+            schema_ref: builder_rollback_session
+    output:
+      schema_ref: yaoyorozu_execution_chain_binding
+    guarantees:
+      - every downstream artifact must reuse the same build_request.request_id and remain digest-bound to the selected build_request_binding
+      - sandbox apply must stay rollback-ready and bind the same rollback_plan_ref emitted by the build_artifact
+      - live enactment and rollback witness must both carry reviewer-network-attested Guardian oversight evidence before the chain is considered complete
+      - reviewer-facing required_eval_refs must preserve the original build_request must_pass set while adding Yaoyorozu execution-chain plus builder live/rollback review refs
 compatibility:
   stability: bootstrap
   notes:
@@ -305,5 +346,5 @@ compatibility:
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with profile-aware review_budget, required coverage policy, and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - TaskGraph bundle binding keeps the proposal profile's dispatch coverage within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `inter-mind-negotiation` grouping schema+docs, `memory-edit` optionally grouping eval+schema, and `fork-request` optionally grouping docs+eval.
-    - L5 build_request handoff binding is fixed to `L5.PatchGenerator`, `emit_build_request`, and a patch-generator-allowed scope before any broader builder pipeline is considered.
+    - L5 build_request handoff binding is fixed to `L5.PatchGenerator`, `emit_build_request`, and a patch-generator-allowed scope before the same-request execution chain extends to build_artifact, sandbox apply, live enactment, and rollback witness artifacts.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

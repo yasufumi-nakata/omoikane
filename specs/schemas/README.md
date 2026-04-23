@@ -133,6 +133,7 @@
 - `world_state.schema`
 - `yaoyorozu_consensus_dispatch_binding.schema`
 - `yaoyorozu_build_request_binding.schema`
+- `yaoyorozu_execution_chain_binding.schema`
 - `yaoyorozu_task_graph_binding.schema`
 - `yaoyorozu_workspace_discovery.schema`
 - `yaoyorozu_worker_dispatch_plan.schema`

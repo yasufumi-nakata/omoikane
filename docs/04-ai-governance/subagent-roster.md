@@ -87,6 +87,10 @@ worker claim / guardian gate / resolve digest を伴う
 patch-generator-ready scope validation に接続され、
 priority-ranked patch candidate hint を添えた
 `yaoyorozu_build_request_binding` としても materialize される。
+その same-request handoff は downstream の
+`build_artifact` / `sandbox_apply_receipt` / live enactment /
+rollback witness まで延長され、
+`yaoyorozu_execution_chain_binding` として reviewer-facing に監査できる。
 
 ## 並列召喚
 

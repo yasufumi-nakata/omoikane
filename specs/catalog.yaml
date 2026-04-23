@@ -1881,6 +1881,17 @@ entries:
       - reference-runtime
     rationale: Required to bind one Yaoyorozu convocation, worker dispatch, ConsensusBus transcript, and TaskGraph bundle to an L5 build_request-ready handoff with candidate-bound review hints.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_execution_chain_binding.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind one Yaoyorozu build_request handoff to downstream build artifact, sandbox apply, live enactment, staged rollout, and rollback witness artifacts under the same digest family.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
     consumers:
@@ -1889,7 +1900,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -1960,6 +1971,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects same-session build_request handoff binding, patch-generator-ready scope validation, and profile-aware must_pass eval selection for Yaoyorozu execution.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_execution_chain_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects same-request execution-chain binding across build_request handoff, build artifact, sandbox apply, reviewer-network-attested live enactment, and rollback witness artifacts.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

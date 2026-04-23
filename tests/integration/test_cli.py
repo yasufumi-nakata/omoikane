@@ -1476,6 +1476,18 @@ class CliIntegrationTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_build_request_binding.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
+        self.assertEqual("rollback", result["validation"]["execution_chain_rollout_decision"])
+        self.assertTrue(result["validation"]["execution_chain_reviewer_network_attested"])
+        self.assertEqual(
+            result["build_request_binding"]["binding_ref"],
+            result["execution_chain"]["build_request_binding_ref"],
+        )
+        self.assertEqual("rolled-back", result["execution_chain"]["rollback_session"]["status"])
+        self.assertIn(
+            "evals/agentic/yaoyorozu_execution_chain_binding.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
+        )
         self.assertTrue(result["validation"]["task_graph_worker_claims_bound"])
         self.assertTrue(result["validation"]["task_graph_coverage_grouping_ok"])
         self.assertEqual(
@@ -1585,6 +1597,11 @@ class CliIntegrationTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
+        self.assertIn(
+            "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
+        )
 
     def test_yaoyorozu_demo_supports_memory_edit_optional_schema_dispatch(self) -> None:
         stdout = io.StringIO()
@@ -1618,6 +1635,7 @@ class CliIntegrationTests(unittest.TestCase):
             "memory-edit-optional-schema-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
         self.assertEqual(
             [["docs"], ["eval", "schema"], ["runtime"]],
             sorted(
@@ -1693,6 +1711,11 @@ class CliIntegrationTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_fork_request_profile.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
+        self.assertIn(
+            "evals/agentic/yaoyorozu_fork_request_profile.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
+        )
 
     def test_yaoyorozu_demo_supports_fork_request_optional_eval_dispatch(self) -> None:
         stdout = io.StringIO()
@@ -1726,6 +1749,7 @@ class CliIntegrationTests(unittest.TestCase):
             "fork-request-optional-eval-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
         self.assertEqual(
             [["docs", "eval"], ["runtime"], ["schema"]],
             sorted(
@@ -1800,6 +1824,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn(
             "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
+        self.assertTrue(result["validation"]["execution_chain_ok"])
+        self.assertIn(
+            "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
         )
 
     def test_oversight_demo_emits_breach_propagation(self) -> None:

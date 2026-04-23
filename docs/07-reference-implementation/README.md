@@ -352,6 +352,12 @@ final resolve を監査し、blocked direct handoff と worker claim chain を
 `L5.PatchGenerator` 向け `build_request` と patch-generator-ready scope validation に接続し、
 priority-ranked patch candidate hint を添えた
 `yaoyorozu_build_request_binding` として束縛することを確認する。
+さらに同じ `build_request` handoff が
+`build_artifact` / `sandbox_apply_receipt` / `builder_live_enactment_session` /
+`builder_rollback_session` を含む
+`yaoyorozu_execution_chain_binding` へ延長され、
+repo-local reviewer-facing builder execution chain を
+1 つの digest family として可視化することも確認する。
 optional dispatch を要求した場合は
 `memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
 `fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ

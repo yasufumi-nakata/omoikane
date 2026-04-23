@@ -415,6 +415,96 @@ class OmoikaneReferenceOS:
         )
         return event
 
+    def _materialize_yaoyorozu_execution_chain(
+        self,
+        *,
+        build_request_binding: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        build_request = build_request_binding["build_request"]
+        build_artifact = self.patch_generator.generate_patch_set(build_request)
+        sandbox_apply_receipt = self.sandbox_apply.apply_artifact(
+            build_request=build_request,
+            build_artifact=build_artifact,
+        )
+        sandbox_apply_validation = self.sandbox_apply.validate_receipt(sandbox_apply_receipt)
+        live_enactment_oversight_event = self._build_live_enactment_oversight_event(
+            reviewer_namespace="yaoyorozu-execution-live",
+            payload_ref=f"artifact://{build_artifact['artifact_id']}",
+        )
+        live_enactment_session = self.live_enactment.execute(
+            build_request=build_request,
+            build_artifact=build_artifact,
+            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
+            repo_root=self.repo_root,
+            guardian_oversight_event=live_enactment_oversight_event,
+        )
+        live_enactment_validation = self.live_enactment.validate_session(live_enactment_session)
+        rollout_eval_reports = [
+            self.diff_evaluator.run_ab_eval(
+                eval_ref="evals/continuity/builder_staged_rollout_execution.yaml",
+                baseline_ref="runtime://baseline/current",
+                sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
+            ),
+            self.diff_evaluator.run_ab_eval(
+                eval_ref="evals/continuity/builder_rollback_execution.yaml",
+                baseline_ref="runtime://baseline/current",
+                sandbox_ref=f"mirage://{build_request['request_id']}/snapshot/rollback-breach",
+            ),
+        ]
+        rollout = self.diff_evaluator.classify_rollout(
+            outcomes=[report["outcome"] for report in rollout_eval_reports]
+        )
+        rollout_session = self.rollout_planner.execute_rollout(
+            build_request=build_request,
+            apply_receipt=sandbox_apply_receipt,
+            eval_reports=rollout_eval_reports,
+            decision=rollout["decision"],
+            guardian_gate_status=build_request["approval_context"]["guardian_gate"],
+        )
+        rollout_validation = self.rollout_planner.validate_session(rollout_session)
+        rollback_guardian_oversight_event = self._build_live_enactment_oversight_event(
+            reviewer_namespace="yaoyorozu-execution-rollback",
+            payload_ref=sandbox_apply_receipt["rollback_plan_ref"],
+        )
+        rollback_session = self.rollback_engine.execute_rollback(
+            build_request=build_request,
+            apply_receipt=sandbox_apply_receipt,
+            rollout_session=rollout_session,
+            live_enactment_session=live_enactment_session,
+            repo_root=self.repo_root,
+            trigger="eval-regression",
+            reason="Regression injected for Yaoyorozu execution-chain rollback witness.",
+            initiator="YaoyorozuRegistryService",
+            guardian_oversight_event=rollback_guardian_oversight_event,
+        )
+        rollback_validation = self.rollback_engine.validate_session(rollback_session)
+        execution_chain = self.yaoyorozu.bind_execution_chain(
+            build_request_binding=build_request_binding,
+            build_artifact=build_artifact,
+            sandbox_apply_receipt=sandbox_apply_receipt,
+            live_enactment_session=live_enactment_session,
+            rollout_session=rollout_session,
+            rollback_session=rollback_session,
+        )
+        execution_chain_validation = self.yaoyorozu.validate_execution_chain(execution_chain)
+        return {
+            "build_artifact": build_artifact,
+            "sandbox_apply_receipt": sandbox_apply_receipt,
+            "sandbox_apply_validation": sandbox_apply_validation,
+            "live_enactment_oversight_event": live_enactment_oversight_event,
+            "live_enactment_session": live_enactment_session,
+            "live_enactment_validation": live_enactment_validation,
+            "rollout_eval_reports": rollout_eval_reports,
+            "rollout": rollout,
+            "rollout_session": rollout_session,
+            "rollout_validation": rollout_validation,
+            "rollback_guardian_oversight_event": rollback_guardian_oversight_event,
+            "rollback_session": rollback_session,
+            "rollback_validation": rollback_validation,
+            "execution_chain": execution_chain,
+            "execution_chain_validation": execution_chain_validation,
+        }
+
     @contextmanager
     def _design_reader_demo_repo(
         self,
@@ -3714,6 +3804,11 @@ json.dump(response, sys.stdout)
         build_request_binding_validation = self.yaoyorozu.validate_build_request_handoff(
             build_request_binding
         )
+        execution_chain_runtime = self._materialize_yaoyorozu_execution_chain(
+            build_request_binding=build_request_binding
+        )
+        execution_chain = execution_chain_runtime["execution_chain"]
+        execution_chain_validation = execution_chain_runtime["execution_chain_validation"]
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="yaoyorozu.workspace_discovered",
@@ -3805,6 +3900,118 @@ json.dump(response, sys.stdout)
             layer="L4",
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.patch.generated",
+            payload={
+                "artifact": execution_chain_runtime["build_artifact"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="PatchGeneratorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.sandbox.applied",
+            payload={
+                "receipt": execution_chain_runtime["sandbox_apply_receipt"],
+                "validation": execution_chain_runtime["sandbox_apply_validation"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="SandboxApplyService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.enactment.attestation.satisfied",
+            payload=execution_chain_runtime["live_enactment_oversight_event"],
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.enactment.executed",
+            payload={
+                "session": execution_chain_runtime["live_enactment_session"],
+                "validation": execution_chain_runtime["live_enactment_validation"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="LiveEnactmentService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.diff_eval.completed",
+            payload={
+                "reports": execution_chain_runtime["rollout_eval_reports"],
+                "rollout": execution_chain_runtime["rollout"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="DifferentialEvaluatorService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollout.executed",
+            payload={
+                "session": execution_chain_runtime["rollout_session"],
+                "validation": execution_chain_runtime["rollout_validation"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="RolloutPlanner",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="guardian.rollback.attestation.satisfied",
+            payload=execution_chain_runtime["rollback_guardian_oversight_event"],
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="selfctor.rollback.executed",
+            payload={
+                "session": execution_chain_runtime["rollback_session"],
+                "validation": execution_chain_runtime["rollback_validation"],
+                "execution_chain_ref": execution_chain["binding_ref"],
+            },
+            actor="RollbackEngineService",
+            category="self-modify",
+            layer="L5",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.execution_chain.bound",
+            payload=execution_chain,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
         ledger_verification = self.ledger.verify()
 
         return {
@@ -3821,6 +4028,7 @@ json.dump(response, sys.stdout)
             "consensus_dispatch": consensus_dispatch,
             "task_graph_binding": task_graph_binding,
             "build_request_binding": build_request_binding,
+            "execution_chain": execution_chain,
             "validation": {
                 "workspace_discovery_ok": workspace_discovery_validation["ok"],
                 "workspace_count": workspace_discovery_validation["workspace_count"],
@@ -3944,6 +4152,26 @@ json.dump(response, sys.stdout)
                 "build_request_output_path_count": build_request_binding_validation[
                     "output_path_count"
                 ],
+                "execution_chain_ok": execution_chain_validation["ok"],
+                "execution_chain_patch_count": execution_chain_validation["patch_count"],
+                "execution_chain_applied_patch_count": execution_chain_validation[
+                    "applied_patch_count"
+                ],
+                "execution_chain_reverted_patch_count": execution_chain_validation[
+                    "reverted_patch_count"
+                ],
+                "execution_chain_reviewer_network_attested": execution_chain_validation[
+                    "reviewer_network_attested"
+                ],
+                "execution_chain_rollout_decision": execution_chain["execution_summary"][
+                    "rollout_decision"
+                ],
+                "execution_chain_live_enactment_status": execution_chain[
+                    "live_enactment_session"
+                ]["status"],
+                "execution_chain_rollback_status": execution_chain["rollback_session"][
+                    "status"
+                ],
                 "ok": (
                     workspace_discovery_validation["ok"]
                     and
@@ -3953,6 +4181,7 @@ json.dump(response, sys.stdout)
                     and consensus_dispatch_validation["ok"]
                     and task_graph_binding_validation["ok"]
                     and build_request_binding_validation["ok"]
+                    and execution_chain_validation["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },

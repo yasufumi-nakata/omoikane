@@ -116,6 +116,11 @@ worker dispatch receipt と guardian gate / resolve digest を
 `L5.PatchGenerator` 向け `build_request` と patch-generator-ready scope validation に接続され、
 priority-ranked patch candidate hint を添えた
 `yaoyorozu_build_request_binding` としても固定される。
+さらに同じ `build_request` handoff は
+`build_artifact` / `sandbox_apply_receipt` / `builder_live_enactment_session` /
+`builder_rollback_session` を same-request digest family に束縛した
+`yaoyorozu_execution_chain_binding` としても返り、
+reviewer-facing builder execution chain を 1 artifact で監査できる。
 optional dispatch を要求した場合は
 `memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
 `fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ

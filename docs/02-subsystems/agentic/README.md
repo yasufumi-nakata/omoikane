@@ -49,7 +49,13 @@
   `yaoyorozu_task_graph_binding` として残し、
   さらに同じ bundle を `L5.PatchGenerator` 向け `build_request` と
   patch-generator-ready scope validation へ接続した
-  `yaoyorozu_build_request_binding` まで materialize する
+  `yaoyorozu_build_request_binding` まで materialize する。
+  そのうえで同じ `build_request` handoff から
+  `build_artifact` / `sandbox_apply_receipt` / live enactment /
+  rollback witness を same-request digest family に束縛した
+  `yaoyorozu_execution_chain_binding` まで返し、
+  L4 orchestration から reviewer-facing builder execution chain までを
+  1 つの artifact family として監査できるようにする
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

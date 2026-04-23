@@ -1,0 +1,15 @@
+eval_id: yaoyorozu_execution_chain_binding
+target: agentic.yaoyorozu
+level: L4-L5
+description: Yaoyorozu must extend one same-session build_request handoff into a digest-bound builder execution chain with build artifact, sandbox apply, live enactment, and rollback witness artifacts.
+inputs:
+  - source_root: agents
+  - proposal_profile: self-modify-patch-v1
+  - session_mode: standard
+expected:
+  execution_chain_ok: true
+  execution_chain_rollout_decision: rollback
+  execution_chain_reviewer_network_attested: true
+metric: equality
+threshold: 1.0
+ethics_check: true

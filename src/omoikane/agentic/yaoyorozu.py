@@ -36,6 +36,7 @@ YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
 YAOYOROZU_CONSENSUS_BINDING_PROFILE = "repo-local-yaoyorozu-consensus-bus-binding-v1"
 YAOYOROZU_TASK_GRAPH_BINDING_PROFILE = "repo-local-yaoyorozu-task-graph-binding-v1"
 YAOYOROZU_BUILD_REQUEST_BINDING_PROFILE = "repo-local-yaoyorozu-build-request-binding-v1"
+YAOYOROZU_EXECUTION_CHAIN_BINDING_PROFILE = "repo-local-yaoyorozu-execution-chain-v1"
 YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE = "same-host-local-workspace-discovery-v1"
 YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE = "same-host-local-workspace-catalog"
 YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF = "host://local-loopback"
@@ -69,6 +70,7 @@ YAOYOROZU_BUILD_REQUEST_TARGET_SUBSYSTEM = "L5.PatchGenerator"
 YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS = "feature-improvement"
 YAOYOROZU_BUILD_REQUEST_CANDIDATE_LIMIT = 3
 YAOYOROZU_BUILD_REQUEST_EVAL = "evals/agentic/yaoyorozu_build_request_binding.yaml"
+YAOYOROZU_EXECUTION_CHAIN_EVAL = "evals/agentic/yaoyorozu_execution_chain_binding.yaml"
 YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS = [
     "docs/02-subsystems/agentic/README.md",
     "docs/02-subsystems/agentic/yaoyorozu-roster.md",
@@ -82,6 +84,13 @@ YAOYOROZU_BUILD_REQUEST_SPEC_REFS = [
     "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
     "specs/schemas/yaoyorozu_task_graph_binding.schema",
     "specs/schemas/yaoyorozu_build_request_binding.schema",
+]
+YAOYOROZU_EXECUTION_CHAIN_REQUIRED_EVALS = [
+    YAOYOROZU_EXECUTION_CHAIN_EVAL,
+    "evals/continuity/builder_live_enactment_execution.yaml",
+    "evals/continuity/builder_staged_rollout_execution.yaml",
+    "evals/continuity/builder_rollback_execution.yaml",
+    "evals/continuity/builder_rollback_oversight_network.yaml",
 ]
 YAOYOROZU_BUILD_REQUEST_STATIC_OUTPUT_PATHS = [
     "src/omoikane/self_construction/builders.py",
@@ -472,6 +481,36 @@ def _build_request_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[st
     }
 
 
+def _execution_chain_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": binding["schema_version"],
+        "binding_profile": binding["binding_profile"],
+        "proposal_profile": binding["proposal_profile"],
+        "build_request_binding_ref": binding["build_request_binding_ref"],
+        "build_request_binding_digest": binding["build_request_binding_digest"],
+        "build_artifact_ref": binding["build_artifact_ref"],
+        "build_artifact_digest": binding["build_artifact_digest"],
+        "sandbox_apply_receipt_ref": binding["sandbox_apply_receipt_ref"],
+        "sandbox_apply_receipt_digest": binding["sandbox_apply_receipt_digest"],
+        "live_enactment_session_ref": binding["live_enactment_session_ref"],
+        "live_enactment_session_digest": binding["live_enactment_session_digest"],
+        "rollout_session_ref": binding["rollout_session_ref"],
+        "rollout_session_digest": binding["rollout_session_digest"],
+        "rollback_session_ref": binding["rollback_session_ref"],
+        "rollback_session_digest": binding["rollback_session_digest"],
+        "digest_family": binding["digest_family"],
+        "execution_summary": binding["execution_summary"],
+        "validation": binding["validation"],
+    }
+
+
+def _artifact_ref(artifact_payload: Mapping[str, Any], artifact_kind: str) -> str:
+    for artifact in artifact_payload.get("artifacts", []):
+        if isinstance(artifact, Mapping) and artifact.get("artifact_kind") == artifact_kind:
+            return str(artifact.get("ref", ""))
+    return ""
+
+
 def _workspace_ref_from_root(workspace_root: Path) -> str:
     normalized_name = "".join(
         character.lower() if character.isalnum() else "-"
@@ -580,6 +619,7 @@ class YaoyorozuRegistryPolicy:
     workspace_review_budget: int = YAOYOROZU_WORKSPACE_DISCOVERY_MAX_WORKSPACES
     task_graph_binding_profile: str = YAOYOROZU_TASK_GRAPH_BINDING_PROFILE
     build_request_binding_profile: str = YAOYOROZU_BUILD_REQUEST_BINDING_PROFILE
+    execution_chain_binding_profile: str = YAOYOROZU_EXECUTION_CHAIN_BINDING_PROFILE
     build_request_target_subsystem: str = YAOYOROZU_BUILD_REQUEST_TARGET_SUBSYSTEM
     build_request_candidate_limit: int = YAOYOROZU_BUILD_REQUEST_CANDIDATE_LIMIT
     top_k_per_role: int = 1
@@ -3911,6 +3951,360 @@ class YaoyorozuRegistryService:
             if isinstance(build_request, Mapping)
             else 0,
             "scope_allowed": scope_validation.get("allowed") is True,
+            "errors": errors,
+        }
+
+    def bind_execution_chain(
+        self,
+        *,
+        build_request_binding: Mapping[str, Any],
+        build_artifact: Mapping[str, Any],
+        sandbox_apply_receipt: Mapping[str, Any],
+        live_enactment_session: Mapping[str, Any],
+        rollout_session: Mapping[str, Any],
+        rollback_session: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if build_request_binding.get("kind") != "yaoyorozu_build_request_binding":
+            raise ValueError(
+                "build_request_binding.kind must equal yaoyorozu_build_request_binding"
+            )
+        if build_artifact.get("kind") != "build_artifact":
+            raise ValueError("build_artifact.kind must equal build_artifact")
+        if sandbox_apply_receipt.get("kind") != "sandbox_apply_receipt":
+            raise ValueError("sandbox_apply_receipt.kind must equal sandbox_apply_receipt")
+        if live_enactment_session.get("kind") != "builder_live_enactment_session":
+            raise ValueError(
+                "live_enactment_session.kind must equal builder_live_enactment_session"
+            )
+        if rollout_session.get("kind") != "staged_rollout_session":
+            raise ValueError("rollout_session.kind must equal staged_rollout_session")
+        if rollback_session.get("kind") != "builder_rollback_session":
+            raise ValueError("rollback_session.kind must equal builder_rollback_session")
+
+        build_request = build_request_binding.get("build_request", {})
+        if not isinstance(build_request, Mapping):
+            raise ValueError("build_request_binding.build_request must be a mapping")
+
+        request_id = str(build_request.get("request_id", ""))
+        artifact_id = str(build_artifact.get("artifact_id", ""))
+        apply_receipt_id = str(sandbox_apply_receipt.get("receipt_id", ""))
+        enactment_session_id = str(live_enactment_session.get("enactment_session_id", ""))
+        rollout_session_id = str(rollout_session.get("session_id", ""))
+        rollback_session_id = str(rollback_session.get("rollback_session_id", ""))
+
+        build_artifact_ref = f"artifact://{artifact_id}"
+        sandbox_apply_receipt_ref = f"sandbox-apply://{apply_receipt_id}"
+        live_enactment_session_ref = f"enactment-session://{enactment_session_id}"
+        rollout_session_ref = f"rollout-session://{rollout_session_id}"
+        rollback_session_ref = f"rollback-session://{rollback_session_id}"
+
+        build_artifact_digest = sha256_text(canonical_json(build_artifact))
+        sandbox_apply_receipt_digest = sha256_text(canonical_json(sandbox_apply_receipt))
+        live_enactment_session_digest = sha256_text(canonical_json(live_enactment_session))
+        rollout_session_digest = sha256_text(canonical_json(rollout_session))
+        rollback_session_digest = sha256_text(canonical_json(rollback_session))
+
+        rollback_plan_ref = _artifact_ref(build_artifact, "rollback_plan")
+        build_request_ref = str(build_request_binding.get("build_request_ref", ""))
+        build_request_digest = str(build_request_binding.get("build_request_digest", ""))
+        selected_patch_candidates = list(build_request_binding.get("selected_patch_candidates", []))
+        patch_targets = [
+            str(patch.get("target_path", ""))
+            for patch in build_artifact.get("patches", [])
+            if isinstance(patch, Mapping)
+        ]
+        selected_candidate_targets = [
+            str(candidate.get("target_path", ""))
+            for candidate in selected_patch_candidates
+            if isinstance(candidate, Mapping)
+        ]
+        required_eval_refs = _ordered_unique(
+            [
+                *list(build_request.get("constraints", {}).get("must_pass", [])),
+                *YAOYOROZU_EXECUTION_CHAIN_REQUIRED_EVALS,
+            ]
+        )
+        digest_family = {
+            "request_id": request_id,
+            "artifact_id": artifact_id,
+            "apply_receipt_id": apply_receipt_id,
+            "live_enactment_session_id": enactment_session_id,
+            "rollout_session_id": rollout_session_id,
+            "rollback_session_id": rollback_session_id,
+            "build_request_digest": build_request_digest,
+            "build_artifact_digest": build_artifact_digest,
+            "sandbox_apply_receipt_digest": sandbox_apply_receipt_digest,
+            "live_enactment_session_digest": live_enactment_session_digest,
+            "rollout_session_digest": rollout_session_digest,
+            "rollback_session_digest": rollback_session_digest,
+        }
+        digest_family["family_digest"] = sha256_text(canonical_json(digest_family))
+
+        execution_summary = {
+            "execution_profile": "rollback-witness-same-request-v1",
+            "target_subsystem": str(build_request.get("target_subsystem", "")),
+            "candidate_review_signal": str(
+                build_request_binding.get("handoff_summary", {}).get("candidate_signal", "no-candidates")
+            ),
+            "selected_candidate_count": len(selected_patch_candidates),
+            "matched_candidate_target_count": sum(
+                target in patch_targets for target in selected_candidate_targets
+            ),
+            "patch_count": len(build_artifact.get("patches", [])),
+            "applied_patch_count": int(sandbox_apply_receipt.get("applied_patch_count", 0)),
+            "live_eval_refs": list(live_enactment_session.get("eval_refs", [])),
+            "live_command_count": int(live_enactment_session.get("executed_command_count", 0)),
+            "required_eval_refs": required_eval_refs,
+            "rollout_decision": str(rollout_session.get("decision", "")),
+            "rollback_trigger": str(rollback_session.get("trigger", "")),
+            "reverted_patch_count": int(rollback_session.get("reverted_patch_count", 0)),
+            "reverted_stage_ids": list(rollback_session.get("reverted_stage_ids", [])),
+            "reviewer_network_attested": (
+                bool(live_enactment_session.get("oversight_gate", {}).get("reviewer_network_attested"))
+                and bool(rollback_session.get("telemetry_gate", {}).get("reviewer_network_attested"))
+            ),
+        }
+
+        validation = {
+            "build_request_binding_ok": build_request_binding.get("validation", {}).get("ok") is True,
+            "artifact_request_bound": (
+                build_artifact.get("request_id") == request_id and build_artifact.get("status") == "ready"
+            ),
+            "sandbox_apply_bound": (
+                sandbox_apply_receipt.get("request_id") == request_id
+                and sandbox_apply_receipt.get("artifact_id") == artifact_id
+                and sandbox_apply_receipt.get("status") == "applied"
+                and sandbox_apply_receipt.get("rollback_plan_ref") == rollback_plan_ref
+            ),
+            "live_enactment_bound": (
+                live_enactment_session.get("request_id") == request_id
+                and live_enactment_session.get("artifact_id") == artifact_id
+                and live_enactment_session.get("status") == "passed"
+                and live_enactment_session.get("guardian_oversight_event", {}).get("payload_ref")
+                == build_artifact_ref
+            ),
+            "rollout_bound": (
+                rollout_session.get("request_id") == request_id
+                and rollout_session.get("artifact_id") == artifact_id
+                and rollout_session.get("apply_receipt_id") == apply_receipt_id
+                and rollout_session.get("decision") == "rollback"
+                and rollout_session.get("status") == "rolled-back"
+            ),
+            "rollback_bound": (
+                rollback_session.get("request_id") == request_id
+                and rollback_session.get("artifact_id") == artifact_id
+                and rollback_session.get("apply_receipt_id") == apply_receipt_id
+                and rollback_session.get("rollout_session_id") == rollout_session_id
+                and rollback_session.get("live_enactment_session_id") == enactment_session_id
+                and rollback_session.get("rollback_plan_ref") == rollback_plan_ref
+                and rollback_session.get("status") == "rolled-back"
+            ),
+            "candidate_hints_bound": (
+                build_request_binding.get("handoff_summary", {}).get("selected_candidate_count")
+                == len(selected_patch_candidates)
+                and all(
+                    target_path in list(build_request.get("output_paths", []))
+                    for target_path in selected_candidate_targets
+                )
+            ),
+            "digest_family_bound": (
+                digest_family["build_request_digest"] == build_request_digest
+                and digest_family["build_artifact_digest"] == build_artifact_digest
+                and digest_family["sandbox_apply_receipt_digest"] == sandbox_apply_receipt_digest
+                and digest_family["live_enactment_session_digest"] == live_enactment_session_digest
+                and digest_family["rollout_session_digest"] == rollout_session_digest
+                and digest_family["rollback_session_digest"] == rollback_session_digest
+            ),
+            "reviewer_network_attested": execution_summary["reviewer_network_attested"] is True,
+            "required_eval_refs_bound": (
+                execution_summary["required_eval_refs"] == required_eval_refs
+                and YAOYOROZU_EXECUTION_CHAIN_EVAL in required_eval_refs
+            ),
+        }
+        validation["ok"] = all(validation.values())
+
+        binding = {
+            "kind": "yaoyorozu_execution_chain_binding",
+            "schema_version": "1.0.0",
+            "binding_id": new_id("yaoyorozu-execution-chain"),
+            "binding_ref": "",
+            "bound_at": utc_now_iso(),
+            "binding_profile": self._policy.execution_chain_binding_profile,
+            "proposal_profile": str(build_request_binding.get("proposal_profile", "")),
+            "build_request_binding_ref": str(build_request_binding.get("binding_ref", "")),
+            "build_request_binding_digest": str(build_request_binding.get("binding_digest", "")),
+            "build_request_binding": dict(build_request_binding),
+            "build_artifact_ref": build_artifact_ref,
+            "build_artifact_digest": build_artifact_digest,
+            "build_artifact": dict(build_artifact),
+            "sandbox_apply_receipt_ref": sandbox_apply_receipt_ref,
+            "sandbox_apply_receipt_digest": sandbox_apply_receipt_digest,
+            "sandbox_apply_receipt": dict(sandbox_apply_receipt),
+            "live_enactment_session_ref": live_enactment_session_ref,
+            "live_enactment_session_digest": live_enactment_session_digest,
+            "live_enactment_session": dict(live_enactment_session),
+            "rollout_session_ref": rollout_session_ref,
+            "rollout_session_digest": rollout_session_digest,
+            "rollout_session": dict(rollout_session),
+            "rollback_session_ref": rollback_session_ref,
+            "rollback_session_digest": rollback_session_digest,
+            "rollback_session": dict(rollback_session),
+            "digest_family": digest_family,
+            "execution_summary": execution_summary,
+            "validation": validation,
+        }
+        binding["binding_ref"] = f"execution-chain-binding://{binding['binding_id']}"
+        binding["binding_digest"] = sha256_text(
+            canonical_json(_execution_chain_binding_digest_payload(binding))
+        )
+        return binding
+
+    def validate_execution_chain(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if binding.get("kind") != "yaoyorozu_execution_chain_binding":
+            errors.append("kind must equal yaoyorozu_execution_chain_binding")
+        if binding.get("binding_profile") != self._policy.execution_chain_binding_profile:
+            errors.append("binding_profile mismatch")
+
+        build_request_binding = binding.get("build_request_binding", {})
+        build_artifact = binding.get("build_artifact", {})
+        sandbox_apply_receipt = binding.get("sandbox_apply_receipt", {})
+        live_enactment_session = binding.get("live_enactment_session", {})
+        rollout_session = binding.get("rollout_session", {})
+        rollback_session = binding.get("rollback_session", {})
+        digest_family = binding.get("digest_family", {})
+        execution_summary = binding.get("execution_summary", {})
+        validation = binding.get("validation", {})
+
+        if not isinstance(build_request_binding, Mapping):
+            errors.append("build_request_binding must be a mapping")
+            build_request_binding = {}
+        if not isinstance(build_artifact, Mapping):
+            errors.append("build_artifact must be a mapping")
+            build_artifact = {}
+        if not isinstance(sandbox_apply_receipt, Mapping):
+            errors.append("sandbox_apply_receipt must be a mapping")
+            sandbox_apply_receipt = {}
+        if not isinstance(live_enactment_session, Mapping):
+            errors.append("live_enactment_session must be a mapping")
+            live_enactment_session = {}
+        if not isinstance(rollout_session, Mapping):
+            errors.append("rollout_session must be a mapping")
+            rollout_session = {}
+        if not isinstance(rollback_session, Mapping):
+            errors.append("rollback_session must be a mapping")
+            rollback_session = {}
+        if not isinstance(digest_family, Mapping):
+            errors.append("digest_family must be a mapping")
+            digest_family = {}
+        if not isinstance(execution_summary, Mapping):
+            errors.append("execution_summary must be a mapping")
+            execution_summary = {}
+        if not isinstance(validation, Mapping):
+            errors.append("validation must be a mapping")
+            validation = {}
+
+        if build_request_binding.get("kind") != "yaoyorozu_build_request_binding":
+            errors.append("build_request_binding.kind must equal yaoyorozu_build_request_binding")
+        if build_artifact.get("kind") != "build_artifact":
+            errors.append("build_artifact.kind must equal build_artifact")
+        if sandbox_apply_receipt.get("kind") != "sandbox_apply_receipt":
+            errors.append("sandbox_apply_receipt.kind must equal sandbox_apply_receipt")
+        if live_enactment_session.get("kind") != "builder_live_enactment_session":
+            errors.append("live_enactment_session.kind must equal builder_live_enactment_session")
+        if rollout_session.get("kind") != "staged_rollout_session":
+            errors.append("rollout_session.kind must equal staged_rollout_session")
+        if rollback_session.get("kind") != "builder_rollback_session":
+            errors.append("rollback_session.kind must equal builder_rollback_session")
+
+        build_request = build_request_binding.get("build_request", {})
+        request_id = str(build_request.get("request_id", ""))
+        artifact_id = str(build_artifact.get("artifact_id", ""))
+        apply_receipt_id = str(sandbox_apply_receipt.get("receipt_id", ""))
+        enactment_session_id = str(live_enactment_session.get("enactment_session_id", ""))
+        rollout_session_id = str(rollout_session.get("session_id", ""))
+        rollback_session_id = str(rollback_session.get("rollback_session_id", ""))
+
+        if binding.get("build_request_binding_ref") != build_request_binding.get("binding_ref"):
+            errors.append("build_request_binding_ref must bind build_request_binding.binding_ref")
+        if binding.get("build_request_binding_digest") != build_request_binding.get("binding_digest"):
+            errors.append(
+                "build_request_binding_digest must bind build_request_binding.binding_digest"
+            )
+        if binding.get("build_artifact_ref") != f"artifact://{artifact_id}":
+            errors.append("build_artifact_ref must bind build_artifact.artifact_id")
+        if binding.get("build_artifact_digest") != sha256_text(canonical_json(build_artifact)):
+            errors.append("build_artifact_digest mismatch")
+        if binding.get("sandbox_apply_receipt_ref") != f"sandbox-apply://{apply_receipt_id}":
+            errors.append("sandbox_apply_receipt_ref must bind sandbox_apply_receipt.receipt_id")
+        if binding.get("sandbox_apply_receipt_digest") != sha256_text(
+            canonical_json(sandbox_apply_receipt)
+        ):
+            errors.append("sandbox_apply_receipt_digest mismatch")
+        if binding.get("live_enactment_session_ref") != f"enactment-session://{enactment_session_id}":
+            errors.append(
+                "live_enactment_session_ref must bind live_enactment_session.enactment_session_id"
+            )
+        if binding.get("live_enactment_session_digest") != sha256_text(
+            canonical_json(live_enactment_session)
+        ):
+            errors.append("live_enactment_session_digest mismatch")
+        if binding.get("rollout_session_ref") != f"rollout-session://{rollout_session_id}":
+            errors.append("rollout_session_ref must bind rollout_session.session_id")
+        if binding.get("rollout_session_digest") != sha256_text(canonical_json(rollout_session)):
+            errors.append("rollout_session_digest mismatch")
+        if binding.get("rollback_session_ref") != f"rollback-session://{rollback_session_id}":
+            errors.append("rollback_session_ref must bind rollback_session.rollback_session_id")
+        if binding.get("rollback_session_digest") != sha256_text(canonical_json(rollback_session)):
+            errors.append("rollback_session_digest mismatch")
+
+        expected_required_eval_refs = _ordered_unique(
+            [
+                *list(build_request.get("constraints", {}).get("must_pass", [])),
+                *YAOYOROZU_EXECUTION_CHAIN_REQUIRED_EVALS,
+            ]
+        )
+        if execution_summary.get("required_eval_refs") != expected_required_eval_refs:
+            errors.append("execution_summary.required_eval_refs mismatch")
+        if execution_summary.get("target_subsystem") != self._policy.build_request_target_subsystem:
+            errors.append("execution_summary.target_subsystem mismatch")
+        if execution_summary.get("rollout_decision") != "rollback":
+            errors.append("execution_summary.rollout_decision must equal rollback")
+        if execution_summary.get("rollback_trigger") != "eval-regression":
+            errors.append("execution_summary.rollback_trigger must equal eval-regression")
+        if not bool(execution_summary.get("reviewer_network_attested")):
+            errors.append("execution_summary.reviewer_network_attested must be true")
+
+        expected_digest_family = {
+            "request_id": request_id,
+            "artifact_id": artifact_id,
+            "apply_receipt_id": apply_receipt_id,
+            "live_enactment_session_id": enactment_session_id,
+            "rollout_session_id": rollout_session_id,
+            "rollback_session_id": rollback_session_id,
+            "build_request_digest": str(build_request_binding.get("build_request_digest", "")),
+            "build_artifact_digest": str(binding.get("build_artifact_digest", "")),
+            "sandbox_apply_receipt_digest": str(binding.get("sandbox_apply_receipt_digest", "")),
+            "live_enactment_session_digest": str(binding.get("live_enactment_session_digest", "")),
+            "rollout_session_digest": str(binding.get("rollout_session_digest", "")),
+            "rollback_session_digest": str(binding.get("rollback_session_digest", "")),
+        }
+        expected_digest_family["family_digest"] = sha256_text(canonical_json(expected_digest_family))
+        if dict(digest_family) != expected_digest_family:
+            errors.append("digest_family mismatch")
+
+        if validation.get("ok") is not True:
+            errors.append("validation.ok must remain true")
+
+        return {
+            "ok": not errors,
+            "patch_count": int(execution_summary.get("patch_count", 0)),
+            "applied_patch_count": int(execution_summary.get("applied_patch_count", 0)),
+            "reverted_patch_count": int(execution_summary.get("reverted_patch_count", 0)),
+            "reviewer_network_attested": bool(execution_summary.get("reviewer_network_attested")),
             "errors": errors,
         }
 

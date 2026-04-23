@@ -78,6 +78,12 @@ proposal profile に応じた 3 root bundle strategy に畳まれ、
 same-session の convocation / worker dispatch / ConsensusBus / TaskGraph bundle が
 `L5.PatchGenerator` 向け `build_request` と patch-generator-ready scope validation に接続されること。
 
+### Yaoyorozu Execution Chain Binding
+same-session の `build_request` handoff が
+`build_artifact` / `sandbox_apply_receipt` / live enactment /
+rollback witness まで 1 つの digest family に束縛され、
+reviewer-network-attested execution chain として返ること。
+
 ### Yaoyorozu Worker Delta Receipt
 repo-local worker dispatch が ready report だけでなく、
 dispatch/unit binding と workspace-bounded target path observation に加えて、
@@ -135,6 +141,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `task_graph_complexity_guard.yaml`
 - `trust_score_update_guard.yaml`
 - `yaoyorozu_build_request_binding.yaml`
+- `yaoyorozu_execution_chain_binding.yaml`
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_fork_request_profile.yaml`
