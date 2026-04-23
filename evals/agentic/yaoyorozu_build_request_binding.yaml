@@ -1,0 +1,15 @@
+eval_id: yaoyorozu_build_request_binding
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu must promote one same-session dispatch bundle into an L5 build_request handoff that stays patch-generator-ready while keeping candidate-bound review hints.
+inputs:
+  - source_root: agents
+  - proposal_profile: self-modify-patch-v1
+  - session_mode: standard
+expected:
+  build_request_binding_ok: true
+  build_request_scope_allowed: true
+  build_request_target_subsystem: L5.PatchGenerator
+metric: equality
+threshold: 1.0
+ethics_check: true

@@ -83,6 +83,10 @@ blocked direct builder handoff と guardian-gated resolve を伴う
 `TaskGraph` の complexity ceiling に合わせて 3 root bundle strategy へ畳まれ、
 worker claim / guardian gate / resolve digest を伴う
 `yaoyorozu_task_graph_binding` として execution bundle 化される。
+さらに同じ execution bundle は `L5.PatchGenerator` 向け `build_request` と
+patch-generator-ready scope validation に接続され、
+priority-ranked patch candidate hint を添えた
+`yaoyorozu_build_request_binding` としても materialize される。
 
 ## 並列召喚
 

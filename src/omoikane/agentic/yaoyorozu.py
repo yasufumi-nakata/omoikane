@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
+from ..self_construction.builders import PatchGeneratorService
+from ..self_construction.design_reader import DesignReaderService
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
 from .local_worker_stub import (
     YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
@@ -33,6 +35,7 @@ YAOYOROZU_WORKER_DISPATCH_PROFILE = "repo-local-subprocess-worker-dispatch-v1"
 YAOYOROZU_WORKER_EXECUTION_PROFILE = "repo-local-subprocess-worker-execution-v1"
 YAOYOROZU_CONSENSUS_BINDING_PROFILE = "repo-local-yaoyorozu-consensus-bus-binding-v1"
 YAOYOROZU_TASK_GRAPH_BINDING_PROFILE = "repo-local-yaoyorozu-task-graph-binding-v1"
+YAOYOROZU_BUILD_REQUEST_BINDING_PROFILE = "repo-local-yaoyorozu-build-request-binding-v1"
 YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE = "same-host-local-workspace-discovery-v1"
 YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE = "same-host-local-workspace-catalog"
 YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF = "host://local-loopback"
@@ -53,6 +56,60 @@ YAOYOROZU_WORKER_TARGET_PATHS = {
     "schema": ["specs/interfaces/", "specs/schemas/"],
     "eval": ["evals/"],
     "docs": ["docs/", "meta/decision-log/"],
+}
+YAOYOROZU_BUILD_REQUEST_SCOPE_ROOTS = [
+    "src/omoikane/",
+    "tests/",
+    "evals/",
+    "docs/",
+    "meta/decision-log/",
+    "specs/",
+]
+YAOYOROZU_BUILD_REQUEST_TARGET_SUBSYSTEM = "L5.PatchGenerator"
+YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS = "feature-improvement"
+YAOYOROZU_BUILD_REQUEST_CANDIDATE_LIMIT = 3
+YAOYOROZU_BUILD_REQUEST_EVAL = "evals/agentic/yaoyorozu_build_request_binding.yaml"
+YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS = [
+    "docs/02-subsystems/agentic/README.md",
+    "docs/02-subsystems/agentic/yaoyorozu-roster.md",
+    "docs/04-ai-governance/subagent-roster.md",
+    "docs/07-reference-implementation/README.md",
+]
+YAOYOROZU_BUILD_REQUEST_SPEC_REFS = [
+    "specs/interfaces/agentic.yaoyorozu.v0.idl",
+    "specs/schemas/build_request.yaml",
+    "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+    "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
+    "specs/schemas/yaoyorozu_task_graph_binding.schema",
+    "specs/schemas/yaoyorozu_build_request_binding.schema",
+]
+YAOYOROZU_BUILD_REQUEST_STATIC_OUTPUT_PATHS = [
+    "src/omoikane/self_construction/builders.py",
+    "tests/unit/test_builders.py",
+    "evals/continuity/council_output_build_request_pipeline.yaml",
+    *YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS,
+]
+YAOYOROZU_PROFILE_BUILD_REQUEST_EVALS = {
+    "self-modify-patch-v1": [
+        "evals/agentic/yaoyorozu_local_worker_dispatch.yaml",
+        "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
+        "evals/agentic/yaoyorozu_task_graph_binding.yaml",
+    ],
+    "memory-edit-v1": [
+        "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
+        "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
+        "evals/agentic/yaoyorozu_task_graph_binding.yaml",
+    ],
+    "fork-request-v1": [
+        "evals/agentic/yaoyorozu_fork_request_profile.yaml",
+        "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
+        "evals/agentic/yaoyorozu_task_graph_binding.yaml",
+    ],
+    "inter-mind-negotiation-v1": [
+        "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
+        "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
+        "evals/agentic/yaoyorozu_task_graph_binding.yaml",
+    ],
 }
 YAOYOROZU_WORKSPACE_COVERAGE_CAPABILITY_RULES = {
     "runtime": ("code.generate", "code.refactor", "code.test"),
@@ -221,6 +278,15 @@ def _non_empty_string(value: Any, field_name: str) -> str:
     return value.strip()
 
 
+def _ordered_unique(values: Sequence[str]) -> List[str]:
+    ordered: List[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if normalized and normalized not in ordered:
+            ordered.append(normalized)
+    return ordered
+
+
 def _parse_agent_definition(path: Path) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -381,6 +447,31 @@ def _task_graph_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, 
     }
 
 
+def _build_request_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": binding["schema_version"],
+        "binding_profile": binding["binding_profile"],
+        "proposal_profile": binding["proposal_profile"],
+        "convocation_session_ref": binding["convocation_session_ref"],
+        "convocation_session_digest": binding["convocation_session_digest"],
+        "dispatch_plan_ref": binding["dispatch_plan_ref"],
+        "dispatch_plan_digest": binding["dispatch_plan_digest"],
+        "dispatch_receipt_ref": binding["dispatch_receipt_ref"],
+        "dispatch_receipt_digest": binding["dispatch_receipt_digest"],
+        "consensus_binding_ref": binding["consensus_binding_ref"],
+        "consensus_binding_digest": binding["consensus_binding_digest"],
+        "task_graph_binding_ref": binding["task_graph_binding_ref"],
+        "task_graph_binding_digest": binding["task_graph_binding_digest"],
+        "council_action": binding["council_action"],
+        "handoff_summary": binding["handoff_summary"],
+        "selected_patch_candidates": binding["selected_patch_candidates"],
+        "build_request_ref": binding["build_request_ref"],
+        "build_request_digest": binding["build_request_digest"],
+        "scope_validation": binding["scope_validation"],
+        "validation": binding["validation"],
+    }
+
+
 def _workspace_ref_from_root(workspace_root: Path) -> str:
     normalized_name = "".join(
         character.lower() if character.isalnum() else "-"
@@ -488,6 +579,9 @@ class YaoyorozuRegistryPolicy:
     workspace_discovery_host_ref: str = YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF
     workspace_review_budget: int = YAOYOROZU_WORKSPACE_DISCOVERY_MAX_WORKSPACES
     task_graph_binding_profile: str = YAOYOROZU_TASK_GRAPH_BINDING_PROFILE
+    build_request_binding_profile: str = YAOYOROZU_BUILD_REQUEST_BINDING_PROFILE
+    build_request_target_subsystem: str = YAOYOROZU_BUILD_REQUEST_TARGET_SUBSYSTEM
+    build_request_candidate_limit: int = YAOYOROZU_BUILD_REQUEST_CANDIDATE_LIMIT
     top_k_per_role: int = 1
     worker_target_paths: Dict[str, List[str]] = field(
         default_factory=lambda: {
@@ -740,9 +834,13 @@ class YaoyorozuRegistryService:
         *,
         trust_service: Optional[TrustService] = None,
         policy: Optional[YaoyorozuRegistryPolicy] = None,
+        design_reader: Optional[DesignReaderService] = None,
+        patch_generator: Optional[PatchGeneratorService] = None,
     ) -> None:
         self._trust = trust_service or TrustService()
         self._policy = policy or YaoyorozuRegistryPolicy()
+        self._design_reader = design_reader or DesignReaderService()
+        self._patch_generator = patch_generator or PatchGeneratorService()
         self._entries: Dict[str, YaoyorozuRegistryEntry] = {}
         self._agents_root: Optional[Path] = None
         self._last_snapshot_id: Optional[str] = None
@@ -3370,6 +3468,449 @@ class YaoyorozuRegistryService:
             "bundle_strategy_ok": validation.get("bundle_strategy_ok") is True,
             "worker_claims_bound": validation.get("worker_claims_bound") is True,
             "coverage_grouping_ok": validation.get("coverage_grouping_ok") is True,
+            "errors": errors,
+        }
+
+    def _repo_root(self) -> Path:
+        if self._agents_root is None:
+            raise ValueError(
+                "agents directory must be synced before build_request handoff binding can be prepared"
+            )
+        return self._agents_root.parent.resolve()
+
+    def _build_request_eval_refs(self, proposal_profile: str) -> List[str]:
+        profile_evals = YAOYOROZU_PROFILE_BUILD_REQUEST_EVALS.get(proposal_profile)
+        if not isinstance(profile_evals, list) or not profile_evals:
+            raise ValueError(f"unsupported proposal profile for build_request handoff: {proposal_profile}")
+        return _ordered_unique(
+            [
+                "evals/continuity/council_output_build_request_pipeline.yaml",
+                YAOYOROZU_BUILD_REQUEST_EVAL,
+                *profile_evals,
+            ]
+        )
+
+    def _sorted_patch_candidates(
+        self,
+        dispatch_receipt: Mapping[str, Any],
+    ) -> List[Dict[str, Any]]:
+        ranked_candidates: List[Dict[str, Any]] = []
+        for result in dispatch_receipt.get("results", []):
+            if not isinstance(result, Mapping):
+                continue
+            report = result.get("report", {})
+            if not isinstance(report, Mapping):
+                continue
+            patch_candidate_receipt = report.get("patch_candidate_receipt", {})
+            if not isinstance(patch_candidate_receipt, Mapping):
+                continue
+            patch_candidates = patch_candidate_receipt.get("patch_candidates", [])
+            if not isinstance(patch_candidates, list):
+                continue
+            for candidate in patch_candidates:
+                if not isinstance(candidate, Mapping):
+                    continue
+                patch_descriptor = candidate.get("patch_descriptor", {})
+                if not isinstance(patch_descriptor, Mapping):
+                    patch_descriptor = {}
+                ranked_candidates.append(
+                    {
+                        "dispatch_unit_ref": str(result.get("unit_id", "")),
+                        "coverage_area": str(result.get("coverage_area", "")),
+                        "selected_agent_id": str(result.get("selected_agent_id", "")),
+                        "patch_candidate_receipt_ref": str(
+                            patch_candidate_receipt.get("receipt_ref", "")
+                        ),
+                        "patch_candidate_receipt_digest": str(
+                            patch_candidate_receipt.get("receipt_digest", "")
+                        ),
+                        "candidate_id": str(candidate.get("candidate_id", "")),
+                        "candidate_digest": str(candidate.get("candidate_digest", "")),
+                        "priority_rank": int(candidate.get("priority_rank", 0)),
+                        "priority_score": int(candidate.get("priority_score", 0)),
+                        "priority_tier": str(candidate.get("priority_tier", "none")),
+                        "target_path": str(candidate.get("target_path", "")),
+                        "patch_descriptor": dict(patch_descriptor),
+                    }
+                )
+        ranked_candidates.sort(
+            key=lambda candidate: (
+                -int(candidate["priority_score"]),
+                int(candidate["priority_rank"]),
+                str(candidate["coverage_area"]),
+                str(candidate["candidate_id"]),
+            )
+        )
+        for review_rank, candidate in enumerate(ranked_candidates, start=1):
+            candidate["review_rank"] = review_rank
+        return ranked_candidates
+
+    def bind_build_request_handoff(
+        self,
+        *,
+        convocation_session: Mapping[str, Any],
+        dispatch_plan: Mapping[str, Any],
+        dispatch_receipt: Mapping[str, Any],
+        consensus_binding: Mapping[str, Any],
+        task_graph_binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if convocation_session.get("kind") != "council_convocation_session":
+            raise ValueError("convocation_session.kind must equal council_convocation_session")
+        if dispatch_plan.get("kind") != "yaoyorozu_worker_dispatch_plan":
+            raise ValueError("dispatch_plan.kind must equal yaoyorozu_worker_dispatch_plan")
+        if dispatch_receipt.get("kind") != "yaoyorozu_worker_dispatch_receipt":
+            raise ValueError("dispatch_receipt.kind must equal yaoyorozu_worker_dispatch_receipt")
+        if consensus_binding.get("kind") != "yaoyorozu_consensus_dispatch_binding":
+            raise ValueError(
+                "consensus_binding.kind must equal yaoyorozu_consensus_dispatch_binding"
+            )
+        if task_graph_binding.get("kind") != "yaoyorozu_task_graph_binding":
+            raise ValueError("task_graph_binding.kind must equal yaoyorozu_task_graph_binding")
+
+        proposal_profile = str(convocation_session.get("proposal_profile", ""))
+        if proposal_profile != dispatch_plan.get("proposal_profile") or proposal_profile != dispatch_receipt.get(
+            "proposal_profile"
+        ):
+            raise ValueError("proposal_profile must remain aligned across convocation, plan, and receipt")
+        if proposal_profile != task_graph_binding.get("proposal_profile"):
+            raise ValueError("task_graph_binding.proposal_profile must match convocation_session")
+
+        repo_root = self._repo_root()
+        session_id = str(convocation_session.get("session_id", ""))
+        dispatch_plan_ref = f"dispatch://{dispatch_plan['dispatch_id']}"
+        dispatch_receipt_ref = f"dispatch-receipt://{dispatch_receipt['receipt_id']}"
+        consensus_binding_ref = f"consensus-binding://{consensus_binding['binding_id']}"
+        task_graph_binding_ref = f"task-graph-binding://{task_graph_binding['binding_id']}"
+
+        ranked_candidates = self._sorted_patch_candidates(dispatch_receipt)
+        selected_candidates = [
+            {
+                "dispatch_unit_ref": str(candidate["dispatch_unit_ref"]),
+                "coverage_area": str(candidate["coverage_area"]),
+                "selected_agent_id": str(candidate["selected_agent_id"]),
+                "patch_candidate_receipt_ref": str(candidate["patch_candidate_receipt_ref"]),
+                "patch_candidate_receipt_digest": str(candidate["patch_candidate_receipt_digest"]),
+                "candidate_id": str(candidate["candidate_id"]),
+                "candidate_digest": str(candidate["candidate_digest"]),
+                "review_rank": int(candidate["review_rank"]),
+                "priority_rank": int(candidate["priority_rank"]),
+                "priority_score": int(candidate["priority_score"]),
+                "priority_tier": str(candidate["priority_tier"]),
+                "target_path": str(candidate["target_path"]),
+                "patch_descriptor": dict(candidate["patch_descriptor"]),
+            }
+            for candidate in ranked_candidates[: self._policy.build_request_candidate_limit]
+        ]
+
+        request_id = new_id("build")
+        output_paths = _ordered_unique(
+            list(YAOYOROZU_BUILD_REQUEST_STATIC_OUTPUT_PATHS)
+            + [f"meta/decision-log/{request_id}.md"]
+            + [str(candidate["target_path"]) for candidate in ranked_candidates if candidate["target_path"]]
+        )
+        must_pass_evals = self._build_request_eval_refs(proposal_profile)
+        change_summary = (
+            f"Promote the {proposal_profile} Yaoyorozu dispatch bundle into an "
+            f"{self._policy.build_request_target_subsystem} handoff with candidate-bound review hints."
+        )
+        manifest = self._design_reader.finalize_manifest(
+            self._design_reader.read_design_delta(
+                target_subsystem=self._policy.build_request_target_subsystem,
+                change_summary=change_summary,
+                design_refs=list(YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS),
+                spec_refs=list(YAOYOROZU_BUILD_REQUEST_SPEC_REFS),
+                workspace_scope=list(YAOYOROZU_BUILD_REQUEST_SCOPE_ROOTS),
+                output_paths=output_paths,
+                must_sync_docs=list(YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS),
+                repo_root=repo_root,
+            )
+        )
+        build_request = self._design_reader.prepare_build_request(
+            manifest=manifest,
+            request_id=request_id,
+            change_class=YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS,
+            must_pass=must_pass_evals,
+            council_session_id=session_id,
+            guardian_gate="pass",
+        )
+        build_request_ref = f"build://{build_request['request_id']}"
+        build_request_digest = sha256_text(canonical_json(build_request))
+        scope_validation = self._patch_generator.validate_scope(build_request)
+
+        ranked_candidate_ids = [str(candidate["candidate_id"]) for candidate in ranked_candidates]
+        selected_candidate_ids = [
+            str(candidate["candidate_id"]) for candidate in selected_candidates
+        ]
+        handoff_summary = {
+            "target_subsystem": self._policy.build_request_target_subsystem,
+            "change_class": YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS,
+            "dispatch_coverage_areas": list(dispatch_plan["selection_summary"]["dispatch_coverage_areas"]),
+            "workspace_scope": list(build_request["workspace_scope"]),
+            "output_paths": list(build_request["output_paths"]),
+            "must_sync_docs": list(build_request["must_sync_docs"]),
+            "must_pass_evals": list(build_request["constraints"]["must_pass"]),
+            "candidate_signal": "candidate-ready" if ranked_candidates else "no-candidates",
+            "candidate_count": len(ranked_candidates),
+            "selected_candidate_count": len(selected_candidates),
+            "selected_candidate_limit": self._policy.build_request_candidate_limit,
+            "patch_priority_profile": str(
+                dispatch_receipt["execution_summary"]["patch_priority_profile"]
+            ),
+            "highest_priority_tier": str(
+                dispatch_receipt["execution_summary"]["highest_patch_priority_tier"]
+            ),
+            "highest_priority_score": int(
+                dispatch_receipt["execution_summary"]["highest_patch_priority_score"]
+            ),
+            "ranked_candidate_ids": ranked_candidate_ids,
+            "selected_candidate_ids": selected_candidate_ids,
+        }
+        council_action = {
+            "session_id": session_id,
+            "approved_action": "emit_build_request",
+            "guardian_gate_status": "pass",
+            "resolution_status": "ready-for-patch-generator",
+            "guardian_gate_message_digest": str(task_graph_binding["guardian_gate_message_digest"]),
+            "resolve_message_digest": str(task_graph_binding["resolve_message_digest"]),
+        }
+
+        def _scope_contains(path: str, scopes: Sequence[str]) -> bool:
+            normalized_path = path.rstrip("/")
+            for scope in scopes:
+                normalized_scope = str(scope).rstrip("/")
+                if normalized_path == normalized_scope or normalized_path.startswith(
+                    f"{normalized_scope}/"
+                ):
+                    return True
+            return False
+
+        validation = {
+            "same_session_bound": (
+                build_request["approval_context"]["council_session_id"] == session_id
+                and consensus_binding.get("consensus_session_id") == session_id
+                and task_graph_binding.get("consensus_session_id") == session_id
+                and council_action["session_id"] == session_id
+            ),
+            "consensus_task_graph_bound": (
+                consensus_binding.get("convocation_session_ref")
+                == f"convocation://{convocation_session['session_id']}"
+                and consensus_binding.get("dispatch_plan_ref") == dispatch_plan_ref
+                and consensus_binding.get("dispatch_receipt_ref") == dispatch_receipt_ref
+                and task_graph_binding.get("convocation_session_ref")
+                == f"convocation://{convocation_session['session_id']}"
+                and task_graph_binding.get("dispatch_plan_ref") == dispatch_plan_ref
+                and task_graph_binding.get("dispatch_receipt_ref") == dispatch_receipt_ref
+                and task_graph_binding.get("consensus_binding_ref") == consensus_binding_ref
+            ),
+            "build_request_ref_bound": (
+                build_request_ref == f"build://{build_request['request_id']}"
+                and build_request["target_subsystem"] == self._policy.build_request_target_subsystem
+                and build_request["change_class"] == YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS
+                and build_request["approval_context"]["guardian_gate"]
+                == council_action["guardian_gate_status"]
+            ),
+            "build_request_scope_allowed": (
+                scope_validation["allowed"] is True and not scope_validation["blocking_rules"]
+            ),
+            "must_pass_bound": list(build_request["constraints"]["must_pass"]) == must_pass_evals,
+            "output_paths_bound": (
+                list(build_request["output_paths"]) == output_paths
+                and list(build_request["constraints"]["allowed_write_paths"]) == output_paths
+                and all(
+                    _scope_contains(path, build_request["workspace_scope"])
+                    for path in build_request["output_paths"]
+                )
+            ),
+            "patch_candidate_summary_bound": (
+                handoff_summary["patch_priority_profile"]
+                == dispatch_receipt["execution_summary"]["patch_priority_profile"]
+                and handoff_summary["highest_priority_tier"]
+                == dispatch_receipt["execution_summary"]["highest_patch_priority_tier"]
+                and handoff_summary["highest_priority_score"]
+                == dispatch_receipt["execution_summary"]["highest_patch_priority_score"]
+                and handoff_summary["candidate_count"] == len(ranked_candidates)
+                and handoff_summary["selected_candidate_count"] == len(selected_candidates)
+                and handoff_summary["selected_candidate_ids"] == selected_candidate_ids
+            ),
+            "selected_candidates_sorted": (
+                selected_candidate_ids == ranked_candidate_ids[: len(selected_candidates)]
+                and [candidate["review_rank"] for candidate in selected_candidates]
+                == list(range(1, len(selected_candidates) + 1))
+            ),
+        }
+        validation["ok"] = all(validation.values())
+
+        binding = {
+            "kind": "yaoyorozu_build_request_binding",
+            "schema_version": "1.0.0",
+            "binding_id": new_id("yaoyorozu-build-request"),
+            "binding_ref": "",
+            "bound_at": utc_now_iso(),
+            "binding_profile": self._policy.build_request_binding_profile,
+            "proposal_profile": proposal_profile,
+            "convocation_session_ref": f"convocation://{convocation_session['session_id']}",
+            "convocation_session_digest": convocation_session["session_digest"],
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+            "dispatch_receipt_ref": dispatch_receipt_ref,
+            "dispatch_receipt_digest": dispatch_receipt["receipt_digest"],
+            "consensus_binding_ref": consensus_binding_ref,
+            "consensus_binding_digest": consensus_binding["binding_digest"],
+            "task_graph_binding_ref": task_graph_binding_ref,
+            "task_graph_binding_digest": task_graph_binding["binding_digest"],
+            "council_action": council_action,
+            "handoff_summary": handoff_summary,
+            "selected_patch_candidates": selected_candidates,
+            "build_request_ref": build_request_ref,
+            "build_request_digest": build_request_digest,
+            "build_request": build_request,
+            "scope_validation": dict(scope_validation),
+            "validation": validation,
+        }
+        binding["binding_ref"] = f"build-request-binding://{binding['binding_id']}"
+        binding["binding_digest"] = sha256_text(
+            canonical_json(_build_request_binding_digest_payload(binding))
+        )
+        return binding
+
+    def validate_build_request_handoff(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if binding.get("kind") != "yaoyorozu_build_request_binding":
+            errors.append("kind must equal yaoyorozu_build_request_binding")
+        if binding.get("binding_profile") != self._policy.build_request_binding_profile:
+            errors.append("binding_profile mismatch")
+
+        proposal_profile = binding.get("proposal_profile")
+        if proposal_profile not in self._policy.council_profiles:
+            errors.append("proposal_profile must remain one supported Yaoyorozu proposal profile")
+
+        handoff_summary = binding.get("handoff_summary", {})
+        build_request = binding.get("build_request", {})
+        scope_validation = binding.get("scope_validation", {})
+        selected_patch_candidates = binding.get("selected_patch_candidates", [])
+        council_action = binding.get("council_action", {})
+        validation = binding.get("validation", {})
+        if not isinstance(handoff_summary, Mapping):
+            errors.append("handoff_summary must be a mapping")
+            handoff_summary = {}
+        if not isinstance(build_request, Mapping):
+            errors.append("build_request must be a mapping")
+            build_request = {}
+        if not isinstance(scope_validation, Mapping):
+            errors.append("scope_validation must be a mapping")
+            scope_validation = {}
+        if not isinstance(selected_patch_candidates, list):
+            errors.append("selected_patch_candidates must be a list")
+            selected_patch_candidates = []
+        if not isinstance(council_action, Mapping):
+            errors.append("council_action must be a mapping")
+            council_action = {}
+        if not isinstance(validation, Mapping):
+            errors.append("validation must be a mapping")
+            validation = {}
+
+        if build_request:
+            if binding.get("build_request_ref") != f"build://{build_request.get('request_id', '')}":
+                errors.append("build_request_ref must bind build_request.request_id")
+            expected_build_request_digest = sha256_text(canonical_json(build_request))
+            if binding.get("build_request_digest") != expected_build_request_digest:
+                errors.append("build_request_digest mismatch")
+            if build_request.get("target_subsystem") != self._policy.build_request_target_subsystem:
+                errors.append("build_request.target_subsystem mismatch")
+            if build_request.get("change_class") != YAOYOROZU_BUILD_REQUEST_CHANGE_CLASS:
+                errors.append("build_request.change_class mismatch")
+            if build_request.get("design_refs") != list(YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS):
+                errors.append("build_request.design_refs mismatch")
+            if build_request.get("spec_refs") != list(YAOYOROZU_BUILD_REQUEST_SPEC_REFS):
+                errors.append("build_request.spec_refs mismatch")
+            if build_request.get("must_sync_docs") != list(YAOYOROZU_BUILD_REQUEST_MUST_SYNC_DOCS):
+                errors.append("build_request.must_sync_docs mismatch")
+
+        if proposal_profile in self._policy.council_profiles and build_request:
+            expected_must_pass = self._build_request_eval_refs(str(proposal_profile))
+            if build_request.get("constraints", {}).get("must_pass") != expected_must_pass:
+                errors.append("build_request.constraints.must_pass mismatch")
+            if handoff_summary.get("must_pass_evals") != expected_must_pass:
+                errors.append("handoff_summary.must_pass_evals mismatch")
+
+        if build_request and handoff_summary:
+            if build_request.get("output_paths") != handoff_summary.get("output_paths"):
+                errors.append("handoff_summary.output_paths must mirror build_request.output_paths")
+            if build_request.get("workspace_scope") != handoff_summary.get("workspace_scope"):
+                errors.append(
+                    "handoff_summary.workspace_scope must mirror build_request.workspace_scope"
+                )
+            if build_request.get("must_sync_docs") != handoff_summary.get("must_sync_docs"):
+                errors.append("handoff_summary.must_sync_docs mismatch")
+            if build_request.get("constraints", {}).get("allowed_write_paths") != build_request.get(
+                "output_paths"
+            ):
+                errors.append("build_request allowed_write_paths must equal output_paths")
+
+        if build_request and council_action:
+            if build_request.get("approval_context", {}).get("council_session_id") != council_action.get(
+                "session_id"
+            ):
+                errors.append("council_action.session_id must bind build_request approval_context")
+            if build_request.get("approval_context", {}).get("guardian_gate") != council_action.get(
+                "guardian_gate_status"
+            ):
+                errors.append(
+                    "council_action.guardian_gate_status must bind build_request approval_context"
+                )
+
+        if scope_validation.get("allowed") is not True:
+            errors.append("scope_validation.allowed must remain true")
+        if list(scope_validation.get("blocking_rules", [])):
+            errors.append("scope_validation.blocking_rules must remain empty")
+
+        selected_candidate_ids = [
+            str(candidate.get("candidate_id", ""))
+            for candidate in selected_patch_candidates
+            if isinstance(candidate, Mapping)
+        ]
+        if handoff_summary:
+            ranked_candidate_ids = handoff_summary.get("ranked_candidate_ids", [])
+            if handoff_summary.get("selected_candidate_ids") != selected_candidate_ids:
+                errors.append("handoff_summary.selected_candidate_ids mismatch")
+            if selected_candidate_ids != ranked_candidate_ids[: len(selected_candidate_ids)]:
+                errors.append("selected_patch_candidates must preserve ranked candidate order")
+            if handoff_summary.get("selected_candidate_count") != len(selected_patch_candidates):
+                errors.append("handoff_summary.selected_candidate_count mismatch")
+            if (
+                handoff_summary.get("candidate_signal") == "no-candidates"
+                and handoff_summary.get("candidate_count") != 0
+            ):
+                errors.append("candidate_signal no-candidates requires candidate_count == 0")
+            if (
+                handoff_summary.get("candidate_signal") == "candidate-ready"
+                and handoff_summary.get("candidate_count", 0) < 1
+            ):
+                errors.append("candidate-ready requires candidate_count >= 1")
+
+        review_ranks = [
+            int(candidate.get("review_rank", 0))
+            for candidate in selected_patch_candidates
+            if isinstance(candidate, Mapping)
+        ]
+        if review_ranks and review_ranks != list(range(1, len(review_ranks) + 1)):
+            errors.append("selected_patch_candidates.review_rank must remain consecutive")
+        if validation.get("ok") is not True:
+            errors.append("binding validation must remain ok")
+
+        return {
+            "ok": not errors,
+            "selected_candidate_count": len(selected_patch_candidates),
+            "must_pass_count": len(build_request.get("constraints", {}).get("must_pass", []))
+            if isinstance(build_request, Mapping)
+            else 0,
+            "output_path_count": len(build_request.get("output_paths", []))
+            if isinstance(build_request, Mapping)
+            else 0,
+            "scope_allowed": scope_validation.get("allowed") is True,
             "errors": errors,
         }
 

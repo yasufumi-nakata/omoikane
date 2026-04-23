@@ -112,6 +112,10 @@ same-session artifact として固定する。
 の 3 root bundle strategy へ畳み、
 worker dispatch receipt と guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として固定する。
+さらに同じ convocation / dispatch / ConsensusBus / TaskGraph bundle は
+`L5.PatchGenerator` 向け `build_request` と patch-generator-ready scope validation に接続され、
+priority-ranked patch candidate hint を添えた
+`yaoyorozu_build_request_binding` としても固定される。
 optional dispatch を要求した場合は
 `memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
 `fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ

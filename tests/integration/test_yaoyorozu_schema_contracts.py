@@ -116,6 +116,18 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["task_graph_binding"],
         )
 
+    def test_build_request_binding_matches_public_schemas(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/build_request.yaml",
+            result["build_request_binding"]["build_request"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
+        )
+
     def test_memory_edit_profile_task_graph_binding_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
 
@@ -143,6 +155,10 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
+        )
 
     def test_memory_edit_optional_schema_dispatch_matches_public_schemas(self) -> None:
         result = self.runtime.run_yaoyorozu_demo(
@@ -165,6 +181,10 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
         )
 
     def test_fork_request_profile_matches_public_schemas(self) -> None:
@@ -194,6 +214,10 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
+        )
 
     def test_fork_request_optional_eval_dispatch_matches_public_schemas(self) -> None:
         result = self.runtime.run_yaoyorozu_demo(
@@ -216,6 +240,10 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
         )
 
     def test_inter_mind_negotiation_profile_matches_public_schemas(self) -> None:
@@ -244,4 +272,8 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_build_request_binding.schema",
+            result["build_request_binding"],
         )

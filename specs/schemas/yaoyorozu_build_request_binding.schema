@@ -1,0 +1,340 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_build_request_binding.schema"
+title: YaoyorozuBuildRequestBinding
+description: >
+  Same-session binding that promotes one Yaoyorozu convocation, worker dispatch,
+  ConsensusBus transcript, and TaskGraph bundle into an L5 build_request handoff.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_id
+  - binding_ref
+  - bound_at
+  - binding_digest
+  - binding_profile
+  - proposal_profile
+  - convocation_session_ref
+  - convocation_session_digest
+  - dispatch_plan_ref
+  - dispatch_plan_digest
+  - dispatch_receipt_ref
+  - dispatch_receipt_digest
+  - consensus_binding_ref
+  - consensus_binding_digest
+  - task_graph_binding_ref
+  - task_graph_binding_digest
+  - council_action
+  - handoff_summary
+  - selected_patch_candidates
+  - build_request_ref
+  - build_request_digest
+  - build_request
+  - scope_validation
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_build_request_binding
+  schema_version:
+    const: 1.0.0
+  binding_id:
+    type: string
+    pattern: "^yaoyorozu-build-request-[a-f0-9]{12}$"
+  binding_ref:
+    type: string
+    pattern: "^build-request-binding://yaoyorozu-build-request-[a-f0-9]{12}$"
+  bound_at:
+    type: string
+    format: date-time
+  binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  binding_profile:
+    const: repo-local-yaoyorozu-build-request-binding-v1
+  proposal_profile:
+    type: string
+    enum:
+      - self-modify-patch-v1
+      - memory-edit-v1
+      - fork-request-v1
+      - inter-mind-negotiation-v1
+  convocation_session_ref:
+    type: string
+    pattern: "^convocation://"
+  convocation_session_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://"
+  dispatch_plan_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_receipt_ref:
+    type: string
+    pattern: "^dispatch-receipt://"
+  dispatch_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  consensus_binding_ref:
+    type: string
+    pattern: "^consensus-binding://yaoyorozu-consensus-[a-f0-9]{12}$"
+  consensus_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  task_graph_binding_ref:
+    type: string
+    pattern: "^task-graph-binding://yaoyorozu-task-graph-[a-f0-9]{12}$"
+  task_graph_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_action:
+    type: object
+    additionalProperties: false
+    required:
+      - session_id
+      - approved_action
+      - guardian_gate_status
+      - resolution_status
+      - guardian_gate_message_digest
+      - resolve_message_digest
+    properties:
+      session_id:
+        type: string
+        pattern: "^council-convocation-[a-f0-9]{12}$"
+      approved_action:
+        const: emit_build_request
+      guardian_gate_status:
+        const: pass
+      resolution_status:
+        const: ready-for-patch-generator
+      guardian_gate_message_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      resolve_message_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  handoff_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - target_subsystem
+      - change_class
+      - dispatch_coverage_areas
+      - workspace_scope
+      - output_paths
+      - must_sync_docs
+      - must_pass_evals
+      - candidate_signal
+      - candidate_count
+      - selected_candidate_count
+      - selected_candidate_limit
+      - patch_priority_profile
+      - highest_priority_tier
+      - highest_priority_score
+      - ranked_candidate_ids
+      - selected_candidate_ids
+    properties:
+      target_subsystem:
+        const: L5.PatchGenerator
+      change_class:
+        const: feature-improvement
+      dispatch_coverage_areas:
+        type: array
+        minItems: 3
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      workspace_scope:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      output_paths:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      must_sync_docs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          pattern: "^docs/"
+      must_pass_evals:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          pattern: "^evals/"
+      candidate_signal:
+        type: string
+        enum:
+          - no-candidates
+          - candidate-ready
+      candidate_count:
+        type: integer
+        minimum: 0
+      selected_candidate_count:
+        type: integer
+        minimum: 0
+      selected_candidate_limit:
+        const: 3
+      patch_priority_profile:
+        const: target-delta-priority-ranking-v1
+      highest_priority_tier:
+        type: string
+        enum:
+          - none
+          - low
+          - medium
+          - high
+          - critical
+      highest_priority_score:
+        type: integer
+        minimum: 0
+        maximum: 100
+      ranked_candidate_ids:
+        type: array
+        items:
+          type: string
+          pattern: "^worker-patch-candidate-[a-f0-9]{12}$"
+      selected_candidate_ids:
+        type: array
+        items:
+          type: string
+          pattern: "^worker-patch-candidate-[a-f0-9]{12}$"
+  selected_patch_candidates:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - dispatch_unit_ref
+        - coverage_area
+        - selected_agent_id
+        - patch_candidate_receipt_ref
+        - patch_candidate_receipt_digest
+        - candidate_id
+        - candidate_digest
+        - review_rank
+        - priority_rank
+        - priority_score
+        - priority_tier
+        - target_path
+        - patch_descriptor
+      properties:
+        dispatch_unit_ref:
+          type: string
+          pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        coverage_area:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+        selected_agent_id:
+          type: string
+          minLength: 1
+        patch_candidate_receipt_ref:
+          type: string
+          pattern: "^worker-patch://"
+        patch_candidate_receipt_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        candidate_id:
+          type: string
+          pattern: "^worker-patch-candidate-[a-f0-9]{12}$"
+        candidate_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        review_rank:
+          type: integer
+          minimum: 1
+        priority_rank:
+          type: integer
+          minimum: 1
+        priority_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        priority_tier:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        target_path:
+          type: string
+          minLength: 1
+        patch_descriptor:
+          $ref: "patch_descriptor.schema"
+  build_request_ref:
+    type: string
+    pattern: "^build://build-[a-f0-9]{12}$"
+  build_request_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  build_request:
+    $ref: "build_request.yaml"
+  scope_validation:
+    type: object
+    additionalProperties: false
+    required:
+      - allowed
+      - blocking_rules
+    properties:
+      allowed:
+        const: true
+      blocking_rules:
+        type: array
+        maxItems: 0
+        items:
+          type: string
+          minLength: 1
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - same_session_bound
+      - consensus_task_graph_bound
+      - build_request_ref_bound
+      - build_request_scope_allowed
+      - must_pass_bound
+      - output_paths_bound
+      - patch_candidate_summary_bound
+      - selected_candidates_sorted
+      - ok
+    properties:
+      same_session_bound:
+        const: true
+      consensus_task_graph_bound:
+        const: true
+      build_request_ref_bound:
+        const: true
+      build_request_scope_allowed:
+        const: true
+      must_pass_bound:
+        const: true
+      output_paths_bound:
+        const: true
+      patch_candidate_summary_bound:
+        const: true
+      selected_candidates_sorted:
+        const: true
+      ok:
+        const: true
+examples:
+  - kind: yaoyorozu_build_request_binding
+    schema_version: 1.0.0

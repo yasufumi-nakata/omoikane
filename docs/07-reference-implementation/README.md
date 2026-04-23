@@ -343,6 +343,10 @@ final resolve を監査し、blocked direct handoff と worker claim chain を
 の 3 root bundle strategy へ畳み込んだ `TaskGraph` が、
 同じ session 上の worker claim / guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として束縛することを確認する。
+さらに同じ session の convocation / dispatch / ConsensusBus / TaskGraph bundle を
+`L5.PatchGenerator` 向け `build_request` と patch-generator-ready scope validation に接続し、
+priority-ranked patch candidate hint を添えた
+`yaoyorozu_build_request_binding` として束縛することを確認する。
 optional dispatch を要求した場合は
 `memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
 `fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ

@@ -1870,6 +1870,17 @@ entries:
       - reference-runtime
     rationale: Required to bind one coverage-complete Yaoyorozu dispatch bundle to the proposal-profile-selected three-root TaskGraph strategy, ConsensusBus claim chain, and guardian gate digest.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_build_request_binding.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind one Yaoyorozu convocation, worker dispatch, ConsensusBus transcript, and TaskGraph bundle to an L5 build_request-ready handoff with candidate-bound review hints.
+  - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
     consumers:
@@ -1878,7 +1889,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph handoff binding, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -1942,6 +1953,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects same-session TaskGraph bundling, profile-aware three-root strategy selection, complexity compliance, and guardian-bound synthesis for Yaoyorozu worker execution.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_build_request_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects same-session build_request handoff binding, patch-generator-ready scope validation, and profile-aware must_pass eval selection for Yaoyorozu execution.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

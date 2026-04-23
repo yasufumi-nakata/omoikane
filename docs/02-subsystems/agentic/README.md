@@ -46,7 +46,10 @@
   `fork-request`=`runtime` / `schema` / `docs`,
   `inter-mind-negotiation`=`runtime` / `contract-sync(schema+docs)` / `eval`
   の 3 root bundle に畳み込んだ `TaskGraph` execution bundle を
-  `yaoyorozu_task_graph_binding` として残す
+  `yaoyorozu_task_graph_binding` として残し、
+  さらに同じ bundle を `L5.PatchGenerator` 向け `build_request` と
+  patch-generator-ready scope validation へ接続した
+  `yaoyorozu_build_request_binding` まで materialize する
 
 ### TaskGraph
 - タスクの依存関係グラフ（DAG）

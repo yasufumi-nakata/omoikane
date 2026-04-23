@@ -330,7 +330,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     yaoyorozu_parser = subparsers.add_parser(
         "yaoyorozu-demo",
-        help="Run the repo-local Yaoyorozu registry sync and council convocation scenario",
+        help="Run the repo-local Yaoyorozu registry sync, council convocation, and build-request handoff scenario",
     )
     yaoyorozu_parser.add_argument(
         "--proposal-profile",

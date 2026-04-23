@@ -1457,6 +1457,20 @@ class CliIntegrationTests(unittest.TestCase):
             "self-modify-three-root-bundle-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
+        self.assertTrue(result["validation"]["build_request_binding_ok"])
+        self.assertTrue(result["validation"]["build_request_scope_allowed"])
+        self.assertEqual(
+            "L5.PatchGenerator",
+            result["validation"]["build_request_target_subsystem"],
+        )
+        self.assertEqual(
+            result["convocation"]["session_id"],
+            result["build_request_binding"]["council_action"]["session_id"],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_build_request_binding.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
         self.assertTrue(result["validation"]["task_graph_worker_claims_bound"])
         self.assertTrue(result["validation"]["task_graph_coverage_grouping_ok"])
         self.assertEqual(
@@ -1562,6 +1576,10 @@ class CliIntegrationTests(unittest.TestCase):
                 for binding in result["task_graph_binding"]["node_bindings"]
             ),
         )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
 
     def test_yaoyorozu_demo_supports_memory_edit_optional_schema_dispatch(self) -> None:
         stdout = io.StringIO()
@@ -1666,6 +1684,10 @@ class CliIntegrationTests(unittest.TestCase):
             "legal-scholar",
             result["convocation"]["council_panel"][1]["selected_agent_id"],
         )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_fork_request_profile.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
 
     def test_yaoyorozu_demo_supports_fork_request_optional_eval_dispatch(self) -> None:
         stdout = io.StringIO()
@@ -1769,6 +1791,10 @@ class CliIntegrationTests(unittest.TestCase):
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]
             ),
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
 
     def test_oversight_demo_emits_breach_propagation(self) -> None:

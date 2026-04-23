@@ -3150,6 +3150,50 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             ),
         )
 
+    def test_build_request_binding_promotes_yaoyorozu_bundle_to_patch_generator_scope(self) -> None:
+        result = OmoikaneReferenceOS().run_yaoyorozu_demo()
+        binding = result["build_request_binding"]
+
+        self.assertTrue(binding["validation"]["ok"])
+        self.assertEqual("L5.PatchGenerator", binding["handoff_summary"]["target_subsystem"])
+        self.assertTrue(binding["scope_validation"]["allowed"])
+        self.assertEqual(
+            result["convocation"]["session_id"],
+            binding["council_action"]["session_id"],
+        )
+        self.assertEqual(
+            "evals/continuity/council_output_build_request_pipeline.yaml",
+            binding["build_request"]["constraints"]["must_pass"][0],
+        )
+        self.assertEqual(
+            binding["build_request"]["output_paths"],
+            binding["build_request"]["constraints"]["allowed_write_paths"],
+        )
+        self.assertEqual(
+            binding["handoff_summary"]["selected_candidate_count"],
+            len(binding["selected_patch_candidates"]),
+        )
+
+    def test_build_request_binding_switches_profile_eval_by_proposal_profile(self) -> None:
+        memory_edit = OmoikaneReferenceOS().run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
+        fork_request = OmoikaneReferenceOS().run_yaoyorozu_demo(proposal_profile="fork-request-v1")
+        inter_mind = OmoikaneReferenceOS().run_yaoyorozu_demo(
+            proposal_profile="inter-mind-negotiation-v1"
+        )
+
+        self.assertIn(
+            "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
+            memory_edit["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_fork_request_profile.yaml",
+            fork_request["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
+            inter_mind["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
+
 
 class CognitiveAuditTests(unittest.TestCase):
     def test_audit_record_binds_cross_layer_refs(self) -> None:

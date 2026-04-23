@@ -3704,6 +3704,16 @@ json.dump(response, sys.stdout)
         task_graph_binding_validation = self.yaoyorozu.validate_task_graph_dispatch_binding(
             task_graph_binding
         )
+        build_request_binding = self.yaoyorozu.bind_build_request_handoff(
+            convocation_session=convocation,
+            dispatch_plan=dispatch_plan,
+            dispatch_receipt=dispatch_receipt,
+            consensus_binding=consensus_dispatch,
+            task_graph_binding=task_graph_binding,
+        )
+        build_request_binding_validation = self.yaoyorozu.validate_build_request_handoff(
+            build_request_binding
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="yaoyorozu.workspace_discovered",
@@ -3786,6 +3796,15 @@ json.dump(response, sys.stdout)
             layer="L4",
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="yaoyorozu.build_request.bound",
+            payload=build_request_binding,
+            actor="YaoyorozuRegistryService",
+            category="yaoyorozu",
+            layer="L4",
+            substrate="classical-silicon",
+        )
         ledger_verification = self.ledger.verify()
 
         return {
@@ -3801,6 +3820,7 @@ json.dump(response, sys.stdout)
             "dispatch_receipt": dispatch_receipt,
             "consensus_dispatch": consensus_dispatch,
             "task_graph_binding": task_graph_binding,
+            "build_request_binding": build_request_binding,
             "validation": {
                 "workspace_discovery_ok": workspace_discovery_validation["ok"],
                 "workspace_count": workspace_discovery_validation["workspace_count"],
@@ -3910,6 +3930,20 @@ json.dump(response, sys.stdout)
                 "task_graph_coverage_grouping_ok": task_graph_binding_validation[
                     "coverage_grouping_ok"
                 ],
+                "build_request_binding_ok": build_request_binding_validation["ok"],
+                "build_request_scope_allowed": build_request_binding_validation["scope_allowed"],
+                "build_request_target_subsystem": build_request_binding["handoff_summary"][
+                    "target_subsystem"
+                ],
+                "build_request_selected_candidate_count": build_request_binding_validation[
+                    "selected_candidate_count"
+                ],
+                "build_request_must_pass_count": build_request_binding_validation[
+                    "must_pass_count"
+                ],
+                "build_request_output_path_count": build_request_binding_validation[
+                    "output_path_count"
+                ],
                 "ok": (
                     workspace_discovery_validation["ok"]
                     and
@@ -3918,6 +3952,7 @@ json.dump(response, sys.stdout)
                     and dispatch_receipt_validation["ok"]
                     and consensus_dispatch_validation["ok"]
                     and task_graph_binding_validation["ok"]
+                    and build_request_binding_validation["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },
