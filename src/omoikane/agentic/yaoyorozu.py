@@ -17,6 +17,7 @@ from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PR
 from .local_worker_stub import (
     YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
     YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+    YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
     YAOYOROZU_WORKER_READY_GATE_PROFILE,
     YAOYOROZU_WORKER_REPORT_KIND,
     YAOYOROZU_WORKER_REPORT_PROFILE,
@@ -40,6 +41,13 @@ YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
 YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
+YAOYOROZU_PATCH_PRIORITY_TIER_ORDER = {
+    "none": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
 YAOYOROZU_WORKER_TARGET_PATHS = {
     "runtime": ["src/omoikane/", "tests/unit/", "tests/integration/"],
     "schema": ["specs/interfaces/", "specs/schemas/"],
@@ -1861,6 +1869,13 @@ class YaoyorozuRegistryService:
                         "patch_candidate_status": patch_candidate_receipt["status"],
                         "patch_candidate_count": patch_candidate_receipt["patch_candidate_count"],
                         "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+                        "patch_priority_profile": YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
+                        "highest_patch_priority_tier": patch_candidate_receipt[
+                            "highest_priority_tier"
+                        ],
+                        "highest_patch_priority_score": patch_candidate_receipt[
+                            "highest_priority_score"
+                        ],
                         "all_delta_entries_materialized": patch_candidate_receipt[
                             "all_delta_entries_materialized"
                         ],
@@ -1917,9 +1932,14 @@ class YaoyorozuRegistryService:
                 and patch_candidate_receipt.get("delta_receipt_ref") == delta_receipt.get("receipt_ref")
                 and patch_candidate_receipt.get("delta_receipt_digest") == delta_receipt.get("receipt_digest")
                 and patch_candidate_receipt.get("status") in {"no-candidates", "candidate-ready"}
+                and patch_candidate_receipt.get("priority_profile")
+                == YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE
                 and patch_candidate_receipt.get("all_delta_entries_materialized") is True
                 and isinstance(patch_candidates, list)
                 and patch_candidate_receipt.get("patch_candidate_count") == len(patch_candidates)
+                and isinstance(patch_candidate_receipt.get("ranked_candidate_ids"), list)
+                and patch_candidate_receipt.get("ranked_candidate_ids")
+                == [candidate.get("candidate_id") for candidate in patch_candidates]
                 and isinstance(coverage_evidence, Mapping)
                 and coverage_evidence.get("patch_candidate_receipt_ref")
                 == patch_candidate_receipt.get("receipt_ref")
@@ -1928,6 +1948,12 @@ class YaoyorozuRegistryService:
                 == patch_candidate_receipt.get("patch_candidate_count")
                 and coverage_evidence.get("patch_candidate_profile")
                 == YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+                and coverage_evidence.get("patch_priority_profile")
+                == YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE
+                and coverage_evidence.get("highest_patch_priority_tier")
+                == patch_candidate_receipt.get("highest_priority_tier")
+                and coverage_evidence.get("highest_patch_priority_score")
+                == patch_candidate_receipt.get("highest_priority_score")
                 and coverage_evidence.get("all_delta_entries_materialized") is True
             )
             target_paths_ready = (
@@ -1971,6 +1997,29 @@ class YaoyorozuRegistryService:
                 failed_role_ids.append(str(unit["role_id"]))
             results.append(result)
 
+        highest_patch_priority_score = max(
+            (
+                int(
+                    result["report"]["patch_candidate_receipt"].get("highest_priority_score", 0)
+                )
+                for result in results
+            ),
+            default=0,
+        )
+        highest_patch_priority_tier = max(
+            (
+                str(
+                    result["report"]["patch_candidate_receipt"].get(
+                        "highest_priority_tier",
+                        "none",
+                    )
+                )
+                for result in results
+            ),
+            key=lambda tier: YAOYOROZU_PATCH_PRIORITY_TIER_ORDER.get(tier, -1),
+            default="none",
+        )
+
         execution_summary = {
             "launched_process_count": len(results),
             "completed_process_count": sum(
@@ -1998,6 +2047,9 @@ class YaoyorozuRegistryService:
             "ready_gate_profile": YAOYOROZU_WORKER_READY_GATE_PROFILE,
             "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
             "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+            "patch_priority_profile": YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
+            "highest_patch_priority_tier": highest_patch_priority_tier,
+            "highest_patch_priority_score": highest_patch_priority_score,
         }
         validation = {
             "command_digests_match": all(
@@ -2135,6 +2187,11 @@ class YaoyorozuRegistryService:
                     != YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
                 ):
                     errors.append("worker report patch_candidate_profile mismatch")
+                if (
+                    coverage_evidence.get("patch_priority_profile")
+                    != YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE
+                ):
+                    errors.append("worker report patch_priority_profile mismatch")
                 if coverage_evidence.get("all_delta_entries_materialized") is not True:
                     errors.append("worker report must fully materialize delta entries into patch candidates")
             delta_receipt = report.get("workspace_delta_receipt", {})
@@ -2179,6 +2236,11 @@ class YaoyorozuRegistryService:
                     errors.append("worker patch candidate receipt dispatch_unit_ref must match the result unit")
                 if patch_candidate_receipt.get("status") not in {"no-candidates", "candidate-ready"}:
                     errors.append("worker patch candidate receipt must stay no-candidates or candidate-ready")
+                if (
+                    patch_candidate_receipt.get("priority_profile")
+                    != YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE
+                ):
+                    errors.append("worker patch candidate receipt priority_profile mismatch")
                 if patch_candidate_receipt.get("all_delta_entries_materialized") is not True:
                     errors.append("worker patch candidate receipt must fully materialize delta entries")
                 candidates = patch_candidate_receipt.get("patch_candidates", [])
@@ -2188,6 +2250,38 @@ class YaoyorozuRegistryService:
                     errors.append(
                         "worker patch candidate receipt patch_candidate_count must match patch_candidates"
                     )
+                ranked_candidate_ids = patch_candidate_receipt.get("ranked_candidate_ids", [])
+                if not isinstance(ranked_candidate_ids, list):
+                    errors.append("worker patch candidate receipt ranked_candidate_ids must be a list")
+                    ranked_candidate_ids = []
+                elif ranked_candidate_ids != [
+                    candidate.get("candidate_id")
+                    for candidate in candidates
+                    if isinstance(candidate, Mapping)
+                ]:
+                    errors.append("worker patch candidate receipt ranked_candidate_ids must match candidate order")
+                expected_highest_tier = (
+                    candidates[0].get("priority_tier") if candidates and isinstance(candidates[0], Mapping) else "none"
+                )
+                expected_highest_score = (
+                    candidates[0].get("priority_score") if candidates and isinstance(candidates[0], Mapping) else 0
+                )
+                if patch_candidate_receipt.get("highest_priority_tier") != expected_highest_tier:
+                    errors.append("worker patch candidate receipt highest_priority_tier mismatch")
+                if patch_candidate_receipt.get("highest_priority_score") != expected_highest_score:
+                    errors.append("worker patch candidate receipt highest_priority_score mismatch")
+                for priority_rank, candidate in enumerate(candidates, start=1):
+                    if not isinstance(candidate, Mapping):
+                        errors.append("worker patch candidate entries must remain mappings")
+                        continue
+                    if candidate.get("priority_rank") != priority_rank:
+                        errors.append("worker patch candidate priority_rank must preserve candidate order")
+                    if candidate.get("priority_tier") not in YAOYOROZU_PATCH_PRIORITY_TIER_ORDER:
+                        errors.append("worker patch candidate priority_tier is invalid")
+                    if not isinstance(candidate.get("priority_reason"), str) or not str(
+                        candidate.get("priority_reason")
+                    ).strip():
+                        errors.append("worker patch candidate priority_reason must be a non-empty string")
                 if patch_candidate_receipt.get("delta_receipt_ref") != delta_receipt.get("receipt_ref"):
                     errors.append("worker patch candidate receipt must bind the delta receipt ref")
                 if patch_candidate_receipt.get("delta_receipt_digest") != delta_receipt.get("receipt_digest"):
@@ -2204,6 +2298,16 @@ class YaoyorozuRegistryService:
                     != patch_candidate_receipt.get("patch_candidate_count")
                 ):
                     errors.append("worker report must bind the patch candidate count")
+                if (
+                    coverage_evidence.get("highest_patch_priority_tier")
+                    != patch_candidate_receipt.get("highest_priority_tier")
+                ):
+                    errors.append("worker report must bind the highest patch priority tier")
+                if (
+                    coverage_evidence.get("highest_patch_priority_score")
+                    != patch_candidate_receipt.get("highest_priority_score")
+                ):
+                    errors.append("worker report must bind the highest patch priority score")
             if result.get("exit_code") != 0:
                 errors.append("worker process exit_code must be 0")
 
@@ -2213,6 +2317,37 @@ class YaoyorozuRegistryService:
         ]
         if execution_summary.get("coverage_areas") != coverage_areas:
             errors.append("execution_summary.coverage_areas must match result coverage order")
+        if execution_summary.get("patch_priority_profile") != YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE:
+            errors.append("execution_summary.patch_priority_profile mismatch")
+        expected_highest_patch_priority_score = max(
+            (
+                int(
+                    result.get("report", {})
+                    .get("patch_candidate_receipt", {})
+                    .get("highest_priority_score", 0)
+                )
+                for result in results
+                if isinstance(result, Mapping)
+            ),
+            default=0,
+        )
+        expected_highest_patch_priority_tier = max(
+            (
+                str(
+                    result.get("report", {})
+                    .get("patch_candidate_receipt", {})
+                    .get("highest_priority_tier", "none")
+                )
+                for result in results
+                if isinstance(result, Mapping)
+            ),
+            key=lambda tier: YAOYOROZU_PATCH_PRIORITY_TIER_ORDER.get(tier, -1),
+            default="none",
+        )
+        if execution_summary.get("highest_patch_priority_score") != expected_highest_patch_priority_score:
+            errors.append("execution_summary.highest_patch_priority_score mismatch")
+        if execution_summary.get("highest_patch_priority_tier") != expected_highest_patch_priority_tier:
+            errors.append("execution_summary.highest_patch_priority_tier mismatch")
         if execution_summary.get("successful_process_count") != sum(
             1
             for result in results

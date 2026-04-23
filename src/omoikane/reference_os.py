@@ -3868,6 +3868,9 @@ json.dump(response, sys.stdout)
                 "worker_patch_candidate_profile": dispatch_receipt["execution_summary"][
                     "patch_candidate_profile"
                 ],
+                "worker_patch_priority_profile": dispatch_receipt["execution_summary"][
+                    "patch_priority_profile"
+                ],
                 "consensus_dispatch_ok": consensus_dispatch_validation["ok"],
                 "consensus_message_count": consensus_dispatch_validation["message_count"],
                 "consensus_related_claim_count": consensus_dispatch_validation[

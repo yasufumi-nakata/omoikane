@@ -23,6 +23,10 @@ required:
   - delta_receipt_digest
   - planned_at
   - status
+  - priority_profile
+  - highest_priority_tier
+  - highest_priority_score
+  - ranked_candidate_ids
   - patch_candidate_count
   - all_delta_entries_materialized
   - patch_candidates
@@ -83,6 +87,25 @@ properties:
       - no-candidates
       - candidate-ready
       - blocked
+  priority_profile:
+    const: target-delta-priority-ranking-v1
+  highest_priority_tier:
+    type: string
+    enum:
+      - none
+      - low
+      - medium
+      - high
+      - critical
+  highest_priority_score:
+    type: integer
+    minimum: 0
+    maximum: 100
+  ranked_candidate_ids:
+    type: array
+    items:
+      type: string
+      pattern: "^worker-patch-candidate-[a-f0-9]{12}$"
   patch_candidate_count:
     type: integer
     minimum: 0
@@ -100,6 +123,10 @@ properties:
         - target_path_observation_digest
         - delta_entry_digest
         - change_status
+        - priority_rank
+        - priority_score
+        - priority_tier
+        - priority_reason
         - patch_descriptor
         - candidate_digest
       properties:
@@ -124,6 +151,23 @@ properties:
             - added
             - modified
             - removed
+        priority_rank:
+          type: integer
+          minimum: 1
+        priority_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        priority_tier:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        priority_reason:
+          type: string
+          minLength: 1
         patch_descriptor:
           $ref: "patch_descriptor.schema"
         candidate_digest:
@@ -144,6 +188,10 @@ allOf:
           const: no-candidates
     then:
       properties:
+        highest_priority_tier:
+          const: none
+        highest_priority_score:
+          const: 0
         patch_candidate_count:
           const: 0
         all_delta_entries_materialized:
@@ -188,6 +236,11 @@ examples:
     delta_receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
     planned_at: "2026-04-23T07:06:00Z"
     status: candidate-ready
+    priority_profile: target-delta-priority-ranking-v1
+    highest_priority_tier: high
+    highest_priority_score: 84
+    ranked_candidate_ids:
+      - worker-patch-candidate-0123456789ab
     patch_candidate_count: 1
     all_delta_entries_materialized: true
     patch_candidates:
@@ -197,6 +250,10 @@ examples:
         target_path_observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         delta_entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
         change_status: modified
+        priority_rank: 1
+        priority_score: 84
+        priority_tier: high
+        priority_reason: runtime source candidate on src/omoikane/agentic/local_worker_stub.py uses modify and scores 84 (high) under target-delta-priority-ranking-v1.
         patch_descriptor:
           patch_id: worker-patch-0123456789ab
           target_path: src/omoikane/agentic/local_worker_stub.py

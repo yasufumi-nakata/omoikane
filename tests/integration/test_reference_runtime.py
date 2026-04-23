@@ -1598,12 +1598,28 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "target-delta-to-patch-candidate-v1",
             result["validation"]["worker_patch_candidate_profile"],
         )
+        self.assertEqual(
+            "target-delta-priority-ranking-v1",
+            result["validation"]["worker_patch_priority_profile"],
+        )
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["successful_process_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["delta_bound_count"])
         self.assertEqual(
             4,
             result["dispatch_receipt"]["execution_summary"]["patch_candidate_bound_count"],
+        )
+        self.assertEqual(
+            "target-delta-priority-ranking-v1",
+            result["dispatch_receipt"]["execution_summary"]["patch_priority_profile"],
+        )
+        self.assertIn(
+            result["dispatch_receipt"]["execution_summary"]["highest_patch_priority_tier"],
+            {"none", "low", "medium", "high", "critical"},
+        )
+        self.assertGreaterEqual(
+            result["dispatch_receipt"]["execution_summary"]["highest_patch_priority_score"],
+            0,
         )
         self.assertEqual(
             "path-bound-target-delta-patch-candidate-v3",
@@ -1640,6 +1656,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 and process["report"]["coverage_evidence"]["all_targets_within_workspace"]
                 and process["report"]["coverage_evidence"]["delta_scan_profile"]
                 == "git-target-path-delta-v1"
+                and process["report"]["coverage_evidence"]["patch_priority_profile"]
+                == "target-delta-priority-ranking-v1"
+                and process["report"]["coverage_evidence"]["highest_patch_priority_tier"]
+                in {"none", "low", "medium", "high", "critical"}
+                and process["report"]["coverage_evidence"]["highest_patch_priority_score"] >= 0
                 and process["report"]["workspace_delta_receipt"]["status"] in {"clean", "delta-detected"}
                 for process in result["dispatch_receipt"]["results"]
             )

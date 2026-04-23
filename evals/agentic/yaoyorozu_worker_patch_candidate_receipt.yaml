@@ -10,6 +10,7 @@ expected:
   worker_dispatch_receipt_ok: true
   worker_patch_candidate_receipts_bound: true
   worker_patch_candidate_profile: target-delta-to-patch-candidate-v1
+  worker_patch_priority_profile: target-delta-priority-ranking-v1
 metric: equality
 threshold: 1.0
 ethics_check: true

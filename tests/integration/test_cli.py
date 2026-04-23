@@ -1444,6 +1444,10 @@ class CliIntegrationTests(unittest.TestCase):
             "target-delta-to-patch-candidate-v1",
             result["validation"]["worker_patch_candidate_profile"],
         )
+        self.assertEqual(
+            "target-delta-priority-ranking-v1",
+            result["validation"]["worker_patch_priority_profile"],
+        )
         self.assertEqual(3, result["validation"]["task_graph_ready_node_count"])
         self.assertEqual(4, result["validation"]["task_graph_dispatch_unit_count"])
         self.assertEqual(3, result["validation"]["task_graph_synthesis_count"])
@@ -1471,6 +1475,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             4,
             result["dispatch_receipt"]["execution_summary"]["patch_candidate_bound_count"],
+        )
+        self.assertEqual(
+            "target-delta-priority-ranking-v1",
+            result["dispatch_receipt"]["execution_summary"]["patch_priority_profile"],
+        )
+        self.assertIn(
+            result["dispatch_receipt"]["execution_summary"]["highest_patch_priority_tier"],
+            {"none", "low", "medium", "high", "critical"},
+        )
+        self.assertGreaterEqual(
+            result["dispatch_receipt"]["execution_summary"]["highest_patch_priority_score"],
+            0,
         )
         self.assertEqual(
             ["docs", "eval"],

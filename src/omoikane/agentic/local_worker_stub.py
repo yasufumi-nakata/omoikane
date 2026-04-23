@@ -18,6 +18,7 @@ YAOYOROZU_WORKER_REPORT_PROFILE = "repo-local-path-bound-worker-report-v3"
 YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-delta-patch-candidate-v3"
 YAOYOROZU_WORKER_DELTA_SCAN_PROFILE = "git-target-path-delta-v1"
 YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE = "target-delta-to-patch-candidate-v1"
+YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE = "target-delta-priority-ranking-v1"
 YAOYOROZU_WORKER_SAMPLE_ENTRY_LIMIT = 3
 
 
@@ -404,6 +405,68 @@ def _candidate_section_labels(relative_path: str) -> list[str]:
     return parts[:3]
 
 
+def _candidate_priority_score(relative_path: str, action: str, cue_kind: str) -> int:
+    base_by_cue_kind = {
+        "runtime-source": 78,
+        "test-coverage": 64,
+        "eval-sync": 56,
+        "docs-sync": 48,
+        "meta-decision-log": 40,
+    }
+    action_bonus = {
+        "delete": 10,
+        "modify": 6,
+        "create": 4,
+    }.get(action, 0)
+    scope_bonus = 0
+    if relative_path.startswith("src/omoikane/"):
+        scope_bonus = 6
+    elif relative_path.startswith("specs/interfaces/"):
+        scope_bonus = 5
+    elif relative_path.startswith("specs/schemas/"):
+        scope_bonus = 4
+    elif relative_path.startswith("tests/integration/"):
+        scope_bonus = 3
+    elif relative_path.startswith("tests/unit/"):
+        scope_bonus = 2
+    elif relative_path.startswith("evals/"):
+        scope_bonus = 2
+    elif relative_path.startswith("docs/"):
+        scope_bonus = 1
+    return min(100, base_by_cue_kind.get(cue_kind, 50) + action_bonus + scope_bonus)
+
+
+def _candidate_priority_tier(score: int) -> str:
+    if score >= 90:
+        return "critical"
+    if score >= 76:
+        return "high"
+    if score >= 60:
+        return "medium"
+    return "low"
+
+
+def _candidate_priority_reason(
+    relative_path: str,
+    *,
+    cue_kind: str,
+    action: str,
+    score: int,
+    tier: str,
+) -> str:
+    cue_label = {
+        "runtime-source": "runtime source",
+        "test-coverage": "test coverage",
+        "eval-sync": "eval sync",
+        "docs-sync": "docs sync",
+        "meta-decision-log": "decision log",
+    }.get(cue_kind, "repo-local")
+    return (
+        f"{cue_label} candidate on {relative_path} uses {action} and scores "
+        f"{score} ({tier}) under {YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE}."
+    )
+
+
 def build_patch_candidate_receipt(
     *,
     workspace_root: Path,
@@ -454,6 +517,8 @@ def build_patch_candidate_receipt(
             continue
 
         action = _candidate_action(str(entry.get("change_status", "")))
+        cue_kind = _candidate_cue_kind(relative_path)
+        priority_score = _candidate_priority_score(relative_path, action, cue_kind)
         patch_descriptor = {
             "patch_id": new_id("worker-patch"),
             "target_path": relative_path,
@@ -466,7 +531,7 @@ def build_patch_candidate_receipt(
                 dispatch_unit_ref,
                 str(workspace_delta_receipt.get("receipt_ref", "")),
             ],
-            "cue_kind": _candidate_cue_kind(relative_path),
+            "cue_kind": cue_kind,
             "source_refs": [source_ref, target_scope],
             "section_labels": _candidate_section_labels(relative_path),
             "target_subsystem": _worker_target_subsystem(coverage_area),
@@ -481,9 +546,29 @@ def build_patch_candidate_receipt(
             "delta_entry_digest": str(entry.get("entry_digest", "")),
             "change_status": str(entry.get("change_status", "")),
             "patch_descriptor": patch_descriptor,
+            "priority_score": priority_score,
         }
-        candidate["candidate_digest"] = sha256_text(canonical_json(candidate))
         patch_candidates.append(candidate)
+
+    patch_candidates.sort(
+        key=lambda candidate: (
+            -int(candidate.get("priority_score", 0)),
+            str(candidate.get("target_path", "")),
+        )
+    )
+    for priority_rank, candidate in enumerate(patch_candidates, start=1):
+        priority_score = int(candidate.get("priority_score", 0))
+        priority_tier = _candidate_priority_tier(priority_score)
+        candidate["priority_rank"] = priority_rank
+        candidate["priority_tier"] = priority_tier
+        candidate["priority_reason"] = _candidate_priority_reason(
+            str(candidate.get("target_path", "")),
+            cue_kind=str(candidate.get("patch_descriptor", {}).get("cue_kind", "")),
+            action=str(candidate.get("patch_descriptor", {}).get("action", "")),
+            score=priority_score,
+            tier=priority_tier,
+        )
+        candidate["candidate_digest"] = sha256_text(canonical_json(candidate))
 
     delta_status = str(workspace_delta_receipt.get("status", "blocked"))
     all_delta_entries_materialized = len(patch_candidates) == len(delta_entries) and not blocking_reasons
@@ -493,6 +578,12 @@ def build_patch_candidate_receipt(
         status = "candidate-ready"
     else:
         status = "no-candidates"
+
+    ranked_candidate_ids = [str(candidate["candidate_id"]) for candidate in patch_candidates]
+    highest_priority_score = int(patch_candidates[0]["priority_score"]) if patch_candidates else 0
+    highest_priority_tier = (
+        str(patch_candidates[0]["priority_tier"]) if patch_candidates else "none"
+    )
 
     digest_payload = {
         "workspace_root": str(workspace_root),
@@ -504,6 +595,10 @@ def build_patch_candidate_receipt(
         "delta_receipt_ref": workspace_delta_receipt.get("receipt_ref", ""),
         "delta_receipt_digest": workspace_delta_receipt.get("receipt_digest", ""),
         "status": status,
+        "priority_profile": YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
+        "highest_priority_tier": highest_priority_tier,
+        "highest_priority_score": highest_priority_score,
+        "ranked_candidate_ids": ranked_candidate_ids,
         "patch_candidate_count": len(patch_candidates),
         "all_delta_entries_materialized": all_delta_entries_materialized,
         "candidate_digests": [candidate["candidate_digest"] for candidate in patch_candidates],
@@ -525,6 +620,10 @@ def build_patch_candidate_receipt(
         "delta_receipt_digest": str(workspace_delta_receipt.get("receipt_digest", "")),
         "planned_at": utc_now_iso(),
         "status": status,
+        "priority_profile": YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
+        "highest_priority_tier": highest_priority_tier,
+        "highest_priority_score": highest_priority_score,
+        "ranked_candidate_ids": ranked_candidate_ids,
         "patch_candidate_count": len(patch_candidates),
         "all_delta_entries_materialized": all_delta_entries_materialized,
         "patch_candidates": patch_candidates,
@@ -594,6 +693,9 @@ def main() -> None:
         "patch_candidate_status": patch_candidate_receipt["status"],
         "patch_candidate_count": patch_candidate_receipt["patch_candidate_count"],
         "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+        "patch_priority_profile": patch_candidate_receipt["priority_profile"],
+        "highest_patch_priority_tier": patch_candidate_receipt["highest_priority_tier"],
+        "highest_patch_priority_score": patch_candidate_receipt["highest_priority_score"],
         "all_delta_entries_materialized": patch_candidate_receipt["all_delta_entries_materialized"],
         "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
     }

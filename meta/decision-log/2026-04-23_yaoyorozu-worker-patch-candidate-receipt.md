@@ -56,9 +56,9 @@ repo 内 surface として固定されていませんでした。
   reviewer-facing に示せます
 - `patch_descriptor.schema` との shape drift を増やさず、
   future の PatchGenerator / Builder handoff へ接続しやすくなります
-- residual gap は generic な「changed path をどう読むか不明」ではなく、
-  priority ranking や actual patch application witness のような
-  次段の execution orchestration へ縮小します
+- next-stage execution surface は generic な「changed path をどう読むか不明」ではなく、
+  actual patch application witness や same-digest builder handoff のような
+  reviewer-facing orchestration へ縮小します
 
 ## Revisit triggers
 

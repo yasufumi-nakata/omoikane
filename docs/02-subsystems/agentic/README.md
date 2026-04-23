@@ -36,7 +36,7 @@
   `inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
   だけを actual builder handoff coverage として固定したうえで、
   selected builder handoff を dispatch/unit binding と workspace target 観測、
-  さらに git-bound target path delta receipt と delta-derived patch candidate receipt を持つ
+  さらに git-bound target path delta receipt と deterministic priority-ranked patch candidate receipt を持つ
   repo-local subprocess worker dispatch receipt まで実行しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
   `yaoyorozu_consensus_dispatch_binding` として束縛する。

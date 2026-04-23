@@ -264,6 +264,9 @@ properties:
                 - patch_candidate_status
                 - patch_candidate_count
                 - patch_candidate_profile
+                - patch_priority_profile
+                - highest_patch_priority_tier
+                - highest_patch_priority_score
                 - all_delta_entries_materialized
                 - ready_gate
               properties:
@@ -306,6 +309,20 @@ properties:
                   minimum: 0
                 patch_candidate_profile:
                   const: target-delta-to-patch-candidate-v1
+                patch_priority_profile:
+                  const: target-delta-priority-ranking-v1
+                highest_patch_priority_tier:
+                  type: string
+                  enum:
+                    - none
+                    - low
+                    - medium
+                    - high
+                    - critical
+                highest_patch_priority_score:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
                 all_delta_entries_materialized:
                   const: true
                 ready_gate:
@@ -329,6 +346,9 @@ properties:
       - ready_gate_profile
       - delta_scan_profile
       - patch_candidate_profile
+      - patch_priority_profile
+      - highest_patch_priority_tier
+      - highest_patch_priority_score
     properties:
       launched_process_count:
         type: integer
@@ -390,6 +410,20 @@ properties:
         const: git-target-path-delta-v1
       patch_candidate_profile:
         const: target-delta-to-patch-candidate-v1
+      patch_priority_profile:
+        const: target-delta-priority-ranking-v1
+      highest_patch_priority_tier:
+        type: string
+        enum:
+          - none
+          - low
+          - medium
+          - high
+          - critical
+      highest_patch_priority_score:
+        type: integer
+        minimum: 0
+        maximum: 100
   validation:
     type: object
     additionalProperties: false
@@ -548,6 +582,11 @@ examples:
             delta_receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
             planned_at: "2026-04-23T07:06:00Z"
             status: candidate-ready
+            priority_profile: target-delta-priority-ranking-v1
+            highest_priority_tier: high
+            highest_priority_score: 84
+            ranked_candidate_ids:
+              - worker-patch-candidate-0123456789ab
             patch_candidate_count: 1
             all_delta_entries_materialized: true
             patch_candidates:
@@ -557,6 +596,10 @@ examples:
                 target_path_observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
                 delta_entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
                 change_status: modified
+                priority_rank: 1
+                priority_score: 84
+                priority_tier: high
+                priority_reason: runtime source candidate on src/omoikane/agentic/local_worker_stub.py uses modify and scores 84 (high) under target-delta-priority-ranking-v1.
                 patch_descriptor:
                   patch_id: worker-patch-0123456789ab
                   target_path: src/omoikane/agentic/local_worker_stub.py
@@ -592,6 +635,9 @@ examples:
             patch_candidate_status: candidate-ready
             patch_candidate_count: 1
             patch_candidate_profile: target-delta-to-patch-candidate-v1
+            patch_priority_profile: target-delta-priority-ranking-v1
+            highest_patch_priority_tier: high
+            highest_patch_priority_score: 84
             all_delta_entries_materialized: true
             ready_gate: path-bound-target-delta-patch-candidate-v3
           status: ready
@@ -609,6 +655,9 @@ examples:
       ready_gate_profile: path-bound-target-delta-patch-candidate-v3
       delta_scan_profile: git-target-path-delta-v1
       patch_candidate_profile: target-delta-to-patch-candidate-v1
+      patch_priority_profile: target-delta-priority-ranking-v1
+      highest_patch_priority_tier: high
+      highest_patch_priority_score: 84
     validation:
       command_digests_match: true
       all_processes_exited_zero: true
