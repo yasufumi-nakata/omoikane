@@ -122,13 +122,22 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 
 - `source-guardian` / `destination-guardian` / `human-reviewer` の fixed 3 者 quorum
 - source / destination snapshot digest と route digest の束縛
+- `guardian-reviewer-remote-attestation-v1` による 2 本の live remote verifier receipt
+  を human reviewer attestation に再束縛した `remote_verifier_federation`
 - history / thresholds / provenance policy / eligibility の preserve
 - destination 側 seed mode を `snapshot-clone-with-history` に固定
+- `bounded-trust-transfer-re-attestation-cadence-v1` による
+  `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 
-## 研究延長
+`remote_verifier_federation` は `verifier_ref`、`verifier_endpoint`、
+`authority_chain_ref`、`trust_root_ref`、`transport_exchange` digest を含む
+2 receipt を保持し、`reviewer_binding_digest` で human reviewer と
+transfer route に束縛する。
 
-- live remote verifier を跨ぐ attestation federation
-- 長期 horizon の trust portability / expiry / re-attestation cadence
+`re_attestation_cadence` は live verifier federation の最遅 `recorded_at` を
+`attested_at` とし、最小 freshness window から `valid_until` を導出する。
+reference runtime では `renew_after + grace_window <= valid_until` を
+満たす時だけ `re_attestation_current=true` と評価する。
 
 ## Reference runtime surface
 
@@ -139,4 +148,5 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
-  - trust transfer では guardian/human quorum、digest binding、snapshot preserve を継続検証する
+  - trust transfer では guardian/human quorum、remote verifier federation、re-attestation cadence、
+    digest binding、snapshot preserve を継続検証する

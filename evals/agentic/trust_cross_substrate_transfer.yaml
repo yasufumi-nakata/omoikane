@@ -2,7 +2,8 @@ eval_id: trust_cross_substrate_transfer
 target: agentic.trust
 description: >
   Trust snapshot が guardian/human quorum 付きの digest-bound receipt として
-  substrate 境界を越えて export/import され、history・thresholds・eligibility を
+  substrate 境界を越えて export/import され、live remote verifier federation と
+  fixed re-attestation cadence を保持しつつ history・thresholds・eligibility を
   崩さず保持すること。
 scenarios:
   - name: trust transfer demo smoke
@@ -16,5 +17,9 @@ checks:
   provenance_policy_preserved: true
   eligibility_preserved: true
   federation_quorum_attested: true
+  live_remote_verifier_attested: true
+  remote_verifier_receipts_bound: true
+  re_attestation_cadence_bound: true
+  re_attestation_current: true
   destination_seeded: true
   receipt_digest_bound: true

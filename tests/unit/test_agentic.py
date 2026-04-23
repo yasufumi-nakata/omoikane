@@ -2183,6 +2183,58 @@ class TrustServiceTests(unittest.TestCase):
         )
         return source, destination
 
+    @staticmethod
+    def _build_remote_verifier_receipts() -> list[dict[str, object]]:
+        def build_receipt(verifier_ref: str, token: str) -> dict[str, object]:
+            return {
+                "kind": "guardian_verifier_network_receipt",
+                "schema_version": "1.0.0",
+                "receipt_id": f"verifier-network-receipt-{token}",
+                "reviewer_id": "human-reviewer-trust-transfer-001",
+                "verifier_endpoint": "verifier://guardian-oversight.jp",
+                "verifier_ref": verifier_ref,
+                "jurisdiction": "JP-13",
+                "transport_profile": "reviewer-live-proof-bridge-v1",
+                "network_profile_id": "guardian-reviewer-remote-attestation-v1",
+                "challenge_ref": f"challenge://trust-transfer/{token}",
+                "challenge_digest": f"sha256:{token}",
+                "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+                "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+                "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v1",
+                "transport_exchange": {
+                    "kind": "guardian_verifier_transport_exchange",
+                    "schema_version": "1.0.0",
+                    "exchange_id": f"verifier-transport-exchange-{token}",
+                    "verifier_endpoint": "verifier://guardian-oversight.jp",
+                    "verifier_ref": verifier_ref,
+                    "jurisdiction": "JP-13",
+                    "transport_profile": "reviewer-live-proof-bridge-v1",
+                    "exchange_profile_id": "digest-bound-reviewer-transport-exchange-v1",
+                    "challenge_ref": f"challenge://trust-transfer/{token}",
+                    "challenge_digest": f"sha256:{token}",
+                    "request_payload_kind": "reviewer-live-proof-request",
+                    "request_payload_ref": f"sealed://trust-transfer/{token}/request",
+                    "request_payload_digest": sha256_text(f"request:{token}"),
+                    "request_size_bytes": 296,
+                    "response_payload_kind": "reviewer-live-proof-response",
+                    "response_payload_ref": f"sealed://trust-transfer/{token}/response",
+                    "response_payload_digest": sha256_text(f"response:{token}"),
+                    "response_size_bytes": 298,
+                    "recorded_at": "2026-04-24T00:00:00+00:00",
+                    "digest": sha256_text(f"exchange:{token}"),
+                },
+                "freshness_window_seconds": 900,
+                "observed_latency_ms": 48.6,
+                "receipt_status": "verified",
+                "recorded_at": "2026-04-24T00:00:00+00:00",
+                "digest": sha256_text(f"receipt:{token}"),
+            }
+
+        return [
+            build_receipt("verifier://guardian-oversight.jp/reviewer-alpha", "trust-transfer-alpha"),
+            build_receipt("verifier://guardian-oversight.jp/reviewer-beta", "trust-transfer-beta"),
+        ]
+
     def test_positive_event_updates_score_and_thresholds(self) -> None:
         service = TrustService()
         service.register_agent(
@@ -2328,11 +2380,16 @@ class TrustServiceTests(unittest.TestCase):
             source_guardian_agent_id="integrity-guardian",
             destination_guardian_agent_id="identity-guardian",
             human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
             council_session_ref="council://trust-transfer/session-001",
             rationale="cross-substrate trust carryover requires guardian and human attestation",
         )
 
         self.assertTrue(receipt["validation"]["ok"])
+        self.assertTrue(receipt["validation"]["live_remote_verifier_attested"])
+        self.assertTrue(receipt["validation"]["remote_verifier_receipts_bound"])
+        self.assertTrue(receipt["validation"]["re_attestation_cadence_bound"])
+        self.assertTrue(receipt["validation"]["re_attestation_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
         self.assertEqual(
             receipt["source_snapshot_digest"],
@@ -2359,6 +2416,7 @@ class TrustServiceTests(unittest.TestCase):
             source_guardian_agent_id="integrity-guardian",
             destination_guardian_agent_id="identity-guardian",
             human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
             council_session_ref="council://trust-transfer/session-001",
             rationale="cross-substrate trust carryover requires guardian and human attestation",
         )
@@ -2375,6 +2433,36 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["federation_quorum_attested"])
         self.assertIn("federation_attestation.received_roles mismatch", validation["errors"])
+
+    def test_validate_transfer_receipt_rejects_stale_remote_verifier_receipt(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["federation_attestation"]["remote_verifier_federation"]["verifier_receipts"][0][
+            "freshness_window_seconds"
+        ] = 300
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["re_attestation_current"])
+        self.assertIn(
+            "federation_attestation.remote_verifier_federation.receipt_digest mismatch",
+            validation["errors"],
+        )
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):

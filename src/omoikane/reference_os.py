@@ -3632,6 +3632,47 @@ json.dump(response, sys.stdout)
             },
         }
 
+    def _build_trust_transfer_remote_verifier_receipts(self) -> List[Dict[str, Any]]:
+        reviewer = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-trust-transfer-001",
+            display_name="Trust Transfer Reviewer",
+            credential_id="credential-trust-transfer-001",
+            attestation_type="institutional-badge",
+            proof_ref="proof://trust-transfer/reviewer/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-24T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://trust-transfer/reviewer/v1",
+            escalation_contact="mailto:trust-transfer-reviewer@example.invalid",
+            allowed_guardian_roles=["integrity", "identity"],
+            allowed_categories=["attest"],
+        )
+        verified_at = "2026-04-24T00:00:00+00:00"
+        alpha = self.oversight.verify_reviewer_from_network(
+            reviewer["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-alpha",
+            challenge_ref="challenge://trust-transfer/reviewer-alpha/2026-04-24T00:00:00Z",
+            challenge_digest="sha256:trust-transfer-reviewer-alpha-20260424",
+            jurisdiction_bundle_ref="legal://jp-13/trust-transfer/v1",
+            jurisdiction_bundle_digest="sha256:jp13-trust-transfer-v1",
+            verified_at=verified_at,
+            valid_until="2026-10-24T00:00:00+00:00",
+        )
+        beta = self.oversight.verify_reviewer_from_network(
+            reviewer["reviewer_id"],
+            verifier_ref="verifier://guardian-oversight.jp/reviewer-beta",
+            challenge_ref="challenge://trust-transfer/reviewer-beta/2026-04-24T00:00:00Z",
+            challenge_digest="sha256:trust-transfer-reviewer-beta-20260424",
+            jurisdiction_bundle_ref="legal://jp-13/trust-transfer/v1",
+            jurisdiction_bundle_digest="sha256:jp13-trust-transfer-v1",
+            verified_at=verified_at,
+            valid_until="2026-10-24T00:00:00+00:00",
+        )
+        return [
+            alpha["credential_verification"]["network_receipt"],
+            beta["credential_verification"]["network_receipt"],
+        ]
+
     def run_trust_transfer_demo(self) -> Dict[str, Any]:
         source_service = self._seed_trust_demo_service()
         self._record_trust_demo_events(source_service)
@@ -3652,6 +3693,7 @@ json.dump(response, sys.stdout)
         )
 
         source_snapshot = source_service.snapshot("design-architect")
+        remote_verifier_receipts = self._build_trust_transfer_remote_verifier_receipts()
         transfer = source_service.transfer_snapshot_to(
             "design-architect",
             destination_service=destination_service,
@@ -3661,6 +3703,7 @@ json.dump(response, sys.stdout)
             source_guardian_agent_id="integrity-guardian",
             destination_guardian_agent_id="identity-guardian",
             human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=remote_verifier_receipts,
             council_session_ref="council://trust-transfer/session-001",
             rationale="cross-substrate trust carryover requires guardian and human attestation",
         )

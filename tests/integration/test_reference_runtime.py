@@ -1509,9 +1509,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["provenance_policy_preserved"])
         self.assertTrue(result["validation"]["eligibility_preserved"])
         self.assertTrue(result["validation"]["federation_quorum_attested"])
+        self.assertTrue(result["validation"]["live_remote_verifier_attested"])
+        self.assertTrue(result["validation"]["remote_verifier_receipts_bound"])
+        self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
+        self.assertTrue(result["validation"]["re_attestation_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
+        self.assertEqual(
+            2,
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"][
+                "received_verifier_count"
+            ],
+        )
 
     def test_oversight_demo_propagates_pin_breach(self) -> None:
         runtime = OmoikaneReferenceOS()

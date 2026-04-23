@@ -1427,8 +1427,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["history_preserved"])
         self.assertTrue(result["validation"]["thresholds_preserved"])
         self.assertTrue(result["validation"]["federation_quorum_attested"])
+        self.assertTrue(result["validation"]["live_remote_verifier_attested"])
+        self.assertTrue(result["validation"]["remote_verifier_receipts_bound"])
+        self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
+        self.assertTrue(result["validation"]["re_attestation_current"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
+        self.assertEqual(
+            2,
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"][
+                "received_verifier_count"
+            ],
+        )
 
     def test_yaoyorozu_demo_emits_registry_and_convocation_json(self) -> None:
         stdout = io.StringIO()

@@ -21,7 +21,8 @@
 - 役割定義は [agents/](../../../agents/) 配下
 - reference runtime では `agentic.trust.v0` と `trust-demo` / `trust-transfer-demo` が deterministic な更新規則に加え、
   self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
-  guardian / human quorum 付きの cross-substrate trust export/import receipt まで machine-checkable にし、
+  guardian / human quorum 付きの cross-substrate trust export/import receipt に
+  live remote verifier federation と fixed re-attestation cadence まで内包して machine-checkable にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
   `fork-request-v1` では `runtime/schema/docs` required + `eval` optional、

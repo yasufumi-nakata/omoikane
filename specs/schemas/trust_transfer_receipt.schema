@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/trust_transfer_receipt.schema"
 title: TrustTransferReceipt
-description: Digest-bound cross-substrate trust export/import receipt with fixed guardian and human attestation quorum.
+description: Digest-bound cross-substrate trust export/import receipt with fixed guardian/human quorum, live remote verifier federation, and re-attestation cadence.
 type: object
 additionalProperties: false
 required:
@@ -129,6 +129,8 @@ properties:
       - quorum_received
       - route_ref
       - route_digest
+      - remote_verifier_federation
+      - re_attestation_cadence
       - cross_substrate_attested
     properties:
       attestation_id:
@@ -203,6 +205,134 @@ properties:
       route_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+      remote_verifier_federation:
+        type: object
+        additionalProperties: false
+        required:
+          - federation_id
+          - federation_ref
+          - federation_policy_id
+          - network_profile_id
+          - human_reviewer_ref
+          - required_verifier_count
+          - received_verifier_count
+          - verifier_receipts
+          - verifier_refs
+          - trust_root_refs
+          - authority_chain_refs
+          - reviewer_binding_digest
+          - federation_status
+          - receipt_digest
+        properties:
+          federation_id:
+            type: string
+            pattern: "^trust-verifier-federation-[a-f0-9]{12}$"
+          federation_ref:
+            type: string
+            minLength: 1
+          federation_policy_id:
+            const: bounded-live-trust-transfer-verifier-federation-v1
+          network_profile_id:
+            const: guardian-reviewer-remote-attestation-v1
+          human_reviewer_ref:
+            type: string
+            minLength: 1
+          required_verifier_count:
+            const: 2
+          received_verifier_count:
+            type: integer
+            minimum: 0
+          verifier_receipts:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              $ref: "./guardian_verifier_network_receipt.schema"
+          verifier_refs:
+            type: array
+            minItems: 2
+            maxItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          trust_root_refs:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          authority_chain_refs:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          reviewer_binding_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          federation_status:
+            const: verified
+          receipt_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+      re_attestation_cadence:
+        type: object
+        additionalProperties: false
+        required:
+          - cadence_id
+          - cadence_ref
+          - cadence_policy_id
+          - attested_at
+          - renew_after
+          - valid_until
+          - grace_window_seconds
+          - covered_verifier_receipt_ids
+          - bound_federation_ref
+          - bound_federation_digest
+          - cadence_status
+          - receipt_digest
+        properties:
+          cadence_id:
+            type: string
+            pattern: "^trust-re-attestation-[a-f0-9]{12}$"
+          cadence_ref:
+            type: string
+            minLength: 1
+          cadence_policy_id:
+            const: bounded-trust-transfer-re-attestation-cadence-v1
+          attested_at:
+            type: string
+            format: date-time
+          renew_after:
+            type: string
+            format: date-time
+          valid_until:
+            type: string
+            format: date-time
+          grace_window_seconds:
+            const: 240
+          covered_verifier_receipt_ids:
+            type: array
+            minItems: 2
+            maxItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          bound_federation_ref:
+            type: string
+            minLength: 1
+          bound_federation_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          cadence_status:
+            const: scheduled
+          receipt_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
       cross_substrate_attested:
         const: true
   import_receipt:
@@ -259,6 +389,10 @@ properties:
       - provenance_policy_preserved
       - eligibility_preserved
       - federation_quorum_attested
+      - live_remote_verifier_attested
+      - remote_verifier_receipts_bound
+      - re_attestation_cadence_bound
+      - re_attestation_current
       - destination_seeded
       - receipt_digest_bound
       - ok
@@ -277,6 +411,14 @@ properties:
         type: boolean
       federation_quorum_attested:
         type: boolean
+      live_remote_verifier_attested:
+        type: boolean
+      remote_verifier_receipts_bound:
+        type: boolean
+      re_attestation_cadence_bound:
+        type: boolean
+      re_attestation_current:
+        type: boolean
       destination_seeded:
         type: boolean
       receipt_digest_bound:
@@ -290,7 +432,7 @@ properties:
     pattern: "^[a-f0-9]{64}$"
 examples:
   - kind: trust_transfer_receipt
-    schema_version: 1.0.0
+    schema_version: 1.1.0
     receipt_id: trust-transfer-0123456789ab
     transfer_policy_id: bounded-cross-substrate-trust-transfer-v1
     attestation_policy_id: bounded-trust-transfer-attestation-federation-v1
@@ -393,6 +535,120 @@ examples:
       quorum_received: 3
       route_ref: trust-transfer-route://design-architect
       route_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      remote_verifier_federation:
+        federation_id: trust-verifier-federation-0123456789ab
+        federation_ref: trust-verifier-federation://4c38ec8f5f8a
+        federation_policy_id: bounded-live-trust-transfer-verifier-federation-v1
+        network_profile_id: guardian-reviewer-remote-attestation-v1
+        human_reviewer_ref: human://yasufumi
+        required_verifier_count: 2
+        received_verifier_count: 2
+        verifier_receipts:
+          - kind: guardian_verifier_network_receipt
+            schema_version: 1.0.0
+            receipt_id: verifier-network-receipt-aaaaaaaaaaaa
+            reviewer_id: human-reviewer-trust-transfer-001
+            verifier_endpoint: verifier://guardian-oversight.jp
+            verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+            jurisdiction: JP-13
+            transport_profile: reviewer-live-proof-bridge-v1
+            network_profile_id: guardian-reviewer-remote-attestation-v1
+            challenge_ref: challenge://trust-transfer/reviewer-alpha/2026-04-24T00:00:00Z
+            challenge_digest: sha256:trust-transfer-reviewer-alpha-20260424
+            authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+            trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+            trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+            transport_exchange:
+              kind: guardian_verifier_transport_exchange
+              schema_version: 1.0.0
+              exchange_id: verifier-transport-exchange-aaaaaaaaaaaa
+              verifier_endpoint: verifier://guardian-oversight.jp
+              verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+              jurisdiction: JP-13
+              transport_profile: reviewer-live-proof-bridge-v1
+              exchange_profile_id: digest-bound-reviewer-transport-exchange-v1
+              challenge_ref: challenge://trust-transfer/reviewer-alpha/2026-04-24T00:00:00Z
+              challenge_digest: sha256:trust-transfer-reviewer-alpha-20260424
+              request_payload_kind: reviewer-live-proof-request
+              request_payload_ref: sealed://trust-transfer/reviewer-alpha/request
+              request_payload_digest: "1111111111111111111111111111111111111111111111111111111111111111"
+              request_size_bytes: 296
+              response_payload_kind: reviewer-live-proof-response
+              response_payload_ref: sealed://trust-transfer/reviewer-alpha/response
+              response_payload_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+              response_size_bytes: 298
+              recorded_at: "2026-04-24T00:00:00+00:00"
+              digest: "3333333333333333333333333333333333333333333333333333333333333333"
+            freshness_window_seconds: 900
+            observed_latency_ms: 48.6
+            receipt_status: verified
+            recorded_at: "2026-04-24T00:00:00+00:00"
+            digest: "4444444444444444444444444444444444444444444444444444444444444444"
+          - kind: guardian_verifier_network_receipt
+            schema_version: 1.0.0
+            receipt_id: verifier-network-receipt-bbbbbbbbbbbb
+            reviewer_id: human-reviewer-trust-transfer-001
+            verifier_endpoint: verifier://guardian-oversight.jp
+            verifier_ref: verifier://guardian-oversight.jp/reviewer-beta
+            jurisdiction: JP-13
+            transport_profile: reviewer-live-proof-bridge-v1
+            network_profile_id: guardian-reviewer-remote-attestation-v1
+            challenge_ref: challenge://trust-transfer/reviewer-beta/2026-04-24T00:00:00Z
+            challenge_digest: sha256:trust-transfer-reviewer-beta-20260424
+            authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+            trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+            trust_root_digest: sha256:guardian-oversight-jp-reviewer-live-pki-v1
+            transport_exchange:
+              kind: guardian_verifier_transport_exchange
+              schema_version: 1.0.0
+              exchange_id: verifier-transport-exchange-bbbbbbbbbbbb
+              verifier_endpoint: verifier://guardian-oversight.jp
+              verifier_ref: verifier://guardian-oversight.jp/reviewer-beta
+              jurisdiction: JP-13
+              transport_profile: reviewer-live-proof-bridge-v1
+              exchange_profile_id: digest-bound-reviewer-transport-exchange-v1
+              challenge_ref: challenge://trust-transfer/reviewer-beta/2026-04-24T00:00:00Z
+              challenge_digest: sha256:trust-transfer-reviewer-beta-20260424
+              request_payload_kind: reviewer-live-proof-request
+              request_payload_ref: sealed://trust-transfer/reviewer-beta/request
+              request_payload_digest: "5555555555555555555555555555555555555555555555555555555555555555"
+              request_size_bytes: 296
+              response_payload_kind: reviewer-live-proof-response
+              response_payload_ref: sealed://trust-transfer/reviewer-beta/response
+              response_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666"
+              response_size_bytes: 298
+              recorded_at: "2026-04-24T00:00:00+00:00"
+              digest: "7777777777777777777777777777777777777777777777777777777777777777"
+            freshness_window_seconds: 900
+            observed_latency_ms: 51.2
+            receipt_status: verified
+            recorded_at: "2026-04-24T00:00:00+00:00"
+            digest: "8888888888888888888888888888888888888888888888888888888888888888"
+        verifier_refs:
+          - verifier://guardian-oversight.jp/reviewer-alpha
+          - verifier://guardian-oversight.jp/reviewer-beta
+        trust_root_refs:
+          - root://guardian-oversight.jp/reviewer-live-pki
+        authority_chain_refs:
+          - authority://guardian-oversight.jp/reviewer-attestation
+        reviewer_binding_digest: "1212121212121212121212121212121212121212121212121212121212121212"
+        federation_status: verified
+        receipt_digest: "1313131313131313131313131313131313131313131313131313131313131313"
+      re_attestation_cadence:
+        cadence_id: trust-re-attestation-0123456789ab
+        cadence_ref: trust-re-attestation://trust-verifier-federation-0123456789ab
+        cadence_policy_id: bounded-trust-transfer-re-attestation-cadence-v1
+        attested_at: "2026-04-24T00:00:00+00:00"
+        renew_after: "2026-04-24T00:10:00+00:00"
+        valid_until: "2026-04-24T00:15:00+00:00"
+        grace_window_seconds: 240
+        covered_verifier_receipt_ids:
+          - verifier-network-receipt-aaaaaaaaaaaa
+          - verifier-network-receipt-bbbbbbbbbbbb
+        bound_federation_ref: trust-verifier-federation://4c38ec8f5f8a
+        bound_federation_digest: "1313131313131313131313131313131313131313131313131313131313131313"
+        cadence_status: scheduled
+        receipt_digest: "1414141414141414141414141414141414141414141414141414141414141414"
       cross_substrate_attested: true
     import_receipt:
       import_id: trust-import-0123456789ab
@@ -413,6 +669,10 @@ examples:
       provenance_policy_preserved: true
       eligibility_preserved: true
       federation_quorum_attested: true
+      live_remote_verifier_attested: true
+      remote_verifier_receipts_bound: true
+      re_attestation_cadence_bound: true
+      re_attestation_current: true
       destination_seeded: true
       receipt_digest_bound: true
       ok: true
