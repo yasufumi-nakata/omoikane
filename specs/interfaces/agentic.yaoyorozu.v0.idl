@@ -100,11 +100,11 @@ operations:
       - standing roles must include speaker, recorder, guardian_liaison, and self_liaison
       - when workspace_discovery is bound, its proposal_profile and profile policy must match the selected convocation profile
       - council panel must satisfy weighted vote quorum before emit_build_request
-      - builder handoff must cover runtime, schema, eval, and docs surfaces
+      - proposal_profile must fix the required builder coverage surfaced by builder_handoff and exclude optional worker coverage areas from the convocation artifact
   prepare_worker_dispatch:
     summary: >
       Convert one selected bounded Yaoyorozu convocation into a repo-local worker dispatch plan
-      that launches bounded builder processes for runtime, schema, eval, and docs coverage.
+      that launches bounded builder processes only for the proposal profile's required worker coverage.
     input:
       inline_schema:
         type: object
@@ -117,8 +117,9 @@ operations:
       schema_ref: yaoyorozu_worker_dispatch_plan
     guarantees:
       - dispatch units must be derived only from selected builder_handoff entries
+      - proposal_profile must fix the required and optional worker coverage policy echoed by the dispatch plan summary
       - every command preview must remain repo-local, subprocess-bound, and temp-workspace-only
-      - runtime, schema, eval, and docs coverage areas must each map to one dispatch unit
+      - every required worker coverage area must map to exactly one dispatch unit and optional worker coverage areas must not be launched
   execute_worker_dispatch:
     summary: >
       Execute one repo-local worker dispatch plan as bounded subprocess workers and return
@@ -254,5 +255,5 @@ compatibility:
     - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, and `fork-request-v1` proposal profiles.
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with profile-aware review_budget, required coverage policy, and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
-    - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `memory-edit` grouping runtime+eval, and `fork-request` grouping schema+docs.
+    - TaskGraph bundle binding keeps the proposal profile's required worker coverage within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs while `memory-edit` and `fork-request` bind one required surface per root node.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

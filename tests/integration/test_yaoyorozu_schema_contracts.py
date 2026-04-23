@@ -124,8 +124,20 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["workspace_discovery"],
         )
         self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
+            result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/council_convocation_session.schema",
             result["convocation"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
+            result["consensus_dispatch"],
         )
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
@@ -146,6 +158,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
             result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
+            result["consensus_dispatch"],
         )
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",

@@ -10,6 +10,7 @@ expected:
   standing_roles_ready: true
   council_role_coverage_ok: true
   builder_handoff_coverage_ok: true
+  builder_profile_policy_ready: true
   workspace_count: 2
   non_source_workspace_count: 1
   profile_workspace_review_budget: 2
@@ -17,13 +18,19 @@ expected:
     - runtime
     - eval
     - docs
-  selected_builder_coverage_count: 4
-  dispatch_unit_count: 4
+  required_builder_coverage_areas:
+    - runtime
+    - eval
+    - docs
+  optional_builder_coverage_areas:
+    - schema
+  selected_builder_coverage_count: 3
+  dispatch_unit_count: 3
   worker_dispatch_coverage_complete: true
   workspace_discovery_bound: true
   workspace_profile_policy_ready: true
   task_graph_bundle_strategy_ok: true
-  task_graph_bundle_strategy_id: memory-edit-rehearsal-three-root-bundle-v1
+  task_graph_bundle_strategy_id: memory-edit-required-dispatch-three-root-v1
 metric: equality
 threshold: 1.0
 ethics_check: true

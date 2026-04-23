@@ -82,7 +82,10 @@ source workspace に加えて bounded same-host local candidate workspace catalo
 repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
 `self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` を切り替え可能な
-bounded proposal profile catalog、および runtime / schema / eval / docs の 4 coverage を持つ
+bounded proposal profile catalog、および
+`self-modify-patch-v1` では 4 coverage、
+`memory-edit-v1` では `runtime/eval/docs` の 3 coverage、
+`fork-request-v1` では `runtime/schema/docs` の 3 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
 各 worker report は dispatch plan / dispatch unit に束縛され、
 workspace 内 target path の存在確認と bounded sample observation に加え、
@@ -97,8 +100,8 @@ selected profile の required coverage と accepted workspace set を
 same-session artifact として固定する。
 さらに `TaskGraph` 側では `max_parallelism=3` を守るため、
 `self-modify-patch-v1` は `runtime` / `schema` / `evidence-sync(eval+docs)`,
-`memory-edit-v1` は `runtime+eval` / `schema` / `docs`,
-`fork-request-v1` は `runtime` / `schema+docs` / `eval`
+`memory-edit-v1` は `runtime` / `eval` / `docs`,
+`fork-request-v1` は `runtime` / `schema` / `docs`
 の 3 root bundle strategy へ畳み、
 worker dispatch receipt と guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として固定する。

@@ -64,7 +64,8 @@ properties:
     minLength: 1
   dispatch_units:
     type: array
-    minItems: 4
+    minItems: 3
+    maxItems: 4
     items:
       type: object
       additionalProperties: false
@@ -143,6 +144,8 @@ properties:
     additionalProperties: false
     required:
       - required_worker_count
+      - required_coverage_areas
+      - optional_coverage_areas
       - selected_worker_count
       - unique_coverage_areas
       - missing_coverage
@@ -151,6 +154,28 @@ properties:
       required_worker_count:
         type: integer
         minimum: 1
+      required_coverage_areas:
+        type: array
+        minItems: 1
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      optional_coverage_areas:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
       selected_worker_count:
         type: integer
         minimum: 0
@@ -183,6 +208,7 @@ properties:
       - builder_coverage_ok
       - unique_command_digests
       - repo_local_scope_only
+      - profile_policy_ready
       - ok
     properties:
       registry_bound:
@@ -194,6 +220,8 @@ properties:
       unique_command_digests:
         const: true
       repo_local_scope_only:
+        const: true
+      profile_policy_ready:
         const: true
       ok:
         const: true
@@ -271,6 +299,8 @@ examples:
           - status
     selection_summary:
       required_worker_count: 4
+      required_coverage_areas: [runtime, schema, eval, docs]
+      optional_coverage_areas: []
       selected_worker_count: 4
       unique_coverage_areas: [docs, eval, runtime, schema]
       missing_coverage: []
@@ -281,4 +311,5 @@ examples:
       builder_coverage_ok: true
       unique_command_digests: true
       repo_local_scope_only: true
+      profile_policy_ready: true
       ok: true

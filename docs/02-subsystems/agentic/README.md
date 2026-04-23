@@ -29,6 +29,10 @@
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、
+  `self-modify-patch-v1` では `runtime/schema/eval/docs`、
+  `memory-edit-v1` では `runtime/eval/docs`、
+  `fork-request-v1` では `runtime/schema/docs`
+  だけを actual builder handoff coverage として固定したうえで、
   selected builder handoff を dispatch/unit binding と workspace target 観測、
   さらに git-bound target path delta receipt と delta-derived patch candidate receipt を持つ
   repo-local subprocess worker dispatch receipt まで実行しつつ、
@@ -36,8 +40,8 @@
   `yaoyorozu_consensus_dispatch_binding` として束縛する。
   さらに fixed `max_parallelism=3` を守るため、
   `self-modify`=`runtime` / `schema` / `evidence-sync(eval+docs)`,
-  `memory-edit`=`runtime+eval` / `schema` / `docs`,
-  `fork-request`=`runtime` / `schema+docs` / `eval`
+  `memory-edit`=`runtime` / `eval` / `docs`,
+  `fork-request`=`runtime` / `schema` / `docs`
   の 3 root bundle に畳み込んだ `TaskGraph` execution bundle を
   `yaoyorozu_task_graph_binding` として残す
 
@@ -47,8 +51,8 @@
 - Council が分解、Yaoyorozu が実行
 - reference runtime v0 では `max_nodes=5 / max_edges=4 / max_depth=3 / max_parallelism=3`
   に固定し、過大な DAG は build 前に reject する。
-  `yaoyorozu-demo` はこの ceiling を破らないため、4 worker coverage を
-  proposal profile に応じた 3 root node grouping へ畳み込んでから
+  `yaoyorozu-demo` はこの ceiling を破らないため、proposal profile ごとの
+  required worker coverage だけを 3 root node grouping へ畳み込んでから
   review / synthesis へ流す
 
 ### ConsensusBus

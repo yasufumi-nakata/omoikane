@@ -1530,11 +1530,12 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
         self.assertEqual(
-            "memory-edit-rehearsal-three-root-bundle-v1",
+            "memory-edit-required-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
-        self.assertIn(
-            ["eval", "runtime"],
+        self.assertEqual(3, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(
+            [["docs"], ["eval"], ["runtime"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]
@@ -1585,11 +1586,12 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
         self.assertEqual(
-            "fork-request-governance-three-root-bundle-v1",
+            "fork-request-required-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
-        self.assertIn(
-            ["docs", "schema"],
+        self.assertEqual(3, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(
+            [["docs"], ["runtime"], ["schema"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]

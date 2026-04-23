@@ -54,6 +54,10 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、
 `fork-request-v1` では `runtime+schema+docs` required という
 profile-aware workspace review policy へ切り替わり、
+actual builder dispatch も
+`memory-edit-v1` では `runtime/eval/docs`、
+`fork-request-v1` では `runtime/schema/docs`
+の required coverage だけへ縮退しつつ、
 selected builder 群が dispatch/unit binding と workspace target 観測を伴う
 git-bound delta receipt と patch candidate receipt 付きの
 repo-local worker dispatch receipt として実行される。
@@ -64,8 +68,8 @@ identity fork の triple-approval review 向け convocation / dispatch へ切り
 そのうえで同じ Council session 上の `ConsensusBus` transcript が
 blocked direct builder handoff と guardian-gated resolve を伴う
 `yaoyorozu_consensus_dispatch_binding` として束縛される。
-さらに 4 worker coverage は `TaskGraph` の complexity ceiling に合わせて
-proposal profile ごとの 3 root bundle strategy へ畳まれ、
+さらに proposal profile ごとの required worker coverage は
+`TaskGraph` の complexity ceiling に合わせて 3 root bundle strategy へ畳まれ、
 worker claim / guardian gate / resolve digest を伴う
 `yaoyorozu_task_graph_binding` として execution bundle 化される。
 

@@ -61,7 +61,7 @@ deterministic に切り替えられること。
 
 ### Yaoyorozu Local Worker Dispatch
 repo-local `agents/` から選んだ builder handoff が
-runtime / schema / eval / docs の 4 coverage へ分解され、
+selected proposal profile の required coverage へだけ分解され、
 actual subprocess worker receipt として machine-checkable に実行されること。
 
 ### Yaoyorozu Workspace Discovery
@@ -87,12 +87,12 @@ repo-local worker dispatch が git-bound delta receipt に加えて、
 ### Yaoyorozu Memory Edit Profile
 `memory-edit-v1` の reversible memory-edit convocation が
 `MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
-panel と 4 coverage の worker dispatch を維持すること。
+panel と `runtime/eval/docs` の required worker dispatch を維持すること。
 
 ### Yaoyorozu Fork Request Profile
 `fork-request-v1` の identity fork convocation が
 `IdentityProtector` / `LegalScholar` / `ConservatismAdvocate` / `EthicsCommittee`
-panel と 4 coverage の worker dispatch を維持すること。
+panel と `runtime/schema/docs` の required worker dispatch を維持すること。
 
 ## 実装済み eval
 

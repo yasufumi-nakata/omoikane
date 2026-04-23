@@ -65,7 +65,7 @@ properties:
     const: consensus-bus-only
   dispatch_claim_ids:
     type: array
-    minItems: 6
+    minItems: 5
     items:
       type: string
       minLength: 1
@@ -188,7 +188,7 @@ properties:
         const: resolve
       related_claim_ids:
         type: array
-        minItems: 6
+        minItems: 5
         items:
           type: string
           minLength: 1

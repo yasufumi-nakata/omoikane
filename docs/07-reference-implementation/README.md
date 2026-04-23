@@ -297,7 +297,10 @@ repo-local `agents/` から materialize した trust-bound registry snapshot、
 さらに convocation 自体が `workspace_discovery_binding` を持ち、
 selected profile の review budget / required coverage / accepted workspace set を
 same-session Council artifact に束縛すること、
-runtime / schema / eval / docs を覆う builder handoff coverage、
+`self-modify-patch-v1` では `runtime/schema/eval/docs`、
+`memory-edit-v1` では `runtime/eval/docs`、
+`fork-request-v1` では `runtime/schema/docs`
+を覆う builder handoff coverage、
 さらにそれを repo-local subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されること、
@@ -315,9 +318,9 @@ final resolve を監査し、blocked direct handoff と worker claim chain を
 `self-modify-patch-v1` では
 `runtime` / `schema` / `evidence-sync(eval+docs)`、
 `memory-edit-v1` では
-`memory-rehearsal(runtime+eval)` / `schema` / `docs`、
+`runtime` / `eval` / `docs`、
 `fork-request-v1` では
-`runtime` / `fork-governance(schema+docs)` / `eval`
+`runtime` / `schema` / `docs`
 の 3 root bundle strategy へ畳み込んだ `TaskGraph` が、
 同じ session 上の worker claim / guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として束縛することを確認する。

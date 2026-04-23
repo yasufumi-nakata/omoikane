@@ -3829,12 +3829,21 @@ json.dump(response, sys.stdout)
                 "builder_coverage_count": convocation["selection_summary"][
                     "selected_builder_coverage_count"
                 ],
+                "required_builder_coverage_areas": convocation["selection_summary"][
+                    "required_builder_coverage_areas"
+                ],
+                "optional_builder_coverage_areas": convocation["selection_summary"][
+                    "optional_builder_coverage_areas"
+                ],
                 "dispatch_unit_count": dispatch_plan_validation["dispatch_unit_count"],
                 "dispatch_success_count": dispatch_receipt_validation["success_count"],
                 "standing_roles_ready": convocation["validation"]["standing_roles_ready"],
                 "council_role_coverage_ok": convocation["validation"]["council_role_coverage_ok"],
                 "builder_handoff_coverage_ok": convocation["validation"][
                     "builder_handoff_coverage_ok"
+                ],
+                "builder_profile_policy_ready": convocation["validation"][
+                    "builder_profile_policy_ready"
                 ],
                 "workspace_discovery_bound": convocation["validation"][
                     "workspace_discovery_bound"

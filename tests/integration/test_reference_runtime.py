@@ -1571,6 +1571,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["validation"]["profile_required_workspace_coverage_areas"],
         )
         self.assertEqual([], result["validation"]["profile_optional_workspace_coverage_areas"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["required_builder_coverage_areas"],
+        )
+        self.assertEqual([], result["validation"]["optional_builder_coverage_areas"])
         self.assertTrue(result["validation"]["cross_workspace_coverage_complete"])
         self.assertEqual(4, result["validation"]["dispatch_unit_count"])
         self.assertEqual(4, result["validation"]["dispatch_success_count"])
@@ -1578,6 +1583,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["consensus_dispatch_ok"])
         self.assertTrue(result["validation"]["consensus_direct_handoff_blocked"])
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["builder_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertTrue(result["validation"]["worker_delta_receipts_bound"])
@@ -1668,9 +1674,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ["schema"],
             result["validation"]["profile_optional_workspace_coverage_areas"],
         )
+        self.assertEqual(
+            ["runtime", "eval", "docs"],
+            result["validation"]["required_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["schema"],
+            result["validation"]["optional_builder_coverage_areas"],
+        )
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["builder_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(3, result["validation"]["builder_coverage_count"])
+        self.assertEqual(3, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(3, result["validation"]["dispatch_success_count"])
         self.assertIn(
             "memory-edit-v1",
             result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
@@ -1696,11 +1714,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
         self.assertEqual(
-            "memory-edit-rehearsal-three-root-bundle-v1",
+            "memory-edit-required-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
-        self.assertIn(
-            ["eval", "runtime"],
+        self.assertEqual(
+            [["docs"], ["eval"], ["runtime"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]
@@ -1723,9 +1741,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ["eval"],
             result["validation"]["profile_optional_workspace_coverage_areas"],
         )
+        self.assertEqual(
+            ["runtime", "schema", "docs"],
+            result["validation"]["required_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            ["eval"],
+            result["validation"]["optional_builder_coverage_areas"],
+        )
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["builder_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(3, result["validation"]["builder_coverage_count"])
+        self.assertEqual(3, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(3, result["validation"]["dispatch_success_count"])
         self.assertIn(
             "fork-request-v1",
             result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
@@ -1749,11 +1779,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
         self.assertEqual(
-            "fork-request-governance-three-root-bundle-v1",
+            "fork-request-required-dispatch-three-root-v1",
             result["validation"]["task_graph_bundle_strategy_id"],
         )
-        self.assertIn(
-            ["docs", "schema"],
+        self.assertEqual(
+            [["docs"], ["runtime"], ["schema"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]
