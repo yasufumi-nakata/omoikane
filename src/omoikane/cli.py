@@ -328,6 +328,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     trust_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    trust_transfer_parser = subparsers.add_parser(
+        "trust-transfer-demo",
+        help="Run the L4 cross-substrate trust export/import receipt scenario",
+    )
+    trust_transfer_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     yaoyorozu_parser = subparsers.add_parser(
         "yaoyorozu-demo",
         help="Run the repo-local Yaoyorozu registry sync, council convocation, and build-request handoff scenario",
@@ -601,6 +607,10 @@ def main() -> None:
 
     if args.command == "trust-demo":
         _print_result(runtime.run_trust_demo(), args.json)
+        return
+
+    if args.command == "trust-transfer-demo":
+        _print_result(runtime.run_trust_transfer_demo(), args.json)
         return
 
     if args.command == "yaoyorozu-demo":

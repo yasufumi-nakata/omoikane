@@ -55,3 +55,11 @@ class TrustSchemaContractTests(unittest.TestCase):
 
         for snapshot in result["agents"].values():
             self._assert_schema_valid("specs/schemas/trust_snapshot.schema", snapshot)
+
+    def test_trust_transfer_demo_receipt_matches_public_schema(self) -> None:
+        result = self.runtime.run_trust_transfer_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/trust_transfer_receipt.schema",
+            result["transfer"],
+        )

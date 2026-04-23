@@ -1,8 +1,8 @@
 # Agent Trust Management
 
 各 Agent には **trust score** が付与され、召集権・議決重み・本体反映の可否に影響する。
-reference runtime では `agentic.trust.v0` と `trust-demo` により、
-更新アルゴリズムまで固定する。
+reference runtime では `agentic.trust.v0` と `trust-demo` / `trust-transfer-demo` により、
+更新アルゴリズムと cross-substrate export/import receipt まで固定する。
 
 ## スコア構造
 
@@ -114,15 +114,29 @@ eligibility:
 - LLM 系 Agent が「trust を上げるための判断」をするインセンティブを持たないよう、
   Guardian は **trust 最大化行動の検出** を試みる（オープン研究領域）。
 
-## 未解決
+## Cross-Substrate Transfer
 
-- Trust の **substrate 跨ぎ妥当性**
+reference runtime では `trust-transfer-demo` が
+source / destination の `trust_snapshot` を同一 receipt に束ね、
+次を machine-checkable に固定する。
+
+- `source-guardian` / `destination-guardian` / `human-reviewer` の fixed 3 者 quorum
+- source / destination snapshot digest と route digest の束縛
+- history / thresholds / provenance policy / eligibility の preserve
+- destination 側 seed mode を `snapshot-clone-with-history` に固定
+
+## 研究延長
+
+- live remote verifier を跨ぐ attestation federation
+- 長期 horizon の trust portability / expiry / re-attestation cadence
 
 ## Reference runtime surface
 
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-demo --json`
+- CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --json`
 - Oversight: `PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json`
-- Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`
+- Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`, `specs/schemas/trust_transfer_receipt.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
-- Eval: `evals/agentic/trust_score_update_guard.yaml`
+- Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
+  - trust transfer では guardian/human quorum、digest binding、snapshot preserve を継続検証する

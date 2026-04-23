@@ -2134,6 +2134,55 @@ class TaskGraphExecutionTests(unittest.TestCase):
 
 
 class TrustServiceTests(unittest.TestCase):
+    @staticmethod
+    def _build_transfer_services() -> tuple[TrustService, TrustService]:
+        source = TrustService()
+        source.register_agent(
+            "design-architect",
+            initial_score=0.58,
+            per_domain={"council_deliberation": 0.58, "self_modify": 0.58},
+        )
+        source.register_agent(
+            "identity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        source.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        source.record_event(
+            "design-architect",
+            event_type="council_quality_positive",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="Council",
+            rationale="consistent review quality",
+        )
+
+        destination = TrustService()
+        destination.register_agent(
+            "identity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        destination.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        return source, destination
+
     def test_positive_event_updates_score_and_thresholds(self) -> None:
         service = TrustService()
         service.register_agent(
@@ -2256,6 +2305,76 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual("blocked-reciprocal-positive", reciprocal["provenance_status"])
         self.assertEqual("identity-guardian", reciprocal["triggered_by_agent_id"])
         self.assertEqual(0.99, snapshot["global_score"])
+
+    def test_import_snapshot_preserves_history_and_eligibility(self) -> None:
+        source, destination = self._build_transfer_services()
+
+        snapshot = source.snapshot("design-architect")
+        imported = destination.import_snapshot(snapshot)
+
+        self.assertEqual(snapshot, imported)
+        self.assertEqual(snapshot["history"], imported["history"])
+        self.assertEqual(snapshot["eligibility"], imported["eligibility"])
+
+    def test_transfer_snapshot_to_emits_digest_bound_receipt_and_seeds_destination(self) -> None:
+        source, destination = self._build_transfer_services()
+
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+
+        self.assertTrue(receipt["validation"]["ok"])
+        self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
+        self.assertEqual(
+            receipt["source_snapshot_digest"],
+            sha256_text(canonical_json(receipt["source_snapshot"])),
+        )
+        self.assertEqual(
+            receipt["destination_snapshot_digest"],
+            sha256_text(canonical_json(receipt["destination_snapshot"])),
+        )
+        self.assertTrue(destination.has_agent("design-architect"))
+        self.assertEqual(
+            receipt["source_snapshot"],
+            destination.snapshot("design-architect"),
+        )
+
+    def test_validate_transfer_receipt_rejects_attestation_quorum_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["federation_attestation"]["received_roles"] = [
+            "source-guardian",
+            "destination-guardian",
+        ]
+        tampered["federation_attestation"]["quorum_received"] = 2
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["federation_quorum_attested"])
+        self.assertIn("federation_attestation.received_roles mismatch", validation["errors"])
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):

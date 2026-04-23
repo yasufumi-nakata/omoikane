@@ -127,6 +127,7 @@
 - `termination_request.schema`
 - `trust_event.schema`
 - `trust_snapshot.schema`
+- `trust_transfer_receipt.schema`
 - `volition_intent.schema`
 - `volition_shift.schema`
 - `wms_reconcile.schema`

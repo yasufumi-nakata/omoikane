@@ -32,6 +32,7 @@ PYTHONPATH=src python3 -m omoikane.cli cognitive-audit-governance-demo --json
 PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
+PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --include-optional-coverage schema --json
@@ -285,6 +286,13 @@ direct handoff attempt が `blocked` として別途記録されることを確�
 `ethics_violation=-0.25`) と provenance guard / human pin freeze を JSON で可視化し、
 Council 召集・weighted vote・runtime 反映・guardian role の gate に加えて、
 self-issued positive event と reciprocal positive boost が fail-closed になることを確認する。
+
+`trust-transfer-demo` は L4 TrustRegistry の cross-substrate transfer contract
+(`bounded-cross-substrate-trust-transfer-v1`) を JSON で可視化し、
+`source-guardian` / `destination-guardian` / `human-reviewer` の fixed quorum、
+source / destination `trust_snapshot` の digest binding、
+history / thresholds / provenance policy / eligibility preserve、
+`snapshot-clone-with-history` seed mode を 1 receipt で確認する。
 
 `yaoyorozu-demo` は L4 YaoyorozuRegistry / council convocation の reference contract
 (`agentic.yaoyorozu.v0`) を JSON で可視化し、

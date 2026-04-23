@@ -6,6 +6,7 @@ summary: Deterministic trust scoring, provenance-bound anti-tamper guards, human
 imports:
   trust_snapshot: ../schemas/trust_snapshot.schema
   trust_event: ../schemas/trust_event.schema
+  trust_transfer_receipt: ../schemas/trust_transfer_receipt.schema
 operations:
   register_agent:
     summary: Create or seed a trust record for one agent.
@@ -109,10 +110,102 @@ operations:
               maximum: 1
     output:
       schema_ref: trust_snapshot
+  transfer_snapshot:
+    summary: Export one trust snapshot across a substrate boundary and seed it on the destination with bounded guardian and human attestation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - agent_id
+          - source_substrate_ref
+          - destination_substrate_ref
+          - destination_host_ref
+          - source_guardian_agent_id
+          - destination_guardian_agent_id
+          - human_reviewer_ref
+          - council_session_ref
+          - rationale
+        properties:
+          agent_id:
+            type: string
+          source_substrate_ref:
+            type: string
+          destination_substrate_ref:
+            type: string
+          destination_host_ref:
+            type: string
+          source_guardian_agent_id:
+            type: string
+          destination_guardian_agent_id:
+            type: string
+          human_reviewer_ref:
+            type: string
+          council_session_ref:
+            type: string
+          rationale:
+            type: string
+    output:
+      schema_ref: trust_transfer_receipt
+    guarantees:
+      - source_snapshot and destination_snapshot must both validate against trust_snapshot
+      - source_snapshot_digest and destination_snapshot_digest must bind the exported and imported snapshot payloads
+      - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
+      - import must preserve thresholds, provenance policy, eligibility flags, and append-only history without mutation
+      - receipt_digest must stay stable for the fixed export/import/attestation payload family
+  validate_transfer_receipt:
+    summary: Validate one cross-substrate trust transfer receipt against the fixed export/import and attestation policy.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - receipt
+        properties:
+          receipt:
+            schema_ref: trust_transfer_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - source_snapshot_digest_bound
+          - destination_snapshot_digest_bound
+          - history_preserved
+          - thresholds_preserved
+          - provenance_policy_preserved
+          - eligibility_preserved
+          - federation_quorum_attested
+          - destination_seeded
+          - receipt_digest_bound
+          - ok
+          - errors
+        properties:
+          source_snapshot_digest_bound:
+            type: boolean
+          destination_snapshot_digest_bound:
+            type: boolean
+          history_preserved:
+            type: boolean
+          thresholds_preserved:
+            type: boolean
+          provenance_policy_preserved:
+            type: boolean
+          eligibility_preserved:
+            type: boolean
+          federation_quorum_attested:
+            type: boolean
+          destination_seeded:
+            type: boolean
+          receipt_digest_bound:
+            type: boolean
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
 compatibility:
   stability: bootstrap
   notes:
     - Guardian role requires global_score >= 0.99 and explicit human pin.
     - Self-modify eligibility requires both global_score and self_modify domain score to exceed 0.95.
     - Trust provenance is fixed to Council / Guardian / Human origins and blocks self-issued or reciprocal positive boosts.
-    - Cross-substrate transfer of trust remains outside the reference runtime.
+    - Cross-substrate transfer is materialized as a snapshot-clone receipt with source guardian, destination guardian, and human reviewer attestation quorum.

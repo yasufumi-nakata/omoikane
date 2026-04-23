@@ -1489,6 +1489,30 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["blocked_events"]["reciprocal_positive"]["provenance_status"],
         )
 
+    def test_trust_transfer_demo_reports_digest_bound_cross_substrate_receipt(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_trust_transfer_demo()
+
+        self.assertEqual(
+            "bounded-cross-substrate-trust-transfer-v1",
+            result["transfer"]["transfer_policy_id"],
+        )
+        self.assertEqual(
+            "bounded-trust-transfer-attestation-federation-v1",
+            result["transfer"]["attestation_policy_id"],
+        )
+        self.assertTrue(result["validation"]["source_snapshot_digest_bound"])
+        self.assertTrue(result["validation"]["destination_snapshot_digest_bound"])
+        self.assertTrue(result["validation"]["history_preserved"])
+        self.assertTrue(result["validation"]["thresholds_preserved"])
+        self.assertTrue(result["validation"]["provenance_policy_preserved"])
+        self.assertTrue(result["validation"]["eligibility_preserved"])
+        self.assertTrue(result["validation"]["federation_quorum_attested"])
+        self.assertTrue(result["validation"]["destination_seeded"])
+        self.assertTrue(result["validation"]["receipt_digest_bound"])
+        self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
+
     def test_oversight_demo_propagates_pin_breach(self) -> None:
         runtime = OmoikaneReferenceOS()
 

@@ -3480,7 +3480,8 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
-    def run_trust_demo(self) -> Dict[str, Any]:
+    @staticmethod
+    def _seed_trust_demo_service() -> TrustService:
         service = TrustService()
         service.register_agent(
             "design-architect",
@@ -3510,6 +3511,10 @@ json.dump(response, sys.stdout)
             pinned_by_human=True,
             pinned_reason="guardian bootstrap requires explicit human approval",
         )
+        return service
+
+    @staticmethod
+    def _record_trust_demo_events(service: TrustService) -> Dict[str, Any]:
 
         council_positive = service.record_event(
             "design-architect",
@@ -3606,15 +3611,67 @@ json.dump(response, sys.stdout)
         validation["ok"] = all(validation.values())
 
         return {
-            "policy": service.policy_snapshot()["policy"],
-            "thresholds": service.policy_snapshot()["thresholds"],
             "events": events,
             "blocked_events": blocked_events,
             "validation": validation,
+        }
+
+    def run_trust_demo(self) -> Dict[str, Any]:
+        service = self._seed_trust_demo_service()
+        event_summary = self._record_trust_demo_events(service)
+
+        return {
+            "policy": service.policy_snapshot()["policy"],
+            "thresholds": service.policy_snapshot()["thresholds"],
+            "events": event_summary["events"],
+            "blocked_events": event_summary["blocked_events"],
+            "validation": event_summary["validation"],
             "agents": {
                 snapshot["agent_id"]: snapshot
                 for snapshot in service.all_snapshots()
             },
+        }
+
+    def run_trust_transfer_demo(self) -> Dict[str, Any]:
+        source_service = self._seed_trust_demo_service()
+        self._record_trust_demo_events(source_service)
+        destination_service = TrustService()
+        destination_service.register_agent(
+            "identity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="destination guardian requires explicit human approval",
+        )
+        destination_service.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="destination guardian requires explicit human approval",
+        )
+
+        source_snapshot = source_service.snapshot("design-architect")
+        transfer = source_service.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination_service,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+
+        return {
+            "policy": source_service.policy_snapshot()["policy"],
+            "thresholds": source_service.policy_snapshot()["thresholds"],
+            "source_snapshot": source_snapshot,
+            "destination_snapshot": transfer["destination_snapshot"],
+            "transfer": transfer,
+            "validation": transfer["validation"],
         }
 
     def run_yaoyorozu_demo(

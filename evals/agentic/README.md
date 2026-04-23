@@ -139,6 +139,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `distributed_transport_rotation.yaml`
 - `multi_council_externalization.yaml`
 - `task_graph_complexity_guard.yaml`
+- `trust_cross_substrate_transfer.yaml`
 - `trust_score_update_guard.yaml`
 - `yaoyorozu_build_request_binding.yaml`
 - `yaoyorozu_execution_chain_binding.yaml`

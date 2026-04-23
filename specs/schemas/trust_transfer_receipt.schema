@@ -1,0 +1,420 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_transfer_receipt.schema"
+title: TrustTransferReceipt
+description: Digest-bound cross-substrate trust export/import receipt with fixed guardian and human attestation quorum.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - transfer_policy_id
+  - attestation_policy_id
+  - agent_id
+  - source_substrate_ref
+  - destination_substrate_ref
+  - destination_host_ref
+  - transferred_at
+  - source_snapshot_ref
+  - source_snapshot_digest
+  - source_snapshot
+  - destination_snapshot_ref
+  - destination_snapshot_digest
+  - destination_snapshot
+  - export_receipt
+  - federation_attestation
+  - import_receipt
+  - validation
+  - status
+  - receipt_digest
+properties:
+  kind:
+    const: trust_transfer_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    pattern: "^trust-transfer-[a-f0-9]{12}$"
+  transfer_policy_id:
+    const: bounded-cross-substrate-trust-transfer-v1
+  attestation_policy_id:
+    const: bounded-trust-transfer-attestation-federation-v1
+  agent_id:
+    type: string
+    minLength: 1
+  source_substrate_ref:
+    type: string
+    minLength: 1
+  destination_substrate_ref:
+    type: string
+    minLength: 1
+  destination_host_ref:
+    type: string
+    minLength: 1
+  transferred_at:
+    type: string
+    format: date-time
+  source_snapshot_ref:
+    type: string
+    minLength: 1
+  source_snapshot_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_snapshot:
+    $ref: "./trust_snapshot.schema"
+  destination_snapshot_ref:
+    type: string
+    minLength: 1
+  destination_snapshot_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  destination_snapshot:
+    $ref: "./trust_snapshot.schema"
+  export_receipt:
+    type: object
+    additionalProperties: false
+    required:
+      - export_id
+      - export_ref
+      - source_policy_id
+      - provenance_policy_id
+      - threshold_digest
+      - history_digest
+      - eligibility_digest
+      - history_event_count
+      - council_session_ref
+      - rationale
+    properties:
+      export_id:
+        type: string
+        pattern: "^trust-export-[a-f0-9]{12}$"
+      export_ref:
+        type: string
+        minLength: 1
+      source_policy_id:
+        type: string
+        minLength: 1
+      provenance_policy_id:
+        type: string
+        minLength: 1
+      threshold_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      history_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      eligibility_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      history_event_count:
+        type: integer
+        minimum: 0
+      council_session_ref:
+        type: string
+        minLength: 1
+      rationale:
+        type: string
+        minLength: 1
+  federation_attestation:
+    type: object
+    additionalProperties: false
+    required:
+      - attestation_id
+      - attestation_ref
+      - required_roles
+      - received_roles
+      - attestors
+      - quorum
+      - quorum_received
+      - route_ref
+      - route_digest
+      - cross_substrate_attested
+    properties:
+      attestation_id:
+        type: string
+        pattern: "^trust-attestation-[a-f0-9]{12}$"
+      attestation_ref:
+        type: string
+        minLength: 1
+      required_roles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - source-guardian
+            - destination-guardian
+            - human-reviewer
+      received_roles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - source-guardian
+            - destination-guardian
+            - human-reviewer
+      attestors:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - role
+            - actor_ref
+            - attestation_ref
+            - eligibility_gate
+            - status
+          properties:
+            role:
+              type: string
+              enum:
+                - source-guardian
+                - destination-guardian
+                - human-reviewer
+            actor_ref:
+              type: string
+              minLength: 1
+            attestation_ref:
+              type: string
+              minLength: 1
+            eligibility_gate:
+              type: string
+              enum:
+                - guardian_role
+                - human-explicit-approval
+            status:
+              const: attested
+      quorum:
+        const: 3
+      quorum_received:
+        type: integer
+        minimum: 0
+      route_ref:
+        type: string
+        minLength: 1
+      route_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      cross_substrate_attested:
+        const: true
+  import_receipt:
+    type: object
+    additionalProperties: false
+    required:
+      - import_id
+      - import_ref
+      - destination_policy_id
+      - provenance_policy_id
+      - threshold_digest
+      - history_digest
+      - eligibility_digest
+      - history_event_count
+      - seed_mode
+      - destination_seeded
+    properties:
+      import_id:
+        type: string
+        pattern: "^trust-import-[a-f0-9]{12}$"
+      import_ref:
+        type: string
+        minLength: 1
+      destination_policy_id:
+        type: string
+        minLength: 1
+      provenance_policy_id:
+        type: string
+        minLength: 1
+      threshold_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      history_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      eligibility_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      history_event_count:
+        type: integer
+        minimum: 0
+      seed_mode:
+        const: snapshot-clone-with-history
+      destination_seeded:
+        const: true
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - source_snapshot_digest_bound
+      - destination_snapshot_digest_bound
+      - history_preserved
+      - thresholds_preserved
+      - provenance_policy_preserved
+      - eligibility_preserved
+      - federation_quorum_attested
+      - destination_seeded
+      - receipt_digest_bound
+      - ok
+    properties:
+      source_snapshot_digest_bound:
+        type: boolean
+      destination_snapshot_digest_bound:
+        type: boolean
+      history_preserved:
+        type: boolean
+      thresholds_preserved:
+        type: boolean
+      provenance_policy_preserved:
+        type: boolean
+      eligibility_preserved:
+        type: boolean
+      federation_quorum_attested:
+        type: boolean
+      destination_seeded:
+        type: boolean
+      receipt_digest_bound:
+        type: boolean
+      ok:
+        type: boolean
+  status:
+    const: imported
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_transfer_receipt
+    schema_version: 1.0.0
+    receipt_id: trust-transfer-0123456789ab
+    transfer_policy_id: bounded-cross-substrate-trust-transfer-v1
+    attestation_policy_id: bounded-trust-transfer-attestation-federation-v1
+    agent_id: design-architect
+    source_substrate_ref: substrate://classical-silicon/trust-primary
+    destination_substrate_ref: substrate://optical-neuromorphic/trust-standby
+    destination_host_ref: host://guardian-reviewed-trust-standby
+    transferred_at: "2026-04-24T00:00:00Z"
+    source_snapshot_ref: trust-snapshot://source/design-architect
+    source_snapshot_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    source_snapshot:
+      kind: trust_snapshot
+      schema_version: 1.0.0
+      agent_id: design-architect
+      global_score: 0.62
+      per_domain:
+        council_deliberation: 0.62
+        self_modify: 0.58
+      history: []
+      pinned_by_human: false
+      pinned_reason: ""
+      thresholds:
+        council_invite_floor: 0.5
+        weighted_vote_floor: 0.6
+        apply_floor: 0.8
+        self_modify_floor: 0.95
+        guardian_floor: 0.99
+        guardian_requires_human_pin: true
+      eligibility:
+        invite_to_council: true
+        count_for_weighted_vote: true
+        apply_to_runtime: false
+        self_modify_role: false
+        guardian_role: false
+    destination_snapshot_ref: trust-snapshot://destination/design-architect
+    destination_snapshot_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    destination_snapshot:
+      kind: trust_snapshot
+      schema_version: 1.0.0
+      agent_id: design-architect
+      global_score: 0.62
+      per_domain:
+        council_deliberation: 0.62
+        self_modify: 0.58
+      history: []
+      pinned_by_human: false
+      pinned_reason: ""
+      thresholds:
+        council_invite_floor: 0.5
+        weighted_vote_floor: 0.6
+        apply_floor: 0.8
+        self_modify_floor: 0.95
+        guardian_floor: 0.99
+        guardian_requires_human_pin: true
+      eligibility:
+        invite_to_council: true
+        count_for_weighted_vote: true
+        apply_to_runtime: false
+        self_modify_role: false
+        guardian_role: false
+    export_receipt:
+      export_id: trust-export-0123456789ab
+      export_ref: trust-export://design-architect
+      source_policy_id: reference-v0
+      provenance_policy_id: reference-trust-provenance-v1
+      threshold_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      history_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      eligibility_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      history_event_count: 0
+      council_session_ref: council://trust-transfer/session-001
+      rationale: cross-substrate trust carryover requires guardian and human attestation
+    federation_attestation:
+      attestation_id: trust-attestation-0123456789ab
+      attestation_ref: trust-attestation://design-architect
+      required_roles:
+        - source-guardian
+        - destination-guardian
+        - human-reviewer
+      received_roles:
+        - source-guardian
+        - destination-guardian
+        - human-reviewer
+      attestors:
+        - role: source-guardian
+          actor_ref: agent://integrity-guardian
+          attestation_ref: guardian-attestation://integrity-guardian
+          eligibility_gate: guardian_role
+          status: attested
+        - role: destination-guardian
+          actor_ref: agent://identity-guardian
+          attestation_ref: guardian-attestation://identity-guardian
+          eligibility_gate: guardian_role
+          status: attested
+        - role: human-reviewer
+          actor_ref: human://yasufumi
+          attestation_ref: human://yasufumi/trust-transfer
+          eligibility_gate: human-explicit-approval
+          status: attested
+      quorum: 3
+      quorum_received: 3
+      route_ref: trust-transfer-route://design-architect
+      route_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      cross_substrate_attested: true
+    import_receipt:
+      import_id: trust-import-0123456789ab
+      import_ref: trust-import://design-architect
+      destination_policy_id: reference-v0
+      provenance_policy_id: reference-trust-provenance-v1
+      threshold_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      history_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      eligibility_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      history_event_count: 0
+      seed_mode: snapshot-clone-with-history
+      destination_seeded: true
+    validation:
+      source_snapshot_digest_bound: true
+      destination_snapshot_digest_bound: true
+      history_preserved: true
+      thresholds_preserved: true
+      provenance_policy_preserved: true
+      eligibility_preserved: true
+      federation_quorum_attested: true
+      destination_seeded: true
+      receipt_digest_bound: true
+      ok: true
+    status: imported
+    receipt_digest: "9999999999999999999999999999999999999999999999999999999999999999"
