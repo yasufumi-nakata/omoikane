@@ -3833,6 +3833,12 @@ json.dump(response, sys.stdout)
                 "worker_delta_scan_profile": dispatch_receipt["execution_summary"][
                     "delta_scan_profile"
                 ],
+                "worker_patch_candidate_receipts_bound": dispatch_receipt_validation[
+                    "all_patch_candidate_receipts_bound"
+                ],
+                "worker_patch_candidate_profile": dispatch_receipt["execution_summary"][
+                    "patch_candidate_profile"
+                ],
                 "consensus_dispatch_ok": consensus_dispatch_validation["ok"],
                 "consensus_message_count": consensus_dispatch_validation["message_count"],
                 "consensus_related_claim_count": consensus_dispatch_validation[

@@ -1825,7 +1825,19 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, workspace-bounded target path observations, and git-bound target path delta receipts.
+    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema
+    consumers:
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/04-ai-governance/subagent-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize one dispatch-bound patch candidate receipt that reuses patch_descriptor shape while binding every candidate back to the worker delta receipt and target-path observations.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_workspace_delta_receipt.schema

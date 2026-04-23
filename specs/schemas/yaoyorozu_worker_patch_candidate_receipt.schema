@@ -1,0 +1,223 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema"
+title: YaoyorozuWorkerPatchCandidateReceipt
+description: >
+  Dispatch-bound worker receipt that materializes patch_descriptor-compatible
+  patch candidates from one git-bound Yaoyorozu worker delta receipt.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - receipt_ref
+  - profile_id
+  - workspace_root
+  - workspace_root_digest
+  - dispatch_plan_ref
+  - dispatch_unit_ref
+  - source_ref
+  - coverage_area
+  - target_paths
+  - delta_receipt_ref
+  - delta_receipt_digest
+  - planned_at
+  - status
+  - patch_candidate_count
+  - all_delta_entries_materialized
+  - patch_candidates
+  - receipt_digest
+properties:
+  kind:
+    const: yaoyorozu_worker_patch_candidate_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^yaoyorozu-worker-patch-candidate-[a-f0-9]{12}$"
+  receipt_ref:
+    type: string
+    pattern: "^worker-patch://yaoyorozu-worker-patch-candidate-[a-f0-9]{12}$"
+  profile_id:
+    const: target-delta-to-patch-candidate-v1
+  workspace_root:
+    type: string
+    minLength: 1
+  workspace_root_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://"
+  dispatch_unit_ref:
+    type: string
+    pattern: "^worker-dispatch-[a-f0-9]{12}$"
+  source_ref:
+    type: string
+    minLength: 1
+  coverage_area:
+    type: string
+    enum:
+      - runtime
+      - schema
+      - eval
+      - docs
+  target_paths:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  delta_receipt_ref:
+    type: string
+    pattern: "^worker-delta://"
+  delta_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  planned_at:
+    type: string
+    format: date-time
+  status:
+    type: string
+    enum:
+      - no-candidates
+      - candidate-ready
+      - blocked
+  patch_candidate_count:
+    type: integer
+    minimum: 0
+  all_delta_entries_materialized:
+    type: boolean
+  patch_candidates:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_id
+        - target_path
+        - target_path_scope
+        - target_path_observation_digest
+        - delta_entry_digest
+        - change_status
+        - patch_descriptor
+        - candidate_digest
+      properties:
+        candidate_id:
+          type: string
+          pattern: "^worker-patch-candidate-[a-f0-9]{12}$"
+        target_path:
+          type: string
+          minLength: 1
+        target_path_scope:
+          type: string
+          minLength: 1
+        target_path_observation_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        delta_entry_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        change_status:
+          type: string
+          enum:
+            - added
+            - modified
+            - removed
+        patch_descriptor:
+          $ref: "patch_descriptor.schema"
+        candidate_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+allOf:
+  - if:
+      properties:
+        status:
+          const: no-candidates
+    then:
+      properties:
+        patch_candidate_count:
+          const: 0
+        all_delta_entries_materialized:
+          const: true
+  - if:
+      properties:
+        status:
+          const: candidate-ready
+    then:
+      properties:
+        patch_candidate_count:
+          minimum: 1
+        all_delta_entries_materialized:
+          const: true
+  - if:
+      properties:
+        status:
+          const: blocked
+    then:
+      required:
+        - blocking_reasons
+      properties:
+        blocking_reasons:
+          minItems: 1
+examples:
+  - kind: yaoyorozu_worker_patch_candidate_receipt
+    schema_version: 1.0.0
+    receipt_id: yaoyorozu-worker-patch-candidate-0123456789ab
+    receipt_ref: worker-patch://yaoyorozu-worker-patch-candidate-0123456789ab
+    profile_id: target-delta-to-patch-candidate-v1
+    workspace_root: /Users/example/omoikane
+    workspace_root_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+    dispatch_unit_ref: worker-dispatch-0123456789ab
+    source_ref: agents/builders/codex-builder.yaml
+    coverage_area: runtime
+    target_paths:
+      - src/omoikane/
+      - tests/unit/
+      - tests/integration/
+    delta_receipt_ref: worker-delta://yaoyorozu-worker-delta-0123456789ab
+    delta_receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+    planned_at: "2026-04-23T07:06:00Z"
+    status: candidate-ready
+    patch_candidate_count: 1
+    all_delta_entries_materialized: true
+    patch_candidates:
+      - candidate_id: worker-patch-candidate-0123456789ab
+        target_path: src/omoikane/agentic/local_worker_stub.py
+        target_path_scope: src/omoikane/
+        target_path_observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        delta_entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+        change_status: modified
+        patch_descriptor:
+          patch_id: worker-patch-0123456789ab
+          target_path: src/omoikane/agentic/local_worker_stub.py
+          action: modify
+          format: structured_patch
+          summary: Modify the runtime target src/omoikane/agentic/local_worker_stub.py from dispatch-bound git delta evidence.
+          safety_impact: medium
+          rationale_refs:
+            - dispatch://yaoyorozu-dispatch-0123456789ab
+            - worker-dispatch-0123456789ab
+            - worker-delta://yaoyorozu-worker-delta-0123456789ab
+          cue_kind: runtime-source
+          source_refs:
+            - agents/builders/codex-builder.yaml
+            - src/omoikane/
+          section_labels:
+            - src
+            - omoikane
+            - agentic
+          target_subsystem: L4.Yaoyorozu.RuntimeWorker
+          rollback_hint: Restore src/omoikane/agentic/local_worker_stub.py from the dispatch-bound HEAD baseline.
+          applies_cleanly: true
+        candidate_digest: fedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafe
+    receipt_digest: 1111111111111111111111111111111111111111111111111111111111111111

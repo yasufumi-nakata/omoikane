@@ -54,6 +54,7 @@ status: decided | superseded
 - [2026-04-23_yaoyorozu-task-graph-binding.md](2026-04-23_yaoyorozu-task-graph-binding.md)
 - [2026-04-23_yaoyorozu-local-worker-dispatch.md](2026-04-23_yaoyorozu-local-worker-dispatch.md)
 - [2026-04-23_yaoyorozu-worker-delta-receipt.md](2026-04-23_yaoyorozu-worker-delta-receipt.md)
+- [2026-04-23_yaoyorozu-worker-patch-candidate-receipt.md](2026-04-23_yaoyorozu-worker-patch-candidate-receipt.md)
 - [2026-04-23_gap-report-eval-inventory-drift.md](2026-04-23_gap-report-eval-inventory-drift.md)
 - [2026-04-19_procedural-memory-preview.md](2026-04-19_procedural-memory-preview.md)
 - [2026-04-19_procedural-writeback-gate.md](2026-04-19_procedural-writeback-gate.md)

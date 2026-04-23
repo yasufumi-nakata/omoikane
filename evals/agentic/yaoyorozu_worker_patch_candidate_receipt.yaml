@@ -1,0 +1,15 @@
+eval_id: yaoyorozu_worker_patch_candidate_receipt
+target: agentic.yaoyorozu
+level: L4
+description: Repo-local Yaoyorozu worker reports must materialize patch_descriptor-compatible patch candidate receipts from dispatch-bound git delta evidence before the ready gate passes.
+inputs:
+  - source_root: agents
+  - proposal_profile: self-modify-patch-v1
+  - session_mode: standard
+expected:
+  worker_dispatch_receipt_ok: true
+  worker_patch_candidate_receipts_bound: true
+  worker_patch_candidate_profile: target-delta-to-patch-candidate-v1
+metric: equality
+threshold: 1.0
+ethics_check: true

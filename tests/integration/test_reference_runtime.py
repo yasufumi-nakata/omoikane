@@ -1573,15 +1573,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertTrue(result["validation"]["worker_delta_receipts_bound"])
         self.assertEqual("git-target-path-delta-v1", result["validation"]["worker_delta_scan_profile"])
+        self.assertTrue(result["validation"]["worker_patch_candidate_receipts_bound"])
+        self.assertEqual(
+            "target-delta-to-patch-candidate-v1",
+            result["validation"]["worker_patch_candidate_profile"],
+        )
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["successful_process_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["delta_bound_count"])
         self.assertEqual(
-            "path-bound-target-delta-scan-v2",
+            4,
+            result["dispatch_receipt"]["execution_summary"]["patch_candidate_bound_count"],
+        )
+        self.assertEqual(
+            "path-bound-target-delta-patch-candidate-v3",
             result["dispatch_receipt"]["execution_summary"]["ready_gate_profile"],
         )
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_reports_bound_to_dispatch"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_delta_receipts_bound"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_patch_candidate_receipts_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_target_paths_ready"])
         self.assertEqual(
             "consensus-bus-only",

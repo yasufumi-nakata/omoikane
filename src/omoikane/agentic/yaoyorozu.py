@@ -15,9 +15,11 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
 from .local_worker_stub import (
     YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+    YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
     YAOYOROZU_WORKER_READY_GATE_PROFILE,
     YAOYOROZU_WORKER_REPORT_KIND,
     YAOYOROZU_WORKER_REPORT_PROFILE,
+    build_patch_candidate_receipt,
     build_workspace_delta_receipt,
     build_worker_report_binding_digest,
 )
@@ -71,6 +73,7 @@ YAOYOROZU_WORKER_REPORT_FIELDS = [
     "invocation_digest",
     "target_path_observations",
     "workspace_delta_receipt",
+    "patch_candidate_receipt",
     "coverage_evidence",
     "status",
 ]
@@ -1324,6 +1327,15 @@ class YaoyorozuRegistryService:
                 dispatch_unit_ref=str(unit["unit_id"]),
                 target_paths=list(unit["target_paths"]),
             )
+            patch_candidate_receipt = build_patch_candidate_receipt(
+                workspace_root=repo_root,
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=str(unit["unit_id"]),
+                source_ref=str(unit["source_ref"]),
+                coverage_area=str(unit["coverage_area"]),
+                target_paths=list(unit["target_paths"]),
+                workspace_delta_receipt=workspace_delta_receipt,
+            )
             if not report:
                 report = {
                     "kind": YAOYOROZU_WORKER_REPORT_KIND,
@@ -1342,6 +1354,7 @@ class YaoyorozuRegistryService:
                     "invocation_digest": expected_binding_digest,
                     "target_path_observations": [],
                     "workspace_delta_receipt": workspace_delta_receipt,
+                    "patch_candidate_receipt": patch_candidate_receipt,
                     "coverage_evidence": {
                         "expected_target_count": len(unit["target_paths"]),
                         "observed_target_count": 0,
@@ -1352,13 +1365,26 @@ class YaoyorozuRegistryService:
                         "delta_status": workspace_delta_receipt["status"],
                         "changed_path_count": workspace_delta_receipt["changed_path_count"],
                         "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+                        "patch_candidate_receipt_ref": patch_candidate_receipt["receipt_ref"],
+                        "patch_candidate_status": patch_candidate_receipt["status"],
+                        "patch_candidate_count": patch_candidate_receipt["patch_candidate_count"],
+                        "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+                        "all_delta_entries_materialized": patch_candidate_receipt[
+                            "all_delta_entries_materialized"
+                        ],
                         "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
                     },
                     "status": "failed",
                 }
             coverage_evidence = report.get("coverage_evidence", {})
             delta_receipt = report.get("workspace_delta_receipt", {})
+            patch_candidate_receipt = report.get("patch_candidate_receipt", {})
             delta_entries = delta_receipt.get("entries", []) if isinstance(delta_receipt, Mapping) else []
+            patch_candidates = (
+                patch_candidate_receipt.get("patch_candidates", [])
+                if isinstance(patch_candidate_receipt, Mapping)
+                else []
+            )
             report_binding_ok = (
                 report.get("report_profile") == YAOYOROZU_WORKER_REPORT_PROFILE
                 and report.get("dispatch_plan_ref") == dispatch_plan_ref
@@ -1384,6 +1410,33 @@ class YaoyorozuRegistryService:
                 and coverage_evidence.get("delta_status") == delta_receipt.get("status")
                 and coverage_evidence.get("changed_path_count") == delta_receipt.get("changed_path_count")
                 and coverage_evidence.get("delta_scan_profile") == YAOYOROZU_WORKER_DELTA_SCAN_PROFILE
+            )
+            patch_candidate_receipt_ok = (
+                isinstance(patch_candidate_receipt, Mapping)
+                and patch_candidate_receipt.get("kind") == "yaoyorozu_worker_patch_candidate_receipt"
+                and patch_candidate_receipt.get("profile_id")
+                == YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+                and patch_candidate_receipt.get("dispatch_plan_ref") == dispatch_plan_ref
+                and patch_candidate_receipt.get("dispatch_unit_ref") == unit["unit_id"]
+                and patch_candidate_receipt.get("workspace_root") == str(repo_root)
+                and patch_candidate_receipt.get("source_ref") == unit["source_ref"]
+                and patch_candidate_receipt.get("coverage_area") == unit["coverage_area"]
+                and patch_candidate_receipt.get("target_paths") == unit["target_paths"]
+                and patch_candidate_receipt.get("delta_receipt_ref") == delta_receipt.get("receipt_ref")
+                and patch_candidate_receipt.get("delta_receipt_digest") == delta_receipt.get("receipt_digest")
+                and patch_candidate_receipt.get("status") in {"no-candidates", "candidate-ready"}
+                and patch_candidate_receipt.get("all_delta_entries_materialized") is True
+                and isinstance(patch_candidates, list)
+                and patch_candidate_receipt.get("patch_candidate_count") == len(patch_candidates)
+                and isinstance(coverage_evidence, Mapping)
+                and coverage_evidence.get("patch_candidate_receipt_ref")
+                == patch_candidate_receipt.get("receipt_ref")
+                and coverage_evidence.get("patch_candidate_status") == patch_candidate_receipt.get("status")
+                and coverage_evidence.get("patch_candidate_count")
+                == patch_candidate_receipt.get("patch_candidate_count")
+                and coverage_evidence.get("patch_candidate_profile")
+                == YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+                and coverage_evidence.get("all_delta_entries_materialized") is True
             )
             target_paths_ready = (
                 isinstance(coverage_evidence, Mapping)
@@ -1411,6 +1464,7 @@ class YaoyorozuRegistryService:
                 "report_digest": sha256_text(canonical_json(report)),
                 "report_binding_ok": report_binding_ok,
                 "delta_receipt_ok": delta_receipt_ok,
+                "patch_candidate_receipt_ok": patch_candidate_receipt_ok,
                 "target_paths_ready": target_paths_ready,
                 "report": report,
             }
@@ -1419,6 +1473,7 @@ class YaoyorozuRegistryService:
                 or report.get("status") != "ready"
                 or not report_binding_ok
                 or not delta_receipt_ok
+                or not patch_candidate_receipt_ok
                 or not target_paths_ready
             ):
                 failed_role_ids.append(str(unit["role_id"]))
@@ -1443,8 +1498,12 @@ class YaoyorozuRegistryService:
             "coverage_areas": [str(result["coverage_area"]) for result in results],
             "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
             "delta_bound_count": sum(1 for result in results if result["delta_receipt_ok"]),
+            "patch_candidate_bound_count": sum(
+                1 for result in results if result["patch_candidate_receipt_ok"]
+            ),
             "ready_gate_profile": YAOYOROZU_WORKER_READY_GATE_PROFILE,
             "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+            "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
         }
         validation = {
             "command_digests_match": all(
@@ -1471,6 +1530,9 @@ class YaoyorozuRegistryService:
             ),
             "all_delta_receipts_bound": all(
                 result["delta_receipt_ok"] for result in results
+            ),
+            "all_patch_candidate_receipts_bound": all(
+                result["patch_candidate_receipt_ok"] for result in results
             ),
             "all_target_paths_ready": all(result["target_paths_ready"] for result in results),
         }
@@ -1534,6 +1596,8 @@ class YaoyorozuRegistryService:
                 errors.append("worker report must remain bound to the dispatch unit")
             if result.get("delta_receipt_ok") is not True:
                 errors.append("worker report must keep a dispatch-bound delta receipt")
+            if result.get("patch_candidate_receipt_ok") is not True:
+                errors.append("worker report must keep a delta-derived patch candidate receipt")
             if result.get("target_paths_ready") is not True:
                 errors.append("worker report must prove target path readiness")
             coverage_evidence = report.get("coverage_evidence", {})
@@ -1548,6 +1612,13 @@ class YaoyorozuRegistryService:
                     errors.append("worker report must confirm workspace-bounded target paths")
                 if coverage_evidence.get("delta_scan_profile") != YAOYOROZU_WORKER_DELTA_SCAN_PROFILE:
                     errors.append("worker report delta_scan_profile mismatch")
+                if (
+                    coverage_evidence.get("patch_candidate_profile")
+                    != YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+                ):
+                    errors.append("worker report patch_candidate_profile mismatch")
+                if coverage_evidence.get("all_delta_entries_materialized") is not True:
+                    errors.append("worker report must fully materialize delta entries into patch candidates")
             delta_receipt = report.get("workspace_delta_receipt", {})
             if not isinstance(delta_receipt, Mapping):
                 errors.append("worker report workspace_delta_receipt must be a mapping")
@@ -1573,6 +1644,48 @@ class YaoyorozuRegistryService:
                     errors.append("worker report must bind the delta receipt status")
                 if coverage_evidence.get("changed_path_count") != delta_receipt.get("changed_path_count"):
                     errors.append("worker report must bind the delta receipt changed_path_count")
+            patch_candidate_receipt = report.get("patch_candidate_receipt", {})
+            if not isinstance(patch_candidate_receipt, Mapping):
+                errors.append("worker report patch_candidate_receipt must be a mapping")
+            else:
+                if patch_candidate_receipt.get("kind") != "yaoyorozu_worker_patch_candidate_receipt":
+                    errors.append("worker patch candidate receipt kind mismatch")
+                if (
+                    patch_candidate_receipt.get("profile_id")
+                    != YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+                ):
+                    errors.append("worker patch candidate receipt profile mismatch")
+                if patch_candidate_receipt.get("dispatch_plan_ref") != dispatch_receipt.get("dispatch_plan_ref"):
+                    errors.append("worker patch candidate receipt dispatch_plan_ref must match receipt")
+                if patch_candidate_receipt.get("dispatch_unit_ref") != result.get("unit_id"):
+                    errors.append("worker patch candidate receipt dispatch_unit_ref must match the result unit")
+                if patch_candidate_receipt.get("status") not in {"no-candidates", "candidate-ready"}:
+                    errors.append("worker patch candidate receipt must stay no-candidates or candidate-ready")
+                if patch_candidate_receipt.get("all_delta_entries_materialized") is not True:
+                    errors.append("worker patch candidate receipt must fully materialize delta entries")
+                candidates = patch_candidate_receipt.get("patch_candidates", [])
+                if not isinstance(candidates, list):
+                    errors.append("worker patch candidate receipt patch_candidates must be a list")
+                elif patch_candidate_receipt.get("patch_candidate_count") != len(candidates):
+                    errors.append(
+                        "worker patch candidate receipt patch_candidate_count must match patch_candidates"
+                    )
+                if patch_candidate_receipt.get("delta_receipt_ref") != delta_receipt.get("receipt_ref"):
+                    errors.append("worker patch candidate receipt must bind the delta receipt ref")
+                if patch_candidate_receipt.get("delta_receipt_digest") != delta_receipt.get("receipt_digest"):
+                    errors.append("worker patch candidate receipt must bind the delta receipt digest")
+                if (
+                    coverage_evidence.get("patch_candidate_receipt_ref")
+                    != patch_candidate_receipt.get("receipt_ref")
+                ):
+                    errors.append("worker report must bind the patch candidate receipt ref")
+                if coverage_evidence.get("patch_candidate_status") != patch_candidate_receipt.get("status"):
+                    errors.append("worker report must bind the patch candidate receipt status")
+                if (
+                    coverage_evidence.get("patch_candidate_count")
+                    != patch_candidate_receipt.get("patch_candidate_count")
+                ):
+                    errors.append("worker report must bind the patch candidate count")
             if result.get("exit_code") != 0:
                 errors.append("worker process exit_code must be 0")
 
@@ -1595,6 +1708,7 @@ class YaoyorozuRegistryService:
                 and result.get("reported_status") == "ready"
                 and result.get("report_binding_ok") is True
                 and result.get("delta_receipt_ok") is True
+                and result.get("patch_candidate_receipt_ok") is True
                 and result.get("target_paths_ready") is True
             ),
             "coverage_complete": not missing_coverage,
@@ -1605,6 +1719,10 @@ class YaoyorozuRegistryService:
             ),
             "all_delta_receipts_bound": all(
                 isinstance(result, Mapping) and result.get("delta_receipt_ok") is True
+                for result in results
+            ),
+            "all_patch_candidate_receipts_bound": all(
+                isinstance(result, Mapping) and result.get("patch_candidate_receipt_ok") is True
                 for result in results
             ),
             "all_target_paths_ready": all(

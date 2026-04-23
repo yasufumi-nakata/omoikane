@@ -79,6 +79,11 @@ repo-local worker dispatch が ready report だけでなく、
 dispatch/unit binding と workspace-bounded target path observation に加えて、
 git-bound target path delta receipt を返すこと。
 
+### Yaoyorozu Worker Patch Candidate Receipt
+repo-local worker dispatch が git-bound delta receipt に加えて、
+`patch_descriptor` 互換の patch candidate receipt を返し、
+各 delta entry を dispatch-bound target scope に沿って materialize すること。
+
 ### Yaoyorozu Memory Edit Profile
 `memory-edit-v1` の reversible memory-edit convocation が
 `MemoryArchivist` / `DesignAuditor` / `ConservatismAdvocate` / `EthicsCommittee`
@@ -117,6 +122,7 @@ panel と 4 coverage の worker dispatch を維持すること。
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_fork_request_profile.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
+- `yaoyorozu_worker_patch_candidate_receipt.yaml`
 - `yaoyorozu_worker_delta_receipt.yaml`
 - `yaoyorozu_memory_edit_profile.yaml`
 - `yaoyorozu_task_graph_binding.yaml`

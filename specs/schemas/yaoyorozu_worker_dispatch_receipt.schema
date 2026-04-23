@@ -67,6 +67,7 @@ properties:
         - report_digest
         - report_binding_ok
         - delta_receipt_ok
+        - patch_candidate_receipt_ok
         - target_paths_ready
         - report
       properties:
@@ -118,6 +119,8 @@ properties:
           const: true
         delta_receipt_ok:
           const: true
+        patch_candidate_receipt_ok:
+          const: true
         target_paths_ready:
           const: true
         report:
@@ -140,13 +143,14 @@ properties:
             - invocation_digest
             - target_path_observations
             - workspace_delta_receipt
+            - patch_candidate_receipt
             - coverage_evidence
             - status
           properties:
             kind:
               const: yaoyorozu_local_worker_report
             report_profile:
-              const: repo-local-path-bound-worker-report-v2
+              const: repo-local-path-bound-worker-report-v3
             agent_id:
               type: string
               minLength: 1
@@ -232,6 +236,8 @@ properties:
                     pattern: "^[a-f0-9]{64}$"
             workspace_delta_receipt:
               $ref: "yaoyorozu_worker_workspace_delta_receipt.schema"
+            patch_candidate_receipt:
+              $ref: "yaoyorozu_worker_patch_candidate_receipt.schema"
             coverage_evidence:
               type: object
               additionalProperties: false
@@ -245,6 +251,11 @@ properties:
                 - delta_status
                 - changed_path_count
                 - delta_scan_profile
+                - patch_candidate_receipt_ref
+                - patch_candidate_status
+                - patch_candidate_count
+                - patch_candidate_profile
+                - all_delta_entries_materialized
                 - ready_gate
               properties:
                 expected_target_count:
@@ -273,8 +284,23 @@ properties:
                   minimum: 0
                 delta_scan_profile:
                   const: git-target-path-delta-v1
+                patch_candidate_receipt_ref:
+                  type: string
+                  pattern: "^worker-patch://"
+                patch_candidate_status:
+                  type: string
+                  enum:
+                    - no-candidates
+                    - candidate-ready
+                patch_candidate_count:
+                  type: integer
+                  minimum: 0
+                patch_candidate_profile:
+                  const: target-delta-to-patch-candidate-v1
+                all_delta_entries_materialized:
+                  const: true
                 ready_gate:
-                  const: path-bound-target-delta-scan-v2
+                  const: path-bound-target-delta-patch-candidate-v3
             status:
               const: ready
   execution_summary:
@@ -288,8 +314,10 @@ properties:
       - coverage_areas
       - target_ready_count
       - delta_bound_count
+      - patch_candidate_bound_count
       - ready_gate_profile
       - delta_scan_profile
+      - patch_candidate_profile
     properties:
       launched_process_count:
         type: integer
@@ -320,10 +348,15 @@ properties:
       delta_bound_count:
         type: integer
         minimum: 0
+      patch_candidate_bound_count:
+        type: integer
+        minimum: 0
       ready_gate_profile:
-        const: path-bound-target-delta-scan-v2
+        const: path-bound-target-delta-patch-candidate-v3
       delta_scan_profile:
         const: git-target-path-delta-v1
+      patch_candidate_profile:
+        const: target-delta-to-patch-candidate-v1
   validation:
     type: object
     additionalProperties: false
@@ -334,6 +367,7 @@ properties:
       - coverage_complete
       - all_reports_bound_to_dispatch
       - all_delta_receipts_bound
+      - all_patch_candidate_receipts_bound
       - all_target_paths_ready
       - ok
     properties:
@@ -348,6 +382,8 @@ properties:
       all_reports_bound_to_dispatch:
         const: true
       all_delta_receipts_bound:
+        const: true
+      all_patch_candidate_receipts_bound:
         const: true
       all_target_paths_ready:
         const: true
@@ -380,10 +416,11 @@ examples:
         report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         report_binding_ok: true
         delta_receipt_ok: true
+        patch_candidate_receipt_ok: true
         target_paths_ready: true
         report:
           kind: yaoyorozu_local_worker_report
-          report_profile: repo-local-path-bound-worker-report-v2
+          report_profile: repo-local-path-bound-worker-report-v3
           agent_id: codex-builder
           role_id: builder-runtime
           coverage_area: runtime
@@ -454,6 +491,56 @@ examples:
                 stdout_excerpt: " M src/omoikane/agentic/local_worker_stub.py"
                 stderr_excerpt: ""
             receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+          patch_candidate_receipt:
+            kind: yaoyorozu_worker_patch_candidate_receipt
+            schema_version: 1.0.0
+            receipt_id: yaoyorozu-worker-patch-candidate-0123456789ab
+            receipt_ref: worker-patch://yaoyorozu-worker-patch-candidate-0123456789ab
+            profile_id: target-delta-to-patch-candidate-v1
+            workspace_root: /Users/example/omoikane
+            workspace_root_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+            dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+            dispatch_unit_ref: worker-dispatch-0123456789ab
+            source_ref: agents/builders/codex-builder.yaml
+            coverage_area: runtime
+            target_paths:
+              - src/omoikane/
+              - tests/unit/
+              - tests/integration/
+            delta_receipt_ref: worker-delta://yaoyorozu-worker-delta-0123456789ab
+            delta_receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+            planned_at: "2026-04-23T07:06:00Z"
+            status: candidate-ready
+            patch_candidate_count: 1
+            all_delta_entries_materialized: true
+            patch_candidates:
+              - candidate_id: worker-patch-candidate-0123456789ab
+                target_path: src/omoikane/agentic/local_worker_stub.py
+                target_path_scope: src/omoikane/
+                target_path_observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                delta_entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+                change_status: modified
+                patch_descriptor:
+                  patch_id: worker-patch-0123456789ab
+                  target_path: src/omoikane/agentic/local_worker_stub.py
+                  action: modify
+                  format: structured_patch
+                  summary: Modify the runtime target src/omoikane/agentic/local_worker_stub.py from dispatch-bound git delta evidence.
+                  safety_impact: medium
+                  rationale_refs:
+                    - dispatch://yaoyorozu-dispatch-0123456789ab
+                    - worker-dispatch-0123456789ab
+                    - worker-delta://yaoyorozu-worker-delta-0123456789ab
+                  cue_kind: runtime-source
+                  source_refs:
+                    - agents/builders/codex-builder.yaml
+                    - src/omoikane/
+                  section_labels: [src, omoikane, agentic]
+                  target_subsystem: L4.Yaoyorozu.RuntimeWorker
+                  rollback_hint: Restore src/omoikane/agentic/local_worker_stub.py from the dispatch-bound HEAD baseline.
+                  applies_cleanly: true
+                candidate_digest: fedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafe
+            receipt_digest: 1111111111111111111111111111111111111111111111111111111111111111
           coverage_evidence:
             expected_target_count: 3
             observed_target_count: 3
@@ -464,7 +551,12 @@ examples:
             delta_status: delta-detected
             changed_path_count: 1
             delta_scan_profile: git-target-path-delta-v1
-            ready_gate: path-bound-target-delta-scan-v2
+            patch_candidate_receipt_ref: worker-patch://yaoyorozu-worker-patch-candidate-0123456789ab
+            patch_candidate_status: candidate-ready
+            patch_candidate_count: 1
+            patch_candidate_profile: target-delta-to-patch-candidate-v1
+            all_delta_entries_materialized: true
+            ready_gate: path-bound-target-delta-patch-candidate-v3
           status: ready
     execution_summary:
       launched_process_count: 4
@@ -474,8 +566,10 @@ examples:
       coverage_areas: [docs, eval, runtime, schema]
       target_ready_count: 4
       delta_bound_count: 4
-      ready_gate_profile: path-bound-target-delta-scan-v2
+      patch_candidate_bound_count: 4
+      ready_gate_profile: path-bound-target-delta-patch-candidate-v3
       delta_scan_profile: git-target-path-delta-v1
+      patch_candidate_profile: target-delta-to-patch-candidate-v1
     validation:
       command_digests_match: true
       all_processes_exited_zero: true
@@ -483,5 +577,6 @@ examples:
       coverage_complete: true
       all_reports_bound_to_dispatch: true
       all_delta_receipts_bound: true
+      all_patch_candidate_receipts_bound: true
       all_target_paths_ready: true
       ok: true

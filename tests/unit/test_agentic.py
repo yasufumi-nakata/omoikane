@@ -23,7 +23,10 @@ from omoikane.agentic.distributed_transport_mtls_fixtures import (
     MTLS_SERVER_NAME,
     write_fixture_bundle,
 )
-from omoikane.agentic.local_worker_stub import build_workspace_delta_receipt
+from omoikane.agentic.local_worker_stub import (
+    build_patch_candidate_receipt,
+    build_workspace_delta_receipt,
+)
 from omoikane.agentic.task_graph import TaskGraphService
 from omoikane.agentic.trust import TrustService
 from omoikane.agentic.yaoyorozu import YaoyorozuRegistryService
@@ -2566,6 +2569,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and "dispatch_unit_ref" in unit["expected_report_fields"]
                 and "target_path_observations" in unit["expected_report_fields"]
                 and "workspace_delta_receipt" in unit["expected_report_fields"]
+                and "patch_candidate_receipt" in unit["expected_report_fields"]
                 and "coverage_evidence" in unit["expected_report_fields"]
                 for unit in plan["dispatch_units"]
             )
@@ -2622,6 +2626,72 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 [command["command_label"] for command in receipt["command_receipts"]],
             )
 
+    def test_build_patch_candidate_receipt_materializes_patch_descriptors(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="omoikane-worker-patch-candidate-") as temp_dir:
+            repo_root = Path(temp_dir)
+            source_path = repo_root / "src/omoikane"
+            docs_path = repo_root / "docs"
+            source_path.mkdir(parents=True)
+            docs_path.mkdir(parents=True)
+            tracked_file = source_path / "runtime.py"
+            tracked_file.write_text("VALUE = 1\n", encoding="utf-8")
+
+            subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "config", "user.email", "unit@example.com"],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Unit Test"],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "add", "src/omoikane/runtime.py"],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "commit", "-m", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+
+            tracked_file.write_text("VALUE = 2\n", encoding="utf-8")
+            added_file = docs_path / "notes.md"
+            added_file.write_text("# Note\n", encoding="utf-8")
+
+            delta_receipt = build_workspace_delta_receipt(
+                workspace_root=repo_root,
+                dispatch_plan_ref="dispatch://yaoyorozu-dispatch-0123456789ab",
+                dispatch_unit_ref="worker-dispatch-0123456789ab",
+                target_paths=["src/omoikane/", "docs/"],
+            )
+            candidate_receipt = build_patch_candidate_receipt(
+                workspace_root=repo_root,
+                dispatch_plan_ref="dispatch://yaoyorozu-dispatch-0123456789ab",
+                dispatch_unit_ref="worker-dispatch-0123456789ab",
+                source_ref="agents/builders/codex-builder.yaml",
+                coverage_area="runtime",
+                target_paths=["src/omoikane/", "docs/"],
+                workspace_delta_receipt=delta_receipt,
+            )
+
+            self.assertEqual("candidate-ready", candidate_receipt["status"])
+            self.assertTrue(candidate_receipt["all_delta_entries_materialized"])
+            self.assertEqual(2, candidate_receipt["patch_candidate_count"])
+            descriptors = {
+                candidate["target_path"]: candidate["patch_descriptor"]
+                for candidate in candidate_receipt["patch_candidates"]
+            }
+            self.assertEqual("modify", descriptors["src/omoikane/runtime.py"]["action"])
+            self.assertEqual("runtime-source", descriptors["src/omoikane/runtime.py"]["cue_kind"])
+            self.assertEqual("create", descriptors["docs/notes.md"]["action"])
+            self.assertEqual("docs-sync", descriptors["docs/notes.md"]["cue_kind"])
+
     def test_execute_worker_dispatch_returns_completed_receipt(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         trust = TrustService()
@@ -2662,24 +2732,39 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(4, receipt["execution_summary"]["successful_process_count"])
         self.assertEqual(4, receipt["execution_summary"]["target_ready_count"])
         self.assertEqual(4, receipt["execution_summary"]["delta_bound_count"])
-        self.assertEqual("path-bound-target-delta-scan-v2", receipt["execution_summary"]["ready_gate_profile"])
+        self.assertEqual(4, receipt["execution_summary"]["patch_candidate_bound_count"])
+        self.assertEqual(
+            "path-bound-target-delta-patch-candidate-v3",
+            receipt["execution_summary"]["ready_gate_profile"],
+        )
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
+        self.assertEqual(
+            "target-delta-to-patch-candidate-v1",
+            receipt["execution_summary"]["patch_candidate_profile"],
+        )
         self.assertTrue(receipt["validation"]["all_reports_bound_to_dispatch"])
         self.assertTrue(receipt["validation"]["all_delta_receipts_bound"])
+        self.assertTrue(receipt["validation"]["all_patch_candidate_receipts_bound"])
         self.assertTrue(receipt["validation"]["all_target_paths_ready"])
         self.assertTrue(
             all(result["report"]["kind"] == "yaoyorozu_local_worker_report" for result in receipt["results"])
         )
         self.assertTrue(all(result["report_binding_ok"] for result in receipt["results"]))
         self.assertTrue(all(result["delta_receipt_ok"] for result in receipt["results"]))
+        self.assertTrue(all(result["patch_candidate_receipt_ok"] for result in receipt["results"]))
         self.assertTrue(all(result["target_paths_ready"] for result in receipt["results"]))
         self.assertTrue(
             all(
-                result["report"]["coverage_evidence"]["ready_gate"] == "path-bound-target-delta-scan-v2"
+                result["report"]["coverage_evidence"]["ready_gate"]
+                == "path-bound-target-delta-patch-candidate-v3"
                 and result["report"]["coverage_evidence"]["all_targets_exist"]
                 and result["report"]["coverage_evidence"]["all_targets_within_workspace"]
                 and result["report"]["coverage_evidence"]["delta_scan_profile"] == "git-target-path-delta-v1"
+                and result["report"]["coverage_evidence"]["patch_candidate_profile"]
+                == "target-delta-to-patch-candidate-v1"
+                and result["report"]["coverage_evidence"]["all_delta_entries_materialized"]
                 and result["report"]["workspace_delta_receipt"]["status"] in {"clean", "delta-detected"}
+                and result["report"]["patch_candidate_receipt"]["status"] in {"no-candidates", "candidate-ready"}
                 for result in receipt["results"]
             )
         )

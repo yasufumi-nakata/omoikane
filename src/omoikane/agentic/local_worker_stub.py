@@ -8,14 +8,16 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+from typing import Any, Mapping
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 YAOYOROZU_WORKER_REPORT_KIND = "yaoyorozu_local_worker_report"
-YAOYOROZU_WORKER_REPORT_PROFILE = "repo-local-path-bound-worker-report-v2"
-YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-delta-scan-v2"
+YAOYOROZU_WORKER_REPORT_PROFILE = "repo-local-path-bound-worker-report-v3"
+YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-delta-patch-candidate-v3"
 YAOYOROZU_WORKER_DELTA_SCAN_PROFILE = "git-target-path-delta-v1"
+YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE = "target-delta-to-patch-candidate-v1"
 YAOYOROZU_WORKER_SAMPLE_ENTRY_LIMIT = 3
 
 
@@ -61,6 +63,17 @@ def _path_matches_target_paths(relative_path: str, target_paths: list[str]) -> b
         if relative_path == normalized_target or relative_path.startswith(f"{normalized_target}/"):
             return True
     return False
+
+
+def _matching_target_path_scope(relative_path: str, target_paths: list[str]) -> str:
+    matches = [
+        target_path
+        for target_path in target_paths
+        if _path_matches_target_paths(relative_path, [target_path])
+    ]
+    if not matches:
+        return ""
+    return max(matches, key=len)
 
 
 def _excerpt(text: str, *, limit: int = 240) -> str:
@@ -320,6 +333,211 @@ def _observe_target_paths(workspace_root: Path, target_paths: list[str]) -> list
     return observations
 
 
+def _worker_target_subsystem(coverage_area: str) -> str:
+    return {
+        "runtime": "L4.Yaoyorozu.RuntimeWorker",
+        "schema": "L4.Yaoyorozu.SchemaWorker",
+        "eval": "L4.Yaoyorozu.EvalWorker",
+        "docs": "L4.Yaoyorozu.DocSyncWorker",
+    }.get(coverage_area, "L4.Yaoyorozu.Worker")
+
+
+def _candidate_action(change_status: str) -> str:
+    return {
+        "added": "create",
+        "modified": "modify",
+        "removed": "delete",
+    }.get(change_status, "modify")
+
+
+def _candidate_cue_kind(relative_path: str) -> str:
+    if relative_path.startswith("tests/"):
+        return "test-coverage"
+    if relative_path.startswith("evals/"):
+        return "eval-sync"
+    if relative_path.startswith("docs/"):
+        return "docs-sync"
+    if relative_path.startswith("meta/decision-log/"):
+        return "meta-decision-log"
+    return "runtime-source"
+
+
+def _candidate_safety_impact(relative_path: str, coverage_area: str) -> str:
+    if relative_path.startswith("docs/"):
+        return "cosmetic"
+    if relative_path.startswith("meta/decision-log/"):
+        return "low"
+    if relative_path.startswith("tests/") or relative_path.startswith("evals/"):
+        return "low"
+    if coverage_area == "schema":
+        return "medium"
+    return "medium"
+
+
+def _candidate_summary(relative_path: str, coverage_area: str, action: str) -> str:
+    verbs = {
+        "create": "Create",
+        "modify": "Modify",
+        "delete": "Delete",
+    }
+    coverage_labels = {
+        "runtime": "runtime",
+        "schema": "schema",
+        "eval": "eval",
+        "docs": "docs",
+    }
+    return (
+        f"{verbs.get(action, 'Modify')} the "
+        f"{coverage_labels.get(coverage_area, 'worker')} target {relative_path} "
+        "from dispatch-bound git delta evidence."
+    )
+
+
+def _candidate_rollback_hint(relative_path: str, action: str) -> str:
+    if action == "create":
+        return f"Delete {relative_path} to revert the worker-derived candidate."
+    return f"Restore {relative_path} from the dispatch-bound HEAD baseline."
+
+
+def _candidate_section_labels(relative_path: str) -> list[str]:
+    parts = [segment for segment in relative_path.split("/") if segment]
+    return parts[:3]
+
+
+def build_patch_candidate_receipt(
+    *,
+    workspace_root: Path,
+    dispatch_plan_ref: str,
+    dispatch_unit_ref: str,
+    source_ref: str,
+    coverage_area: str,
+    target_paths: list[str],
+    workspace_delta_receipt: Mapping[str, Any],
+    target_path_observations: list[Mapping[str, Any]] | None = None,
+) -> dict[str, object]:
+    workspace_root = workspace_root.resolve()
+    observations = (
+        list(target_path_observations)
+        if target_path_observations is not None
+        else _observe_target_paths(workspace_root, target_paths)
+    )
+    observation_index = {
+        str(observation.get("target_path", "")): observation
+        for observation in observations
+        if isinstance(observation, Mapping)
+    }
+    delta_entries = workspace_delta_receipt.get("entries", [])
+    if not isinstance(delta_entries, list):
+        delta_entries = []
+    blocking_reasons: list[str] = []
+    patch_candidates: list[dict[str, object]] = []
+
+    for entry in delta_entries:
+        if not isinstance(entry, Mapping):
+            blocking_reasons.append("worker delta receipt entries must remain mappings")
+            continue
+        relative_path = str(entry.get("path", "")).strip()
+        if not relative_path:
+            blocking_reasons.append("worker delta entry path must be a non-empty string")
+            continue
+        target_scope = _matching_target_path_scope(relative_path, target_paths)
+        if not target_scope:
+            blocking_reasons.append(
+                f"worker delta path could not be rebound to a target scope: {relative_path}"
+            )
+            continue
+        observation = observation_index.get(target_scope)
+        if observation is None:
+            blocking_reasons.append(
+                f"worker target-path observation missing for scope {target_scope}"
+            )
+            continue
+
+        action = _candidate_action(str(entry.get("change_status", "")))
+        patch_descriptor = {
+            "patch_id": new_id("worker-patch"),
+            "target_path": relative_path,
+            "action": action,
+            "format": "structured_patch",
+            "summary": _candidate_summary(relative_path, coverage_area, action),
+            "safety_impact": _candidate_safety_impact(relative_path, coverage_area),
+            "rationale_refs": [
+                dispatch_plan_ref,
+                dispatch_unit_ref,
+                str(workspace_delta_receipt.get("receipt_ref", "")),
+            ],
+            "cue_kind": _candidate_cue_kind(relative_path),
+            "source_refs": [source_ref, target_scope],
+            "section_labels": _candidate_section_labels(relative_path),
+            "target_subsystem": _worker_target_subsystem(coverage_area),
+            "rollback_hint": _candidate_rollback_hint(relative_path, action),
+            "applies_cleanly": True,
+        }
+        candidate = {
+            "candidate_id": new_id("worker-patch-candidate"),
+            "target_path": relative_path,
+            "target_path_scope": target_scope,
+            "target_path_observation_digest": str(observation.get("observation_digest", "")),
+            "delta_entry_digest": str(entry.get("entry_digest", "")),
+            "change_status": str(entry.get("change_status", "")),
+            "patch_descriptor": patch_descriptor,
+        }
+        candidate["candidate_digest"] = sha256_text(canonical_json(candidate))
+        patch_candidates.append(candidate)
+
+    delta_status = str(workspace_delta_receipt.get("status", "blocked"))
+    all_delta_entries_materialized = len(patch_candidates) == len(delta_entries) and not blocking_reasons
+    if delta_status == "blocked" or blocking_reasons:
+        status = "blocked"
+    elif delta_entries:
+        status = "candidate-ready"
+    else:
+        status = "no-candidates"
+
+    digest_payload = {
+        "workspace_root": str(workspace_root),
+        "dispatch_plan_ref": dispatch_plan_ref,
+        "dispatch_unit_ref": dispatch_unit_ref,
+        "source_ref": source_ref,
+        "coverage_area": coverage_area,
+        "target_paths": list(target_paths),
+        "delta_receipt_ref": workspace_delta_receipt.get("receipt_ref", ""),
+        "delta_receipt_digest": workspace_delta_receipt.get("receipt_digest", ""),
+        "status": status,
+        "patch_candidate_count": len(patch_candidates),
+        "all_delta_entries_materialized": all_delta_entries_materialized,
+        "candidate_digests": [candidate["candidate_digest"] for candidate in patch_candidates],
+    }
+    receipt = {
+        "kind": "yaoyorozu_worker_patch_candidate_receipt",
+        "schema_version": "1.0.0",
+        "receipt_id": new_id("yaoyorozu-worker-patch-candidate"),
+        "receipt_ref": "",
+        "profile_id": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+        "workspace_root": str(workspace_root),
+        "workspace_root_digest": sha256_text(str(workspace_root)),
+        "dispatch_plan_ref": dispatch_plan_ref,
+        "dispatch_unit_ref": dispatch_unit_ref,
+        "source_ref": source_ref,
+        "coverage_area": coverage_area,
+        "target_paths": list(target_paths),
+        "delta_receipt_ref": str(workspace_delta_receipt.get("receipt_ref", "")),
+        "delta_receipt_digest": str(workspace_delta_receipt.get("receipt_digest", "")),
+        "planned_at": utc_now_iso(),
+        "status": status,
+        "patch_candidate_count": len(patch_candidates),
+        "all_delta_entries_materialized": all_delta_entries_materialized,
+        "patch_candidates": patch_candidates,
+    }
+    receipt["receipt_ref"] = f"worker-patch://{receipt['receipt_id']}"
+    receipt["receipt_digest"] = sha256_text(canonical_json(digest_payload))
+    if status == "blocked":
+        receipt["blocking_reasons"] = blocking_reasons or [
+            "worker patch candidate materialization is blocked by the delta receipt state"
+        ]
+    return receipt
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Emit one bounded Yaoyorozu worker report.")
     parser.add_argument("--agent-id", required=True)
@@ -346,6 +564,16 @@ def main() -> None:
         dispatch_unit_ref=args.dispatch_unit_ref,
         target_paths=target_paths,
     )
+    patch_candidate_receipt = build_patch_candidate_receipt(
+        workspace_root=workspace_root,
+        dispatch_plan_ref=args.dispatch_plan_ref,
+        dispatch_unit_ref=args.dispatch_unit_ref,
+        source_ref=args.source_ref,
+        coverage_area=args.coverage_area,
+        target_paths=target_paths,
+        workspace_delta_receipt=workspace_delta_receipt,
+        target_path_observations=target_path_observations,
+    )
     coverage_evidence = {
         "expected_target_count": len(target_paths),
         "observed_target_count": len(target_path_observations),
@@ -362,6 +590,11 @@ def main() -> None:
         "delta_status": workspace_delta_receipt["status"],
         "changed_path_count": workspace_delta_receipt["changed_path_count"],
         "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+        "patch_candidate_receipt_ref": patch_candidate_receipt["receipt_ref"],
+        "patch_candidate_status": patch_candidate_receipt["status"],
+        "patch_candidate_count": patch_candidate_receipt["patch_candidate_count"],
+        "patch_candidate_profile": YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
+        "all_delta_entries_materialized": patch_candidate_receipt["all_delta_entries_materialized"],
         "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
     }
     status = (
@@ -369,6 +602,8 @@ def main() -> None:
         if coverage_evidence["all_targets_exist"]
         and coverage_evidence["all_targets_within_workspace"]
         and workspace_delta_receipt["status"] in {"clean", "delta-detected"}
+        and patch_candidate_receipt["status"] in {"no-candidates", "candidate-ready"}
+        and patch_candidate_receipt["all_delta_entries_materialized"] is True
         else "failed"
     )
     report = {
@@ -399,6 +634,7 @@ def main() -> None:
         ),
         "target_path_observations": target_path_observations,
         "workspace_delta_receipt": workspace_delta_receipt,
+        "patch_candidate_receipt": patch_candidate_receipt,
         "coverage_evidence": coverage_evidence,
         "status": status,
     }
