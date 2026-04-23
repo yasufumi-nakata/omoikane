@@ -112,7 +112,7 @@ operations:
     output:
       schema_ref: trust_snapshot
   transfer_snapshot:
-    summary: Export one trust snapshot across a substrate boundary and seed it on the destination with bounded guardian/human attestation, live remote verifier federation, and fixed re-attestation cadence.
+    summary: Export one trust snapshot across a substrate boundary and seed it on the destination with bounded guardian/human attestation, live remote verifier federation, fixed re-attestation cadence, and append-only destination lifecycle history.
     input:
       inline_schema:
         type: object
@@ -160,6 +160,7 @@ operations:
       - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
       - two live remote verifier receipts must bind the human reviewer attestation with distinct verifier refs before import completes
       - fixed re-attestation cadence must renew before the minimum verifier freshness window expires
+      - destination lifecycle must preserve imported, renewed, and revocation-cleared history entries as one append-only ledger
       - import must preserve thresholds, provenance policy, eligibility flags, and append-only history without mutation
       - receipt_digest must stay stable for the fixed export/import/attestation payload family
   validate_transfer_receipt:
@@ -187,6 +188,10 @@ operations:
           - remote_verifier_receipts_bound
           - re_attestation_cadence_bound
           - re_attestation_current
+          - destination_lifecycle_bound
+          - destination_renewal_history_bound
+          - destination_revocation_history_bound
+          - destination_current
           - destination_seeded
           - receipt_digest_bound
           - ok
@@ -214,6 +219,14 @@ operations:
             type: boolean
           re_attestation_current:
             type: boolean
+          destination_lifecycle_bound:
+            type: boolean
+          destination_renewal_history_bound:
+            type: boolean
+          destination_revocation_history_bound:
+            type: boolean
+          destination_current:
+            type: boolean
           destination_seeded:
             type: boolean
           receipt_digest_bound:
@@ -230,4 +243,4 @@ compatibility:
     - Guardian role requires global_score >= 0.99 and explicit human pin.
     - Self-modify eligibility requires both global_score and self_modify domain score to exceed 0.95.
     - Trust provenance is fixed to Council / Guardian / Human origins and blocks self-issued or reciprocal positive boosts.
-    - Cross-substrate transfer is materialized as a snapshot-clone receipt with source guardian, destination guardian, human reviewer attestation quorum, live remote verifier federation, and fixed re-attestation cadence.
+    - Cross-substrate transfer is materialized as a snapshot-clone receipt with source guardian, destination guardian, human reviewer attestation quorum, live remote verifier federation, fixed re-attestation cadence, and append-only destination lifecycle history.

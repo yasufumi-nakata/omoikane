@@ -2390,7 +2390,19 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["remote_verifier_receipts_bound"])
         self.assertTrue(receipt["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(receipt["validation"]["re_attestation_current"])
+        self.assertTrue(receipt["validation"]["destination_lifecycle_bound"])
+        self.assertTrue(receipt["validation"]["destination_renewal_history_bound"])
+        self.assertTrue(receipt["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(receipt["validation"]["destination_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
+        self.assertEqual("current", receipt["destination_lifecycle"]["current_status"])
+        self.assertEqual(
+            ["imported", "renewed", "revocation-cleared"],
+            [
+                entry["event_type"]
+                for entry in receipt["destination_lifecycle"]["history"]
+            ],
+        )
         self.assertEqual(
             receipt["source_snapshot_digest"],
             sha256_text(canonical_json(receipt["source_snapshot"])),
@@ -2463,6 +2475,32 @@ class TrustServiceTests(unittest.TestCase):
             "federation_attestation.remote_verifier_federation.receipt_digest mismatch",
             validation["errors"],
         )
+
+    def test_validate_transfer_receipt_rejects_destination_lifecycle_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["destination_lifecycle"]["history"][-1]["event_type"] = "renewed"
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["destination_revocation_history_bound"])
+        self.assertFalse(validation["destination_current"])
+        self.assertIn("destination_lifecycle.lifecycle_digest mismatch", validation["errors"])
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):

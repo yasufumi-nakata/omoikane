@@ -1513,9 +1513,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_verifier_receipts_bound"])
         self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(result["validation"]["re_attestation_current"])
+        self.assertTrue(result["validation"]["destination_lifecycle_bound"])
+        self.assertTrue(result["validation"]["destination_renewal_history_bound"])
+        self.assertTrue(result["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(result["validation"]["destination_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
+        self.assertEqual("current", result["transfer"]["destination_lifecycle"]["current_status"])
+        self.assertEqual(
+            ["imported", "renewed", "revocation-cleared"],
+            [
+                entry["event_type"]
+                for entry in result["transfer"]["destination_lifecycle"]["history"]
+            ],
+        )
         self.assertEqual(
             2,
             result["transfer"]["federation_attestation"]["remote_verifier_federation"][

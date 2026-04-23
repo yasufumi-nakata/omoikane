@@ -1431,6 +1431,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_verifier_receipts_bound"])
         self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(result["validation"]["re_attestation_current"])
+        self.assertTrue(result["validation"]["destination_lifecycle_bound"])
+        self.assertTrue(result["validation"]["destination_renewal_history_bound"])
+        self.assertTrue(result["validation"]["destination_revocation_history_bound"])
+        self.assertTrue(result["validation"]["destination_current"])
+        self.assertEqual("current", result["transfer"]["destination_lifecycle"]["current_status"])
+        self.assertEqual(
+            "revocation-cleared",
+            result["transfer"]["destination_lifecycle"]["history"][-1]["event_type"],
+        )
         self.assertTrue(result["validation"]["receipt_digest_bound"])
         self.assertEqual(result["source_snapshot"], result["destination_snapshot"])
         self.assertEqual(

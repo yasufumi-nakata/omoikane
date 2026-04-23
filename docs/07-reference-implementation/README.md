@@ -296,7 +296,10 @@ history / thresholds / provenance policy / eligibility preserve、
 `guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
 human reviewer attestation に束縛した `remote_verifier_federation` と、
 `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew を
-固定した `re_attestation_cadence` を 1 receipt で確認する。
+固定した `re_attestation_cadence`、
+さらに destination 側の `imported -> renewed -> revocation-cleared`
+append-only lifecycle と fail-closed revocation action を
+1 receipt で確認する。
 
 `yaoyorozu-demo` は L4 YaoyorozuRegistry / council convocation の reference contract
 (`agentic.yaoyorozu.v0`) を JSON で可視化し、

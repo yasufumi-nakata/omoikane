@@ -1763,7 +1763,7 @@ entries:
       - specs/interfaces/agentic.trust.v0.idl
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, digest binding, and snapshot preservation.
+    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and snapshot preservation.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.trust.v0.idl
@@ -1785,7 +1785,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects digest-bound trust export/import, guardian and human attestation quorum, and snapshot preservation across substrate boundaries.
+    rationale: Protects digest-bound trust export/import, guardian and human attestation quorum, destination renewal/revocation lifecycle, and snapshot preservation across substrate boundaries.
   - priority: P1
     kind: schema
     file: specs/schemas/agent_registry_entry.schema

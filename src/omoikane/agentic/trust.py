@@ -11,7 +11,7 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.1.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.2.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
 TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID = (
@@ -24,6 +24,15 @@ TRUST_TRANSFER_REATTESTATION_CADENCE_POLICY_ID = (
 )
 TRUST_TRANSFER_REATTESTATION_INTERVAL_SECONDS = 600
 TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS = 240
+TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID = (
+    "bounded-trust-transfer-destination-lifecycle-v1"
+)
+TRUST_TRANSFER_DESTINATION_CURRENT_STATUS = "current"
+TRUST_TRANSFER_DESTINATION_REVOKED_STATUS = "revoked"
+TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION = (
+    "disable-destination-trust-usage"
+)
+TRUST_TRANSFER_DESTINATION_REVOCATION_CHECK_OFFSET_SECONDS = 60
 TRUST_TRANSFER_REQUIRED_ATTESTATION_ROLES = (
     "source-guardian",
     "destination-guardian",
@@ -76,6 +85,7 @@ def _trust_transfer_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]
         "export_receipt": receipt["export_receipt"],
         "federation_attestation": receipt["federation_attestation"],
         "import_receipt": receipt["import_receipt"],
+        "destination_lifecycle": receipt["destination_lifecycle"],
         "status": receipt["status"],
     }
 
@@ -115,6 +125,24 @@ def _trust_transfer_re_attestation_cadence_digest_payload(
         "bound_federation_ref": cadence["bound_federation_ref"],
         "bound_federation_digest": cadence["bound_federation_digest"],
         "cadence_status": cadence["cadence_status"],
+    }
+
+
+def _trust_transfer_destination_lifecycle_digest_payload(
+    lifecycle: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "lifecycle_id": lifecycle["lifecycle_id"],
+        "lifecycle_ref": lifecycle["lifecycle_ref"],
+        "lifecycle_policy_id": lifecycle["lifecycle_policy_id"],
+        "current_status": lifecycle["current_status"],
+        "active_entry_ref": lifecycle["active_entry_ref"],
+        "latest_federation_ref": lifecycle["latest_federation_ref"],
+        "latest_federation_digest": lifecycle["latest_federation_digest"],
+        "latest_cadence_ref": lifecycle["latest_cadence_ref"],
+        "latest_cadence_digest": lifecycle["latest_cadence_digest"],
+        "revocation_fail_closed_action": lifecycle["revocation_fail_closed_action"],
+        "history": lifecycle["history"],
     }
 
 
@@ -436,6 +464,7 @@ class TrustService:
 
         destination_snapshot = destination_service.import_snapshot(source_snapshot)
         destination_snapshot_digest = sha256_text(canonical_json(destination_snapshot))
+        transferred_at = utc_now_iso()
 
         attestors = [
             {
@@ -461,6 +490,42 @@ class TrustService:
             },
         ]
         received_roles = [attestor["role"] for attestor in attestors if attestor["status"] == "attested"]
+        route_digest = sha256_text(
+            canonical_json(
+                {
+                    "source_substrate_ref": normalized_source_substrate,
+                    "destination_substrate_ref": normalized_destination_substrate,
+                    "destination_host_ref": normalized_destination_host,
+                }
+            )
+        )
+        initial_remote_verifier_federation = self._build_remote_verifier_federation(
+            human_reviewer_ref=normalized_human_reviewer,
+            route_digest=route_digest,
+            verifier_receipts=normalized_remote_verifier_receipts,
+        )
+        initial_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=initial_remote_verifier_federation
+        )
+        renewed_remote_verifier_receipts = self._renew_remote_verifier_receipts(
+            verifier_receipts=normalized_remote_verifier_receipts,
+            renewed_at=initial_re_attestation_cadence["renew_after"],
+        )
+        current_remote_verifier_federation = self._build_remote_verifier_federation(
+            human_reviewer_ref=normalized_human_reviewer,
+            route_digest=route_digest,
+            verifier_receipts=renewed_remote_verifier_receipts,
+        )
+        current_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=current_remote_verifier_federation
+        )
+        destination_lifecycle = self._build_destination_lifecycle(
+            destination_snapshot_digest=destination_snapshot_digest,
+            initial_federation=initial_remote_verifier_federation,
+            initial_cadence=initial_re_attestation_cadence,
+            current_federation=current_remote_verifier_federation,
+            current_cadence=current_re_attestation_cadence,
+        )
         receipt = {
             "kind": "trust_transfer_receipt",
             "schema_version": TRUST_TRANSFER_SCHEMA_VERSION,
@@ -471,7 +536,7 @@ class TrustService:
             "source_substrate_ref": normalized_source_substrate,
             "destination_substrate_ref": normalized_destination_substrate,
             "destination_host_ref": normalized_destination_host,
-            "transferred_at": utc_now_iso(),
+            "transferred_at": transferred_at,
             "source_snapshot_ref": f"trust-snapshot://source/{normalized_agent_id}",
             "source_snapshot_digest": source_snapshot_digest,
             "source_snapshot": source_snapshot,
@@ -499,9 +564,9 @@ class TrustService:
                 "quorum": len(TRUST_TRANSFER_REQUIRED_ATTESTATION_ROLES),
                 "quorum_received": len(received_roles),
                 "route_ref": f"trust-transfer-route://{normalized_agent_id}",
-                "route_digest": "",
-                "remote_verifier_federation": {},
-                "re_attestation_cadence": {},
+                "route_digest": route_digest,
+                "remote_verifier_federation": current_remote_verifier_federation,
+                "re_attestation_cadence": current_re_attestation_cadence,
                 "cross_substrate_attested": True,
             },
             "import_receipt": {
@@ -516,25 +581,11 @@ class TrustService:
                 "seed_mode": "snapshot-clone-with-history",
                 "destination_seeded": destination_service.has_agent(normalized_agent_id),
             },
+            "destination_lifecycle": destination_lifecycle,
             "validation": {},
             "status": "imported",
             "receipt_digest": "",
         }
-        receipt["federation_attestation"]["route_digest"] = sha256_text(
-            canonical_json(_trust_transfer_route_digest_payload(receipt))
-        )
-        receipt["federation_attestation"]["remote_verifier_federation"] = (
-            self._build_remote_verifier_federation(
-                human_reviewer_ref=normalized_human_reviewer,
-                route_digest=receipt["federation_attestation"]["route_digest"],
-                verifier_receipts=normalized_remote_verifier_receipts,
-            )
-        )
-        receipt["federation_attestation"]["re_attestation_cadence"] = (
-            self._build_re_attestation_cadence(
-                federation=receipt["federation_attestation"]["remote_verifier_federation"]
-            )
-        )
         receipt["receipt_digest"] = sha256_text(canonical_json(_trust_transfer_digest_payload(receipt)))
         receipt["validation"] = self._transfer_validation_summary(receipt)
         validation = self.validate_transfer_receipt(receipt)
@@ -644,6 +695,11 @@ class TrustService:
             errors,
         )
         self._require_mapping_field(receipt.get("import_receipt"), "import_receipt", errors)
+        self._require_mapping_field(
+            receipt.get("destination_lifecycle"),
+            "destination_lifecycle",
+            errors,
+        )
         self._require_mapping_field(receipt.get("validation"), "validation", errors)
         self._require_non_empty_string(receipt.get("receipt_id"), "receipt_id", errors)
         self._require_non_empty_string(receipt.get("agent_id"), "agent_id", errors)
@@ -730,6 +786,30 @@ class TrustService:
                 errors.append("import_receipt.seed_mode mismatch")
             if import_receipt.get("destination_seeded") is not True:
                 errors.append("import_receipt.destination_seeded must be true")
+
+        destination_lifecycle = receipt.get("destination_lifecycle", {})
+        if isinstance(destination_lifecycle, Mapping):
+            if (
+                destination_lifecycle.get("lifecycle_policy_id")
+                != TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID
+            ):
+                errors.append("destination_lifecycle.lifecycle_policy_id mismatch")
+            if (
+                destination_lifecycle.get("revocation_fail_closed_action")
+                != TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION
+            ):
+                errors.append("destination_lifecycle.revocation_fail_closed_action mismatch")
+            try:
+                expected_lifecycle_digest = sha256_text(
+                    canonical_json(
+                        _trust_transfer_destination_lifecycle_digest_payload(destination_lifecycle)
+                    )
+                )
+            except KeyError:
+                errors.append("destination_lifecycle.lifecycle_digest mismatch")
+            else:
+                if destination_lifecycle.get("lifecycle_digest") != expected_lifecycle_digest:
+                    errors.append("destination_lifecycle.lifecycle_digest mismatch")
 
         federation_attestation = receipt.get("federation_attestation", {})
         if isinstance(federation_attestation, Mapping):
@@ -1070,6 +1150,7 @@ class TrustService:
         export_receipt = receipt.get("export_receipt", {})
         import_receipt = receipt.get("import_receipt", {})
         federation_attestation = receipt.get("federation_attestation", {})
+        destination_lifecycle = receipt.get("destination_lifecycle", {})
 
         source_snapshot_digest_bound = isinstance(source_snapshot, Mapping) and receipt.get(
             "source_snapshot_digest"
@@ -1126,6 +1207,10 @@ class TrustService:
         remote_verifier_receipts_bound = False
         re_attestation_cadence_bound = False
         re_attestation_current = False
+        destination_lifecycle_bound = False
+        destination_renewal_history_bound = False
+        destination_revocation_history_bound = False
+        destination_current = False
         if isinstance(federation_attestation, Mapping):
             attestors = federation_attestation.get("attestors", [])
             received_roles = [
@@ -1291,6 +1376,178 @@ class TrustService:
                         except (TypeError, ValueError):
                             re_attestation_cadence_bound = False
                             re_attestation_current = False
+        if isinstance(destination_lifecycle, Mapping):
+            history = destination_lifecycle.get("history", [])
+            remote_verifier_federation = (
+                federation_attestation.get("remote_verifier_federation", {})
+                if isinstance(federation_attestation, Mapping)
+                else {}
+            )
+            re_attestation_cadence = (
+                federation_attestation.get("re_attestation_cadence", {})
+                if isinstance(federation_attestation, Mapping)
+                else {}
+            )
+            if isinstance(history, list):
+                history_entries = [
+                    entry for entry in history if isinstance(entry, Mapping)
+                ]
+                final_entry = history_entries[-1] if len(history_entries) == len(history) and history_entries else None
+                try:
+                    lifecycle_digest = sha256_text(
+                        canonical_json(
+                            _trust_transfer_destination_lifecycle_digest_payload(destination_lifecycle)
+                        )
+                    )
+                except KeyError:
+                    lifecycle_digest = ""
+                destination_lifecycle_bound = (
+                    len(history_entries) == len(history)
+                    and destination_lifecycle.get("lifecycle_policy_id")
+                    == TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID
+                    and destination_lifecycle.get("lifecycle_digest") == lifecycle_digest
+                    and isinstance(final_entry, Mapping)
+                    and destination_lifecycle.get("active_entry_ref") == final_entry.get("entry_ref")
+                    and destination_lifecycle.get("latest_federation_ref")
+                    == remote_verifier_federation.get("federation_ref")
+                    and destination_lifecycle.get("latest_federation_digest")
+                    == remote_verifier_federation.get("receipt_digest")
+                    and destination_lifecycle.get("latest_cadence_ref")
+                    == re_attestation_cadence.get("cadence_ref")
+                    and destination_lifecycle.get("latest_cadence_digest")
+                    == re_attestation_cadence.get("receipt_digest")
+                    and destination_lifecycle.get("revocation_fail_closed_action")
+                    == TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION
+                )
+                if destination_lifecycle_bound and isinstance(final_entry, Mapping):
+                    sequences = [entry.get("sequence") for entry in history_entries]
+                    imported_entries = [
+                        entry for entry in history_entries if entry.get("event_type") == "imported"
+                    ]
+                    renewed_entries = [
+                        entry for entry in history_entries if entry.get("event_type") == "renewed"
+                    ]
+                    imported_entry = imported_entries[0] if len(imported_entries) == 1 else None
+                    latest_renewed_entry = renewed_entries[-1] if renewed_entries else None
+                    try:
+                        imported_recorded_at = (
+                            _parse_datetime(
+                                str(imported_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history[].recorded_at",
+                            )
+                            if isinstance(imported_entry, Mapping)
+                            else None
+                        )
+                        imported_valid_until = (
+                            _parse_datetime(
+                                str(imported_entry.get("valid_until", "")),
+                                "destination_lifecycle.history[].valid_until",
+                            )
+                            if isinstance(imported_entry, Mapping)
+                            else None
+                        )
+                        latest_renewed_recorded_at = (
+                            _parse_datetime(
+                                str(latest_renewed_entry.get("recorded_at", "")),
+                                "destination_lifecycle.history[].recorded_at",
+                            )
+                            if isinstance(latest_renewed_entry, Mapping)
+                            else None
+                        )
+                        final_recorded_at = _parse_datetime(
+                            str(final_entry.get("recorded_at", "")),
+                            "destination_lifecycle.history[].recorded_at",
+                        )
+                        final_valid_until = _parse_datetime(
+                            str(final_entry.get("valid_until", "")),
+                            "destination_lifecycle.history[].valid_until",
+                        )
+                    except (TypeError, ValueError):
+                        imported_recorded_at = None
+                        imported_valid_until = None
+                        latest_renewed_recorded_at = None
+                        final_recorded_at = None
+                        final_valid_until = None
+
+                    destination_renewal_history_bound = (
+                        sequences == list(range(len(history_entries)))
+                        and isinstance(imported_entry, Mapping)
+                        and isinstance(latest_renewed_entry, Mapping)
+                        and history_entries[0].get("event_type") == "imported"
+                        and imported_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and latest_renewed_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and latest_renewed_entry.get("federation_ref")
+                        == destination_lifecycle.get("latest_federation_ref")
+                        and latest_renewed_entry.get("federation_digest")
+                        == destination_lifecycle.get("latest_federation_digest")
+                        and latest_renewed_entry.get("cadence_ref")
+                        == destination_lifecycle.get("latest_cadence_ref")
+                        and latest_renewed_entry.get("cadence_digest")
+                        == destination_lifecycle.get("latest_cadence_digest")
+                        and latest_renewed_entry.get("covered_verifier_receipt_ids")
+                        == re_attestation_cadence.get("covered_verifier_receipt_ids")
+                        and imported_entry.get("destination_snapshot_digest")
+                        == receipt.get("destination_snapshot_digest")
+                        and all(
+                            entry.get("destination_snapshot_digest")
+                            == receipt.get("destination_snapshot_digest")
+                            for entry in history_entries
+                        )
+                        and all(
+                            isinstance(entry.get("covered_verifier_receipt_ids"), list)
+                            and len(entry.get("covered_verifier_receipt_ids"))
+                            == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                            and len(set(entry.get("covered_verifier_receipt_ids")))
+                            == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                            for entry in history_entries
+                        )
+                        and imported_recorded_at is not None
+                        and imported_valid_until is not None
+                        and latest_renewed_recorded_at is not None
+                        and imported_recorded_at <= latest_renewed_recorded_at <= imported_valid_until
+                        and imported_entry.get("federation_digest")
+                        != latest_renewed_entry.get("federation_digest")
+                        and imported_entry.get("cadence_digest")
+                        != latest_renewed_entry.get("cadence_digest")
+                    )
+                    destination_revocation_history_bound = (
+                        destination_renewal_history_bound
+                        and final_entry.get("entry_ref") == destination_lifecycle.get("active_entry_ref")
+                        and final_entry.get("federation_ref")
+                        == destination_lifecycle.get("latest_federation_ref")
+                        and final_entry.get("federation_digest")
+                        == destination_lifecycle.get("latest_federation_digest")
+                        and final_entry.get("cadence_ref")
+                        == destination_lifecycle.get("latest_cadence_ref")
+                        and final_entry.get("cadence_digest")
+                        == destination_lifecycle.get("latest_cadence_digest")
+                        and (
+                            (
+                                final_entry.get("event_type") == "revocation-cleared"
+                                and final_entry.get("status")
+                                == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                            )
+                            or (
+                                final_entry.get("event_type") == "revoked"
+                                and final_entry.get("status")
+                                == TRUST_TRANSFER_DESTINATION_REVOKED_STATUS
+                            )
+                        )
+                        and latest_renewed_recorded_at is not None
+                        and final_recorded_at is not None
+                        and final_valid_until is not None
+                        and latest_renewed_recorded_at <= final_recorded_at <= final_valid_until
+                    )
+                    destination_current = (
+                        destination_revocation_history_bound
+                        and destination_lifecycle.get("current_status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and final_entry.get("status")
+                        == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
+                        and re_attestation_current
+                    )
         destination_seeded = isinstance(import_receipt, Mapping) and (
             import_receipt.get("destination_seeded") is True
             and isinstance(destination_snapshot, Mapping)
@@ -1311,6 +1568,10 @@ class TrustService:
             "remote_verifier_receipts_bound": remote_verifier_receipts_bound,
             "re_attestation_cadence_bound": re_attestation_cadence_bound,
             "re_attestation_current": re_attestation_current,
+            "destination_lifecycle_bound": destination_lifecycle_bound,
+            "destination_renewal_history_bound": destination_renewal_history_bound,
+            "destination_revocation_history_bound": destination_revocation_history_bound,
+            "destination_current": destination_current,
             "destination_seeded": destination_seeded,
             "receipt_digest_bound": receipt_digest_bound,
         }
@@ -1403,6 +1664,197 @@ class TrustService:
             canonical_json(_trust_transfer_re_attestation_cadence_digest_payload(cadence))
         )
         return cadence
+
+    def _renew_remote_verifier_receipts(
+        self,
+        *,
+        verifier_receipts: List[Mapping[str, Any]],
+        renewed_at: str,
+    ) -> List[Dict[str, Any]]:
+        renewed_at_dt = _parse_datetime(renewed_at, "renewed_at")
+        renewed_at_iso = renewed_at_dt.isoformat()
+        renewed_receipts: List[Dict[str, Any]] = []
+        for verifier_receipt in verifier_receipts:
+            renewed_receipt = dict(verifier_receipt)
+            verifier_ref = str(renewed_receipt["verifier_ref"])
+            verifier_slug = verifier_ref.rstrip("/").rsplit("/", 1)[-1]
+            challenge_ref = (
+                "challenge://trust-transfer/"
+                f"{verifier_slug}/renewal/{renewed_at_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+            )
+            challenge_digest = (
+                "sha256:trust-transfer-"
+                f"{verifier_slug}-renewal-{renewed_at_dt.strftime('%Y%m%d%H%M%SZ').lower()}"
+            )
+            transport_exchange = dict(renewed_receipt["transport_exchange"])
+            transport_exchange.update(
+                {
+                    "exchange_id": new_id("verifier-transport-exchange"),
+                    "challenge_ref": challenge_ref,
+                    "challenge_digest": challenge_digest,
+                    "request_payload_ref": (
+                        f"sealed://trust-transfer/{verifier_slug}/renewal/request"
+                    ),
+                    "request_payload_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "verifier_ref": verifier_ref,
+                                "recorded_at": renewed_at_iso,
+                                "payload_kind": "request",
+                            }
+                        )
+                    ),
+                    "response_payload_ref": (
+                        f"sealed://trust-transfer/{verifier_slug}/renewal/response"
+                    ),
+                    "response_payload_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "verifier_ref": verifier_ref,
+                                "recorded_at": renewed_at_iso,
+                                "payload_kind": "response",
+                            }
+                        )
+                    ),
+                    "recorded_at": renewed_at_iso,
+                }
+            )
+            transport_exchange["digest"] = sha256_text(
+                canonical_json(
+                    {
+                        "exchange_id": transport_exchange["exchange_id"],
+                        "verifier_ref": verifier_ref,
+                        "challenge_ref": challenge_ref,
+                        "request_payload_digest": transport_exchange["request_payload_digest"],
+                        "response_payload_digest": transport_exchange["response_payload_digest"],
+                        "recorded_at": renewed_at_iso,
+                    }
+                )
+            )
+            renewed_receipt.update(
+                {
+                    "receipt_id": new_id("verifier-network-receipt"),
+                    "challenge_ref": challenge_ref,
+                    "challenge_digest": challenge_digest,
+                    "transport_exchange": transport_exchange,
+                    "recorded_at": renewed_at_iso,
+                    "observed_latency_ms": round(
+                        float(renewed_receipt["observed_latency_ms"]) + 1.0,
+                        1,
+                    ),
+                }
+            )
+            renewed_receipt["digest"] = sha256_text(
+                canonical_json(
+                    {
+                        "receipt_id": renewed_receipt["receipt_id"],
+                        "verifier_ref": verifier_ref,
+                        "challenge_ref": challenge_ref,
+                        "recorded_at": renewed_at_iso,
+                        "transport_exchange_digest": transport_exchange["digest"],
+                    }
+                )
+            )
+            renewed_receipts.append(renewed_receipt)
+        return self._normalize_remote_verifier_receipts(renewed_receipts)
+
+    def _build_destination_lifecycle(
+        self,
+        *,
+        destination_snapshot_digest: str,
+        initial_federation: Mapping[str, Any],
+        initial_cadence: Mapping[str, Any],
+        current_federation: Mapping[str, Any],
+        current_cadence: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        revocation_checked_at = (
+            _parse_datetime(
+                str(current_cadence["attested_at"]),
+                "current_cadence.attested_at",
+            )
+            + timedelta(seconds=TRUST_TRANSFER_DESTINATION_REVOCATION_CHECK_OFFSET_SECONDS)
+        ).isoformat()
+        history = [
+            {
+                "sequence": 0,
+                "entry_id": new_id("trust-destination-entry"),
+                "entry_ref": "trust-destination-entry://imported",
+                "event_type": "imported",
+                "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
+                "recorded_at": initial_cadence["attested_at"],
+                "attested_at": initial_cadence["attested_at"],
+                "valid_until": initial_cadence["valid_until"],
+                "federation_ref": initial_federation["federation_ref"],
+                "federation_digest": initial_federation["receipt_digest"],
+                "cadence_ref": initial_cadence["cadence_ref"],
+                "cadence_digest": initial_cadence["receipt_digest"],
+                "covered_verifier_receipt_ids": list(
+                    initial_cadence["covered_verifier_receipt_ids"]
+                ),
+                "destination_snapshot_digest": destination_snapshot_digest,
+                "rationale": "initial destination seed completed with guardian and human attestation",
+            },
+            {
+                "sequence": 1,
+                "entry_id": new_id("trust-destination-entry"),
+                "entry_ref": "trust-destination-entry://renewed",
+                "event_type": "renewed",
+                "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
+                "recorded_at": current_cadence["attested_at"],
+                "attested_at": current_cadence["attested_at"],
+                "valid_until": current_cadence["valid_until"],
+                "federation_ref": current_federation["federation_ref"],
+                "federation_digest": current_federation["receipt_digest"],
+                "cadence_ref": current_cadence["cadence_ref"],
+                "cadence_digest": current_cadence["receipt_digest"],
+                "covered_verifier_receipt_ids": list(
+                    current_cadence["covered_verifier_receipt_ids"]
+                ),
+                "destination_snapshot_digest": destination_snapshot_digest,
+                "rationale": "destination verifier federation renewed before freshness expiry",
+            },
+            {
+                "sequence": 2,
+                "entry_id": new_id("trust-destination-entry"),
+                "entry_ref": "trust-destination-entry://revocation-cleared",
+                "event_type": "revocation-cleared",
+                "status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
+                "recorded_at": revocation_checked_at,
+                "attested_at": current_cadence["attested_at"],
+                "valid_until": current_cadence["valid_until"],
+                "federation_ref": current_federation["federation_ref"],
+                "federation_digest": current_federation["receipt_digest"],
+                "cadence_ref": current_cadence["cadence_ref"],
+                "cadence_digest": current_cadence["receipt_digest"],
+                "covered_verifier_receipt_ids": list(
+                    current_cadence["covered_verifier_receipt_ids"]
+                ),
+                "destination_snapshot_digest": destination_snapshot_digest,
+                "rationale": "destination revocation check cleared and trust remains current",
+            },
+        ]
+        lifecycle = {
+            "lifecycle_id": new_id("trust-destination-lifecycle"),
+            "lifecycle_ref": (
+                f"trust-destination-lifecycle://{current_federation['federation_id']}"
+            ),
+            "lifecycle_policy_id": TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID,
+            "current_status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
+            "active_entry_ref": history[-1]["entry_ref"],
+            "latest_federation_ref": current_federation["federation_ref"],
+            "latest_federation_digest": current_federation["receipt_digest"],
+            "latest_cadence_ref": current_cadence["cadence_ref"],
+            "latest_cadence_digest": current_cadence["receipt_digest"],
+            "revocation_fail_closed_action": (
+                TRUST_TRANSFER_DESTINATION_REVOCATION_FAIL_CLOSED_ACTION
+            ),
+            "history": history,
+            "lifecycle_digest": "",
+        }
+        lifecycle["lifecycle_digest"] = sha256_text(
+            canonical_json(_trust_transfer_destination_lifecycle_digest_payload(lifecycle))
+        )
+        return lifecycle
 
     @staticmethod
     def _same_actor(agent_id: str, triggered_by: str, triggered_by_agent_id: str) -> bool:

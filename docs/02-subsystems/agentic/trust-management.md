@@ -128,6 +128,9 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 - destination 側 seed mode を `snapshot-clone-with-history` に固定
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
+- `bounded-trust-transfer-destination-lifecycle-v1` による
+  `imported -> renewed -> revocation-cleared` append-only history と
+  revocation fail-closed action の固定
 
 `remote_verifier_federation` は `verifier_ref`、`verifier_endpoint`、
 `authority_chain_ref`、`trust_root_ref`、`transport_exchange` digest を含む
@@ -139,6 +142,13 @@ transfer route に束縛する。
 reference runtime では `renew_after + grace_window <= valid_until` を
 満たす時だけ `re_attestation_current=true` と評価する。
 
+`destination_lifecycle` は top-level snapshot を変えずに
+destination 側の post-import state を append-only ledger として保持する。
+reference runtime では import 時の federation/cadence、renew 後の federation/cadence、
+そして destination usage を解放する前の `revocation-cleared` check を
+同じ ledger に束ね、`current | revoked` の fail-closed state を
+`destination_current` で machine-checkable にする。
+
 ## Reference runtime surface
 
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-demo --json`
@@ -149,4 +159,4 @@ reference runtime では `renew_after + grace_window <= valid_until` を
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
   - trust transfer では guardian/human quorum、remote verifier federation、re-attestation cadence、
-    digest binding、snapshot preserve を継続検証する
+    destination lifecycle、digest binding、snapshot preserve を継続検証する
