@@ -26,6 +26,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual([], result["missing_required_reference_files"])
         self.assertEqual(0, result["missing_expected_file_count"])
         self.assertEqual(0, result["inventory_drift_count"])
+        self.assertIn("decision_log_residual_count", result)
+        self.assertEqual(
+            result["decision_log_residual_count"],
+            len(result["decision_log_residual_hits"]),
+        )
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()
@@ -1604,6 +1609,70 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "legal-scholar",
             result["convocation"]["council_panel"][1]["selected_agent_id"],
+        )
+
+    def test_yaoyorozu_demo_supports_inter_mind_negotiation_profile(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "yaoyorozu-demo",
+                "--proposal-profile",
+                "inter-mind-negotiation-v1",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual("inter-mind-negotiation-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["profile_required_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            [],
+            result["validation"]["profile_optional_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["required_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            [],
+            result["validation"]["optional_builder_coverage_areas"],
+        )
+        self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
+        self.assertIn(
+            "inter-mind-negotiation-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "legal-scholar",
+                "design-auditor",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "inter-mind-negotiation-contract-sync-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(
+            [["docs", "schema"], ["eval"], ["runtime"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
         )
 
     def test_oversight_demo_emits_breach_propagation(self) -> None:

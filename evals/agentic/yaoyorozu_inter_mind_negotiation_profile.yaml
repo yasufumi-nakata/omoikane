@@ -1,0 +1,37 @@
+eval_id: yaoyorozu_inter_mind_negotiation_profile
+target: agentic.yaoyorozu
+level: L4
+description: Yaoyorozu must materialize the inter-mind negotiation proposal profile into deterministic convocation, full four-surface worker dispatch, and a schema+docs contract-sync TaskGraph strategy.
+inputs:
+  - source_root: agents
+  - proposal_profile: inter-mind-negotiation-v1
+  - session_mode: standard
+expected:
+  standing_roles_ready: true
+  council_role_coverage_ok: true
+  builder_handoff_coverage_ok: true
+  builder_profile_policy_ready: true
+  workspace_count: 3
+  non_source_workspace_count: 2
+  profile_workspace_review_budget: 3
+  profile_required_workspace_coverage_areas:
+    - runtime
+    - schema
+    - eval
+    - docs
+  required_builder_coverage_areas:
+    - runtime
+    - schema
+    - eval
+    - docs
+  optional_builder_coverage_areas: []
+  selected_builder_coverage_count: 4
+  dispatch_unit_count: 4
+  worker_dispatch_coverage_complete: true
+  workspace_discovery_bound: true
+  workspace_profile_policy_ready: true
+  task_graph_bundle_strategy_ok: true
+  task_graph_bundle_strategy_id: inter-mind-negotiation-contract-sync-v1
+metric: equality
+threshold: 1.0
+ethics_check: true

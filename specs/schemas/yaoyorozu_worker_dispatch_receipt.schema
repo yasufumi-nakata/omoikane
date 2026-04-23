@@ -49,6 +49,7 @@ properties:
       - self-modify-patch-v1
       - memory-edit-v1
       - fork-request-v1
+      - inter-mind-negotiation-v1
   workspace_root:
     type: string
     minLength: 1

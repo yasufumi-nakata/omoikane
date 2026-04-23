@@ -239,6 +239,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["empty_eval_surface_count"])
         self.assertEqual(0, report["catalog_pending_count"])
         self.assertEqual(0, report["inventory_drift_count"])
+        self.assertIn("decision_log_residual_count", report)
+        self.assertEqual(
+            report["decision_log_residual_count"],
+            len(report["decision_log_residual_hits"]),
+        )
 
     def test_naming_demo_returns_fixed_policy_and_aliases(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -1784,6 +1789,67 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             [["docs"], ["runtime"], ["schema"]],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
+
+    def test_yaoyorozu_demo_supports_inter_mind_negotiation_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_yaoyorozu_demo(proposal_profile="inter-mind-negotiation-v1")
+
+        self.assertEqual("inter-mind-negotiation-v1", result["convocation"]["proposal_profile"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["profile_required_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            [],
+            result["validation"]["profile_optional_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["required_builder_coverage_areas"],
+        )
+        self.assertEqual(
+            [],
+            result["validation"]["optional_builder_coverage_areas"],
+        )
+        self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["builder_profile_policy_ready"])
+        self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
+        self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(4, result["validation"]["builder_coverage_count"])
+        self.assertEqual(4, result["validation"]["dispatch_unit_count"])
+        self.assertEqual(4, result["validation"]["dispatch_success_count"])
+        self.assertIn(
+            "inter-mind-negotiation-v1",
+            result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            [
+                "legal-scholar",
+                "design-auditor",
+                "conservatism-advocate",
+                "ethics-committee",
+            ],
+            [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertEqual(
+            "legal-scholar",
+            result["convocation"]["council_panel"][0]["selected_agent_id"],
+        )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "inter-mind-negotiation-contract-sync-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertEqual(
+            [["docs", "schema"], ["eval"], ["runtime"]],
             sorted(
                 sorted(binding["coverage_areas"])
                 for binding in result["task_graph_binding"]["node_bindings"]

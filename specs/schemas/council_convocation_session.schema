@@ -48,6 +48,7 @@ properties:
       - self-modify-patch-v1
       - memory-edit-v1
       - fork-request-v1
+      - inter-mind-negotiation-v1
   summary:
     type: string
     minLength: 1
@@ -84,6 +85,7 @@ properties:
           - self-modify-patch-v1
           - memory-edit-v1
           - fork-request-v1
+          - inter-mind-negotiation-v1
       workspace_review_budget:
         type: integer
         minimum: 2

@@ -12,6 +12,13 @@ PLACEHOLDER_MARKERS = (
     "本体記述",
     "未生成",
 )
+DECISION_LOG_RESIDUAL_MARKERS = (
+    "residual gap",
+    "residual future work",
+    "residual scope",
+    "unresolved gap",
+)
+DECISION_LOG_IGNORED_NAME_SNIPPETS = ("gap-report",)
 REQUIRED_REFERENCE_FILES = (
     "references/operating-playbook.md",
     "references/repo-coverage-checklist.md",
@@ -47,6 +54,7 @@ class GapScanner:
         placeholder_hits = self._placeholder_hits(repo_root)
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
+        decision_log_residual_hits = self._decision_log_residual_hits(repo_root)
 
         prioritized_tasks: List[Dict[str, str]] = []
         for filename in missing_specs:
@@ -97,6 +105,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in decision_log_residual_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "medium",
+                    "kind": "decision-log-residual",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for item in open_questions[:10]:
             prioritized_tasks.append(
                 {
@@ -123,6 +139,7 @@ class GapScanner:
             "placeholder_hit_count": len(placeholder_hits),
             "inventory_drift_count": len(inventory_drift_hits),
             "future_work_hit_count": len(future_work_hits),
+            "decision_log_residual_count": len(decision_log_residual_hits),
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
             "missing_required_reference_files": missing_reference_files,
@@ -132,6 +149,7 @@ class GapScanner:
             "placeholder_hits": placeholder_hits,
             "inventory_drift_hits": inventory_drift_hits,
             "future_work_hits": future_work_hits,
+            "decision_log_residual_hits": decision_log_residual_hits,
             "prioritized_tasks": prioritized_tasks,
         }
 
@@ -318,3 +336,86 @@ class GapScanner:
                     continue
                 hits.append({"path": str(relative_path), "line": stripped})
         return hits
+
+    def _decision_log_residual_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        hits: List[Dict[str, str]] = []
+        seen = set()
+        decision_logs = self._latest_decision_logs(repo_root / "meta" / "decision-log")
+        for path in decision_logs:
+            if any(snippet in path.name for snippet in DECISION_LOG_IGNORED_NAME_SNIPPETS):
+                continue
+            relative_path = path.relative_to(repo_root)
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            in_consequences = False
+            for line in text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("## "):
+                    in_consequences = stripped == "## Consequences"
+                    continue
+                if not in_consequences:
+                    continue
+                lowered = stripped.lower()
+                if not stripped.startswith("- "):
+                    continue
+                if not any(marker in lowered for marker in DECISION_LOG_RESIDUAL_MARKERS):
+                    continue
+                key = (str(relative_path), stripped)
+                if key in seen:
+                    continue
+                seen.add(key)
+                hits.append(
+                    {
+                        "path": str(relative_path),
+                        "line": stripped,
+                        "decision_date": path.name[:10],
+                    }
+                )
+        return hits
+
+    @staticmethod
+    def _latest_decision_logs(decision_log_root: Path) -> List[Path]:
+        if not decision_log_root.exists():
+            return []
+
+        candidates: List[tuple[str, Path]] = []
+        for path in sorted(decision_log_root.glob("*.md")):
+            if not path.is_file():
+                continue
+            date_prefix = path.name[:10]
+            if not GapScanner._looks_like_iso_date(date_prefix):
+                continue
+            if GapScanner._decision_log_status(path) == "superseded":
+                continue
+            candidates.append((date_prefix, path))
+
+        if not candidates:
+            return []
+
+        latest_date = max(date_prefix for date_prefix, _ in candidates)
+        return [path for date_prefix, path in candidates if date_prefix == latest_date]
+
+    @staticmethod
+    def _decision_log_status(path: Path) -> str:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            return "decided"
+        if not lines or lines[0].strip() != "---":
+            return "decided"
+        for line in lines[1:]:
+            stripped = line.strip()
+            if stripped == "---":
+                break
+            if stripped.startswith("status:"):
+                return stripped.partition(":")[2].strip().lower()
+        return "decided"
+
+    @staticmethod
+    def _looks_like_iso_date(value: str) -> bool:
+        if len(value) != 10 or value[4] != "-" or value[7] != "-":
+            return False
+        year, month, day = value[:4], value[5:7], value[8:10]
+        return year.isdigit() and month.isdigit() and day.isdigit()

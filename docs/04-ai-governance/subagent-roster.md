@@ -52,11 +52,13 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 (`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、
-`fork-request-v1` では `runtime+schema+docs` required という
+`fork-request-v1` では `runtime+schema+docs` required、
+`inter-mind-negotiation-v1` では `runtime+schema+eval+docs` required という
 profile-aware workspace review policy へ切り替わり、
 actual builder dispatch も
 `memory-edit-v1` では `runtime/eval/docs`、
-`fork-request-v1` では `runtime/schema/docs`
+`fork-request-v1` では `runtime/schema/docs`、
+`inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
 の required coverage だけへ縮退しつつ、
 selected builder 群が dispatch/unit binding と workspace target 観測を伴う
 git-bound delta receipt と patch candidate receipt 付きの
@@ -65,6 +67,8 @@ repo-local worker dispatch receipt として実行される。
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
 さらに `--proposal-profile fork-request-v1` により
 identity fork の triple-approval review 向け convocation / dispatch へ切り替えられる。
+さらに `--proposal-profile inter-mind-negotiation-v1` により
+disclosure / merge / collective contract review 向け convocation / dispatch へ切り替えられる。
 そのうえで同じ Council session 上の `ConsensusBus` transcript が
 blocked direct builder handoff と guardian-gated resolve を伴う
 `yaoyorozu_consensus_dispatch_binding` として束縛される。

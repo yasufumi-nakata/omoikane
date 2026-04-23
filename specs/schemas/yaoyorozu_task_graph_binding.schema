@@ -56,6 +56,7 @@ properties:
       - self-modify-patch-v1
       - memory-edit-v1
       - fork-request-v1
+      - inter-mind-negotiation-v1
   convocation_session_ref:
     type: string
     pattern: "^convocation://"
@@ -102,6 +103,7 @@ properties:
           - self-modify-patch-v1
           - memory-edit-v1
           - fork-request-v1
+          - inter-mind-negotiation-v1
       root_bundle_count:
         const: 3
       max_parallelism:

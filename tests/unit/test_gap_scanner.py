@@ -232,10 +232,91 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, report["future_work_hit_count"])
             self.assertEqual([], report["future_work_hits"])
 
+    def test_scan_reports_latest_decision_log_residuals(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-22_old-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-22\n"
+                "status: decided\n"
+                "---\n\n"
+                "- residual gap は generic な old backlog ではなく、 historical surface へ縮小する\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_recent-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Options considered\n"
+                "- residual gap は option text なので拾わない\n\n"
+                "## Consequences\n"
+                "- residual gap は generic な profile unawareness ではなく、 inter-mind-negotiation-v1 へ縮小する\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_gap-report-meta.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- residual gap は gap-report 自身の meta note なので拾わない\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_residual_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-23_recent-gap.md",
+                report["decision_log_residual_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "2026-04-23",
+                report["decision_log_residual_hits"][0]["decision_date"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "decision-log-residual" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_ignores_superseded_latest_decision_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-22_recent-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-22\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- unresolved gap は generic な trust tampering 全般ではなく、 cross-substrate trust transfer へ縮小する\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_superseded-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: superseded\n"
+                "---\n\n"
+                "- residual future work は generic な packet export 一般論ではなく、 live capture へ縮小する\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_residual_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-22_recent-gap.md",
+                report["decision_log_residual_hits"][0]["path"],
+            )
+
     @staticmethod
     def _bootstrap_repo(repo_root: Path) -> None:
         (repo_root / "meta").mkdir(parents=True)
         (repo_root / "meta" / "open-questions.md").write_text("# Open Questions\n", encoding="utf-8")
+        (repo_root / "meta" / "decision-log").mkdir(parents=True, exist_ok=True)
         references_root = repo_root / "references"
         references_root.mkdir(parents=True, exist_ok=True)
         for filename in (

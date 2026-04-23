@@ -63,7 +63,9 @@ repo-local `agents/` の定義を trust snapshot に束縛し、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role と
 `self-modify-patch-v1` の council panel / builder handoff coverage に加えて、
 `memory-edit-v1` では `MemoryArchivist` / `DesignAuditor` /
-`ConservatismAdvocate` / `EthicsCommittee` を使う reversible memory-edit review panel を
+`ConservatismAdvocate` / `EthicsCommittee` を使う reversible memory-edit review panel、
+`inter-mind-negotiation-v1` では `LegalScholar` / `DesignAuditor` /
+`ConservatismAdvocate` / `EthicsCommittee` を使う disclosure / merge / collective contract review panel を
 deterministic に召集できることを確認する。
 
 ## 多 Council 化

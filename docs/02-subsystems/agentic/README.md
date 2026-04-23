@@ -23,15 +23,17 @@
   self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
-  `fork-request-v1` では `runtime/schema/docs` required + `eval` optional という cross-workspace coverage policy を
+  `fork-request-v1` では `runtime/schema/docs` required + `eval` optional、
+  `inter-mind-negotiation-v1` では `runtime/schema/eval/docs` required という cross-workspace coverage policy を
   `yaoyorozu_workspace_discovery` として machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
-  `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` の
+  `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` / `inter-mind-negotiation-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、
   `memory-edit-v1` では `runtime/eval/docs`、
-  `fork-request-v1` では `runtime/schema/docs`
+  `fork-request-v1` では `runtime/schema/docs`、
+  `inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
   だけを actual builder handoff coverage として固定したうえで、
   selected builder handoff を dispatch/unit binding と workspace target 観測、
   さらに git-bound target path delta receipt と delta-derived patch candidate receipt を持つ
@@ -41,7 +43,8 @@
   さらに fixed `max_parallelism=3` を守るため、
   `self-modify`=`runtime` / `schema` / `evidence-sync(eval+docs)`,
   `memory-edit`=`runtime` / `eval` / `docs`,
-  `fork-request`=`runtime` / `schema` / `docs`
+  `fork-request`=`runtime` / `schema` / `docs`,
+  `inter-mind-negotiation`=`runtime` / `contract-sync(schema+docs)` / `eval`
   の 3 root bundle に畳み込んだ `TaskGraph` execution bundle を
   `yaoyorozu_task_graph_binding` として残す
 

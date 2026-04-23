@@ -125,6 +125,23 @@ YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES = {
             },
         ),
     },
+    "inter-mind-negotiation-v1": {
+        "strategy_id": "inter-mind-negotiation-contract-sync-v1",
+        "root_bundles": (
+            {
+                "bundle_role": "negotiation-runtime-bundle",
+                "coverage_areas": ("runtime",),
+            },
+            {
+                "bundle_role": "negotiation-contract-sync-bundle",
+                "coverage_areas": ("schema", "docs"),
+            },
+            {
+                "bundle_role": "negotiation-eval-bundle",
+                "coverage_areas": ("eval",),
+            },
+        ),
+    },
 }
 YAOYOROZU_PROPOSAL_PROFILES = tuple(YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES)
 
@@ -608,6 +625,56 @@ class YaoyorozuRegistryPolicy:
                 ],
                 "task_graph_bundle_strategy_id": YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES[
                     "fork-request-v1"
+                ]["strategy_id"],
+            },
+            "inter-mind-negotiation-v1": {
+                "summary": "Prepare a bounded Council review and inter-mind negotiation handoff for one disclosure, merge, or collective contract update.",
+                "workspace_review_policy_id": "inter-mind-negotiation-cross-workspace-review-v1",
+                "workspace_review_budget": 3,
+                "required_workspace_coverage_areas": ["runtime", "schema", "eval", "docs"],
+                "optional_workspace_coverage_areas": [],
+                "council_roles": [
+                    {
+                        "role_id": "legal-scholar",
+                        "role_label": "LegalScholar",
+                        "candidate_agents": ["legal-scholar"],
+                    },
+                    {
+                        "role_id": "design-auditor",
+                        "role_label": "DesignAuditor",
+                        "candidate_agents": ["design-architect"],
+                    },
+                    {
+                        "role_id": "conservatism-advocate",
+                        "role_label": "ConservatismAdvocate",
+                        "candidate_agents": ["conservatism-advocate"],
+                    },
+                    {
+                        "role_id": "ethics-committee",
+                        "role_label": "EthicsCommittee",
+                        "candidate_agents": ["ethics-committee"],
+                    },
+                ],
+                "builder_handoff": [
+                    {
+                        "coverage_area": "runtime",
+                        "candidate_agents": ["codex-builder"],
+                    },
+                    {
+                        "coverage_area": "schema",
+                        "candidate_agents": ["schema-builder"],
+                    },
+                    {
+                        "coverage_area": "eval",
+                        "candidate_agents": ["eval-builder"],
+                    },
+                    {
+                        "coverage_area": "docs",
+                        "candidate_agents": ["doc-sync-builder"],
+                    },
+                ],
+                "task_graph_bundle_strategy_id": YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES[
+                    "inter-mind-negotiation-v1"
                 ]["strategy_id"],
             },
         }

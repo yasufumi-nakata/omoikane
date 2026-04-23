@@ -1909,6 +1909,13 @@ entries:
     rationale: Protects the fork-request profile's required runtime/schema/docs review coverage, Council panel selection, and governance-focused TaskGraph strategy selection.
   - priority: P1
     kind: eval
+    file: evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the inter-mind negotiation profile's full four-surface review coverage, legal/ethics-focused Council panel selection, and schema+docs contract-sync TaskGraph strategy selection.
+  - priority: P1
+    kind: eval
     file: evals/agentic/yaoyorozu_local_worker_dispatch.yaml
     consumers:
       - reference-runtime

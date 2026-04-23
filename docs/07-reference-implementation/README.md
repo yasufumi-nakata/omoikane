@@ -35,6 +35,7 @@ PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile fork-request-v1 --json
+PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile inter-mind-negotiation-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json
 PYTHONPATH=src python3 -m omoikane.cli oversight-network-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ethics-demo --json
@@ -89,7 +90,9 @@ automation が前提にする repo-local `references/*.md` の欠落、
 `specs/interfaces/README.md` / `specs/schemas/README.md` / `evals/*/README.md` の inventory drift、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
-residual `future work` も JSON で列挙する。
+residual `future work` に加え、
+最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
+`decision_log_residual_hits` として JSON で列挙する。
 
 `identity-demo` は L1 IdentityRegistry の reference contract
 (`kernel.identity.v0`) を JSON で可視化し、
@@ -282,7 +285,8 @@ source workspace に加えて bounded same-host local candidate workspace を
 proposal profile ごとの review policy で走査した `yaoyorozu_workspace_discovery` を返し、
 `self-modify-patch-v1` では `review_budget=3` / `runtime+schema+eval+docs`、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required + `schema` optional、
-`fork-request-v1` では `review_budget=3` / `runtime+schema+docs` required + `eval` optional
+`fork-request-v1` では `review_budget=3` / `runtime+schema+docs` required + `eval` optional、
+`inter-mind-negotiation-v1` では `review_budget=3` / `runtime+schema+eval+docs`
 という cross-workspace coverage policy を machine-readable に固定する。
 そのうえで、
 repo-local `agents/` から materialize した trust-bound registry snapshot、
@@ -292,6 +296,8 @@ repo-local `agents/` から materialize した trust-bound registry snapshot、
 `memory-edit-v1` の `MemoryArchivist` / `DesignAuditor` /
 `ConservatismAdvocate` / `EthicsCommittee` panel、
 `fork-request-v1` の `IdentityProtector` / `LegalScholar` /
+`ConservatismAdvocate` / `EthicsCommittee` panel、
+`inter-mind-negotiation-v1` の `LegalScholar` / `DesignAuditor` /
 `ConservatismAdvocate` / `EthicsCommittee` panel を
 同じ bounded profile catalog から選べること、
 さらに convocation 自体が `workspace_discovery_binding` を持ち、
@@ -299,7 +305,8 @@ selected profile の review budget / required coverage / accepted workspace set 
 same-session Council artifact に束縛すること、
 `self-modify-patch-v1` では `runtime/schema/eval/docs`、
 `memory-edit-v1` では `runtime/eval/docs`、
-`fork-request-v1` では `runtime/schema/docs`
+`fork-request-v1` では `runtime/schema/docs`、
+`inter-mind-negotiation-v1` では `runtime/schema/eval/docs`
 を覆う builder handoff coverage、
 さらにそれを repo-local subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
@@ -311,6 +318,8 @@ CLI は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch chain へ切り替えられる。
 同じ CLI は `--proposal-profile fork-request-v1` により
 identity fork の triple-approval review 向け convocation / dispatch chain へ切り替えられる。
+同じ CLI は `--proposal-profile inter-mind-negotiation-v1` により
+disclosure / merge / collective contract review 向け convocation / dispatch chain へ切り替えられる。
 さらに同じ session 上で `ConsensusBus` が builder report / guardian gate /
 final resolve を監査し、blocked direct handoff と worker claim chain を
 `yaoyorozu_consensus_dispatch_binding` として束縛することを確認する。
@@ -320,7 +329,9 @@ final resolve を監査し、blocked direct handoff と worker claim chain を
 `memory-edit-v1` では
 `runtime` / `eval` / `docs`、
 `fork-request-v1` では
-`runtime` / `schema` / `docs`
+`runtime` / `schema` / `docs`、
+`inter-mind-negotiation-v1` では
+`runtime` / `contract-sync(schema+docs)` / `eval`
 の 3 root bundle strategy へ畳み込んだ `TaskGraph` が、
 同じ session 上の worker claim / guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として束縛することを確認する。

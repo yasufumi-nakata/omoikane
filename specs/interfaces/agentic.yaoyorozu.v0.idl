@@ -38,6 +38,7 @@ operations:
               - self-modify-patch-v1
               - memory-edit-v1
               - fork-request-v1
+              - inter-mind-negotiation-v1
           review_budget:
             type: integer
             minimum: 2
@@ -85,6 +86,7 @@ operations:
               - self-modify-patch-v1
               - memory-edit-v1
               - fork-request-v1
+              - inter-mind-negotiation-v1
           session_mode:
             type: string
             enum:
@@ -252,8 +254,8 @@ operations:
 compatibility:
   stability: bootstrap
   notes:
-    - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, and `fork-request-v1` proposal profiles.
+    - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, `fork-request-v1`, and `inter-mind-negotiation-v1` proposal profiles.
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with profile-aware review_budget, required coverage policy, and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
-    - TaskGraph bundle binding keeps the proposal profile's required worker coverage within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs while `memory-edit` and `fork-request` bind one required surface per root node.
+    - TaskGraph bundle binding keeps the proposal profile's required worker coverage within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `inter-mind-negotiation` grouping schema+docs, and `memory-edit` / `fork-request` binding one required surface per root node.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

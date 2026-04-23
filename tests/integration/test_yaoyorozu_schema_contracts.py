@@ -171,3 +171,31 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
         )
+
+    def test_inter_mind_negotiation_profile_matches_public_schemas(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo(proposal_profile="inter-mind-negotiation-v1")
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_workspace_discovery.schema",
+            result["workspace_discovery"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/council_convocation_session.schema",
+            result["convocation"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
+            result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            result["dispatch_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_consensus_dispatch_binding.schema",
+            result["consensus_dispatch"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
+        )

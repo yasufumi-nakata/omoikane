@@ -77,15 +77,17 @@ source workspace に加えて bounded same-host local candidate workspace catalo
 `yaoyorozu_workspace_discovery` として記録し、
 `self-modify-patch-v1` では `review_budget=3` / full four-surface review、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required + `schema` optional、
-`fork-request-v1` では `review_budget=3` / `runtime+schema+docs` required + `eval` optional
+`fork-request-v1` では `review_budget=3` / `runtime+schema+docs` required + `eval` optional、
+`inter-mind-negotiation-v1` では `review_budget=3` / full four-surface review
 という proposal-profile-bound workspace review policy を返し、
 repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
-`self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` を切り替え可能な
+`self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` と `inter-mind-negotiation-v1` を切り替え可能な
 bounded proposal profile catalog、および
 `self-modify-patch-v1` では 4 coverage、
 `memory-edit-v1` では `runtime/eval/docs` の 3 coverage、
-`fork-request-v1` では `runtime/schema/docs` の 3 coverage を持つ
+`fork-request-v1` では `runtime/schema/docs` の 3 coverage、
+`inter-mind-negotiation-v1` では `runtime/schema/eval/docs` の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
 各 worker report は dispatch plan / dispatch unit に束縛され、
 workspace 内 target path の存在確認と bounded sample observation に加え、
@@ -101,7 +103,8 @@ same-session artifact として固定する。
 さらに `TaskGraph` 側では `max_parallelism=3` を守るため、
 `self-modify-patch-v1` は `runtime` / `schema` / `evidence-sync(eval+docs)`,
 `memory-edit-v1` は `runtime` / `eval` / `docs`,
-`fork-request-v1` は `runtime` / `schema` / `docs`
+`fork-request-v1` は `runtime` / `schema` / `docs`,
+`inter-mind-negotiation-v1` は `runtime` / `contract-sync(schema+docs)` / `eval`
 の 3 root bundle strategy へ畳み、
 worker dispatch receipt と guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として固定する。

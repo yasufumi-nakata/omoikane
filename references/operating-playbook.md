@@ -18,6 +18,8 @@ thin prompt でも、次の順序は崩しません。
 
 `gap-report` が all-zero でも停止しません。
 truth-source と現行 runtime を読み、repo 内で machine-checkable に閉じられる残差を拾います。
+最新 decision log 日付の `residual gap` / `unresolved gap` が `gap-report` に出ている場合は、
+それも next durable gap 候補として同列に扱います。
 
 ## 3. ギャップ選定ルール
 
