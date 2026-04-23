@@ -1414,6 +1414,7 @@ class CliIntegrationTests(unittest.TestCase):
             main()
 
         result = json.loads(stdout.getvalue())
+        self.assertEqual("snapshot-clone-with-history", result["transfer"]["export_profile_id"])
         self.assertEqual(
             "bounded-cross-substrate-trust-transfer-v1",
             result["transfer"]["transfer_policy_id"],
@@ -1424,6 +1425,8 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["source_snapshot_digest_bound"])
         self.assertTrue(result["validation"]["destination_snapshot_digest_bound"])
+        self.assertTrue(result["validation"]["export_profile_bound"])
+        self.assertTrue(result["validation"]["history_commitment_bound"])
         self.assertTrue(result["validation"]["history_preserved"])
         self.assertTrue(result["validation"]["thresholds_preserved"])
         self.assertTrue(result["validation"]["federation_quorum_attested"])
@@ -1447,6 +1450,37 @@ class CliIntegrationTests(unittest.TestCase):
             result["transfer"]["federation_attestation"]["remote_verifier_federation"][
                 "received_verifier_count"
             ],
+        )
+
+    def test_trust_transfer_demo_emits_redacted_export_profile_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            [
+                "omoikane",
+                "trust-transfer-demo",
+                "--export-profile",
+                "bounded-trust-transfer-redacted-export-v1",
+                "--json",
+            ],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(
+            "bounded-trust-transfer-redacted-export-v1",
+            result["transfer"]["export_profile_id"],
+        )
+        self.assertTrue(result["validation"]["export_profile_bound"])
+        self.assertTrue(result["validation"]["history_commitment_bound"])
+        self.assertNotIn("source_snapshot", result["transfer"])
+        self.assertNotIn("destination_snapshot", result["transfer"])
+        self.assertIn("source_snapshot_redacted", result["transfer"])
+        self.assertIn("destination_snapshot_redacted", result["transfer"])
+        self.assertEqual(
+            "bounded-trust-transfer-history-redaction-v1",
+            result["transfer"]["export_receipt"]["redaction_policy_id"],
         )
 
     def test_yaoyorozu_demo_emits_registry_and_convocation_json(self) -> None:

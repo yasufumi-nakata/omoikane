@@ -28,7 +28,11 @@ from omoikane.agentic.local_worker_stub import (
     build_workspace_delta_receipt,
 )
 from omoikane.agentic.task_graph import TaskGraphService
-from omoikane.agentic.trust import TrustService
+from omoikane.agentic.trust import (
+    TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
+    TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
+    TrustService,
+)
 from omoikane.agentic.yaoyorozu import YaoyorozuRegistryService
 from omoikane.common import canonical_json, sha256_text
 from omoikane.reference_os import OmoikaneReferenceOS
@@ -2386,6 +2390,9 @@ class TrustServiceTests(unittest.TestCase):
         )
 
         self.assertTrue(receipt["validation"]["ok"])
+        self.assertEqual(TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID, receipt["export_profile_id"])
+        self.assertTrue(receipt["validation"]["export_profile_bound"])
+        self.assertTrue(receipt["validation"]["history_commitment_bound"])
         self.assertTrue(receipt["validation"]["live_remote_verifier_attested"])
         self.assertTrue(receipt["validation"]["remote_verifier_receipts_bound"])
         self.assertTrue(receipt["validation"]["re_attestation_cadence_bound"])
@@ -2416,6 +2423,50 @@ class TrustServiceTests(unittest.TestCase):
             receipt["source_snapshot"],
             destination.snapshot("design-architect"),
         )
+
+    def test_transfer_snapshot_to_can_emit_redacted_export_profile(self) -> None:
+        source, destination = self._build_transfer_services()
+
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+            export_profile_id=TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
+        )
+
+        self.assertTrue(receipt["validation"]["ok"])
+        self.assertEqual(TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID, receipt["export_profile_id"])
+        self.assertTrue(receipt["validation"]["export_profile_bound"])
+        self.assertTrue(receipt["validation"]["history_commitment_bound"])
+        self.assertNotIn("source_snapshot", receipt)
+        self.assertNotIn("destination_snapshot", receipt)
+        self.assertIn("source_snapshot_redacted", receipt)
+        self.assertIn("destination_snapshot_redacted", receipt)
+        self.assertEqual(
+            receipt["source_snapshot_redacted"]["sealed_snapshot_digest"],
+            receipt["source_snapshot_digest"],
+        )
+        self.assertEqual(
+            receipt["destination_snapshot_redacted"]["sealed_snapshot_digest"],
+            receipt["destination_snapshot_digest"],
+        )
+        self.assertEqual(
+            "bounded-trust-transfer-history-redaction-v1",
+            receipt["export_receipt"]["redaction_policy_id"],
+        )
+        self.assertGreater(
+            len(receipt["source_snapshot_redacted"]["redacted_fields"]),
+            0,
+        )
+        self.assertTrue(destination.has_agent("design-architect"))
 
     def test_validate_transfer_receipt_rejects_attestation_quorum_drift(self) -> None:
         source, destination = self._build_transfer_services()
@@ -2501,6 +2552,35 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["destination_revocation_history_bound"])
         self.assertFalse(validation["destination_current"])
         self.assertIn("destination_lifecycle.lifecycle_digest mismatch", validation["errors"])
+
+    def test_validate_transfer_receipt_rejects_redacted_projection_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+            export_profile_id=TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["source_snapshot_redacted"]["history_summary"]["event_count"] = 999
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["history_commitment_bound"])
+        self.assertIn(
+            "history commitment digests must stay aligned with the export profile",
+            validation["errors"],
+        )
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):

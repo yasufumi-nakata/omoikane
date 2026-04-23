@@ -1758,12 +1758,20 @@ entries:
     rationale: Required to serialize global/domain trust, history, thresholds, and operational gates.
   - priority: P1
     kind: schema
+    file: specs/schemas/trust_redacted_snapshot.schema
+    consumers:
+      - specs/schemas/trust_transfer_receipt.schema
+      - docs/02-subsystems/agentic/trust-management.md
+      - reference-runtime
+    rationale: Required to serialize one public redacted trust snapshot projection with sealed snapshot bindings, history commitments, and score/threshold disclosure floors.
+  - priority: P1
+    kind: schema
     file: specs/schemas/trust_transfer_receipt.schema
     consumers:
       - specs/interfaces/agentic.trust.v0.idl
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and snapshot preservation.
+    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and full-clone versus redacted export profile branching.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.trust.v0.idl

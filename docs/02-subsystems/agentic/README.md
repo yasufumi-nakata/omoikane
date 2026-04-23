@@ -23,7 +23,9 @@
   self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
   guardian / human quorum 付きの cross-substrate trust export/import receipt に
   live remote verifier federation、fixed re-attestation cadence、
-  append-only destination lifecycle (`imported -> renewed -> revocation-cleared`) まで内包して machine-checkable にし、
+  append-only destination lifecycle (`imported -> renewed -> revocation-cleared`) に加えて
+  full-clone / redacted の public export profile 分岐と
+  `trust_redacted_snapshot` projection まで内包して machine-checkable にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
   `fork-request-v1` では `runtime/schema/docs` required + `eval` optional、

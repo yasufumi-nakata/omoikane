@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from .agentic.trust import TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES
 from .agentic.yaoyorozu import YAOYOROZU_PROPOSAL_PROFILES
 from .reference_os import OmoikaneReferenceOS
 
@@ -332,6 +333,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "trust-transfer-demo",
         help="Run the L4 cross-substrate trust export/import receipt scenario",
     )
+    trust_transfer_parser.add_argument(
+        "--export-profile",
+        choices=TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES,
+        default=TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES[0],
+        help="Select the trust transfer export profile to materialize",
+    )
     trust_transfer_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
     yaoyorozu_parser = subparsers.add_parser(
@@ -610,7 +617,10 @@ def main() -> None:
         return
 
     if args.command == "trust-transfer-demo":
-        _print_result(runtime.run_trust_transfer_demo(), args.json)
+        _print_result(
+            runtime.run_trust_transfer_demo(export_profile_id=args.export_profile),
+            args.json,
+        )
         return
 
     if args.command == "yaoyorozu-demo":

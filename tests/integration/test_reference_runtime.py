@@ -1494,6 +1494,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         result = runtime.run_trust_transfer_demo()
 
+        self.assertEqual("snapshot-clone-with-history", result["transfer"]["export_profile_id"])
         self.assertEqual(
             "bounded-cross-substrate-trust-transfer-v1",
             result["transfer"]["transfer_policy_id"],
@@ -1504,6 +1505,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["source_snapshot_digest_bound"])
         self.assertTrue(result["validation"]["destination_snapshot_digest_bound"])
+        self.assertTrue(result["validation"]["export_profile_bound"])
+        self.assertTrue(result["validation"]["history_commitment_bound"])
         self.assertTrue(result["validation"]["history_preserved"])
         self.assertTrue(result["validation"]["thresholds_preserved"])
         self.assertTrue(result["validation"]["provenance_policy_preserved"])
@@ -1533,6 +1536,37 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["transfer"]["federation_attestation"]["remote_verifier_federation"][
                 "received_verifier_count"
             ],
+        )
+
+    def test_trust_transfer_demo_can_emit_redacted_export_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_trust_transfer_demo(
+            export_profile_id="bounded-trust-transfer-redacted-export-v1"
+        )
+
+        self.assertEqual(
+            "bounded-trust-transfer-redacted-export-v1",
+            result["transfer"]["export_profile_id"],
+        )
+        self.assertTrue(result["validation"]["export_profile_bound"])
+        self.assertTrue(result["validation"]["history_commitment_bound"])
+        self.assertTrue(result["validation"]["destination_seeded"])
+        self.assertNotIn("source_snapshot", result["transfer"])
+        self.assertNotIn("destination_snapshot", result["transfer"])
+        self.assertIn("source_snapshot_redacted", result["transfer"])
+        self.assertIn("destination_snapshot_redacted", result["transfer"])
+        self.assertEqual(
+            "bounded-trust-transfer-history-redaction-v1",
+            result["transfer"]["export_receipt"]["redaction_policy_id"],
+        )
+        self.assertEqual(
+            result["transfer"]["source_snapshot_redacted"]["sealed_snapshot_digest"],
+            result["transfer"]["source_snapshot_digest"],
+        )
+        self.assertEqual(
+            result["transfer"]["destination_snapshot_redacted"]["sealed_snapshot_digest"],
+            result["transfer"]["destination_snapshot_digest"],
         )
 
     def test_oversight_demo_propagates_pin_breach(self) -> None:

@@ -11,9 +11,17 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.2.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.3.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
+TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID = "snapshot-clone-with-history"
+TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID = "bounded-trust-transfer-redacted-export-v1"
+TRUST_TRANSFER_NO_REDACTION_POLICY_ID = "trust-transfer-no-redaction-v1"
+TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID = "bounded-trust-transfer-history-redaction-v1"
+TRUST_TRANSFER_REDACTED_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID = (
+    "bounded-trust-transfer-redacted-snapshot-v1"
+)
 TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID = (
     "bounded-live-trust-transfer-verifier-federation-v1"
 )
@@ -37,6 +45,23 @@ TRUST_TRANSFER_REQUIRED_ATTESTATION_ROLES = (
     "source-guardian",
     "destination-guardian",
     "human-reviewer",
+)
+TRUST_TRANSFER_REDACTED_FIELDS = (
+    "pinned_reason",
+    "history[].triggered_by",
+    "history[].triggered_by_agent_id",
+    "history[].rationale",
+    "history[].evidence_confidence",
+    "history[].raw_delta",
+    "history[].applied_delta",
+    "history[].global_before",
+    "history[].global_after",
+    "history[].domain_before",
+    "history[].domain_after",
+)
+TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES = (
+    TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
+    TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
 )
 
 
@@ -69,10 +94,11 @@ def _trust_transfer_route_digest_payload(receipt: Mapping[str, Any]) -> Dict[str
 
 
 def _trust_transfer_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
-    return {
+    payload: Dict[str, Any] = {
         "schema_version": receipt["schema_version"],
         "transfer_policy_id": receipt["transfer_policy_id"],
         "attestation_policy_id": receipt["attestation_policy_id"],
+        "export_profile_id": receipt["export_profile_id"],
         "agent_id": receipt["agent_id"],
         "source_substrate_ref": receipt["source_substrate_ref"],
         "destination_substrate_ref": receipt["destination_substrate_ref"],
@@ -88,6 +114,39 @@ def _trust_transfer_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]
         "destination_lifecycle": receipt["destination_lifecycle"],
         "status": receipt["status"],
     }
+    if "source_snapshot_redacted" in receipt:
+        payload["source_snapshot_redacted"] = receipt["source_snapshot_redacted"]
+    if "destination_snapshot_redacted" in receipt:
+        payload["destination_snapshot_redacted"] = receipt["destination_snapshot_redacted"]
+    return payload
+
+
+def _trust_transfer_history_commitment_payload(
+    snapshot: Mapping[str, Any],
+) -> List[Dict[str, Any]]:
+    history = snapshot.get("history", [])
+    if not isinstance(history, list):
+        return []
+    commitment: List[Dict[str, Any]] = []
+    for event in history:
+        if not isinstance(event, Mapping):
+            continue
+        commitment.append(
+            {
+                "event_id": event.get("event_id"),
+                "domain": event.get("domain"),
+                "event_type": event.get("event_type"),
+                "severity": event.get("severity"),
+                "applied": event.get("applied"),
+                "provenance_status": event.get("provenance_status"),
+                "recorded_at": event.get("recorded_at"),
+            }
+        )
+    return commitment
+
+
+def _trust_transfer_history_commitment_digest(snapshot: Mapping[str, Any]) -> str:
+    return sha256_text(canonical_json(_trust_transfer_history_commitment_payload(snapshot)))
 
 
 def _trust_transfer_remote_verifier_federation_digest_payload(
@@ -144,6 +203,40 @@ def _trust_transfer_destination_lifecycle_digest_payload(
         "revocation_fail_closed_action": lifecycle["revocation_fail_closed_action"],
         "history": lifecycle["history"],
     }
+
+
+def _trust_transfer_redacted_snapshot_digest_payload(
+    projection: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": projection["kind"],
+        "schema_version": projection["schema_version"],
+        "projection_id": projection["projection_id"],
+        "projection_ref": projection["projection_ref"],
+        "projection_profile_id": projection["projection_profile_id"],
+        "sealed_snapshot_ref": projection["sealed_snapshot_ref"],
+        "sealed_snapshot_digest": projection["sealed_snapshot_digest"],
+        "agent_id": projection["agent_id"],
+        "global_score": projection["global_score"],
+        "per_domain": projection["per_domain"],
+        "pinned_by_human": projection["pinned_by_human"],
+        "thresholds": projection["thresholds"],
+        "eligibility": projection["eligibility"],
+        "history_summary": projection["history_summary"],
+        "redaction_policy_id": projection["redaction_policy_id"],
+        "redacted_fields": projection["redacted_fields"],
+    }
+
+
+def _trust_transfer_redacted_snapshot_digest(
+    projection: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(_trust_transfer_redacted_snapshot_digest_payload(projection))
+        )
+    except KeyError:
+        return None
 
 
 def _trust_transfer_remote_reviewer_binding_digest(
@@ -413,6 +506,7 @@ class TrustService:
         remote_verifier_receipts: List[Mapping[str, Any]],
         council_session_ref: str,
         rationale: str,
+        export_profile_id: str = TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
     ) -> Dict[str, Any]:
         normalized_agent_id = self._normalize_non_empty(agent_id, "agent_id")
         normalized_source_substrate = self._normalize_non_empty(
@@ -447,6 +541,7 @@ class TrustService:
             "council_session_ref",
         )
         normalized_rationale = self._normalize_non_empty(rationale, "rationale")
+        normalized_export_profile = self._normalize_export_profile(export_profile_id)
         if normalized_source_substrate == normalized_destination_substrate:
             raise ValueError("source_substrate_ref and destination_substrate_ref must differ")
         if normalized_source_guardian == normalized_destination_guardian:
@@ -459,11 +554,17 @@ class TrustService:
         source_snapshot = self.snapshot(normalized_agent_id)
         source_snapshot_digest = sha256_text(canonical_json(source_snapshot))
         source_history_digest = _snapshot_history_digest(source_snapshot)
+        source_history_commitment_digest = _trust_transfer_history_commitment_digest(
+            source_snapshot
+        )
         source_threshold_digest = _snapshot_threshold_digest(source_snapshot)
         source_eligibility_digest = _snapshot_eligibility_digest(source_snapshot)
 
         destination_snapshot = destination_service.import_snapshot(source_snapshot)
         destination_snapshot_digest = sha256_text(canonical_json(destination_snapshot))
+        destination_history_commitment_digest = _trust_transfer_history_commitment_digest(
+            destination_snapshot
+        )
         transferred_at = utc_now_iso()
 
         attestors = [
@@ -532,6 +633,7 @@ class TrustService:
             "receipt_id": new_id("trust-transfer"),
             "transfer_policy_id": TRUST_TRANSFER_POLICY_ID,
             "attestation_policy_id": TRUST_TRANSFER_ATTESTATION_POLICY_ID,
+            "export_profile_id": normalized_export_profile,
             "agent_id": normalized_agent_id,
             "source_substrate_ref": normalized_source_substrate,
             "destination_substrate_ref": normalized_destination_substrate,
@@ -539,10 +641,8 @@ class TrustService:
             "transferred_at": transferred_at,
             "source_snapshot_ref": f"trust-snapshot://source/{normalized_agent_id}",
             "source_snapshot_digest": source_snapshot_digest,
-            "source_snapshot": source_snapshot,
             "destination_snapshot_ref": f"trust-snapshot://destination/{normalized_agent_id}",
             "destination_snapshot_digest": destination_snapshot_digest,
-            "destination_snapshot": destination_snapshot,
             "export_receipt": {
                 "export_id": new_id("trust-export"),
                 "export_ref": f"trust-export://{normalized_agent_id}",
@@ -550,10 +650,13 @@ class TrustService:
                 "provenance_policy_id": self._policy.provenance_policy_id,
                 "threshold_digest": source_threshold_digest,
                 "history_digest": source_history_digest,
+                "history_commitment_digest": source_history_commitment_digest,
                 "eligibility_digest": source_eligibility_digest,
                 "history_event_count": len(source_snapshot["history"]),
                 "council_session_ref": normalized_council_session,
                 "rationale": normalized_rationale,
+                "redaction_policy_id": TRUST_TRANSFER_NO_REDACTION_POLICY_ID,
+                "redacted_fields": [],
             },
             "federation_attestation": {
                 "attestation_id": new_id("trust-attestation"),
@@ -576,9 +679,10 @@ class TrustService:
                 "provenance_policy_id": destination_service._policy.provenance_policy_id,
                 "threshold_digest": _snapshot_threshold_digest(destination_snapshot),
                 "history_digest": _snapshot_history_digest(destination_snapshot),
+                "history_commitment_digest": destination_history_commitment_digest,
                 "eligibility_digest": _snapshot_eligibility_digest(destination_snapshot),
                 "history_event_count": len(destination_snapshot["history"]),
-                "seed_mode": "snapshot-clone-with-history",
+                "seed_mode": TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
                 "destination_seeded": destination_service.has_agent(normalized_agent_id),
             },
             "destination_lifecycle": destination_lifecycle,
@@ -586,6 +690,26 @@ class TrustService:
             "status": "imported",
             "receipt_digest": "",
         }
+        if normalized_export_profile == TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID:
+            receipt["source_snapshot"] = source_snapshot
+            receipt["destination_snapshot"] = destination_snapshot
+        else:
+            receipt["export_receipt"]["redaction_policy_id"] = (
+                TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID
+            )
+            receipt["export_receipt"]["redacted_fields"] = list(
+                TRUST_TRANSFER_REDACTED_FIELDS
+            )
+            receipt["source_snapshot_redacted"] = self._build_redacted_snapshot_projection(
+                snapshot=source_snapshot,
+                snapshot_ref=str(receipt["source_snapshot_ref"]),
+                snapshot_digest=str(receipt["source_snapshot_digest"]),
+            )
+            receipt["destination_snapshot_redacted"] = self._build_redacted_snapshot_projection(
+                snapshot=destination_snapshot,
+                snapshot_ref=str(receipt["destination_snapshot_ref"]),
+                snapshot_digest=str(receipt["destination_snapshot_digest"]),
+            )
         receipt["receipt_digest"] = sha256_text(canonical_json(_trust_transfer_digest_payload(receipt)))
         receipt["validation"] = self._transfer_validation_summary(receipt)
         validation = self.validate_transfer_receipt(receipt)
@@ -679,6 +803,7 @@ class TrustService:
 
     def validate_transfer_receipt(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
+        export_profile_id = receipt.get("export_profile_id")
         if receipt.get("kind") != "trust_transfer_receipt":
             errors.append("kind must equal trust_transfer_receipt")
         if receipt.get("schema_version") != TRUST_TRANSFER_SCHEMA_VERSION:
@@ -687,6 +812,8 @@ class TrustService:
             errors.append("transfer_policy_id mismatch")
         if receipt.get("attestation_policy_id") != TRUST_TRANSFER_ATTESTATION_POLICY_ID:
             errors.append("attestation_policy_id mismatch")
+        if export_profile_id not in TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES:
+            errors.append("export_profile_id mismatch")
 
         self._require_mapping_field(receipt.get("export_receipt"), "export_receipt", errors)
         self._require_mapping_field(
@@ -729,23 +856,84 @@ class TrustService:
             "destination_snapshot_ref",
             errors,
         )
-
-        source_snapshot, source_snapshot_errors = self._snapshot_payload_errors(
-            receipt.get("source_snapshot"),
-            "source_snapshot",
-        )
-        destination_snapshot, destination_snapshot_errors = self._snapshot_payload_errors(
-            receipt.get("destination_snapshot"),
-            "destination_snapshot",
-        )
-        errors.extend(source_snapshot_errors)
-        errors.extend(destination_snapshot_errors)
+        source_snapshot: Optional[Mapping[str, Any]] = None
+        destination_snapshot: Optional[Mapping[str, Any]] = None
+        if export_profile_id == TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID:
+            source_snapshot, source_snapshot_errors = self._snapshot_payload_errors(
+                receipt.get("source_snapshot"),
+                "source_snapshot",
+            )
+            destination_snapshot, destination_snapshot_errors = self._snapshot_payload_errors(
+                receipt.get("destination_snapshot"),
+                "destination_snapshot",
+            )
+            errors.extend(source_snapshot_errors)
+            errors.extend(destination_snapshot_errors)
+            if "source_snapshot_redacted" in receipt or "destination_snapshot_redacted" in receipt:
+                errors.append(
+                    "redacted snapshot projections are only supported for the redacted export profile"
+                )
+        elif export_profile_id == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
+            if "source_snapshot" in receipt or "destination_snapshot" in receipt:
+                errors.append(
+                    "source_snapshot and destination_snapshot must be omitted for the redacted export profile"
+                )
+            self._require_mapping_field(
+                receipt.get("source_snapshot_redacted"),
+                "source_snapshot_redacted",
+                errors,
+            )
+            self._require_mapping_field(
+                receipt.get("destination_snapshot_redacted"),
+                "destination_snapshot_redacted",
+                errors,
+            )
+            for field_name, expected_ref_field, expected_digest_field in (
+                (
+                    "source_snapshot_redacted",
+                    "source_snapshot_ref",
+                    "source_snapshot_digest",
+                ),
+                (
+                    "destination_snapshot_redacted",
+                    "destination_snapshot_ref",
+                    "destination_snapshot_digest",
+                ),
+            ):
+                projection = receipt.get(field_name)
+                if not isinstance(projection, Mapping):
+                    continue
+                if (
+                    projection.get("projection_profile_id")
+                    != TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID
+                ):
+                    errors.append(f"{field_name}.projection_profile_id mismatch")
+                if (
+                    projection.get("redaction_policy_id")
+                    != TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID
+                ):
+                    errors.append(f"{field_name}.redaction_policy_id mismatch")
+                if projection.get("redacted_fields") != list(TRUST_TRANSFER_REDACTED_FIELDS):
+                    errors.append(f"{field_name}.redacted_fields mismatch")
+                if projection.get("sealed_snapshot_ref") != receipt.get(expected_ref_field):
+                    errors.append(f"{field_name}.sealed_snapshot_ref mismatch")
+                if projection.get("sealed_snapshot_digest") != receipt.get(expected_digest_field):
+                    errors.append(f"{field_name}.sealed_snapshot_digest mismatch")
+                expected_projection_digest = _trust_transfer_redacted_snapshot_digest(projection)
+                if projection.get("projection_digest") != expected_projection_digest:
+                    errors.append(f"{field_name}.projection_digest mismatch")
+                if not isinstance(projection.get("history_summary"), Mapping):
+                    errors.append(f"{field_name}.history_summary must be a mapping")
 
         summary = self._transfer_validation_summary(receipt)
         if receipt.get("validation") != summary:
             errors.append("validation must match the computed transfer validation summary")
         if receipt.get("receipt_digest") != sha256_text(canonical_json(_trust_transfer_digest_payload(receipt))):
             errors.append("receipt_digest must bind the fixed transfer digest payload")
+        if not summary["export_profile_bound"]:
+            errors.append("export_profile_id must bind the fixed trust transfer export profile")
+        if not summary["history_commitment_bound"]:
+            errors.append("history commitment digests must stay aligned with the export profile")
 
         if isinstance(source_snapshot, Mapping) and isinstance(destination_snapshot, Mapping):
             if receipt.get("agent_id") != source_snapshot.get("agent_id"):
@@ -766,6 +954,11 @@ class TrustService:
             if export_receipt.get("provenance_policy_id") != self._policy.provenance_policy_id:
                 errors.append("export_receipt.provenance_policy_id mismatch")
             self._require_non_empty_string(
+                export_receipt.get("history_commitment_digest"),
+                "export_receipt.history_commitment_digest",
+                errors,
+            )
+            self._require_non_empty_string(
                 export_receipt.get("council_session_ref"),
                 "export_receipt.council_session_ref",
                 errors,
@@ -782,7 +975,12 @@ class TrustService:
                 errors.append("import_receipt.destination_policy_id mismatch")
             if import_receipt.get("provenance_policy_id") != self._policy.provenance_policy_id:
                 errors.append("import_receipt.provenance_policy_id mismatch")
-            if import_receipt.get("seed_mode") != "snapshot-clone-with-history":
+            self._require_non_empty_string(
+                import_receipt.get("history_commitment_digest"),
+                "import_receipt.history_commitment_digest",
+                errors,
+            )
+            if import_receipt.get("seed_mode") != TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID:
                 errors.append("import_receipt.seed_mode mismatch")
             if import_receipt.get("destination_seeded") is not True:
                 errors.append("import_receipt.destination_seeded must be true")
@@ -1145,43 +1343,22 @@ class TrustService:
         )
 
     def _transfer_validation_summary(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
-        source_snapshot = receipt.get("source_snapshot", {})
-        destination_snapshot = receipt.get("destination_snapshot", {})
+        export_profile_id = receipt.get("export_profile_id")
+        source_snapshot = receipt.get("source_snapshot")
+        destination_snapshot = receipt.get("destination_snapshot")
+        source_snapshot_redacted = receipt.get("source_snapshot_redacted")
+        destination_snapshot_redacted = receipt.get("destination_snapshot_redacted")
         export_receipt = receipt.get("export_receipt", {})
         import_receipt = receipt.get("import_receipt", {})
         federation_attestation = receipt.get("federation_attestation", {})
         destination_lifecycle = receipt.get("destination_lifecycle", {})
-
-        source_snapshot_digest_bound = isinstance(source_snapshot, Mapping) and receipt.get(
-            "source_snapshot_digest"
-        ) == sha256_text(canonical_json(source_snapshot))
-        destination_snapshot_digest_bound = isinstance(
-            destination_snapshot,
-            Mapping,
-        ) and receipt.get("destination_snapshot_digest") == sha256_text(
-            canonical_json(destination_snapshot)
-        )
-        history_preserved = (
-            isinstance(source_snapshot, Mapping)
-            and isinstance(destination_snapshot, Mapping)
-            and source_snapshot.get("history") == destination_snapshot.get("history")
-            and isinstance(export_receipt, Mapping)
-            and isinstance(import_receipt, Mapping)
-            and export_receipt.get("history_digest") == _snapshot_history_digest(source_snapshot)
-            and import_receipt.get("history_digest") == _snapshot_history_digest(destination_snapshot)
-            and export_receipt.get("history_digest") == import_receipt.get("history_digest")
-        )
-        thresholds_preserved = (
-            isinstance(source_snapshot, Mapping)
-            and isinstance(destination_snapshot, Mapping)
-            and source_snapshot.get("thresholds") == destination_snapshot.get("thresholds")
-            and isinstance(export_receipt, Mapping)
-            and isinstance(import_receipt, Mapping)
-            and export_receipt.get("threshold_digest") == _snapshot_threshold_digest(source_snapshot)
-            and import_receipt.get("threshold_digest")
-            == _snapshot_threshold_digest(destination_snapshot)
-            and export_receipt.get("threshold_digest") == import_receipt.get("threshold_digest")
-        )
+        expected_redacted_fields = list(TRUST_TRANSFER_REDACTED_FIELDS)
+        source_snapshot_digest_bound = False
+        destination_snapshot_digest_bound = False
+        export_profile_bound = False
+        history_commitment_bound = False
+        history_preserved = False
+        thresholds_preserved = False
         provenance_policy_preserved = isinstance(export_receipt, Mapping) and isinstance(
             import_receipt,
             Mapping,
@@ -1190,18 +1367,176 @@ class TrustService:
             == import_receipt.get("provenance_policy_id")
             == self._policy.provenance_policy_id
         )
-        eligibility_preserved = (
-            isinstance(source_snapshot, Mapping)
+        eligibility_preserved = False
+        if (
+            export_profile_id == TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID
+            and isinstance(source_snapshot, Mapping)
             and isinstance(destination_snapshot, Mapping)
-            and source_snapshot.get("eligibility") == destination_snapshot.get("eligibility")
-            and isinstance(export_receipt, Mapping)
-            and isinstance(import_receipt, Mapping)
-            and export_receipt.get("eligibility_digest")
-            == _snapshot_eligibility_digest(source_snapshot)
-            and import_receipt.get("eligibility_digest")
-            == _snapshot_eligibility_digest(destination_snapshot)
-            and export_receipt.get("eligibility_digest") == import_receipt.get("eligibility_digest")
-        )
+        ):
+            source_snapshot_digest_bound = receipt.get("source_snapshot_digest") == sha256_text(
+                canonical_json(source_snapshot)
+            )
+            destination_snapshot_digest_bound = receipt.get(
+                "destination_snapshot_digest"
+            ) == sha256_text(canonical_json(destination_snapshot))
+            history_commitment_bound = (
+                isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("redaction_policy_id")
+                == TRUST_TRANSFER_NO_REDACTION_POLICY_ID
+                and export_receipt.get("redacted_fields") == []
+                and export_receipt.get("history_commitment_digest")
+                == _trust_transfer_history_commitment_digest(source_snapshot)
+                and import_receipt.get("history_commitment_digest")
+                == _trust_transfer_history_commitment_digest(destination_snapshot)
+                and export_receipt.get("history_commitment_digest")
+                == import_receipt.get("history_commitment_digest")
+            )
+            export_profile_bound = (
+                "source_snapshot_redacted" not in receipt
+                and "destination_snapshot_redacted" not in receipt
+                and history_commitment_bound
+            )
+            history_preserved = (
+                source_snapshot.get("history") == destination_snapshot.get("history")
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("history_digest") == _snapshot_history_digest(source_snapshot)
+                and import_receipt.get("history_digest")
+                == _snapshot_history_digest(destination_snapshot)
+                and export_receipt.get("history_digest") == import_receipt.get("history_digest")
+                and history_commitment_bound
+            )
+            thresholds_preserved = (
+                source_snapshot.get("thresholds") == destination_snapshot.get("thresholds")
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("threshold_digest")
+                == _snapshot_threshold_digest(source_snapshot)
+                and import_receipt.get("threshold_digest")
+                == _snapshot_threshold_digest(destination_snapshot)
+                and export_receipt.get("threshold_digest")
+                == import_receipt.get("threshold_digest")
+            )
+            eligibility_preserved = (
+                source_snapshot.get("eligibility") == destination_snapshot.get("eligibility")
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("eligibility_digest")
+                == _snapshot_eligibility_digest(source_snapshot)
+                and import_receipt.get("eligibility_digest")
+                == _snapshot_eligibility_digest(destination_snapshot)
+                and export_receipt.get("eligibility_digest")
+                == import_receipt.get("eligibility_digest")
+            )
+        elif (
+            export_profile_id == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID
+            and isinstance(source_snapshot_redacted, Mapping)
+            and isinstance(destination_snapshot_redacted, Mapping)
+        ):
+            source_projection_digest = _trust_transfer_redacted_snapshot_digest(
+                source_snapshot_redacted
+            )
+            destination_projection_digest = _trust_transfer_redacted_snapshot_digest(
+                destination_snapshot_redacted
+            )
+            source_redacted_digest_bound = (
+                source_snapshot_redacted.get("projection_digest") == source_projection_digest
+            )
+            destination_redacted_digest_bound = (
+                destination_snapshot_redacted.get("projection_digest")
+                == destination_projection_digest
+            )
+            source_snapshot_digest_bound = (
+                source_redacted_digest_bound
+                and source_snapshot_redacted.get("projection_profile_id")
+                == TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID
+                and source_snapshot_redacted.get("agent_id") == receipt.get("agent_id")
+                and source_snapshot_redacted.get("redaction_policy_id")
+                == TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID
+                and source_snapshot_redacted.get("redacted_fields") == expected_redacted_fields
+                and source_snapshot_redacted.get("sealed_snapshot_ref")
+                == receipt.get("source_snapshot_ref")
+                and source_snapshot_redacted.get("sealed_snapshot_digest")
+                == receipt.get("source_snapshot_digest")
+            )
+            destination_snapshot_digest_bound = (
+                destination_redacted_digest_bound
+                and destination_snapshot_redacted.get("projection_profile_id")
+                == TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID
+                and destination_snapshot_redacted.get("agent_id") == receipt.get("agent_id")
+                and destination_snapshot_redacted.get("redaction_policy_id")
+                == TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID
+                and destination_snapshot_redacted.get("redacted_fields") == expected_redacted_fields
+                and destination_snapshot_redacted.get("sealed_snapshot_ref")
+                == receipt.get("destination_snapshot_ref")
+                and destination_snapshot_redacted.get("sealed_snapshot_digest")
+                == receipt.get("destination_snapshot_digest")
+            )
+            source_history_summary = source_snapshot_redacted.get("history_summary", {})
+            destination_history_summary = destination_snapshot_redacted.get(
+                "history_summary",
+                {},
+            )
+            history_commitment_digest = (
+                source_history_summary.get("history_commitment_digest")
+                if isinstance(source_history_summary, Mapping)
+                else None
+            )
+            history_commitment_bound = (
+                isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and isinstance(source_history_summary, Mapping)
+                and isinstance(destination_history_summary, Mapping)
+                and export_receipt.get("redaction_policy_id")
+                == TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID
+                and export_receipt.get("redacted_fields") == expected_redacted_fields
+                and history_commitment_digest
+                == destination_history_summary.get("history_commitment_digest")
+                == export_receipt.get("history_commitment_digest")
+                == import_receipt.get("history_commitment_digest")
+                and source_history_summary.get("event_count")
+                == destination_history_summary.get("event_count")
+                == export_receipt.get("history_event_count")
+                == import_receipt.get("history_event_count")
+                and source_history_summary.get("applied_event_count", 0)
+                + source_history_summary.get("blocked_event_count", 0)
+                == source_history_summary.get("event_count")
+                and destination_history_summary.get("applied_event_count", 0)
+                + destination_history_summary.get("blocked_event_count", 0)
+                == destination_history_summary.get("event_count")
+            )
+            export_profile_bound = (
+                "source_snapshot" not in receipt
+                and "destination_snapshot" not in receipt
+                and history_commitment_bound
+            )
+            history_preserved = (
+                isinstance(source_history_summary, Mapping)
+                and isinstance(destination_history_summary, Mapping)
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("history_digest") == import_receipt.get("history_digest")
+                and export_receipt.get("history_event_count")
+                == source_history_summary.get("event_count")
+                == destination_history_summary.get("event_count")
+                and history_commitment_bound
+            )
+            thresholds_preserved = (
+                source_snapshot_redacted.get("thresholds")
+                == destination_snapshot_redacted.get("thresholds")
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("threshold_digest") == import_receipt.get("threshold_digest")
+            )
+            eligibility_preserved = (
+                source_snapshot_redacted.get("eligibility")
+                == destination_snapshot_redacted.get("eligibility")
+                and isinstance(export_receipt, Mapping)
+                and isinstance(import_receipt, Mapping)
+                and export_receipt.get("eligibility_digest")
+                == import_receipt.get("eligibility_digest")
+            )
         federation_quorum_attested = False
         live_remote_verifier_attested = False
         remote_verifier_receipts_bound = False
@@ -1548,10 +1883,14 @@ class TrustService:
                         == TRUST_TRANSFER_DESTINATION_CURRENT_STATUS
                         and re_attestation_current
                     )
+        destination_seeded_agent_id = None
+        if isinstance(destination_snapshot, Mapping):
+            destination_seeded_agent_id = destination_snapshot.get("agent_id")
+        elif isinstance(destination_snapshot_redacted, Mapping):
+            destination_seeded_agent_id = destination_snapshot_redacted.get("agent_id")
         destination_seeded = isinstance(import_receipt, Mapping) and (
             import_receipt.get("destination_seeded") is True
-            and isinstance(destination_snapshot, Mapping)
-            and destination_snapshot.get("agent_id") == receipt.get("agent_id")
+            and destination_seeded_agent_id == receipt.get("agent_id")
         )
         receipt_digest_bound = receipt.get("receipt_digest") == sha256_text(
             canonical_json(_trust_transfer_digest_payload(receipt))
@@ -1559,6 +1898,8 @@ class TrustService:
         summary = {
             "source_snapshot_digest_bound": source_snapshot_digest_bound,
             "destination_snapshot_digest_bound": destination_snapshot_digest_bound,
+            "export_profile_bound": export_profile_bound,
+            "history_commitment_bound": history_commitment_bound,
             "history_preserved": history_preserved,
             "thresholds_preserved": thresholds_preserved,
             "provenance_policy_preserved": provenance_policy_preserved,
@@ -1855,6 +2196,93 @@ class TrustService:
             canonical_json(_trust_transfer_destination_lifecycle_digest_payload(lifecycle))
         )
         return lifecycle
+
+    def _build_redacted_snapshot_projection(
+        self,
+        *,
+        snapshot: Mapping[str, Any],
+        snapshot_ref: str,
+        snapshot_digest: str,
+    ) -> Dict[str, Any]:
+        history = snapshot.get("history", [])
+        history_entries = [entry for entry in history if isinstance(entry, Mapping)] if isinstance(history, list) else []
+        latest_recorded_at = None
+        if history_entries:
+            latest_recorded_at = max(
+                _parse_datetime(
+                    str(entry.get("recorded_at", "")),
+                    "history[].recorded_at",
+                )
+                for entry in history_entries
+            ).isoformat()
+        projection = {
+            "kind": "trust_redacted_snapshot",
+            "schema_version": TRUST_TRANSFER_REDACTED_SNAPSHOT_SCHEMA_VERSION,
+            "projection_id": new_id("trust-redacted-snapshot"),
+            "projection_ref": f"trust-redacted-snapshot://{sha256_text(snapshot_ref)[:12]}",
+            "projection_profile_id": TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID,
+            "sealed_snapshot_ref": snapshot_ref,
+            "sealed_snapshot_digest": snapshot_digest,
+            "agent_id": snapshot["agent_id"],
+            "global_score": snapshot["global_score"],
+            "per_domain": dict(snapshot["per_domain"]),
+            "pinned_by_human": snapshot["pinned_by_human"],
+            "thresholds": dict(snapshot["thresholds"]),
+            "eligibility": dict(snapshot["eligibility"]),
+            "history_summary": {
+                "event_count": len(history_entries),
+                "applied_event_count": sum(
+                    1 for entry in history_entries if entry.get("applied") is True
+                ),
+                "blocked_event_count": sum(
+                    1 for entry in history_entries if entry.get("applied") is not True
+                ),
+                "event_types": sorted(
+                    {
+                        str(entry.get("event_type", ""))
+                        for entry in history_entries
+                        if str(entry.get("event_type", "")).strip()
+                    }
+                ),
+                "domains": sorted(
+                    {
+                        str(entry.get("domain", ""))
+                        for entry in history_entries
+                        if str(entry.get("domain", "")).strip()
+                    }
+                ),
+                "provenance_statuses": sorted(
+                    {
+                        str(entry.get("provenance_status", ""))
+                        for entry in history_entries
+                        if str(entry.get("provenance_status", "")).strip()
+                    }
+                ),
+                "latest_recorded_at": latest_recorded_at,
+                "history_commitment_digest": _trust_transfer_history_commitment_digest(
+                    snapshot
+                ),
+            },
+            "redaction_policy_id": TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID,
+            "redacted_fields": list(TRUST_TRANSFER_REDACTED_FIELDS),
+            "projection_digest": "",
+        }
+        projection["projection_digest"] = sha256_text(
+            canonical_json(_trust_transfer_redacted_snapshot_digest_payload(projection))
+        )
+        return projection
+
+    def _normalize_export_profile(self, export_profile_id: str) -> str:
+        normalized_profile = self._normalize_non_empty(
+            export_profile_id,
+            "export_profile_id",
+        )
+        if normalized_profile not in TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES:
+            raise ValueError(
+                "export_profile_id must be one of "
+                + ", ".join(TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES)
+            )
+        return normalized_profile
 
     @staticmethod
     def _same_actor(agent_id: str, triggered_by: str, triggered_by_agent_id: str) -> bool:

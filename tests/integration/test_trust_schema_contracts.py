@@ -63,3 +63,21 @@ class TrustSchemaContractTests(unittest.TestCase):
             "specs/schemas/trust_transfer_receipt.schema",
             result["transfer"],
         )
+
+    def test_trust_transfer_demo_redacted_receipt_matches_public_schema(self) -> None:
+        result = self.runtime.run_trust_transfer_demo(
+            export_profile_id="bounded-trust-transfer-redacted-export-v1"
+        )
+
+        self._assert_schema_valid(
+            "specs/schemas/trust_transfer_receipt.schema",
+            result["transfer"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/trust_redacted_snapshot.schema",
+            result["transfer"]["source_snapshot_redacted"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/trust_redacted_snapshot.schema",
+            result["transfer"]["destination_snapshot_redacted"],
+        )

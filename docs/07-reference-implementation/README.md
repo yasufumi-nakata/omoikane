@@ -33,6 +33,7 @@ PYTHONPATH=src python3 -m omoikane.cli task-graph-demo --json
 PYTHONPATH=src python3 -m omoikane.cli consensus-bus-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-demo --json
 PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --json
+PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --export-profile bounded-trust-transfer-redacted-export-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --json
 PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --proposal-profile memory-edit-v1 --include-optional-coverage schema --json
@@ -293,6 +294,12 @@ self-issued positive event と reciprocal positive boost が fail-closed にな�
 source / destination `trust_snapshot` の digest binding、
 history / thresholds / provenance policy / eligibility preserve、
 `snapshot-clone-with-history` seed mode に加えて、
+`export_profile_id=snapshot-clone-with-history | bounded-trust-transfer-redacted-export-v1`
+により full snapshot export と redacted projection export を切り替えられ、
+redacted profile では `trust_redacted_snapshot` が
+sealed snapshot ref / digest、history commitment digest、thresholds、eligibility、
+`pinned_reason` と raw history payload を伏せた `redacted_fields`
+だけを public surface として返すこと、
 `guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
 human reviewer attestation に束縛した `remote_verifier_federation` と、
 `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew を

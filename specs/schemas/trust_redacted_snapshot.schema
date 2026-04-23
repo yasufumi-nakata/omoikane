@@ -1,0 +1,228 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_redacted_snapshot.schema"
+title: TrustRedactedSnapshot
+description: >
+  Public redacted trust snapshot projection that preserves score, thresholds,
+  eligibility, and history commitments without exposing raw event payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - projection_id
+  - projection_ref
+  - projection_profile_id
+  - sealed_snapshot_ref
+  - sealed_snapshot_digest
+  - agent_id
+  - global_score
+  - per_domain
+  - pinned_by_human
+  - thresholds
+  - eligibility
+  - history_summary
+  - redaction_policy_id
+  - redacted_fields
+  - projection_digest
+properties:
+  kind:
+    const: trust_redacted_snapshot
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  projection_id:
+    type: string
+    pattern: "^trust-redacted-snapshot-[a-f0-9]{12}$"
+  projection_ref:
+    type: string
+    minLength: 1
+  projection_profile_id:
+    const: bounded-trust-transfer-redacted-snapshot-v1
+  sealed_snapshot_ref:
+    type: string
+    minLength: 1
+  sealed_snapshot_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  agent_id:
+    type: string
+    minLength: 1
+  global_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  per_domain:
+    type: object
+    additionalProperties:
+      type: number
+      minimum: 0
+      maximum: 1
+  pinned_by_human:
+    type: boolean
+  thresholds:
+    type: object
+    additionalProperties: false
+    required:
+      - council_invite_floor
+      - weighted_vote_floor
+      - apply_floor
+      - self_modify_floor
+      - guardian_floor
+      - guardian_requires_human_pin
+    properties:
+      council_invite_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      weighted_vote_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      apply_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      self_modify_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      guardian_floor:
+        type: number
+        minimum: 0
+        maximum: 1
+      guardian_requires_human_pin:
+        type: boolean
+  eligibility:
+    type: object
+    additionalProperties: false
+    required:
+      - invite_to_council
+      - count_for_weighted_vote
+      - apply_to_runtime
+      - self_modify_role
+      - guardian_role
+    properties:
+      invite_to_council:
+        type: boolean
+      count_for_weighted_vote:
+        type: boolean
+      apply_to_runtime:
+        type: boolean
+      self_modify_role:
+        type: boolean
+      guardian_role:
+        type: boolean
+  history_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - event_count
+      - applied_event_count
+      - blocked_event_count
+      - event_types
+      - domains
+      - provenance_statuses
+      - latest_recorded_at
+      - history_commitment_digest
+    properties:
+      event_count:
+        type: integer
+        minimum: 0
+      applied_event_count:
+        type: integer
+        minimum: 0
+      blocked_event_count:
+        type: integer
+        minimum: 0
+      event_types:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      domains:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      provenance_statuses:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      latest_recorded_at:
+        anyOf:
+          - type: string
+            format: date-time
+          - type: "null"
+      history_commitment_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  redaction_policy_id:
+    const: bounded-trust-transfer-history-redaction-v1
+  redacted_fields:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  projection_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_redacted_snapshot
+    schema_version: 1.0.0
+    projection_id: trust-redacted-snapshot-0123456789ab
+    projection_ref: trust-redacted-snapshot://7d17acb8f92d
+    projection_profile_id: bounded-trust-transfer-redacted-snapshot-v1
+    sealed_snapshot_ref: trust-snapshot://source/design-architect
+    sealed_snapshot_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    agent_id: design-architect
+    global_score: 0.62
+    per_domain:
+      council_deliberation: 0.62
+      self_modify: 0.58
+    pinned_by_human: false
+    thresholds:
+      council_invite_floor: 0.5
+      weighted_vote_floor: 0.6
+      apply_floor: 0.8
+      self_modify_floor: 0.95
+      guardian_floor: 0.99
+      guardian_requires_human_pin: true
+    eligibility:
+      invite_to_council: true
+      count_for_weighted_vote: true
+      apply_to_runtime: false
+      self_modify_role: false
+      guardian_role: false
+    history_summary:
+      event_count: 3
+      applied_event_count: 2
+      blocked_event_count: 1
+      event_types:
+        - council_quality_positive
+        - guardian_audit_pass
+      domains:
+        - council_deliberation
+      provenance_statuses:
+        - accepted
+        - blocked-reciprocal-positive
+      latest_recorded_at: "2026-04-24T00:10:00Z"
+      history_commitment_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    redaction_policy_id: bounded-trust-transfer-history-redaction-v1
+    redacted_fields:
+      - pinned_reason
+      - history[].triggered_by
+      - history[].triggered_by_agent_id
+      - history[].rationale
+      - history[].evidence_confidence
+      - history[].raw_delta
+      - history[].applied_delta
+      - history[].global_before
+      - history[].global_after
+      - history[].domain_before
+      - history[].domain_after
+    projection_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"

@@ -126,6 +126,11 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
   を human reviewer attestation に再束縛した `remote_verifier_federation`
 - history / thresholds / provenance policy / eligibility の preserve
 - destination 側 seed mode を `snapshot-clone-with-history` に固定
+- `export_profile_id=snapshot-clone-with-history | bounded-trust-transfer-redacted-export-v1`
+  により full snapshot export と redacted public export を同一 receipt family で切り替える
+- redacted profile では `trust_redacted_snapshot` が sealed snapshot ref / digest、
+  history commitment digest、thresholds、eligibility、score surface を保持し、
+  `pinned_reason` と raw trust event payload は `redacted_fields` へ退避する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 - `bounded-trust-transfer-destination-lifecycle-v1` による
@@ -153,8 +158,9 @@ reference runtime では import 時の federation/cadence、renew 後の federat
 
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-demo --json`
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --json`
+- CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --export-profile bounded-trust-transfer-redacted-export-v1 --json`
 - Oversight: `PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json`
-- Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`, `specs/schemas/trust_transfer_receipt.schema`
+- Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`, `specs/schemas/trust_redacted_snapshot.schema`, `specs/schemas/trust_transfer_receipt.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する

@@ -28,7 +28,10 @@ from .agentic.distributed_transport_mtls_fixtures import (
     write_fixture_bundle,
 )
 from .agentic.task_graph import TaskGraphService
-from .agentic.trust import TrustService
+from .agentic.trust import (
+    TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
+    TrustService,
+)
 from .agentic.yaoyorozu import YaoyorozuRegistryService
 from .common import canonical_json, new_id, sha256_text, utc_now_iso
 from .cognitive import (
@@ -3673,7 +3676,11 @@ json.dump(response, sys.stdout)
             beta["credential_verification"]["network_receipt"],
         ]
 
-    def run_trust_transfer_demo(self) -> Dict[str, Any]:
+    def run_trust_transfer_demo(
+        self,
+        *,
+        export_profile_id: str = TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
+    ) -> Dict[str, Any]:
         source_service = self._seed_trust_demo_service()
         self._record_trust_demo_events(source_service)
         destination_service = TrustService()
@@ -3706,13 +3713,15 @@ json.dump(response, sys.stdout)
             remote_verifier_receipts=remote_verifier_receipts,
             council_session_ref="council://trust-transfer/session-001",
             rationale="cross-substrate trust carryover requires guardian and human attestation",
+            export_profile_id=export_profile_id,
         )
+        destination_snapshot = destination_service.snapshot("design-architect")
 
         return {
             "policy": source_service.policy_snapshot()["policy"],
             "thresholds": source_service.policy_snapshot()["thresholds"],
             "source_snapshot": source_snapshot,
-            "destination_snapshot": transfer["destination_snapshot"],
+            "destination_snapshot": destination_snapshot,
             "transfer": transfer,
             "validation": transfer["validation"],
         }
