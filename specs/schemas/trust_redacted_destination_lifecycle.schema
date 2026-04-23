@@ -1,0 +1,199 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_redacted_destination_lifecycle.schema"
+title: TrustRedactedDestinationLifecycle
+description: >
+  Public redacted summary for the destination-side trust transfer lifecycle
+  that preserves status transitions, timing, and digest bindings while sealing
+  entry refs, verifier receipt ids, and rationale text.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - lifecycle_id
+  - lifecycle_ref
+  - summary_profile_id
+  - lifecycle_policy_id
+  - current_status
+  - active_sequence
+  - active_entry_digest
+  - latest_federation_digest
+  - latest_cadence_digest
+  - revocation_fail_closed_action
+  - history_summaries
+  - history_summary_commitment_digest
+  - sealed_lifecycle_digest
+  - redaction_policy_id
+  - redacted_fields
+  - summary_digest
+properties:
+  kind:
+    const: trust_redacted_destination_lifecycle
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  lifecycle_id:
+    type: string
+    pattern: "^trust-destination-lifecycle-[a-f0-9]{12}$"
+  lifecycle_ref:
+    type: string
+    minLength: 1
+  summary_profile_id:
+    const: bounded-trust-transfer-redacted-destination-lifecycle-v1
+  lifecycle_policy_id:
+    const: bounded-trust-transfer-destination-lifecycle-v1
+  current_status:
+    type: string
+    enum:
+      - current
+      - revoked
+  active_sequence:
+    type: integer
+    minimum: 0
+  active_entry_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  latest_federation_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  latest_cadence_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  revocation_fail_closed_action:
+    const: disable-destination-trust-usage
+  history_summaries:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - event_type
+        - status
+        - recorded_at
+        - valid_until
+        - federation_digest
+        - cadence_digest
+        - covered_verifier_count
+        - covered_verifier_receipt_commitment_digest
+        - destination_snapshot_digest
+        - entry_digest
+      properties:
+        sequence:
+          type: integer
+          minimum: 0
+        event_type:
+          type: string
+          enum:
+            - imported
+            - renewed
+            - revocation-cleared
+            - revoked
+        status:
+          type: string
+          enum:
+            - current
+            - revoked
+        recorded_at:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+        federation_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        cadence_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        covered_verifier_count:
+          const: 2
+        covered_verifier_receipt_commitment_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        destination_snapshot_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        entry_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  history_summary_commitment_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  sealed_lifecycle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  redaction_policy_id:
+    const: bounded-trust-transfer-destination-lifecycle-summary-redaction-v1
+  redacted_fields:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  summary_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_redacted_destination_lifecycle
+    schema_version: 1.0.0
+    lifecycle_id: trust-destination-lifecycle-0123456789ab
+    lifecycle_ref: trust-destination-lifecycle://trust-verifier-federation-0123456789ab
+    summary_profile_id: bounded-trust-transfer-redacted-destination-lifecycle-v1
+    lifecycle_policy_id: bounded-trust-transfer-destination-lifecycle-v1
+    current_status: current
+    active_sequence: 2
+    active_entry_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    latest_federation_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    latest_cadence_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    revocation_fail_closed_action: disable-destination-trust-usage
+    history_summaries:
+      - sequence: 0
+        event_type: imported
+        status: current
+        recorded_at: "2026-04-24T00:00:00Z"
+        valid_until: "2026-04-24T00:15:00Z"
+        federation_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        cadence_digest: 2222222222222222222222222222222222222222222222222222222222222222
+        covered_verifier_count: 2
+        covered_verifier_receipt_commitment_digest: 3333333333333333333333333333333333333333333333333333333333333333
+        destination_snapshot_digest: 4444444444444444444444444444444444444444444444444444444444444444
+        entry_digest: 5555555555555555555555555555555555555555555555555555555555555555
+      - sequence: 1
+        event_type: renewed
+        status: current
+        recorded_at: "2026-04-24T00:10:00Z"
+        valid_until: "2026-04-24T00:25:00Z"
+        federation_digest: 6666666666666666666666666666666666666666666666666666666666666666
+        cadence_digest: 7777777777777777777777777777777777777777777777777777777777777777
+        covered_verifier_count: 2
+        covered_verifier_receipt_commitment_digest: 8888888888888888888888888888888888888888888888888888888888888888
+        destination_snapshot_digest: 4444444444444444444444444444444444444444444444444444444444444444
+        entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+      - sequence: 2
+        event_type: revocation-cleared
+        status: current
+        recorded_at: "2026-04-24T00:11:00Z"
+        valid_until: "2026-04-24T00:25:00Z"
+        federation_digest: 6666666666666666666666666666666666666666666666666666666666666666
+        cadence_digest: 7777777777777777777777777777777777777777777777777777777777777777
+        covered_verifier_count: 2
+        covered_verifier_receipt_commitment_digest: 8888888888888888888888888888888888888888888888888888888888888888
+        destination_snapshot_digest: 4444444444444444444444444444444444444444444444444444444444444444
+        entry_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+    history_summary_commitment_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+    sealed_lifecycle_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    redaction_policy_id: bounded-trust-transfer-destination-lifecycle-summary-redaction-v1
+    redacted_fields:
+      - destination_lifecycle.active_entry_ref
+      - destination_lifecycle.latest_federation_ref
+      - destination_lifecycle.latest_cadence_ref
+      - destination_lifecycle.history[].entry_id
+      - destination_lifecycle.history[].entry_ref
+      - destination_lifecycle.history[].attested_at
+      - destination_lifecycle.history[].federation_ref
+      - destination_lifecycle.history[].cadence_ref
+      - destination_lifecycle.history[].covered_verifier_receipt_ids
+      - destination_lifecycle.history[].rationale
+    summary_digest: 1212121212121212121212121212121212121212121212121212121212121212

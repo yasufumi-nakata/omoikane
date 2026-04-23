@@ -85,6 +85,10 @@ class TrustSchemaContractTests(unittest.TestCase):
             "specs/schemas/trust_redacted_verifier_federation.schema",
             result["transfer"]["federation_attestation"]["remote_verifier_federation"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/trust_redacted_destination_lifecycle.schema",
+            result["transfer"]["destination_lifecycle"],
+        )
         for summary in result["transfer"]["federation_attestation"][
             "remote_verifier_federation"
         ]["verifier_receipt_summaries"]:

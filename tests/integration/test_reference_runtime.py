@@ -1518,6 +1518,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(result["validation"]["re_attestation_current"])
         self.assertTrue(result["validation"]["destination_lifecycle_bound"])
+        self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_renewal_history_bound"])
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
         self.assertTrue(result["validation"]["destination_current"])
@@ -1553,11 +1554,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["export_profile_bound"])
         self.assertTrue(result["validation"]["history_commitment_bound"])
         self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
+        self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
         self.assertIn("source_snapshot_redacted", result["transfer"])
         self.assertIn("destination_snapshot_redacted", result["transfer"])
+        self.assertEqual(
+            "trust_redacted_destination_lifecycle",
+            result["transfer"]["destination_lifecycle"]["kind"],
+        )
+        self.assertNotIn("history", result["transfer"]["destination_lifecycle"])
+        self.assertEqual(
+            3,
+            len(result["transfer"]["destination_lifecycle"]["history_summaries"]),
+        )
         self.assertNotIn(
             "verifier_receipts",
             result["transfer"]["federation_attestation"]["remote_verifier_federation"],

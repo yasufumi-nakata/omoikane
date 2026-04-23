@@ -304,11 +304,16 @@ sealed snapshot ref / digest、history commitment digest、thresholds、eligibil
 `trust_redacted_verifier_receipt_summary` を 2 本束ね、
 freshness timing / transport digest / sealed receipt digest を保ちつつ
 challenge / payload exchange detail を `redacted_fields` へ退避すること、
+さらに `trust_redacted_destination_lifecycle` が
+`imported -> renewed -> revocation-cleared` の current path を
+sequence / status / timing / federation digest / cadence digest /
+covered verifier receipt commitment digest へ縮約し、
+entry ref / verifier receipt ids / rationale を `redacted_fields` へ退避すること、
 `guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
 human reviewer attestation に束縛した `remote_verifier_federation` と、
 `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew を
 固定した `re_attestation_cadence`、
-さらに destination 側の `imported -> renewed -> revocation-cleared`
+さらに full profile では destination 側の `imported -> renewed -> revocation-cleared`
 append-only lifecycle と fail-closed revocation action を
 1 receipt で確認する。
 

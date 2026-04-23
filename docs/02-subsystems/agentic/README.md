@@ -26,7 +26,8 @@
   append-only destination lifecycle (`imported -> renewed -> revocation-cleared`) に加えて
   full-clone / redacted の public export profile 分岐と
   `trust_redacted_snapshot` projection と
-  `trust_redacted_verifier_federation` summary まで内包して machine-checkable にし、
+  `trust_redacted_verifier_federation` summary、
+  `trust_redacted_destination_lifecycle` summary まで内包して machine-checkable にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
   `fork-request-v1` では `runtime/schema/docs` required + `eval` optional、

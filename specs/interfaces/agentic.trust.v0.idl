@@ -163,6 +163,7 @@ operations:
       - full-clone export emits source_snapshot and destination_snapshot that both validate against trust_snapshot
       - redacted export emits source_snapshot_redacted and destination_snapshot_redacted that bind sealed snapshot refs, sealed snapshot digests, and history commitments without exposing raw event payloads
       - redacted export replaces full remote verifier receipts with redacted verifier federation summaries that keep freshness timing and digest commitments while sealing challenge and payload exchange details
+      - redacted export replaces the full destination lifecycle ledger with a redacted summary that keeps status transitions, timing, and digest commitments while sealing entry refs, verifier receipt ids, and rationale text
       - source_snapshot_digest and destination_snapshot_digest must bind the exported and imported snapshot payload family selected by export_profile_id
       - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
       - two live remote verifier receipts must bind the human reviewer attestation with distinct verifier refs before import completes
@@ -200,6 +201,7 @@ operations:
           - re_attestation_cadence_bound
           - re_attestation_current
           - destination_lifecycle_bound
+          - destination_lifecycle_disclosure_bound
           - destination_renewal_history_bound
           - destination_revocation_history_bound
           - destination_current
@@ -238,6 +240,8 @@ operations:
             type: boolean
           destination_lifecycle_bound:
             type: boolean
+          destination_lifecycle_disclosure_bound:
+            type: boolean
           destination_renewal_history_bound:
             type: boolean
           destination_revocation_history_bound:
@@ -260,4 +264,4 @@ compatibility:
     - Guardian role requires global_score >= 0.99 and explicit human pin.
     - Self-modify eligibility requires both global_score and self_modify domain score to exceed 0.95.
     - Trust provenance is fixed to Council / Guardian / Human origins and blocks self-issued or reciprocal positive boosts.
-    - Cross-substrate transfer is materialized as one receipt family with a full-clone export profile and a redacted export profile, while destination seeding stays snapshot-clone-with-history internally and redacted export seals verifier receipts behind summary commitments.
+    - Cross-substrate transfer is materialized as one receipt family with a full-clone export profile and a redacted export profile, while destination seeding stays snapshot-clone-with-history internally and redacted export seals verifier receipts and destination lifecycle ledgers behind summary commitments.

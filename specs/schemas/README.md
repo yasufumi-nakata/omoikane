@@ -126,6 +126,7 @@
 - `termination_outcome.schema`
 - `termination_request.schema`
 - `trust_event.schema`
+- `trust_redacted_destination_lifecycle.schema`
 - `trust_redacted_snapshot.schema`
 - `trust_redacted_verifier_federation.schema`
 - `trust_redacted_verifier_receipt_summary.schema`

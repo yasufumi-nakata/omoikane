@@ -135,6 +135,11 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
   `trust_redacted_verifier_receipt_summary` を 2 本束ね、
   verifier freshness timing / transport digest / sealed receipt digest だけを公開し、
   challenge / payload exchange detail は `redacted_fields` へ退避する
+- 同じ redacted profile では `trust_redacted_destination_lifecycle` が
+  destination 側の `imported -> renewed -> revocation-cleared` current path を
+  sequence / status / timing / federation digest / cadence digest /
+  covered verifier receipt commitment digest へ縮約し、
+  entry ref / verifier receipt ids / rationale は `redacted_fields` へ退避する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 - `bounded-trust-transfer-destination-lifecycle-v1` による
@@ -160,12 +165,21 @@ federation 全体では `verifier_receipt_commitment_digest` と
 reference runtime では `renew_after + grace_window <= valid_until` を
 満たす時だけ `re_attestation_current=true` と評価する。
 
-`destination_lifecycle` は top-level snapshot を変えずに
+full-clone profile の `destination_lifecycle` は top-level snapshot を変えずに
 destination 側の post-import state を append-only ledger として保持する。
 reference runtime では import 時の federation/cadence、renew 後の federation/cadence、
 そして destination usage を解放する前の `revocation-cleared` check を
 同じ ledger に束ね、`current | revoked` の fail-closed state を
 `destination_current` で machine-checkable にする。
+
+redacted profile の `destination_lifecycle` は
+`trust_redacted_destination_lifecycle` summary に切り替わり、
+history entry ごとの `sequence` / `event_type` / `status` / `recorded_at` /
+`valid_until` / federation digest / cadence digest /
+covered verifier receipt commitment digest / destination snapshot digest
+だけを公開する。append-only ledger 本体は `sealed_lifecycle_digest` に封じ、
+validator は `destination_lifecycle_disclosure_bound` により
+selected export profile と disclosure floor の一致を継続検証する。
 
 ## Reference runtime surface
 
@@ -174,9 +188,10 @@ reference runtime では import 時の federation/cadence、renew 後の federat
 - CLI: `PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --export-profile bounded-trust-transfer-redacted-export-v1 --json`
 - Oversight: `PYTHONPATH=src python3 -m omoikane.cli oversight-demo --json`
 - Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`, `specs/schemas/trust_redacted_snapshot.schema`, `specs/schemas/trust_transfer_receipt.schema`
+- Schema: `specs/schemas/trust_redacted_destination_lifecycle.schema`
 - Schema: `specs/schemas/trust_redacted_verifier_receipt_summary.schema`, `specs/schemas/trust_redacted_verifier_federation.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
   - trust transfer では guardian/human quorum、remote verifier federation、re-attestation cadence、
-    destination lifecycle、digest binding、snapshot preserve、verifier disclosure floor を継続検証する
+    destination lifecycle、digest binding、snapshot preserve、verifier / lifecycle disclosure floor を継続検証する
