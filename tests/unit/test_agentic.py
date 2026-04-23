@@ -2402,6 +2402,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["destination_renewal_history_bound"])
         self.assertTrue(receipt["validation"]["destination_revocation_history_bound"])
         self.assertTrue(receipt["validation"]["destination_recovery_history_bound"])
+        self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
         self.assertTrue(receipt["validation"]["destination_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
         self.assertEqual("current", receipt["destination_lifecycle"]["current_status"])
@@ -2415,6 +2416,26 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(
             "revoked",
             receipt["destination_lifecycle"]["history"][2]["status"],
+        )
+        self.assertEqual(
+            "bounded-trust-transfer-multi-root-recovery-v1",
+            receipt["federation_attestation"]["remote_verifier_federation"]["quorum_policy_id"],
+        )
+        self.assertEqual(
+            3,
+            receipt["federation_attestation"]["remote_verifier_federation"]["received_verifier_count"],
+        )
+        self.assertEqual(
+            2,
+            receipt["federation_attestation"]["remote_verifier_federation"]["trust_root_quorum"],
+        )
+        self.assertEqual(
+            2,
+            receipt["federation_attestation"]["remote_verifier_federation"]["jurisdiction_quorum"],
+        )
+        self.assertEqual(
+            3,
+            len(receipt["destination_lifecycle"]["history"][-1]["covered_verifier_receipt_ids"]),
         )
         self.assertEqual(
             receipt["source_snapshot_digest"],
@@ -2453,6 +2474,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["export_profile_bound"])
         self.assertTrue(receipt["validation"]["history_commitment_bound"])
         self.assertTrue(receipt["validation"]["remote_verifier_disclosure_bound"])
+        self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
         self.assertNotIn("source_snapshot", receipt)
         self.assertNotIn("destination_snapshot", receipt)
         self.assertIn("source_snapshot_redacted", receipt)
@@ -2466,7 +2488,7 @@ class TrustServiceTests(unittest.TestCase):
             receipt["federation_attestation"]["remote_verifier_federation"],
         )
         self.assertEqual(
-            2,
+            3,
             len(
                 receipt["federation_attestation"]["remote_verifier_federation"][
                     "verifier_receipt_summaries"
@@ -2495,6 +2517,18 @@ class TrustServiceTests(unittest.TestCase):
         self.assertGreater(
             len(receipt["source_snapshot_redacted"]["redacted_fields"]),
             0,
+        )
+        self.assertEqual(
+            3,
+            receipt["destination_lifecycle"]["history_summaries"][-1]["covered_verifier_count"],
+        )
+        self.assertEqual(
+            2,
+            receipt["destination_lifecycle"]["history_summaries"][-1]["trust_root_quorum"],
+        )
+        self.assertEqual(
+            2,
+            receipt["destination_lifecycle"]["history_summaries"][-1]["jurisdiction_quorum"],
         )
         self.assertTrue(destination.has_agent("design-architect"))
 
@@ -2642,6 +2676,35 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["remote_verifier_disclosure_bound"])
         self.assertIn(
             "federation_attestation.remote_verifier_federation.verifier_receipt_commitment_digest mismatch",
+            validation["errors"],
+        )
+
+    def test_validate_transfer_receipt_rejects_recovery_quorum_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["destination_lifecycle"]["history"][-1]["jurisdiction_quorum"] = 1
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["destination_recovery_history_bound"])
+        self.assertFalse(validation["recovery_quorum_bound"])
+        self.assertIn(
+            "destination_lifecycle.lifecycle_digest mismatch",
             validation["errors"],
         )
 

@@ -1522,6 +1522,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_renewal_history_bound"])
         self.assertTrue(result["validation"]["destination_revocation_history_bound"])
         self.assertTrue(result["validation"]["destination_recovery_history_bound"])
+        self.assertTrue(result["validation"]["recovery_quorum_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
@@ -1535,9 +1536,27 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            2,
+            3,
             result["transfer"]["federation_attestation"]["remote_verifier_federation"][
                 "received_verifier_count"
+            ],
+        )
+        self.assertEqual(
+            "bounded-trust-transfer-multi-root-recovery-v1",
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"][
+                "quorum_policy_id"
+            ],
+        )
+        self.assertEqual(
+            2,
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"][
+                "trust_root_quorum"
+            ],
+        )
+        self.assertEqual(
+            2,
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"][
+                "jurisdiction_quorum"
             ],
         )
 
@@ -1556,6 +1575,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["history_commitment_bound"])
         self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
+        self.assertTrue(result["validation"]["recovery_quorum_bound"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
@@ -1582,12 +1602,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["transfer"]["federation_attestation"]["remote_verifier_federation"],
         )
         self.assertEqual(
-            2,
+            3,
             len(
                 result["transfer"]["federation_attestation"][
                     "remote_verifier_federation"
                 ]["verifier_receipt_summaries"]
             ),
+        )
+        self.assertEqual(
+            3,
+            result["transfer"]["destination_lifecycle"]["history_summaries"][-1][
+                "covered_verifier_count"
+            ],
         )
         self.assertEqual(
             "bounded-trust-transfer-history-redaction-v1",

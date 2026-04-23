@@ -244,12 +244,16 @@ properties:
               - federation_ref
               - federation_policy_id
               - network_profile_id
+              - quorum_policy_id
               - human_reviewer_ref
               - required_verifier_count
               - received_verifier_count
               - verifier_receipts
               - verifier_refs
               - trust_root_refs
+              - jurisdictions
+              - trust_root_quorum
+              - jurisdiction_quorum
               - authority_chain_refs
               - reviewer_binding_digest
               - federation_status
@@ -265,24 +269,28 @@ properties:
                 const: bounded-live-trust-transfer-verifier-federation-v1
               network_profile_id:
                 const: guardian-reviewer-remote-attestation-v1
+              quorum_policy_id:
+                type: string
+                enum:
+                  - bounded-trust-transfer-fixed-verifier-pair-v1
+                  - bounded-trust-transfer-multi-root-recovery-v1
               human_reviewer_ref:
                 type: string
                 minLength: 1
               required_verifier_count:
-                const: 2
+                type: integer
+                minimum: 2
               received_verifier_count:
                 type: integer
                 minimum: 0
               verifier_receipts:
                 type: array
                 minItems: 2
-                maxItems: 2
                 items:
                   $ref: "./guardian_verifier_network_receipt.schema"
               verifier_refs:
                 type: array
                 minItems: 2
-                maxItems: 2
                 uniqueItems: true
                 items:
                   type: string
@@ -294,6 +302,19 @@ properties:
                 items:
                   type: string
                   minLength: 1
+              jurisdictions:
+                type: array
+                minItems: 1
+                uniqueItems: true
+                items:
+                  type: string
+                  minLength: 1
+              trust_root_quorum:
+                type: integer
+                minimum: 1
+              jurisdiction_quorum:
+                type: integer
+                minimum: 1
               authority_chain_refs:
                 type: array
                 minItems: 1
@@ -349,7 +370,6 @@ properties:
           covered_verifier_receipt_ids:
             type: array
             minItems: 2
-            maxItems: 2
             uniqueItems: true
             items:
               type: string
@@ -477,11 +497,16 @@ properties:
                 - recorded_at
                 - attested_at
                 - valid_until
+                - quorum_policy_id
                 - federation_ref
                 - federation_digest
                 - cadence_ref
                 - cadence_digest
+                - trust_root_quorum
+                - jurisdiction_quorum
                 - covered_verifier_receipt_ids
+                - covered_trust_root_refs
+                - covered_jurisdictions
                 - destination_snapshot_digest
                 - rationale
               properties:
@@ -515,6 +540,11 @@ properties:
                 valid_until:
                   type: string
                   format: date-time
+                quorum_policy_id:
+                  type: string
+                  enum:
+                    - bounded-trust-transfer-fixed-verifier-pair-v1
+                    - bounded-trust-transfer-multi-root-recovery-v1
                 federation_ref:
                   type: string
                   minLength: 1
@@ -527,10 +557,29 @@ properties:
                 cadence_digest:
                   type: string
                   pattern: "^[a-f0-9]{64}$"
+                trust_root_quorum:
+                  type: integer
+                  minimum: 1
+                jurisdiction_quorum:
+                  type: integer
+                  minimum: 1
                 covered_verifier_receipt_ids:
                   type: array
                   minItems: 2
-                  maxItems: 2
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                covered_trust_root_refs:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                covered_jurisdictions:
+                  type: array
+                  minItems: 1
                   uniqueItems: true
                   items:
                     type: string
@@ -568,6 +617,7 @@ properties:
       - destination_renewal_history_bound
       - destination_revocation_history_bound
       - destination_recovery_history_bound
+      - recovery_quorum_bound
       - destination_current
       - destination_seeded
       - receipt_digest_bound
@@ -610,6 +660,8 @@ properties:
       destination_revocation_history_bound:
         type: boolean
       destination_recovery_history_bound:
+        type: boolean
+      recovery_quorum_bound:
         type: boolean
       destination_current:
         type: boolean

@@ -301,21 +301,25 @@ sealed snapshot ref / digest、history commitment digest、thresholds、eligibil
 `pinned_reason` と raw history payload を伏せた `redacted_fields`
 だけを public surface として返すこと、
 同じ redacted profile では `trust_redacted_verifier_federation` が
-`trust_redacted_verifier_receipt_summary` を 2 本束ね、
-freshness timing / transport digest / sealed receipt digest を保ちつつ
+`trust_redacted_verifier_receipt_summary` を束ね、
+`quorum_policy_id` / `trust_root_quorum` / `jurisdiction_quorum` / `jurisdictions`
+を保ちつつ freshness timing / transport digest / sealed receipt digest を公開し、
 challenge / payload exchange detail を `redacted_fields` へ退避すること、
 さらに `trust_redacted_destination_lifecycle` が
 `imported -> renewed -> revoked -> recovered` の bounded recovery branch を
-sequence / status / timing / federation digest / cadence digest /
-covered verifier receipt commitment digest へ縮約し、
+sequence / status / timing / `quorum_policy_id` / federation digest / cadence digest /
+`trust_root_quorum` / `jurisdiction_quorum` / covered verifier receipt commitment digest へ縮約し、
 entry ref / verifier receipt ids / rationale を `redacted_fields` へ退避すること、
-`guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
-human reviewer attestation に束縛した `remote_verifier_federation` と、
+baseline では `guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
+human reviewer attestation に束縛しつつ、
+recovered branch では `required_verifier_count=3` /
+`trust_root_quorum=2` / `jurisdiction_quorum=2` の multi-root / cross-jurisdiction
+quorum へ昇格した `remote_verifier_federation` と、
 `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew を
 固定した `re_attestation_cadence`、
 さらに full profile では destination 側の `imported -> renewed -> revoked -> recovered`
-append-only lifecycle と fail-closed revocation action を
-1 receipt で確認する。
+append-only lifecycle、fail-closed revocation action、`recovery_quorum_bound=true`
+を 1 receipt で確認する。
 
 `yaoyorozu-demo` は L4 YaoyorozuRegistry / council convocation の reference contract
 (`agentic.yaoyorozu.v0`) を JSON で可視化し、

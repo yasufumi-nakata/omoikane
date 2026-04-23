@@ -73,9 +73,14 @@ properties:
         - status
         - recorded_at
         - valid_until
+        - quorum_policy_id
         - federation_digest
         - cadence_digest
+        - trust_root_quorum
+        - jurisdiction_quorum
         - covered_verifier_count
+        - covered_trust_root_count
+        - covered_jurisdiction_count
         - covered_verifier_receipt_commitment_digest
         - destination_snapshot_digest
         - entry_digest
@@ -101,14 +106,32 @@ properties:
         valid_until:
           type: string
           format: date-time
+        quorum_policy_id:
+          type: string
+          enum:
+            - bounded-trust-transfer-fixed-verifier-pair-v1
+            - bounded-trust-transfer-multi-root-recovery-v1
         federation_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
         cadence_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        trust_root_quorum:
+          type: integer
+          minimum: 1
+        jurisdiction_quorum:
+          type: integer
+          minimum: 1
         covered_verifier_count:
-          const: 2
+          type: integer
+          minimum: 2
+        covered_trust_root_count:
+          type: integer
+          minimum: 1
+        covered_jurisdiction_count:
+          type: integer
+          minimum: 1
         covered_verifier_receipt_commitment_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"

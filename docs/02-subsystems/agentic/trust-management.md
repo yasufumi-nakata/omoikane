@@ -122,8 +122,10 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 
 - `source-guardian` / `destination-guardian` / `human-reviewer` の fixed 3 者 quorum
 - source / destination snapshot digest と route digest の束縛
-- `guardian-reviewer-remote-attestation-v1` による 2 本の live remote verifier receipt
-  を human reviewer attestation に再束縛した `remote_verifier_federation`
+- `guardian-reviewer-remote-attestation-v1` による baseline 2 receipt と、
+  `recovered` branch で `trust_root_quorum=2` / `jurisdiction_quorum=2` を満たす
+  3 receipt の multi-root / cross-jurisdiction recovery quorum を持つ
+  `remote_verifier_federation`
 - history / thresholds / provenance policy / eligibility の preserve
 - destination 側 seed mode を `snapshot-clone-with-history` に固定
 - `export_profile_id=snapshot-clone-with-history | bounded-trust-transfer-redacted-export-v1`
@@ -132,13 +134,15 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
   history commitment digest、thresholds、eligibility、score surface を保持し、
   `pinned_reason` と raw trust event payload は `redacted_fields` へ退避する
 - 同じ redacted profile では `trust_redacted_verifier_federation` が
-  `trust_redacted_verifier_receipt_summary` を 2 本束ね、
+  `trust_redacted_verifier_receipt_summary` を束ねつつ、
+  `quorum_policy_id` / `trust_root_quorum` / `jurisdiction_quorum` /
+  `jurisdictions` を公開し、
   verifier freshness timing / transport digest / sealed receipt digest だけを公開し、
   challenge / payload exchange detail は `redacted_fields` へ退避する
 - 同じ redacted profile では `trust_redacted_destination_lifecycle` が
   destination 側の `imported -> renewed -> revoked -> recovered` branch を
-  sequence / status / timing / federation digest / cadence digest /
-  covered verifier receipt commitment digest へ縮約し、
+  sequence / status / timing / `quorum_policy_id` / federation digest / cadence digest /
+  `trust_root_quorum` / `jurisdiction_quorum` / covered verifier receipt commitment digest へ縮約し、
   entry ref / verifier receipt ids / rationale は `redacted_fields` へ退避する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
@@ -148,8 +152,12 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 
 full-clone profile の `remote_verifier_federation` は
 `verifier_ref`、`verifier_endpoint`、`authority_chain_ref`、`trust_root_ref`、
-`transport_exchange` digest を含む 2 receipt を保持し、
+`jurisdiction`、`transport_exchange` digest を含む receipt 群を保持し、
 `reviewer_binding_digest` で human reviewer と transfer route に束縛する。
+final `recovered` federation は
+`quorum_policy_id=bounded-trust-transfer-multi-root-recovery-v1`、
+`required_verifier_count=3`、`trust_root_quorum=2`、`jurisdiction_quorum=2` を満たし、
+`JP-13` / `US-CA` / `EU-DE` の distinct verifier を 1 federation へ束ねる。
 
 redacted profile の `remote_verifier_federation` は
 `trust_redacted_verifier_federation` summary に切り替わり、
@@ -175,10 +183,10 @@ revocation 発火で一度 trust usage を fail-closed に落とした `revoked`
 redacted profile の `destination_lifecycle` は
 `trust_redacted_destination_lifecycle` summary に切り替わり、
 history entry ごとの `sequence` / `event_type` / `status` / `recorded_at` /
-`valid_until` / federation digest / cadence digest /
-covered verifier receipt commitment digest / destination snapshot digest
+`valid_until` / `quorum_policy_id` / federation digest / cadence digest /
+`trust_root_quorum` / `jurisdiction_quorum` / covered verifier receipt commitment digest / destination snapshot digest
 だけを公開する。append-only ledger 本体は `sealed_lifecycle_digest` に封じ、
-validator は `destination_lifecycle_disclosure_bound` により
+validator は `destination_lifecycle_disclosure_bound` と `recovery_quorum_bound` により
 selected export profile と disclosure floor の一致を継続検証する。
 
 ## Reference runtime surface
@@ -194,4 +202,5 @@ selected export profile と disclosure floor の一致を継続検証する。
 - Eval: `evals/agentic/trust_score_update_guard.yaml`, `evals/agentic/trust_cross_substrate_transfer.yaml`
   - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する
   - trust transfer では guardian/human quorum、remote verifier federation、re-attestation cadence、
-    destination lifecycle、digest binding、snapshot preserve、verifier / lifecycle disclosure floor を継続検証する
+    destination lifecycle、multi-root recovery quorum、digest binding、snapshot preserve、
+    verifier / lifecycle disclosure floor を継続検証する

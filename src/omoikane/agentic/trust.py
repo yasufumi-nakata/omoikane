@@ -43,7 +43,18 @@ TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID = (
     "bounded-live-trust-transfer-verifier-federation-v1"
 )
 TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID = "guardian-reviewer-remote-attestation-v1"
+TRUST_TRANSFER_BASELINE_REMOTE_VERIFIER_QUORUM_POLICY_ID = (
+    "bounded-trust-transfer-fixed-verifier-pair-v1"
+)
+TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID = (
+    "bounded-trust-transfer-multi-root-recovery-v1"
+)
 TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT = 2
+TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_COUNT = 3
+TRUST_TRANSFER_BASELINE_TRUST_ROOT_QUORUM = 1
+TRUST_TRANSFER_BASELINE_JURISDICTION_QUORUM = 1
+TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM = 2
+TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM = 2
 TRUST_TRANSFER_REATTESTATION_CADENCE_POLICY_ID = (
     "bounded-trust-transfer-re-attestation-cadence-v1"
 )
@@ -111,6 +122,102 @@ TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES = (
     TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
     TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
 )
+
+
+def _trust_transfer_quorum_policy_spec(
+    quorum_policy_id: str,
+) -> Optional[Dict[str, int | str]]:
+    if quorum_policy_id == TRUST_TRANSFER_BASELINE_REMOTE_VERIFIER_QUORUM_POLICY_ID:
+        return {
+            "quorum_policy_id": quorum_policy_id,
+            "required_verifier_count": TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT,
+            "trust_root_quorum": TRUST_TRANSFER_BASELINE_TRUST_ROOT_QUORUM,
+            "jurisdiction_quorum": TRUST_TRANSFER_BASELINE_JURISDICTION_QUORUM,
+        }
+    if quorum_policy_id == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID:
+        return {
+            "quorum_policy_id": quorum_policy_id,
+            "required_verifier_count": TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_COUNT,
+            "trust_root_quorum": TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM,
+            "jurisdiction_quorum": TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM,
+        }
+    return None
+
+
+def _trust_transfer_verifier_quorum_fields(
+    *,
+    quorum_policy_id: str,
+    verifier_receipts: List[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    spec = _trust_transfer_quorum_policy_spec(quorum_policy_id)
+    if spec is None:
+        raise ValueError(f"unsupported verifier quorum policy: {quorum_policy_id}")
+    verifier_refs = [
+        str(verifier_receipt["verifier_ref"]) for verifier_receipt in verifier_receipts
+    ]
+    trust_root_refs = sorted(
+        {str(verifier_receipt["trust_root_ref"]) for verifier_receipt in verifier_receipts}
+    )
+    jurisdictions = sorted(
+        {str(verifier_receipt["jurisdiction"]) for verifier_receipt in verifier_receipts}
+    )
+    if len(verifier_receipts) != int(spec["required_verifier_count"]):
+        raise ValueError(
+            "verifier receipt count must match the selected quorum policy"
+        )
+    if len(set(verifier_refs)) != len(verifier_refs):
+        raise ValueError("verifier quorum requires distinct verifier_ref values")
+    if len(trust_root_refs) < int(spec["trust_root_quorum"]):
+        raise ValueError("verifier quorum must satisfy trust_root_quorum")
+    if len(jurisdictions) < int(spec["jurisdiction_quorum"]):
+        raise ValueError("verifier quorum must satisfy jurisdiction_quorum")
+    return {
+        "quorum_policy_id": quorum_policy_id,
+        "required_verifier_count": int(spec["required_verifier_count"]),
+        "received_verifier_count": len(verifier_receipts),
+        "verifier_refs": verifier_refs,
+        "trust_root_refs": trust_root_refs,
+        "jurisdictions": jurisdictions,
+        "trust_root_quorum": int(spec["trust_root_quorum"]),
+        "jurisdiction_quorum": int(spec["jurisdiction_quorum"]),
+    }
+
+
+def _trust_transfer_lifecycle_entry_quorum_bound(entry: Mapping[str, Any]) -> bool:
+    spec = _trust_transfer_quorum_policy_spec(str(entry.get("quorum_policy_id", "")))
+    if spec is None:
+        return False
+    covered_verifier_receipt_ids = entry.get("covered_verifier_receipt_ids")
+    covered_trust_root_refs = entry.get("covered_trust_root_refs")
+    covered_jurisdictions = entry.get("covered_jurisdictions")
+    return (
+        isinstance(covered_verifier_receipt_ids, list)
+        and len(covered_verifier_receipt_ids) == int(spec["required_verifier_count"])
+        and len(set(str(receipt_id) for receipt_id in covered_verifier_receipt_ids))
+        == int(spec["required_verifier_count"])
+        and entry.get("trust_root_quorum") == int(spec["trust_root_quorum"])
+        and isinstance(covered_trust_root_refs, list)
+        and len(sorted({str(root_ref) for root_ref in covered_trust_root_refs}))
+        >= int(spec["trust_root_quorum"])
+        and entry.get("jurisdiction_quorum") == int(spec["jurisdiction_quorum"])
+        and isinstance(covered_jurisdictions, list)
+        and len(sorted({str(jurisdiction) for jurisdiction in covered_jurisdictions}))
+        >= int(spec["jurisdiction_quorum"])
+    )
+
+
+def _trust_transfer_redacted_lifecycle_entry_quorum_bound(summary: Mapping[str, Any]) -> bool:
+    spec = _trust_transfer_quorum_policy_spec(str(summary.get("quorum_policy_id", "")))
+    if spec is None:
+        return False
+    return (
+        summary.get("covered_verifier_count") == int(spec["required_verifier_count"])
+        and summary.get("trust_root_quorum") == int(spec["trust_root_quorum"])
+        and summary.get("covered_trust_root_count", 0) >= int(spec["trust_root_quorum"])
+        and summary.get("jurisdiction_quorum") == int(spec["jurisdiction_quorum"])
+        and summary.get("covered_jurisdiction_count", 0)
+        >= int(spec["jurisdiction_quorum"])
+    )
 
 
 def _clamp_score(value: float) -> float:
@@ -205,12 +312,16 @@ def _trust_transfer_remote_verifier_federation_digest_payload(
         "federation_ref": federation["federation_ref"],
         "federation_policy_id": federation["federation_policy_id"],
         "network_profile_id": federation["network_profile_id"],
+        "quorum_policy_id": federation["quorum_policy_id"],
         "human_reviewer_ref": federation["human_reviewer_ref"],
         "required_verifier_count": federation["required_verifier_count"],
         "received_verifier_count": federation["received_verifier_count"],
         "verifier_receipts": federation["verifier_receipts"],
         "verifier_refs": federation["verifier_refs"],
         "trust_root_refs": federation["trust_root_refs"],
+        "jurisdictions": federation["jurisdictions"],
+        "trust_root_quorum": federation["trust_root_quorum"],
+        "jurisdiction_quorum": federation["jurisdiction_quorum"],
         "authority_chain_refs": federation["authority_chain_refs"],
         "reviewer_binding_digest": federation["reviewer_binding_digest"],
         "federation_status": federation["federation_status"],
@@ -370,12 +481,16 @@ def _trust_transfer_redacted_verifier_federation_digest_payload(
         "summary_profile_id": federation["summary_profile_id"],
         "federation_policy_id": federation["federation_policy_id"],
         "network_profile_id": federation["network_profile_id"],
+        "quorum_policy_id": federation["quorum_policy_id"],
         "human_reviewer_ref": federation["human_reviewer_ref"],
         "required_verifier_count": federation["required_verifier_count"],
         "received_verifier_count": federation["received_verifier_count"],
         "verifier_receipt_summaries": federation["verifier_receipt_summaries"],
         "verifier_refs": federation["verifier_refs"],
         "trust_root_refs": federation["trust_root_refs"],
+        "jurisdictions": federation["jurisdictions"],
+        "trust_root_quorum": federation["trust_root_quorum"],
+        "jurisdiction_quorum": federation["jurisdiction_quorum"],
         "authority_chain_refs": federation["authority_chain_refs"],
         "reviewer_binding_digest": federation["reviewer_binding_digest"],
         "verifier_receipt_commitment_digest": federation[
@@ -403,9 +518,14 @@ def _trust_transfer_redacted_destination_lifecycle_entry_summary_digest_payload(
         "status": summary["status"],
         "recorded_at": summary["recorded_at"],
         "valid_until": summary["valid_until"],
+        "quorum_policy_id": summary["quorum_policy_id"],
         "federation_digest": summary["federation_digest"],
         "cadence_digest": summary["cadence_digest"],
+        "trust_root_quorum": summary["trust_root_quorum"],
+        "jurisdiction_quorum": summary["jurisdiction_quorum"],
         "covered_verifier_count": summary["covered_verifier_count"],
+        "covered_trust_root_count": summary["covered_trust_root_count"],
+        "covered_jurisdiction_count": summary["covered_jurisdiction_count"],
         "covered_verifier_receipt_commitment_digest": summary[
             "covered_verifier_receipt_commitment_digest"
         ],
@@ -854,6 +974,7 @@ class TrustService:
             human_reviewer_ref=normalized_human_reviewer,
             route_digest=route_digest,
             verifier_receipts=normalized_remote_verifier_receipts,
+            quorum_policy_id=TRUST_TRANSFER_BASELINE_REMOTE_VERIFIER_QUORUM_POLICY_ID,
         )
         renewed_remote_verifier_receipts = self._renew_remote_verifier_receipts(
             verifier_receipts=normalized_remote_verifier_receipts,
@@ -867,18 +988,20 @@ class TrustService:
             human_reviewer_ref=normalized_human_reviewer,
             route_digest=route_digest,
             verifier_receipts=renewed_remote_verifier_receipts,
+            quorum_policy_id=TRUST_TRANSFER_BASELINE_REMOTE_VERIFIER_QUORUM_POLICY_ID,
         )
         renewed_re_attestation_cadence = self._build_re_attestation_cadence(
             federation=renewed_remote_verifier_federation
         )
-        recovered_remote_verifier_receipts = self._renew_remote_verifier_receipts(
+        recovered_remote_verifier_receipts = self._build_multi_root_recovery_remote_verifier_receipts(
             verifier_receipts=renewed_remote_verifier_receipts,
-            renewed_at=str(renewed_re_attestation_cadence["renew_after"]),
+            recovered_at=str(renewed_re_attestation_cadence["renew_after"]),
         )
         recovered_remote_verifier_federation = self._build_remote_verifier_federation(
             human_reviewer_ref=normalized_human_reviewer,
             route_digest=route_digest,
             verifier_receipts=recovered_remote_verifier_receipts,
+            quorum_policy_id=TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID,
         )
         initial_public_remote_verifier_federation = initial_remote_verifier_federation
         renewed_public_remote_verifier_federation = renewed_remote_verifier_federation
@@ -1277,14 +1400,13 @@ class TrustService:
                         "destination_lifecycle.history_summaries must contain mappings"
                     )
                 for index, summary_item in enumerate(summary_items):
-                    if (
-                        summary_item.get("covered_verifier_count")
-                        != TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                    if not _trust_transfer_redacted_lifecycle_entry_quorum_bound(
+                        summary_item
                     ):
                         errors.append(
                             "destination_lifecycle.history_summaries["
                             f"{index}"
-                            "].covered_verifier_count mismatch"
+                            "].quorum fields mismatch"
                         )
                     expected_entry_digest = (
                         _trust_transfer_redacted_destination_lifecycle_entry_summary_digest(
@@ -1348,6 +1470,10 @@ class TrustService:
         if not summary["destination_lifecycle_disclosure_bound"]:
             errors.append(
                 "destination_lifecycle must match the selected public disclosure profile"
+            )
+        if not summary["recovery_quorum_bound"]:
+            errors.append(
+                "recovery quorum must satisfy the multi-root, cross-jurisdiction contract"
             )
 
         if isinstance(source_snapshot, Mapping) and isinstance(destination_snapshot, Mapping):
@@ -1476,13 +1602,36 @@ class TrustService:
                 verifier_receipt_summaries = remote_verifier_federation.get(
                     "verifier_receipt_summaries"
                 )
-                if remote_verifier_federation.get("required_verifier_count") != (
-                    TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
-                ):
+                quorum_policy_id = str(
+                    remote_verifier_federation.get("quorum_policy_id", "")
+                )
+                quorum_spec = _trust_transfer_quorum_policy_spec(quorum_policy_id)
+                if quorum_spec is None:
                     errors.append(
-                        "federation_attestation.remote_verifier_federation."
-                        "required_verifier_count mismatch"
+                        "federation_attestation.remote_verifier_federation.quorum_policy_id mismatch"
                     )
+                else:
+                    if remote_verifier_federation.get("required_verifier_count") != int(
+                        quorum_spec["required_verifier_count"]
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "required_verifier_count mismatch"
+                        )
+                    if remote_verifier_federation.get("trust_root_quorum") != int(
+                        quorum_spec["trust_root_quorum"]
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "trust_root_quorum mismatch"
+                        )
+                    if remote_verifier_federation.get("jurisdiction_quorum") != int(
+                        quorum_spec["jurisdiction_quorum"]
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "jurisdiction_quorum mismatch"
+                        )
                 if isinstance(verifier_receipts, list):
                     if export_profile_id == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
                         errors.append(
@@ -1495,6 +1644,18 @@ class TrustService:
                         errors.append(
                             "federation_attestation.remote_verifier_federation."
                             "received_verifier_count mismatch"
+                        )
+                    expected_jurisdictions = sorted(
+                        {
+                            verifier_receipt.get("jurisdiction")
+                            for verifier_receipt in verifier_receipts
+                            if isinstance(verifier_receipt, Mapping)
+                        }
+                    )
+                    if remote_verifier_federation.get("jurisdictions") != expected_jurisdictions:
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "jurisdictions mismatch"
                         )
                     expected_binding_digest = _trust_transfer_remote_reviewer_binding_digest(
                         human_reviewer_ref=str(
@@ -1556,6 +1717,18 @@ class TrustService:
                         errors.append(
                             "federation_attestation.remote_verifier_federation."
                             "received_verifier_count mismatch"
+                        )
+                    expected_jurisdictions = sorted(
+                        {
+                            summary_item.get("jurisdiction")
+                            for summary_item in verifier_receipt_summaries
+                            if isinstance(summary_item, Mapping)
+                        }
+                    )
+                    if remote_verifier_federation.get("jurisdictions") != expected_jurisdictions:
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "jurisdictions mismatch"
                         )
                     for index, summary_item in enumerate(verifier_receipt_summaries):
                         if not isinstance(summary_item, Mapping):
@@ -2097,6 +2270,7 @@ class TrustService:
         destination_renewal_history_bound = False
         destination_revocation_history_bound = False
         destination_recovery_history_bound = False
+        recovery_quorum_bound = False
         destination_current = False
         if isinstance(federation_attestation, Mapping):
             attestors = federation_attestation.get("attestors", [])
@@ -2138,21 +2312,31 @@ class TrustService:
                         verifier_receipt.get("verifier_ref")
                         for verifier_receipt in verifier_entries
                     ]
+                    verifier_quorum_spec = _trust_transfer_quorum_policy_spec(
+                        str(remote_verifier_federation.get("quorum_policy_id", ""))
+                    )
+                    required_verifier_count = (
+                        int(verifier_quorum_spec["required_verifier_count"])
+                        if verifier_quorum_spec is not None
+                        else -1
+                    )
                     live_remote_verifier_attested = (
                         remote_verifier_federation.get("federation_policy_id")
                         == TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID
                         and remote_verifier_federation.get("network_profile_id")
                         == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
+                        and verifier_quorum_spec is not None
                         and remote_verifier_federation.get("required_verifier_count")
-                        == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        == required_verifier_count
                         and remote_verifier_federation.get("received_verifier_count")
                         == len(verifier_entries)
-                        and len(verifier_entries) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
-                        and len(set(verifier_refs)) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        and len(verifier_entries) == required_verifier_count
+                        and len(set(verifier_refs)) == required_verifier_count
                         and all(
                             verifier_receipt.get("network_profile_id")
                             == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
                             and verifier_receipt.get("receipt_status") == "verified"
+                            and bool(verifier_receipt.get("jurisdiction"))
                             and isinstance(verifier_receipt.get("transport_exchange"), Mapping)
                             and bool(
                                 verifier_receipt["transport_exchange"].get(
@@ -2184,6 +2368,21 @@ class TrustService:
                                 for verifier_receipt in verifier_entries
                             }
                         )
+                        and remote_verifier_federation.get("jurisdictions")
+                        == sorted(
+                            {
+                                verifier_receipt.get("jurisdiction")
+                                for verifier_receipt in verifier_entries
+                            }
+                        )
+                        and remote_verifier_federation.get("trust_root_quorum")
+                        == int(verifier_quorum_spec["trust_root_quorum"])
+                        and remote_verifier_federation.get("jurisdiction_quorum")
+                        == int(verifier_quorum_spec["jurisdiction_quorum"])
+                        and len(remote_verifier_federation.get("trust_root_refs", []))
+                        >= int(verifier_quorum_spec["trust_root_quorum"])
+                        and len(remote_verifier_federation.get("jurisdictions", []))
+                        >= int(verifier_quorum_spec["jurisdiction_quorum"])
                         and remote_verifier_federation.get("reviewer_binding_digest")
                         == _trust_transfer_remote_reviewer_binding_digest(
                             human_reviewer_ref=str(
@@ -2220,6 +2419,14 @@ class TrustService:
                         verifier_receipt.get("verifier_ref")
                         for verifier_receipt in verifier_entries
                     ]
+                    verifier_quorum_spec = _trust_transfer_quorum_policy_spec(
+                        str(remote_verifier_federation.get("quorum_policy_id", ""))
+                    )
+                    required_verifier_count = (
+                        int(verifier_quorum_spec["required_verifier_count"])
+                        if verifier_quorum_spec is not None
+                        else -1
+                    )
                     summary_digests_match = all(
                         verifier_receipt.get("summary_profile_id")
                         == TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID
@@ -2243,12 +2450,13 @@ class TrustService:
                         == TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID
                         and remote_verifier_federation.get("network_profile_id")
                         == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
+                        and verifier_quorum_spec is not None
                         and remote_verifier_federation.get("required_verifier_count")
-                        == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        == required_verifier_count
                         and remote_verifier_federation.get("received_verifier_count")
                         == len(verifier_entries)
-                        and len(verifier_entries) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
-                        and len(set(verifier_refs)) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        and len(verifier_entries) == required_verifier_count
+                        and len(set(verifier_refs)) == required_verifier_count
                         and summary_digests_match
                     )
                     remote_verifier_receipts_bound = (
@@ -2278,6 +2486,21 @@ class TrustService:
                                 for verifier_receipt in verifier_entries
                             }
                         )
+                        and remote_verifier_federation.get("jurisdictions")
+                        == sorted(
+                            {
+                                verifier_receipt.get("jurisdiction")
+                                for verifier_receipt in verifier_entries
+                            }
+                        )
+                        and remote_verifier_federation.get("trust_root_quorum")
+                        == int(verifier_quorum_spec["trust_root_quorum"])
+                        and remote_verifier_federation.get("jurisdiction_quorum")
+                        == int(verifier_quorum_spec["jurisdiction_quorum"])
+                        and len(remote_verifier_federation.get("trust_root_refs", []))
+                        >= int(verifier_quorum_spec["trust_root_quorum"])
+                        and len(remote_verifier_federation.get("jurisdictions", []))
+                        >= int(verifier_quorum_spec["jurisdiction_quorum"])
                         and remote_verifier_federation.get("reviewer_binding_digest")
                         == _trust_transfer_remote_reviewer_binding_digest(
                             human_reviewer_ref=str(
@@ -2392,7 +2615,7 @@ class TrustService:
             current_verifier_receipt_commitment_digest = None
             if (
                 isinstance(cadence_receipt_ids, list)
-                and len(cadence_receipt_ids) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                and len(cadence_receipt_ids) >= TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
                 and all(
                     isinstance(receipt_id, str) and receipt_id.strip()
                     for receipt_id in cadence_receipt_ids
@@ -2537,11 +2760,7 @@ class TrustService:
                             for entry in history_entries
                         )
                         and all(
-                            isinstance(entry.get("covered_verifier_receipt_ids"), list)
-                            and len(entry.get("covered_verifier_receipt_ids"))
-                            == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
-                            and len(set(entry.get("covered_verifier_receipt_ids")))
-                            == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                            _trust_transfer_lifecycle_entry_quorum_bound(entry)
                             for entry in history_entries
                         )
                         and imported_recorded_at is not None
@@ -2587,6 +2806,16 @@ class TrustService:
                         == destination_lifecycle.get("latest_cadence_ref")
                         and final_entry.get("cadence_digest")
                         == destination_lifecycle.get("latest_cadence_digest")
+                        and final_entry.get("quorum_policy_id")
+                        == remote_verifier_federation.get("quorum_policy_id")
+                        and final_entry.get("trust_root_quorum")
+                        == remote_verifier_federation.get("trust_root_quorum")
+                        and final_entry.get("jurisdiction_quorum")
+                        == remote_verifier_federation.get("jurisdiction_quorum")
+                        and final_entry.get("covered_trust_root_refs")
+                        == remote_verifier_federation.get("trust_root_refs")
+                        and final_entry.get("covered_jurisdictions")
+                        == remote_verifier_federation.get("jurisdictions")
                         and final_entry.get("covered_verifier_receipt_ids")
                         == re_attestation_cadence.get("covered_verifier_receipt_ids")
                         and final_entry.get("event_type") == "recovered"
@@ -2600,6 +2829,28 @@ class TrustService:
                         and recovered_recorded_at is not None
                         and recovered_valid_until is not None
                         and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
+                    )
+                    recovery_quorum_bound = (
+                        destination_recovery_history_bound
+                        and remote_verifier_federation.get("quorum_policy_id")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID
+                        and remote_verifier_federation.get("required_verifier_count")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_COUNT
+                        and remote_verifier_federation.get("trust_root_quorum")
+                        == TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and remote_verifier_federation.get("jurisdiction_quorum")
+                        == TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
+                        and isinstance(recovered_entry, Mapping)
+                        and recovered_entry.get("quorum_policy_id")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID
+                        and recovered_entry.get("trust_root_quorum")
+                        == TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and recovered_entry.get("jurisdiction_quorum")
+                        == TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
+                        and len(recovered_entry.get("covered_trust_root_refs", []))
+                        >= TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and len(recovered_entry.get("covered_jurisdictions", []))
+                        >= TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
                     )
                     destination_current = (
                         destination_recovery_history_bound
@@ -2634,8 +2885,7 @@ class TrustService:
                 except KeyError:
                     lifecycle_summary_digest = ""
                 summary_entries_valid = all(
-                    entry.get("covered_verifier_count")
-                    == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                    _trust_transfer_redacted_lifecycle_entry_quorum_bound(entry)
                     and bool(entry.get("covered_verifier_receipt_commitment_digest"))
                     and entry.get("entry_digest")
                     == _trust_transfer_redacted_destination_lifecycle_entry_summary_digest(
@@ -2778,11 +3028,8 @@ class TrustService:
                             for entry in history_entries
                         )
                         and all(
-                            entry.get("covered_verifier_count")
-                            == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
-                            and bool(
-                                entry.get("covered_verifier_receipt_commitment_digest")
-                            )
+                            _trust_transfer_redacted_lifecycle_entry_quorum_bound(entry)
+                            and bool(entry.get("covered_verifier_receipt_commitment_digest"))
                             for entry in history_entries
                         )
                         and current_verifier_receipt_commitment_digest is not None
@@ -2827,6 +3074,16 @@ class TrustService:
                         == destination_lifecycle.get("latest_federation_digest")
                         and final_entry.get("cadence_digest")
                         == destination_lifecycle.get("latest_cadence_digest")
+                        and final_entry.get("quorum_policy_id")
+                        == remote_verifier_federation.get("quorum_policy_id")
+                        and final_entry.get("trust_root_quorum")
+                        == remote_verifier_federation.get("trust_root_quorum")
+                        and final_entry.get("jurisdiction_quorum")
+                        == remote_verifier_federation.get("jurisdiction_quorum")
+                        and final_entry.get("covered_trust_root_count")
+                        == len(remote_verifier_federation.get("trust_root_refs", []))
+                        and final_entry.get("covered_jurisdiction_count")
+                        == len(remote_verifier_federation.get("jurisdictions", []))
                         and current_verifier_receipt_commitment_digest is not None
                         and final_entry.get(
                             "covered_verifier_receipt_commitment_digest"
@@ -2843,6 +3100,28 @@ class TrustService:
                         and recovered_recorded_at is not None
                         and recovered_valid_until is not None
                         and revoked_recorded_at <= recovered_recorded_at <= recovered_valid_until
+                    )
+                    recovery_quorum_bound = (
+                        destination_recovery_history_bound
+                        and remote_verifier_federation.get("quorum_policy_id")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID
+                        and remote_verifier_federation.get("required_verifier_count")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_COUNT
+                        and remote_verifier_federation.get("trust_root_quorum")
+                        == TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and remote_verifier_federation.get("jurisdiction_quorum")
+                        == TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
+                        and isinstance(recovered_entry, Mapping)
+                        and recovered_entry.get("quorum_policy_id")
+                        == TRUST_TRANSFER_RECOVERY_REMOTE_VERIFIER_QUORUM_POLICY_ID
+                        and recovered_entry.get("trust_root_quorum")
+                        == TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and recovered_entry.get("jurisdiction_quorum")
+                        == TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
+                        and recovered_entry.get("covered_trust_root_count", 0)
+                        >= TRUST_TRANSFER_RECOVERY_TRUST_ROOT_QUORUM
+                        and recovered_entry.get("covered_jurisdiction_count", 0)
+                        >= TRUST_TRANSFER_RECOVERY_JURISDICTION_QUORUM
                     )
                     destination_current = (
                         destination_recovery_history_bound
@@ -2884,6 +3163,7 @@ class TrustService:
             "destination_renewal_history_bound": destination_renewal_history_bound,
             "destination_revocation_history_bound": destination_revocation_history_bound,
             "destination_recovery_history_bound": destination_recovery_history_bound,
+            "recovery_quorum_bound": recovery_quorum_bound,
             "destination_current": destination_current,
             "destination_seeded": destination_seeded,
             "receipt_digest_bound": receipt_digest_bound,
@@ -2897,22 +3177,27 @@ class TrustService:
         human_reviewer_ref: str,
         route_digest: str,
         verifier_receipts: List[Mapping[str, Any]],
+        quorum_policy_id: str,
     ) -> Dict[str, Any]:
+        quorum_fields = _trust_transfer_verifier_quorum_fields(
+            quorum_policy_id=quorum_policy_id,
+            verifier_receipts=verifier_receipts,
+        )
         federation = {
             "federation_id": new_id("trust-verifier-federation"),
             "federation_ref": f"trust-verifier-federation://{sha256_text(human_reviewer_ref)[:12]}",
             "federation_policy_id": TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID,
             "network_profile_id": TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID,
+            "quorum_policy_id": quorum_fields["quorum_policy_id"],
             "human_reviewer_ref": human_reviewer_ref,
-            "required_verifier_count": TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT,
-            "received_verifier_count": len(verifier_receipts),
+            "required_verifier_count": quorum_fields["required_verifier_count"],
+            "received_verifier_count": quorum_fields["received_verifier_count"],
             "verifier_receipts": [dict(verifier_receipt) for verifier_receipt in verifier_receipts],
-            "verifier_refs": [
-                verifier_receipt["verifier_ref"] for verifier_receipt in verifier_receipts
-            ],
-            "trust_root_refs": sorted(
-                {verifier_receipt["trust_root_ref"] for verifier_receipt in verifier_receipts}
-            ),
+            "verifier_refs": quorum_fields["verifier_refs"],
+            "trust_root_refs": quorum_fields["trust_root_refs"],
+            "jurisdictions": quorum_fields["jurisdictions"],
+            "trust_root_quorum": quorum_fields["trust_root_quorum"],
+            "jurisdiction_quorum": quorum_fields["jurisdiction_quorum"],
             "authority_chain_refs": sorted(
                 {verifier_receipt["authority_chain_ref"] for verifier_receipt in verifier_receipts}
             ),
@@ -2993,6 +3278,7 @@ class TrustService:
             "summary_profile_id": TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID,
             "federation_policy_id": federation["federation_policy_id"],
             "network_profile_id": federation["network_profile_id"],
+            "quorum_policy_id": federation["quorum_policy_id"],
             "human_reviewer_ref": federation["human_reviewer_ref"],
             "required_verifier_count": federation["required_verifier_count"],
             "received_verifier_count": federation["received_verifier_count"],
@@ -3007,6 +3293,14 @@ class TrustService:
                     for verifier_receipt in verifier_receipt_summaries
                 }
             ),
+            "jurisdictions": sorted(
+                {
+                    verifier_receipt["jurisdiction"]
+                    for verifier_receipt in verifier_receipt_summaries
+                }
+            ),
+            "trust_root_quorum": federation["trust_root_quorum"],
+            "jurisdiction_quorum": federation["jurisdiction_quorum"],
             "authority_chain_refs": sorted(
                 {
                     verifier_receipt["authority_chain_ref"]
@@ -3086,6 +3380,178 @@ class TrustService:
             canonical_json(_trust_transfer_re_attestation_cadence_digest_payload(cadence))
         )
         return cadence
+
+    def _build_remote_verifier_receipt(
+        self,
+        *,
+        reviewer_id: str,
+        verifier_endpoint: str,
+        verifier_ref: str,
+        jurisdiction: str,
+        authority_chain_ref: str,
+        trust_root_ref: str,
+        trust_root_digest: str,
+        recorded_at: str,
+        freshness_window_seconds: int,
+        observed_latency_ms: float,
+        challenge_stage: str,
+    ) -> Dict[str, Any]:
+        recorded_at_dt = _parse_datetime(recorded_at, "recorded_at")
+        recorded_at_iso = recorded_at_dt.isoformat()
+        verifier_slug = verifier_ref.rstrip("/").rsplit("/", 1)[-1]
+        stage_slug = challenge_stage.strip().replace("_", "-")
+        challenge_ref = (
+            "challenge://trust-transfer/"
+            f"{verifier_slug}/{stage_slug}/{recorded_at_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        )
+        challenge_digest = (
+            "sha256:trust-transfer-"
+            f"{verifier_slug}-{stage_slug}-{recorded_at_dt.strftime('%Y%m%d%H%M%SZ').lower()}"
+        )
+        transport_exchange = {
+            "kind": "guardian_verifier_transport_exchange",
+            "schema_version": "1.0.0",
+            "exchange_id": new_id("verifier-transport-exchange"),
+            "verifier_endpoint": verifier_endpoint,
+            "verifier_ref": verifier_ref,
+            "jurisdiction": jurisdiction,
+            "transport_profile": "reviewer-live-proof-bridge-v1",
+            "exchange_profile_id": "digest-bound-reviewer-transport-exchange-v1",
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "request_payload_kind": "reviewer-live-proof-request",
+            "request_payload_ref": f"sealed://trust-transfer/{verifier_slug}/{stage_slug}/request",
+            "request_payload_digest": sha256_text(
+                canonical_json(
+                    {
+                        "verifier_ref": verifier_ref,
+                        "recorded_at": recorded_at_iso,
+                        "payload_kind": "request",
+                    }
+                )
+            ),
+            "request_size_bytes": 296,
+            "response_payload_kind": "reviewer-live-proof-response",
+            "response_payload_ref": f"sealed://trust-transfer/{verifier_slug}/{stage_slug}/response",
+            "response_payload_digest": sha256_text(
+                canonical_json(
+                    {
+                        "verifier_ref": verifier_ref,
+                        "recorded_at": recorded_at_iso,
+                        "payload_kind": "response",
+                    }
+                )
+            ),
+            "response_size_bytes": 298,
+            "recorded_at": recorded_at_iso,
+            "digest": "",
+        }
+        transport_exchange["digest"] = sha256_text(
+            canonical_json(
+                {
+                    "exchange_id": transport_exchange["exchange_id"],
+                    "verifier_ref": verifier_ref,
+                    "challenge_ref": challenge_ref,
+                    "request_payload_digest": transport_exchange["request_payload_digest"],
+                    "response_payload_digest": transport_exchange["response_payload_digest"],
+                    "recorded_at": recorded_at_iso,
+                }
+            )
+        )
+        receipt = {
+            "kind": "guardian_verifier_network_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": new_id("verifier-network-receipt"),
+            "reviewer_id": reviewer_id,
+            "verifier_endpoint": verifier_endpoint,
+            "verifier_ref": verifier_ref,
+            "jurisdiction": jurisdiction,
+            "transport_profile": "reviewer-live-proof-bridge-v1",
+            "network_profile_id": TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID,
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "authority_chain_ref": authority_chain_ref,
+            "trust_root_ref": trust_root_ref,
+            "trust_root_digest": trust_root_digest,
+            "transport_exchange": transport_exchange,
+            "freshness_window_seconds": freshness_window_seconds,
+            "observed_latency_ms": round(float(observed_latency_ms), 1),
+            "receipt_status": "verified",
+            "recorded_at": recorded_at_iso,
+            "digest": "",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                {
+                    "receipt_id": receipt["receipt_id"],
+                    "verifier_ref": verifier_ref,
+                    "challenge_ref": challenge_ref,
+                    "recorded_at": recorded_at_iso,
+                    "transport_exchange_digest": transport_exchange["digest"],
+                }
+            )
+        )
+        return receipt
+
+    def _build_multi_root_recovery_remote_verifier_receipts(
+        self,
+        *,
+        verifier_receipts: List[Mapping[str, Any]],
+        recovered_at: str,
+    ) -> List[Dict[str, Any]]:
+        recovered_at_dt = _parse_datetime(recovered_at, "recovered_at")
+        reviewer_id = str(
+            verifier_receipts[0].get("reviewer_id", "human-reviewer-trust-transfer-001")
+        )
+        receipt_templates = [
+            {
+                "verifier_endpoint": "verifier://guardian-oversight.jp",
+                "verifier_ref": "verifier://guardian-oversight.jp/reviewer-alpha-recovery",
+                "jurisdiction": "JP-13",
+                "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+                "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+                "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v2",
+                "freshness_window_seconds": 900,
+                "observed_latency_ms": 49.2,
+            },
+            {
+                "verifier_endpoint": "verifier://guardian-oversight.us",
+                "verifier_ref": "verifier://guardian-oversight.us/reviewer-beta-recovery",
+                "jurisdiction": "US-CA",
+                "authority_chain_ref": "authority://guardian-oversight.us/reviewer-attestation",
+                "trust_root_ref": "root://guardian-oversight.us/reviewer-live-pki",
+                "trust_root_digest": "sha256:guardian-oversight-us-reviewer-live-pki-v1",
+                "freshness_window_seconds": 960,
+                "observed_latency_ms": 52.4,
+            },
+            {
+                "verifier_endpoint": "verifier://guardian-oversight.eu",
+                "verifier_ref": "verifier://guardian-oversight.eu/reviewer-gamma-recovery",
+                "jurisdiction": "EU-DE",
+                "authority_chain_ref": "authority://guardian-oversight.eu/reviewer-attestation",
+                "trust_root_ref": "root://guardian-oversight.eu/reviewer-live-pki",
+                "trust_root_digest": "sha256:guardian-oversight-eu-reviewer-live-pki-v1",
+                "freshness_window_seconds": 1020,
+                "observed_latency_ms": 55.1,
+            },
+        ]
+        recovered_receipts = [
+            self._build_remote_verifier_receipt(
+                reviewer_id=reviewer_id,
+                verifier_endpoint=str(template["verifier_endpoint"]),
+                verifier_ref=str(template["verifier_ref"]),
+                jurisdiction=str(template["jurisdiction"]),
+                authority_chain_ref=str(template["authority_chain_ref"]),
+                trust_root_ref=str(template["trust_root_ref"]),
+                trust_root_digest=str(template["trust_root_digest"]),
+                recorded_at=(recovered_at_dt + timedelta(seconds=index * 30)).isoformat(),
+                freshness_window_seconds=int(template["freshness_window_seconds"]),
+                observed_latency_ms=float(template["observed_latency_ms"]),
+                challenge_stage="recovery",
+            )
+            for index, template in enumerate(receipt_templates)
+        ]
+        return self._normalize_remote_verifier_receipts(recovered_receipts)
 
     def _renew_remote_verifier_receipts(
         self,
@@ -3215,15 +3681,20 @@ class TrustService:
                 "recorded_at": initial_cadence["attested_at"],
                 "attested_at": initial_cadence["attested_at"],
                 "valid_until": initial_cadence["valid_until"],
+                "quorum_policy_id": initial_federation["quorum_policy_id"],
                 "federation_ref": initial_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
                     initial_federation
                 ),
                 "cadence_ref": initial_cadence["cadence_ref"],
                 "cadence_digest": initial_cadence["receipt_digest"],
+                "trust_root_quorum": initial_federation["trust_root_quorum"],
+                "jurisdiction_quorum": initial_federation["jurisdiction_quorum"],
                 "covered_verifier_receipt_ids": list(
                     initial_cadence["covered_verifier_receipt_ids"]
                 ),
+                "covered_trust_root_refs": list(initial_federation["trust_root_refs"]),
+                "covered_jurisdictions": list(initial_federation["jurisdictions"]),
                 "destination_snapshot_digest": destination_snapshot_digest,
                 "rationale": "initial destination seed completed with guardian and human attestation",
             },
@@ -3236,15 +3707,20 @@ class TrustService:
                 "recorded_at": renewed_cadence["attested_at"],
                 "attested_at": renewed_cadence["attested_at"],
                 "valid_until": renewed_cadence["valid_until"],
+                "quorum_policy_id": renewed_federation["quorum_policy_id"],
                 "federation_ref": renewed_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
                     renewed_federation
                 ),
                 "cadence_ref": renewed_cadence["cadence_ref"],
                 "cadence_digest": renewed_cadence["receipt_digest"],
+                "trust_root_quorum": renewed_federation["trust_root_quorum"],
+                "jurisdiction_quorum": renewed_federation["jurisdiction_quorum"],
                 "covered_verifier_receipt_ids": list(
                     renewed_cadence["covered_verifier_receipt_ids"]
                 ),
+                "covered_trust_root_refs": list(renewed_federation["trust_root_refs"]),
+                "covered_jurisdictions": list(renewed_federation["jurisdictions"]),
                 "destination_snapshot_digest": destination_snapshot_digest,
                 "rationale": "destination verifier federation renewed before freshness expiry",
             },
@@ -3257,15 +3733,20 @@ class TrustService:
                 "recorded_at": revoked_at,
                 "attested_at": renewed_cadence["attested_at"],
                 "valid_until": renewed_cadence["valid_until"],
+                "quorum_policy_id": renewed_federation["quorum_policy_id"],
                 "federation_ref": renewed_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
                     renewed_federation
                 ),
                 "cadence_ref": renewed_cadence["cadence_ref"],
                 "cadence_digest": renewed_cadence["receipt_digest"],
+                "trust_root_quorum": renewed_federation["trust_root_quorum"],
+                "jurisdiction_quorum": renewed_federation["jurisdiction_quorum"],
                 "covered_verifier_receipt_ids": list(
                     renewed_cadence["covered_verifier_receipt_ids"]
                 ),
+                "covered_trust_root_refs": list(renewed_federation["trust_root_refs"]),
+                "covered_jurisdictions": list(renewed_federation["jurisdictions"]),
                 "destination_snapshot_digest": destination_snapshot_digest,
                 "rationale": "destination revocation signal raised and trust usage was disabled fail-closed",
             },
@@ -3278,17 +3759,25 @@ class TrustService:
                 "recorded_at": recovered_at,
                 "attested_at": recovered_cadence["attested_at"],
                 "valid_until": recovered_cadence["valid_until"],
+                "quorum_policy_id": recovered_federation["quorum_policy_id"],
                 "federation_ref": recovered_federation["federation_ref"],
                 "federation_digest": _trust_transfer_federation_binding_digest(
                     recovered_federation
                 ),
                 "cadence_ref": recovered_cadence["cadence_ref"],
                 "cadence_digest": recovered_cadence["receipt_digest"],
+                "trust_root_quorum": recovered_federation["trust_root_quorum"],
+                "jurisdiction_quorum": recovered_federation["jurisdiction_quorum"],
                 "covered_verifier_receipt_ids": list(
                     recovered_cadence["covered_verifier_receipt_ids"]
                 ),
+                "covered_trust_root_refs": list(recovered_federation["trust_root_refs"]),
+                "covered_jurisdictions": list(recovered_federation["jurisdictions"]),
                 "destination_snapshot_digest": destination_snapshot_digest,
-                "rationale": "destination trust was re-enabled after renewed verifier attestation cleared recovery review",
+                "rationale": (
+                    "destination trust was re-enabled after multi-root, cross-jurisdiction "
+                    "verifier quorum cleared recovery review"
+                ),
             },
         ]
         lifecycle = {
@@ -3338,9 +3827,18 @@ class TrustService:
                 "status": entry["status"],
                 "recorded_at": entry["recorded_at"],
                 "valid_until": entry["valid_until"],
+                "quorum_policy_id": entry["quorum_policy_id"],
                 "federation_digest": entry["federation_digest"],
                 "cadence_digest": entry["cadence_digest"],
+                "trust_root_quorum": entry["trust_root_quorum"],
+                "jurisdiction_quorum": entry["jurisdiction_quorum"],
                 "covered_verifier_count": len(covered_verifier_receipt_ids),
+                "covered_trust_root_count": len(
+                    list(entry.get("covered_trust_root_refs", []))
+                ),
+                "covered_jurisdiction_count": len(
+                    list(entry.get("covered_jurisdictions", []))
+                ),
                 "covered_verifier_receipt_commitment_digest": (
                     _trust_transfer_covered_verifier_receipt_commitment_digest(
                         [str(receipt_id) for receipt_id in covered_verifier_receipt_ids]
@@ -3510,6 +4008,7 @@ class TrustService:
                 "receipt_id",
                 "verifier_endpoint",
                 "verifier_ref",
+                "jurisdiction",
                 "network_profile_id",
                 "challenge_ref",
                 "challenge_digest",
@@ -3580,12 +4079,12 @@ class TrustService:
                     )
             normalized.append(normalized_receipt)
         verifier_refs = [normalized_receipt["verifier_ref"] for normalized_receipt in normalized]
-        if len(normalized) != TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT:
+        if len(normalized) < TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT:
             raise ValueError(
                 "remote_verifier_receipts must contain "
-                f"{TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT} verified receipts"
+                f"at least {TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT} verified receipts"
             )
-        if len(set(verifier_refs)) != TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT:
+        if len(set(verifier_refs)) != len(verifier_refs):
             raise ValueError("remote_verifier_receipts must use distinct verifier_ref values")
         return normalized
 

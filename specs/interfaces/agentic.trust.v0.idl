@@ -145,7 +145,6 @@ operations:
           remote_verifier_receipts:
             type: array
             minItems: 2
-            maxItems: 2
             items:
               schema_ref: guardian_verifier_network_receipt
           council_session_ref:
@@ -167,6 +166,7 @@ operations:
       - source_snapshot_digest and destination_snapshot_digest must bind the exported and imported snapshot payload family selected by export_profile_id
       - source guardian, destination guardian, and one explicit human reviewer must satisfy the fixed attestation quorum before import completes
       - two live remote verifier receipts must bind the human reviewer attestation with distinct verifier refs before import completes
+      - recovered destination trust must rebind to a multi-root, cross-jurisdiction verifier quorum before the recovered branch can return to current
       - fixed re-attestation cadence must renew before the minimum verifier freshness window expires
       - destination lifecycle must preserve imported, renewed, revoked, and recovered history entries as one append-only ledger
       - import must preserve thresholds, provenance policy, eligibility flags, and append-only history without mutation
@@ -249,6 +249,8 @@ operations:
             type: boolean
           destination_recovery_history_bound:
             type: boolean
+          recovery_quorum_bound:
+            type: boolean
           destination_current:
             type: boolean
           destination_seeded:
@@ -268,3 +270,4 @@ compatibility:
     - Self-modify eligibility requires both global_score and self_modify domain score to exceed 0.95.
     - Trust provenance is fixed to Council / Guardian / Human origins and blocks self-issued or reciprocal positive boosts.
     - Cross-substrate transfer is materialized as one receipt family with a full-clone export profile and a redacted export profile, while destination seeding stays snapshot-clone-with-history internally and redacted export seals verifier receipts and destination lifecycle ledgers behind summary commitments.
+    - The recovered branch escalates from the baseline verifier pair to a multi-root, cross-jurisdiction recovery quorum that remains machine-checkable in both full and redacted exports.
