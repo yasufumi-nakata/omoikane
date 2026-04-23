@@ -1,0 +1,135 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/trust_redacted_verifier_receipt_summary.schema"
+title: TrustRedactedVerifierReceiptSummary
+description: >
+  Public redacted summary for one live remote verifier receipt that preserves
+  verifier identity, freshness timing, and transport commitment digests without
+  exposing the full challenge and payload exchange.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - summary_id
+  - summary_ref
+  - summary_profile_id
+  - receipt_id
+  - verifier_endpoint
+  - verifier_ref
+  - jurisdiction
+  - network_profile_id
+  - authority_chain_ref
+  - trust_root_ref
+  - freshness_window_seconds
+  - observed_latency_ms
+  - recorded_at
+  - receipt_status
+  - transport_exchange_digest
+  - sealed_receipt_digest
+  - redaction_policy_id
+  - redacted_fields
+  - summary_digest
+properties:
+  kind:
+    const: trust_redacted_verifier_receipt_summary
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  summary_id:
+    type: string
+    pattern: "^trust-verifier-summary-[a-f0-9]{12}$"
+  summary_ref:
+    type: string
+    minLength: 1
+  summary_profile_id:
+    const: bounded-trust-transfer-redacted-verifier-receipt-summary-v1
+  receipt_id:
+    type: string
+    minLength: 1
+  verifier_endpoint:
+    type: string
+    minLength: 1
+  verifier_ref:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  network_profile_id:
+    const: guardian-reviewer-remote-attestation-v1
+  authority_chain_ref:
+    type: string
+    minLength: 1
+  trust_root_ref:
+    type: string
+    minLength: 1
+  freshness_window_seconds:
+    type: integer
+    minimum: 1
+  observed_latency_ms:
+    type: number
+    minimum: 0
+  recorded_at:
+    type: string
+    format: date-time
+  receipt_status:
+    type: string
+    enum:
+      - verified
+      - stale
+      - revoked
+  transport_exchange_digest:
+    type: string
+    minLength: 1
+  sealed_receipt_digest:
+    type: string
+    minLength: 1
+  redaction_policy_id:
+    const: bounded-trust-transfer-verifier-summary-redaction-v1
+  redacted_fields:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  summary_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: trust_redacted_verifier_receipt_summary
+    schema_version: 1.0.0
+    summary_id: trust-verifier-summary-0123456789ab
+    summary_ref: trust-redacted-verifier-receipt://4c38ec8f5f8a
+    summary_profile_id: bounded-trust-transfer-redacted-verifier-receipt-summary-v1
+    receipt_id: verifier-network-receipt-aaaaaaaaaaaa
+    verifier_endpoint: verifier://guardian-oversight.jp
+    verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
+    jurisdiction: JP-13
+    network_profile_id: guardian-reviewer-remote-attestation-v1
+    authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
+    trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
+    freshness_window_seconds: 900
+    observed_latency_ms: 48.6
+    recorded_at: "2026-04-24T00:10:00Z"
+    receipt_status: verified
+    transport_exchange_digest: 5600b1c59519cd93f529a24cd90ded53a6ea2e787c1d460fa5b3ffd460c75fc3
+    sealed_receipt_digest: 9524158fbd8e6ded8d0c7b0b932bffbfe53c883b0ee00f735f02cc7c73cf11ba
+    redaction_policy_id: bounded-trust-transfer-verifier-summary-redaction-v1
+    redacted_fields:
+      - verifier_receipts[].reviewer_id
+      - verifier_receipts[].challenge_ref
+      - verifier_receipts[].challenge_digest
+      - verifier_receipts[].trust_root_digest
+      - verifier_receipts[].transport_exchange.exchange_id
+      - verifier_receipts[].transport_exchange.challenge_ref
+      - verifier_receipts[].transport_exchange.challenge_digest
+      - verifier_receipts[].transport_exchange.request_payload_kind
+      - verifier_receipts[].transport_exchange.request_payload_ref
+      - verifier_receipts[].transport_exchange.request_payload_digest
+      - verifier_receipts[].transport_exchange.request_size_bytes
+      - verifier_receipts[].transport_exchange.response_payload_kind
+      - verifier_receipts[].transport_exchange.response_payload_ref
+      - verifier_receipts[].transport_exchange.response_payload_digest
+      - verifier_receipts[].transport_exchange.response_size_bytes
+      - verifier_receipts[].transport_exchange.recorded_at
+    summary_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

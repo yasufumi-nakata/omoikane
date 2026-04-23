@@ -5,7 +5,7 @@ description: >
   Digest-bound cross-substrate trust export/import receipt with fixed
   guardian/human quorum, live remote verifier federation, re-attestation
   cadence, destination lifecycle history, and a selectable public export
-  profile.
+  profile with verifier disclosure-floor branching.
 type: object
 additionalProperties: false
 required:
@@ -236,78 +236,80 @@ properties:
         type: string
         pattern: "^[a-f0-9]{64}$"
       remote_verifier_federation:
-        type: object
-        additionalProperties: false
-        required:
-          - federation_id
-          - federation_ref
-          - federation_policy_id
-          - network_profile_id
-          - human_reviewer_ref
-          - required_verifier_count
-          - received_verifier_count
-          - verifier_receipts
-          - verifier_refs
-          - trust_root_refs
-          - authority_chain_refs
-          - reviewer_binding_digest
-          - federation_status
-          - receipt_digest
-        properties:
-          federation_id:
-            type: string
-            pattern: "^trust-verifier-federation-[a-f0-9]{12}$"
-          federation_ref:
-            type: string
-            minLength: 1
-          federation_policy_id:
-            const: bounded-live-trust-transfer-verifier-federation-v1
-          network_profile_id:
-            const: guardian-reviewer-remote-attestation-v1
-          human_reviewer_ref:
-            type: string
-            minLength: 1
-          required_verifier_count:
-            const: 2
-          received_verifier_count:
-            type: integer
-            minimum: 0
-          verifier_receipts:
-            type: array
-            minItems: 2
-            maxItems: 2
-            items:
-              $ref: "./guardian_verifier_network_receipt.schema"
-          verifier_refs:
-            type: array
-            minItems: 2
-            maxItems: 2
-            uniqueItems: true
-            items:
-              type: string
-              minLength: 1
-          trust_root_refs:
-            type: array
-            minItems: 1
-            uniqueItems: true
-            items:
-              type: string
-              minLength: 1
-          authority_chain_refs:
-            type: array
-            minItems: 1
-            uniqueItems: true
-            items:
-              type: string
-              minLength: 1
-          reviewer_binding_digest:
-            type: string
-            pattern: "^[a-f0-9]{64}$"
-          federation_status:
-            const: verified
-          receipt_digest:
-            type: string
-            pattern: "^[a-f0-9]{64}$"
+        oneOf:
+          - type: object
+            additionalProperties: false
+            required:
+              - federation_id
+              - federation_ref
+              - federation_policy_id
+              - network_profile_id
+              - human_reviewer_ref
+              - required_verifier_count
+              - received_verifier_count
+              - verifier_receipts
+              - verifier_refs
+              - trust_root_refs
+              - authority_chain_refs
+              - reviewer_binding_digest
+              - federation_status
+              - receipt_digest
+            properties:
+              federation_id:
+                type: string
+                pattern: "^trust-verifier-federation-[a-f0-9]{12}$"
+              federation_ref:
+                type: string
+                minLength: 1
+              federation_policy_id:
+                const: bounded-live-trust-transfer-verifier-federation-v1
+              network_profile_id:
+                const: guardian-reviewer-remote-attestation-v1
+              human_reviewer_ref:
+                type: string
+                minLength: 1
+              required_verifier_count:
+                const: 2
+              received_verifier_count:
+                type: integer
+                minimum: 0
+              verifier_receipts:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items:
+                  $ref: "./guardian_verifier_network_receipt.schema"
+              verifier_refs:
+                type: array
+                minItems: 2
+                maxItems: 2
+                uniqueItems: true
+                items:
+                  type: string
+                  minLength: 1
+              trust_root_refs:
+                type: array
+                minItems: 1
+                uniqueItems: true
+                items:
+                  type: string
+                  minLength: 1
+              authority_chain_refs:
+                type: array
+                minItems: 1
+                uniqueItems: true
+                items:
+                  type: string
+                  minLength: 1
+              reviewer_binding_digest:
+                type: string
+                pattern: "^[a-f0-9]{64}$"
+              federation_status:
+                const: verified
+              receipt_digest:
+                type: string
+                pattern: "^[a-f0-9]{64}$"
+          - $ref: "./trust_redacted_verifier_federation.schema"
       re_attestation_cadence:
         type: object
         additionalProperties: false
@@ -556,6 +558,7 @@ properties:
       - federation_quorum_attested
       - live_remote_verifier_attested
       - remote_verifier_receipts_bound
+      - remote_verifier_disclosure_bound
       - re_attestation_cadence_bound
       - re_attestation_current
       - destination_lifecycle_bound
@@ -588,6 +591,8 @@ properties:
         type: boolean
       remote_verifier_receipts_bound:
         type: boolean
+      remote_verifier_disclosure_bound:
+        type: boolean
       re_attestation_cadence_bound:
         type: boolean
       re_attestation_current:
@@ -611,6 +616,29 @@ properties:
   receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+allOf:
+  - if:
+      properties:
+        export_profile_id:
+          const: snapshot-clone-with-history
+    then:
+      properties:
+        federation_attestation:
+          properties:
+            remote_verifier_federation:
+              type: object
+              required:
+                - verifier_receipts
+  - if:
+      properties:
+        export_profile_id:
+          const: bounded-trust-transfer-redacted-export-v1
+    then:
+      properties:
+        federation_attestation:
+          properties:
+            remote_verifier_federation:
+              $ref: "./trust_redacted_verifier_federation.schema"
 oneOf:
   - required:
       - source_snapshot
@@ -626,7 +654,7 @@ oneOf:
         const: bounded-trust-transfer-redacted-export-v1
 examples:
   - kind: trust_transfer_receipt
-    schema_version: 1.3.0
+    schema_version: 1.4.0
     receipt_id: trust-transfer-0123456789ab
     transfer_policy_id: bounded-cross-substrate-trust-transfer-v1
     attestation_policy_id: bounded-trust-transfer-attestation-federation-v1
@@ -936,6 +964,7 @@ examples:
       federation_quorum_attested: true
       live_remote_verifier_attested: true
       remote_verifier_receipts_bound: true
+      remote_verifier_disclosure_bound: true
       re_attestation_cadence_bound: true
       re_attestation_current: true
       destination_lifecycle_bound: true

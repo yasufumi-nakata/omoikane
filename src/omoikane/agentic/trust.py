@@ -11,7 +11,7 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.3.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.4.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
 TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID = "snapshot-clone-with-history"
@@ -21,6 +21,16 @@ TRUST_TRANSFER_HISTORY_REDACTION_POLICY_ID = "bounded-trust-transfer-history-red
 TRUST_TRANSFER_REDACTED_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
 TRUST_TRANSFER_REDACTED_SNAPSHOT_PROFILE_ID = (
     "bounded-trust-transfer-redacted-snapshot-v1"
+)
+TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID = (
+    "bounded-trust-transfer-redacted-verifier-federation-v1"
+)
+TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID = (
+    "bounded-trust-transfer-redacted-verifier-receipt-summary-v1"
+)
+TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID = (
+    "bounded-trust-transfer-verifier-summary-redaction-v1"
 )
 TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID = (
     "bounded-live-trust-transfer-verifier-federation-v1"
@@ -58,6 +68,24 @@ TRUST_TRANSFER_REDACTED_FIELDS = (
     "history[].global_after",
     "history[].domain_before",
     "history[].domain_after",
+)
+TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS = (
+    "verifier_receipts[].reviewer_id",
+    "verifier_receipts[].challenge_ref",
+    "verifier_receipts[].challenge_digest",
+    "verifier_receipts[].trust_root_digest",
+    "verifier_receipts[].transport_exchange.exchange_id",
+    "verifier_receipts[].transport_exchange.challenge_ref",
+    "verifier_receipts[].transport_exchange.challenge_digest",
+    "verifier_receipts[].transport_exchange.request_payload_kind",
+    "verifier_receipts[].transport_exchange.request_payload_ref",
+    "verifier_receipts[].transport_exchange.request_payload_digest",
+    "verifier_receipts[].transport_exchange.request_size_bytes",
+    "verifier_receipts[].transport_exchange.response_payload_kind",
+    "verifier_receipts[].transport_exchange.response_payload_ref",
+    "verifier_receipts[].transport_exchange.response_payload_digest",
+    "verifier_receipts[].transport_exchange.response_size_bytes",
+    "verifier_receipts[].transport_exchange.recorded_at",
 )
 TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES = (
     TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
@@ -239,6 +267,107 @@ def _trust_transfer_redacted_snapshot_digest(
         return None
 
 
+def _trust_transfer_redacted_verifier_receipt_summary_digest_payload(
+    summary: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": summary["kind"],
+        "schema_version": summary["schema_version"],
+        "summary_id": summary["summary_id"],
+        "summary_ref": summary["summary_ref"],
+        "summary_profile_id": summary["summary_profile_id"],
+        "receipt_id": summary["receipt_id"],
+        "verifier_endpoint": summary["verifier_endpoint"],
+        "verifier_ref": summary["verifier_ref"],
+        "jurisdiction": summary["jurisdiction"],
+        "network_profile_id": summary["network_profile_id"],
+        "authority_chain_ref": summary["authority_chain_ref"],
+        "trust_root_ref": summary["trust_root_ref"],
+        "freshness_window_seconds": summary["freshness_window_seconds"],
+        "observed_latency_ms": summary["observed_latency_ms"],
+        "recorded_at": summary["recorded_at"],
+        "receipt_status": summary["receipt_status"],
+        "transport_exchange_digest": summary["transport_exchange_digest"],
+        "sealed_receipt_digest": summary["sealed_receipt_digest"],
+        "redaction_policy_id": summary["redaction_policy_id"],
+        "redacted_fields": summary["redacted_fields"],
+    }
+
+
+def _trust_transfer_redacted_verifier_receipt_summary_digest(
+    summary: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(
+                _trust_transfer_redacted_verifier_receipt_summary_digest_payload(summary)
+            )
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_redacted_verifier_receipt_commitment_payload(
+    summaries: List[Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    commitment: List[Dict[str, Any]] = []
+    for summary in summaries:
+        commitment.append(
+            {
+                "receipt_id": summary["receipt_id"],
+                "verifier_ref": summary["verifier_ref"],
+                "recorded_at": summary["recorded_at"],
+                "freshness_window_seconds": summary["freshness_window_seconds"],
+                "receipt_status": summary["receipt_status"],
+                "transport_exchange_digest": summary["transport_exchange_digest"],
+                "sealed_receipt_digest": summary["sealed_receipt_digest"],
+            }
+        )
+    return commitment
+
+
+def _trust_transfer_redacted_verifier_receipt_commitment_digest(
+    summaries: List[Mapping[str, Any]],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(
+                _trust_transfer_redacted_verifier_receipt_commitment_payload(summaries)
+            )
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_redacted_verifier_federation_digest_payload(
+    federation: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": federation["kind"],
+        "schema_version": federation["schema_version"],
+        "federation_id": federation["federation_id"],
+        "federation_ref": federation["federation_ref"],
+        "summary_profile_id": federation["summary_profile_id"],
+        "federation_policy_id": federation["federation_policy_id"],
+        "network_profile_id": federation["network_profile_id"],
+        "human_reviewer_ref": federation["human_reviewer_ref"],
+        "required_verifier_count": federation["required_verifier_count"],
+        "received_verifier_count": federation["received_verifier_count"],
+        "verifier_receipt_summaries": federation["verifier_receipt_summaries"],
+        "verifier_refs": federation["verifier_refs"],
+        "trust_root_refs": federation["trust_root_refs"],
+        "authority_chain_refs": federation["authority_chain_refs"],
+        "reviewer_binding_digest": federation["reviewer_binding_digest"],
+        "verifier_receipt_commitment_digest": federation[
+            "verifier_receipt_commitment_digest"
+        ],
+        "sealed_federation_digest": federation["sealed_federation_digest"],
+        "redaction_policy_id": federation["redaction_policy_id"],
+        "redacted_fields": federation["redacted_fields"],
+        "federation_status": federation["federation_status"],
+    }
+
+
 def _trust_transfer_remote_reviewer_binding_digest(
     *,
     human_reviewer_ref: str,
@@ -268,6 +397,13 @@ def _parse_datetime(value: str, field_name: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError(f"{field_name} must include timezone information")
     return parsed
+
+
+def _trust_transfer_federation_binding_digest(federation: Mapping[str, Any]) -> str:
+    sealed_digest = federation.get("sealed_federation_digest")
+    if isinstance(sealed_digest, str) and sealed_digest.strip():
+        return sealed_digest
+    return str(federation.get("receipt_digest", ""))
 
 
 @dataclass(frozen=True)
@@ -605,26 +741,43 @@ class TrustService:
             route_digest=route_digest,
             verifier_receipts=normalized_remote_verifier_receipts,
         )
-        initial_re_attestation_cadence = self._build_re_attestation_cadence(
-            federation=initial_remote_verifier_federation
-        )
         renewed_remote_verifier_receipts = self._renew_remote_verifier_receipts(
             verifier_receipts=normalized_remote_verifier_receipts,
-            renewed_at=initial_re_attestation_cadence["renew_after"],
+            renewed_at=(
+                self._build_re_attestation_cadence(
+                    federation=initial_remote_verifier_federation
+                )["renew_after"]
+            ),
         )
         current_remote_verifier_federation = self._build_remote_verifier_federation(
             human_reviewer_ref=normalized_human_reviewer,
             route_digest=route_digest,
             verifier_receipts=renewed_remote_verifier_receipts,
         )
+        initial_public_remote_verifier_federation = initial_remote_verifier_federation
+        current_public_remote_verifier_federation = current_remote_verifier_federation
+        if normalized_export_profile == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
+            initial_public_remote_verifier_federation = (
+                self._build_redacted_verifier_federation_summary(
+                    initial_remote_verifier_federation
+                )
+            )
+            current_public_remote_verifier_federation = (
+                self._build_redacted_verifier_federation_summary(
+                    current_remote_verifier_federation
+                )
+            )
+        initial_re_attestation_cadence = self._build_re_attestation_cadence(
+            federation=initial_public_remote_verifier_federation
+        )
         current_re_attestation_cadence = self._build_re_attestation_cadence(
-            federation=current_remote_verifier_federation
+            federation=current_public_remote_verifier_federation
         )
         destination_lifecycle = self._build_destination_lifecycle(
             destination_snapshot_digest=destination_snapshot_digest,
-            initial_federation=initial_remote_verifier_federation,
+            initial_federation=initial_public_remote_verifier_federation,
             initial_cadence=initial_re_attestation_cadence,
-            current_federation=current_remote_verifier_federation,
+            current_federation=current_public_remote_verifier_federation,
             current_cadence=current_re_attestation_cadence,
         )
         receipt = {
@@ -668,7 +821,7 @@ class TrustService:
                 "quorum_received": len(received_roles),
                 "route_ref": f"trust-transfer-route://{normalized_agent_id}",
                 "route_digest": route_digest,
-                "remote_verifier_federation": current_remote_verifier_federation,
+                "remote_verifier_federation": current_public_remote_verifier_federation,
                 "re_attestation_cadence": current_re_attestation_cadence,
                 "cross_substrate_attested": True,
             },
@@ -934,6 +1087,10 @@ class TrustService:
             errors.append("export_profile_id must bind the fixed trust transfer export profile")
         if not summary["history_commitment_bound"]:
             errors.append("history commitment digests must stay aligned with the export profile")
+        if not summary["remote_verifier_disclosure_bound"]:
+            errors.append(
+                "remote verifier federation must match the selected public disclosure profile"
+            )
 
         if isinstance(source_snapshot, Mapping) and isinstance(destination_snapshot, Mapping):
             if receipt.get("agent_id") != source_snapshot.get("agent_id"):
@@ -1055,12 +1212,10 @@ class TrustService:
                         "federation_attestation.remote_verifier_federation."
                         "network_profile_id mismatch"
                     )
-                verifier_receipts = remote_verifier_federation.get("verifier_receipts", [])
-                if not isinstance(verifier_receipts, list):
-                    errors.append(
-                        "federation_attestation.remote_verifier_federation.verifier_receipts must be a list"
-                    )
-                    verifier_receipts = []
+                verifier_receipts = remote_verifier_federation.get("verifier_receipts")
+                verifier_receipt_summaries = remote_verifier_federation.get(
+                    "verifier_receipt_summaries"
+                )
                 if remote_verifier_federation.get("required_verifier_count") != (
                     TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
                 ):
@@ -1068,41 +1223,175 @@ class TrustService:
                         "federation_attestation.remote_verifier_federation."
                         "required_verifier_count mismatch"
                     )
-                if remote_verifier_federation.get("received_verifier_count") != len(
-                    verifier_receipts
-                ):
-                    errors.append(
-                        "federation_attestation.remote_verifier_federation."
-                        "received_verifier_count mismatch"
+                if isinstance(verifier_receipts, list):
+                    if export_profile_id == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID:
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.verifier_receipts "
+                            "must be omitted for the redacted export profile"
+                        )
+                    if remote_verifier_federation.get("received_verifier_count") != len(
+                        verifier_receipts
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "received_verifier_count mismatch"
+                        )
+                    expected_binding_digest = _trust_transfer_remote_reviewer_binding_digest(
+                        human_reviewer_ref=str(
+                            remote_verifier_federation.get("human_reviewer_ref", "")
+                        ),
+                        route_digest=str(federation_attestation.get("route_digest", "")),
+                        verifier_receipts=[
+                            verifier_receipt
+                            for verifier_receipt in verifier_receipts
+                            if isinstance(verifier_receipt, Mapping)
+                        ],
                     )
-                expected_binding_digest = _trust_transfer_remote_reviewer_binding_digest(
-                    human_reviewer_ref=str(
-                        remote_verifier_federation.get("human_reviewer_ref", "")
-                    ),
-                    route_digest=str(federation_attestation.get("route_digest", "")),
-                    verifier_receipts=[
-                        verifier_receipt
-                        for verifier_receipt in verifier_receipts
-                        if isinstance(verifier_receipt, Mapping)
-                    ],
-                )
-                if (
-                    remote_verifier_federation.get("reviewer_binding_digest")
-                    != expected_binding_digest
-                ):
-                    errors.append(
-                        "federation_attestation.remote_verifier_federation."
-                        "reviewer_binding_digest mismatch"
+                    if (
+                        remote_verifier_federation.get("reviewer_binding_digest")
+                        != expected_binding_digest
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "reviewer_binding_digest mismatch"
+                        )
+                    if remote_verifier_federation.get("receipt_digest") != sha256_text(
+                        canonical_json(
+                            _trust_transfer_remote_verifier_federation_digest_payload(
+                                remote_verifier_federation
+                            )
+                        )
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.receipt_digest mismatch"
+                        )
+                elif isinstance(verifier_receipt_summaries, list):
+                    if export_profile_id == TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID:
+                        errors.append(
+                            "redacted verifier federation summary is only supported for the redacted export profile"
+                        )
+                    if (
+                        remote_verifier_federation.get("summary_profile_id")
+                        != TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.summary_profile_id mismatch"
+                        )
+                    if (
+                        remote_verifier_federation.get("redaction_policy_id")
+                        != TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.redaction_policy_id mismatch"
+                        )
+                    if remote_verifier_federation.get("redacted_fields") != list(
+                        TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.redacted_fields mismatch"
+                        )
+                    if remote_verifier_federation.get("received_verifier_count") != len(
+                        verifier_receipt_summaries
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "received_verifier_count mismatch"
+                        )
+                    for index, summary_item in enumerate(verifier_receipt_summaries):
+                        if not isinstance(summary_item, Mapping):
+                            errors.append(
+                                "federation_attestation.remote_verifier_federation."
+                                "verifier_receipt_summaries must contain mappings"
+                            )
+                            continue
+                        if (
+                            summary_item.get("summary_profile_id")
+                            != TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID
+                        ):
+                            errors.append(
+                                "federation_attestation.remote_verifier_federation."
+                                f"verifier_receipt_summaries[{index}].summary_profile_id mismatch"
+                            )
+                        if (
+                            summary_item.get("redaction_policy_id")
+                            != TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID
+                        ):
+                            errors.append(
+                                "federation_attestation.remote_verifier_federation."
+                                f"verifier_receipt_summaries[{index}].redaction_policy_id mismatch"
+                            )
+                        if summary_item.get("redacted_fields") != list(
+                            TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS
+                        ):
+                            errors.append(
+                                "federation_attestation.remote_verifier_federation."
+                                f"verifier_receipt_summaries[{index}].redacted_fields mismatch"
+                            )
+                        expected_summary_digest = (
+                            _trust_transfer_redacted_verifier_receipt_summary_digest(
+                                summary_item
+                            )
+                        )
+                        if summary_item.get("summary_digest") != expected_summary_digest:
+                            errors.append(
+                                "federation_attestation.remote_verifier_federation."
+                                f"verifier_receipt_summaries[{index}].summary_digest mismatch"
+                            )
+                    expected_binding_digest = _trust_transfer_remote_reviewer_binding_digest(
+                        human_reviewer_ref=str(
+                            remote_verifier_federation.get("human_reviewer_ref", "")
+                        ),
+                        route_digest=str(federation_attestation.get("route_digest", "")),
+                        verifier_receipts=[
+                            summary_item
+                            for summary_item in verifier_receipt_summaries
+                            if isinstance(summary_item, Mapping)
+                        ],
                     )
-                if remote_verifier_federation.get("receipt_digest") != sha256_text(
-                    canonical_json(
-                        _trust_transfer_remote_verifier_federation_digest_payload(
-                            remote_verifier_federation
+                    if (
+                        remote_verifier_federation.get("reviewer_binding_digest")
+                        != expected_binding_digest
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "reviewer_binding_digest mismatch"
+                        )
+                    expected_commitment_digest = (
+                        _trust_transfer_redacted_verifier_receipt_commitment_digest(
+                            [
+                                summary_item
+                                for summary_item in verifier_receipt_summaries
+                                if isinstance(summary_item, Mapping)
+                            ]
                         )
                     )
-                ):
+                    if (
+                        remote_verifier_federation.get("verifier_receipt_commitment_digest")
+                        != expected_commitment_digest
+                    ):
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation."
+                            "verifier_receipt_commitment_digest mismatch"
+                        )
+                    expected_federation_digest = sha256_text(
+                        canonical_json(
+                            _trust_transfer_redacted_verifier_federation_digest_payload(
+                                remote_verifier_federation
+                            )
+                        )
+                    )
+                    if remote_verifier_federation.get("receipt_digest") != expected_federation_digest:
+                        errors.append(
+                            "federation_attestation.remote_verifier_federation.receipt_digest mismatch"
+                        )
+                    self._require_non_empty_string(
+                        remote_verifier_federation.get("sealed_federation_digest"),
+                        "federation_attestation.remote_verifier_federation.sealed_federation_digest",
+                        errors,
+                    )
+                else:
                     errors.append(
-                        "federation_attestation.remote_verifier_federation.receipt_digest mismatch"
+                        "federation_attestation.remote_verifier_federation must expose verifier_receipts or verifier_receipt_summaries"
                     )
             re_attestation_cadence = federation_attestation.get("re_attestation_cadence", {})
             if not isinstance(re_attestation_cadence, Mapping):
@@ -1540,6 +1829,7 @@ class TrustService:
         federation_quorum_attested = False
         live_remote_verifier_attested = False
         remote_verifier_receipts_bound = False
+        remote_verifier_disclosure_bound = False
         re_attestation_cadence_bound = False
         re_attestation_current = False
         destination_lifecycle_bound = False
@@ -1571,12 +1861,20 @@ class TrustService:
             )
             re_attestation_cadence = federation_attestation.get("re_attestation_cadence", {})
             if isinstance(remote_verifier_federation, Mapping):
-                verifier_receipts = remote_verifier_federation.get("verifier_receipts", [])
-                if isinstance(verifier_receipts, list):
+                verifier_entries: List[Mapping[str, Any]] = []
+                verifier_refs: List[Any] = []
+                if isinstance(remote_verifier_federation.get("verifier_receipts"), list):
+                    verifier_entries = [
+                        verifier_receipt
+                        for verifier_receipt in remote_verifier_federation.get(
+                            "verifier_receipts",
+                            [],
+                        )
+                        if isinstance(verifier_receipt, Mapping)
+                    ]
                     verifier_refs = [
                         verifier_receipt.get("verifier_ref")
-                        for verifier_receipt in verifier_receipts
-                        if isinstance(verifier_receipt, Mapping)
+                        for verifier_receipt in verifier_entries
                     ]
                     live_remote_verifier_attested = (
                         remote_verifier_federation.get("federation_policy_id")
@@ -1586,20 +1884,25 @@ class TrustService:
                         and remote_verifier_federation.get("required_verifier_count")
                         == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
                         and remote_verifier_federation.get("received_verifier_count")
-                        == len(verifier_receipts)
-                        and len(verifier_receipts) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        == len(verifier_entries)
+                        and len(verifier_entries) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
                         and len(set(verifier_refs)) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
                         and all(
-                            isinstance(verifier_receipt, Mapping)
-                            and verifier_receipt.get("network_profile_id")
+                            verifier_receipt.get("network_profile_id")
                             == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
                             and verifier_receipt.get("receipt_status") == "verified"
                             and isinstance(verifier_receipt.get("transport_exchange"), Mapping)
-                            and bool(verifier_receipt["transport_exchange"].get("request_payload_digest"))
                             and bool(
-                                verifier_receipt["transport_exchange"].get("response_payload_digest")
+                                verifier_receipt["transport_exchange"].get(
+                                    "request_payload_digest"
+                                )
                             )
-                            for verifier_receipt in verifier_receipts
+                            and bool(
+                                verifier_receipt["transport_exchange"].get(
+                                    "response_payload_digest"
+                                )
+                            )
+                            for verifier_receipt in verifier_entries
                         )
                     )
                     remote_verifier_receipts_bound = (
@@ -1609,16 +1912,14 @@ class TrustService:
                         == sorted(
                             {
                                 verifier_receipt.get("trust_root_ref")
-                                for verifier_receipt in verifier_receipts
-                                if isinstance(verifier_receipt, Mapping)
+                                for verifier_receipt in verifier_entries
                             }
                         )
                         and remote_verifier_federation.get("authority_chain_refs")
                         == sorted(
                             {
                                 verifier_receipt.get("authority_chain_ref")
-                                for verifier_receipt in verifier_receipts
-                                if isinstance(verifier_receipt, Mapping)
+                                for verifier_receipt in verifier_entries
                             }
                         )
                         and remote_verifier_federation.get("reviewer_binding_digest")
@@ -1627,11 +1928,7 @@ class TrustService:
                                 remote_verifier_federation.get("human_reviewer_ref", "")
                             ),
                             route_digest=str(federation_attestation.get("route_digest", "")),
-                            verifier_receipts=[
-                                verifier_receipt
-                                for verifier_receipt in verifier_receipts
-                                if isinstance(verifier_receipt, Mapping)
-                            ],
+                            verifier_receipts=verifier_entries,
                         )
                         and remote_verifier_federation.get("receipt_digest")
                         == sha256_text(
@@ -1643,74 +1940,177 @@ class TrustService:
                         )
                         and remote_verifier_federation.get("federation_status") == "verified"
                     )
-                    if remote_verifier_receipts_bound and isinstance(re_attestation_cadence, Mapping):
-                        try:
-                            attested_at = max(
-                                _parse_datetime(
-                                    str(verifier_receipt.get("recorded_at", "")),
-                                    "remote_verifier_receipts[].recorded_at",
+                    remote_verifier_disclosure_bound = (
+                        remote_verifier_receipts_bound
+                        and export_profile_id == TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID
+                        and "verifier_receipt_summaries" not in remote_verifier_federation
+                    )
+                elif isinstance(remote_verifier_federation.get("verifier_receipt_summaries"), list):
+                    verifier_entries = [
+                        verifier_receipt
+                        for verifier_receipt in remote_verifier_federation.get(
+                            "verifier_receipt_summaries",
+                            [],
+                        )
+                        if isinstance(verifier_receipt, Mapping)
+                    ]
+                    verifier_refs = [
+                        verifier_receipt.get("verifier_ref")
+                        for verifier_receipt in verifier_entries
+                    ]
+                    summary_digests_match = all(
+                        verifier_receipt.get("summary_profile_id")
+                        == TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID
+                        and verifier_receipt.get("network_profile_id")
+                        == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
+                        and verifier_receipt.get("receipt_status") == "verified"
+                        and verifier_receipt.get("redaction_policy_id")
+                        == TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID
+                        and verifier_receipt.get("redacted_fields")
+                        == list(TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS)
+                        and bool(verifier_receipt.get("transport_exchange_digest"))
+                        and bool(verifier_receipt.get("sealed_receipt_digest"))
+                        and verifier_receipt.get("summary_digest")
+                        == _trust_transfer_redacted_verifier_receipt_summary_digest(
+                            verifier_receipt
+                        )
+                        for verifier_receipt in verifier_entries
+                    )
+                    live_remote_verifier_attested = (
+                        remote_verifier_federation.get("federation_policy_id")
+                        == TRUST_TRANSFER_REMOTE_VERIFIER_FEDERATION_POLICY_ID
+                        and remote_verifier_federation.get("network_profile_id")
+                        == TRUST_TRANSFER_REMOTE_VERIFIER_NETWORK_PROFILE_ID
+                        and remote_verifier_federation.get("required_verifier_count")
+                        == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        and remote_verifier_federation.get("received_verifier_count")
+                        == len(verifier_entries)
+                        and len(verifier_entries) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        and len(set(verifier_refs)) == TRUST_TRANSFER_REQUIRED_REMOTE_VERIFIER_COUNT
+                        and summary_digests_match
+                    )
+                    remote_verifier_receipts_bound = (
+                        live_remote_verifier_attested
+                        and remote_verifier_federation.get("kind")
+                        == "trust_redacted_verifier_federation"
+                        and remote_verifier_federation.get("schema_version")
+                        == TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_SCHEMA_VERSION
+                        and remote_verifier_federation.get("summary_profile_id")
+                        == TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID
+                        and remote_verifier_federation.get("redaction_policy_id")
+                        == TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID
+                        and remote_verifier_federation.get("redacted_fields")
+                        == list(TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS)
+                        and remote_verifier_federation.get("verifier_refs") == verifier_refs
+                        and remote_verifier_federation.get("trust_root_refs")
+                        == sorted(
+                            {
+                                verifier_receipt.get("trust_root_ref")
+                                for verifier_receipt in verifier_entries
+                            }
+                        )
+                        and remote_verifier_federation.get("authority_chain_refs")
+                        == sorted(
+                            {
+                                verifier_receipt.get("authority_chain_ref")
+                                for verifier_receipt in verifier_entries
+                            }
+                        )
+                        and remote_verifier_federation.get("reviewer_binding_digest")
+                        == _trust_transfer_remote_reviewer_binding_digest(
+                            human_reviewer_ref=str(
+                                remote_verifier_federation.get("human_reviewer_ref", "")
+                            ),
+                            route_digest=str(federation_attestation.get("route_digest", "")),
+                            verifier_receipts=verifier_entries,
+                        )
+                        and remote_verifier_federation.get(
+                            "verifier_receipt_commitment_digest"
+                        )
+                        == _trust_transfer_redacted_verifier_receipt_commitment_digest(
+                            verifier_entries
+                        )
+                        and bool(remote_verifier_federation.get("sealed_federation_digest"))
+                        and remote_verifier_federation.get("receipt_digest")
+                        == sha256_text(
+                            canonical_json(
+                                _trust_transfer_redacted_verifier_federation_digest_payload(
+                                    remote_verifier_federation
                                 )
-                                for verifier_receipt in verifier_receipts
-                                if isinstance(verifier_receipt, Mapping)
                             )
-                            valid_until = min(
-                                _parse_datetime(
-                                    str(verifier_receipt.get("recorded_at", "")),
-                                    "remote_verifier_receipts[].recorded_at",
-                                )
-                                + timedelta(
-                                    seconds=int(
-                                        verifier_receipt.get("freshness_window_seconds", 0)
+                        )
+                        and remote_verifier_federation.get("federation_status") == "verified"
+                    )
+                    remote_verifier_disclosure_bound = (
+                        remote_verifier_receipts_bound
+                        and export_profile_id == TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID
+                        and "verifier_receipts" not in remote_verifier_federation
+                    )
+                if remote_verifier_receipts_bound and isinstance(re_attestation_cadence, Mapping):
+                    try:
+                        attested_at = max(
+                            _parse_datetime(
+                                str(verifier_receipt.get("recorded_at", "")),
+                                "remote_verifier_receipts[].recorded_at",
+                            )
+                            for verifier_receipt in verifier_entries
+                        )
+                        valid_until = min(
+                            _parse_datetime(
+                                str(verifier_receipt.get("recorded_at", "")),
+                                "remote_verifier_receipts[].recorded_at",
+                            )
+                            + timedelta(
+                                seconds=int(verifier_receipt.get("freshness_window_seconds", 0))
+                            )
+                            for verifier_receipt in verifier_entries
+                        )
+                        renew_after = attested_at + timedelta(
+                            seconds=TRUST_TRANSFER_REATTESTATION_INTERVAL_SECONDS
+                        )
+                        re_attestation_cadence_bound = (
+                            re_attestation_cadence.get("cadence_policy_id")
+                            == TRUST_TRANSFER_REATTESTATION_CADENCE_POLICY_ID
+                            and re_attestation_cadence.get("attested_at")
+                            == attested_at.isoformat()
+                            and re_attestation_cadence.get("renew_after")
+                            == renew_after.isoformat()
+                            and re_attestation_cadence.get("valid_until")
+                            == valid_until.isoformat()
+                            and re_attestation_cadence.get("grace_window_seconds")
+                            == TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS
+                            and re_attestation_cadence.get("covered_verifier_receipt_ids")
+                            == [
+                                verifier_receipt.get("receipt_id")
+                                for verifier_receipt in verifier_entries
+                            ]
+                            and re_attestation_cadence.get("bound_federation_ref")
+                            == remote_verifier_federation.get("federation_ref")
+                            and re_attestation_cadence.get("bound_federation_digest")
+                            == _trust_transfer_federation_binding_digest(
+                                remote_verifier_federation
+                            )
+                            and re_attestation_cadence.get("receipt_digest")
+                            == sha256_text(
+                                canonical_json(
+                                    _trust_transfer_re_attestation_cadence_digest_payload(
+                                        re_attestation_cadence
                                     )
                                 )
-                                for verifier_receipt in verifier_receipts
-                                if isinstance(verifier_receipt, Mapping)
                             )
-                            renew_after = attested_at + timedelta(
-                                seconds=TRUST_TRANSFER_REATTESTATION_INTERVAL_SECONDS
+                        )
+                        re_attestation_current = (
+                            re_attestation_cadence_bound
+                            and renew_after
+                            + timedelta(
+                                seconds=TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS
                             )
-                            re_attestation_cadence_bound = (
-                                re_attestation_cadence.get("cadence_policy_id")
-                                == TRUST_TRANSFER_REATTESTATION_CADENCE_POLICY_ID
-                                and re_attestation_cadence.get("attested_at")
-                                == attested_at.isoformat()
-                                and re_attestation_cadence.get("renew_after")
-                                == renew_after.isoformat()
-                                and re_attestation_cadence.get("valid_until")
-                                == valid_until.isoformat()
-                                and re_attestation_cadence.get("grace_window_seconds")
-                                == TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS
-                                and re_attestation_cadence.get("covered_verifier_receipt_ids")
-                                == [
-                                    verifier_receipt.get("receipt_id")
-                                    for verifier_receipt in verifier_receipts
-                                    if isinstance(verifier_receipt, Mapping)
-                                ]
-                                and re_attestation_cadence.get("bound_federation_ref")
-                                == remote_verifier_federation.get("federation_ref")
-                                and re_attestation_cadence.get("bound_federation_digest")
-                                == remote_verifier_federation.get("receipt_digest")
-                                and re_attestation_cadence.get("receipt_digest")
-                                == sha256_text(
-                                    canonical_json(
-                                        _trust_transfer_re_attestation_cadence_digest_payload(
-                                            re_attestation_cadence
-                                        )
-                                    )
-                                )
-                            )
-                            re_attestation_current = (
-                                re_attestation_cadence_bound
-                                and renew_after
-                                + timedelta(
-                                    seconds=TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS
-                                )
-                                <= valid_until
-                                and re_attestation_cadence.get("cadence_status") == "scheduled"
-                            )
-                        except (TypeError, ValueError):
-                            re_attestation_cadence_bound = False
-                            re_attestation_current = False
+                            <= valid_until
+                            and re_attestation_cadence.get("cadence_status") == "scheduled"
+                        )
+                    except (TypeError, ValueError):
+                        re_attestation_cadence_bound = False
+                        re_attestation_current = False
         if isinstance(destination_lifecycle, Mapping):
             history = destination_lifecycle.get("history", [])
             remote_verifier_federation = (
@@ -1746,7 +2146,7 @@ class TrustService:
                     and destination_lifecycle.get("latest_federation_ref")
                     == remote_verifier_federation.get("federation_ref")
                     and destination_lifecycle.get("latest_federation_digest")
-                    == remote_verifier_federation.get("receipt_digest")
+                    == _trust_transfer_federation_binding_digest(remote_verifier_federation)
                     and destination_lifecycle.get("latest_cadence_ref")
                     == re_attestation_cadence.get("cadence_ref")
                     and destination_lifecycle.get("latest_cadence_digest")
@@ -1907,6 +2307,7 @@ class TrustService:
             "federation_quorum_attested": federation_quorum_attested,
             "live_remote_verifier_attested": live_remote_verifier_attested,
             "remote_verifier_receipts_bound": remote_verifier_receipts_bound,
+            "remote_verifier_disclosure_bound": remote_verifier_disclosure_bound,
             "re_attestation_cadence_bound": re_attestation_cadence_bound,
             "re_attestation_current": re_attestation_current,
             "destination_lifecycle_bound": destination_lifecycle_bound,
@@ -1957,20 +2358,127 @@ class TrustService:
         )
         return federation
 
+    def _build_redacted_verifier_receipt_summary(
+        self,
+        verifier_receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        transport_exchange = verifier_receipt.get("transport_exchange", {})
+        if not isinstance(transport_exchange, Mapping):
+            raise ValueError("verifier receipt transport_exchange must be a mapping")
+        summary = {
+            "kind": "trust_redacted_verifier_receipt_summary",
+            "schema_version": TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_SCHEMA_VERSION,
+            "summary_id": new_id("trust-verifier-summary"),
+            "summary_ref": (
+                "trust-redacted-verifier-receipt://"
+                f"{sha256_text(str(verifier_receipt['receipt_id']))[:12]}"
+            ),
+            "summary_profile_id": (
+                TRUST_TRANSFER_REDACTED_VERIFIER_RECEIPT_SUMMARY_PROFILE_ID
+            ),
+            "receipt_id": verifier_receipt["receipt_id"],
+            "verifier_endpoint": verifier_receipt["verifier_endpoint"],
+            "verifier_ref": verifier_receipt["verifier_ref"],
+            "jurisdiction": verifier_receipt["jurisdiction"],
+            "network_profile_id": verifier_receipt["network_profile_id"],
+            "authority_chain_ref": verifier_receipt["authority_chain_ref"],
+            "trust_root_ref": verifier_receipt["trust_root_ref"],
+            "freshness_window_seconds": verifier_receipt["freshness_window_seconds"],
+            "observed_latency_ms": verifier_receipt["observed_latency_ms"],
+            "recorded_at": verifier_receipt["recorded_at"],
+            "receipt_status": verifier_receipt["receipt_status"],
+            "transport_exchange_digest": transport_exchange["digest"],
+            "sealed_receipt_digest": verifier_receipt["digest"],
+            "redaction_policy_id": TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID,
+            "redacted_fields": list(TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS),
+            "summary_digest": "",
+        }
+        summary["summary_digest"] = sha256_text(
+            canonical_json(
+                _trust_transfer_redacted_verifier_receipt_summary_digest_payload(summary)
+            )
+        )
+        return summary
+
+    def _build_redacted_verifier_federation_summary(
+        self,
+        federation: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        verifier_receipts = federation.get("verifier_receipts", [])
+        if not isinstance(verifier_receipts, list) or not verifier_receipts:
+            raise ValueError("verifier federation summary requires verifier receipts")
+        verifier_receipt_summaries = [
+            self._build_redacted_verifier_receipt_summary(verifier_receipt)
+            for verifier_receipt in verifier_receipts
+            if isinstance(verifier_receipt, Mapping)
+        ]
+        if len(verifier_receipt_summaries) != len(verifier_receipts):
+            raise ValueError("verifier federation summary requires mapping verifier receipts")
+        summary = {
+            "kind": "trust_redacted_verifier_federation",
+            "schema_version": TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_SCHEMA_VERSION,
+            "federation_id": federation["federation_id"],
+            "federation_ref": federation["federation_ref"],
+            "summary_profile_id": TRUST_TRANSFER_REDACTED_VERIFIER_FEDERATION_PROFILE_ID,
+            "federation_policy_id": federation["federation_policy_id"],
+            "network_profile_id": federation["network_profile_id"],
+            "human_reviewer_ref": federation["human_reviewer_ref"],
+            "required_verifier_count": federation["required_verifier_count"],
+            "received_verifier_count": federation["received_verifier_count"],
+            "verifier_receipt_summaries": verifier_receipt_summaries,
+            "verifier_refs": [
+                verifier_receipt["verifier_ref"]
+                for verifier_receipt in verifier_receipt_summaries
+            ],
+            "trust_root_refs": sorted(
+                {
+                    verifier_receipt["trust_root_ref"]
+                    for verifier_receipt in verifier_receipt_summaries
+                }
+            ),
+            "authority_chain_refs": sorted(
+                {
+                    verifier_receipt["authority_chain_ref"]
+                    for verifier_receipt in verifier_receipt_summaries
+                }
+            ),
+            "reviewer_binding_digest": federation["reviewer_binding_digest"],
+            "verifier_receipt_commitment_digest": (
+                _trust_transfer_redacted_verifier_receipt_commitment_digest(
+                    verifier_receipt_summaries
+                )
+            ),
+            "sealed_federation_digest": federation["receipt_digest"],
+            "redaction_policy_id": TRUST_TRANSFER_VERIFIER_SUMMARY_REDACTION_POLICY_ID,
+            "redacted_fields": list(TRUST_TRANSFER_REDACTED_VERIFIER_FIELDS),
+            "federation_status": federation["federation_status"],
+            "receipt_digest": "",
+        }
+        summary["receipt_digest"] = sha256_text(
+            canonical_json(
+                _trust_transfer_redacted_verifier_federation_digest_payload(summary)
+            )
+        )
+        return summary
+
     def _build_re_attestation_cadence(
         self,
         *,
         federation: Mapping[str, Any],
     ) -> Dict[str, Any]:
-        verifier_receipts = federation.get("verifier_receipts", [])
-        if not isinstance(verifier_receipts, list) or not verifier_receipts:
+        verifier_receipts = federation.get("verifier_receipts")
+        verifier_receipt_summaries = federation.get("verifier_receipt_summaries")
+        verifier_entries = verifier_receipts
+        if not isinstance(verifier_entries, list):
+            verifier_entries = verifier_receipt_summaries
+        if not isinstance(verifier_entries, list) or not verifier_entries:
             raise ValueError("remote verifier federation requires at least one verifier receipt")
         attested_at = max(
             _parse_datetime(
                 str(verifier_receipt.get("recorded_at", "")),
                 "remote_verifier_receipts[].recorded_at",
             )
-            for verifier_receipt in verifier_receipts
+            for verifier_receipt in verifier_entries
             if isinstance(verifier_receipt, Mapping)
         )
         valid_until = min(
@@ -1979,7 +2487,7 @@ class TrustService:
                 "remote_verifier_receipts[].recorded_at",
             )
             + timedelta(seconds=int(verifier_receipt.get("freshness_window_seconds", 0)))
-            for verifier_receipt in verifier_receipts
+            for verifier_receipt in verifier_entries
             if isinstance(verifier_receipt, Mapping)
         )
         renew_after = attested_at + timedelta(seconds=TRUST_TRANSFER_REATTESTATION_INTERVAL_SECONDS)
@@ -1993,11 +2501,13 @@ class TrustService:
             "grace_window_seconds": TRUST_TRANSFER_REATTESTATION_GRACE_WINDOW_SECONDS,
             "covered_verifier_receipt_ids": [
                 verifier_receipt["receipt_id"]
-                for verifier_receipt in verifier_receipts
+                for verifier_receipt in verifier_entries
                 if isinstance(verifier_receipt, Mapping)
             ],
             "bound_federation_ref": federation["federation_ref"],
-            "bound_federation_digest": federation["receipt_digest"],
+            "bound_federation_digest": _trust_transfer_federation_binding_digest(
+                federation
+            ),
             "cadence_status": "scheduled",
             "receipt_digest": "",
         }
@@ -2126,7 +2636,9 @@ class TrustService:
                 "attested_at": initial_cadence["attested_at"],
                 "valid_until": initial_cadence["valid_until"],
                 "federation_ref": initial_federation["federation_ref"],
-                "federation_digest": initial_federation["receipt_digest"],
+                "federation_digest": _trust_transfer_federation_binding_digest(
+                    initial_federation
+                ),
                 "cadence_ref": initial_cadence["cadence_ref"],
                 "cadence_digest": initial_cadence["receipt_digest"],
                 "covered_verifier_receipt_ids": list(
@@ -2145,7 +2657,9 @@ class TrustService:
                 "attested_at": current_cadence["attested_at"],
                 "valid_until": current_cadence["valid_until"],
                 "federation_ref": current_federation["federation_ref"],
-                "federation_digest": current_federation["receipt_digest"],
+                "federation_digest": _trust_transfer_federation_binding_digest(
+                    current_federation
+                ),
                 "cadence_ref": current_cadence["cadence_ref"],
                 "cadence_digest": current_cadence["receipt_digest"],
                 "covered_verifier_receipt_ids": list(
@@ -2164,7 +2678,9 @@ class TrustService:
                 "attested_at": current_cadence["attested_at"],
                 "valid_until": current_cadence["valid_until"],
                 "federation_ref": current_federation["federation_ref"],
-                "federation_digest": current_federation["receipt_digest"],
+                "federation_digest": _trust_transfer_federation_binding_digest(
+                    current_federation
+                ),
                 "cadence_ref": current_cadence["cadence_ref"],
                 "cadence_digest": current_cadence["receipt_digest"],
                 "covered_verifier_receipt_ids": list(
@@ -2183,7 +2699,9 @@ class TrustService:
             "current_status": TRUST_TRANSFER_DESTINATION_CURRENT_STATUS,
             "active_entry_ref": history[-1]["entry_ref"],
             "latest_federation_ref": current_federation["federation_ref"],
-            "latest_federation_digest": current_federation["receipt_digest"],
+            "latest_federation_digest": _trust_transfer_federation_binding_digest(
+                current_federation
+            ),
             "latest_cadence_ref": current_cadence["cadence_ref"],
             "latest_cadence_digest": current_cadence["receipt_digest"],
             "revocation_fail_closed_action": (

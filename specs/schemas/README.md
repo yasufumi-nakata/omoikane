@@ -127,6 +127,8 @@
 - `termination_request.schema`
 - `trust_event.schema`
 - `trust_redacted_snapshot.schema`
+- `trust_redacted_verifier_federation.schema`
+- `trust_redacted_verifier_receipt_summary.schema`
 - `trust_snapshot.schema`
 - `trust_transfer_receipt.schema`
 - `volition_intent.schema`

@@ -1766,12 +1766,29 @@ entries:
     rationale: Required to serialize one public redacted trust snapshot projection with sealed snapshot bindings, history commitments, and score/threshold disclosure floors.
   - priority: P1
     kind: schema
+    file: specs/schemas/trust_redacted_verifier_receipt_summary.schema
+    consumers:
+      - specs/schemas/trust_redacted_verifier_federation.schema
+      - specs/schemas/trust_transfer_receipt.schema
+      - docs/02-subsystems/agentic/trust-management.md
+      - reference-runtime
+    rationale: Required to serialize one public redacted summary of a live remote verifier receipt without exposing the full challenge and payload exchange.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/trust_redacted_verifier_federation.schema
+    consumers:
+      - specs/schemas/trust_transfer_receipt.schema
+      - docs/02-subsystems/agentic/trust-management.md
+      - reference-runtime
+    rationale: Required to serialize one public redacted verifier federation summary with receipt commitments, freshness timing, and sealed full-federation binding.
+  - priority: P1
+    kind: schema
     file: specs/schemas/trust_transfer_receipt.schema
     consumers:
       - specs/interfaces/agentic.trust.v0.idl
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and full-clone versus redacted export profile branching.
+    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and full-clone versus redacted export profile branching including verifier disclosure-floor summaries.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.trust.v0.idl

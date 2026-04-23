@@ -300,6 +300,10 @@ redacted profile では `trust_redacted_snapshot` が
 sealed snapshot ref / digest、history commitment digest、thresholds、eligibility、
 `pinned_reason` と raw history payload を伏せた `redacted_fields`
 だけを public surface として返すこと、
+同じ redacted profile では `trust_redacted_verifier_federation` が
+`trust_redacted_verifier_receipt_summary` を 2 本束ね、
+freshness timing / transport digest / sealed receipt digest を保ちつつ
+challenge / payload exchange detail を `redacted_fields` へ退避すること、
 `guardian-reviewer-remote-attestation-v1` の 2 verifier receipt を
 human reviewer attestation に束縛した `remote_verifier_federation` と、
 `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew を

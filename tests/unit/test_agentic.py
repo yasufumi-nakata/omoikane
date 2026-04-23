@@ -2395,6 +2395,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["history_commitment_bound"])
         self.assertTrue(receipt["validation"]["live_remote_verifier_attested"])
         self.assertTrue(receipt["validation"]["remote_verifier_receipts_bound"])
+        self.assertTrue(receipt["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(receipt["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(receipt["validation"]["re_attestation_current"])
         self.assertTrue(receipt["validation"]["destination_lifecycle_bound"])
@@ -2446,10 +2447,27 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID, receipt["export_profile_id"])
         self.assertTrue(receipt["validation"]["export_profile_bound"])
         self.assertTrue(receipt["validation"]["history_commitment_bound"])
+        self.assertTrue(receipt["validation"]["remote_verifier_disclosure_bound"])
         self.assertNotIn("source_snapshot", receipt)
         self.assertNotIn("destination_snapshot", receipt)
         self.assertIn("source_snapshot_redacted", receipt)
         self.assertIn("destination_snapshot_redacted", receipt)
+        self.assertNotIn(
+            "verifier_receipts",
+            receipt["federation_attestation"]["remote_verifier_federation"],
+        )
+        self.assertIn(
+            "verifier_receipt_summaries",
+            receipt["federation_attestation"]["remote_verifier_federation"],
+        )
+        self.assertEqual(
+            2,
+            len(
+                receipt["federation_attestation"]["remote_verifier_federation"][
+                    "verifier_receipt_summaries"
+                ]
+            ),
+        )
         self.assertEqual(
             receipt["source_snapshot_redacted"]["sealed_snapshot_digest"],
             receipt["source_snapshot_digest"],
@@ -2579,6 +2597,38 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["history_commitment_bound"])
         self.assertIn(
             "history commitment digests must stay aligned with the export profile",
+            validation["errors"],
+        )
+
+    def test_validate_transfer_receipt_rejects_redacted_verifier_summary_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+            export_profile_id=TRUST_TRANSFER_REDACTED_EXPORT_PROFILE_ID,
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["federation_attestation"]["remote_verifier_federation"][
+            "verifier_receipt_summaries"
+        ][0]["transport_exchange_digest"] = "0" * 64
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["remote_verifier_receipts_bound"])
+        self.assertFalse(validation["remote_verifier_disclosure_bound"])
+        self.assertIn(
+            "federation_attestation.remote_verifier_federation.verifier_receipt_commitment_digest mismatch",
             validation["errors"],
         )
 

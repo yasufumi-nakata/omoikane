@@ -25,7 +25,8 @@
   live remote verifier federation、fixed re-attestation cadence、
   append-only destination lifecycle (`imported -> renewed -> revocation-cleared`) に加えて
   full-clone / redacted の public export profile 分岐と
-  `trust_redacted_snapshot` projection まで内包して machine-checkable にし、
+  `trust_redacted_snapshot` projection と
+  `trust_redacted_verifier_federation` summary まで内包して machine-checkable にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
   `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
   `fork-request-v1` では `runtime/schema/docs` required + `eval` optional、
@@ -136,3 +137,4 @@ CouncilMessage:
 - [task-decomposition.md](task-decomposition.md) ── タスク分解アルゴリズム
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア
+# workspace-enacted: patch-746f10325328 target=docs/02-subsystems/agentic/README.md

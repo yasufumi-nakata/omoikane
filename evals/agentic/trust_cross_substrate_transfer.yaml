@@ -3,11 +3,14 @@ target: agentic.trust
 description: >
   Trust snapshot が guardian/human quorum 付きの digest-bound receipt として
   substrate 境界を越えて export/import され、live remote verifier federation と
-  fixed re-attestation cadence、destination renewal/revocation lifecycle を保持しつつ
-  history・thresholds・eligibility を崩さず保持すること。
+  fixed re-attestation cadence、destination renewal/revocation lifecycle、
+  verifier disclosure floor を保持しつつ history・thresholds・eligibility を
+  崩さず保持すること。
 scenarios:
   - name: trust transfer demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --json
+  - name: trust transfer redacted export smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli trust-transfer-demo --export-profile bounded-trust-transfer-redacted-export-v1 --json
 checks:
   transfer_ok: true
   source_snapshot_digest_bound: true
@@ -19,6 +22,7 @@ checks:
   federation_quorum_attested: true
   live_remote_verifier_attested: true
   remote_verifier_receipts_bound: true
+  remote_verifier_disclosure_bound: true
   re_attestation_cadence_bound: true
   re_attestation_current: true
   destination_lifecycle_bound: true

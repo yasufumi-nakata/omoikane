@@ -1432,6 +1432,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["federation_quorum_attested"])
         self.assertTrue(result["validation"]["live_remote_verifier_attested"])
         self.assertTrue(result["validation"]["remote_verifier_receipts_bound"])
+        self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(result["validation"]["re_attestation_cadence_bound"])
         self.assertTrue(result["validation"]["re_attestation_current"])
         self.assertTrue(result["validation"]["destination_lifecycle_bound"])
@@ -1474,10 +1475,23 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["export_profile_bound"])
         self.assertTrue(result["validation"]["history_commitment_bound"])
+        self.assertTrue(result["validation"]["remote_verifier_disclosure_bound"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
         self.assertIn("source_snapshot_redacted", result["transfer"])
         self.assertIn("destination_snapshot_redacted", result["transfer"])
+        self.assertNotIn(
+            "verifier_receipts",
+            result["transfer"]["federation_attestation"]["remote_verifier_federation"],
+        )
+        self.assertEqual(
+            2,
+            len(
+                result["transfer"]["federation_attestation"][
+                    "remote_verifier_federation"
+                ]["verifier_receipt_summaries"]
+            ),
+        )
         self.assertEqual(
             "bounded-trust-transfer-history-redaction-v1",
             result["transfer"]["export_receipt"]["redaction_policy_id"],
