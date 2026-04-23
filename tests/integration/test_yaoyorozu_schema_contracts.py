@@ -120,6 +120,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         result = self.runtime.run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
 
         self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_workspace_discovery.schema",
+            result["workspace_discovery"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/council_convocation_session.schema",
+            result["convocation"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/yaoyorozu_task_graph_binding.schema",
             result["task_graph_binding"],
         )

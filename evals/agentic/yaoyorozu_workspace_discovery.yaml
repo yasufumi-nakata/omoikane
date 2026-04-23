@@ -3,14 +3,22 @@ target: agentic.yaoyorozu
 level: L4
 description: Yaoyorozu must discover a bounded same-host local workspace catalog with machine-readable builder coverage before any cross-workspace handoff is considered.
 inputs:
+  - proposal_profile: self-modify-patch-v1
   - review_budget: 3
   - workspace_count: 3
   - non_source_workspace_count: 2
 expected:
+  proposal_profile: self-modify-patch-v1
   workspace_discovery_ok: true
   workspace_count: 3
   non_source_workspace_count: 2
   workspace_review_budget_respected: true
+  profile_workspace_review_budget: 3
+  profile_required_workspace_coverage_areas:
+    - runtime
+    - schema
+    - eval
+    - docs
   cross_workspace_coverage_complete: true
 metric: equality
 threshold: 1.0

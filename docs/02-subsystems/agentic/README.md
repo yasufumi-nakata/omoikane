@@ -21,11 +21,14 @@
 - 役割定義は [agents/](../../../agents/) 配下
 - reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則に加え、
   self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
-  `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を `review_budget=3` で走査し、
-  `yaoyorozu_workspace_discovery` として cross-workspace builder coverage を machine-readable に固定したうえで、
+  `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を proposal profile ごとの review budget で走査し、
+  `self-modify-patch-v1` では `runtime/schema/eval/docs`、`memory-edit-v1` では `runtime/eval/docs` required + `schema` optional、
+  `fork-request-v1` では `runtime/schema/docs` required + `eval` optional という cross-workspace coverage policy を
+  `yaoyorozu_workspace_discovery` として machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` の
   Council convocation / builder handoff plan を materialize し、
+  convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、
   selected builder handoff を dispatch/unit binding と workspace target 観測、
   さらに git-bound target path delta receipt と delta-derived patch candidate receipt を持つ
   repo-local subprocess worker dispatch receipt まで実行しつつ、

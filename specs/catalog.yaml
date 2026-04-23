@@ -1789,7 +1789,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to serialize one bounded same-host workspace catalog with builder-capable agent registries, coverage summaries, and review-budgeted discovery order before any cross-workspace Yaoyorozu handoff.
+    rationale: Required to serialize one bounded same-host workspace catalog with proposal-profile-selected review budget, required cross-workspace coverage, and accepted candidate ordering before any Yaoyorozu handoff.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_registry_snapshot.schema
@@ -1807,7 +1807,7 @@ entries:
       - docs/02-subsystems/agentic/council-composition.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to bind standing roles, council panel selection, and builder handoff coverage into one deterministic convocation artifact.
+    rationale: Required to bind standing roles, council panel selection, builder handoff coverage, and the selected workspace-discovery policy into one deterministic convocation artifact.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -1878,7 +1878,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, bounded Council convocation, same-session ConsensusBus/TaskGraph handoff binding, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph handoff binding, and local worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -1892,7 +1892,21 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects standing role readiness, weighted vote quorum, and builder handoff coverage for self-modify convocation.
+    rationale: Protects standing role readiness, weighted vote quorum, builder handoff coverage, and workspace-discovery policy binding for self-modify convocation.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_memory_edit_profile.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the memory-edit profile's tighter review budget, required cross-workspace runtime/eval/docs coverage, and same-session TaskGraph strategy selection.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_fork_request_profile.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the fork-request profile's required runtime/schema/docs review coverage, Council panel selection, and governance-focused TaskGraph strategy selection.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_local_worker_dispatch.yaml

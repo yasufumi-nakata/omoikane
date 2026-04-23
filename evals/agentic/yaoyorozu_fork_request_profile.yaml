@@ -10,9 +10,16 @@ expected:
   standing_roles_ready: true
   council_role_coverage_ok: true
   builder_handoff_coverage_ok: true
+  profile_workspace_review_budget: 3
+  profile_required_workspace_coverage_areas:
+    - runtime
+    - schema
+    - docs
   selected_builder_coverage_count: 4
   dispatch_unit_count: 4
   worker_dispatch_coverage_complete: true
+  workspace_discovery_bound: true
+  workspace_profile_policy_ready: true
   task_graph_bundle_strategy_ok: true
   task_graph_bundle_strategy_id: fork-request-governance-three-root-bundle-v1
 metric: equality

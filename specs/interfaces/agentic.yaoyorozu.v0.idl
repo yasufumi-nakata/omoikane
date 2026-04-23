@@ -16,13 +16,14 @@ operations:
   discover_workspace_workers:
     summary: >
       Discover one bounded same-host local workspace catalog of builder-capable agent registries
-      before any cross-workspace builder handoff is considered.
+      before any cross-workspace builder handoff is considered, using the selected
+      proposal profile's review budget and required coverage policy.
     input:
       inline_schema:
         type: object
         required:
           - workspace_roots
-          - review_budget
+          - proposal_profile
         properties:
           workspace_roots:
             type: array
@@ -31,6 +32,12 @@ operations:
             items:
               type: string
               minLength: 1
+          proposal_profile:
+            type: string
+            enum:
+              - self-modify-patch-v1
+              - memory-edit-v1
+              - fork-request-v1
           review_budget:
             type: integer
             minimum: 2
@@ -39,8 +46,9 @@ operations:
       schema_ref: yaoyorozu_workspace_discovery
     guarantees:
       - discovery must stay on the same host and only scan explicit local workspace_roots
+      - proposal_profile must fix the review budget, required coverage areas, and TaskGraph bundle strategy echoed by the discovery output
       - accepted workspaces must expose builder agents, machine-readable role/capability indexes, and coverage summaries
-      - review_budget must cap accepted workspaces and preserve the input ordering of source then candidate workspaces
+      - review_budget must cap accepted workspaces and preserve the input ordering of source then accepted candidates
   sync_registry:
     summary: Materialize one trust-bound registry snapshot from repo-local agents/ definitions.
     input:
@@ -59,7 +67,9 @@ operations:
       - every entry must carry a trust_snapshot and trust_floor
       - role_index and capability_index must remain machine-readable
   prepare_council_convocation:
-    summary: Derive one deterministic Council convocation and builder handoff plan from the synced registry.
+    summary: >
+      Derive one deterministic Council convocation and builder handoff plan from the synced registry,
+      optionally binding the selected workspace-discovery policy and its accepted candidate set.
     input:
       inline_schema:
         type: object
@@ -67,6 +77,7 @@ operations:
           - proposal_profile
           - session_mode
           - target_identity_ref
+          - workspace_discovery
         properties:
           proposal_profile:
             type: string
@@ -81,10 +92,13 @@ operations:
               - expedited
           target_identity_ref:
             type: string
+          workspace_discovery:
+            schema_ref: yaoyorozu_workspace_discovery
     output:
       schema_ref: council_convocation_session
     guarantees:
       - standing roles must include speaker, recorder, guardian_liaison, and self_liaison
+      - when workspace_discovery is bound, its proposal_profile and profile policy must match the selected convocation profile
       - council panel must satisfy weighted vote quorum before emit_build_request
       - builder handoff must cover runtime, schema, eval, and docs surfaces
   prepare_worker_dispatch:
@@ -238,7 +252,7 @@ compatibility:
   stability: bootstrap
   notes:
     - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, and `fork-request-v1` proposal profiles.
-    - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with explicit review_budget and no external runtime execution.
+    - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with profile-aware review_budget, required coverage policy, and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `memory-edit` grouping runtime+eval, and `fork-request` grouping schema+docs.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

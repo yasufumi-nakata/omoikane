@@ -11,6 +11,8 @@ expected:
   council_role_coverage_ok: true
   weighted_vote_quorum_ready: true
   builder_handoff_coverage_ok: true
+  workspace_discovery_bound: true
+  workspace_profile_policy_ready: true
   selected_builder_coverage_count: 4
 metric: equality
 threshold: 1.0

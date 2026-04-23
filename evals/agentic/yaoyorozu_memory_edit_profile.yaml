@@ -10,9 +10,18 @@ expected:
   standing_roles_ready: true
   council_role_coverage_ok: true
   builder_handoff_coverage_ok: true
+  workspace_count: 2
+  non_source_workspace_count: 1
+  profile_workspace_review_budget: 2
+  profile_required_workspace_coverage_areas:
+    - runtime
+    - eval
+    - docs
   selected_builder_coverage_count: 4
   dispatch_unit_count: 4
   worker_dispatch_coverage_complete: true
+  workspace_discovery_bound: true
+  workspace_profile_policy_ready: true
   task_graph_bundle_strategy_ok: true
   task_graph_bundle_strategy_id: memory-edit-rehearsal-three-root-bundle-v1
 metric: equality

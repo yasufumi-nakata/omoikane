@@ -1562,14 +1562,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["consensus_dispatch"]["validation"]["ok"])
         self.assertEqual(3, result["validation"]["workspace_count"])
         self.assertEqual(2, result["validation"]["non_source_workspace_count"])
+        self.assertEqual("self-modify-patch-v1", result["validation"]["proposal_profile"])
         self.assertTrue(result["validation"]["workspace_discovery_ok"])
         self.assertTrue(result["validation"]["workspace_review_budget_respected"])
+        self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            result["validation"]["profile_required_workspace_coverage_areas"],
+        )
+        self.assertEqual([], result["validation"]["profile_optional_workspace_coverage_areas"])
         self.assertTrue(result["validation"]["cross_workspace_coverage_complete"])
         self.assertEqual(4, result["validation"]["dispatch_unit_count"])
         self.assertEqual(4, result["validation"]["dispatch_success_count"])
         self.assertEqual(7, result["validation"]["consensus_message_count"])
         self.assertTrue(result["validation"]["consensus_dispatch_ok"])
         self.assertTrue(result["validation"]["consensus_direct_handoff_blocked"])
+        self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertTrue(result["validation"]["worker_delta_receipts_bound"])
         self.assertEqual("git-target-path-delta-v1", result["validation"]["worker_delta_scan_profile"])
@@ -1648,10 +1657,33 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         self.assertEqual("memory-edit-v1", result["convocation"]["proposal_profile"])
         self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(2, result["validation"]["workspace_count"])
+        self.assertEqual(1, result["validation"]["non_source_workspace_count"])
+        self.assertEqual(2, result["validation"]["profile_workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "eval", "docs"],
+            result["validation"]["profile_required_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            ["schema"],
+            result["validation"]["profile_optional_workspace_coverage_areas"],
+        )
+        self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertIn(
             "memory-edit-v1",
             result["workspace_discovery"]["workspaces"][0]["proposal_profiles"],
+        )
+        self.assertEqual(
+            ["runtime", "eval", "docs"],
+            result["workspace_discovery"]["coverage_summary"][
+                "non_source_profile_supported_coverage_areas"
+            ],
+        )
+        self.assertEqual(
+            ["schema"],
+            result["workspace_discovery"]["coverage_summary"]["non_source_missing_coverage_areas"],
         )
         self.assertEqual(
             [
@@ -1682,6 +1714,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         self.assertEqual("fork-request-v1", result["convocation"]["proposal_profile"])
         self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "schema", "docs"],
+            result["validation"]["profile_required_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            ["eval"],
+            result["validation"]["profile_optional_workspace_coverage_areas"],
+        )
+        self.assertTrue(result["validation"]["workspace_discovery_bound"])
+        self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertIn(
             "fork-request-v1",

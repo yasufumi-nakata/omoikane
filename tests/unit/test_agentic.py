@@ -2328,6 +2328,19 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 ),
             )
             self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-eval-builder.yaml",
+                (
+                    "name: ritual-eval-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - eval.generate\n"
+                    "  - eval.run\n"
+                    "trust_floor: 0.57\n"
+                ),
+            )
+            self._write_workspace_agent(
                 evidence_root,
                 "agents/builders/evidence-schema-builder.yaml",
                 (
@@ -2340,27 +2353,23 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                     "trust_floor: 0.57\n"
                 ),
             )
-            self._write_workspace_agent(
-                evidence_root,
-                "agents/builders/evidence-eval-builder.yaml",
-                (
-                    "name: evidence-eval-builder\n"
-                    "role: builder\n"
-                    "version: 0.1.0\n"
-                    "capabilities:\n"
-                    "  - eval.generate\n"
-                    "  - eval.run\n"
-                    "trust_floor: 0.59\n"
-                ),
-            )
 
-            discovery = service.discover_workspace_workers([repo_root, ritual_root, evidence_root])
+            discovery = service.discover_workspace_workers(
+                [repo_root, ritual_root, evidence_root],
+                proposal_profile="self-modify-patch-v1",
+            )
             validation = service.validate_workspace_discovery(discovery)
 
         self.assertTrue(validation["ok"])
         self.assertEqual(3, validation["workspace_count"])
         self.assertEqual(2, validation["non_source_workspace_count"])
         self.assertTrue(validation["cross_workspace_coverage_complete"])
+        self.assertEqual("self-modify-patch-v1", discovery["proposal_profile"])
+        self.assertEqual(3, discovery["profile_policy"]["workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "schema", "eval", "docs"],
+            discovery["profile_policy"]["required_workspace_coverage_areas"],
+        )
         self.assertEqual(
             [],
             discovery["coverage_summary"]["non_source_missing_coverage_areas"],
@@ -2373,6 +2382,101 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(
             ["self-modify-patch-v1", "memory-edit-v1", "fork-request-v1"],
             discovery["workspaces"][0]["proposal_profiles"],
+        )
+
+    def test_discover_workspace_workers_applies_memory_edit_budget_and_required_coverage(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-yaoyorozu-memory-edit-") as temp_dir:
+            ritual_root = Path(temp_dir) / "ritual-atelier"
+            evidence_root = Path(temp_dir) / "evidence-foundry"
+            self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-runtime-builder.yaml",
+                (
+                    "name: ritual-runtime-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - code.generate\n"
+                    "  - code.refactor\n"
+                    "trust_floor: 0.56\n"
+                ),
+            )
+            self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-eval-builder.yaml",
+                (
+                    "name: ritual-eval-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - eval.generate\n"
+                    "  - eval.run\n"
+                    "trust_floor: 0.57\n"
+                ),
+            )
+            self._write_workspace_agent(
+                ritual_root,
+                "agents/builders/ritual-doc-sync-builder.yaml",
+                (
+                    "name: ritual-doc-sync-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - design.delta.read\n"
+                    "  - sync.docs-to-impl\n"
+                    "trust_floor: 0.58\n"
+                ),
+            )
+            self._write_workspace_agent(
+                evidence_root,
+                "agents/builders/evidence-schema-builder.yaml",
+                (
+                    "name: evidence-schema-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - schema.generate\n"
+                    "  - schema.validate\n"
+                    "trust_floor: 0.57\n"
+                ),
+            )
+
+            discovery = service.discover_workspace_workers(
+                [repo_root, ritual_root, evidence_root],
+                proposal_profile="memory-edit-v1",
+            )
+            validation = service.validate_workspace_discovery(discovery)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(2, validation["workspace_count"])
+        self.assertEqual(1, validation["non_source_workspace_count"])
+        self.assertTrue(validation["cross_workspace_coverage_complete"])
+        self.assertEqual("memory-edit-v1", discovery["proposal_profile"])
+        self.assertEqual(2, discovery["review_budget"])
+        self.assertEqual(2, discovery["profile_policy"]["workspace_review_budget"])
+        self.assertEqual(
+            ["runtime", "eval", "docs"],
+            discovery["profile_policy"]["required_workspace_coverage_areas"],
+        )
+        self.assertEqual(
+            ["schema"],
+            discovery["profile_policy"]["optional_workspace_coverage_areas"],
+        )
+        self.assertEqual(2, len(discovery["accepted_workspace_refs"]))
+        self.assertEqual(
+            ["runtime", "eval", "docs"],
+            discovery["coverage_summary"]["non_source_profile_supported_coverage_areas"],
+        )
+        self.assertEqual(
+            [],
+            discovery["coverage_summary"]["non_source_profile_missing_coverage_areas"],
+        )
+        self.assertEqual(
+            ["schema"],
+            discovery["coverage_summary"]["non_source_missing_coverage_areas"],
         )
 
     def test_prepare_self_modify_convocation_selects_required_roles(self) -> None:

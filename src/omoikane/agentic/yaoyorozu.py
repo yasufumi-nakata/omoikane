@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -353,6 +354,8 @@ def _workspace_discovery_digest_payload(discovery: Mapping[str, Any]) -> Dict[st
         "schema_version": discovery["schema_version"],
         "discovery_profile": discovery["discovery_profile"],
         "discovery_scope": discovery["discovery_scope"],
+        "proposal_profile": discovery["proposal_profile"],
+        "profile_policy": discovery["profile_policy"],
         "source_workspace_ref": discovery["source_workspace_ref"],
         "host_ref": discovery["host_ref"],
         "review_budget": discovery["review_budget"],
@@ -459,6 +462,10 @@ class YaoyorozuRegistryPolicy:
         default_factory=lambda: {
             "self-modify-patch-v1": {
                 "summary": "Prepare a bounded Council review and builder handoff for one self-modify patch.",
+                "workspace_review_policy_id": "self-modify-cross-workspace-review-v1",
+                "workspace_review_budget": 3,
+                "required_workspace_coverage_areas": ["runtime", "schema", "eval", "docs"],
+                "optional_workspace_coverage_areas": [],
                 "council_roles": [
                     {
                         "role_id": "design-auditor",
@@ -505,6 +512,10 @@ class YaoyorozuRegistryPolicy:
             },
             "memory-edit-v1": {
                 "summary": "Prepare a bounded Council review and reversible memory-edit handoff for one recall-affect-buffer session.",
+                "workspace_review_policy_id": "memory-edit-cross-workspace-review-v1",
+                "workspace_review_budget": 2,
+                "required_workspace_coverage_areas": ["runtime", "eval", "docs"],
+                "optional_workspace_coverage_areas": ["schema"],
                 "council_roles": [
                     {
                         "role_id": "memory-archivist",
@@ -551,6 +562,10 @@ class YaoyorozuRegistryPolicy:
             },
             "fork-request-v1": {
                 "summary": "Prepare a bounded Council review and triple-approval fork handoff for one identity fork request.",
+                "workspace_review_policy_id": "fork-request-cross-workspace-review-v1",
+                "workspace_review_budget": 3,
+                "required_workspace_coverage_areas": ["runtime", "schema", "docs"],
+                "optional_workspace_coverage_areas": ["eval"],
                 "council_roles": [
                     {
                         "role_id": "identity-protector",
@@ -620,6 +635,53 @@ class YaoyorozuRegistryService:
     def policy_snapshot(self) -> Dict[str, Any]:
         return self._policy.to_dict()
 
+    def _proposal_profile_policy(self, proposal_profile: str) -> Dict[str, Any]:
+        profile = self._policy.council_profiles.get(proposal_profile)
+        if not isinstance(profile, Mapping):
+            raise ValueError(f"unsupported proposal profile: {proposal_profile}")
+
+        review_budget = profile.get("workspace_review_budget")
+        if not isinstance(review_budget, int):
+            raise ValueError("workspace_review_budget must be an integer")
+        if review_budget < 2 or review_budget > self._policy.workspace_review_budget:
+            raise ValueError(
+                f"workspace_review_budget must be between 2 and {self._policy.workspace_review_budget}"
+            )
+
+        required_coverage_areas = [
+            _non_empty_string(area, "required_workspace_coverage_area")
+            for area in profile.get("required_workspace_coverage_areas", [])
+        ]
+        optional_coverage_areas = [
+            _non_empty_string(area, "optional_workspace_coverage_area")
+            for area in profile.get("optional_workspace_coverage_areas", [])
+        ]
+        if not required_coverage_areas:
+            raise ValueError("required_workspace_coverage_areas must not be empty")
+
+        total_coverage_areas = required_coverage_areas + optional_coverage_areas
+        if len(set(total_coverage_areas)) != len(total_coverage_areas):
+            raise ValueError("workspace coverage areas must remain unique per proposal profile")
+        if sorted(total_coverage_areas) != sorted(self._policy.worker_target_paths):
+            raise ValueError(
+                "workspace coverage areas must partition runtime, schema, eval, and docs"
+            )
+
+        return {
+            "proposal_profile": proposal_profile,
+            "workspace_review_policy_id": _non_empty_string(
+                profile.get("workspace_review_policy_id"),
+                "workspace_review_policy_id",
+            ),
+            "workspace_review_budget": review_budget,
+            "required_workspace_coverage_areas": required_coverage_areas,
+            "optional_workspace_coverage_areas": optional_coverage_areas,
+            "task_graph_bundle_strategy_id": _non_empty_string(
+                profile.get("task_graph_bundle_strategy_id"),
+                "task_graph_bundle_strategy_id",
+            ),
+        }
+
     def _task_graph_bundle_strategy(self, proposal_profile: str) -> Dict[str, Any]:
         strategy = self._policy.task_graph_bundle_strategies.get(proposal_profile)
         if not isinstance(strategy, Mapping):
@@ -657,11 +719,14 @@ class YaoyorozuRegistryService:
         self,
         workspace_roots: Sequence[str | Path],
         *,
+        proposal_profile: Optional[str] = None,
         review_budget: Optional[int] = None,
     ) -> Dict[str, Any]:
         if len(workspace_roots) < 2:
             raise ValueError("workspace_roots must contain at least two local workspaces")
-        budget = review_budget or self._policy.workspace_review_budget
+        profile_id = proposal_profile or self._policy.default_convocation_profile
+        profile_policy = self._proposal_profile_policy(profile_id)
+        budget = review_budget or int(profile_policy["workspace_review_budget"])
         if budget < 2 or budget > self._policy.workspace_review_budget:
             raise ValueError(
                 f"review_budget must be between 2 and {self._policy.workspace_review_budget}"
@@ -671,8 +736,10 @@ class YaoyorozuRegistryService:
             Path(_non_empty_string(str(root), "workspace_root")).resolve()
             for root in workspace_roots
         ]
-        if len(normalized_roots) > budget:
-            raise ValueError("workspace_roots must not exceed review_budget")
+        if len(normalized_roots) > self._policy.workspace_review_budget:
+            raise ValueError(
+                f"workspace_roots must not exceed {self._policy.workspace_review_budget} explicit roots"
+            )
         if len({str(root) for root in normalized_roots}) != len(normalized_roots):
             raise ValueError("workspace_roots must be distinct")
 
@@ -685,7 +752,7 @@ class YaoyorozuRegistryService:
         non_source_coverage_to_workspace_refs = {
             coverage_area: [] for coverage_area in required_coverage
         }
-        workspaces: List[Dict[str, Any]] = []
+        discovered_workspaces: List[Dict[str, Any]] = []
         for workspace_index, workspace_root in enumerate(normalized_roots, start=1):
             agents_root = workspace_root / "agents"
             if not agents_root.is_dir():
@@ -760,10 +827,48 @@ class YaoyorozuRegistryService:
             workspace["workspace_digest"] = sha256_text(
                 canonical_json(_workspace_summary_digest_payload(workspace))
             )
-            workspaces.append(workspace)
-            for coverage_area in supported_coverage_areas:
+            discovered_workspaces.append(workspace)
+
+        source_workspace = discovered_workspaces[0]
+        candidate_workspaces = discovered_workspaces[1:]
+        candidate_budget = budget - 1
+        if candidate_budget < 1:
+            raise ValueError("review_budget must leave room for at least one candidate workspace")
+        selected_candidates = candidate_workspaces
+        if len(candidate_workspaces) > candidate_budget:
+            required_candidate_coverage = set(profile_policy["required_workspace_coverage_areas"])
+            optional_candidate_coverage = set(profile_policy["optional_workspace_coverage_areas"])
+            best_subset: Optional[Sequence[Dict[str, Any]]] = None
+            best_score: Optional[tuple[Any, ...]] = None
+            max_subset_size = min(len(candidate_workspaces), candidate_budget)
+            for subset_size in range(1, max_subset_size + 1):
+                for subset in combinations(candidate_workspaces, subset_size):
+                    supported = {
+                        coverage_area
+                        for workspace in subset
+                        for coverage_area in workspace["supported_coverage_areas"]
+                    }
+                    required_supported = required_candidate_coverage.intersection(supported)
+                    optional_supported = optional_candidate_coverage.intersection(supported)
+                    score = (
+                        len(required_candidate_coverage) - len(required_supported),
+                        -len(required_supported),
+                        subset_size,
+                        -len(optional_supported),
+                        tuple(int(workspace["workspace_order"]) for workspace in subset),
+                    )
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_subset = subset
+            if best_subset is None:
+                raise ValueError("unable to select candidate workspaces within the bounded review budget")
+            selected_candidates = list(best_subset)
+
+        workspaces = [source_workspace, *selected_candidates]
+        for workspace in workspaces:
+            for coverage_area in workspace["supported_coverage_areas"]:
                 coverage_to_workspace_refs[coverage_area].append(workspace["workspace_ref"])
-                if workspace_index > 1:
+                if workspace["workspace_role"] == "candidate":
                     non_source_coverage_to_workspace_refs[coverage_area].append(
                         workspace["workspace_ref"]
                     )
@@ -788,12 +893,40 @@ class YaoyorozuRegistryService:
             for coverage_area in required_coverage
             if coverage_area not in non_source_supported_coverage_areas
         ]
+        profile_required_coverage = list(profile_policy["required_workspace_coverage_areas"])
+        profile_optional_coverage = list(profile_policy["optional_workspace_coverage_areas"])
+        profile_supported_coverage_areas = [
+            coverage_area
+            for coverage_area in profile_required_coverage
+            if coverage_area in supported_coverage_areas
+        ]
+        profile_missing_coverage_areas = [
+            coverage_area
+            for coverage_area in profile_required_coverage
+            if coverage_area not in profile_supported_coverage_areas
+        ]
+        non_source_profile_supported_coverage_areas = [
+            coverage_area
+            for coverage_area in profile_required_coverage
+            if coverage_area in non_source_supported_coverage_areas
+        ]
+        non_source_profile_missing_coverage_areas = [
+            coverage_area
+            for coverage_area in profile_required_coverage
+            if coverage_area not in non_source_profile_supported_coverage_areas
+        ]
         coverage_summary = {
             "required_coverage_areas": required_coverage,
             "supported_coverage_areas": supported_coverage_areas,
             "missing_coverage_areas": missing_coverage_areas,
             "non_source_supported_coverage_areas": non_source_supported_coverage_areas,
             "non_source_missing_coverage_areas": non_source_missing_coverage_areas,
+            "profile_required_coverage_areas": profile_required_coverage,
+            "profile_optional_coverage_areas": profile_optional_coverage,
+            "profile_supported_coverage_areas": profile_supported_coverage_areas,
+            "profile_missing_coverage_areas": profile_missing_coverage_areas,
+            "non_source_profile_supported_coverage_areas": non_source_profile_supported_coverage_areas,
+            "non_source_profile_missing_coverage_areas": non_source_profile_missing_coverage_areas,
             "coverage_to_workspace_refs": coverage_to_workspace_refs,
             "non_source_coverage_to_workspace_refs": non_source_coverage_to_workspace_refs,
             "workspace_count": len(workspaces),
@@ -828,7 +961,9 @@ class YaoyorozuRegistryService:
                 == sorted(required_coverage)
             ),
             "cross_workspace_ready": coverage_summary["non_source_workspace_count"] >= 1,
-            "cross_workspace_coverage_complete": not non_source_missing_coverage_areas,
+            "proposal_profile_bound": True,
+            "profile_policy_bound": True,
+            "cross_workspace_coverage_complete": not non_source_profile_missing_coverage_areas,
         }
         validation["ok"] = all(validation.values())
         discovery = {
@@ -838,6 +973,8 @@ class YaoyorozuRegistryService:
             "discovered_at": utc_now_iso(),
             "discovery_profile": self._policy.workspace_discovery_profile,
             "discovery_scope": self._policy.workspace_discovery_scope,
+            "proposal_profile": profile_id,
+            "profile_policy": profile_policy,
             "source_workspace_ref": workspaces[0]["workspace_ref"],
             "host_ref": self._policy.workspace_discovery_host_ref,
             "review_budget": budget,
@@ -881,6 +1018,18 @@ class YaoyorozuRegistryService:
             or review_budget > self._policy.workspace_review_budget
         ):
             errors.append("review_budget must stay within the bounded workspace review budget")
+        proposal_profile = workspace_discovery.get("proposal_profile")
+        if proposal_profile not in self._policy.council_profiles:
+            errors.append("proposal_profile must map to one supported proposal profile")
+            expected_profile_policy: Dict[str, Any] = {}
+        else:
+            expected_profile_policy = self._proposal_profile_policy(str(proposal_profile))
+        profile_policy = workspace_discovery.get("profile_policy", {})
+        if not isinstance(profile_policy, Mapping):
+            errors.append("profile_policy must be a mapping")
+            profile_policy = {}
+        elif expected_profile_policy and dict(profile_policy) != expected_profile_policy:
+            errors.append("profile_policy must match the selected proposal profile policy")
         workspace_roots = workspace_discovery.get("workspace_roots", [])
         if not isinstance(workspace_roots, list) or len(workspace_roots) < 2:
             errors.append("workspace_roots must list at least two workspaces")
@@ -936,10 +1085,37 @@ class YaoyorozuRegistryService:
         missing_coverage_areas = coverage_summary.get("missing_coverage_areas", [])
         non_source_supported = coverage_summary.get("non_source_supported_coverage_areas", [])
         non_source_missing = coverage_summary.get("non_source_missing_coverage_areas", [])
+        profile_required = coverage_summary.get("profile_required_coverage_areas", [])
+        profile_optional = coverage_summary.get("profile_optional_coverage_areas", [])
+        profile_supported = coverage_summary.get("profile_supported_coverage_areas", [])
+        profile_missing = coverage_summary.get("profile_missing_coverage_areas", [])
+        non_source_profile_supported = coverage_summary.get(
+            "non_source_profile_supported_coverage_areas",
+            [],
+        )
+        non_source_profile_missing = coverage_summary.get(
+            "non_source_profile_missing_coverage_areas",
+            [],
+        )
         if sorted({*supported_coverage_areas, *missing_coverage_areas}) != sorted(required_coverage):
             errors.append("coverage_summary must partition the required coverage areas")
         if sorted({*non_source_supported, *non_source_missing}) != sorted(required_coverage):
             errors.append("non_source coverage summary must partition the required coverage areas")
+        if expected_profile_policy:
+            expected_required = expected_profile_policy["required_workspace_coverage_areas"]
+            expected_optional = expected_profile_policy["optional_workspace_coverage_areas"]
+            if profile_required != expected_required:
+                errors.append("coverage_summary.profile_required_coverage_areas mismatch")
+            if profile_optional != expected_optional:
+                errors.append("coverage_summary.profile_optional_coverage_areas mismatch")
+            if sorted({*profile_supported, *profile_missing}) != sorted(expected_required):
+                errors.append(
+                    "coverage_summary profile-supported/profile-missing coverage must partition the required profile coverage"
+                )
+            if sorted({*non_source_profile_supported, *non_source_profile_missing}) != sorted(expected_required):
+                errors.append(
+                    "coverage_summary non_source profile-supported/profile-missing coverage must partition the required profile coverage"
+                )
         if coverage_summary.get("workspace_count") != len(workspaces):
             errors.append("coverage_summary.workspace_count must match accepted workspaces")
         if coverage_summary.get("non_source_workspace_count") != max(len(workspaces) - 1, 0):
@@ -955,7 +1131,8 @@ class YaoyorozuRegistryService:
             "non_source_workspace_count": max(len(workspaces) - 1, 0),
             "builder_workspace_count": builder_workspace_count,
             "review_budget_respected": len(workspaces) <= int(review_budget or 0),
-            "cross_workspace_coverage_complete": not non_source_missing,
+            "proposal_profile": proposal_profile,
+            "cross_workspace_coverage_complete": not non_source_profile_missing,
             "errors": errors,
         }
 
@@ -1042,6 +1219,7 @@ class YaoyorozuRegistryService:
         proposal_profile: str | None = None,
         session_mode: str = "standard",
         target_identity_ref: str = "identity://primary",
+        workspace_discovery: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         if not self._entries:
             raise ValueError("registry must be synced before preparing a convocation")
@@ -1050,6 +1228,53 @@ class YaoyorozuRegistryService:
             raise ValueError(f"unsupported convocation profile: {profile_id}")
 
         profile = self._policy.council_profiles[profile_id]
+        profile_policy = self._proposal_profile_policy(profile_id)
+        workspace_discovery_binding: Dict[str, Any] | None = None
+        workspace_profile_policy_ready = True
+        if workspace_discovery is not None:
+            workspace_discovery_validation = self.validate_workspace_discovery(workspace_discovery)
+            if workspace_discovery.get("proposal_profile") != profile_id:
+                raise ValueError("workspace_discovery proposal_profile must match the convocation profile")
+            if not workspace_discovery_validation["ok"]:
+                raise ValueError("workspace_discovery must validate before preparing a convocation")
+            if not workspace_discovery_validation["cross_workspace_coverage_complete"]:
+                raise ValueError(
+                    "workspace_discovery must satisfy the profile-required cross-workspace coverage"
+                )
+            workspace_discovery_binding = {
+                "workspace_discovery_ref": (
+                    f"workspace-discovery://{workspace_discovery['discovery_id']}"
+                ),
+                "workspace_discovery_digest": _non_empty_string(
+                    workspace_discovery.get("discovery_digest"),
+                    "workspace_discovery.discovery_digest",
+                ),
+                "proposal_profile": profile_id,
+                "workspace_review_budget": int(profile_policy["workspace_review_budget"]),
+                "required_workspace_coverage_areas": list(
+                    profile_policy["required_workspace_coverage_areas"]
+                ),
+                "optional_workspace_coverage_areas": list(
+                    profile_policy["optional_workspace_coverage_areas"]
+                ),
+                "accepted_workspace_refs": list(workspace_discovery["accepted_workspace_refs"]),
+                "cross_workspace_coverage_complete": bool(
+                    workspace_discovery_validation["cross_workspace_coverage_complete"]
+                ),
+            }
+            workspace_profile_policy_ready = (
+                workspace_discovery_binding["workspace_review_budget"]
+                == workspace_discovery.get("review_budget")
+                and workspace_discovery_binding["required_workspace_coverage_areas"]
+                == workspace_discovery.get("profile_policy", {}).get(
+                    "required_workspace_coverage_areas"
+                )
+                and workspace_discovery_binding["optional_workspace_coverage_areas"]
+                == workspace_discovery.get("profile_policy", {}).get(
+                    "optional_workspace_coverage_areas"
+                )
+            )
+
         standing_roles = {
             "speaker": self._select_named_agent(
                 role_id="speaker",
@@ -1128,8 +1353,14 @@ class YaoyorozuRegistryService:
             "council_role_coverage_ok": not missing_council_roles,
             "weighted_vote_quorum_ready": weighted_vote_ready_count >= 3,
             "builder_handoff_coverage_ok": not missing_builder_coverage,
+            "workspace_discovery_bound": workspace_discovery_binding is not None,
+            "workspace_profile_policy_ready": workspace_profile_policy_ready,
         }
-        validation["ok"] = all(validation.values())
+        validation["ok"] = all(
+            value
+            for key, value in validation.items()
+            if key != "workspace_discovery_bound"
+        )
         session_body = {
             "registry_snapshot_ref": (
                 f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
@@ -1152,6 +1383,8 @@ class YaoyorozuRegistryService:
             },
             "validation": validation,
         }
+        if workspace_discovery_binding is not None:
+            session_body["workspace_discovery_binding"] = workspace_discovery_binding
         return {
             "kind": "council_convocation_session",
             "schema_version": "1.0.0",

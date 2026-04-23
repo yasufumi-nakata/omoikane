@@ -466,6 +466,16 @@ class OmoikaneReferenceOS:
                         "trust_floor: 0.56\n"
                         "prompt_or_policy_ref: agents/builders/ritual-runtime-builder.policy.md\n"
                     ),
+                    "agents/builders/ritual-eval-builder.yaml": (
+                        "name: ritual-eval-builder\n"
+                        "role: builder\n"
+                        "version: 0.1.0\n"
+                        "capabilities:\n"
+                        "  - eval.generate\n"
+                        "  - eval.run\n"
+                        "trust_floor: 0.57\n"
+                        "prompt_or_policy_ref: agents/builders/ritual-eval-builder.policy.md\n"
+                    ),
                     "agents/builders/ritual-doc-sync-builder.yaml": (
                         "name: ritual-doc-sync-builder\n"
                         "role: builder\n"
@@ -487,16 +497,6 @@ class OmoikaneReferenceOS:
                         "  - schema.validate\n"
                         "trust_floor: 0.57\n"
                         "prompt_or_policy_ref: agents/builders/evidence-schema-builder.policy.md\n"
-                    ),
-                    "agents/builders/evidence-eval-builder.yaml": (
-                        "name: evidence-eval-builder\n"
-                        "role: builder\n"
-                        "version: 0.1.0\n"
-                        "capabilities:\n"
-                        "  - eval.generate\n"
-                        "  - eval.run\n"
-                        "trust_floor: 0.59\n"
-                        "prompt_or_policy_ref: agents/builders/evidence-eval-builder.policy.md\n"
                     ),
                 },
             }
@@ -3582,7 +3582,10 @@ json.dump(response, sys.stdout)
             self.trust.register_agent(**seed)
 
         with self._yaoyorozu_demo_workspaces() as workspace_roots:
-            workspace_discovery = self.yaoyorozu.discover_workspace_workers(workspace_roots)
+            workspace_discovery = self.yaoyorozu.discover_workspace_workers(
+                workspace_roots,
+                proposal_profile=proposal_profile,
+            )
         workspace_discovery_validation = self.yaoyorozu.validate_workspace_discovery(
             workspace_discovery
         )
@@ -3591,6 +3594,7 @@ json.dump(response, sys.stdout)
             proposal_profile=proposal_profile,
             session_mode="standard",
             target_identity_ref=identity.identity_id,
+            workspace_discovery=workspace_discovery,
         )
         dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(convocation)
         dispatch_plan_validation = self.yaoyorozu.validate_worker_dispatch_plan(dispatch_plan)
@@ -3801,9 +3805,19 @@ json.dump(response, sys.stdout)
                 "non_source_workspace_count": workspace_discovery_validation[
                     "non_source_workspace_count"
                 ],
+                "proposal_profile": workspace_discovery_validation["proposal_profile"],
                 "workspace_review_budget_respected": workspace_discovery_validation[
                     "review_budget_respected"
                 ],
+                "profile_workspace_review_budget": workspace_discovery["profile_policy"][
+                    "workspace_review_budget"
+                ],
+                "profile_required_workspace_coverage_areas": workspace_discovery[
+                    "profile_policy"
+                ]["required_workspace_coverage_areas"],
+                "profile_optional_workspace_coverage_areas": workspace_discovery[
+                    "profile_policy"
+                ]["optional_workspace_coverage_areas"],
                 "cross_workspace_coverage_complete": workspace_discovery_validation[
                     "cross_workspace_coverage_complete"
                 ],
@@ -3821,6 +3835,12 @@ json.dump(response, sys.stdout)
                 "council_role_coverage_ok": convocation["validation"]["council_role_coverage_ok"],
                 "builder_handoff_coverage_ok": convocation["validation"][
                     "builder_handoff_coverage_ok"
+                ],
+                "workspace_discovery_bound": convocation["validation"][
+                    "workspace_discovery_bound"
+                ],
+                "workspace_profile_policy_ready": convocation["validation"][
+                    "workspace_profile_policy_ready"
                 ],
                 "worker_dispatch_plan_ok": dispatch_plan_validation["ok"],
                 "worker_dispatch_receipt_ok": dispatch_receipt_validation["ok"],
