@@ -14,9 +14,11 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
 from .local_worker_stub import (
+    YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
     YAOYOROZU_WORKER_READY_GATE_PROFILE,
     YAOYOROZU_WORKER_REPORT_KIND,
     YAOYOROZU_WORKER_REPORT_PROFILE,
+    build_workspace_delta_receipt,
     build_worker_report_binding_digest,
 )
 from .task_graph import TaskGraphService
@@ -68,6 +70,7 @@ YAOYOROZU_WORKER_REPORT_FIELDS = [
     "workspace_root_digest",
     "invocation_digest",
     "target_path_observations",
+    "workspace_delta_receipt",
     "coverage_evidence",
     "status",
 ]
@@ -1315,6 +1318,12 @@ class YaoyorozuRegistryService:
                 workspace_root=str(repo_root),
                 target_paths=list(unit["target_paths"]),
             )
+            workspace_delta_receipt = build_workspace_delta_receipt(
+                workspace_root=repo_root,
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=str(unit["unit_id"]),
+                target_paths=list(unit["target_paths"]),
+            )
             if not report:
                 report = {
                     "kind": YAOYOROZU_WORKER_REPORT_KIND,
@@ -1332,17 +1341,24 @@ class YaoyorozuRegistryService:
                     "workspace_root_digest": sha256_text(str(repo_root)),
                     "invocation_digest": expected_binding_digest,
                     "target_path_observations": [],
+                    "workspace_delta_receipt": workspace_delta_receipt,
                     "coverage_evidence": {
                         "expected_target_count": len(unit["target_paths"]),
                         "observed_target_count": 0,
                         "existing_target_count": 0,
                         "all_targets_exist": False,
                         "all_targets_within_workspace": False,
+                        "delta_receipt_ref": workspace_delta_receipt["receipt_ref"],
+                        "delta_status": workspace_delta_receipt["status"],
+                        "changed_path_count": workspace_delta_receipt["changed_path_count"],
+                        "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
                         "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
                     },
                     "status": "failed",
                 }
             coverage_evidence = report.get("coverage_evidence", {})
+            delta_receipt = report.get("workspace_delta_receipt", {})
+            delta_entries = delta_receipt.get("entries", []) if isinstance(delta_receipt, Mapping) else []
             report_binding_ok = (
                 report.get("report_profile") == YAOYOROZU_WORKER_REPORT_PROFILE
                 and report.get("dispatch_plan_ref") == dispatch_plan_ref
@@ -1351,6 +1367,23 @@ class YaoyorozuRegistryService:
                 and report.get("invocation_digest") == expected_binding_digest
                 and report.get("source_ref") == unit["source_ref"]
                 and report.get("target_paths") == unit["target_paths"]
+            )
+            delta_receipt_ok = (
+                isinstance(delta_receipt, Mapping)
+                and delta_receipt.get("kind") == "yaoyorozu_worker_workspace_delta_receipt"
+                and delta_receipt.get("profile_id") == YAOYOROZU_WORKER_DELTA_SCAN_PROFILE
+                and delta_receipt.get("dispatch_plan_ref") == dispatch_plan_ref
+                and delta_receipt.get("dispatch_unit_ref") == unit["unit_id"]
+                and delta_receipt.get("workspace_root") == str(repo_root)
+                and delta_receipt.get("target_paths") == unit["target_paths"]
+                and delta_receipt.get("status") in {"clean", "delta-detected"}
+                and isinstance(delta_entries, list)
+                and delta_receipt.get("changed_path_count") == len(delta_entries)
+                and isinstance(coverage_evidence, Mapping)
+                and coverage_evidence.get("delta_receipt_ref") == delta_receipt.get("receipt_ref")
+                and coverage_evidence.get("delta_status") == delta_receipt.get("status")
+                and coverage_evidence.get("changed_path_count") == delta_receipt.get("changed_path_count")
+                and coverage_evidence.get("delta_scan_profile") == YAOYOROZU_WORKER_DELTA_SCAN_PROFILE
             )
             target_paths_ready = (
                 isinstance(coverage_evidence, Mapping)
@@ -1377,6 +1410,7 @@ class YaoyorozuRegistryService:
                 "stderr_digest": sha256_text(stderr_text),
                 "report_digest": sha256_text(canonical_json(report)),
                 "report_binding_ok": report_binding_ok,
+                "delta_receipt_ok": delta_receipt_ok,
                 "target_paths_ready": target_paths_ready,
                 "report": report,
             }
@@ -1384,6 +1418,7 @@ class YaoyorozuRegistryService:
                 process.returncode != 0
                 or report.get("status") != "ready"
                 or not report_binding_ok
+                or not delta_receipt_ok
                 or not target_paths_ready
             ):
                 failed_role_ids.append(str(unit["role_id"]))
@@ -1401,12 +1436,15 @@ class YaoyorozuRegistryService:
                 and result["exit_code"] == 0
                 and result["reported_status"] == "ready"
                 and result["report_binding_ok"]
+                and result["delta_receipt_ok"]
                 and result["target_paths_ready"]
             ),
             "failed_role_ids": failed_role_ids,
             "coverage_areas": [str(result["coverage_area"]) for result in results],
             "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
+            "delta_bound_count": sum(1 for result in results if result["delta_receipt_ok"]),
             "ready_gate_profile": YAOYOROZU_WORKER_READY_GATE_PROFILE,
+            "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
         }
         validation = {
             "command_digests_match": all(
@@ -1430,6 +1468,9 @@ class YaoyorozuRegistryService:
             ),
             "all_reports_bound_to_dispatch": all(
                 result["report_binding_ok"] for result in results
+            ),
+            "all_delta_receipts_bound": all(
+                result["delta_receipt_ok"] for result in results
             ),
             "all_target_paths_ready": all(result["target_paths_ready"] for result in results),
         }
@@ -1491,6 +1532,8 @@ class YaoyorozuRegistryService:
                 errors.append("worker report dispatch_plan_ref must match receipt")
             if result.get("report_binding_ok") is not True:
                 errors.append("worker report must remain bound to the dispatch unit")
+            if result.get("delta_receipt_ok") is not True:
+                errors.append("worker report must keep a dispatch-bound delta receipt")
             if result.get("target_paths_ready") is not True:
                 errors.append("worker report must prove target path readiness")
             coverage_evidence = report.get("coverage_evidence", {})
@@ -1503,6 +1546,33 @@ class YaoyorozuRegistryService:
                     errors.append("worker report must confirm all target paths exist")
                 if coverage_evidence.get("all_targets_within_workspace") is not True:
                     errors.append("worker report must confirm workspace-bounded target paths")
+                if coverage_evidence.get("delta_scan_profile") != YAOYOROZU_WORKER_DELTA_SCAN_PROFILE:
+                    errors.append("worker report delta_scan_profile mismatch")
+            delta_receipt = report.get("workspace_delta_receipt", {})
+            if not isinstance(delta_receipt, Mapping):
+                errors.append("worker report workspace_delta_receipt must be a mapping")
+            else:
+                if delta_receipt.get("kind") != "yaoyorozu_worker_workspace_delta_receipt":
+                    errors.append("worker delta receipt kind mismatch")
+                if delta_receipt.get("profile_id") != YAOYOROZU_WORKER_DELTA_SCAN_PROFILE:
+                    errors.append("worker delta receipt profile mismatch")
+                if delta_receipt.get("dispatch_plan_ref") != dispatch_receipt.get("dispatch_plan_ref"):
+                    errors.append("worker delta receipt dispatch_plan_ref must match receipt")
+                if delta_receipt.get("dispatch_unit_ref") != result.get("unit_id"):
+                    errors.append("worker delta receipt dispatch_unit_ref must match the result unit")
+                if delta_receipt.get("status") not in {"clean", "delta-detected"}:
+                    errors.append("worker delta receipt must stay clean or delta-detected")
+                entries = delta_receipt.get("entries", [])
+                if not isinstance(entries, list):
+                    errors.append("worker delta receipt entries must be a list")
+                elif delta_receipt.get("changed_path_count") != len(entries):
+                    errors.append("worker delta receipt changed_path_count must match entries")
+                if coverage_evidence.get("delta_receipt_ref") != delta_receipt.get("receipt_ref"):
+                    errors.append("worker report must bind the delta receipt ref")
+                if coverage_evidence.get("delta_status") != delta_receipt.get("status"):
+                    errors.append("worker report must bind the delta receipt status")
+                if coverage_evidence.get("changed_path_count") != delta_receipt.get("changed_path_count"):
+                    errors.append("worker report must bind the delta receipt changed_path_count")
             if result.get("exit_code") != 0:
                 errors.append("worker process exit_code must be 0")
 
@@ -1523,9 +1593,24 @@ class YaoyorozuRegistryService:
                 and result.get("process_status") == "completed"
                 and result.get("exit_code") == 0
                 and result.get("reported_status") == "ready"
+                and result.get("report_binding_ok") is True
+                and result.get("delta_receipt_ok") is True
+                and result.get("target_paths_ready") is True
             ),
             "coverage_complete": not missing_coverage,
             "missing_coverage": missing_coverage,
+            "all_reports_bound_to_dispatch": all(
+                isinstance(result, Mapping) and result.get("report_binding_ok") is True
+                for result in results
+            ),
+            "all_delta_receipts_bound": all(
+                isinstance(result, Mapping) and result.get("delta_receipt_ok") is True
+                for result in results
+            ),
+            "all_target_paths_ready": all(
+                isinstance(result, Mapping) and result.get("target_paths_ready") is True
+                for result in results
+            ),
             "errors": errors,
         }
 

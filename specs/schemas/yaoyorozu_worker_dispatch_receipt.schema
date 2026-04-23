@@ -66,6 +66,7 @@ properties:
         - stderr_digest
         - report_digest
         - report_binding_ok
+        - delta_receipt_ok
         - target_paths_ready
         - report
       properties:
@@ -115,6 +116,8 @@ properties:
           pattern: "^[a-f0-9]{64}$"
         report_binding_ok:
           const: true
+        delta_receipt_ok:
+          const: true
         target_paths_ready:
           const: true
         report:
@@ -136,13 +139,14 @@ properties:
             - workspace_root_digest
             - invocation_digest
             - target_path_observations
+            - workspace_delta_receipt
             - coverage_evidence
             - status
           properties:
             kind:
               const: yaoyorozu_local_worker_report
             report_profile:
-              const: repo-local-path-bound-worker-report-v1
+              const: repo-local-path-bound-worker-report-v2
             agent_id:
               type: string
               minLength: 1
@@ -226,6 +230,8 @@ properties:
                   observation_digest:
                     type: string
                     pattern: "^[a-f0-9]{64}$"
+            workspace_delta_receipt:
+              $ref: "yaoyorozu_worker_workspace_delta_receipt.schema"
             coverage_evidence:
               type: object
               additionalProperties: false
@@ -235,6 +241,10 @@ properties:
                 - existing_target_count
                 - all_targets_exist
                 - all_targets_within_workspace
+                - delta_receipt_ref
+                - delta_status
+                - changed_path_count
+                - delta_scan_profile
                 - ready_gate
               properties:
                 expected_target_count:
@@ -250,8 +260,21 @@ properties:
                   const: true
                 all_targets_within_workspace:
                   const: true
+                delta_receipt_ref:
+                  type: string
+                  pattern: "^worker-delta://"
+                delta_status:
+                  type: string
+                  enum:
+                    - clean
+                    - delta-detected
+                changed_path_count:
+                  type: integer
+                  minimum: 0
+                delta_scan_profile:
+                  const: git-target-path-delta-v1
                 ready_gate:
-                  const: path-bound-target-scan-v1
+                  const: path-bound-target-delta-scan-v2
             status:
               const: ready
   execution_summary:
@@ -264,7 +287,9 @@ properties:
       - failed_role_ids
       - coverage_areas
       - target_ready_count
+      - delta_bound_count
       - ready_gate_profile
+      - delta_scan_profile
     properties:
       launched_process_count:
         type: integer
@@ -292,8 +317,13 @@ properties:
       target_ready_count:
         type: integer
         minimum: 0
+      delta_bound_count:
+        type: integer
+        minimum: 0
       ready_gate_profile:
-        const: path-bound-target-scan-v1
+        const: path-bound-target-delta-scan-v2
+      delta_scan_profile:
+        const: git-target-path-delta-v1
   validation:
     type: object
     additionalProperties: false
@@ -303,6 +333,7 @@ properties:
       - all_reports_ready
       - coverage_complete
       - all_reports_bound_to_dispatch
+      - all_delta_receipts_bound
       - all_target_paths_ready
       - ok
     properties:
@@ -315,6 +346,8 @@ properties:
       coverage_complete:
         const: true
       all_reports_bound_to_dispatch:
+        const: true
+      all_delta_receipts_bound:
         const: true
       all_target_paths_ready:
         const: true
@@ -346,10 +379,11 @@ examples:
         stderr_digest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
         report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         report_binding_ok: true
+        delta_receipt_ok: true
         target_paths_ready: true
         report:
           kind: yaoyorozu_local_worker_report
-          report_profile: repo-local-path-bound-worker-report-v1
+          report_profile: repo-local-path-bound-worker-report-v2
           agent_id: codex-builder
           role_id: builder-runtime
           coverage_area: runtime
@@ -374,13 +408,63 @@ examples:
               entry_count: 8
               sample_entries: [agentic, cognitive, kernel]
               observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          workspace_delta_receipt:
+            kind: yaoyorozu_worker_workspace_delta_receipt
+            schema_version: 1.0.0
+            receipt_id: yaoyorozu-worker-delta-0123456789ab
+            receipt_ref: worker-delta://yaoyorozu-worker-delta-0123456789ab
+            profile_id: git-target-path-delta-v1
+            workspace_root: /Users/example/omoikane
+            workspace_root_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+            dispatch_plan_ref: dispatch://yaoyorozu-dispatch-0123456789ab
+            dispatch_unit_ref: worker-dispatch-0123456789ab
+            target_paths:
+              - src/omoikane/
+              - tests/unit/
+              - tests/integration/
+            scanned_at: "2026-04-23T07:05:00Z"
+            head_commit: 0123456789abcdef0123456789abcdef01234567
+            status: delta-detected
+            changed_path_count: 1
+            entries:
+              - path: src/omoikane/agentic/local_worker_stub.py
+                path_kind: file
+                working_tree_state: modified
+                change_status: modified
+                within_workspace: true
+                within_target_paths: true
+                baseline_present: true
+                current_present: true
+                baseline_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+                baseline_bytes: 2048
+                current_bytes: 2432
+                entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+            command_receipts:
+              - command_label: git-rev-parse-head
+                command: git -C /Users/example/omoikane rev-parse HEAD
+                exit_code: 0
+                status: pass
+                stdout_excerpt: 0123456789abcdef0123456789abcdef01234567
+                stderr_excerpt: ""
+              - command_label: git-status-short
+                command: git -C /Users/example/omoikane status --short --untracked-files=all -- src/omoikane/ tests/unit/ tests/integration/
+                exit_code: 0
+                status: pass
+                stdout_excerpt: " M src/omoikane/agentic/local_worker_stub.py"
+                stderr_excerpt: ""
+            receipt_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
           coverage_evidence:
             expected_target_count: 3
             observed_target_count: 3
             existing_target_count: 3
             all_targets_exist: true
             all_targets_within_workspace: true
-            ready_gate: path-bound-target-scan-v1
+            delta_receipt_ref: worker-delta://yaoyorozu-worker-delta-0123456789ab
+            delta_status: delta-detected
+            changed_path_count: 1
+            delta_scan_profile: git-target-path-delta-v1
+            ready_gate: path-bound-target-delta-scan-v2
           status: ready
     execution_summary:
       launched_process_count: 4
@@ -389,12 +473,15 @@ examples:
       failed_role_ids: []
       coverage_areas: [docs, eval, runtime, schema]
       target_ready_count: 4
-      ready_gate_profile: path-bound-target-scan-v1
+      delta_bound_count: 4
+      ready_gate_profile: path-bound-target-delta-scan-v2
+      delta_scan_profile: git-target-path-delta-v1
     validation:
       command_digests_match: true
       all_processes_exited_zero: true
       all_reports_ready: true
       coverage_complete: true
       all_reports_bound_to_dispatch: true
+      all_delta_receipts_bound: true
       all_target_paths_ready: true
       ok: true

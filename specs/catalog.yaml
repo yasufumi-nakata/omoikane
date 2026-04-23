@@ -1825,7 +1825,17 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, and workspace-bounded target path observations.
+    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, workspace-bounded target path observations, and git-bound target path delta receipts.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_worker_workspace_delta_receipt.schema
+    consumers:
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - docs/02-subsystems/agentic/README.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize one dispatch-bound git delta receipt that records changed candidate paths inside the bounded Yaoyorozu worker target scope.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_consensus_dispatch_binding.schema
@@ -1878,6 +1888,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects repo-local subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_worker_delta_receipt.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects dispatch-bound git delta receipts, target-path scope binding, and ready-gate summary alignment for Yaoyorozu worker execution.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_consensus_dispatch.yaml

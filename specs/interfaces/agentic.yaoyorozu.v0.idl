@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and TaskGraph handoff binding, and path-bound local worker dispatch planning.
+summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and TaskGraph handoff binding, and path/delta-bound local worker dispatch planning.
 imports:
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
@@ -122,6 +122,7 @@ operations:
     guarantees:
       - every launched worker must emit a ready report bound to the same dispatch_plan_ref and dispatch_unit_ref
       - worker reports must verify that every target path exists and remains inside the repo-local workspace
+      - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit
       - worker execution must stay inside the repo-local workspace and inherit the dispatch profile
       - only zero-exit, ready-reported workers count toward completed dispatch coverage
   bind_consensus_dispatch:

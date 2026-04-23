@@ -6,14 +6,16 @@ import argparse
 import json
 import os
 from pathlib import Path
-import sys
+import shlex
+import subprocess
 
-from ..common import canonical_json, sha256_text
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 YAOYOROZU_WORKER_REPORT_KIND = "yaoyorozu_local_worker_report"
-YAOYOROZU_WORKER_REPORT_PROFILE = "repo-local-path-bound-worker-report-v1"
-YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-scan-v1"
+YAOYOROZU_WORKER_REPORT_PROFILE = "repo-local-path-bound-worker-report-v2"
+YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-delta-scan-v2"
+YAOYOROZU_WORKER_DELTA_SCAN_PROFILE = "git-target-path-delta-v1"
 YAOYOROZU_WORKER_SAMPLE_ENTRY_LIMIT = 3
 
 
@@ -51,6 +53,237 @@ def _path_within_workspace(workspace_root: Path, candidate: Path) -> bool:
     except ValueError:
         return False
     return common == str(workspace_root)
+
+
+def _path_matches_target_paths(relative_path: str, target_paths: list[str]) -> bool:
+    for target_path in target_paths:
+        normalized_target = target_path.rstrip("/")
+        if relative_path == normalized_target or relative_path.startswith(f"{normalized_target}/"):
+            return True
+    return False
+
+
+def _excerpt(text: str, *, limit: int = 240) -> str:
+    compact = " ".join(str(text).split())
+    return compact[:limit]
+
+
+def _run_argv_command(
+    *,
+    argv: list[str],
+    cwd: Path,
+    timeout_seconds: int = 5,
+) -> dict[str, object]:
+    command = " ".join(shlex.quote(item) for item in argv)
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "command": command,
+            "exit_code": 124,
+            "status": "timeout",
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        }
+    return {
+        "command": command,
+        "exit_code": completed.returncode,
+        "status": "pass" if completed.returncode == 0 else "fail",
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+    }
+
+
+def _compact_command_receipt(label: str, result: dict[str, object]) -> dict[str, object]:
+    return {
+        "command_label": label,
+        "command": str(result.get("command", "")),
+        "exit_code": int(result.get("exit_code", -1)),
+        "status": str(result.get("status", "fail")),
+        "stdout_excerpt": _excerpt(str(result.get("stdout", ""))),
+        "stderr_excerpt": _excerpt(str(result.get("stderr", ""))),
+    }
+
+
+def _normalize_git_status(code: str) -> str:
+    if code == "??":
+        return "added"
+    if "D" in code:
+        return "removed"
+    if any(flag in code for flag in ("M", "A", "R", "C")):
+        return "modified"
+    return "clean"
+
+
+def _parse_git_status_output(stdout: str, *, target_paths: list[str]) -> dict[str, str]:
+    status_map: dict[str, str] = {}
+    for line in stdout.splitlines():
+        if len(line) < 4:
+            continue
+        code = line[:2]
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        if _path_matches_target_paths(path, target_paths):
+            status_map[path] = _normalize_git_status(code)
+    return status_map
+
+
+def build_workspace_delta_receipt(
+    *,
+    workspace_root: Path,
+    dispatch_plan_ref: str,
+    dispatch_unit_ref: str,
+    target_paths: list[str],
+) -> dict[str, object]:
+    workspace_root = workspace_root.resolve()
+    normalized_target_paths = list(target_paths)
+    command_receipts: list[dict[str, object]] = []
+    blocking_reasons: list[str] = []
+
+    head_result = _run_argv_command(
+        argv=["git", "-C", str(workspace_root), "rev-parse", "HEAD"],
+        cwd=workspace_root,
+    )
+    command_receipts.append(_compact_command_receipt("git-rev-parse-head", head_result))
+    head_commit = str(head_result.get("stdout", "")).strip()
+    if head_result["status"] != "pass" or len(head_commit) != 40:
+        blocking_reasons.append("git HEAD commit could not be resolved for the worker delta scan")
+        head_commit = "0" * 40
+
+    status_result = _run_argv_command(
+        argv=[
+            "git",
+            "-C",
+            str(workspace_root),
+            "status",
+            "--short",
+            "--untracked-files=all",
+            "--",
+            *normalized_target_paths,
+        ],
+        cwd=workspace_root,
+    )
+    command_receipts.append(_compact_command_receipt("git-status-short", status_result))
+    if status_result["status"] != "pass":
+        blocking_reasons.append("git status --short failed for the worker delta scan")
+    status_map = _parse_git_status_output(
+        str(status_result.get("stdout", "")),
+        target_paths=normalized_target_paths,
+    )
+
+    entries: list[dict[str, object]] = []
+    for relative_path, working_tree_state in sorted(status_map.items()):
+        resolved_path = (workspace_root / relative_path).resolve()
+        current_present = resolved_path.is_file()
+        current_text = (
+            resolved_path.read_text(encoding="utf-8", errors="replace")
+            if current_present
+            else ""
+        )
+        current_digest = sha256_text(current_text) if current_present else ""
+        current_bytes = len(current_text.encode("utf-8")) if current_present else 0
+
+        baseline_present = False
+        baseline_text = ""
+        if head_commit != "0" * 40:
+            show_result = _run_argv_command(
+                argv=["git", "-C", str(workspace_root), "show", f"{head_commit}:{relative_path}"],
+                cwd=workspace_root,
+            )
+            if show_result["status"] == "pass":
+                baseline_present = True
+                baseline_text = str(show_result.get("stdout", ""))
+            else:
+                stderr_text = str(show_result.get("stderr", ""))
+                missing_from_head = "exists on disk, but not in" in stderr_text
+                missing_from_head = missing_from_head or "does not exist in" in stderr_text
+                missing_from_head = missing_from_head or (
+                    "fatal: path '" in stderr_text and "HEAD" in stderr_text
+                )
+                if not missing_from_head:
+                    blocking_reasons.append(f"git show failed for worker delta path: {relative_path}")
+
+        baseline_digest = sha256_text(baseline_text) if baseline_present else ""
+        baseline_bytes = len(baseline_text.encode("utf-8")) if baseline_present else 0
+        path_kind = "file" if current_present else "missing"
+        if working_tree_state == "removed" or (baseline_present and not current_present):
+            change_status = "removed"
+        elif working_tree_state == "added" or (not baseline_present and current_present):
+            change_status = "added"
+        else:
+            change_status = "modified"
+
+        entry = {
+            "path": relative_path,
+            "path_kind": path_kind,
+            "working_tree_state": working_tree_state,
+            "change_status": change_status,
+            "within_workspace": _path_within_workspace(workspace_root, resolved_path),
+            "within_target_paths": _path_matches_target_paths(relative_path, normalized_target_paths),
+            "baseline_present": baseline_present,
+            "current_present": current_present,
+            "baseline_digest": baseline_digest,
+            "current_digest": current_digest,
+            "baseline_bytes": baseline_bytes,
+            "current_bytes": current_bytes,
+        }
+        entry["entry_digest"] = sha256_text(canonical_json(entry))
+        entries.append(entry)
+
+    status = "blocked"
+    if not blocking_reasons:
+        status = "delta-detected" if entries else "clean"
+
+    digest_payload = {
+        "workspace_root": str(workspace_root),
+        "dispatch_plan_ref": dispatch_plan_ref,
+        "dispatch_unit_ref": dispatch_unit_ref,
+        "target_paths": normalized_target_paths,
+        "head_commit": head_commit,
+        "status": status,
+        "changed_path_count": len(entries),
+        "entries": [
+            {
+                "path": entry["path"],
+                "working_tree_state": entry["working_tree_state"],
+                "change_status": entry["change_status"],
+                "baseline_digest": entry["baseline_digest"],
+                "current_digest": entry["current_digest"],
+            }
+            for entry in entries
+        ],
+    }
+    receipt = {
+        "kind": "yaoyorozu_worker_workspace_delta_receipt",
+        "schema_version": "1.0.0",
+        "receipt_id": new_id("yaoyorozu-worker-delta"),
+        "receipt_ref": "",
+        "profile_id": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+        "workspace_root": str(workspace_root),
+        "workspace_root_digest": sha256_text(str(workspace_root)),
+        "dispatch_plan_ref": dispatch_plan_ref,
+        "dispatch_unit_ref": dispatch_unit_ref,
+        "target_paths": normalized_target_paths,
+        "scanned_at": utc_now_iso(),
+        "head_commit": head_commit,
+        "status": status,
+        "changed_path_count": len(entries),
+        "entries": entries,
+        "command_receipts": command_receipts,
+    }
+    receipt["receipt_ref"] = f"worker-delta://{receipt['receipt_id']}"
+    receipt["receipt_digest"] = sha256_text(canonical_json(digest_payload))
+    if status == "blocked":
+        receipt["blocking_reasons"] = blocking_reasons
+    return receipt
 
 
 def _sample_entries(path: Path) -> tuple[int, list[str]]:
@@ -107,6 +340,12 @@ def main() -> None:
     workspace_root = Path(args.workspace_root).resolve()
     target_paths = list(args.target_paths)
     target_path_observations = _observe_target_paths(workspace_root, target_paths)
+    workspace_delta_receipt = build_workspace_delta_receipt(
+        workspace_root=workspace_root,
+        dispatch_plan_ref=args.dispatch_plan_ref,
+        dispatch_unit_ref=args.dispatch_unit_ref,
+        target_paths=target_paths,
+    )
     coverage_evidence = {
         "expected_target_count": len(target_paths),
         "observed_target_count": len(target_path_observations),
@@ -119,11 +358,17 @@ def main() -> None:
         "all_targets_within_workspace": all(
             observation["within_workspace"] is True for observation in target_path_observations
         ),
+        "delta_receipt_ref": workspace_delta_receipt["receipt_ref"],
+        "delta_status": workspace_delta_receipt["status"],
+        "changed_path_count": workspace_delta_receipt["changed_path_count"],
+        "delta_scan_profile": YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
         "ready_gate": YAOYOROZU_WORKER_READY_GATE_PROFILE,
     }
     status = (
         "ready"
-        if coverage_evidence["all_targets_exist"] and coverage_evidence["all_targets_within_workspace"]
+        if coverage_evidence["all_targets_exist"]
+        and coverage_evidence["all_targets_within_workspace"]
+        and workspace_delta_receipt["status"] in {"clean", "delta-detected"}
         else "failed"
     )
     report = {
@@ -153,6 +398,7 @@ def main() -> None:
             target_paths=target_paths,
         ),
         "target_path_observations": target_path_observations,
+        "workspace_delta_receipt": workspace_delta_receipt,
         "coverage_evidence": coverage_evidence,
         "status": status,
     }

@@ -81,7 +81,8 @@ trust-bound registry snapshot、bounded convocation plan、
 bounded proposal profile catalog、および runtime / schema / eval / docs の 4 coverage を持つ
 repo-local worker dispatch receipt を JSON で可視化する。
 各 worker report は dispatch plan / dispatch unit に束縛され、
-workspace 内 target path の存在確認と bounded sample observation を返す。
+workspace 内 target path の存在確認と bounded sample observation に加え、
+同じ target path scope に閉じた git-bound delta receipt を返す。
 同じ demo は builder report / guardian gate / final resolve を
 `ConsensusBus` transcript として監査し、
 blocked direct builder handoff と worker claim chain を

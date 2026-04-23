@@ -134,7 +134,7 @@ properties:
             minLength: 1
         expected_report_fields:
           type: array
-          minItems: 16
+          minItems: 17
           items:
             type: string
             minLength: 1
@@ -266,6 +266,7 @@ examples:
           - workspace_root_digest
           - invocation_digest
           - target_path_observations
+          - workspace_delta_receipt
           - coverage_evidence
           - status
     selection_summary:

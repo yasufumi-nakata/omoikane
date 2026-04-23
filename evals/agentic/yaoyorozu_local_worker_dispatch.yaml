@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_local_worker_dispatch
 target: agentic.yaoyorozu
 level: L4
-description: Repo-local Yaoyorozu registry must execute builder handoff coverage as bounded local worker dispatch receipts with dispatch-bound, workspace-bounded target path evidence.
+description: Repo-local Yaoyorozu registry must execute builder handoff coverage as bounded local worker dispatch receipts with dispatch-bound path observations and git-bound target path delta evidence.
 inputs:
   - source_root: agents
   - proposal_profile: self-modify-patch-v1

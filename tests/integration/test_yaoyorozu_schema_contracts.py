@@ -84,6 +84,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["dispatch_receipt"],
         )
 
+    def test_worker_workspace_delta_receipt_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_worker_workspace_delta_receipt.schema",
+            result["dispatch_receipt"]["results"][0]["report"]["workspace_delta_receipt"],
+        )
+
     def test_consensus_dispatch_binding_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
 

@@ -136,6 +136,7 @@
 - `yaoyorozu_workspace_discovery.schema`
 - `yaoyorozu_worker_dispatch_plan.schema`
 - `yaoyorozu_worker_dispatch_receipt.schema`
+- `yaoyorozu_worker_workspace_delta_receipt.schema`
 - `yaoyorozu_registry_snapshot.schema`
 
 ## 次段階
