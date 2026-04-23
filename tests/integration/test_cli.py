@@ -1382,9 +1382,20 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertEqual("reference-v0", result["policy"]["policy_id"])
+        self.assertEqual("reference-trust-provenance-v1", result["policy"]["provenance_policy_id"])
         self.assertEqual(0.99, result["agents"]["integrity-guardian"]["global_score"])
-        self.assertFalse(result["events"][-1]["applied"])
+        self.assertFalse(result["blocked_events"]["pinned_negative"]["applied"])
         self.assertTrue(result["agents"]["design-architect"]["eligibility"]["count_for_weighted_vote"])
+        self.assertTrue(result["validation"]["self_issued_positive_blocked"])
+        self.assertTrue(result["validation"]["reciprocal_positive_blocked"])
+        self.assertEqual(
+            "blocked-self-issued-positive",
+            result["blocked_events"]["self_issued_positive"]["provenance_status"],
+        )
+        self.assertEqual(
+            "blocked-reciprocal-positive",
+            result["blocked_events"]["reciprocal_positive"]["provenance_status"],
+        )
 
     def test_yaoyorozu_demo_emits_registry_and_convocation_json(self) -> None:
         stdout = io.StringIO()

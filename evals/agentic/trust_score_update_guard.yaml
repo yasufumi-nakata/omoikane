@@ -1,7 +1,7 @@
 eval_id: trust_score_update_guard
 target: agentic.trust
 level: L4
-description: Trust update deltas, threshold gates, and human pin freeze must remain deterministic.
+description: Trust update deltas, provenance guards, threshold gates, and human pin freeze must remain deterministic.
 inputs:
   - agent: design-architect
   - initial_score: 0.58
@@ -14,6 +14,8 @@ inputs:
 expected:
   delta: 0.04
   council_vote_eligible: true
+  self_issued_positive_blocked: true
+  reciprocal_positive_blocked: true
   pinned_event_applied: false
 metric: equality
 threshold: 1.0

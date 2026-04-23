@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import re
 from typing import Any, Dict, List, Optional
 
 from ..common import new_id, utc_now_iso
@@ -10,6 +11,10 @@ from ..common import new_id, utc_now_iso
 
 def _clamp_score(value: float) -> float:
     return round(max(0.0, min(1.0, value)), 3)
+
+
+def _actor_fingerprint(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
 @dataclass(frozen=True)
@@ -32,6 +37,7 @@ class TrustUpdatePolicy:
     """Fixed trust update policy for the reference runtime."""
 
     policy_id: str = "reference-v0"
+    provenance_policy_id: str = "reference-trust-provenance-v1"
     initial_score: float = 0.3
     base_deltas: Dict[str, float] = field(
         default_factory=lambda: {
@@ -52,6 +58,18 @@ class TrustUpdatePolicy:
             "critical": 2.0,
         }
     )
+    event_origin_requirements: Dict[str, str] = field(
+        default_factory=lambda: {
+            "council_quality_positive": "council",
+            "guardian_audit_pass": "guardian",
+            "human_feedback_good": "human",
+            "guardian_veto": "guardian",
+            "regression_detected": "any",
+            "human_feedback_bad": "human",
+            "ethics_violation": "any",
+        }
+    )
+    blocked_positive_reciprocity_scope: str = "registered-agent-domain-history"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -71,12 +89,15 @@ class TrustEvent:
     applied_delta: float
     applied: bool
     triggered_by: str
+    triggered_by_agent_id: str
     rationale: str
     global_before: float
     global_after: float
     domain_before: float
     domain_after: float
     policy_id: str
+    provenance_status: str
+    provenance_policy_id: str
     recorded_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -216,6 +237,7 @@ class TrustService:
         rationale: str,
     ) -> Dict[str, Any]:
         state = self._state(agent_id)
+        normalized_agent = self._normalize_non_empty(agent_id, "agent_id")
         normalized_domain = self._normalize_non_empty(domain, "domain")
         normalized_trigger = self._normalize_non_empty(triggered_by, "triggered_by")
         normalized_rationale = self._normalize_non_empty(rationale, "rationale")
@@ -230,10 +252,24 @@ class TrustService:
         base_delta = self._policy.base_deltas[event_type]
         multiplier = self._policy.severity_multipliers[severity]
         raw_delta = round(base_delta * multiplier * evidence_confidence, 3)
+        triggered_by_agent_id = self._resolve_registered_agent_id(normalized_trigger)
+        provenance_status = self._evaluate_provenance(
+            agent_id=normalized_agent,
+            event_type=event_type,
+            domain=normalized_domain,
+            raw_delta=raw_delta,
+            triggered_by=normalized_trigger,
+            triggered_by_agent_id=triggered_by_agent_id,
+        )
         global_before = _clamp_score(state.global_score)
         domain_before = _clamp_score(state.per_domain.get(normalized_domain, state.global_score))
 
-        if state.pinned_by_human:
+        if provenance_status != "accepted":
+            applied = False
+            applied_delta = 0.0
+            global_after = global_before
+            domain_after = domain_before
+        elif state.pinned_by_human:
             applied = False
             applied_delta = 0.0
             global_after = global_before
@@ -257,12 +293,15 @@ class TrustService:
             applied_delta=applied_delta,
             applied=applied,
             triggered_by=normalized_trigger,
+            triggered_by_agent_id=triggered_by_agent_id,
             rationale=normalized_rationale,
             global_before=global_before,
             global_after=global_after,
             domain_before=domain_before,
             domain_after=domain_after,
             policy_id=self._policy.policy_id,
+            provenance_status=provenance_status,
+            provenance_policy_id=self._policy.provenance_policy_id,
         )
         state.history.append(event)
         return event.to_dict()
@@ -272,6 +311,95 @@ class TrustService:
         if agent_key not in self._states:
             self.register_agent(agent_key)
         return self._states[agent_key]
+
+    def _evaluate_provenance(
+        self,
+        *,
+        agent_id: str,
+        event_type: str,
+        domain: str,
+        raw_delta: float,
+        triggered_by: str,
+        triggered_by_agent_id: str,
+    ) -> str:
+        if raw_delta <= 0:
+            return self._check_event_origin(event_type, triggered_by, triggered_by_agent_id)
+
+        if self._same_actor(agent_id, triggered_by, triggered_by_agent_id):
+            return "blocked-self-issued-positive"
+
+        origin_status = self._check_event_origin(event_type, triggered_by, triggered_by_agent_id)
+        if origin_status != "accepted":
+            return origin_status
+
+        if triggered_by_agent_id and self._has_reciprocal_positive_history(
+            agent_id=agent_id,
+            evaluator_agent_id=triggered_by_agent_id,
+            domain=domain,
+        ):
+            return "blocked-reciprocal-positive"
+        return "accepted"
+
+    def _check_event_origin(
+        self,
+        event_type: str,
+        triggered_by: str,
+        triggered_by_agent_id: str,
+    ) -> str:
+        expected_origin = self._policy.event_origin_requirements.get(event_type, "any")
+        if expected_origin == "any":
+            return "accepted"
+        if expected_origin == "council":
+            return "accepted" if _actor_fingerprint(triggered_by) == "council" else "blocked-provenance-mismatch"
+        if expected_origin == "guardian":
+            if triggered_by_agent_id and self._is_guardian_authority(triggered_by_agent_id):
+                return "accepted"
+            return "blocked-provenance-mismatch"
+        if expected_origin == "human":
+            if _actor_fingerprint(triggered_by) == "council" or triggered_by_agent_id:
+                return "blocked-provenance-mismatch"
+            return "accepted"
+        return "accepted"
+
+    def _resolve_registered_agent_id(self, actor: str) -> str:
+        actor_fingerprint = _actor_fingerprint(actor)
+        for registered_agent_id in self._states:
+            if _actor_fingerprint(registered_agent_id) == actor_fingerprint:
+                return registered_agent_id
+        return ""
+
+    def _is_guardian_authority(self, agent_id: str) -> bool:
+        state = self._states.get(agent_id)
+        if state is None:
+            return False
+        return bool(state.to_dict(self._thresholds)["eligibility"]["guardian_role"])
+
+    def _has_reciprocal_positive_history(
+        self,
+        *,
+        agent_id: str,
+        evaluator_agent_id: str,
+        domain: str,
+    ) -> bool:
+        evaluator_state = self._states.get(evaluator_agent_id)
+        if evaluator_state is None:
+            return False
+        for event in evaluator_state.history:
+            if (
+                event.domain == domain
+                and event.raw_delta > 0
+                and event.provenance_status == "accepted"
+                and event.triggered_by_agent_id
+                and self._same_actor(agent_id, event.triggered_by, event.triggered_by_agent_id)
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _same_actor(agent_id: str, triggered_by: str, triggered_by_agent_id: str) -> bool:
+        if triggered_by_agent_id:
+            return triggered_by_agent_id == agent_id
+        return _actor_fingerprint(agent_id) == _actor_fingerprint(triggered_by)
 
     @staticmethod
     def _normalize_non_empty(value: str, field_name: str) -> str:

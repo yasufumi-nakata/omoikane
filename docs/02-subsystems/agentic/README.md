@@ -19,7 +19,8 @@
 - 利用可能 Agent の登録簿
 - 各 Agent の role, capability, trust score を管理
 - 役割定義は [agents/](../../../agents/) 配下
-- reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則を持ち、
+- reference runtime では `agentic.trust.v0` と `trust-demo` が deterministic な更新規則に加え、
+  self-issued positive event と reciprocal positive boost を provenance guard で fail-closed にし、
   `agentic.yaoyorozu.v0` と `yaoyorozu-demo` が source workspace に加えて bounded same-host local candidate workspace を `review_budget=3` で走査し、
   `yaoyorozu_workspace_discovery` として cross-workspace builder coverage を machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と

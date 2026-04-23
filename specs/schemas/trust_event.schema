@@ -15,12 +15,15 @@ required:
   - applied_delta
   - applied
   - triggered_by
+  - triggered_by_agent_id
   - rationale
   - global_before
   - global_after
   - domain_before
   - domain_after
   - policy_id
+  - provenance_status
+  - provenance_policy_id
   - recorded_at
 properties:
   event_id:
@@ -66,6 +69,8 @@ properties:
   triggered_by:
     type: string
     minLength: 1
+  triggered_by_agent_id:
+    type: string
   rationale:
     type: string
     minLength: 1
@@ -88,6 +93,16 @@ properties:
   policy_id:
     type: string
     minLength: 1
+  provenance_status:
+    type: string
+    enum:
+      - accepted
+      - blocked-self-issued-positive
+      - blocked-provenance-mismatch
+      - blocked-reciprocal-positive
+  provenance_policy_id:
+    type: string
+    minLength: 1
   recorded_at:
     type: string
     format: date-time
@@ -102,10 +117,13 @@ examples:
     applied_delta: 0.04
     applied: true
     triggered_by: Council
+    triggered_by_agent_id: ""
     rationale: timeout-aware decision left no policy regression
     global_before: 0.58
     global_after: 0.62
     domain_before: 0.58
     domain_after: 0.62
     policy_id: reference-v0
+    provenance_status: accepted
+    provenance_policy_id: reference-trust-provenance-v1
     recorded_at: "2026-04-18T10:00:00Z"

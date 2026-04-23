@@ -53,6 +53,23 @@ score' = clamp(score + raw_delta, 0.0, 1.0)
 | `high` | 1.5 |
 | `critical` | 2.0 |
 
+## Provenance / Anti-Tamper Guard
+
+positive delta を伴う event は `triggered_by` の origin を固定し、
+自己加点や相互加点を fail-closed にする。
+
+| event_type | required origin |
+|---|---|
+| `council_quality_positive` | `Council` |
+| `guardian_audit_pass` / `guardian_veto` | human-pinned Guardian |
+| `human_feedback_good` / `human_feedback_bad` | 人間起点（registered agent ではない） |
+
+- target Agent 自身が positive event を self-issue した場合は `blocked-self-issued-positive`
+- registered agent 同士が同一 domain で reciprocal positive boost を試みた場合は `blocked-reciprocal-positive`
+- `trust_event` は `triggered_by_agent_id`、`provenance_status`、
+  `provenance_policy_id=reference-trust-provenance-v1` を保持し、
+  provenance が拒否された event でも append-only history には残す
+
 ## 閾値
 
 | 操作 | 必要 trust |
@@ -100,8 +117,6 @@ eligibility:
 ## 未解決
 
 - Trust の **substrate 跨ぎ妥当性**
-- Agent 自身による自己 trust 改ざん攻撃
-- 集合的な trust 操作（複数 Agent が結託）
 
 ## Reference runtime surface
 
@@ -110,3 +125,4 @@ eligibility:
 - Schema: `specs/schemas/trust_event.schema`, `specs/schemas/trust_snapshot.schema`
 - IDL: `specs/interfaces/agentic.trust.v0.idl`
 - Eval: `evals/agentic/trust_score_update_guard.yaml`
+  - self-issued positive block、reciprocal positive block、human pin freeze を継続検証する

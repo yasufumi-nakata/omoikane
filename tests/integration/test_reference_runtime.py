@@ -1462,10 +1462,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_trust_demo()
 
         self.assertEqual("reference-v0", result["policy"]["policy_id"])
+        self.assertEqual("reference-trust-provenance-v1", result["policy"]["provenance_policy_id"])
         self.assertEqual(0.99, result["agents"]["integrity-guardian"]["global_score"])
-        self.assertFalse(result["events"][-1]["applied"])
+        self.assertFalse(result["blocked_events"]["pinned_negative"]["applied"])
         self.assertEqual(0.62, result["agents"]["design-architect"]["global_score"])
         self.assertTrue(result["agents"]["codex-builder"]["eligibility"]["apply_to_runtime"])
+        self.assertTrue(result["validation"]["self_issued_positive_blocked"])
+        self.assertTrue(result["validation"]["reciprocal_positive_blocked"])
+        self.assertTrue(result["validation"]["pinned_event_frozen"])
+        self.assertEqual(
+            "blocked-self-issued-positive",
+            result["blocked_events"]["self_issued_positive"]["provenance_status"],
+        )
+        self.assertEqual(
+            "blocked-reciprocal-positive",
+            result["blocked_events"]["reciprocal_positive"]["provenance_status"],
+        )
 
     def test_oversight_demo_propagates_pin_breach(self) -> None:
         runtime = OmoikaneReferenceOS()

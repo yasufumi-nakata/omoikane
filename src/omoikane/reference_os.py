@@ -3407,6 +3407,13 @@ json.dump(response, sys.stdout)
             per_domain={"council_deliberation": 0.3, "documentation": 0.3},
         )
         service.register_agent(
+            "identity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap requires explicit human approval",
+        )
+        service.register_agent(
             "integrity-guardian",
             initial_score=0.99,
             per_domain={"council_deliberation": 0.99, "self_modify": 0.99},
@@ -3414,49 +3421,106 @@ json.dump(response, sys.stdout)
             pinned_reason="guardian bootstrap requires explicit human approval",
         )
 
+        council_positive = service.record_event(
+            "design-architect",
+            event_type="council_quality_positive",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="Council",
+            rationale="timeout-aware decision left no policy regression",
+        )
+        guardian_positive = service.record_event(
+            "codex-builder",
+            event_type="guardian_audit_pass",
+            domain="self_modify",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="integrity-guardian",
+            rationale="reference patch preserved immutable boundary and passed evals",
+        )
+        human_positive = service.record_event(
+            "new-researcher",
+            event_type="human_feedback_good",
+            domain="documentation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="yasufumi",
+            rationale="low-risk documentation work matched the requested scope",
+        )
+        self_issued_positive = service.record_event(
+            "design-architect",
+            event_type="council_quality_positive",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="design-architect",
+            rationale="self-issued trust boosts are not accepted",
+        )
+        guardian_peer_positive = service.record_event(
+            "identity-guardian",
+            event_type="guardian_audit_pass",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="integrity-guardian",
+            rationale="one guardian attested the peer review bundle",
+        )
+        reciprocal_positive = service.record_event(
+            "integrity-guardian",
+            event_type="guardian_audit_pass",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="identity-guardian",
+            rationale="reciprocal guardian boosts must fail closed",
+        )
+        pinned_negative = service.record_event(
+            "integrity-guardian",
+            event_type="human_feedback_bad",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="yasufumi",
+            rationale="pin の間は event を記録するが自動減点しない",
+        )
         events = [
-            service.record_event(
-                "design-architect",
-                event_type="council_quality_positive",
-                domain="council_deliberation",
-                severity="medium",
-                evidence_confidence=1.0,
-                triggered_by="Council",
-                rationale="timeout-aware decision left no policy regression",
-            ),
-            service.record_event(
-                "codex-builder",
-                event_type="guardian_audit_pass",
-                domain="self_modify",
-                severity="medium",
-                evidence_confidence=1.0,
-                triggered_by="IntegrityGuardian",
-                rationale="reference patch preserved immutable boundary and passed evals",
-            ),
-            service.record_event(
-                "new-researcher",
-                event_type="human_feedback_good",
-                domain="documentation",
-                severity="medium",
-                evidence_confidence=1.0,
-                triggered_by="yasufumi",
-                rationale="low-risk documentation work matched the requested scope",
-            ),
-            service.record_event(
-                "integrity-guardian",
-                event_type="human_feedback_bad",
-                domain="council_deliberation",
-                severity="medium",
-                evidence_confidence=1.0,
-                triggered_by="yasufumi",
-                rationale="pin の間は event を記録するが自動減点しない",
-            ),
+            council_positive,
+            guardian_positive,
+            human_positive,
+            self_issued_positive,
+            guardian_peer_positive,
+            reciprocal_positive,
+            pinned_negative,
         ]
+        blocked_events = {
+            "self_issued_positive": self_issued_positive,
+            "reciprocal_positive": reciprocal_positive,
+            "pinned_negative": pinned_negative,
+        }
+        validation = {
+            "self_issued_positive_blocked": (
+                self_issued_positive["provenance_status"] == "blocked-self-issued-positive"
+                and not self_issued_positive["applied"]
+            ),
+            "reciprocal_positive_blocked": (
+                reciprocal_positive["provenance_status"] == "blocked-reciprocal-positive"
+                and not reciprocal_positive["applied"]
+            ),
+            "guardian_origin_accepted": guardian_positive["provenance_status"] == "accepted",
+            "human_origin_accepted": human_positive["provenance_status"] == "accepted",
+            "pinned_event_frozen": (
+                pinned_negative["provenance_status"] == "accepted" and not pinned_negative["applied"]
+            ),
+        }
+        validation["ok"] = all(validation.values())
 
         return {
             "policy": service.policy_snapshot()["policy"],
             "thresholds": service.policy_snapshot()["thresholds"],
             "events": events,
+            "blocked_events": blocked_events,
+            "validation": validation,
             "agents": {
                 snapshot["agent_id"]: snapshot
                 for snapshot in service.all_snapshots()

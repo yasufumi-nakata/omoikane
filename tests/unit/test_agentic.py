@@ -2149,6 +2149,7 @@ class TrustServiceTests(unittest.TestCase):
         snapshot = service.snapshot("design-architect")
 
         self.assertEqual(0.04, event["applied_delta"])
+        self.assertEqual("accepted", event["provenance_status"])
         self.assertEqual(0.62, snapshot["global_score"])
         self.assertEqual(0.62, snapshot["per_domain"]["council_deliberation"])
         self.assertTrue(snapshot["eligibility"]["count_for_weighted_vote"])
@@ -2176,9 +2177,80 @@ class TrustServiceTests(unittest.TestCase):
 
         self.assertFalse(event["applied"])
         self.assertEqual(0.0, event["applied_delta"])
+        self.assertEqual("accepted", event["provenance_status"])
         self.assertEqual(0.99, snapshot["global_score"])
         self.assertTrue(snapshot["eligibility"]["guardian_role"])
         self.assertEqual("guardian bootstrap", snapshot["pinned_reason"])
+
+    def test_self_issued_positive_event_is_blocked(self) -> None:
+        service = TrustService()
+        service.register_agent(
+            "design-architect",
+            initial_score=0.58,
+            per_domain={"council_deliberation": 0.58},
+        )
+
+        event = service.record_event(
+            "design-architect",
+            event_type="council_quality_positive",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="design-architect",
+            rationale="self-issued trust boosts must fail closed",
+        )
+        snapshot = service.snapshot("design-architect")
+
+        self.assertFalse(event["applied"])
+        self.assertEqual(0.0, event["applied_delta"])
+        self.assertEqual("blocked-self-issued-positive", event["provenance_status"])
+        self.assertEqual("design-architect", event["triggered_by_agent_id"])
+        self.assertEqual(0.58, snapshot["global_score"])
+        self.assertEqual(0.58, snapshot["per_domain"]["council_deliberation"])
+
+    def test_reciprocal_positive_guardian_boost_is_blocked(self) -> None:
+        service = TrustService()
+        service.register_agent(
+            "integrity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+        service.register_agent(
+            "identity-guardian",
+            initial_score=0.99,
+            per_domain={"council_deliberation": 0.99},
+            pinned_by_human=True,
+            pinned_reason="guardian bootstrap",
+        )
+
+        first = service.record_event(
+            "identity-guardian",
+            event_type="guardian_audit_pass",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="integrity-guardian",
+            rationale="one guardian attested the peer review bundle",
+        )
+        reciprocal = service.record_event(
+            "integrity-guardian",
+            event_type="guardian_audit_pass",
+            domain="council_deliberation",
+            severity="medium",
+            evidence_confidence=1.0,
+            triggered_by="identity-guardian",
+            rationale="reciprocal guardian boosts must fail closed",
+        )
+        snapshot = service.snapshot("integrity-guardian")
+
+        self.assertEqual("accepted", first["provenance_status"])
+        self.assertFalse(reciprocal["applied"])
+        self.assertEqual(0.0, reciprocal["applied_delta"])
+        self.assertEqual("blocked-reciprocal-positive", reciprocal["provenance_status"])
+        self.assertEqual("identity-guardian", reciprocal["triggered_by_agent_id"])
+        self.assertEqual(0.99, snapshot["global_score"])
 
 
 class YaoyorozuRegistryServiceTests(unittest.TestCase):
