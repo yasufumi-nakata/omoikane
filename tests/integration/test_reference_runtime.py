@@ -1628,6 +1628,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ["runtime", "schema", "eval", "docs"],
             result["workspace_discovery"]["coverage_summary"]["non_source_supported_coverage_areas"],
         )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "self-modify-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertIn(
+            ["docs", "eval"],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
 
     def test_yaoyorozu_demo_supports_memory_edit_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -1649,6 +1661,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "ethics-committee",
             ],
             [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "memory-edit-rehearsal-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertIn(
+            ["eval", "runtime"],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
         )
 
     def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
@@ -1679,6 +1703,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "legal-scholar",
             result["convocation"]["council_panel"][1]["selected_agent_id"],
+        )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "fork-request-governance-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertIn(
+            ["docs", "schema"],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
         )
 
     def test_ethics_demo_reports_rule_language_and_recorded_events(self) -> None:

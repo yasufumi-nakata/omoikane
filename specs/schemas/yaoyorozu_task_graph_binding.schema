@@ -11,6 +11,7 @@ required:
   - bound_at
   - binding_digest
   - binding_profile
+  - proposal_profile
   - convocation_session_ref
   - convocation_session_digest
   - dispatch_plan_ref
@@ -20,6 +21,7 @@ required:
   - consensus_binding_ref
   - consensus_binding_digest
   - consensus_session_id
+  - bundle_strategy
   - task_graph_ref
   - task_graph_digest
   - task_graph_dispatch_digest
@@ -48,6 +50,12 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   binding_profile:
     const: repo-local-yaoyorozu-task-graph-binding-v1
+  proposal_profile:
+    type: string
+    enum:
+      - self-modify-patch-v1
+      - memory-edit-v1
+      - fork-request-v1
   convocation_session_ref:
     type: string
     pattern: "^convocation://"
@@ -75,6 +83,55 @@ properties:
   consensus_session_id:
     type: string
     pattern: "^council-convocation-[a-f0-9]{12}$"
+  bundle_strategy:
+    type: object
+    additionalProperties: false
+    required:
+      - strategy_id
+      - proposal_profile
+      - root_bundle_count
+      - max_parallelism
+      - root_bundles
+    properties:
+      strategy_id:
+        type: string
+        minLength: 1
+      proposal_profile:
+        type: string
+        enum:
+          - self-modify-patch-v1
+          - memory-edit-v1
+          - fork-request-v1
+      root_bundle_count:
+        const: 3
+      max_parallelism:
+        const: 3
+      root_bundles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - bundle_role
+            - coverage_areas
+          properties:
+            bundle_role:
+              type: string
+              minLength: 1
+            coverage_areas:
+              type: array
+              minItems: 1
+              maxItems: 2
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - runtime
+                  - schema
+                  - eval
+                  - docs
   task_graph_ref:
     type: string
     pattern: "^task-graph://graph-[a-f0-9]{12}$"
@@ -293,6 +350,7 @@ properties:
       - complexity_policy_ok
       - root_bundle_count_ok
       - dispatch_units_bound
+      - bundle_strategy_ok
       - coverage_grouping_ok
       - worker_claims_bound
       - guardian_gate_bound
@@ -309,6 +367,8 @@ properties:
       root_bundle_count_ok:
         const: true
       dispatch_units_bound:
+        const: true
+      bundle_strategy_ok:
         const: true
       coverage_grouping_ok:
         const: true

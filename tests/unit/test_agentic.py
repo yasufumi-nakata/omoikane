@@ -2774,6 +2774,12 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         binding = result["task_graph_binding"]
 
         self.assertTrue(binding["validation"]["ok"])
+        self.assertEqual("self-modify-patch-v1", binding["proposal_profile"])
+        self.assertEqual(
+            "self-modify-three-root-bundle-v1",
+            binding["bundle_strategy"]["strategy_id"],
+        )
+        self.assertTrue(binding["validation"]["bundle_strategy_ok"])
         self.assertEqual(3, binding["task_graph_dispatch"]["dispatched_count"])
         self.assertEqual(
             4,
@@ -2785,6 +2791,35 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             sorted(
                 sorted(node_binding["coverage_areas"])
                 for node_binding in binding["node_bindings"]
+            ),
+        )
+
+    def test_task_graph_binding_switches_bundle_strategy_by_proposal_profile(self) -> None:
+        memory_edit = OmoikaneReferenceOS().run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
+        fork_request = OmoikaneReferenceOS().run_yaoyorozu_demo(proposal_profile="fork-request-v1")
+
+        self.assertEqual(
+            "memory-edit-rehearsal-three-root-bundle-v1",
+            memory_edit["task_graph_binding"]["bundle_strategy"]["strategy_id"],
+        )
+        self.assertTrue(memory_edit["task_graph_binding"]["validation"]["bundle_strategy_ok"])
+        self.assertIn(
+            ["eval", "runtime"],
+            sorted(
+                sorted(node_binding["coverage_areas"])
+                for node_binding in memory_edit["task_graph_binding"]["node_bindings"]
+            ),
+        )
+        self.assertEqual(
+            "fork-request-governance-three-root-bundle-v1",
+            fork_request["task_graph_binding"]["bundle_strategy"]["strategy_id"],
+        )
+        self.assertTrue(fork_request["task_graph_binding"]["validation"]["bundle_strategy_ok"])
+        self.assertIn(
+            ["docs", "schema"],
+            sorted(
+                sorted(node_binding["coverage_areas"])
+                for node_binding in fork_request["task_graph_binding"]["node_bindings"]
             ),
         )
 

@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and TaskGraph handoff binding, and path/delta/patch-candidate-bound local worker dispatch planning.
+summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, and path/delta/patch-candidate-bound local worker dispatch planning.
 imports:
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
@@ -207,8 +207,9 @@ operations:
       - direct builder-to-builder handoff attempts must be recorded as blocked and never silently bypass the bus
   bind_task_graph_dispatch:
     summary: >
-      Collapse one coverage-complete worker dispatch into the fixed three-root TaskGraph bundle
-      and bind it to the same Council session, ConsensusBus claim chain, guardian gate, and synthesis receipt.
+      Collapse one coverage-complete worker dispatch into the selected proposal-profile's fixed
+      three-root TaskGraph bundle strategy and bind it to the same Council session,
+      ConsensusBus claim chain, guardian gate, and synthesis receipt.
     input:
       inline_schema:
         type: object
@@ -229,7 +230,7 @@ operations:
     output:
       schema_ref: yaoyorozu_task_graph_binding
     guarantees:
-      - root TaskGraph bundles must stay within max_parallelism=3 by grouping runtime, schema, and evidence-sync(eval+docs)
+      - root TaskGraph bundles must stay within max_parallelism=3 and match the fixed bundle strategy selected by proposal_profile
       - every dispatch unit must bind exactly once to one ready root node together with its ConsensusBus report claim
       - guardian gate and final resolve digests must bind the review and synthesis nodes before the execution bundle is considered complete
       - synthesis must accept exactly one result ref per ready root node and must not bypass the Council review node
@@ -239,5 +240,5 @@ compatibility:
     - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, and `fork-request-v1` proposal profiles.
     - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with explicit review_budget and no external runtime execution.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
-    - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling by grouping eval and docs as one evidence-sync root.
+    - TaskGraph bundle binding keeps 4 worker coverage areas within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `memory-edit` grouping runtime+eval, and `fork-request` grouping schema+docs.
     - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.

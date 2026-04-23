@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_task_graph_binding
 target: agentic.yaoyorozu
 level: L4
-description: Yaoyorozu worker dispatch must collapse into the fixed three-root TaskGraph bundle and remain bound to the same ConsensusBus session, guardian gate, and synthesis receipt.
+description: Yaoyorozu worker dispatch must collapse into the selected proposal profile's fixed three-root TaskGraph bundle strategy and remain bound to the same ConsensusBus session, guardian gate, and synthesis receipt.
 inputs:
   - proposal_profile: self-modify-patch-v1
   - max_parallelism: 3
@@ -9,6 +9,8 @@ inputs:
   - dispatch_unit_count: 4
 expected:
   task_graph_binding_ok: true
+  task_graph_bundle_strategy_ok: true
+  task_graph_bundle_strategy_id: self-modify-three-root-bundle-v1
   task_graph_ready_node_count: 3
   task_graph_dispatch_unit_count: 4
   task_graph_synthesis_count: 3

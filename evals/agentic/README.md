@@ -71,7 +71,7 @@ machine-readable に示せること。
 
 ### Yaoyorozu TaskGraph Binding
 coverage-complete な worker dispatch が
-`runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle に畳まれ、
+proposal profile に応じた 3 root bundle strategy に畳まれ、
 同じ ConsensusBus session と guardian gate digest に束縛されること。
 
 ### Yaoyorozu Worker Delta Receipt

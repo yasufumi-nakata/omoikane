@@ -62,7 +62,7 @@ identity fork の triple-approval review 向け convocation / dispatch へ切り
 blocked direct builder handoff と guardian-gated resolve を伴う
 `yaoyorozu_consensus_dispatch_binding` として束縛される。
 さらに 4 worker coverage は `TaskGraph` の complexity ceiling に合わせて
-3 root bundle へ畳まれ、
+proposal profile ごとの 3 root bundle strategy へ畳まれ、
 worker claim / guardian gate / resolve digest を伴う
 `yaoyorozu_task_graph_binding` として execution bundle 化される。
 

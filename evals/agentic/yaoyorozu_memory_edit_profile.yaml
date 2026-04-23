@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_memory_edit_profile
 target: agentic.yaoyorozu
 level: L4
-description: Yaoyorozu must materialize the reversible memory-edit proposal profile into deterministic convocation and worker dispatch coverage.
+description: Yaoyorozu must materialize the reversible memory-edit proposal profile into deterministic convocation, worker dispatch coverage, and a fixed TaskGraph bundle strategy.
 inputs:
   - source_root: agents
   - proposal_profile: memory-edit-v1
@@ -13,6 +13,8 @@ expected:
   selected_builder_coverage_count: 4
   dispatch_unit_count: 4
   worker_dispatch_coverage_complete: true
+  task_graph_bundle_strategy_ok: true
+  task_graph_bundle_strategy_id: memory-edit-rehearsal-three-root-bundle-v1
 metric: equality
 threshold: 1.0
 ethics_check: true

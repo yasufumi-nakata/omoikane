@@ -39,11 +39,6 @@ YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
 YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
-YAOYOROZU_PROPOSAL_PROFILES = (
-    "self-modify-patch-v1",
-    "memory-edit-v1",
-    "fork-request-v1",
-)
 YAOYOROZU_WORKER_TARGET_PATHS = {
     "runtime": ["src/omoikane/", "tests/unit/", "tests/integration/"],
     "schema": ["specs/interfaces/", "specs/schemas/"],
@@ -77,20 +72,60 @@ YAOYOROZU_WORKER_REPORT_FIELDS = [
     "coverage_evidence",
     "status",
 ]
-YAOYOROZU_TASK_GRAPH_ROOT_BUNDLES = (
-    {
-        "bundle_role": "runtime-bundle",
-        "coverage_areas": ("runtime",),
+YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES = {
+    "self-modify-patch-v1": {
+        "strategy_id": "self-modify-three-root-bundle-v1",
+        "root_bundles": (
+            {
+                "bundle_role": "runtime-bundle",
+                "coverage_areas": ("runtime",),
+            },
+            {
+                "bundle_role": "schema-bundle",
+                "coverage_areas": ("schema",),
+            },
+            {
+                "bundle_role": "evidence-sync-bundle",
+                "coverage_areas": ("eval", "docs"),
+            },
+        ),
     },
-    {
-        "bundle_role": "schema-bundle",
-        "coverage_areas": ("schema",),
+    "memory-edit-v1": {
+        "strategy_id": "memory-edit-rehearsal-three-root-bundle-v1",
+        "root_bundles": (
+            {
+                "bundle_role": "memory-rehearsal-bundle",
+                "coverage_areas": ("runtime", "eval"),
+            },
+            {
+                "bundle_role": "memory-schema-bundle",
+                "coverage_areas": ("schema",),
+            },
+            {
+                "bundle_role": "memory-docs-bundle",
+                "coverage_areas": ("docs",),
+            },
+        ),
     },
-    {
-        "bundle_role": "evidence-sync-bundle",
-        "coverage_areas": ("eval", "docs"),
+    "fork-request-v1": {
+        "strategy_id": "fork-request-governance-three-root-bundle-v1",
+        "root_bundles": (
+            {
+                "bundle_role": "identity-runtime-bundle",
+                "coverage_areas": ("runtime",),
+            },
+            {
+                "bundle_role": "fork-governance-bundle",
+                "coverage_areas": ("schema", "docs"),
+            },
+            {
+                "bundle_role": "fork-review-eval-bundle",
+                "coverage_areas": ("eval",),
+            },
+        ),
     },
-)
+}
+YAOYOROZU_PROPOSAL_PROFILES = tuple(YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES)
 
 
 def _pascal_case(name: str) -> str:
@@ -258,6 +293,7 @@ def _task_graph_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, 
     return {
         "schema_version": binding["schema_version"],
         "binding_profile": binding["binding_profile"],
+        "proposal_profile": binding["proposal_profile"],
         "convocation_session_ref": binding["convocation_session_ref"],
         "convocation_session_digest": binding["convocation_session_digest"],
         "dispatch_plan_ref": binding["dispatch_plan_ref"],
@@ -267,6 +303,7 @@ def _task_graph_binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, 
         "consensus_binding_ref": binding["consensus_binding_ref"],
         "consensus_binding_digest": binding["consensus_binding_digest"],
         "consensus_session_id": binding["consensus_session_id"],
+        "bundle_strategy": binding["bundle_strategy"],
         "task_graph_ref": binding["task_graph_ref"],
         "task_graph_digest": binding["task_graph_digest"],
         "task_graph_dispatch_digest": binding["task_graph_dispatch_digest"],
@@ -396,14 +433,20 @@ class YaoyorozuRegistryPolicy:
             for coverage_area, capabilities in YAOYOROZU_WORKSPACE_COVERAGE_CAPABILITY_RULES.items()
         }
     )
-    task_graph_root_bundles: List[Dict[str, Any]] = field(
-        default_factory=lambda: [
-            {
-                "bundle_role": str(bundle["bundle_role"]),
-                "coverage_areas": [str(area) for area in bundle["coverage_areas"]],
+    task_graph_bundle_strategies: Dict[str, Dict[str, Any]] = field(
+        default_factory=lambda: {
+            proposal_profile: {
+                "strategy_id": str(strategy["strategy_id"]),
+                "root_bundles": [
+                    {
+                        "bundle_role": str(bundle["bundle_role"]),
+                        "coverage_areas": [str(area) for area in bundle["coverage_areas"]],
+                    }
+                    for bundle in strategy["root_bundles"]
+                ],
             }
-            for bundle in YAOYOROZU_TASK_GRAPH_ROOT_BUNDLES
-        ]
+            for proposal_profile, strategy in YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES.items()
+        }
     )
     standing_roles: Dict[str, str] = field(
         default_factory=lambda: {
@@ -456,6 +499,9 @@ class YaoyorozuRegistryPolicy:
                         "candidate_agents": ["doc-sync-builder"],
                     },
                 ],
+                "task_graph_bundle_strategy_id": YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES[
+                    "self-modify-patch-v1"
+                ]["strategy_id"],
             },
             "memory-edit-v1": {
                 "summary": "Prepare a bounded Council review and reversible memory-edit handoff for one recall-affect-buffer session.",
@@ -499,6 +545,9 @@ class YaoyorozuRegistryPolicy:
                         "candidate_agents": ["doc-sync-builder"],
                     },
                 ],
+                "task_graph_bundle_strategy_id": YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES[
+                    "memory-edit-v1"
+                ]["strategy_id"],
             },
             "fork-request-v1": {
                 "summary": "Prepare a bounded Council review and triple-approval fork handoff for one identity fork request.",
@@ -542,6 +591,9 @@ class YaoyorozuRegistryPolicy:
                         "candidate_agents": ["doc-sync-builder"],
                     },
                 ],
+                "task_graph_bundle_strategy_id": YAOYOROZU_TASK_GRAPH_BUNDLE_STRATEGIES[
+                    "fork-request-v1"
+                ]["strategy_id"],
             },
         }
     )
@@ -567,6 +619,39 @@ class YaoyorozuRegistryService:
 
     def policy_snapshot(self) -> Dict[str, Any]:
         return self._policy.to_dict()
+
+    def _task_graph_bundle_strategy(self, proposal_profile: str) -> Dict[str, Any]:
+        strategy = self._policy.task_graph_bundle_strategies.get(proposal_profile)
+        if not isinstance(strategy, Mapping):
+            raise ValueError(f"unsupported TaskGraph bundle strategy for proposal profile: {proposal_profile}")
+
+        root_bundles = [
+            {
+                "bundle_role": _non_empty_string(bundle.get("bundle_role"), "bundle_role"),
+                "coverage_areas": [
+                    _non_empty_string(area, "coverage_area")
+                    for area in bundle.get("coverage_areas", [])
+                ],
+            }
+            for bundle in strategy.get("root_bundles", [])
+            if isinstance(bundle, Mapping)
+        ]
+        if len(root_bundles) != 3:
+            raise ValueError("TaskGraph bundle strategy must expose exactly 3 root bundles")
+        flat_coverage = [area for bundle in root_bundles for area in bundle["coverage_areas"]]
+        if sorted(flat_coverage) != sorted(self._policy.worker_target_paths):
+            raise ValueError(
+                "TaskGraph bundle strategy must cover runtime, schema, eval, and docs exactly once"
+            )
+        if len(set(flat_coverage)) != len(flat_coverage):
+            raise ValueError("TaskGraph bundle strategy coverage_areas must remain unique")
+        return {
+            "strategy_id": _non_empty_string(strategy.get("strategy_id"), "strategy_id"),
+            "proposal_profile": proposal_profile,
+            "root_bundle_count": len(root_bundles),
+            "max_parallelism": 3,
+            "root_bundles": root_bundles,
+        }
 
     def discover_workspace_workers(
         self,
@@ -1973,6 +2058,11 @@ class YaoyorozuRegistryService:
             raise ValueError("consensus binding must reuse the same dispatch receipt digest")
         if consensus_binding.get("consensus_session_id") != session_id:
             raise ValueError("consensus binding must reuse the same session id")
+        proposal_profile = _non_empty_string(
+            convocation_session.get("proposal_profile"),
+            "convocation_session.proposal_profile",
+        )
+        bundle_strategy = self._task_graph_bundle_strategy(proposal_profile)
 
         messages = consensus_binding.get("messages", [])
         if not isinstance(messages, list) or not messages:
@@ -2029,7 +2119,7 @@ class YaoyorozuRegistryService:
             raise ValueError("consensus binding must expose one resolve message")
 
         bundle_specs: List[Dict[str, Any]] = []
-        for bundle in self._policy.task_graph_root_bundles:
+        for bundle in bundle_strategy["root_bundles"]:
             coverage_areas = [str(area) for area in bundle["coverage_areas"]]
             grouped_units: List[Dict[str, Any]] = []
             for coverage_area in coverage_areas:
@@ -2195,7 +2285,7 @@ class YaoyorozuRegistryService:
             ",".join(sorted(node_binding["coverage_areas"])) for node_binding in node_bindings
         )
         expected_coverage_groups = sorted(
-            ",".join(sorted(bundle["coverage_areas"])) for bundle in bundle_specs
+            ",".join(sorted(bundle["coverage_areas"])) for bundle in bundle_strategy["root_bundles"]
         )
         validation = {
             "same_session_bound": (
@@ -2221,6 +2311,24 @@ class YaoyorozuRegistryService:
                 and task_graph_dispatch["dispatched_count"] == len(bundle_specs)
             ),
             "dispatch_units_bound": actual_dispatch_unit_ids == expected_dispatch_unit_ids,
+            "bundle_strategy_ok": (
+                bundle_strategy["strategy_id"]
+                == self._task_graph_bundle_strategy(proposal_profile)["strategy_id"]
+                and bundle_strategy["proposal_profile"] == proposal_profile
+                and bundle_strategy["root_bundle_count"] == len(bundle_specs)
+                and bundle_strategy["max_parallelism"] == graph["complexity_policy"]["max_parallelism"]
+                and task_graph_validation["root_count"] == bundle_strategy["root_bundle_count"]
+                and graph["required_roles"]
+                == [bundle["bundle_role"] for bundle in bundle_strategy["root_bundles"]]
+                and bundle_strategy["root_bundles"]
+                == [
+                    {
+                        "bundle_role": bundle["bundle_role"],
+                        "coverage_areas": list(bundle["coverage_areas"]),
+                    }
+                    for bundle in bundle_specs
+                ]
+            ),
             "coverage_grouping_ok": coverage_groups == expected_coverage_groups,
             "worker_claims_bound": (
                 all(
@@ -2258,6 +2366,7 @@ class YaoyorozuRegistryService:
             "binding_id": new_id("yaoyorozu-task-graph"),
             "bound_at": utc_now_iso(),
             "binding_profile": self._policy.task_graph_binding_profile,
+            "proposal_profile": proposal_profile,
             "convocation_session_ref": convocation_session_ref,
             "convocation_session_digest": convocation_session["session_digest"],
             "dispatch_plan_ref": dispatch_plan_ref,
@@ -2267,6 +2376,7 @@ class YaoyorozuRegistryService:
             "consensus_binding_ref": consensus_binding_ref,
             "consensus_binding_digest": consensus_binding["binding_digest"],
             "consensus_session_id": session_id,
+            "bundle_strategy": bundle_strategy,
             "task_graph_ref": f"task-graph://{graph['graph_id']}",
             "task_graph_digest": sha256_text(canonical_json(_task_graph_digest_payload(graph))),
             "task_graph_dispatch_digest": sha256_text(canonical_json(task_graph_dispatch)),
@@ -2294,6 +2404,27 @@ class YaoyorozuRegistryService:
             errors.append("kind must equal yaoyorozu_task_graph_binding")
         if binding.get("binding_profile") != self._policy.task_graph_binding_profile:
             errors.append("binding_profile mismatch")
+        proposal_profile = binding.get("proposal_profile")
+        if proposal_profile not in self._policy.task_graph_bundle_strategies:
+            errors.append("proposal_profile must map to one supported TaskGraph bundle strategy")
+            expected_bundle_strategy = {}
+        else:
+            expected_bundle_strategy = self._task_graph_bundle_strategy(str(proposal_profile))
+        bundle_strategy = binding.get("bundle_strategy", {})
+        if not isinstance(bundle_strategy, Mapping):
+            errors.append("bundle_strategy must be a mapping")
+            bundle_strategy = {}
+        elif expected_bundle_strategy:
+            if bundle_strategy.get("strategy_id") != expected_bundle_strategy["strategy_id"]:
+                errors.append("bundle_strategy.strategy_id mismatch")
+            if bundle_strategy.get("proposal_profile") != proposal_profile:
+                errors.append("bundle_strategy.proposal_profile mismatch")
+            if bundle_strategy.get("root_bundle_count") != expected_bundle_strategy["root_bundle_count"]:
+                errors.append("bundle_strategy.root_bundle_count mismatch")
+            if bundle_strategy.get("max_parallelism") != expected_bundle_strategy["max_parallelism"]:
+                errors.append("bundle_strategy.max_parallelism mismatch")
+            if bundle_strategy.get("root_bundles") != expected_bundle_strategy["root_bundles"]:
+                errors.append("bundle_strategy.root_bundles mismatch")
 
         task_graph = binding.get("task_graph", {})
         task_graph_validation = binding.get("task_graph_validation", {})
@@ -2380,6 +2511,10 @@ class YaoyorozuRegistryService:
             errors.append("task_graph_synthesis must accept exactly one result per ready root node")
         if task_graph_dispatch.get("dispatched_count") != len(ready_node_ids):
             errors.append("task_graph_dispatch.dispatched_count must match ready_node_ids count")
+        if expected_bundle_strategy and task_graph.get("required_roles") != [
+            bundle["bundle_role"] for bundle in expected_bundle_strategy["root_bundles"]
+        ]:
+            errors.append("task_graph.required_roles must match the selected bundle strategy")
         if not isinstance(review_node.get("input_spec"), Mapping) or review_node["input_spec"].get(
             "guardian_gate_message_digest"
         ) != binding.get("guardian_gate_message_digest"):
@@ -2401,6 +2536,7 @@ class YaoyorozuRegistryService:
                 and review_node["input_spec"].get("guardian_gate_message_digest")
                 == binding.get("guardian_gate_message_digest")
             ),
+            "bundle_strategy_ok": validation.get("bundle_strategy_ok") is True,
             "worker_claims_bound": validation.get("worker_claims_bound") is True,
             "coverage_grouping_ok": validation.get("coverage_grouping_ok") is True,
             "errors": errors,

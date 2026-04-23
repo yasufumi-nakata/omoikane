@@ -1436,6 +1436,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(4, result["validation"]["task_graph_dispatch_unit_count"])
         self.assertEqual(3, result["validation"]["task_graph_synthesis_count"])
         self.assertTrue(result["validation"]["task_graph_guardian_gate_bound"])
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "self-modify-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
         self.assertTrue(result["validation"]["task_graph_worker_claims_bound"])
         self.assertTrue(result["validation"]["task_graph_coverage_grouping_ok"])
         self.assertEqual(
@@ -1495,6 +1500,18 @@ class CliIntegrationTests(unittest.TestCase):
             ],
             [selection["role_id"] for selection in result["convocation"]["council_panel"]],
         )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "memory-edit-rehearsal-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertIn(
+            ["eval", "runtime"],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
+        )
 
     def test_yaoyorozu_demo_supports_fork_request_profile(self) -> None:
         stdout = io.StringIO()
@@ -1526,6 +1543,18 @@ class CliIntegrationTests(unittest.TestCase):
                 "ethics-committee",
             ],
             [selection["role_id"] for selection in result["convocation"]["council_panel"]],
+        )
+        self.assertTrue(result["validation"]["task_graph_bundle_strategy_ok"])
+        self.assertEqual(
+            "fork-request-governance-three-root-bundle-v1",
+            result["validation"]["task_graph_bundle_strategy_id"],
+        )
+        self.assertIn(
+            ["docs", "schema"],
+            sorted(
+                sorted(binding["coverage_areas"])
+                for binding in result["task_graph_binding"]["node_bindings"]
+            ),
         )
         self.assertEqual(
             "identity-guardian",

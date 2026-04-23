@@ -116,6 +116,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["task_graph_binding"],
         )
 
+    def test_memory_edit_profile_task_graph_binding_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo(proposal_profile="memory-edit-v1")
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
+        )
+
     def test_fork_request_profile_matches_public_schemas(self) -> None:
         result = self.runtime.run_yaoyorozu_demo(proposal_profile="fork-request-v1")
 
@@ -130,4 +138,8 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
             result["dispatch_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_task_graph_binding.schema",
+            result["task_graph_binding"],
         )

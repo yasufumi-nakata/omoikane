@@ -1868,7 +1868,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to bind one coverage-complete Yaoyorozu dispatch bundle to the fixed three-root TaskGraph, ConsensusBus claim chain, and guardian gate digest.
+    rationale: Required to bind one coverage-complete Yaoyorozu dispatch bundle to the proposal-profile-selected three-root TaskGraph strategy, ConsensusBus claim chain, and guardian gate digest.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.yaoyorozu.v0.idl
@@ -1920,7 +1920,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects same-session TaskGraph bundling, three-root complexity compliance, and guardian-bound synthesis for Yaoyorozu worker execution.
+    rationale: Protects same-session TaskGraph bundling, profile-aware three-root strategy selection, complexity compliance, and guardian-bound synthesis for Yaoyorozu worker execution.
   - priority: P1
     kind: schema
     file: specs/schemas/guardian_oversight_event.schema

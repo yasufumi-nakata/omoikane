@@ -306,8 +306,13 @@ identity fork の triple-approval review 向け convocation / dispatch chain へ
 final resolve を監査し、blocked direct handoff と worker claim chain を
 `yaoyorozu_consensus_dispatch_binding` として束縛することを確認する。
 さらに fixed `max_parallelism=3` を超えないよう
-`runtime` / `schema` / `evidence-sync(eval+docs)` の 3 root bundle へ畳み込んだ
-`TaskGraph` が、
+`self-modify-patch-v1` では
+`runtime` / `schema` / `evidence-sync(eval+docs)`、
+`memory-edit-v1` では
+`memory-rehearsal(runtime+eval)` / `schema` / `docs`、
+`fork-request-v1` では
+`runtime` / `fork-governance(schema+docs)` / `eval`
+の 3 root bundle strategy へ畳み込んだ `TaskGraph` が、
 同じ session 上の worker claim / guardian gate / resolve digest を
 `yaoyorozu_task_graph_binding` として束縛することを確認する。
 

@@ -3858,6 +3858,12 @@ json.dump(response, sys.stdout)
                 "task_graph_guardian_gate_bound": task_graph_binding_validation[
                     "guardian_gate_bound"
                 ],
+                "task_graph_bundle_strategy_ok": task_graph_binding_validation[
+                    "bundle_strategy_ok"
+                ],
+                "task_graph_bundle_strategy_id": task_graph_binding["bundle_strategy"][
+                    "strategy_id"
+                ],
                 "task_graph_worker_claims_bound": task_graph_binding_validation[
                     "worker_claims_bound"
                 ],
