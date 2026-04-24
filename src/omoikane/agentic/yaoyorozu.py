@@ -66,6 +66,11 @@ YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS = [
     "src/omoikane/agentic/__init__.py",
     "src/omoikane/agentic/local_worker_stub.py",
 ]
+YAOYOROZU_DEPENDENCY_IMPORT_PRECEDENCE_PROFILE = (
+    "materialized-dependency-pythonpath-first-v1"
+)
+YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS = "materialized-first"
+YAOYOROZU_INLINE_DEPENDENCY_IMPORT_STATUS = "source-inline"
 YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
     "same-host-external-workspace-preseed-guardian-gate-v1"
 )
@@ -891,6 +896,7 @@ class YaoyorozuRegistryPolicy:
     dependency_materialization_paths: List[str] = field(
         default_factory=lambda: list(YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS)
     )
+    dependency_import_precedence_profile: str = YAOYOROZU_DEPENDENCY_IMPORT_PRECEDENCE_PROFILE
     workspace_guardian_gate_profile: str = YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE
     workspace_guardian_role: str = YAOYOROZU_WORKSPACE_GUARDIAN_ROLE
     workspace_guardian_category: str = YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY
@@ -3531,6 +3537,10 @@ class YaoyorozuRegistryService:
             dependency_materialization_manifest_digest = ""
             dependency_materialization_file_count = 0
             command_env = env.copy()
+            dependency_import_root = ""
+            dependency_import_path_order = [str(src_root)]
+            dependency_import_precedence_status = YAOYOROZU_INLINE_DEPENDENCY_IMPORT_STATUS
+            dependency_import_precedence_bound = True
             if workspace_scope == self._policy.external_workspace_scope:
                 workspace_seed_head_commit = self._seed_external_execution_workspace(
                     source_root=repo_root,
@@ -3565,7 +3575,22 @@ class YaoyorozuRegistryService:
                     / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
                     / "src"
                 )
-                command_env["PYTHONPATH"] = f"{env['PYTHONPATH']}{os.pathsep}{materialized_src_root}"
+                dependency_import_root = str(materialized_src_root)
+                dependency_import_path_order = [dependency_import_root, str(src_root)]
+                dependency_import_precedence_status = (
+                    YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                    if dependency_materialization_status == "materialized"
+                    else "blocked"
+                )
+                dependency_import_precedence_bound = (
+                    dependency_import_precedence_status
+                    == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                    and dependency_import_path_order[0] == dependency_import_root
+                    and dependency_import_path_order[1] == str(src_root)
+                )
+                command_env["PYTHONPATH"] = (
+                    f"{dependency_import_root}{os.pathsep}{env['PYTHONPATH']}"
+                )
             command = [sys.executable if preview[0] == "python3" else preview[0], *preview[1:]]
             process = subprocess.Popen(
                 command,
@@ -3778,6 +3803,13 @@ class YaoyorozuRegistryService:
                 ),
                 "dependency_materialization_file_count": dependency_materialization_file_count,
                 "dependency_materialization_manifest": dependency_materialization_manifest,
+                "dependency_import_precedence_profile": (
+                    self._policy.dependency_import_precedence_profile
+                ),
+                "dependency_import_root": dependency_import_root,
+                "dependency_import_path_order": dependency_import_path_order,
+                "dependency_import_precedence_status": dependency_import_precedence_status,
+                "dependency_import_precedence_bound": dependency_import_precedence_bound,
                 "guardian_preseed_gate": dict(guardian_preseed_gate)
                 if isinstance(guardian_preseed_gate, Mapping)
                 else {},
@@ -3958,6 +3990,17 @@ class YaoyorozuRegistryService:
             "dependency_materialization_file_count": sum(
                 int(result["dependency_materialization_file_count"]) for result in results
             ),
+            "dependency_import_precedence_profile": (
+                self._policy.dependency_import_precedence_profile
+            ),
+            "external_dependency_import_precedence_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["dependency_import_precedence_bound"]
+                and result["dependency_import_precedence_status"]
+                == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+            ),
         }
         validation = {
             "command_digests_match": all(
@@ -3995,6 +4038,20 @@ class YaoyorozuRegistryService:
                         and result["dependency_materialization_manifest_digest"]
                         and result["dependency_materialization_file_count"]
                         == len(self._policy.dependency_materialization_paths)
+                    )
+                )
+                for result in results
+            ),
+            "external_dependency_import_precedence_bound": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or (
+                        result["dependency_import_precedence_bound"]
+                        and result["dependency_import_precedence_status"]
+                        == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                        and result["dependency_import_path_order"]
+                        and result["dependency_import_path_order"][0]
+                        == result["dependency_import_root"]
                     )
                 )
                 for result in results
@@ -4136,6 +4193,10 @@ class YaoyorozuRegistryService:
         dependency_materialization_required_count = 0
         external_dependency_materialized_count = 0
         dependency_materialization_file_count = 0
+        external_dependency_import_precedence_count = 0
+        source_src_root = str(
+            Path(str(dispatch_receipt.get("workspace_root", ""))).resolve() / "src"
+        )
         for result in results:
             if not isinstance(result, Mapping):
                 errors.append("results entries must be mappings")
@@ -4216,6 +4277,46 @@ class YaoyorozuRegistryService:
                     == len(self._policy.dependency_materialization_paths)
                 ):
                     external_dependency_materialized_count += 1
+                expected_import_root = str(
+                    Path(execution_workspace_root)
+                    / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
+                    / "src"
+                )
+                dependency_import_path_order = result.get("dependency_import_path_order", [])
+                if result.get(
+                    "dependency_import_precedence_profile"
+                ) != self._policy.dependency_import_precedence_profile:
+                    errors.append("worker result dependency_import_precedence_profile mismatch")
+                if result.get("dependency_import_root") != expected_import_root:
+                    errors.append("external worker dependency_import_root mismatch")
+                if not isinstance(dependency_import_path_order, list):
+                    errors.append("worker result dependency_import_path_order must be a list")
+                    dependency_import_path_order = []
+                if (
+                    len(dependency_import_path_order) < 2
+                    or dependency_import_path_order[0] != expected_import_root
+                    or dependency_import_path_order[1] != source_src_root
+                ):
+                    errors.append(
+                        "external worker dependency import path order must put materialized src before source src"
+                    )
+                if (
+                    result.get("dependency_import_precedence_status")
+                    != YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                ):
+                    errors.append("external worker dependency_import_precedence_status mismatch")
+                if result.get("dependency_import_precedence_bound") is not True:
+                    errors.append("external worker dependency_import_precedence_bound must be true")
+                if (
+                    isinstance(dependency_import_path_order, list)
+                    and len(dependency_import_path_order) >= 2
+                    and dependency_import_path_order[0] == expected_import_root
+                    and dependency_import_path_order[1] == source_src_root
+                    and result.get("dependency_import_precedence_status")
+                    == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                    and result.get("dependency_import_precedence_bound") is True
+                ):
+                    external_dependency_import_precedence_count += 1
             else:
                 if workspace_seed_status != "inline":
                     errors.append("repo-local workspace results must record workspace_seed_status=inline")
@@ -4231,6 +4332,22 @@ class YaoyorozuRegistryService:
                     errors.append("repo-local dependency_materialization_file_count must be 0")
                 if result.get("dependency_materialization_manifest") is not None:
                     errors.append("repo-local dependency_materialization_manifest must be null")
+                dependency_import_path_order = result.get("dependency_import_path_order", [])
+                if result.get(
+                    "dependency_import_precedence_profile"
+                ) != self._policy.dependency_import_precedence_profile:
+                    errors.append("worker result dependency_import_precedence_profile mismatch")
+                if result.get("dependency_import_root") != "":
+                    errors.append("repo-local dependency_import_root must be empty")
+                if dependency_import_path_order != [source_src_root]:
+                    errors.append("repo-local dependency_import_path_order must contain source src only")
+                if (
+                    result.get("dependency_import_precedence_status")
+                    != YAOYOROZU_INLINE_DEPENDENCY_IMPORT_STATUS
+                ):
+                    errors.append("repo-local dependency_import_precedence_status mismatch")
+                if result.get("dependency_import_precedence_bound") is not True:
+                    errors.append("repo-local dependency_import_precedence_bound must be true")
             workspace_target_digest = str(result.get("workspace_target_digest", "")).strip()
             if len(workspace_target_digest) != 64:
                 errors.append("worker result workspace_target_digest must be a sha256 digest")
@@ -4634,6 +4751,16 @@ class YaoyorozuRegistryService:
             != dependency_materialization_file_count
         ):
             errors.append("execution_summary.dependency_materialization_file_count mismatch")
+        if (
+            execution_summary.get("dependency_import_precedence_profile")
+            != self._policy.dependency_import_precedence_profile
+        ):
+            errors.append("execution_summary.dependency_import_precedence_profile mismatch")
+        if (
+            execution_summary.get("external_dependency_import_precedence_count")
+            != external_dependency_import_precedence_count
+        ):
+            errors.append("execution_summary.external_dependency_import_precedence_count mismatch")
         validation = dispatch_receipt.get("validation", {})
         if not isinstance(validation, Mapping):
             errors.append("validation must be a mapping")
@@ -4667,6 +4794,26 @@ class YaoyorozuRegistryService:
                     and result.get("dependency_materialization_manifest_digest")
                     and result.get("dependency_materialization_file_count")
                     == len(self._policy.dependency_materialization_paths)
+                )
+                for result in results
+            ),
+            "external_dependency_import_precedence_bound": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    result.get("dependency_import_precedence_status")
+                    == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
+                    and result.get("dependency_import_precedence_bound") is True
+                    and isinstance(result.get("dependency_import_path_order"), list)
+                    and len(result.get("dependency_import_path_order", [])) >= 2
+                    and result.get("dependency_import_path_order", [None])[0]
+                    == str(
+                        Path(str(result.get("execution_workspace_root", "")))
+                        / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
+                        / "src"
+                    )
+                    and result.get("dependency_import_path_order", [None, None])[1]
+                    == source_src_root
                 )
                 for result in results
             ),
@@ -4746,6 +4893,9 @@ class YaoyorozuRegistryService:
             "external_workspace_seeded": expected_validation["external_workspace_seeded"],
             "external_dependencies_materialized": expected_validation[
                 "external_dependencies_materialized"
+            ],
+            "external_dependency_import_precedence_bound": expected_validation[
+                "external_dependency_import_precedence_bound"
             ],
             "all_guardian_preseed_gates_bound": expected_validation[
                 "all_guardian_preseed_gates_bound"

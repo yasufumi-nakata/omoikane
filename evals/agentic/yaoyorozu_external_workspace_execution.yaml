@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_external_workspace_execution
 target: agentic.yaoyorozu
 level: L4
-description: Yaoyorozu must route profile-covered builder workers into same-host external execution workspaces, pass a HumanOversightChannel-bound integrity Guardian preseed gate before seed/root/dependency materialization, seed source target-path snapshots, materialize minimal runtime dependencies, and bind candidate/source execution counts in the dispatch receipt.
+description: Yaoyorozu must route profile-covered builder workers into same-host external execution workspaces, pass a HumanOversightChannel-bound integrity Guardian preseed gate before seed/root/dependency materialization, seed source target-path snapshots, materialize minimal runtime dependencies, launch workers with materialized dependency src before source src, and bind candidate/source execution counts in the dispatch receipt.
 inputs:
   - source_root: agents
   - proposal_profile: self-modify-patch-v1
@@ -10,6 +10,7 @@ inputs:
   - preseed_gate_profile: same-host-external-workspace-preseed-guardian-gate-v1
   - preseed_oversight_binding_profile: human-oversight-channel-preseed-attestation-v1
   - dependency_materialization_profile: same-host-external-workspace-dependency-materialization-v1
+  - dependency_import_precedence_profile: materialized-dependency-pythonpath-first-v1
 expected:
   workspace_execution_bound: true
   workspace_execution_policy_ready: true
@@ -29,6 +30,8 @@ expected:
   same_host_scope_only: true
   external_workspace_seeded: true
   external_dependencies_materialized: true
+  external_dependency_import_precedence_bound: true
+  external_dependency_import_precedence_count: 4
   external_dependency_materialized_count: 4
   dependency_materialization_required_count: 4
   worker_dispatch_receipt_ok: true

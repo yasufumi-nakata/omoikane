@@ -51,7 +51,8 @@
   requested optional coverage は candidate が無い場合に source fallback として明示し、
   `same-host-external-workspace` の execution root へ source target-path snapshot を seed してから worker を起動し、
   HumanOversightChannel reviewer-network attestation に束縛された preseed gate と
-  dependency materialization manifest / seed commit / candidate-bound success count / source fallback count を receipt に残しつつ、
+  dependency materialization manifest / materialized-first import precedence /
+  seed commit / candidate-bound success count / source fallback count を receipt に残しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
   `yaoyorozu_consensus_dispatch_binding` として束縛する。
   さらに fixed `max_parallelism=3` を守るため、
@@ -145,4 +146,3 @@ CouncilMessage:
 - [task-decomposition.md](task-decomposition.md) ── タスク分解アルゴリズム
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア
-# workspace-enacted: patch-746f10325328 target=docs/02-subsystems/agentic/README.md

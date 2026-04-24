@@ -94,6 +94,11 @@ properties:
         - dependency_materialization_manifest_digest
         - dependency_materialization_file_count
         - dependency_materialization_manifest
+        - dependency_import_precedence_profile
+        - dependency_import_root
+        - dependency_import_path_order
+        - dependency_import_precedence_status
+        - dependency_import_precedence_bound
         - guardian_preseed_gate
         - guardian_preseed_gate_status
         - guardian_preseed_gate_digest
@@ -216,6 +221,24 @@ properties:
           oneOf:
             - $ref: "yaoyorozu_dependency_materialization_manifest.schema"
             - type: "null"
+        dependency_import_precedence_profile:
+          const: materialized-dependency-pythonpath-first-v1
+        dependency_import_root:
+          type: string
+        dependency_import_path_order:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            type: string
+            minLength: 1
+        dependency_import_precedence_status:
+          type: string
+          enum:
+            - source-inline
+            - materialized-first
+        dependency_import_precedence_bound:
+          const: true
         guardian_preseed_gate:
           $ref: "yaoyorozu_workspace_guardian_preseed_gate.schema"
         guardian_preseed_gate_status:
@@ -484,6 +507,8 @@ properties:
       - dependency_materialization_required_count
       - external_dependency_materialized_count
       - dependency_materialization_file_count
+      - dependency_import_precedence_profile
+      - external_dependency_import_precedence_count
     properties:
       launched_process_count:
         type: integer
@@ -616,6 +641,11 @@ properties:
       dependency_materialization_file_count:
         type: integer
         minimum: 0
+      dependency_import_precedence_profile:
+        const: materialized-dependency-pythonpath-first-v1
+      external_dependency_import_precedence_count:
+        type: integer
+        minimum: 0
   validation:
     type: object
     additionalProperties: false
@@ -626,6 +656,7 @@ properties:
       - same_host_scope_only
       - external_workspace_seeded
       - external_dependencies_materialized
+      - external_dependency_import_precedence_bound
       - profile_coverage_bound
       - coverage_complete
       - all_reports_bound_to_dispatch
@@ -649,6 +680,8 @@ properties:
       external_workspace_seeded:
         const: true
       external_dependencies_materialized:
+        const: true
+      external_dependency_import_precedence_bound:
         const: true
       profile_coverage_bound:
         const: true

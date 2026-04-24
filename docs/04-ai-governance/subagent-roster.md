@@ -72,7 +72,8 @@ workspace discovery が bound される場合は
 requested optional coverage は candidate が無い場合に source fallback として示し、
 source target-path snapshot を `same-host-external-workspace` execution root に seed してから
 worker を起動し、HumanOversightChannel reviewer-network attestation 付きの
-preseed integrity Guardian gate、dependency materialization manifest、seed commit、
+preseed integrity Guardian gate、dependency materialization manifest、
+materialized-first import precedence、seed commit、
 candidate/source success count を receipt に残す。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。

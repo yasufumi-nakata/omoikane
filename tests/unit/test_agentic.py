@@ -3717,6 +3717,19 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(0, receipt["execution_summary"]["external_preseed_oversight_satisfied_count"])
         self.assertEqual(0, receipt["execution_summary"]["dependency_materialization_required_count"])
         self.assertEqual(0, receipt["execution_summary"]["external_dependency_materialized_count"])
+        self.assertEqual(0, receipt["execution_summary"]["external_dependency_import_precedence_count"])
+        self.assertTrue(receipt["validation"]["external_dependency_import_precedence_bound"])
+        self.assertTrue(
+            all(
+                result["dependency_import_precedence_profile"]
+                == "materialized-dependency-pythonpath-first-v1"
+                and result["dependency_import_root"] == ""
+                and result["dependency_import_path_order"] == [str(repo_root / "src")]
+                and result["dependency_import_precedence_status"] == "source-inline"
+                and result["dependency_import_precedence_bound"]
+                for result in receipt["results"]
+            )
+        )
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
         self.assertEqual(
             "target-delta-to-patch-candidate-v1",
@@ -3751,6 +3764,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
 
     def test_run_yaoyorozu_demo_routes_workers_into_external_workspace_sandboxes(self) -> None:
         result = OmoikaneReferenceOS().run_yaoyorozu_demo()
+        source_src_root = str(Path(__file__).resolve().parents[2] / "src")
 
         self.assertTrue(result["convocation"]["validation"]["workspace_execution_bound"])
         self.assertTrue(result["convocation"]["validation"]["workspace_execution_policy_ready"])
@@ -3763,6 +3777,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependencies_materialized"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependency_import_precedence_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_gates_passed"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["guardian_preseed_oversight_bound"])
@@ -3778,6 +3793,12 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             4,
             result["dispatch_receipt"]["execution_summary"][
                 "external_dependency_materialized_count"
+            ],
+        )
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_dependency_import_precedence_count"
             ],
         )
         self.assertEqual(
@@ -3803,6 +3824,16 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and process["dependency_materialization_file_count"] >= 5
                 and process["dependency_materialization_manifest"]["status"]
                 == "materialized"
+                and process["dependency_import_precedence_profile"]
+                == "materialized-dependency-pythonpath-first-v1"
+                and process["dependency_import_root"].endswith(
+                    "/.yaoyorozu-dependencies/src"
+                )
+                and process["dependency_import_path_order"][0]
+                == process["dependency_import_root"]
+                and process["dependency_import_path_order"][1] == source_src_root
+                and process["dependency_import_precedence_status"] == "materialized-first"
+                and process["dependency_import_precedence_bound"]
                 and process["guardian_preseed_gate_status"] == "pass"
                 and process["guardian_preseed_gate_bound"]
                 and process["guardian_oversight_event_status"] == "satisfied"
@@ -3870,6 +3901,22 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertFalse(validation["external_dependencies_materialized"])
         self.assertIn(
             "dependency materialization file digest mismatch",
+            validation["errors"],
+        )
+
+    def test_worker_dispatch_receipt_rejects_tampered_dependency_import_precedence(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        path_order = tampered["results"][0]["dependency_import_path_order"]
+        tampered["results"][0]["dependency_import_path_order"] = list(reversed(path_order))
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["external_dependency_import_precedence_bound"])
+        self.assertIn(
+            "external worker dependency import path order must put materialized src before source src",
             validation["errors"],
         )
 

@@ -98,7 +98,10 @@ workspace seed / execution-root creation / dependency materialization より前�
 source target-path snapshot を seed commit 付きで固定し、
 minimal runtime dependency snapshot を
 `same-host-external-workspace-dependency-materialization-v1` manifest として
-digest-bound に materialize してから worker を実行する。
+digest-bound に materialize し、
+`materialized-dependency-pythonpath-first-v1` により materialized `src` を
+source checkout の `src` より前に置いた path order を receipt に残してから
+worker を実行する。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

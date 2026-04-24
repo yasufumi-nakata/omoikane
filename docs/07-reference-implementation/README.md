@@ -404,6 +404,8 @@ reviewer-network attestation に束縛されたうえで
 workspace seed / execution-root creation / dependency materialization 前に pass したこと、
 `same-host-external-workspace-dependency-materialization-v1` manifest が
 minimal runtime dependency snapshot を external execution root へ digest-bound に固定したこと、
+`materialized-dependency-pythonpath-first-v1` により materialized `src` が
+source checkout `src` より先に import される path order を receipt に残すこと、
 `workspace_seed_head_commit`、dependency manifest digest、candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
 target path observation と git-bound target path delta receipt、

@@ -167,6 +167,7 @@ operations:
       - external candidate workers must have a passing same-host-external-workspace-preseed-guardian-gate-v1 artifact before any snapshot seed, execution root creation, or dependency materialization occurs
       - external candidate workers must carry the preseed gate's oversight event ref, digest, reviewer quorum, and verifier-network attestation status into the dispatch receipt
       - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt and a same-host-external-workspace-dependency-materialization-v1 manifest for the minimal runtime dependency snapshot
+      - external candidate workers must launch with materialized-dependency-pythonpath-first-v1 import precedence, placing the materialized dependency src root before the source checkout src root in the receipt-bound path order
       - worker reports must verify that every target path exists and remains inside the selected execution workspace
       - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit
       - worker reports must materialize one patch_descriptor-compatible patch candidate receipt from the same delta evidence before the ready gate passes
