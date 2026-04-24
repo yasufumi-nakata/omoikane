@@ -1,0 +1,390 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/procedural_actuation_bridge_session.schema"
+title: ProceduralActuationBridgeSession
+description: >
+  Digest-bound bridge from one passed procedural skill enactment session to one
+  EWA external actuation authorization and executed command, without retaining
+  raw instruction text.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - bridge_session_id
+  - identity_id
+  - bridge_policy
+  - source_enactment_session_id
+  - source_enactment_digest
+  - source_execution_digest
+  - source_writeback_digest
+  - rollback_token
+  - skill_labels
+  - materialized_skill_count
+  - command_binding
+  - authorization_ready_checks
+  - eval_refs
+  - redacted_fields
+  - preserved_invariants
+  - status
+  - bridged_at
+  - validation_summary
+  - digest
+properties:
+  kind:
+    const: procedural_actuation_bridge_session
+  schema_version:
+    const: "1.0"
+  bridge_session_id:
+    type: string
+    pattern: "^procedural-actuation-bridge-[a-f0-9]{12}$"
+  identity_id:
+    type: string
+    minLength: 1
+  bridge_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - policy_id
+      - source_enactment_policy
+      - ewa_authorization_policy
+      - required_authorization_status
+      - required_delivery_scope
+      - command_must_bind_authorization
+      - raw_instruction_retention
+      - mandatory_eval
+      - required_ewa_eval
+    properties:
+      schema_version:
+        const: "1.0"
+      policy_id:
+        const: procedural-enactment-ewa-authorization-bridge-v1
+      source_enactment_policy:
+        const: guardian-witnessed-procedural-skill-enactment-v1
+      ewa_authorization_policy:
+        const: guardian-jurisdiction-bound-external-actuation-v1
+      required_authorization_status:
+        const: authorized
+      required_delivery_scope:
+        const: physical-device-actuation
+      command_must_bind_authorization:
+        const: true
+      raw_instruction_retention:
+        const: forbidden
+      mandatory_eval:
+        const: evals/continuity/procedural_actuation_bridge.yaml
+      required_ewa_eval:
+        const: evals/safety/ewa_external_actuation_authorization.yaml
+  source_enactment_session_id:
+    type: string
+    pattern: "^procedural-enactment-[a-f0-9]{12}$"
+  source_enactment_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_writeback_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  rollback_token:
+    type: string
+    minLength: 1
+  skill_labels:
+    type: array
+    minItems: 1
+    maxItems: 3
+    items:
+      type: string
+      minLength: 1
+  materialized_skill_count:
+    type: integer
+    minimum: 1
+    maximum: 3
+  command_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - authorization_id
+      - authorization_digest
+      - authorization_status
+      - delivery_scope
+      - command_id
+      - command_status
+      - command_audit_event_ref
+      - instruction_digest
+      - intent_summary_digest
+      - motor_plan_id
+      - motor_plan_digest
+      - stop_signal_path_id
+      - stop_signal_path_digest
+      - legal_execution_id
+      - legal_execution_digest
+      - guardian_oversight_gate_id
+      - guardian_oversight_gate_digest
+      - guardian_oversight_event_id
+      - notice_authority_ref
+      - jurisdiction
+      - liability_mode
+      - reviewer_network_attested
+      - raw_instruction_present
+    properties:
+      authorization_id:
+        type: string
+        minLength: 8
+      authorization_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      authorization_status:
+        const: authorized
+      delivery_scope:
+        const: physical-device-actuation
+      command_id:
+        type: string
+        minLength: 1
+      command_status:
+        const: executed
+      command_audit_event_ref:
+        type: string
+        pattern: "^ledger://"
+      instruction_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      intent_summary_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      motor_plan_id:
+        type: string
+        minLength: 8
+      motor_plan_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      stop_signal_path_id:
+        type: string
+        minLength: 8
+      stop_signal_path_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      legal_execution_id:
+        type: string
+        minLength: 8
+      legal_execution_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      guardian_oversight_gate_id:
+        type: string
+        minLength: 8
+      guardian_oversight_gate_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      guardian_oversight_event_id:
+        type: string
+        minLength: 8
+      notice_authority_ref:
+        type: string
+        minLength: 1
+      jurisdiction:
+        type: string
+        minLength: 1
+      liability_mode:
+        enum:
+          - individual
+          - institutional
+          - joint
+      reviewer_network_attested:
+        const: true
+      raw_instruction_present:
+        const: false
+  authorization_ready_checks:
+    type: object
+    additionalProperties: false
+    required:
+      - authorization_validation_ok
+      - authorization_ready
+      - instruction_digest_matches
+      - intent_digest_matches
+      - motor_plan_bound
+      - stop_signal_path_bound
+      - legal_execution_bound
+      - guardian_oversight_gate_bound
+      - reviewer_network_attested
+    properties:
+      authorization_validation_ok:
+        const: true
+      authorization_ready:
+        const: true
+      instruction_digest_matches:
+        const: true
+      intent_digest_matches:
+        const: true
+      motor_plan_bound:
+        const: true
+      stop_signal_path_bound:
+        const: true
+      legal_execution_bound:
+        const: true
+      guardian_oversight_gate_bound:
+        const: true
+      reviewer_network_attested:
+        const: true
+  eval_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^evals/"
+    contains:
+      const: evals/continuity/procedural_actuation_bridge.yaml
+  redacted_fields:
+    type: array
+    minItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  preserved_invariants:
+    type: array
+    minItems: 6
+    maxItems: 6
+    prefixItems:
+      - const: source-enactment-passed
+      - const: ewa-authorization-required
+      - const: command-bound-to-authorization
+      - const: raw-instruction-redacted
+      - const: rollback-token-retained
+      - const: guardian-oversight-gate-bound
+  status:
+    const: bridged
+  bridged_at:
+    type: string
+    format: date-time
+  validation_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - source_enactment_bound
+      - authorization_digest_bound
+      - authorization_validation_bound
+      - command_bound_to_authorization
+      - legal_execution_bound
+      - guardian_oversight_gate_bound
+      - no_raw_instruction_text
+      - rollback_token_preserved
+      - delivery_scope
+      - ok
+      - errors
+    properties:
+      source_enactment_bound:
+        const: true
+      authorization_digest_bound:
+        const: true
+      authorization_validation_bound:
+        const: true
+      command_bound_to_authorization:
+        const: true
+      legal_execution_bound:
+        const: true
+      guardian_oversight_gate_bound:
+        const: true
+      no_raw_instruction_text:
+        const: true
+      rollback_token_preserved:
+        const: true
+      delivery_scope:
+        const: physical-device-actuation
+      ok:
+        const: true
+      errors:
+        type: array
+        maxItems: 0
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: procedural_actuation_bridge_session
+    schema_version: "1.0"
+    bridge_session_id: procedural-actuation-bridge-0123456789ab
+    identity_id: identity://procedural-actuation-demo
+    bridge_policy:
+      schema_version: "1.0"
+      policy_id: procedural-enactment-ewa-authorization-bridge-v1
+      source_enactment_policy: guardian-witnessed-procedural-skill-enactment-v1
+      ewa_authorization_policy: guardian-jurisdiction-bound-external-actuation-v1
+      required_authorization_status: authorized
+      required_delivery_scope: physical-device-actuation
+      command_must_bind_authorization: true
+      raw_instruction_retention: forbidden
+      mandatory_eval: evals/continuity/procedural_actuation_bridge.yaml
+      required_ewa_eval: evals/safety/ewa_external_actuation_authorization.yaml
+    source_enactment_session_id: procedural-enactment-0123456789ab
+    source_enactment_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    source_execution_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    source_writeback_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    rollback_token: rollback-d9c651600b8c
+    skill_labels:
+      - guardian-review-rehearsal
+    materialized_skill_count: 1
+    command_binding:
+      authorization_id: ewa-authz-0123456789ab
+      authorization_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+      authorization_status: authorized
+      delivery_scope: physical-device-actuation
+      command_id: procedural-actuation-bridge-command-001
+      command_status: executed
+      command_audit_event_ref: ledger://ewa/ewa-0123456789ab/2
+      instruction_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      intent_summary_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+      motor_plan_id: ewa-plan-0123456789ab
+      motor_plan_digest: 1111111111111111111111111111111111111111111111111111111111111111
+      stop_signal_path_id: ewa-stop-path-0123456789ab
+      stop_signal_path_digest: 2222222222222222222222222222222222222222222222222222222222222222
+      legal_execution_id: ewa-legal-0123456789ab
+      legal_execution_digest: 3333333333333333333333333333333333333333333333333333333333333333
+      guardian_oversight_gate_id: ewa-oversight-gate-0123456789ab
+      guardian_oversight_gate_digest: 4444444444444444444444444444444444444444444444444444444444444444
+      guardian_oversight_event_id: oversight-event-0123456789ab
+      notice_authority_ref: authority://jp-13/procedural-actuation-oversight-desk
+      jurisdiction: JP-13
+      liability_mode: joint
+      reviewer_network_attested: true
+      raw_instruction_present: false
+    authorization_ready_checks:
+      authorization_validation_ok: true
+      authorization_ready: true
+      instruction_digest_matches: true
+      intent_digest_matches: true
+      motor_plan_bound: true
+      stop_signal_path_bound: true
+      legal_execution_bound: true
+      guardian_oversight_gate_bound: true
+      reviewer_network_attested: true
+    eval_refs:
+      - evals/continuity/procedural_actuation_bridge.yaml
+      - evals/safety/ewa_external_actuation_authorization.yaml
+    redacted_fields:
+      - authorization.raw_instruction_text
+      - approved_command.raw_instruction_text
+      - approved_command.intent_summary
+    preserved_invariants:
+      - source-enactment-passed
+      - ewa-authorization-required
+      - command-bound-to-authorization
+      - raw-instruction-redacted
+      - rollback-token-retained
+      - guardian-oversight-gate-bound
+    status: bridged
+    bridged_at: "2026-04-24T00:00:00+00:00"
+    validation_summary:
+      source_enactment_bound: true
+      authorization_digest_bound: true
+      authorization_validation_bound: true
+      command_bound_to_authorization: true
+      legal_execution_bound: true
+      guardian_oversight_gate_bound: true
+      no_raw_instruction_text: true
+      rollback_token_preserved: true
+      delivery_scope: physical-device-actuation
+      ok: true
+      errors: []
+    digest: 5555555555555555555555555555555555555555555555555555555555555555

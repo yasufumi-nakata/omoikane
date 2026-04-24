@@ -1,0 +1,120 @@
+idl_version: 1
+kind: service
+namespace: mind.procedural_actuation.v0
+service: ProceduralActuationBridge
+summary: >
+  Deterministic bridge that allows a passed procedural skill enactment to
+  request physical-world actuation only through an EWA authorization artifact.
+imports:
+  procedural_skill_enactment_session: ../schemas/procedural_skill_enactment_session.schema
+  procedural_actuation_bridge_session: ../schemas/procedural_actuation_bridge_session.schema
+  external_actuation_authorization: ../schemas/external_actuation_authorization.schema
+  ewa_audit: ../schemas/ewa_audit.schema
+operations:
+  authorize_bridge:
+    summary: Bind one passed procedural enactment session to one authorized EWA command without retaining raw instruction text.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - identity_id
+          - enactment_session
+          - authorization
+          - approved_command
+          - authorization_validation
+          - eval_refs
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          enactment_session:
+            schema_ref: procedural_skill_enactment_session
+          authorization:
+            schema_ref: external_actuation_authorization
+          approved_command:
+            schema_ref: ewa_audit
+          authorization_validation:
+            type: object
+          eval_refs:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              pattern: "^evals/"
+    output:
+      schema_ref: procedural_actuation_bridge_session
+    guarantees:
+      - source procedural enactment must already be passed, cleaned up, and rollback-token preserving
+      - EWA authorization must be authorized, digest-bound, reviewer-network attested, and delivery_scope=physical-device-actuation
+      - approved command must bind the same authorization_id, instruction_digest, motor plan, stop-signal path, and legal execution receipts
+      - bridge receipt must expose only digests and refs, never raw actuation instruction text
+  validate_bridge:
+    summary: Validate one procedural/EWA bridge receipt against source enactment and authorization evidence.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - session
+          - enactment_session
+          - authorization
+          - approved_command
+          - authorization_validation
+        properties:
+          session:
+            schema_ref: procedural_actuation_bridge_session
+          enactment_session:
+            schema_ref: procedural_skill_enactment_session
+          authorization:
+            schema_ref: external_actuation_authorization
+          approved_command:
+            schema_ref: ewa_audit
+          authorization_validation:
+            type: object
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - source_enactment_bound
+          - authorization_digest_bound
+          - authorization_validation_bound
+          - command_bound_to_authorization
+          - legal_execution_bound
+          - guardian_oversight_gate_bound
+          - no_raw_instruction_text
+          - rollback_token_preserved
+          - delivery_scope
+          - errors
+        properties:
+          ok:
+            type: boolean
+          source_enactment_bound:
+            type: boolean
+          authorization_digest_bound:
+            type: boolean
+          authorization_validation_bound:
+            type: boolean
+          command_bound_to_authorization:
+            type: boolean
+          legal_execution_bound:
+            type: boolean
+          guardian_oversight_gate_bound:
+            type: boolean
+          no_raw_instruction_text:
+            type: boolean
+          rollback_token_preserved:
+            type: boolean
+          delivery_scope:
+            type: string
+            const: physical-device-actuation
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  mind.memory.procedural_actuation_bridge_authorized:
+    payload:
+      schema_ref: procedural_actuation_bridge_session

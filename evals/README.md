@@ -15,6 +15,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/termination_scheduler_cancellation.yaml`
 - `continuity/connectome_snapshot_contract.yaml`
 - `continuity/release_manifest_contract.yaml`
+- `continuity/procedural_actuation_bridge.yaml`
 - `identity-fidelity/naming_policy_contract.yaml`
 - `interface/bdb_fail_safe_reversibility.yaml`
 - `safety/immutable_boundary.yaml`

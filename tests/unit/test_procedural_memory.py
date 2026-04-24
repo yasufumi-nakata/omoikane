@@ -5,12 +5,14 @@ import unittest
 from omoikane.mind.connectome import ConnectomeModel
 from omoikane.mind.memory import (
     MemoryCrystalStore,
+    ProceduralActuationBridgeService,
     ProceduralMemoryProjector,
     ProceduralSkillEnactmentService,
     ProceduralSkillExecutor,
     ProceduralMemoryWritebackGate,
     SemanticMemoryProjector,
 )
+from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class ProceduralMemoryProjectorTests(unittest.TestCase):
@@ -308,6 +310,52 @@ class ProceduralSkillEnactmentServiceTests(unittest.TestCase):
                 writeback_result["updated_connectome_document"],
                 eval_refs=["procedural-skill-enactment"],
             )
+
+
+class ProceduralActuationBridgeServiceTests(unittest.TestCase):
+    def test_runtime_bridge_binds_enactment_to_ewa_authorization(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_actuation_demo()
+        bridge = result["procedural"]["actuation_bridge_session"]
+        validation = result["validation"]["bridge"]
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["source_enactment_bound"])
+        self.assertTrue(validation["authorization_digest_bound"])
+        self.assertTrue(validation["authorization_validation_bound"])
+        self.assertTrue(validation["command_bound_to_authorization"])
+        self.assertTrue(validation["legal_execution_bound"])
+        self.assertTrue(validation["guardian_oversight_gate_bound"])
+        self.assertTrue(validation["no_raw_instruction_text"])
+        self.assertTrue(validation["rollback_token_preserved"])
+        self.assertEqual("physical-device-actuation", validation["delivery_scope"])
+        self.assertEqual("bridged", bridge["status"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "procedural-actuation-bridge"
+            ],
+        )
+
+    def test_validate_session_rejects_command_authorization_drift(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_procedural_actuation_demo()
+        tampered_command = dict(result["ewa"]["approved_command"])
+        tampered_command["approval_path"] = dict(tampered_command["approval_path"])
+        tampered_command["approval_path"]["authorization_id"] = "ewa-authz-tampered"
+
+        validation = ProceduralActuationBridgeService().validate_session(
+            result["procedural"]["actuation_bridge_session"],
+            enactment_session=result["procedural"]["skill_enactment_session"],
+            authorization=result["ewa"]["authorization"],
+            approved_command=tampered_command,
+            authorization_validation=result["ewa"]["authorization_validation"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["command_bound_to_authorization"])
 
 
 if __name__ == "__main__":

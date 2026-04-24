@@ -1,0 +1,23 @@
+eval_id: procedural_actuation_bridge
+target: mind.procedural_actuation
+summary: >
+  Passed procedural skill enactment が external actuation へ移る時に、
+  EWA authorization artifact、approved command digest、legal execution、
+  guardian oversight gate、rollback token を同一 bridge receipt に束縛し、
+  raw instruction text を保持しないこと。
+checks:
+  - name: procedural actuation bridge demo smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli procedural-actuation-demo --json
+expect:
+  bridge_ok: true
+  source_enactment_bound: true
+  authorization_digest_bound: true
+  authorization_validation_bound: true
+  command_bound_to_authorization: true
+  legal_execution_bound: true
+  guardian_oversight_gate_bound: true
+  no_raw_instruction_text: true
+  rollback_token_preserved: true
+  delivery_scope: physical-device-actuation
+  procedural_actuation_bridge_ledger_count: 1
+  ewa_authorization_ledger_count: 1

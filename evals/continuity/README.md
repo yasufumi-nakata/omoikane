@@ -145,6 +145,7 @@ rollback-approved へ到達するか。
 - `memory_edit_recall_buffer.yaml`
 - `memory_replication_quorum.yaml`
 - `patch_generator_direct_contract.yaml`
+- `procedural_actuation_bridge.yaml`
 - `procedural_preview_contract.yaml`
 - `procedural_skill_enactment_execution.yaml`
 - `procedural_skill_execution_contract.yaml`

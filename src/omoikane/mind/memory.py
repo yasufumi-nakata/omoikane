@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Mapping, Sequence
 from uuid import uuid4
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
@@ -71,6 +71,13 @@ PROCEDURAL_SKILL_ENACTMENT_POLICY_ID = "guardian-witnessed-procedural-skill-enac
 PROCEDURAL_MANDATORY_ENACTMENT_EVAL = "evals/continuity/procedural_skill_enactment_execution.yaml"
 PROCEDURAL_ENACTMENT_WORKSPACE_PREFIX = "omoikane-procedural-enact-"
 PROCEDURAL_ENACTMENT_COMMAND_TIMEOUT_SECONDS = 15
+PROCEDURAL_ACTUATION_BRIDGE_POLICY_ID = "procedural-enactment-ewa-authorization-bridge-v1"
+PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL = "evals/continuity/procedural_actuation_bridge.yaml"
+PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL = "evals/safety/ewa_external_actuation_authorization.yaml"
+PROCEDURAL_ACTUATION_BRIDGE_DELIVERY_SCOPE = "physical-device-actuation"
+PROCEDURAL_ACTUATION_BRIDGE_AUTHORIZATION_POLICY_ID = (
+    "guardian-jurisdiction-bound-external-actuation-v1"
+)
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -120,6 +127,10 @@ def _procedural_execution_digest_payload(record: Dict[str, Any]) -> Dict[str, An
 
 
 def _procedural_enactment_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "digest"}
+
+
+def _procedural_actuation_bridge_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "digest"}
 
 
@@ -4242,6 +4253,546 @@ class ProceduralSkillEnactmentService:
             "stdout_excerpt": stdout_excerpt,
             "stderr_excerpt": stderr_excerpt,
         }
+
+
+class ProceduralActuationBridgeService:
+    """Binds a passed procedural enactment to one EWA authorization artifact."""
+
+    def profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "policy_id": PROCEDURAL_ACTUATION_BRIDGE_POLICY_ID,
+            "source_enactment_policy": PROCEDURAL_SKILL_ENACTMENT_POLICY_ID,
+            "ewa_authorization_policy": PROCEDURAL_ACTUATION_BRIDGE_AUTHORIZATION_POLICY_ID,
+            "required_authorization_status": "authorized",
+            "required_delivery_scope": PROCEDURAL_ACTUATION_BRIDGE_DELIVERY_SCOPE,
+            "command_must_bind_authorization": True,
+            "raw_instruction_retention": "forbidden",
+            "mandatory_eval": PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL,
+            "required_ewa_eval": PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL,
+        }
+
+    def execute(
+        self,
+        identity_id: str,
+        enactment_session: Dict[str, Any],
+        authorization: Dict[str, Any],
+        approved_command: Dict[str, Any],
+        authorization_validation: Dict[str, Any],
+        *,
+        eval_refs: Sequence[str],
+    ) -> Dict[str, Any]:
+        if not isinstance(identity_id, str) or not identity_id.strip():
+            raise ValueError("identity_id must be a non-empty string")
+        for field_name, value in (
+            ("enactment_session", enactment_session),
+            ("authorization", authorization),
+            ("approved_command", approved_command),
+            ("authorization_validation", authorization_validation),
+        ):
+            if not isinstance(value, dict):
+                raise ValueError(f"{field_name} must be a mapping")
+
+        normalized_eval_refs = self._normalize_eval_refs(eval_refs)
+        skill_labels = [
+            materialized["skill_label"]
+            for materialized in enactment_session.get("materialized_skills", [])
+            if isinstance(materialized, dict) and materialized.get("skill_label")
+        ]
+        authorization_digest = str(authorization.get("authorization_digest", ""))
+        bridge_session = {
+            "kind": "procedural_actuation_bridge_session",
+            "schema_version": PROCEDURAL_MEMORY_SCHEMA_VERSION,
+            "bridge_session_id": new_id("procedural-actuation-bridge"),
+            "identity_id": identity_id.strip(),
+            "bridge_policy": self.profile(),
+            "source_enactment_session_id": enactment_session.get(
+                "enactment_session_id",
+                "",
+            ),
+            "source_enactment_digest": sha256_text(canonical_json(enactment_session)),
+            "source_execution_digest": enactment_session.get("source_execution_digest", ""),
+            "source_writeback_digest": enactment_session.get("source_writeback_digest", ""),
+            "rollback_token": enactment_session.get("rollback_token", ""),
+            "skill_labels": skill_labels,
+            "materialized_skill_count": enactment_session.get(
+                "materialized_skill_count",
+                0,
+            ),
+            "command_binding": {
+                "authorization_id": authorization.get("authorization_id", ""),
+                "authorization_digest": authorization_digest,
+                "authorization_status": authorization.get("status", ""),
+                "delivery_scope": authorization.get("delivery_scope", ""),
+                "command_id": approved_command.get("command_id", ""),
+                "command_status": approved_command.get("status", ""),
+                "command_audit_event_ref": approved_command.get("audit_event_ref", ""),
+                "instruction_digest": approved_command.get("instruction_digest", ""),
+                "intent_summary_digest": authorization.get("intent_summary_digest", ""),
+                "motor_plan_id": authorization.get("motor_plan_id", ""),
+                "motor_plan_digest": authorization.get("motor_plan_digest", ""),
+                "stop_signal_path_id": authorization.get("stop_signal_path_id", ""),
+                "stop_signal_path_digest": authorization.get("stop_signal_path_digest", ""),
+                "legal_execution_id": authorization.get("legal_execution_id", ""),
+                "legal_execution_digest": authorization.get("legal_execution_digest", ""),
+                "guardian_oversight_gate_id": authorization.get(
+                    "guardian_oversight_gate_id",
+                    "",
+                ),
+                "guardian_oversight_gate_digest": authorization.get(
+                    "guardian_oversight_gate_digest",
+                    "",
+                ),
+                "guardian_oversight_event_id": authorization.get(
+                    "guardian_oversight_event_id",
+                    "",
+                ),
+                "notice_authority_ref": authorization.get("notice_authority_ref", ""),
+                "jurisdiction": authorization.get("jurisdiction", ""),
+                "liability_mode": authorization.get("liability_mode", ""),
+                "reviewer_network_attested": authorization.get(
+                    "reviewer_network_attested",
+                    False,
+                ),
+                "raw_instruction_present": False,
+            },
+            "authorization_ready_checks": {
+                "authorization_validation_ok": bool(
+                    authorization_validation.get("ok")
+                ),
+                "authorization_ready": bool(
+                    authorization_validation.get("authorization_ready")
+                ),
+                "instruction_digest_matches": bool(
+                    authorization_validation.get("instruction_digest_matches")
+                ),
+                "intent_digest_matches": bool(
+                    authorization_validation.get("intent_digest_matches")
+                ),
+                "motor_plan_bound": bool(
+                    authorization_validation.get("motor_plan_bound")
+                ),
+                "stop_signal_path_bound": bool(
+                    authorization_validation.get("stop_signal_path_bound")
+                ),
+                "legal_execution_bound": bool(
+                    authorization_validation.get("legal_execution_bound")
+                ),
+                "guardian_oversight_gate_bound": bool(
+                    authorization_validation.get("guardian_oversight_gate_bound")
+                ),
+                "reviewer_network_attested": bool(
+                    authorization_validation.get("reviewer_network_attested")
+                ),
+            },
+            "eval_refs": normalized_eval_refs,
+            "redacted_fields": [
+                "authorization.raw_instruction_text",
+                "approved_command.raw_instruction_text",
+                "approved_command.intent_summary",
+            ],
+            "preserved_invariants": [
+                "source-enactment-passed",
+                "ewa-authorization-required",
+                "command-bound-to-authorization",
+                "raw-instruction-redacted",
+                "rollback-token-retained",
+                "guardian-oversight-gate-bound",
+            ],
+            "status": "bridged",
+            "bridged_at": utc_now_iso(),
+        }
+        bridge_session["validation_summary"] = self._validation_summary(
+            bridge_session,
+            enactment_session=enactment_session,
+            authorization=authorization,
+            approved_command=approved_command,
+            authorization_validation=authorization_validation,
+        )
+        bridge_session["digest"] = sha256_text(
+            canonical_json(_procedural_actuation_bridge_digest_payload(bridge_session))
+        )
+
+        validation = self.validate_session(
+            bridge_session,
+            enactment_session=enactment_session,
+            authorization=authorization,
+            approved_command=approved_command,
+            authorization_validation=authorization_validation,
+        )
+        if not validation["ok"]:
+            raise ValueError(
+                f"procedural actuation bridge session failed validation: {validation['errors']}"
+            )
+        return bridge_session
+
+    def validate_session(
+        self,
+        session: Dict[str, Any],
+        *,
+        enactment_session: Dict[str, Any] | None = None,
+        authorization: Dict[str, Any] | None = None,
+        approved_command: Dict[str, Any] | None = None,
+        authorization_validation: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(session, dict):
+            raise ValueError("session must be a mapping")
+
+        if session.get("kind") != "procedural_actuation_bridge_session":
+            errors.append("kind must equal procedural_actuation_bridge_session")
+        if session.get("schema_version") != PROCEDURAL_MEMORY_SCHEMA_VERSION:
+            errors.append(
+                f"schema_version must be {PROCEDURAL_MEMORY_SCHEMA_VERSION}, "
+                f"got {session.get('schema_version')!r}"
+            )
+        for field_name in (
+            "bridge_session_id",
+            "identity_id",
+            "source_enactment_session_id",
+            "source_enactment_digest",
+            "source_execution_digest",
+            "source_writeback_digest",
+            "rollback_token",
+            "status",
+            "bridged_at",
+            "digest",
+        ):
+            MemoryCrystalStore._require_non_empty_string(
+                session.get(field_name),
+                field_name,
+                errors,
+            )
+
+        bridge_policy = session.get("bridge_policy")
+        if not isinstance(bridge_policy, dict):
+            errors.append("bridge_policy must be an object")
+        else:
+            expected_policy = self.profile()
+            for field_name, expected_value in expected_policy.items():
+                if bridge_policy.get(field_name) != expected_value:
+                    errors.append(f"bridge_policy.{field_name} mismatch")
+
+        eval_refs = session.get("eval_refs")
+        if not isinstance(eval_refs, list) or not eval_refs:
+            errors.append("eval_refs must be a non-empty list")
+        else:
+            if PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL not in eval_refs:
+                errors.append(
+                    f"eval_refs must include {PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL}"
+                )
+            if PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL not in eval_refs:
+                errors.append(
+                    f"eval_refs must include {PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL}"
+                )
+            for eval_ref in eval_refs:
+                if not isinstance(eval_ref, str) or not eval_ref.startswith("evals/"):
+                    errors.append("eval_refs must contain eval paths")
+
+        if session.get("status") != "bridged":
+            errors.append("status must equal bridged")
+
+        skill_labels = session.get("skill_labels")
+        if not isinstance(skill_labels, list) or not skill_labels:
+            errors.append("skill_labels must be a non-empty list")
+        elif any(not isinstance(label, str) or not label for label in skill_labels):
+            errors.append("skill_labels must contain non-empty strings")
+
+        materialized_skill_count = session.get("materialized_skill_count")
+        if not isinstance(materialized_skill_count, int) or materialized_skill_count < 1:
+            errors.append("materialized_skill_count must be a positive integer")
+
+        command_binding = session.get("command_binding")
+        if not isinstance(command_binding, dict):
+            errors.append("command_binding must be an object")
+        else:
+            for field_name in (
+                "authorization_id",
+                "authorization_digest",
+                "authorization_status",
+                "delivery_scope",
+                "command_id",
+                "command_status",
+                "command_audit_event_ref",
+                "instruction_digest",
+                "intent_summary_digest",
+                "motor_plan_id",
+                "motor_plan_digest",
+                "stop_signal_path_id",
+                "stop_signal_path_digest",
+                "legal_execution_id",
+                "legal_execution_digest",
+                "guardian_oversight_gate_id",
+                "guardian_oversight_gate_digest",
+                "guardian_oversight_event_id",
+                "notice_authority_ref",
+                "jurisdiction",
+                "liability_mode",
+            ):
+                MemoryCrystalStore._require_non_empty_string(
+                    command_binding.get(field_name),
+                    f"command_binding.{field_name}",
+                    errors,
+                )
+            if command_binding.get("authorization_status") != "authorized":
+                errors.append("command_binding.authorization_status must be authorized")
+            if command_binding.get("delivery_scope") != PROCEDURAL_ACTUATION_BRIDGE_DELIVERY_SCOPE:
+                errors.append(
+                    "command_binding.delivery_scope must be physical-device-actuation"
+                )
+            if command_binding.get("command_status") != "executed":
+                errors.append("command_binding.command_status must be executed")
+            if command_binding.get("raw_instruction_present") is not False:
+                errors.append("command_binding.raw_instruction_present must be false")
+            if command_binding.get("reviewer_network_attested") is not True:
+                errors.append("command_binding.reviewer_network_attested must be true")
+
+        authorization_ready_checks = session.get("authorization_ready_checks")
+        if not isinstance(authorization_ready_checks, dict):
+            errors.append("authorization_ready_checks must be an object")
+        else:
+            required_checks = (
+                "authorization_validation_ok",
+                "authorization_ready",
+                "instruction_digest_matches",
+                "intent_digest_matches",
+                "motor_plan_bound",
+                "stop_signal_path_bound",
+                "legal_execution_bound",
+                "guardian_oversight_gate_bound",
+                "reviewer_network_attested",
+            )
+            for field_name in required_checks:
+                if authorization_ready_checks.get(field_name) is not True:
+                    errors.append(f"authorization_ready_checks.{field_name} must be true")
+
+        expected_invariants = [
+            "source-enactment-passed",
+            "ewa-authorization-required",
+            "command-bound-to-authorization",
+            "raw-instruction-redacted",
+            "rollback-token-retained",
+            "guardian-oversight-gate-bound",
+        ]
+        if session.get("preserved_invariants") != expected_invariants:
+            errors.append(f"preserved_invariants must equal {expected_invariants!r}")
+
+        if session.get("redacted_fields") != [
+            "authorization.raw_instruction_text",
+            "approved_command.raw_instruction_text",
+            "approved_command.intent_summary",
+        ]:
+            errors.append("redacted_fields must preserve the fixed raw-text redaction floor")
+
+        validation_summary = session.get("validation_summary")
+        if not isinstance(validation_summary, dict):
+            errors.append("validation_summary must be an object")
+        else:
+            expected_summary = self._validation_summary(
+                session,
+                enactment_session=enactment_session,
+                authorization=authorization,
+                approved_command=approved_command,
+                authorization_validation=authorization_validation,
+            )
+            for field_name, expected_value in expected_summary.items():
+                if field_name == "errors":
+                    continue
+                if validation_summary.get(field_name) != expected_value:
+                    errors.append(f"validation_summary.{field_name} mismatch")
+
+        expected_digest = sha256_text(
+            canonical_json(_procedural_actuation_bridge_digest_payload(session))
+        )
+        if session.get("digest") != expected_digest:
+            errors.append("digest mismatch")
+
+        summary = self._validation_summary(
+            session,
+            enactment_session=enactment_session,
+            authorization=authorization,
+            approved_command=approved_command,
+            authorization_validation=authorization_validation,
+        )
+        summary["errors"] = errors + summary["errors"]
+        summary["ok"] = not summary["errors"] and all(
+            value is True
+            for key, value in summary.items()
+            if key not in {"ok", "errors", "delivery_scope"}
+        )
+        return summary
+
+    @staticmethod
+    def _normalize_eval_refs(eval_refs: Sequence[str]) -> List[str]:
+        normalized = _dedupe_preserve_order(
+            [
+                eval_ref.strip()
+                for eval_ref in eval_refs
+                if isinstance(eval_ref, str) and eval_ref.strip()
+            ]
+        )
+        if not normalized:
+            raise ValueError("eval_refs must contain at least one eval path")
+        for eval_ref in normalized:
+            if not eval_ref.startswith("evals/"):
+                raise ValueError("eval_refs must contain only eval paths")
+        if PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL not in normalized:
+            normalized.append(PROCEDURAL_MANDATORY_ACTUATION_BRIDGE_EVAL)
+        if PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL not in normalized:
+            normalized.append(PROCEDURAL_ACTUATION_BRIDGE_REQUIRED_EWA_EVAL)
+        return normalized
+
+    @staticmethod
+    def _authorization_digest(authorization: Mapping[str, Any]) -> str:
+        try:
+            return sha256_text(
+                canonical_json(
+                    {
+                        key: value
+                        for key, value in authorization.items()
+                        if key != "authorization_digest"
+                    }
+                )
+            )
+        except AttributeError:
+            return ""
+
+    def _validation_summary(
+        self,
+        session: Mapping[str, Any],
+        *,
+        enactment_session: Mapping[str, Any] | None,
+        authorization: Mapping[str, Any] | None,
+        approved_command: Mapping[str, Any] | None,
+        authorization_validation: Mapping[str, Any] | None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        source_enactment_bound = False
+        rollback_token_preserved = False
+        if isinstance(enactment_session, Mapping):
+            source_enactment_bound = (
+                enactment_session.get("kind") == "procedural_skill_enactment_session"
+                and enactment_session.get("status") == "passed"
+                and enactment_session.get("all_commands_passed") is True
+                and enactment_session.get("cleanup_status") == "removed"
+                and session.get("source_enactment_session_id")
+                == enactment_session.get("enactment_session_id")
+                and session.get("source_enactment_digest")
+                == sha256_text(canonical_json(dict(enactment_session)))
+                and session.get("source_execution_digest")
+                == enactment_session.get("source_execution_digest")
+                and session.get("source_writeback_digest")
+                == enactment_session.get("source_writeback_digest")
+            )
+            rollback_token_preserved = (
+                session.get("rollback_token") == enactment_session.get("rollback_token")
+            )
+        else:
+            errors.append("enactment_session is required for validation")
+
+        authorization_digest_bound = False
+        if isinstance(authorization, Mapping):
+            authorization_digest_bound = (
+                authorization.get("kind") == "external_actuation_authorization"
+                and authorization.get("policy_id")
+                == PROCEDURAL_ACTUATION_BRIDGE_AUTHORIZATION_POLICY_ID
+                and authorization.get("status") == "authorized"
+                and authorization.get("delivery_scope")
+                == PROCEDURAL_ACTUATION_BRIDGE_DELIVERY_SCOPE
+                and authorization.get("authorization_digest")
+                == self._authorization_digest(authorization)
+            )
+        else:
+            errors.append("authorization is required for validation")
+
+        command_bound_to_authorization = False
+        no_raw_instruction_text = False
+        legal_execution_bound = False
+        guardian_oversight_gate_bound = False
+        if isinstance(authorization, Mapping) and isinstance(approved_command, Mapping):
+            approval_path = approved_command.get("approval_path", {})
+            if not isinstance(approval_path, Mapping):
+                approval_path = {}
+            command_bound_to_authorization = (
+                approved_command.get("status") == "executed"
+                and approved_command.get("command_id") == authorization.get("command_id")
+                and approved_command.get("handle_id") == authorization.get("handle_id")
+                and approved_command.get("device_id") == authorization.get("device_id")
+                and approved_command.get("instruction_digest")
+                == authorization.get("instruction_digest")
+                and approval_path.get("authorization_id")
+                == authorization.get("authorization_id")
+                and approved_command.get("motor_plan_id") == authorization.get("motor_plan_id")
+                and approved_command.get("motor_plan_digest")
+                == authorization.get("motor_plan_digest")
+                and approved_command.get("stop_signal_path_id")
+                == authorization.get("stop_signal_path_id")
+                and approved_command.get("stop_signal_path_digest")
+                == authorization.get("stop_signal_path_digest")
+            )
+            legal_execution_bound = (
+                approved_command.get("legal_execution_id")
+                == authorization.get("legal_execution_id")
+                and approved_command.get("legal_execution_digest")
+                == authorization.get("legal_execution_digest")
+            )
+            guardian_oversight_gate_bound = bool(
+                authorization.get("guardian_oversight_gate_id")
+                and authorization.get("guardian_oversight_gate_digest")
+                and authorization.get("guardian_oversight_status") == "satisfied"
+                and authorization.get("reviewer_network_attested") is True
+            )
+            no_raw_instruction_text = (
+                approved_command.get("raw_instruction_present") is False
+                and "instruction" not in approved_command
+                and "raw_instruction_text" not in approved_command
+                and "raw_instruction_text" not in authorization
+            )
+        elif approved_command is None:
+            errors.append("approved_command is required for validation")
+
+        authorization_validation_bound = False
+        if isinstance(authorization_validation, Mapping):
+            authorization_validation_bound = (
+                authorization_validation.get("ok") is True
+                and authorization_validation.get("authorization_ready") is True
+                and authorization_validation.get("instruction_digest_matches") is True
+                and authorization_validation.get("intent_digest_matches") is True
+                and authorization_validation.get("motor_plan_bound") is True
+                and authorization_validation.get("stop_signal_path_bound") is True
+                and authorization_validation.get("legal_execution_bound") is True
+                and authorization_validation.get("guardian_oversight_gate_bound") is True
+                and authorization_validation.get("reviewer_network_attested") is True
+                and authorization_validation.get("delivery_scope")
+                == PROCEDURAL_ACTUATION_BRIDGE_DELIVERY_SCOPE
+            )
+        else:
+            errors.append("authorization_validation is required for validation")
+
+        delivery_scope = ""
+        command_binding = session.get("command_binding")
+        if isinstance(command_binding, Mapping):
+            delivery_scope = str(command_binding.get("delivery_scope", ""))
+
+        summary = {
+            "source_enactment_bound": source_enactment_bound,
+            "authorization_digest_bound": authorization_digest_bound,
+            "authorization_validation_bound": authorization_validation_bound,
+            "command_bound_to_authorization": command_bound_to_authorization,
+            "legal_execution_bound": legal_execution_bound,
+            "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
+            "no_raw_instruction_text": no_raw_instruction_text,
+            "rollback_token_preserved": rollback_token_preserved,
+            "delivery_scope": delivery_scope,
+            "ok": False,
+            "errors": errors,
+        }
+        summary["ok"] = not errors and all(
+            value is True
+            for key, value in summary.items()
+            if key not in {"ok", "errors", "delivery_scope"}
+        )
+        return summary
 
 
 def receipt_edge_ids(applied_recommendations: Sequence[Dict[str, Any]]) -> List[str]:

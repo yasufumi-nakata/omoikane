@@ -423,6 +423,39 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-enactment"])
 
+    def test_procedural_actuation_demo_bridges_enactment_to_ewa_authorization(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_procedural_actuation_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["bridge"]["ok"])
+        self.assertTrue(result["validation"]["bridge"]["source_enactment_bound"])
+        self.assertTrue(result["validation"]["bridge"]["authorization_digest_bound"])
+        self.assertTrue(result["validation"]["bridge"]["authorization_validation_bound"])
+        self.assertTrue(result["validation"]["bridge"]["command_bound_to_authorization"])
+        self.assertTrue(result["validation"]["bridge"]["legal_execution_bound"])
+        self.assertTrue(result["validation"]["bridge"]["guardian_oversight_gate_bound"])
+        self.assertTrue(result["validation"]["bridge"]["no_raw_instruction_text"])
+        self.assertEqual(
+            result["ewa"]["authorization"]["authorization_id"],
+            result["procedural"]["actuation_bridge_session"]["command_binding"][
+                "authorization_id"
+            ],
+        )
+        self.assertEqual(
+            "physical-device-actuation",
+            result["procedural"]["actuation_bridge_session"]["command_binding"][
+                "delivery_scope"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "procedural-actuation-bridge"
+            ],
+        )
+
     def test_design_reader_demo_returns_bound_handoff(self) -> None:
         runtime = OmoikaneReferenceOS()
 

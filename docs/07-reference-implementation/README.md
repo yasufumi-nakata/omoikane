@@ -63,6 +63,7 @@ PYTHONPATH=src python3 -m omoikane.cli procedural-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-writeback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-skill-demo --json
 PYTHONPATH=src python3 -m omoikane.cli procedural-enactment-demo --json
+PYTHONPATH=src python3 -m omoikane.cli procedural-actuation-demo --json
 PYTHONPATH=src python3 -m omoikane.cli perception-demo --json
 PYTHONPATH=src python3 -m omoikane.cli qualia-demo --json
 PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
@@ -621,6 +622,17 @@ validated `skill-execution` receipt を `guardian-witnessed-procedural-skill-ena
 で temp workspace に materialize しつつ、
 actual command receipt、cleanup、rollback token carryover、
 sandbox-only delivery、`procedural-enactment` ledger event を確認する。
+
+`procedural-actuation-demo` は L2 procedural skill enactment から
+L6 External World Agent authorization へ移る boundary contract
+(`mind.procedural_actuation.v0`) を JSON で可視化し、
+passed / cleaned-up な `procedural_skill_enactment_session` と
+`external_actuation_authorization`、approved EWA command audit、
+legal execution、Guardian oversight gate、rollback token を
+`procedural_actuation_bridge_session` に digest-bound で束ねる。
+bridge receipt は raw instruction text を保持せず、
+`procedural-actuation-bridge` ledger event と
+`interface-ewa-authorization` ledger event の同時成立を確認する。
 
 `perception-demo` は L3 perception failover の reference contract
 (`cognitive.perception.v0`) を JSON で可視化し、

@@ -127,6 +127,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     procedural_enactment_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    procedural_actuation_parser = subparsers.add_parser(
+        "procedural-actuation-demo",
+        help="Bridge a passed procedural enactment to an EWA external actuation authorization artifact",
+    )
+    procedural_actuation_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     episodic_parser = subparsers.add_parser(
         "episodic-demo",
         help="Run the L2 episodic stream canonical shape and MemoryCrystal handoff scenario",
@@ -492,6 +498,10 @@ def main() -> None:
 
     if args.command == "procedural-enactment-demo":
         _print_result(runtime.run_procedural_enactment_demo(), args.json)
+        return
+
+    if args.command == "procedural-actuation-demo":
+        _print_result(runtime.run_procedural_actuation_demo(), args.json)
         return
 
     if args.command == "episodic-demo":

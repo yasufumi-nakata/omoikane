@@ -95,6 +95,7 @@
 - `perception_frame.schema`
 - `perception_shift.schema`
 - `procedural_memory_preview.schema`
+- `procedural_actuation_bridge_session.schema`
 - `procedural_skill_enactment_session.schema`
 - `procedural_skill_execution.schema`
 - `procedural_writeback_receipt.schema`

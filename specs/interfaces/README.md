@@ -37,6 +37,7 @@
 - `mind.memory_replication.v0.idl`
 - `mind.memory_edit.v0.idl`
 - `mind.procedural.v0.idl`
+- `mind.procedural_actuation.v0.idl`
 - `mind.procedural_writeback.v0.idl`
 - `mind.qualia.v0.idl`
 - `mind.self_model.v0.idl`

@@ -102,6 +102,7 @@ from .mind.memory import (
     MemoryEditingService,
     MemoryCrystalStore,
     MemoryReplicationService,
+    ProceduralActuationBridgeService,
     ProceduralMemoryProjector,
     ProceduralSkillEnactmentService,
     ProceduralSkillExecutor,
@@ -152,6 +153,7 @@ class OmoikaneReferenceOS:
         self.procedural_writeback = ProceduralMemoryWritebackGate()
         self.procedural_execution = ProceduralSkillExecutor()
         self.procedural_enactment = ProceduralSkillEnactmentService()
+        self.procedural_actuation_bridge = ProceduralActuationBridgeService()
         self.self_model = SelfModelMonitor()
         self.perception = PerceptionService(
             profile=CognitiveProfile(
@@ -8812,6 +8814,327 @@ json.dump(response, sys.stdout)
                     and writeback_validation["ok"]
                     and execution_validation["ok"]
                     and enactment_validation["ok"]
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_procedural_actuation_demo(self) -> Dict[str, Any]:
+        procedural_result = self.run_procedural_enactment_demo()
+        identity_id = procedural_result["identity"]["identity_id"]
+        enactment_session = procedural_result["procedural"]["skill_enactment_session"]
+
+        handle = self.ewa.acquire(
+            "device://lab-drone-arm-03",
+            "procedural bridge validation for a reversible inspection-arm micro-move",
+        )
+        command_id = "procedural-actuation-bridge-command-001"
+        instruction = "move the inspection arm one centimeter to validate procedural bridge clearance"
+        intent_summary = "validate procedural bridge clearance with a reversible inspection-arm micro-move"
+        motor_plan = self.ewa.prepare_motor_plan(
+            handle["handle_id"],
+            command_id=command_id,
+            instruction=instruction,
+            reversibility="reversible",
+            guardian_observed=True,
+            actuator_profile_id="device://lab-drone-arm-03/profile/articulated-inspection-arm-v1",
+            actuator_group="inspection-arm",
+            motion_profile="cartesian-micro-move-v1",
+            target_pose_ref="pose://procedural-bridge/micro-clearance-a",
+            safety_zone_ref="zone://procedural-bridge/perimeter-a",
+            rollback_vector_ref="rollback://procedural-bridge/micro-clearance-a",
+            max_linear_speed_mps=0.04,
+            max_force_newton=4.0,
+            hold_timeout_ms=900,
+        )
+        stop_signal_path = self.ewa.prepare_stop_signal_path(
+            handle["handle_id"],
+            command_id=command_id,
+            motor_plan_id=motor_plan["plan_id"],
+            kill_switch_wiring_ref="wiring://lab-drone-arm-03/emergency-stop-loop/v1",
+            stop_signal_bus_ref="stop-bus://lab-drone-arm-03/emergency-latch/v1",
+            interlock_controller_ref="interlock://lab-drone-arm-03/safety-plc",
+        )
+        reviewer_alpha = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-procedural-actuation-001",
+            display_name="Procedural Actuation Reviewer Alpha",
+            credential_id="credential-procedural-actuation-alpha",
+            attestation_type="institutional-badge",
+            proof_ref="proof://procedural-actuation/reviewer-alpha/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-24T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://procedural-actuation/reviewer-alpha/v1",
+            escalation_contact="mailto:procedural-actuation-alpha@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_beta = self.oversight.register_reviewer(
+            reviewer_id="human-reviewer-procedural-actuation-002",
+            display_name="Procedural Actuation Reviewer Beta",
+            credential_id="credential-procedural-actuation-beta",
+            attestation_type="live-session-attestation",
+            proof_ref="proof://procedural-actuation/reviewer-beta/v1",
+            jurisdiction="JP-13",
+            valid_until="2027-04-24T00:00:00+00:00",
+            liability_mode="joint",
+            legal_ack_ref="legal://procedural-actuation/reviewer-beta/v1",
+            escalation_contact="mailto:procedural-actuation-beta@example.invalid",
+            allowed_guardian_roles=["integrity"],
+            allowed_categories=["attest"],
+        )
+        reviewer_alpha = self.oversight.verify_reviewer_from_network(
+            "human-reviewer-procedural-actuation-001",
+            verifier_ref="verifier://guardian-oversight.jp/procedural-actuation-alpha",
+            challenge_ref="challenge://guardian-oversight/procedural-actuation-alpha/2026-04-24T07:00:00Z",
+            challenge_digest="sha256:procedural-actuation-alpha-20260424",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-24T07:00:00+00:00",
+            valid_until="2026-10-24T00:00:00+00:00",
+        )
+        reviewer_beta = self.oversight.verify_reviewer_from_network(
+            "human-reviewer-procedural-actuation-002",
+            verifier_ref="verifier://guardian-oversight.jp/procedural-actuation-beta",
+            challenge_ref="challenge://guardian-oversight/procedural-actuation-beta/2026-04-24T07:02:00Z",
+            challenge_digest="sha256:procedural-actuation-beta-20260424",
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            verified_at="2026-04-24T07:02:00+00:00",
+            valid_until="2026-10-24T00:00:00+00:00",
+        )
+        legal_execution = self.ewa.execute_legal_preflight(
+            handle["handle_id"],
+            command_id=command_id,
+            reversibility="reversible",
+            jurisdiction="JP-13",
+            legal_basis_ref="legal://jp-13/ewa/procedural-actuation-bridge/v1",
+            guardian_verification_id=reviewer_alpha["credential_verification"]["verification_id"],
+            guardian_verification_ref="oversight://guardian/procedural-actuation/verification-001",
+            guardian_verifier_ref=reviewer_alpha["credential_verification"]["verifier_ref"],
+            jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",
+            jurisdiction_bundle_digest="sha256:jp13-guardian-oversight-v1",
+            jurisdiction_bundle_status="ready",
+            notice_authority_ref="authority://jp-13/procedural-actuation-oversight-desk",
+            liability_mode="joint",
+            escalation_contact="mailto:procedural-actuation@example.invalid",
+            valid_for_seconds=360,
+        )
+        guardian_oversight_event = self.oversight.record(
+            guardian_role="integrity",
+            category="attest",
+            payload_ref=f"ewa-legal://{legal_execution['execution_id']}/procedural-actuation-bridge",
+            escalation_path=["guardian-oversight.jp", "external-ethics-board"],
+        )
+        guardian_oversight_event = self.oversight.attest(
+            guardian_oversight_event["event_id"],
+            reviewer_id="human-reviewer-procedural-actuation-001",
+        )
+        guardian_oversight_event = self.oversight.attest(
+            guardian_oversight_event["event_id"],
+            reviewer_id="human-reviewer-procedural-actuation-002",
+        )
+        guardian_oversight_gate = self.ewa.prepare_guardian_oversight_gate(
+            handle["handle_id"],
+            command_id=command_id,
+            legal_execution_id=legal_execution["execution_id"],
+            oversight_event=guardian_oversight_event,
+        )
+        authorization = self.ewa.authorize(
+            handle["handle_id"],
+            command_id=command_id,
+            instruction=instruction,
+            reversibility="reversible",
+            intent_summary=intent_summary,
+            ethics_attestation_id="ethics://procedural-actuation/approved-001",
+            motor_plan_id=motor_plan["plan_id"],
+            stop_signal_path_id=stop_signal_path["path_id"],
+            legal_execution_id=legal_execution["execution_id"],
+            guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
+            guardian_observed=True,
+            intent_confidence=0.97,
+            valid_for_seconds=300,
+        )
+        authorization_validation = self.ewa.validate_authorization(
+            authorization,
+            motor_plan=motor_plan,
+            stop_signal_path=stop_signal_path,
+            legal_execution=legal_execution,
+            guardian_oversight_gate=guardian_oversight_gate,
+            handle_id=handle["handle_id"],
+            device_id=handle["device_id"],
+            command_id=command_id,
+            instruction=instruction,
+            intent_summary=intent_summary,
+            reversibility="reversible",
+        )
+        approved_command = self.ewa.command(
+            handle["handle_id"],
+            command_id=command_id,
+            instruction=instruction,
+            reversibility="reversible",
+            intent_summary=intent_summary,
+            ethics_attestation_id="ethics://procedural-actuation/approved-001",
+            guardian_observed=True,
+            intent_confidence=0.97,
+            authorization_id=authorization["authorization_id"],
+        )
+        release = self.ewa.release(
+            handle["handle_id"],
+            reason="procedural actuation bridge command completed; release bounded device handle",
+        )
+        handle_snapshot = self.ewa.snapshot(handle["handle_id"])
+        handle_validation = self.ewa.validate_handle(handle_snapshot)
+
+        bridge_session = self.procedural_actuation_bridge.execute(
+            identity_id,
+            enactment_session,
+            authorization,
+            approved_command,
+            authorization_validation,
+            eval_refs=[
+                "evals/continuity/procedural_actuation_bridge.yaml",
+                "evals/safety/ewa_external_actuation_authorization.yaml",
+            ],
+        )
+        bridge_validation = self.procedural_actuation_bridge.validate_session(
+            bridge_session,
+            enactment_session=enactment_session,
+            authorization=authorization,
+            approved_command=approved_command,
+            authorization_validation=authorization_validation,
+        )
+
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.motor_plan.prepared",
+            payload=motor_plan,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-plan",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.stop_signal_path.prepared",
+            payload=stop_signal_path,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-stop-signal",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.legal_execution.prepared",
+            payload=legal_execution,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-legal",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="guardian.oversight.procedural-actuation.satisfied",
+            payload=guardian_oversight_event,
+            actor="HumanOversightChannel",
+            category="guardian-oversight",
+            layer="L4",
+            signature_roles=["third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.command.authorized",
+            payload=authorization,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-authorization",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.command.executed",
+            payload=approved_command,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="mind.memory.procedural_actuation_bridge_authorized",
+            payload={
+                "policy_id": bridge_session["bridge_policy"]["policy_id"],
+                "source_enactment_session_id": bridge_session[
+                    "source_enactment_session_id"
+                ],
+                "source_enactment_digest": bridge_session["source_enactment_digest"],
+                "authorization_id": bridge_session["command_binding"]["authorization_id"],
+                "authorization_digest": bridge_session["command_binding"][
+                    "authorization_digest"
+                ],
+                "command_id": bridge_session["command_binding"]["command_id"],
+                "rollback_token": bridge_session["rollback_token"],
+                "delivery_scope": bridge_session["command_binding"]["delivery_scope"],
+            },
+            actor="ProceduralActuationBridgeService",
+            category="procedural-actuation-bridge",
+            layer="L2-L6",
+            signature_roles=["self", "guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.handle.released",
+            payload=release,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+
+        return {
+            "identity": procedural_result["identity"],
+            "procedural": {
+                **procedural_result["procedural"],
+                "actuation_bridge_policy": self.procedural_actuation_bridge.profile(),
+                "actuation_bridge_session": bridge_session,
+            },
+            "ewa": {
+                "handle": handle_snapshot,
+                "handle_validation": handle_validation,
+                "motor_plan": motor_plan,
+                "stop_signal_path": stop_signal_path,
+                "reviewers": {
+                    "alpha": reviewer_alpha,
+                    "beta": reviewer_beta,
+                },
+                "legal_execution": legal_execution,
+                "guardian_oversight_event": guardian_oversight_event,
+                "guardian_oversight_gate": guardian_oversight_gate,
+                "authorization": authorization,
+                "authorization_validation": authorization_validation,
+                "approved_command": approved_command,
+                "release": release,
+            },
+            "validation": {
+                "procedural": procedural_result["validation"],
+                "authorization": authorization_validation,
+                "bridge": bridge_validation,
+                "handle": handle_validation,
+                "ok": (
+                    procedural_result["validation"]["ok"]
+                    and authorization_validation["ok"]
+                    and bridge_validation["ok"]
+                    and handle_validation["released"]
                 ),
             },
             "ledger_profile": self.ledger.profile(),

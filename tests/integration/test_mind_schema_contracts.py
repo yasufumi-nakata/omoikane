@@ -76,6 +76,14 @@ class MindSchemaContractTests(unittest.TestCase):
             result["procedural"]["snapshot"],
         )
 
+    def test_procedural_actuation_demo_bridge_matches_public_schema(self) -> None:
+        result = self.runtime.run_procedural_actuation_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/procedural_actuation_bridge_session.schema",
+            result["procedural"]["actuation_bridge_session"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

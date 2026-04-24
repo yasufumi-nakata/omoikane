@@ -405,6 +405,26 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
         self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
 
+    def test_procedural_actuation_demo_emits_valid_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "procedural-actuation-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["bridge"]["ok"])
+        self.assertTrue(result["validation"]["bridge"]["command_bound_to_authorization"])
+        self.assertTrue(result["validation"]["bridge"]["authorization_digest_bound"])
+        self.assertEqual(
+            "physical-device-actuation",
+            result["validation"]["bridge"]["delivery_scope"],
+        )
+        self.assertEqual(
+            "bridged",
+            result["procedural"]["actuation_bridge_session"]["status"],
+        )
+
     def test_design_reader_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
 

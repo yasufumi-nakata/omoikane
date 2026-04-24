@@ -124,6 +124,7 @@ canonical schema:
 [specs/schemas/procedural_writeback_receipt.schema](../../../specs/schemas/procedural_writeback_receipt.schema)
 and [specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/procedural_skill_execution.schema)
 and [specs/schemas/procedural_skill_enactment_session.schema](../../../specs/schemas/procedural_skill_enactment_session.schema)
+and [specs/schemas/procedural_actuation_bridge_session.schema](../../../specs/schemas/procedural_actuation_bridge_session.schema)
 
 ## トラウマ記憶の扱い
 
@@ -138,8 +139,15 @@ and [specs/schemas/procedural_skill_enactment_session.schema](../../../specs/sch
   [specs/schemas/memory_edit_session.schema](../../../specs/schemas/memory_edit_session.schema)
 - 専用治療プロトコルや人格境界の最終判断は引き続き Open problem
 
+## Procedural actuation boundary
+
+暗黙記憶（procedural）の sandbox rehearsal から実世界 actuation へ移る境界は、
+reference runtime では `procedural-actuation-demo --json` と
+`procedural_actuation_bridge_session` により、passed enactment /
+EWA authorization / approved command / legal execution / Guardian oversight gate の
+digest binding と raw instruction redaction として固定する。
+
 ## 未解決
 
 - 記憶を **substrate 中立な正規形** で表現できるか
-- 暗黙記憶（procedural）の sandbox rehearsal から実世界 actuation へ移る境界をどう保証するか
 - 記憶の真正性を本人自身が判定する手段
