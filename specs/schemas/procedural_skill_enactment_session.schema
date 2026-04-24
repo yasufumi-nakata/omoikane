@@ -175,6 +175,9 @@ properties:
   eval_refs:
     type: array
     minItems: 1
+    contains:
+      type: string
+      const: evals/continuity/procedural_skill_enactment_execution.yaml
     items:
       type: string
       pattern: "^evals/"
@@ -262,6 +265,11 @@ allOf:
           const: true
         cleanup_status:
           const: removed
+        command_runs:
+          items:
+            properties:
+              status:
+                const: pass
   - if:
       properties:
         status:

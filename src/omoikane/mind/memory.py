@@ -3906,6 +3906,8 @@ class ProceduralSkillEnactmentService:
                 errors,
             )
 
+        expected_eval_refs: List[str] = []
+        command_eval_refs_bound = True
         enactment_policy = session.get("enactment_policy")
         if not isinstance(enactment_policy, dict):
             errors.append("enactment_policy must be an object")
@@ -3939,14 +3941,19 @@ class ProceduralSkillEnactmentService:
         eval_refs = session.get("eval_refs")
         if not isinstance(eval_refs, list) or not eval_refs:
             errors.append("eval_refs must be a non-empty list")
+            command_eval_refs_bound = False
         else:
             for eval_ref in eval_refs:
                 if not isinstance(eval_ref, str) or not eval_ref.startswith("evals/"):
                     errors.append("eval_refs must contain eval paths")
+                    command_eval_refs_bound = False
+                else:
+                    expected_eval_refs.append(eval_ref)
             if PROCEDURAL_MANDATORY_ENACTMENT_EVAL not in eval_refs:
                 errors.append(
                     f"eval_refs must include {PROCEDURAL_MANDATORY_ENACTMENT_EVAL}"
                 )
+                command_eval_refs_bound = False
 
         materialized_skills = session.get("materialized_skills")
         if not isinstance(materialized_skills, list) or not materialized_skills:
@@ -4024,6 +4031,12 @@ class ProceduralSkillEnactmentService:
                         f"command_runs[{index}].{field_name}",
                         errors,
                     )
+            eval_ref = command_run.get("eval_ref")
+            if isinstance(eval_ref, str) and eval_ref not in expected_eval_refs:
+                errors.append(
+                    f"command_runs[{index}].eval_ref must be listed in eval_refs"
+                )
+                command_eval_refs_bound = False
             exit_code = command_run.get("exit_code")
             if not isinstance(exit_code, int):
                 errors.append(f"command_runs[{index}].exit_code must be an integer")
@@ -4137,6 +4150,9 @@ class ProceduralSkillEnactmentService:
             "delivery_scope": "sandbox-only",
             "rollback_token_preserved": execution_receipt is None
             or session.get("rollback_token") == execution_receipt.get("rollback_token"),
+            "mandatory_eval_bound": PROCEDURAL_MANDATORY_ENACTMENT_EVAL in expected_eval_refs,
+            "command_eval_refs_bound": command_eval_refs_bound,
+            "temp_workspace_removed": session.get("cleanup_status") == "removed",
             "errors": errors,
         }
 

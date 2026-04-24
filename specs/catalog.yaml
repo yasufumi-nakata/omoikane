@@ -1775,7 +1775,7 @@ entries:
       - specs/interfaces/mind.skill_enactment.v0.idl
       - docs/02-subsystems/mind-substrate/procedural-memory.md
       - reference-runtime
-    rationale: Required to serialize temp-workspace procedural enactment evidence, command receipts, cleanup status, and rollback-token carryover.
+    rationale: Required to serialize temp-workspace procedural enactment evidence, mandatory eval binding, command receipts, cleanup status, and rollback-token carryover.
   - priority: P1
     kind: idl
     file: specs/interfaces/mind.skill_enactment.v0.idl
@@ -1790,7 +1790,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects temp-workspace-only procedural enactment, command execution receipts, cleanup, and rollback token preservation.
+    rationale: Protects temp-workspace-only procedural enactment, public schema validation, command execution receipt eval binding, cleanup, and rollback token preservation.
   - priority: P1
     kind: schema
     file: specs/schemas/procedural_actuation_bridge_session.schema

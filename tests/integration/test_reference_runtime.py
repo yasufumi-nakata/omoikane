@@ -429,6 +429,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("removed", result["validation"]["enactment"]["cleanup_status"])
         self.assertEqual("passed", result["validation"]["enactment"]["enactment_status"])
         self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
+        self.assertTrue(result["validation"]["enactment"]["mandatory_eval_bound"])
+        self.assertTrue(result["validation"]["enactment"]["command_eval_refs_bound"])
+        self.assertTrue(result["validation"]["enactment"]["temp_workspace_removed"])
         self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["procedural-enactment"])
 

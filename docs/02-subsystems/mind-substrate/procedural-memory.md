@@ -70,6 +70,8 @@ procedural actuation bridge schema:
   `skill-execution` receipt、sandbox evidence ref、rollback token carryover を確認する
 - `procedural-enactment-demo --json` で `skill-execution` receipt を temp workspace に materialize し、
   actual command receipt、cleanup、rollback token carryover を確認する
+  - `procedural_skill_enactment_session.schema` に対する public schema validation で、
+    mandatory eval refs、command receipt eval binding、passed session の all-pass command / cleanup removed を固定する
 - `procedural-actuation-demo --json` で passed / cleaned-up な
   `procedural_skill_enactment_session` を EWA の
   `external_actuation_authorization` と approved command audit に
@@ -98,6 +100,7 @@ procedural actuation bridge schema:
 5. すべての writeback は continuity diff と rollback token を残す
 6. skill execution は guardian witness 付き sandbox-only rehearsal に限り、external actuation を禁止する
 7. skill enactment は temp workspace cleanup と actual command receipt を必須とし、external actuation を禁止する
+   かつ command receipt の `eval_ref` は session の `eval_refs` に列挙される
 8. procedural actuation bridge は passed enactment と EWA authorization / approved command / stop-signal adapter receipt の digest が一致する場合だけ成立する
 
 ## 関連

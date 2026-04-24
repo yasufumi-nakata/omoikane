@@ -76,6 +76,20 @@ class MindSchemaContractTests(unittest.TestCase):
             result["procedural"]["snapshot"],
         )
 
+    def test_procedural_enactment_demo_session_matches_public_schema(self) -> None:
+        result = self.runtime.run_procedural_enactment_demo()
+        session = result["procedural"]["skill_enactment_session"]
+
+        self._assert_schema_valid(
+            "specs/schemas/procedural_skill_enactment_session.schema",
+            session,
+        )
+        self.assertIn(
+            "evals/continuity/procedural_skill_enactment_execution.yaml",
+            session["eval_refs"],
+        )
+        self.assertTrue(result["validation"]["enactment"]["command_eval_refs_bound"])
+
     def test_procedural_actuation_demo_bridge_matches_public_schema(self) -> None:
         result = self.runtime.run_procedural_actuation_demo()
 

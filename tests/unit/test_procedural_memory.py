@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import unittest
 
 from omoikane.mind.connectome import ConnectomeModel
@@ -275,7 +276,56 @@ class ProceduralSkillEnactmentServiceTests(unittest.TestCase):
             sorted(validation["skill_labels"]),
         )
         self.assertTrue(validation["rollback_token_preserved"])
+        self.assertTrue(validation["mandatory_eval_bound"])
+        self.assertTrue(validation["command_eval_refs_bound"])
+        self.assertTrue(validation["temp_workspace_removed"])
         self.assertEqual("passed", session["status"])
+
+    def test_validate_session_rejects_command_eval_ref_not_listed(self) -> None:
+        projector = ProceduralMemoryProjector()
+        gate = ProceduralMemoryWritebackGate()
+        executor = ProceduralSkillExecutor()
+        enactment = ProceduralSkillEnactmentService()
+        manifest = MemoryCrystalStore().build_reference_manifest("identity-demo")
+        connectome_document = ConnectomeModel().build_reference_snapshot("identity-demo")
+        preview_snapshot = projector.project("identity-demo", manifest, connectome_document)
+        writeback_result = gate.apply(
+            "identity-demo",
+            preview_snapshot,
+            connectome_document,
+            self_attestation_id="self://procedural-writeback/test-001",
+            council_attestation_id="council://procedural-writeback/test-001",
+            guardian_attestation_id="guardian://procedural-writeback/test-001",
+            human_reviewers=["human://reviewers/alice", "human://reviewers/bob"],
+            approval_reason="bounded preview を writeback として適用する",
+        )
+        execution_receipt = executor.execute(
+            "identity-demo",
+            writeback_result["receipt"],
+            writeback_result["updated_connectome_document"],
+            sandbox_session_id="sandbox://procedural-skill/test-001",
+            guardian_witness_id="guardian://procedural-skill/test-001",
+        )
+        session = enactment.execute(
+            "identity-demo",
+            execution_receipt,
+            writeback_result["updated_connectome_document"],
+            eval_refs=["evals/continuity/procedural_skill_enactment_execution.yaml"],
+        )
+        tampered_session = deepcopy(session)
+        tampered_session["command_runs"][0]["eval_ref"] = "evals/continuity/unlisted.yaml"
+
+        validation = enactment.validate_session(
+            tampered_session,
+            writeback_result["updated_connectome_document"],
+            execution_receipt,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["command_eval_refs_bound"])
+        self.assertTrue(
+            any("eval_ref must be listed in eval_refs" in error for error in validation["errors"])
+        )
 
     def test_execute_rejects_invalid_eval_refs(self) -> None:
         projector = ProceduralMemoryProjector()

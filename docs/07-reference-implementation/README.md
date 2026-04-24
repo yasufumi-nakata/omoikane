@@ -631,6 +631,9 @@ validated `skill-execution` receipt を `guardian-witnessed-procedural-skill-ena
 で temp workspace に materialize しつつ、
 actual command receipt、cleanup、rollback token carryover、
 sandbox-only delivery、`procedural-enactment` ledger event を確認する。
+同じ session は `procedural_skill_enactment_session.schema` に直接照合され、
+mandatory eval と command receipt の `eval_ref` binding が public schema contract として
+検証される。
 
 `procedural-actuation-demo` は L2 procedural skill enactment から
 L6 External World Agent authorization へ移る boundary contract

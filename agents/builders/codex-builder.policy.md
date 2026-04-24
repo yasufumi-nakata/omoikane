@@ -17,7 +17,14 @@
 
 - `src/` と `tests/` の実装コード
 - ユニットテスト
+- 変更 surface の public schema / IDL / eval contract と一致する integration test
 - ビルド成功証跡
+
+## 検証義務
+
+- CLI demo が public schema を持つ場合は、demo 出力を該当 schema に直接通す
+- eval refs や command receipt のような cross-artifact binding は、runtime validation と schema validation の両方で確認する
+- sandbox-only surface では cleanup、rollback token、external actuation 禁止を regression test に残す
 
 ## 禁止事項
 

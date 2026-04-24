@@ -14,4 +14,12 @@ expect:
   all_commands_passed: true
   cleanup_status: removed
   rollback_token_preserved: true
+  mandatory_eval_bound: true
+  command_eval_refs_bound: true
+  public_schema_valid: true
   procedural_enactment_ledger_count: 1
+assertions:
+  - procedural_skill_enactment_session validates against specs/schemas/procedural_skill_enactment_session.schema
+  - eval_refs contains evals/continuity/procedural_skill_enactment_execution.yaml
+  - every command receipt eval_ref is listed in eval_refs before the session can validate
+  - passed sessions contain only passing command receipts and removed temp workspaces

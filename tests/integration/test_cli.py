@@ -412,6 +412,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("removed", result["validation"]["enactment"]["cleanup_status"])
         self.assertEqual("sandbox-only", result["validation"]["enactment"]["delivery_scope"])
         self.assertTrue(result["validation"]["enactment"]["rollback_token_preserved"])
+        self.assertTrue(result["validation"]["enactment"]["mandatory_eval_bound"])
+        self.assertTrue(result["validation"]["enactment"]["command_eval_refs_bound"])
         self.assertEqual("passed", result["procedural"]["skill_enactment_session"]["status"])
 
     def test_procedural_actuation_demo_emits_valid_json(self) -> None:

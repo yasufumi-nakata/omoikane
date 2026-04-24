@@ -42,6 +42,7 @@ operations:
       - execution receipt must validate before temp-workspace enactment starts
       - delivery_scope must remain sandbox-only and external actuation must stay disabled
       - guardian witness and rollback token must be preserved across materialization and command execution
+      - command receipts must point at eval_refs that include evals/continuity/procedural_skill_enactment_execution.yaml
       - temp workspace cleanup must complete before the session closes
   validate_session:
     summary: Validate one procedural skill enactment session against the fixed temp-workspace policy.
@@ -73,6 +74,9 @@ operations:
           - skill_labels
           - delivery_scope
           - rollback_token_preserved
+          - mandatory_eval_bound
+          - command_eval_refs_bound
+          - temp_workspace_removed
           - errors
         properties:
           ok:
@@ -106,6 +110,12 @@ operations:
             type: string
             const: sandbox-only
           rollback_token_preserved:
+            type: boolean
+          mandatory_eval_bound:
+            type: boolean
+          command_eval_refs_bound:
+            type: boolean
+          temp_workspace_removed:
             type: boolean
           errors:
             type: array
