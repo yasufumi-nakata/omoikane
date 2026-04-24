@@ -147,6 +147,7 @@
 - `wms_distributed_approval_fanout_receipt.schema`
 - `wms_participant_approval_transport_receipt.schema`
 - `wms_physics_rules_change_receipt.schema`
+- `wms_time_rate_attestation_receipt.schema`
 - `wms_reconcile.schema`
 - `world_state.schema`
 - `yaoyorozu_consensus_dispatch_binding.schema`

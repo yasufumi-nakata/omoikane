@@ -12,6 +12,10 @@ WMS_MINOR_DIFF_THRESHOLD = 0.05
 WMS_DEFAULT_TIME_RATE = 1.0
 WMS_TIME_RATE_POLICY_ID = "fixed-time-rate-private-escape-v1"
 WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE = "baseline-requested-time-rate-delta-v1"
+WMS_TIME_RATE_ATTESTATION_POLICY_ID = "subjective-time-attestation-transport-v1"
+WMS_TIME_RATE_ATTESTATION_DIGEST_PROFILE = "participant-subjective-time-attestation-set-v1"
+WMS_TIME_RATE_ATTESTATION_KIND = "imc"
+WMS_TIME_RATE_ATTESTATION_DECISION = "attest"
 WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
 WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
 WMS_APPROVAL_TRANSPORT_POLICY_ID = "imc-participant-approval-transport-v1"
@@ -55,6 +59,10 @@ def _approval_fanout_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _time_rate_attestation_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
 class WorldModelSync:
     """Deterministic L6 world-state reconciliation and escape model."""
 
@@ -75,6 +83,10 @@ class WorldModelSync:
                 "deviation_action": "offer-private-reality",
                 "state_mutation_allowed": False,
                 "digest_profile": WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE,
+                "attestation_policy_id": WMS_TIME_RATE_ATTESTATION_POLICY_ID,
+                "attestation_digest_profile": WMS_TIME_RATE_ATTESTATION_DIGEST_PROFILE,
+                "attestation_transport_kind": WMS_TIME_RATE_ATTESTATION_KIND,
+                "attestation_required_when_deviation": True,
             },
             "physics_rules_change_policy": {
                 "policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
@@ -96,6 +108,118 @@ class WorldModelSync:
                 "malicious_inject": "guardian-veto",
             },
         }
+
+    def build_time_rate_attestation_subject(
+        self,
+        session_id: str,
+        *,
+        proposer_id: str,
+        requested_time_rate: float,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        proposer = self._normalize_non_empty_string(proposer_id, "proposer_id")
+        requested = self._normalize_time_rate(requested_time_rate)
+        baseline = float(session["current_state"]["time_rate"])
+        subject = {
+            "schema_version": WMS_SCHEMA_VERSION,
+            "session_id": session_id,
+            "proposer_id": proposer,
+            "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
+            "attestation_policy_id": WMS_TIME_RATE_ATTESTATION_POLICY_ID,
+            "baseline_time_rate": baseline,
+            "requested_time_rate": requested,
+            "time_rate_delta": round(abs(requested - baseline), 3),
+            "attestation_decision": WMS_TIME_RATE_ATTESTATION_DECISION,
+            "state_mutation_allowed": False,
+            "escape_decision": "offer-private-reality",
+        }
+        subject["digest"] = sha256_text(canonical_json(subject))
+        return subject
+
+    def build_time_rate_attestation_receipt(
+        self,
+        session_id: str,
+        *,
+        participant_id: str,
+        time_rate_attestation_subject_digest: str,
+        baseline_time_rate: float,
+        requested_time_rate: float,
+        imc_session: Mapping[str, Any],
+        imc_message: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        participant = self._normalize_non_empty_string(participant_id, "participant_id")
+        subject_digest = self._normalize_digest(
+            time_rate_attestation_subject_digest,
+            "time_rate_attestation_subject_digest",
+        )
+        baseline = self._normalize_time_rate(baseline_time_rate)
+        requested = self._normalize_time_rate(requested_time_rate)
+        if baseline != float(session["current_state"]["time_rate"]):
+            raise ValueError("baseline_time_rate must match the current WMS state")
+        if participant not in session["current_state"]["participants"]:
+            raise ValueError("participant_id must belong to the WMS session")
+        if not isinstance(imc_session, Mapping):
+            raise ValueError("imc_session must be a mapping")
+        if not isinstance(imc_message, Mapping):
+            raise ValueError("imc_message must be a mapping")
+        handshake = imc_session.get("handshake")
+        if not isinstance(handshake, Mapping):
+            raise ValueError("imc_session.handshake must be a mapping")
+        delivered_fields = imc_message.get("delivered_fields")
+        if not isinstance(delivered_fields, Mapping):
+            raise ValueError("imc_message.delivered_fields must be a mapping")
+        expected_payload = {
+            "time_rate_attestation_subject_digest": subject_digest,
+            "participant_id": participant,
+            "baseline_time_rate": baseline,
+            "requested_time_rate": requested,
+            "attestation_decision": WMS_TIME_RATE_ATTESTATION_DECISION,
+        }
+        expected_payload_digest = sha256_text(canonical_json(expected_payload))
+        if delivered_fields != expected_payload:
+            raise ValueError("imc_message delivered fields must equal the time-rate attestation payload")
+        if imc_message.get("payload_digest") != expected_payload_digest:
+            raise ValueError("imc_message payload digest must bind the time-rate attestation payload")
+        if imc_message.get("sender_id") != participant:
+            raise ValueError("imc_message sender_id must match participant_id")
+        if imc_message.get("session_id") != imc_session.get("session_id"):
+            raise ValueError("imc_message must belong to imc_session")
+        imc_participants = imc_session.get("participants")
+        if not isinstance(imc_participants, list) or participant not in imc_participants:
+            raise ValueError("imc_session participants must include participant_id")
+
+        receipt = {
+            "kind": "wms_time_rate_attestation_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "attestation_policy_id": WMS_TIME_RATE_ATTESTATION_POLICY_ID,
+            "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
+            "session_id": session_id,
+            "participant_id": participant,
+            "time_rate_attestation_subject_digest": subject_digest,
+            "baseline_time_rate": baseline,
+            "requested_time_rate": requested,
+            "time_rate_delta": round(abs(requested - baseline), 3),
+            "attestation_decision": WMS_TIME_RATE_ATTESTATION_DECISION,
+            "transport_kind": WMS_TIME_RATE_ATTESTATION_KIND,
+            "transport_session_id": imc_session["session_id"],
+            "transport_handshake_id": handshake["handshake_id"],
+            "transport_handshake_digest": sha256_text(canonical_json(handshake)),
+            "transport_message_id": imc_message["message_id"],
+            "transport_message_summary_digest": sha256_text(str(imc_message["summary"])),
+            "attestation_payload_digest": expected_payload_digest,
+            "delivered_field_names": sorted(delivered_fields.keys()),
+            "redacted_fields": list(imc_message.get("redacted_fields", [])),
+            "continuity_event_ref": imc_message["continuity_event_ref"],
+            "peer_attested": handshake.get("attestation_status") == "verified",
+            "forward_secrecy": handshake.get("forward_secrecy") is True,
+            "council_witnessed": handshake.get("council_witnessed") is True,
+            "delivery_status": imc_message.get("delivery_status"),
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_time_rate_attestation_digest_payload(receipt))
+        )
+        return receipt
 
     def build_physics_rules_approval_subject(
         self,
@@ -574,6 +698,7 @@ class WorldModelSync:
         affected_object_ratio: float,
         attested: bool,
         requested_time_rate: float = WMS_DEFAULT_TIME_RATE,
+        time_rate_attestation_receipts: Sequence[Mapping[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         proposer = self._normalize_non_empty_string(proposer_id, "proposer_id")
@@ -590,8 +715,10 @@ class WorldModelSync:
         )
         time_rate_fields = self._time_rate_deviation_fields(
             session,
+            proposer_id=proposer,
             requested_time_rate=time_rate,
             classification=classification,
+            time_rate_attestation_receipts=time_rate_attestation_receipts,
         )
         reconcile_id = new_id("wms-reconcile")
         recorded_at = utc_now_iso()
@@ -960,6 +1087,116 @@ class WorldModelSync:
                 "audit_event_ref": "",
             }
         return deepcopy(session["last_violation"])
+
+    def validate_time_rate_attestation_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        time_rate_attestation_subject_digest: str | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_time_rate_attestation_receipt":
+            errors.append("kind must equal wms_time_rate_attestation_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("attestation_policy_id") != WMS_TIME_RATE_ATTESTATION_POLICY_ID:
+            errors.append("attestation_policy_id mismatch")
+        if receipt.get("time_rate_policy_id") != WMS_TIME_RATE_POLICY_ID:
+            errors.append("time_rate_policy_id mismatch")
+        if receipt.get("transport_kind") != WMS_TIME_RATE_ATTESTATION_KIND:
+            errors.append("transport_kind must be imc")
+        if receipt.get("attestation_decision") != WMS_TIME_RATE_ATTESTATION_DECISION:
+            errors.append("attestation_decision must be attest")
+        for field_name in (
+            "session_id",
+            "participant_id",
+            "transport_session_id",
+            "transport_handshake_id",
+            "transport_message_id",
+            "continuity_event_ref",
+            "delivery_status",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        expected_subject = time_rate_attestation_subject_digest
+        if expected_subject is not None:
+            try:
+                expected_subject = self._normalize_digest(
+                    expected_subject,
+                    "time_rate_attestation_subject_digest",
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+        subject_digest = receipt.get("time_rate_attestation_subject_digest")
+        if not isinstance(subject_digest, str) or len(subject_digest) != 64:
+            errors.append("time_rate_attestation_subject_digest must be a sha256 hex digest")
+        elif expected_subject is not None and subject_digest != expected_subject:
+            errors.append("time_rate_attestation_subject_digest must match expected subject")
+
+        baseline = receipt.get("baseline_time_rate")
+        requested = receipt.get("requested_time_rate")
+        if not isinstance(baseline, (int, float)) or float(baseline) <= 0:
+            errors.append("baseline_time_rate must be a positive number")
+            baseline = 0.0
+        if not isinstance(requested, (int, float)) or float(requested) <= 0:
+            errors.append("requested_time_rate must be a positive number")
+            requested = 0.0
+        expected_delta = round(abs(float(requested) - float(baseline)), 3)
+        if receipt.get("time_rate_delta") != expected_delta:
+            errors.append("time_rate_delta must match requested-baseline absolute delta")
+
+        for digest_field in (
+            "transport_handshake_digest",
+            "transport_message_summary_digest",
+            "attestation_payload_digest",
+            "digest",
+        ):
+            digest_value = receipt.get(digest_field)
+            if not isinstance(digest_value, str) or len(digest_value) != 64:
+                errors.append(f"{digest_field} must be a sha256 hex digest")
+        delivered_field_names = receipt.get("delivered_field_names")
+        required_fields = {
+            "time_rate_attestation_subject_digest",
+            "participant_id",
+            "baseline_time_rate",
+            "requested_time_rate",
+            "attestation_decision",
+        }
+        delivered_fields_bound = (
+            isinstance(delivered_field_names, list)
+            and set(delivered_field_names) == required_fields
+        )
+        if not delivered_fields_bound:
+            errors.append("delivered_field_names must bind exactly the time-rate attestation payload fields")
+        redacted_fields = receipt.get("redacted_fields")
+        redactions_empty = isinstance(redacted_fields, list) and not redacted_fields
+        if not redactions_empty:
+            errors.append("redacted_fields must be empty for time-rate attestation payloads")
+        peer_attested = receipt.get("peer_attested") is True
+        forward_secrecy = receipt.get("forward_secrecy") is True
+        if not peer_attested:
+            errors.append("peer_attested must be true")
+        if not forward_secrecy:
+            errors.append("forward_secrecy must be true")
+        if receipt.get("delivery_status") not in {"delivered", "delivered-with-redactions"}:
+            errors.append("delivery_status must be delivered or delivered-with-redactions")
+        expected_digest = sha256_text(
+            canonical_json(_time_rate_attestation_digest_payload(receipt))
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match time-rate attestation receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "delivered_fields_bound": delivered_fields_bound,
+            "redactions_empty": redactions_empty,
+            "peer_attested": peer_attested,
+            "forward_secrecy": forward_secrecy,
+            "digest_bound": digest_bound,
+        }
 
     def validate_approval_transport_receipt(
         self,
@@ -1714,12 +1951,71 @@ class WorldModelSync:
         self,
         session: Mapping[str, Any],
         *,
+        proposer_id: str,
         requested_time_rate: float,
         classification: str,
+        time_rate_attestation_receipts: Sequence[Mapping[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         baseline_time_rate = float(session["current_state"]["time_rate"])
         delta = round(abs(requested_time_rate - baseline_time_rate), 3)
         deviation_detected = delta > 0
+        attestation_subject = self.build_time_rate_attestation_subject(
+            session["session_id"],
+            proposer_id=proposer_id,
+            requested_time_rate=requested_time_rate,
+        )
+        required_participants = list(session["current_state"]["participants"])
+        receipts = [
+            deepcopy(receipt)
+            for receipt in (time_rate_attestation_receipts or [])
+            if isinstance(receipt, Mapping)
+        ]
+        receipts_by_participant: Dict[str, Mapping[str, Any]] = {}
+        duplicate_participants: List[str] = []
+        invalid_receipt_count = 0
+        for receipt in receipts:
+            participant_id = receipt.get("participant_id")
+            if (
+                not isinstance(participant_id, str)
+                or participant_id not in required_participants
+            ):
+                invalid_receipt_count += 1
+                continue
+            if participant_id in receipts_by_participant:
+                duplicate_participants.append(participant_id)
+                continue
+            validation = self.validate_time_rate_attestation_receipt(
+                receipt,
+                time_rate_attestation_subject_digest=attestation_subject["digest"],
+            )
+            if not validation["ok"]:
+                invalid_receipt_count += 1
+                continue
+            receipts_by_participant[participant_id] = receipt
+        covered_participants = [
+            participant
+            for participant in required_participants
+            if participant in receipts_by_participant
+        ]
+        missing_participants = [
+            participant
+            for participant in required_participants
+            if participant not in receipts_by_participant
+        ]
+        ordered_receipts = [
+            deepcopy(receipts_by_participant[participant])
+            for participant in covered_participants
+        ]
+        receipt_digests = [receipt["digest"] for receipt in ordered_receipts]
+        attestation_required = deviation_detected
+        attestation_quorum_met = (
+            attestation_required
+            and not missing_participants
+            and invalid_receipt_count == 0
+            and not duplicate_participants
+        )
+        participant_order_bound = covered_participants == required_participants[: len(covered_participants)]
+        attestation_digest = sha256_text(canonical_json(receipt_digests))
         digest_payload = {
             "session_id": session["session_id"],
             "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
@@ -1730,6 +2026,12 @@ class WorldModelSync:
             "time_rate_state_locked": baseline_time_rate == WMS_DEFAULT_TIME_RATE,
             "time_rate_escape_required": deviation_detected,
             "classification": classification,
+            "time_rate_attestation_policy_id": WMS_TIME_RATE_ATTESTATION_POLICY_ID,
+            "time_rate_attestation_subject_digest": attestation_subject["digest"],
+            "time_rate_attestation_digest": attestation_digest,
+            "time_rate_attestation_quorum_met": attestation_quorum_met,
+            "time_rate_attestation_covered_participants": covered_participants,
+            "time_rate_attestation_missing_participants": missing_participants,
         }
         return {
             "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
@@ -1740,6 +2042,20 @@ class WorldModelSync:
             "time_rate_escape_required": deviation_detected,
             "time_rate_deviation_digest_profile": WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE,
             "time_rate_deviation_digest": sha256_text(canonical_json(digest_payload)),
+            "time_rate_attestation_policy_id": WMS_TIME_RATE_ATTESTATION_POLICY_ID,
+            "time_rate_attestation_digest_profile": WMS_TIME_RATE_ATTESTATION_DIGEST_PROFILE,
+            "time_rate_attestation_subject_digest": attestation_subject["digest"],
+            "time_rate_attestation_required": attestation_required,
+            "time_rate_attestation_receipts": ordered_receipts,
+            "time_rate_attestation_digest": attestation_digest,
+            "time_rate_attestation_quorum_met": attestation_quorum_met,
+            "time_rate_attestation_participant_order_bound": participant_order_bound,
+            "time_rate_attestation_covered_participants": covered_participants,
+            "time_rate_attestation_missing_participants": missing_participants,
+            "time_rate_attestation_duplicate_participants": _dedupe_preserve_order(
+                duplicate_participants
+            ),
+            "time_rate_attestation_invalid_receipt_count": invalid_receipt_count,
         }
 
     @staticmethod

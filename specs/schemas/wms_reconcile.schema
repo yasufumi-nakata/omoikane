@@ -29,6 +29,18 @@ required:
   - time_rate_escape_required
   - time_rate_deviation_digest_profile
   - time_rate_deviation_digest
+  - time_rate_attestation_policy_id
+  - time_rate_attestation_digest_profile
+  - time_rate_attestation_subject_digest
+  - time_rate_attestation_required
+  - time_rate_attestation_receipts
+  - time_rate_attestation_digest
+  - time_rate_attestation_quorum_met
+  - time_rate_attestation_participant_order_bound
+  - time_rate_attestation_covered_participants
+  - time_rate_attestation_missing_participants
+  - time_rate_attestation_duplicate_participants
+  - time_rate_attestation_invalid_receipt_count
   - audit_event_ref
 properties:
   schema_version:
@@ -104,6 +116,66 @@ properties:
   time_rate_deviation_digest:
     type: string
     pattern: "^[0-9a-f]{64}$"
+  time_rate_attestation_policy_id:
+    const: subjective-time-attestation-transport-v1
+  time_rate_attestation_digest_profile:
+    const: participant-subjective-time-attestation-set-v1
+  time_rate_attestation_subject_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  time_rate_attestation_required:
+    type: boolean
+  time_rate_attestation_receipts:
+    type: array
+    items:
+      $ref: wms_time_rate_attestation_receipt.schema
+  time_rate_attestation_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  time_rate_attestation_quorum_met:
+    type: boolean
+  time_rate_attestation_participant_order_bound:
+    type: boolean
+  time_rate_attestation_covered_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  time_rate_attestation_missing_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  time_rate_attestation_duplicate_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  time_rate_attestation_invalid_receipt_count:
+    type: integer
+    minimum: 0
   audit_event_ref:
     type: string
     minLength: 1
+allOf:
+  - if:
+      properties:
+        time_rate_deviation_detected:
+          const: true
+    then:
+      properties:
+        time_rate_attestation_required:
+          const: true
+        time_rate_attestation_quorum_met:
+          const: true
+        time_rate_attestation_participant_order_bound:
+          const: true
+        time_rate_attestation_missing_participants:
+          maxItems: 0
+        time_rate_attestation_duplicate_participants:
+          maxItems: 0
+        time_rate_attestation_invalid_receipt_count:
+          const: 0

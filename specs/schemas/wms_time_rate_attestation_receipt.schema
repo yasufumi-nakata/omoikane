@@ -1,0 +1,129 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_time_rate_attestation_receipt.schema"
+title: WMSTimeRateAttestationReceipt
+description: >
+  Digest-bound IMC receipt proving that one WMS participant attested a requested
+  subjective time_rate deviation before fixed-time-rate private escape evidence
+  was accepted. The receipt stores only transport digests and the attestation
+  subject digest, not raw subjective-time conversation payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - attestation_policy_id
+  - time_rate_policy_id
+  - session_id
+  - participant_id
+  - time_rate_attestation_subject_digest
+  - baseline_time_rate
+  - requested_time_rate
+  - time_rate_delta
+  - attestation_decision
+  - transport_kind
+  - transport_session_id
+  - transport_handshake_id
+  - transport_handshake_digest
+  - transport_message_id
+  - transport_message_summary_digest
+  - attestation_payload_digest
+  - delivered_field_names
+  - redacted_fields
+  - continuity_event_ref
+  - peer_attested
+  - forward_secrecy
+  - council_witnessed
+  - delivery_status
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_time_rate_attestation_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  attestation_policy_id:
+    type: string
+    const: subjective-time-attestation-transport-v1
+  time_rate_policy_id:
+    type: string
+    const: fixed-time-rate-private-escape-v1
+  session_id:
+    type: string
+    minLength: 8
+  participant_id:
+    type: string
+    minLength: 1
+  time_rate_attestation_subject_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  baseline_time_rate:
+    type: number
+    const: 1.0
+  requested_time_rate:
+    type: number
+    minimum: 0.001
+  time_rate_delta:
+    type: number
+    minimum: 0
+  attestation_decision:
+    type: string
+    const: attest
+  transport_kind:
+    type: string
+    const: imc
+  transport_session_id:
+    type: string
+    minLength: 8
+  transport_handshake_id:
+    type: string
+    minLength: 8
+  transport_handshake_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  transport_message_id:
+    type: string
+    minLength: 8
+  transport_message_summary_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  attestation_payload_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  delivered_field_names:
+    type: array
+    minItems: 5
+    maxItems: 5
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - time_rate_attestation_subject_digest
+        - participant_id
+        - baseline_time_rate
+        - requested_time_rate
+        - attestation_decision
+  redacted_fields:
+    type: array
+    maxItems: 0
+    items:
+      type: string
+  continuity_event_ref:
+    type: string
+    minLength: 1
+  peer_attested:
+    type: boolean
+    const: true
+  forward_secrecy:
+    type: boolean
+    const: true
+  council_witnessed:
+    type: boolean
+  delivery_status:
+    type: string
+    enum:
+      - delivered
+      - delivered-with-redactions
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

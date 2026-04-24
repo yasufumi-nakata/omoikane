@@ -65,6 +65,12 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/wms_reconcile.schema",
             result["scenarios"]["malicious_diff"],
         )
+        for receipt in result["scenarios"]["time_rate_attestation_receipts"]:
+            self._assert_schema_valid(
+                "specs/schemas/wms_time_rate_attestation_receipt.schema",
+                receipt,
+            )
+        self.assertTrue(result["validation"]["time_rate_attestation_transport_bound"])
 
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
         result = self.runtime.run_wms_demo()

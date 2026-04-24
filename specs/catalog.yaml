@@ -816,8 +816,20 @@ entries:
       - specs/interfaces/interface.wms.v0.idl
       - evals/interface/wms_private_reality_escape.yaml
       - evals/interface/wms_time_rate_deviation_escape.yaml
+      - evals/interface/wms_time_rate_attestation_transport.yaml
       - reference-runtime
-    rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes, fixed-time-rate deviation evidence, and private escape offers.
+    rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes, fixed-time-rate deviation evidence, participant subjective-time attestation receipts, and private escape offers.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_time_rate_attestation_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_reconcile.schema
+      - evals/interface/wms_time_rate_deviation_escape.yaml
+      - evals/interface/wms_time_rate_attestation_transport.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - reference-runtime
+    rationale: Required to prove each WMS participant attested a requested subjective time_rate deviation over an attested, forward-secret IMC transport before private escape evidence is accepted.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_physics_rules_change_receipt.schema
@@ -1206,7 +1218,15 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects fixed-time-rate shared reality behavior by binding requested time_rate deviation to private escape evidence without mutating WorldState.time_rate.
+    rationale: Protects fixed-time-rate shared reality behavior by binding requested time_rate deviation and participant subjective-time attestations to private escape evidence without mutating WorldState.time_rate.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_time_rate_attestation_transport.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects live IMC transport binding for every WMS participant subjective-time attestation before time_rate deviation evidence is accepted.
   - priority: P1
     kind: eval
     file: evals/interface/wms_physics_rules_revert.yaml

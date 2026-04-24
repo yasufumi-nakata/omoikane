@@ -8,6 +8,70 @@ from omoikane.interface.wms import WorldModelSync
 
 
 class WorldModelSyncTests(unittest.TestCase):
+    def _time_rate_attestation_receipts(
+        self,
+        sync: WorldModelSync,
+        session: dict,
+        *,
+        proposer_id: str,
+        requested_time_rate: float,
+    ) -> tuple[dict, list[dict]]:
+        participants = session["current_state"]["participants"]
+        subject = sync.build_time_rate_attestation_subject(
+            session["session_id"],
+            proposer_id=proposer_id,
+            requested_time_rate=requested_time_rate,
+        )
+        imc = InterMindChannel()
+        template = {
+            "public_fields": [
+                "time_rate_attestation_subject_digest",
+                "participant_id",
+                "baseline_time_rate",
+                "requested_time_rate",
+                "attestation_decision",
+            ],
+            "intimate_fields": [],
+            "sealed_fields": [],
+        }
+        receipts = []
+        for participant_id in participants:
+            counterparty = participants[1] if participant_id == participants[0] else participants[0]
+            imc_session = imc.open_session(
+                initiator_id=counterparty,
+                peer_id=participant_id,
+                mode="text",
+                initiator_template=template,
+                peer_template=template,
+                peer_attested=True,
+                forward_secrecy=True,
+                council_witnessed=True,
+            )
+            message = imc.send(
+                imc_session["session_id"],
+                sender_id=participant_id,
+                summary="subjective time-rate attestation for WMS private escape",
+                payload={
+                    "time_rate_attestation_subject_digest": subject["digest"],
+                    "participant_id": participant_id,
+                    "baseline_time_rate": subject["baseline_time_rate"],
+                    "requested_time_rate": subject["requested_time_rate"],
+                    "attestation_decision": "attest",
+                },
+            )
+            receipts.append(
+                sync.build_time_rate_attestation_receipt(
+                    session["session_id"],
+                    participant_id=participant_id,
+                    time_rate_attestation_subject_digest=subject["digest"],
+                    baseline_time_rate=subject["baseline_time_rate"],
+                    requested_time_rate=subject["requested_time_rate"],
+                    imc_session=imc_session,
+                    imc_message=message,
+                )
+            )
+        return subject, receipts
+
     def _approval_transport_receipts(
         self,
         sync: WorldModelSync,
@@ -122,6 +186,12 @@ class WorldModelSyncTests(unittest.TestCase):
             ["identity://primary", "identity://peer"],
             objects=["atrium", "council-table"],
         )
+        subject, attestations = self._time_rate_attestation_receipts(
+            sync,
+            session,
+            proposer_id="identity://peer",
+            requested_time_rate=1.25,
+        )
 
         outcome = sync.propose_diff(
             session["session_id"],
@@ -130,6 +200,7 @@ class WorldModelSyncTests(unittest.TestCase):
             affected_object_ratio=0.01,
             attested=True,
             requested_time_rate=1.25,
+            time_rate_attestation_receipts=attestations,
         )
         snapshot = sync.snapshot(session["session_id"])
 
@@ -145,7 +216,45 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(outcome["time_rate_state_locked"])
         self.assertEqual("baseline-requested-time-rate-delta-v1", outcome["time_rate_deviation_digest_profile"])
         self.assertEqual(64, len(outcome["time_rate_deviation_digest"]))
+        self.assertEqual("subjective-time-attestation-transport-v1", outcome["time_rate_attestation_policy_id"])
+        self.assertEqual(subject["digest"], outcome["time_rate_attestation_subject_digest"])
+        self.assertTrue(outcome["time_rate_attestation_required"])
+        self.assertTrue(outcome["time_rate_attestation_quorum_met"])
+        self.assertTrue(outcome["time_rate_attestation_participant_order_bound"])
+        self.assertEqual(2, len(outcome["time_rate_attestation_receipts"]))
+        self.assertTrue(
+            all(
+                sync.validate_time_rate_attestation_receipt(
+                    receipt,
+                    time_rate_attestation_subject_digest=subject["digest"],
+                )["ok"]
+                for receipt in outcome["time_rate_attestation_receipts"]
+            )
+        )
         self.assertEqual(1.0, snapshot["time_rate"])
+
+    def test_time_rate_deviation_without_transport_attestation_fails_quorum(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+
+        outcome = sync.propose_diff(
+            session["session_id"],
+            proposer_id="identity://peer",
+            candidate_objects=["atrium", "council-table"],
+            affected_object_ratio=0.01,
+            attested=True,
+            requested_time_rate=1.25,
+        )
+
+        self.assertTrue(outcome["time_rate_attestation_required"])
+        self.assertFalse(outcome["time_rate_attestation_quorum_met"])
+        self.assertEqual(
+            ["identity://primary", "identity://peer"],
+            outcome["time_rate_attestation_missing_participants"],
+        )
 
     def test_unauthorized_diff_isolated_as_malicious_inject(self) -> None:
         sync = WorldModelSync()

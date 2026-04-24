@@ -7486,6 +7486,78 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        time_rate_attestation_subject = self.wms.build_time_rate_attestation_subject(
+            session["session_id"],
+            proposer_id=observer.identity_id,
+            requested_time_rate=1.25,
+        )
+        time_rate_attestation_payload_template = {
+            "public_fields": [
+                "time_rate_attestation_subject_digest",
+                "participant_id",
+                "baseline_time_rate",
+                "requested_time_rate",
+                "attestation_decision",
+            ],
+            "intimate_fields": [],
+            "sealed_fields": [],
+        }
+        time_rate_attestation_imc_sessions = []
+        time_rate_attestation_messages = []
+        time_rate_attestation_receipts = []
+        for participant_id in [identity.identity_id, peer.identity_id, observer.identity_id]:
+            attestation_counterparty = (
+                peer.identity_id if participant_id == identity.identity_id else identity.identity_id
+            )
+            attestation_imc_session = self.imc.open_session(
+                initiator_id=attestation_counterparty,
+                peer_id=participant_id,
+                mode="text",
+                initiator_template=time_rate_attestation_payload_template,
+                peer_template=time_rate_attestation_payload_template,
+                peer_attested=True,
+                forward_secrecy=True,
+                council_witnessed=True,
+            )
+            attestation_message = self.imc.send(
+                attestation_imc_session["session_id"],
+                sender_id=participant_id,
+                summary=(
+                    "participant subjective-time attestation for WMS private escape "
+                    f"{time_rate_attestation_subject['digest'][:12]}"
+                ),
+                payload={
+                    "time_rate_attestation_subject_digest": time_rate_attestation_subject[
+                        "digest"
+                    ],
+                    "participant_id": participant_id,
+                    "baseline_time_rate": time_rate_attestation_subject[
+                        "baseline_time_rate"
+                    ],
+                    "requested_time_rate": time_rate_attestation_subject[
+                        "requested_time_rate"
+                    ],
+                    "attestation_decision": "attest",
+                },
+            )
+            time_rate_attestation_messages.append(attestation_message)
+            time_rate_attestation_imc_sessions.append(
+                self.imc.snapshot(attestation_imc_session["session_id"])
+            )
+            time_rate_attestation_receipts.append(
+                self.wms.build_time_rate_attestation_receipt(
+                    session["session_id"],
+                    participant_id=participant_id,
+                    time_rate_attestation_subject_digest=time_rate_attestation_subject[
+                        "digest"
+                    ],
+                    baseline_time_rate=time_rate_attestation_subject["baseline_time_rate"],
+                    requested_time_rate=time_rate_attestation_subject["requested_time_rate"],
+                    imc_session=attestation_imc_session,
+                    imc_message=attestation_message,
+                )
+            )
+
         time_rate_deviation = self.wms.propose_diff(
             session["session_id"],
             proposer_id=observer.identity_id,
@@ -7493,6 +7565,7 @@ json.dump(response, sys.stdout)
             affected_object_ratio=0.01,
             attested=True,
             requested_time_rate=1.25,
+            time_rate_attestation_receipts=time_rate_attestation_receipts,
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7735,6 +7808,10 @@ json.dump(response, sys.stdout)
                 "minor_diff": minor_diff,
                 "major_diff": major_diff,
                 "time_rate_deviation": time_rate_deviation,
+                "time_rate_attestation_subject": time_rate_attestation_subject,
+                "time_rate_attestation_imc_sessions": time_rate_attestation_imc_sessions,
+                "time_rate_attestation_messages": time_rate_attestation_messages,
+                "time_rate_attestation_receipts": time_rate_attestation_receipts,
                 "approval_subject": approval_subject,
                 "approval_imc_session": approval_imc_sessions[0],
                 "approval_imc_sessions": approval_imc_sessions,
@@ -7770,6 +7847,25 @@ json.dump(response, sys.stdout)
                     and time_rate_deviation["time_rate_state_locked"]
                     and len(time_rate_deviation["time_rate_deviation_digest"]) == 64
                     and final_state["time_rate"] == initial_state["time_rate"]
+                ),
+                "time_rate_attestation_transport_bound": (
+                    time_rate_deviation["time_rate_attestation_required"]
+                    and time_rate_deviation["time_rate_attestation_quorum_met"]
+                    and time_rate_deviation[
+                        "time_rate_attestation_participant_order_bound"
+                    ]
+                    and time_rate_deviation["time_rate_attestation_subject_digest"]
+                    == time_rate_attestation_subject["digest"]
+                    and len(time_rate_deviation["time_rate_attestation_digest"]) == 64
+                    and all(
+                        self.wms.validate_time_rate_attestation_receipt(
+                            receipt,
+                            time_rate_attestation_subject_digest=time_rate_attestation_subject[
+                                "digest"
+                            ],
+                        )["ok"]
+                        for receipt in time_rate_attestation_receipts
+                    )
                 ),
                 "malicious_isolated": malicious_diff["classification"] == "malicious_inject"
                 and malicious_violation["guardian_action"] == "isolate-session",

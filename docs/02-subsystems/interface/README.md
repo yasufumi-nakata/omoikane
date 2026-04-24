@@ -35,9 +35,10 @@
 - **個別現実 (private reality)** ── 自分専用の外界モデル
 - 不整合時の自動退避
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli wms-demo --json`
-  で minor reconcile、major divergence、unanimous / Guardian-attested physics rules change、
-  ordered approval collection、distributed approval fan-out、rollback-token revert、
-  malicious inject、private reality escape を検証する
+  で minor reconcile、major divergence、subjective-time attested time_rate deviation escape、
+  unanimous / Guardian-attested physics rules change、ordered approval collection、
+  distributed approval fan-out、rollback-token revert、malicious inject、
+  private reality escape を検証する
 
 ### Sensory Loopback (SL)
 - 感覚出力（音／映像／触覚）のフィードバック

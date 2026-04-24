@@ -1,0 +1,28 @@
+eval_id: wms_time_rate_attestation_transport
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の requested time_rate deviation が private escape evidence
+  へ縮退する際に、participant 全員の subjective-time attestation が IMC
+  handshake、message digest、subject digest、forward secrecy に束縛され、
+  ordered digest set として wms_reconcile output に残ることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  time_rate_deviation_escape_bound: true
+  time_rate_attestation_transport_bound: true
+  attestation_policy_id: subjective-time-attestation-transport-v1
+  attestation_digest_profile: participant-subjective-time-attestation-set-v1
+  baseline_time_rate: 1.0
+  requested_time_rate: 1.25
+  participant_count: 3
+  attestation_quorum_met: true
+  participant_order_bound: true
+  forward_secrecy: true
+  peer_attested: true
+  state_mutation_allowed: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

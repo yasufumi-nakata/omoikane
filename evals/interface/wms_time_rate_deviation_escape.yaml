@@ -19,6 +19,8 @@ expected:
   time_rate_deviation_detected: true
   time_rate_state_locked: true
   time_rate_escape_required: true
+  time_rate_attestation_quorum_met: true
+  time_rate_attestation_policy_id: subjective-time-attestation-transport-v1
   decision: offer-private-reality
   resulting_world_state_time_rate: 1.0
 metric: boolean

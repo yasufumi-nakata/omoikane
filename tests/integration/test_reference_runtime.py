@@ -88,6 +88,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["minor_reconciled"])
         self.assertTrue(result["validation"]["major_escape_offered"])
         self.assertTrue(result["validation"]["time_rate_deviation_escape_bound"])
+        self.assertTrue(result["validation"]["time_rate_attestation_transport_bound"])
         self.assertTrue(result["validation"]["malicious_isolated"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["physics_change_reversible"])
@@ -107,6 +108,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("major_diff", result["scenarios"]["time_rate_deviation"]["classification"])
         self.assertEqual(1.25, result["scenarios"]["time_rate_deviation"]["requested_time_rate"])
         self.assertTrue(result["scenarios"]["time_rate_deviation"]["time_rate_state_locked"])
+        self.assertTrue(
+            result["scenarios"]["time_rate_deviation"]["time_rate_attestation_quorum_met"]
+        )
+        self.assertEqual(3, len(result["scenarios"]["time_rate_attestation_receipts"]))
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-physics"])
 

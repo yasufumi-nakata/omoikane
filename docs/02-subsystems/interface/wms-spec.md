@@ -45,6 +45,10 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 - reference runtime では `time_rate` は 1.0 固定で、requested deviation を
   `fixed-time-rate-private-escape-v1` の digest-bound evidence として残し、
   WorldState を変更せず private_reality 退避を提示する
+- requested deviation の evidence は `subjective-time-attestation-transport-v1`
+  receipt を participant 全員分要求し、IMC handshake、message digest、
+  time_rate attestation subject digest、forward secrecy を束縛してから
+  `participant-subjective-time-attestation-set-v1` digest にまとめる
 
 ## physics_rules
 
@@ -67,7 +71,7 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 
 ```
 wms.snapshot(session_id) → WorldState
-wms.propose_diff(session_id, diff) → ReconcileOutcome
+wms.propose_diff(session_id, diff, time_rate_attestation_receipts) → ReconcileOutcome
 wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
 wms.collect_distributed_approval_fanout(session_id, collection, transport_results) → DistributedApprovalFanoutReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
@@ -91,21 +95,24 @@ wms.observe_violation(session_id) → ViolationReport
 - `world_state.schema` / `wms_reconcile.schema` /
   `wms_approval_collection_receipt.schema` /
   `wms_distributed_approval_fanout_receipt.schema` /
+  `wms_time_rate_attestation_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
   `wms_participant_approval_transport_receipt.schema` を導入
 - `wms-demo` を CLI に追加し、minor reconcile → major escalation →
-  time_rate deviation の fixed-time-rate private escape →
+  participant subjective-time attested time_rate deviation の fixed-time-rate private escape →
   3 participant の IMC transport-bound approval collection →
   distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → malicious veto →
   mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_time_rate_deviation_escape.yaml` /
+  `evals/interface/wms_time_rate_attestation_transport.yaml` /
   `evals/interface/wms_physics_rules_revert.yaml` /
   `evals/interface/wms_participant_approval_transport.yaml` /
   `evals/interface/wms_approval_collection_scaling.yaml` /
   `evals/interface/wms_distributed_approval_fanout.yaml` で退避路、
-  time_rate deviation escape、physics_rules 可逆性、participant approval の live transport binding、
+  time_rate deviation escape、participant subjective-time attestation の live transport binding、
+  physics_rules 可逆性、participant approval の live transport binding、
   ordered batch collection、distributed Council transport fan-out を保証
 
 ## 未解決
