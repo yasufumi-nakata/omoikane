@@ -10,6 +10,7 @@ capabilities:
   - workspace.preseed.oversight-bind
   - workspace.dependency-materialization.attest
   - workspace.dependency-module-origin.attest
+  - wms.participant-approval-transport.attest
   - wms.physics-rules-revert.attest
   - cognitive-audit.distributed-verdict-signature.attest
   - cognitive-audit.verifier-transport-trace.attest
@@ -25,6 +26,7 @@ when_to_invoke: |
   - Yaoyorozu external workspace seed / execution root 作成 / dependency materialization 前の HumanOversightChannel-bound integrity gate
   - Yaoyorozu external workspace worker が materialized dependency snapshot を source checkout より前に import する receipt を検証する時
   - Yaoyorozu external workspace worker の `worker_module_origin` が materialized dependency snapshot 由来であることを検証する時
+  - WMS shared reality の physics_rules change 前に participant approval が IMC transport receipt に束縛されていることを検証する時
   - WMS shared reality の physics_rules change / revert receipt が unanimous approval と rollback token に束縛されていることを検証する時
   - cognitive audit governance binding で Federation / Heritage returned result の signature binding を検証する時
   - cognitive audit governance binding で verifier transport profile の non-loopback / cross-host / OS observer trace digest を検証する時

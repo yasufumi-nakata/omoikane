@@ -50,6 +50,9 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 - Council 承認で変更可能（無重力空間、夢空間、不可視物理）
 - 変更要求は **暴力性 / 不可逆性** を Guardian がチェック
 - 物理改変が他自我の subjective continuity を脅かす場合は **reject**
+- reference runtime では満場一致 approval を静的な participant id だけで扱わず、
+  `imc-participant-approval-transport-v1` receipt で IMC handshake、
+  message digest、approval subject digest、forward secrecy を束縛する
 
 ## API
 
@@ -75,11 +78,15 @@ wms.observe_violation(session_id) → ViolationReport
 - `interface.wms.v0.idl` は `snapshot / propose_diff / switch_mode / observe_violation` に加え、
   `propose_physics_rules_change / revert_physics_rules_change` を固定する
 - `world_state.schema` / `wms_reconcile.schema` /
-  `wms_physics_rules_change_receipt.schema` を導入
+  `wms_physics_rules_change_receipt.schema` /
+  `wms_participant_approval_transport_receipt.schema` を導入
 - `wms-demo` を CLI に追加し、minor reconcile → major escalation →
-  unanimous physics_rules change → rollback-token revert → malicious veto → mode 切替を実行
+  IMC transport-bound unanimous physics_rules change → rollback-token revert →
+  malicious veto → mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
-  `evals/interface/wms_physics_rules_revert.yaml` で退避路と physics_rules 可逆性を保証
+  `evals/interface/wms_physics_rules_revert.yaml` /
+  `evals/interface/wms_participant_approval_transport.yaml` で退避路、
+  physics_rules 可逆性、participant approval の live transport binding を保証
 
 ## 未解決
 

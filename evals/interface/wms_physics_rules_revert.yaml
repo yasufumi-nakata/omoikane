@@ -12,6 +12,7 @@ expected:
   validation_ok: true
   physics_change_decision: applied
   physics_change_approval_quorum_met: true
+  physics_change_approval_transport_quorum_met: true
   physics_change_guardian_attested: true
   physics_change_revert_bound: true
   physics_change_digest_bound: true

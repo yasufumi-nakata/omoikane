@@ -90,9 +90,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["malicious_isolated"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["physics_change_reversible"])
+        self.assertTrue(result["validation"]["physics_approval_transport_bound"])
+        self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertTrue(result["validation"]["physics_change"]["revert_bound"])
+        self.assertTrue(result["validation"]["physics_change"]["approval_transport_quorum_met"])
         self.assertTrue(result["validation"]["physics_revert"]["revert_bound"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
+        self.assertEqual(2, len(result["scenarios"]["approval_transport_receipts"]))
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-physics"])
 

@@ -823,9 +823,20 @@ entries:
     consumers:
       - specs/interfaces/interface.wms.v0.idl
       - evals/interface/wms_physics_rules_revert.yaml
+      - evals/interface/wms_participant_approval_transport.yaml
       - docs/02-subsystems/interface/wms-spec.md
       - reference-runtime
-    rationale: Required to encode unanimous, Guardian-attested, rollback-token-bound physics_rules changes and first-class revert receipts.
+    rationale: Required to encode unanimous, IMC-transport-bound, Guardian-attested, rollback-token-bound physics_rules changes and first-class revert receipts.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_participant_approval_transport_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_physics_rules_change_receipt.schema
+      - evals/interface/wms_participant_approval_transport.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - reference-runtime
+    rationale: Required to prove each WMS participant approval traveled through an attested, forward-secret IMC message bound to the same physics change approval subject digest.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.wms.v0.idl
@@ -1165,6 +1176,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects unanimous, Guardian-attested physics_rules changes and rollback-token revert back to baseline rules.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_participant_approval_transport.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects live IMC transport binding for every WMS participant approval before a shared-reality physics_rules change can apply.
   - priority: P1
     kind: schema
     file: specs/schemas/imc_handshake.schema

@@ -143,6 +143,7 @@
 - `trust_transfer_receipt.schema`
 - `volition_intent.schema`
 - `volition_shift.schema`
+- `wms_participant_approval_transport_receipt.schema`
 - `wms_physics_rules_change_receipt.schema`
 - `wms_reconcile.schema`
 - `world_state.schema`

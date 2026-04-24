@@ -785,9 +785,14 @@ minor diff を `consensus-round` で reconcile しつつ、
 major diff で `private_reality` 退避を提示し、
 `unanimous-reversible-physics-rules-v1` により
 shared-reality の `physics_rules_ref` 改変を全 participant approval /
+`imc-participant-approval-transport-v1` の IMC approval receipt /
 Guardian attestation / rollback token に束縛し、
 `revert_physics_rules_change` で baseline rules へ戻す receipt を返しつつ、
 unauthorized diff を `guardian-veto` / `isolate-session` へ落とすことを確認する。
+同じ demo は `approval_subject_digest`、participant ごとの IMC handshake /
+message digest、forward secrecy、redaction-free approval payload を
+`wms_participant_approval_transport_receipt.schema` と
+`wms_physics_rules_change_receipt.schema` の両方で検証できる形に固定する。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

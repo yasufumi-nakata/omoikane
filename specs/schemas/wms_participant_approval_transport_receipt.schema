@@ -1,0 +1,110 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_participant_approval_transport_receipt.schema"
+title: WMSParticipantApprovalTransportReceipt
+description: >
+  Digest-bound IMC receipt proving that one WMS participant approval for a
+  reversible shared-reality physics_rules change was carried over an attested,
+  forward-secret live transport instead of being only a static participant id.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - transport_policy_id
+  - session_id
+  - participant_id
+  - approval_subject_digest
+  - approval_decision
+  - transport_kind
+  - transport_session_id
+  - transport_handshake_id
+  - transport_handshake_digest
+  - transport_message_id
+  - transport_message_summary_digest
+  - approval_payload_digest
+  - delivered_field_names
+  - redacted_fields
+  - continuity_event_ref
+  - peer_attested
+  - forward_secrecy
+  - council_witnessed
+  - delivery_status
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_participant_approval_transport_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  transport_policy_id:
+    type: string
+    const: imc-participant-approval-transport-v1
+  session_id:
+    type: string
+    minLength: 8
+  participant_id:
+    type: string
+    minLength: 1
+  approval_subject_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_decision:
+    type: string
+    const: approve
+  transport_kind:
+    type: string
+    const: imc
+  transport_session_id:
+    type: string
+    minLength: 8
+  transport_handshake_id:
+    type: string
+    minLength: 8
+  transport_handshake_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  transport_message_id:
+    type: string
+    minLength: 8
+  transport_message_summary_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_payload_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  delivered_field_names:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - approval_subject_digest
+        - participant_id
+        - approval_decision
+  redacted_fields:
+    type: array
+    maxItems: 0
+    items:
+      type: string
+  continuity_event_ref:
+    type: string
+    minLength: 1
+  peer_attested:
+    type: boolean
+    const: true
+  forward_secrecy:
+    type: boolean
+    const: true
+  council_witnessed:
+    type: boolean
+  delivery_status:
+    type: string
+    enum:
+      - delivered
+      - delivered-with-redactions
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

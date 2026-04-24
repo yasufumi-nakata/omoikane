@@ -7482,13 +7482,71 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        proposed_physics_rules_ref = "physics://shared-atrium/low-gravity-council-v1"
+        physics_change_rationale = (
+            "bounded low-gravity rehearsal must remain reversible for every participant"
+        )
+        approval_subject = self.wms.build_physics_rules_approval_subject(
+            session["session_id"],
+            requested_by=identity.identity_id,
+            proposed_physics_rules_ref=proposed_physics_rules_ref,
+            rationale=physics_change_rationale,
+        )
+        approval_payload_template = {
+            "public_fields": [
+                "approval_subject_digest",
+                "participant_id",
+                "approval_decision",
+            ],
+            "intimate_fields": [],
+            "sealed_fields": [],
+        }
+        approval_imc_session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer.identity_id,
+            mode="text",
+            initiator_template=approval_payload_template,
+            peer_template=approval_payload_template,
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        approval_messages = []
+        approval_transport_receipts = []
+        for participant_id in [identity.identity_id, peer.identity_id]:
+            approval_message = self.imc.send(
+                approval_imc_session["session_id"],
+                sender_id=participant_id,
+                summary=(
+                    "participant approval for reversible shared-world physics change "
+                    f"{approval_subject['digest'][:12]}"
+                ),
+                payload={
+                    "approval_subject_digest": approval_subject["digest"],
+                    "participant_id": participant_id,
+                    "approval_decision": "approve",
+                },
+            )
+            approval_messages.append(approval_message)
+            approval_transport_receipts.append(
+                self.wms.build_participant_approval_transport_receipt(
+                    session["session_id"],
+                    participant_id=participant_id,
+                    approval_subject_digest=approval_subject["digest"],
+                    imc_session=approval_imc_session,
+                    imc_message=approval_message,
+                )
+            )
+        approval_imc_snapshot = self.imc.snapshot(approval_imc_session["session_id"])
+
         physics_change = self.wms.propose_physics_rules_change(
             session["session_id"],
             requested_by=identity.identity_id,
-            proposed_physics_rules_ref="physics://shared-atrium/low-gravity-council-v1",
-            rationale="bounded low-gravity rehearsal must remain reversible for every participant",
+            proposed_physics_rules_ref=proposed_physics_rules_ref,
+            rationale=physics_change_rationale,
             participant_approvals=[identity.identity_id, peer.identity_id],
             guardian_attested=True,
+            approval_transport_receipts=approval_transport_receipts,
         )
         physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
         self.ledger.append(
@@ -7519,6 +7577,15 @@ json.dump(response, sys.stdout)
             layer="L6",
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
+        )
+
+        transportless_static_approval_rejection = self.wms.propose_physics_rules_change(
+            session["session_id"],
+            requested_by=identity.identity_id,
+            proposed_physics_rules_ref=proposed_physics_rules_ref,
+            rationale="static participant list must not bypass live approval transport",
+            participant_approvals=[identity.identity_id, peer.identity_id],
+            guardian_attested=True,
         )
 
         malicious_diff = self.wms.propose_diff(
@@ -7560,8 +7627,13 @@ json.dump(response, sys.stdout)
             "scenarios": {
                 "minor_diff": minor_diff,
                 "major_diff": major_diff,
+                "approval_subject": approval_subject,
+                "approval_imc_session": approval_imc_snapshot,
+                "approval_messages": approval_messages,
+                "approval_transport_receipts": approval_transport_receipts,
                 "physics_change": physics_change,
                 "physics_revert": physics_revert,
+                "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
                 "malicious_violation": malicious_violation,
                 "mode_switch": mode_switch,
@@ -7579,6 +7651,22 @@ json.dump(response, sys.stdout)
                 and final_state["authority"] == "local",
                 "physics_change": physics_change_validation,
                 "physics_revert": physics_revert_validation,
+                "physics_approval_transport_bound": physics_change_validation["approval_transport_quorum_met"]
+                and physics_change_validation["approval_transport_digest_bound"]
+                and all(
+                    self.wms.validate_approval_transport_receipt(
+                        receipt,
+                        approval_subject_digest=approval_subject["digest"],
+                    )["ok"]
+                    for receipt in approval_transport_receipts
+                ),
+                "static_approval_without_transport_rejected": (
+                    transportless_static_approval_rejection["decision"] == "rejected"
+                    and transportless_static_approval_rejection["approval_quorum_met"]
+                    and not transportless_static_approval_rejection[
+                        "approval_transport_quorum_met"
+                    ]
+                ),
                 "physics_change_reversible": physics_change_validation["ok"]
                 and physics_revert_validation["ok"]
                 and physics_change["rollback_physics_rules_ref"]

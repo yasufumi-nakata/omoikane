@@ -133,7 +133,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["malicious_isolated"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["physics_change_reversible"])
+        self.assertTrue(result["validation"]["physics_approval_transport_bound"])
+        self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
+        self.assertEqual(2, len(result["scenarios"]["approval_transport_receipts"]))
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(
             result["scenarios"]["physics_change"]["change_id"],

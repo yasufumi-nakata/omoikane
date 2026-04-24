@@ -3,9 +3,10 @@ $id: "https://omoikane.dev/specs/schemas/wms_physics_rules_change_receipt.schema
 title: WMSPhysicsRulesChangeReceipt
 description: >
   Digest-bound receipt for World Model Sync physics-rules changes. The receipt
-  requires unanimous participant approval, Guardian attestation, a rollback
-  token, and a first-class revert operation so no shared-reality physics change
-  can be applied without a reversible path.
+  requires unanimous participant approval, IMC transport-bound participant
+  receipts, Guardian attestation, a rollback token, and a first-class revert
+  operation so no shared-reality physics change can be applied without a
+  reversible path.
 type: object
 additionalProperties: false
 required:
@@ -24,6 +25,11 @@ required:
   - required_approvals
   - participant_approvals
   - approval_quorum_met
+  - approval_subject_digest
+  - approval_transport_policy_id
+  - approval_transport_receipts
+  - approval_transport_quorum_met
+  - approval_transport_digest
   - guardian_attested
   - reversible
   - rollback_physics_rules_ref
@@ -90,6 +96,24 @@ properties:
   approval_quorum_met:
     type: boolean
     const: true
+  approval_subject_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_transport_policy_id:
+    type: string
+    const: imc-participant-approval-transport-v1
+  approval_transport_receipts:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: wms_participant_approval_transport_receipt.schema
+  approval_transport_quorum_met:
+    type: boolean
+    const: true
+  approval_transport_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
   guardian_attested:
     type: boolean
     const: true

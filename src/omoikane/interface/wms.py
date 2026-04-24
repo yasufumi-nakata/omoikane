@@ -12,6 +12,9 @@ WMS_MINOR_DIFF_THRESHOLD = 0.05
 WMS_DEFAULT_TIME_RATE = 1.0
 WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
 WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
+WMS_APPROVAL_TRANSPORT_POLICY_ID = "imc-participant-approval-transport-v1"
+WMS_APPROVAL_TRANSPORT_KIND = "imc"
+WMS_APPROVAL_DECISION = "approve"
 WMS_ALLOWED_MODES = {"shared_reality", "private_reality", "mixed"}
 WMS_ALLOWED_AUTHORITIES = {"consensus", "local", "broker"}
 WMS_PHYSICS_CHANGE_OPERATIONS = {"apply", "revert"}
@@ -32,6 +35,10 @@ def _physics_rules_change_digest_payload(receipt: Mapping[str, Any]) -> Dict[str
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _approval_transport_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
 class WorldModelSync:
     """Deterministic L6 world-state reconciliation and escape model."""
 
@@ -49,6 +56,8 @@ class WorldModelSync:
             "physics_rules_change_policy": {
                 "policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
                 "required_approval": "unanimous-participant-approval",
+                "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+                "approval_transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
                 "guardian_attestation_required": True,
                 "rollback_token_required": True,
                 "revert_operation_required": True,
@@ -59,6 +68,105 @@ class WorldModelSync:
                 "malicious_inject": "guardian-veto",
             },
         }
+
+    def build_physics_rules_approval_subject(
+        self,
+        session_id: str,
+        *,
+        requested_by: str,
+        proposed_physics_rules_ref: str,
+        rationale: str,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        requester = self._normalize_non_empty_string(requested_by, "requested_by")
+        proposed_ref = self._normalize_non_empty_string(
+            proposed_physics_rules_ref,
+            "proposed_physics_rules_ref",
+        )
+        rationale_text = self._normalize_non_empty_string(rationale, "rationale")
+        subject = {
+            "schema_version": WMS_SCHEMA_VERSION,
+            "session_id": session_id,
+            "requested_by": requester,
+            "previous_physics_rules_ref": session["current_state"]["physics_rules_ref"],
+            "proposed_physics_rules_ref": proposed_ref,
+            "rationale": rationale_text,
+            "approval_policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
+            "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+        }
+        subject["digest"] = sha256_text(canonical_json(subject))
+        return subject
+
+    def build_participant_approval_transport_receipt(
+        self,
+        session_id: str,
+        *,
+        participant_id: str,
+        approval_subject_digest: str,
+        imc_session: Mapping[str, Any],
+        imc_message: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        participant = self._normalize_non_empty_string(participant_id, "participant_id")
+        subject_digest = self._normalize_digest(
+            approval_subject_digest,
+            "approval_subject_digest",
+        )
+        if participant not in session["current_state"]["participants"]:
+            raise ValueError("participant_id must belong to the WMS session")
+        if not isinstance(imc_session, Mapping):
+            raise ValueError("imc_session must be a mapping")
+        if not isinstance(imc_message, Mapping):
+            raise ValueError("imc_message must be a mapping")
+        handshake = imc_session.get("handshake")
+        if not isinstance(handshake, Mapping):
+            raise ValueError("imc_session.handshake must be a mapping")
+        delivered_fields = imc_message.get("delivered_fields")
+        if not isinstance(delivered_fields, Mapping):
+            raise ValueError("imc_message.delivered_fields must be a mapping")
+        expected_payload = {
+            "approval_subject_digest": subject_digest,
+            "participant_id": participant,
+            "approval_decision": WMS_APPROVAL_DECISION,
+        }
+        expected_payload_digest = sha256_text(canonical_json(expected_payload))
+        if delivered_fields != expected_payload:
+            raise ValueError("imc_message delivered fields must equal the approval payload")
+        if imc_message.get("payload_digest") != expected_payload_digest:
+            raise ValueError("imc_message payload digest must bind the approval payload")
+        if imc_message.get("sender_id") != participant:
+            raise ValueError("imc_message sender_id must match participant_id")
+        if imc_message.get("session_id") != imc_session.get("session_id"):
+            raise ValueError("imc_message must belong to imc_session")
+        imc_participants = imc_session.get("participants")
+        if not isinstance(imc_participants, list) or participant not in imc_participants:
+            raise ValueError("imc_session participants must include participant_id")
+
+        receipt = {
+            "kind": "wms_participant_approval_transport_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+            "session_id": session_id,
+            "participant_id": participant,
+            "approval_subject_digest": subject_digest,
+            "approval_decision": WMS_APPROVAL_DECISION,
+            "transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
+            "transport_session_id": imc_session["session_id"],
+            "transport_handshake_id": handshake["handshake_id"],
+            "transport_handshake_digest": sha256_text(canonical_json(handshake)),
+            "transport_message_id": imc_message["message_id"],
+            "transport_message_summary_digest": sha256_text(str(imc_message["summary"])),
+            "approval_payload_digest": expected_payload_digest,
+            "delivered_field_names": sorted(delivered_fields.keys()),
+            "redacted_fields": list(imc_message.get("redacted_fields", [])),
+            "continuity_event_ref": imc_message["continuity_event_ref"],
+            "peer_attested": handshake.get("attestation_status") == "verified",
+            "forward_secrecy": handshake.get("forward_secrecy") is True,
+            "council_witnessed": handshake.get("council_witnessed") is True,
+            "delivery_status": imc_message.get("delivery_status"),
+        }
+        receipt["digest"] = sha256_text(canonical_json(_approval_transport_digest_payload(receipt)))
+        return receipt
 
     def create_session(
         self,
@@ -266,6 +374,7 @@ class WorldModelSync:
         guardian_attested: bool,
         reversible: bool = True,
         rollback_physics_rules_ref: str | None = None,
+        approval_transport_receipts: Sequence[Mapping[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         requester = self._normalize_non_empty_string(requested_by, "requested_by")
@@ -289,12 +398,25 @@ class WorldModelSync:
         )
         required_approvals = list(session["current_state"]["participants"])
         approval_quorum_met = set(required_approvals).issubset(set(approvals))
+        approval_subject = self.build_physics_rules_approval_subject(
+            session_id,
+            requested_by=requester,
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale_text,
+        )
+        transport_receipts = [deepcopy(receipt) for receipt in (approval_transport_receipts or [])]
+        approval_transport_quorum_met = self._approval_transport_quorum_met(
+            transport_receipts,
+            required_approvals=required_approvals,
+            approval_subject_digest=approval_subject["digest"],
+        )
         requester_allowed = requester in required_approvals
         reversible_ok = bool(reversible) and rollback_ref == previous_ref
         guardian_ok = bool(guardian_attested)
         can_apply = (
             requester_allowed
             and approval_quorum_met
+            and approval_transport_quorum_met
             and guardian_ok
             and reversible_ok
             and proposed_ref != previous_ref
@@ -323,6 +445,11 @@ class WorldModelSync:
             "required_approvals": required_approvals,
             "participant_approvals": approvals,
             "approval_quorum_met": approval_quorum_met,
+            "approval_subject_digest": approval_subject["digest"],
+            "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+            "approval_transport_receipts": transport_receipts,
+            "approval_transport_quorum_met": approval_transport_quorum_met,
+            "approval_transport_digest": sha256_text(canonical_json(transport_receipts)),
             "guardian_attested": guardian_ok,
             "reversible": bool(reversible),
             "rollback_physics_rules_ref": rollback_ref,
@@ -393,6 +520,11 @@ class WorldModelSync:
             "required_approvals": participants,
             "participant_approvals": participants,
             "approval_quorum_met": True,
+            "approval_subject_digest": target_receipt["approval_subject_digest"],
+            "approval_transport_policy_id": target_receipt["approval_transport_policy_id"],
+            "approval_transport_receipts": deepcopy(target_receipt["approval_transport_receipts"]),
+            "approval_transport_quorum_met": target_receipt["approval_transport_quorum_met"],
+            "approval_transport_digest": target_receipt["approval_transport_digest"],
             "guardian_attested": True,
             "reversible": True,
             "rollback_physics_rules_ref": rollback_ref,
@@ -420,6 +552,96 @@ class WorldModelSync:
                 "audit_event_ref": "",
             }
         return deepcopy(session["last_violation"])
+
+    def validate_approval_transport_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        approval_subject_digest: str | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_participant_approval_transport_receipt":
+            errors.append("kind must equal wms_participant_approval_transport_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("transport_policy_id") != WMS_APPROVAL_TRANSPORT_POLICY_ID:
+            errors.append("transport_policy_id mismatch")
+        if receipt.get("transport_kind") != WMS_APPROVAL_TRANSPORT_KIND:
+            errors.append("transport_kind must be imc")
+        if receipt.get("approval_decision") != WMS_APPROVAL_DECISION:
+            errors.append("approval_decision must be approve")
+        for field_name in (
+            "session_id",
+            "participant_id",
+            "transport_session_id",
+            "transport_handshake_id",
+            "transport_message_id",
+            "continuity_event_ref",
+            "delivery_status",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        expected_subject = approval_subject_digest
+        if expected_subject is not None:
+            try:
+                expected_subject = self._normalize_digest(
+                    expected_subject,
+                    "approval_subject_digest",
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+        subject_digest = receipt.get("approval_subject_digest")
+        if not isinstance(subject_digest, str) or len(subject_digest) != 64:
+            errors.append("approval_subject_digest must be a sha256 hex digest")
+        elif expected_subject is not None and subject_digest != expected_subject:
+            errors.append("approval_subject_digest must match the physics change subject")
+        for digest_field in (
+            "transport_handshake_digest",
+            "transport_message_summary_digest",
+            "approval_payload_digest",
+            "digest",
+        ):
+            digest_value = receipt.get(digest_field)
+            if not isinstance(digest_value, str) or len(digest_value) != 64:
+                errors.append(f"{digest_field} must be a sha256 hex digest")
+        delivered_field_names = receipt.get("delivered_field_names")
+        required_fields = {
+            "approval_subject_digest",
+            "participant_id",
+            "approval_decision",
+        }
+        delivered_fields_bound = (
+            isinstance(delivered_field_names, list)
+            and set(delivered_field_names) == required_fields
+        )
+        if not delivered_fields_bound:
+            errors.append("delivered_field_names must bind exactly the approval payload fields")
+        redacted_fields = receipt.get("redacted_fields")
+        redactions_empty = isinstance(redacted_fields, list) and not redacted_fields
+        if not redactions_empty:
+            errors.append("redacted_fields must be empty for approval payloads")
+        peer_attested = receipt.get("peer_attested") is True
+        forward_secrecy = receipt.get("forward_secrecy") is True
+        if not peer_attested:
+            errors.append("peer_attested must be true")
+        if not forward_secrecy:
+            errors.append("forward_secrecy must be true")
+        if receipt.get("delivery_status") not in {"delivered", "delivered-with-redactions"}:
+            errors.append("delivery_status must be delivered or delivered-with-redactions")
+        expected_digest = sha256_text(canonical_json(_approval_transport_digest_payload(receipt)))
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match approval transport receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "delivered_fields_bound": delivered_fields_bound,
+            "redactions_empty": redactions_empty,
+            "peer_attested": peer_attested,
+            "forward_secrecy": forward_secrecy,
+            "digest_bound": digest_bound,
+        }
 
     def validate_state(self, state: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
@@ -513,6 +735,29 @@ class WorldModelSync:
         approval_quorum_met = bool(required_set) and required_set.issubset(approval_set)
         if receipt.get("approval_quorum_met") is not approval_quorum_met:
             errors.append("approval_quorum_met must reflect required_approvals subset")
+        approval_subject_digest = receipt.get("approval_subject_digest")
+        if not isinstance(approval_subject_digest, str) or len(approval_subject_digest) != 64:
+            errors.append("approval_subject_digest must be a sha256 hex digest")
+            approval_subject_digest = None
+        if receipt.get("approval_transport_policy_id") != WMS_APPROVAL_TRANSPORT_POLICY_ID:
+            errors.append("approval_transport_policy_id mismatch")
+        approval_transport_receipts = receipt.get("approval_transport_receipts")
+        if not isinstance(approval_transport_receipts, list) or not approval_transport_receipts:
+            errors.append("approval_transport_receipts must be a non-empty list")
+            approval_transport_receipts = []
+        approval_transport_quorum_met = self._approval_transport_quorum_met(
+            approval_transport_receipts,
+            required_approvals=required_approvals if isinstance(required_approvals, list) else [],
+            approval_subject_digest=approval_subject_digest,
+        )
+        if receipt.get("approval_transport_quorum_met") is not approval_transport_quorum_met:
+            errors.append("approval_transport_quorum_met must reflect transport-bound approvals")
+        expected_approval_transport_digest = sha256_text(canonical_json(approval_transport_receipts))
+        approval_transport_digest_bound = (
+            receipt.get("approval_transport_digest") == expected_approval_transport_digest
+        )
+        if not approval_transport_digest_bound:
+            errors.append("approval_transport_digest must match approval_transport_receipts")
         if receipt.get("guardian_attested") is not True:
             errors.append("guardian_attested must be true")
         if receipt.get("reversible") is not True:
@@ -551,6 +796,8 @@ class WorldModelSync:
             "ok": not errors,
             "errors": errors,
             "approval_quorum_met": approval_quorum_met,
+            "approval_transport_quorum_met": approval_transport_quorum_met,
+            "approval_transport_digest_bound": approval_transport_digest_bound,
             "guardian_attested": receipt.get("guardian_attested") is True,
             "revert_bound": revert_bound,
             "digest_bound": digest_bound,
@@ -655,6 +902,42 @@ class WorldModelSync:
         if session_id not in self.sessions:
             raise ValueError(f"unknown session_id: {session_id}")
         return self.sessions[session_id]
+
+    def _approval_transport_quorum_met(
+        self,
+        receipts: Sequence[Mapping[str, Any]],
+        *,
+        required_approvals: Sequence[str],
+        approval_subject_digest: str | None,
+    ) -> bool:
+        if not required_approvals or not approval_subject_digest:
+            return False
+        required_set = set(required_approvals)
+        bound_participants: List[str] = []
+        for receipt in receipts:
+            validation = self.validate_approval_transport_receipt(
+                receipt,
+                approval_subject_digest=approval_subject_digest,
+            )
+            participant = receipt.get("participant_id") if isinstance(receipt, Mapping) else None
+            if not validation["ok"] or participant not in required_set:
+                return False
+            bound_participants.append(str(participant))
+        return (
+            bool(bound_participants)
+            and len(bound_participants) == len(set(bound_participants))
+            and required_set.issubset(set(bound_participants))
+        )
+
+    @staticmethod
+    def _normalize_digest(value: str, field_name: str) -> str:
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(char not in "0123456789abcdef" for char in value)
+        ):
+            raise ValueError(f"{field_name} must be a sha256 hex digest")
+        return value
 
     @staticmethod
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:

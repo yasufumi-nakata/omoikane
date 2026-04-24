@@ -7,6 +7,7 @@ imports:
   world_state: ../schemas/world_state.schema
   wms_reconcile: ../schemas/wms_reconcile.schema
   wms_physics_rules_change_receipt: ../schemas/wms_physics_rules_change_receipt.schema
+  wms_participant_approval_transport_receipt: ../schemas/wms_participant_approval_transport_receipt.schema
 operations:
   snapshot:
     summary: Read the current world state for one WMS session.
@@ -172,6 +173,11 @@ operations:
             items:
               type: string
               minLength: 1
+          approval_transport_receipts:
+            type: array
+            minItems: 1
+            items:
+              schema_ref: wms_participant_approval_transport_receipt
           guardian_attested:
             type: boolean
           reversible:
@@ -185,6 +191,7 @@ operations:
     guarantees:
       - requester must be a current session participant
       - participant approvals must cover every current session participant
+      - each participant approval must be backed by one IMC approval transport receipt bound to the same approval_subject_digest
       - Guardian attestation and a rollback token are required before apply
       - successful apply must bind rollback_physics_rules_ref to the previous physics_rules_ref
   revert_physics_rules_change:

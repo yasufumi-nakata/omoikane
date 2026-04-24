@@ -1,0 +1,24 @@
+eval_id: wms_participant_approval_transport
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の physics_rules approval が static participant list だけでなく、
+  live IMC transport receipt によって participant ごとの approval subject digest、
+  message digest、forward secrecy、redaction-free payload に束縛されることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  physics_approval_transport_bound: true
+  approval_transport_policy_id: imc-participant-approval-transport-v1
+  approval_transport_receipt_count: 2
+  approval_transport_quorum_met: true
+  approval_transport_digest_bound: true
+  approval_transport_peer_attested: true
+  approval_transport_forward_secrecy: true
+  approval_transport_redactions_empty: true
+  static_approval_without_transport_rejected: true
+metric: boolean
+threshold: 1.0
+ethics_check: true
