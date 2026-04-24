@@ -23,6 +23,7 @@ required:
   - reviewer_binding_count
   - network_receipt_ids
   - jurisdiction_review_profile
+  - verifier_transport_profile
   - continuity_guard
   - digest
 properties:
@@ -51,6 +52,9 @@ properties:
       - distributed_verdict_signature_profile_id
       - distributed_verdict_signature_algorithm
       - distributed_verdict_signatures_required
+      - verifier_transport_profile_id
+      - required_verifier_transport_trace_status
+      - non_loopback_verifier_transport_required
       - conflict_action
       - heritage_veto_action
       - raw_payload_policy
@@ -83,6 +87,12 @@ properties:
       distributed_verdict_signature_algorithm:
         const: sha256-reference-signature-v1
       distributed_verdict_signatures_required:
+        const: true
+      verifier_transport_profile_id:
+        const: cognitive-audit-non-loopback-verifier-transport-v1
+      required_verifier_transport_trace_status:
+        const: authenticated
+      non_loopback_verifier_transport_required:
         const: true
       conflict_action:
         const: escalate-to-human-governance
@@ -247,6 +257,8 @@ properties:
         pattern: "^[a-f0-9]{64}$"
       multi_jurisdiction_quorum_met:
         const: true
+  verifier_transport_profile:
+    $ref: cognitive_audit_verifier_transport_binding.schema
   continuity_guard:
     type: object
     additionalProperties: false
@@ -257,6 +269,7 @@ properties:
       - network_receipts_bound
       - multi_jurisdiction_review_bound
       - distributed_verdict_signatures_bound
+      - non_loopback_verifier_transport_bound
       - no_raw_payload_exposed
       - conflict_detected
     properties:
@@ -271,6 +284,8 @@ properties:
       multi_jurisdiction_review_bound:
         const: true
       distributed_verdict_signatures_bound:
+        const: true
+      non_loopback_verifier_transport_bound:
         const: true
       no_raw_payload_exposed:
         const: true
@@ -296,6 +311,9 @@ examples:
       distributed_verdict_signature_profile_id: distributed-council-verdict-signature-binding-v1
       distributed_verdict_signature_algorithm: sha256-reference-signature-v1
       distributed_verdict_signatures_required: true
+      verifier_transport_profile_id: cognitive-audit-non-loopback-verifier-transport-v1
+      required_verifier_transport_trace_status: authenticated
+      non_loopback_verifier_transport_required: true
       conflict_action: escalate-to-human-governance
       heritage_veto_action: preserve-boundary
       raw_payload_policy: digest-and-ref-only
@@ -368,6 +386,48 @@ examples:
       network_receipt_count: 2
       reviewer_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
       multi_jurisdiction_quorum_met: true
+    verifier_transport_profile:
+      kind: cognitive_audit_verifier_transport_binding
+      schema_version: 1.0.0
+      profile_id: cognitive-audit-non-loopback-verifier-transport-v1
+      authority_route_trace_ref: authority-route-trace://federation/cognitive-audit-window
+      authority_route_trace_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      authority_plane_ref: authority-plane://federation/cognitive-audit-window
+      authority_plane_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      route_target_discovery_ref: authority-route-targets://federation/cognitive-audit-window
+      route_target_discovery_digest: 1111111111111111111111111111111111111111111111111111111111111111
+      council_tier: federation
+      transport_profile: distributed-council-handoff-v1
+      trace_profile: non-loopback-mtls-authority-route-v1
+      socket_trace_profile: mtls-socket-trace-v1
+      os_observer_profile: os-native-tcp-observer-v1
+      route_target_discovery_profile: bounded-authority-route-target-discovery-v1
+      route_count: 2
+      distinct_remote_host_count: 2
+      mtls_authenticated_count: 2
+      remote_host_refs:
+        - host://federation/authority-edge-a
+        - host://federation/authority-edge-b
+      remote_host_attestation_refs:
+        - host-attestation://federation/authority-edge-a/2026-04-24
+        - host-attestation://federation/authority-edge-b/2026-04-24
+      remote_jurisdictions:
+        - JP-13
+        - US-CA
+      verifier_network_receipt_ids:
+        - verifier-network-receipt-0123456789ab
+        - verifier-network-receipt-89abcdef0123
+      reviewer_jurisdiction_count: 2
+      reviewer_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      route_binding_digest: 2222222222222222222222222222222222222222222222222222222222222222
+      non_loopback_verified: true
+      cross_host_verified: true
+      route_trace_authenticated: true
+      socket_trace_complete: true
+      os_observer_complete: true
+      route_target_discovery_bound: true
+      no_raw_socket_payload_exposed: true
+      digest: 3333333333333333333333333333333333333333333333333333333333333333
     continuity_guard:
       local_resolution_preserved: true
       distributed_refs_present: true
@@ -375,6 +435,7 @@ examples:
       network_receipts_bound: true
       multi_jurisdiction_review_bound: true
       distributed_verdict_signatures_bound: true
+      non_loopback_verifier_transport_bound: true
       no_raw_payload_exposed: true
       conflict_detected: true
     digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

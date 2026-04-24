@@ -2954,6 +2954,8 @@ json.dump(response, sys.stdout)
 
     def run_cognitive_audit_governance_demo(self) -> Dict[str, Any]:
         base = self.run_cognitive_audit_demo()
+        transport_demo = type(self)().run_distributed_transport_demo()
+        verifier_transport_trace = transport_demo["authority_route_trace"]["federation_rotated"]
         identity_id = base["identity"]["identity_id"]
         audit_record = base["audit"]["record"]
         local_resolution = base["audit"]["resolution"]
@@ -3134,18 +3136,21 @@ json.dump(response, sys.stdout)
             local_resolution,
             distributed_resolutions=[federation_resolution.to_dict()],
             oversight_event=oversight_event,
+            verifier_transport_trace=verifier_transport_trace,
         )
         heritage_binding = self.cognitive_audit_governance.bind_governance(
             audit_record,
             local_resolution,
             distributed_resolutions=[heritage_resolution.to_dict()],
             oversight_event=oversight_event,
+            verifier_transport_trace=verifier_transport_trace,
         )
         conflict_binding = self.cognitive_audit_governance.bind_governance(
             audit_record,
             local_resolution,
             distributed_resolutions=[federation_resolution.to_dict(), heritage_resolution.to_dict()],
             oversight_event=oversight_event,
+            verifier_transport_trace=verifier_transport_trace,
         )
         for event_type, binding in (
             ("cognitive.audit.governance.federation_bound", federation_binding),
@@ -3174,6 +3179,15 @@ json.dump(response, sys.stdout)
                 "policy": self.oversight.policy_snapshot(),
                 "reviewers": [reviewer_alpha, reviewer_beta],
                 "event": oversight_event,
+            },
+            "verifier_transport": {
+                "authority_route_trace": verifier_transport_trace,
+                "transport_profile": conflict_binding["verifier_transport_profile"],
+                "non_loopback_trace_bound": (
+                    verifier_transport_trace["trace_status"] == "authenticated"
+                    and verifier_transport_trace["non_loopback_verified"]
+                    and verifier_transport_trace["cross_host_verified"]
+                ),
             },
             "distributed": {
                 "federation": {
@@ -3220,6 +3234,14 @@ json.dump(response, sys.stdout)
                 ),
                 "distributed_signature_bound": all(
                     validation["distributed_signature_bound"]
+                    for validation in (
+                        federation_validation,
+                        heritage_validation,
+                        conflict_validation,
+                    )
+                ),
+                "non_loopback_verifier_transport_bound": all(
+                    validation["non_loopback_verifier_transport_bound"]
                     for validation in (
                         federation_validation,
                         heritage_validation,

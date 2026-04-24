@@ -33,8 +33,9 @@ def _resolve_local_refs(node: Any, base_dir: Path) -> Any:
 
 
 class CognitiveAuditSchemaContractTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.result = OmoikaneReferenceOS().run_cognitive_audit_governance_demo()
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.result = OmoikaneReferenceOS().run_cognitive_audit_governance_demo()
 
     def _assert_schema_valid(self, schema_path: str, payload: dict[str, Any]) -> None:
         schema = _load_schema(schema_path)
@@ -58,6 +59,14 @@ class CognitiveAuditSchemaContractTests(unittest.TestCase):
                     "specs/schemas/distributed_council_verdict_signature.schema",
                     verdict["signature_binding"],
                 )
+
+    def test_verifier_transport_profiles_match_public_schema(self) -> None:
+        for binding in self.result["bindings"].values():
+            self._assert_schema_valid(
+                "specs/schemas/cognitive_audit_verifier_transport_binding.schema",
+                binding["verifier_transport_profile"],
+            )
+            self.assertTrue(binding["continuity_guard"]["non_loopback_verifier_transport_bound"])
 
     def test_cognitive_audit_oversight_event_matches_public_schema(self) -> None:
         self._assert_schema_valid(

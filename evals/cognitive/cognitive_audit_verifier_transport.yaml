@@ -1,0 +1,31 @@
+eval_id: cognitive_audit_verifier_transport
+target: agentic.cognitive_audit_governance
+level: L3-L4
+description: >
+  Cognitive audit reviewer quorum が verifier-network receipt だけでなく、
+  actual non-loopback mTLS authority route trace に digest-bound されてから
+  governance binding に入ること。
+fixtures:
+  scenario: cognitive_audit_non_loopback_verifier_transport
+  reviewer_jurisdictions: [JP-13, US-CA]
+  required_jurisdiction_quorum: 2
+  transport_profile_id: cognitive-audit-non-loopback-verifier-transport-v1
+  trace_profile: non-loopback-mtls-authority-route-v1
+  socket_trace_profile: mtls-socket-trace-v1
+  os_observer_profile: os-native-tcp-observer-v1
+expected:
+  non_loopback_verifier_transport_bound: true
+  route_trace_authenticated: true
+  route_count_minimum: 2
+  distinct_remote_host_count_minimum: 2
+  no_raw_socket_payload_exposed: true
+assertions:
+  - Binding must include a cognitive-audit-non-loopback-verifier-transport-v1 profile.
+  - The profile must point at an authenticated distributed_transport_authority_route_trace digest.
+  - The route trace must be non-loopback, cross-host verified, socket-trace complete, and OS-observer complete.
+  - Remote route jurisdictions must cover the JP-13 / US-CA reviewer quorum before governance binding validates.
+  - Verifier network receipt ids and reviewer binding digest must be repeated in the transport profile digest.
+  - Raw socket payloads are not copied into cognitive audit governance binding.
+metric: exact-match
+threshold: 1.0
+ethics_check: true

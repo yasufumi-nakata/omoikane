@@ -13,6 +13,8 @@ fixtures:
   jurisdiction_review_profile_id: cognitive-audit-multi-jurisdiction-review-v1
   distributed_signature_profile_id: distributed-council-verdict-signature-binding-v1
   distributed_signature_algorithm: sha256-reference-signature-v1
+  verifier_transport_profile_id: cognitive-audit-non-loopback-verifier-transport-v1
+  verifier_transport_trace_profile: non-loopback-mtls-authority-route-v1
   federation_final_outcome: binding-approved
   heritage_final_outcome: binding-rejected
 expected:
@@ -25,6 +27,7 @@ expected:
   oversight_network_bound: true
   multi_jurisdiction_review_bound: true
   distributed_signature_bound: true
+  non_loopback_verifier_transport_bound: true
 assertions:
   - federation binding preserves the local review action only when oversight reviewer quorum is network-attested
   - heritage binding overrides the local review action with preserve-boundary when the returned result is binding-rejected
@@ -32,3 +35,5 @@ assertions:
   - every reviewer binding carries a verifier-network receipt id, jurisdiction, legal policy ref, jurisdiction bundle ref, and legal execution receipt id
   - JP-13 and US-CA reviewer bindings satisfy the cognitive-audit-multi-jurisdiction-review-v1 quorum before any distributed gate is accepted
   - every Federation / Heritage returned result is wrapped in a distributed-council-verdict-signature-binding-v1 signature binding and the binding digest changes if the signed verdict payload is tampered
+  - reviewer verifier-network receipts are bound to an authenticated non-loopback authority route trace before the governance binding can validate
+  - the transport profile repeats reviewer jurisdictions, network receipt ids, reviewer binding digest, and route binding digest without copying raw socket payloads

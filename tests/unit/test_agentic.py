@@ -4173,6 +4173,56 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
             ],
         }
 
+    @staticmethod
+    def _verifier_transport_trace() -> dict[str, object]:
+        return {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_ref": "authority-route-trace://federation/cognitive-audit-window",
+            "authority_plane_ref": "authority-plane://federation/cognitive-audit-window",
+            "authority_plane_digest": "a" * 64,
+            "route_target_discovery_ref": "authority-route-targets://federation/cognitive-audit-window",
+            "route_target_discovery_digest": "b" * 64,
+            "envelope_ref": "distributed-envelope-0123456789ab",
+            "envelope_digest": "c" * 64,
+            "council_tier": "federation",
+            "transport_profile": "distributed-council-handoff-v1",
+            "trace_profile": "non-loopback-mtls-authority-route-v1",
+            "socket_trace_profile": "mtls-socket-trace-v1",
+            "os_observer_profile": "os-native-tcp-observer-v1",
+            "route_target_discovery_profile": "bounded-authority-route-target-discovery-v1",
+            "route_count": 2,
+            "distinct_remote_host_count": 2,
+            "mtls_authenticated_count": 2,
+            "non_loopback_verified": True,
+            "authority_plane_bound": True,
+            "response_digest_bound": True,
+            "socket_trace_complete": True,
+            "os_observer_complete": True,
+            "route_target_discovery_bound": True,
+            "cross_host_verified": True,
+            "trace_status": "authenticated",
+            "digest": "d" * 64,
+            "route_bindings": [
+                {
+                    "route_binding_ref": "authority-route://federation/cognitive-alpha",
+                    "remote_host_ref": "host://federation/cognitive-alpha",
+                    "remote_host_attestation_ref": "host-attestation://federation/cognitive-alpha",
+                    "remote_jurisdiction": "JP-13",
+                    "socket_trace": {"response_digest": "e" * 64},
+                    "os_observer_receipt": {"host_binding_digest": "f" * 64},
+                },
+                {
+                    "route_binding_ref": "authority-route://federation/cognitive-beta",
+                    "remote_host_ref": "host://federation/cognitive-beta",
+                    "remote_host_attestation_ref": "host-attestation://federation/cognitive-beta",
+                    "remote_jurisdiction": "US-CA",
+                    "socket_trace": {"response_digest": "1" * 64},
+                    "os_observer_receipt": {"host_binding_digest": "2" * 64},
+                },
+            ],
+        }
+
     def test_governance_binding_preserves_federated_review(self) -> None:
         service = CognitiveAuditGovernanceService()
         record, resolution = self._build_record_and_resolution()
@@ -4193,6 +4243,7 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
                 }
             ],
             oversight_event=self._oversight_event(),
+            verifier_transport_trace=self._verifier_transport_trace(),
         )
         validation = service.validate_binding(binding)
 
@@ -4203,7 +4254,13 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertTrue(validation["oversight_network_bound"])
         self.assertTrue(validation["multi_jurisdiction_review_bound"])
         self.assertTrue(validation["distributed_signature_bound"])
+        self.assertTrue(validation["non_loopback_verifier_transport_bound"])
         self.assertTrue(binding["continuity_guard"]["distributed_verdict_signatures_bound"])
+        self.assertTrue(binding["continuity_guard"]["non_loopback_verifier_transport_bound"])
+        self.assertEqual(
+            "cognitive-audit-non-loopback-verifier-transport-v1",
+            binding["verifier_transport_profile"]["profile_id"],
+        )
         signature_binding = binding["distributed_verdicts"][0]["signature_binding"]
         self.assertEqual(
             "distributed-council-verdict-signature-binding-v1",
@@ -4237,6 +4294,7 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
                 resolution,
                 distributed_resolutions=[],
                 oversight_event=oversight_event,
+                verifier_transport_trace=self._verifier_transport_trace(),
             )
 
     def test_governance_binding_escalates_conflicting_distributed_verdicts(self) -> None:
@@ -4269,6 +4327,7 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
                 },
             ],
             oversight_event=self._oversight_event(),
+            verifier_transport_trace=self._verifier_transport_trace(),
         )
         validation = service.validate_binding(binding)
 
@@ -4278,7 +4337,9 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertTrue(binding["continuity_guard"]["conflict_detected"])
         self.assertTrue(binding["continuity_guard"]["multi_jurisdiction_review_bound"])
         self.assertTrue(binding["continuity_guard"]["distributed_verdict_signatures_bound"])
+        self.assertTrue(binding["continuity_guard"]["non_loopback_verifier_transport_bound"])
         self.assertTrue(validation["distributed_signature_bound"])
+        self.assertTrue(validation["non_loopback_verifier_transport_bound"])
         self.assertEqual(2, validation["distributed_verdict_count"])
 
     def test_governance_binding_rejects_tampered_distributed_verdict_signature(self) -> None:
@@ -4301,6 +4362,7 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
                 }
             ],
             oversight_event=self._oversight_event(),
+            verifier_transport_trace=self._verifier_transport_trace(),
         )
         tampered = dict(binding)
         tampered["distributed_verdicts"] = [
@@ -4314,6 +4376,40 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertFalse(validation["distributed_signature_bound"])
         self.assertTrue(
             any("signature_binding.signed_payload_digest mismatch" in error for error in validation["errors"])
+        )
+
+    def test_governance_binding_rejects_tampered_verifier_transport_profile(self) -> None:
+        service = CognitiveAuditGovernanceService()
+        record, resolution = self._build_record_and_resolution()
+
+        binding = service.bind_governance(
+            record,
+            resolution,
+            distributed_resolutions=[
+                {
+                    "resolution_id": "distributed-council-fedcba987654",
+                    "topology_ref": "topology-13579bdf2468",
+                    "council_tier": "federation",
+                    "final_outcome": "binding-approved",
+                    "decision_mode": "federation-weighted-majority",
+                    "conflict_resolution": "federation-overrides-local",
+                    "follow_up_action": "open-shared-review-window",
+                    "external_resolution_refs": ["federation://identity-a/result"],
+                }
+            ],
+            oversight_event=self._oversight_event(),
+            verifier_transport_trace=self._verifier_transport_trace(),
+        )
+        tampered = dict(binding)
+        tampered["verifier_transport_profile"] = dict(binding["verifier_transport_profile"])
+        tampered["verifier_transport_profile"]["remote_jurisdictions"] = ["JP-13"]
+
+        validation = service.validate_binding(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["non_loopback_verifier_transport_bound"])
+        self.assertTrue(
+            any("remote_jurisdictions incomplete" in error for error in validation["errors"])
         )
 
 

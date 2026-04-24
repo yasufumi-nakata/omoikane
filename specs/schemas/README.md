@@ -19,6 +19,7 @@
 - `cognitive_audit_governance_binding.schema`
 - `cognitive_audit_record.schema`
 - `cognitive_audit_resolution.schema`
+- `cognitive_audit_verifier_transport_binding.schema`
 - `collective_merge_session.schema`
 - `collective_record.schema`
 - `connectome_document.schema`

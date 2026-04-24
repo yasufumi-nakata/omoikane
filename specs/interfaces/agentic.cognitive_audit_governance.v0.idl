@@ -7,7 +7,9 @@ imports:
   cognitive_audit_record: ../schemas/cognitive_audit_record.schema
   cognitive_audit_resolution: ../schemas/cognitive_audit_resolution.schema
   cognitive_audit_governance_binding: ../schemas/cognitive_audit_governance_binding.schema
+  cognitive_audit_verifier_transport_binding: ../schemas/cognitive_audit_verifier_transport_binding.schema
   distributed_council_verdict_signature: ../schemas/distributed_council_verdict_signature.schema
+  distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
 operations:
   bind_governance:
     summary: >
@@ -20,6 +22,7 @@ operations:
           - record
           - local_resolution
           - oversight_event
+          - verifier_transport_trace
         properties:
           record:
             schema_ref: cognitive_audit_record
@@ -127,12 +130,15 @@ operations:
                     legal_execution_digest:
                       type: string
                       minLength: 1
+          verifier_transport_trace:
+            schema_ref: distributed_transport_authority_route_trace
     output:
       schema_ref: cognitive_audit_governance_binding
     guarantees:
       - open-guardian-review and activate-containment require network-bound oversight evidence
       - reviewer bindings must cover at least two jurisdictions, legal policy refs, jurisdiction bundle refs, and legal execution receipts before governance binding is accepted
       - every Federation or Heritage returned result receives a distributed-council-verdict-signature-binding-v1 signature binding before it enters the governance binding digest
+      - reviewer verifier-network receipts must be bound to a cognitive-audit-non-loopback-verifier-transport-v1 profile derived from an authenticated non-loopback authority route trace
       - heritage binding-rejected verdict overrides the local follow-up with preserve-boundary
       - conflicting federation-approved and heritage-rejected verdicts escalate to human governance
   validate_binding:
@@ -156,6 +162,7 @@ operations:
           - oversight_network_bound
           - multi_jurisdiction_review_bound
           - distributed_signature_bound
+          - non_loopback_verifier_transport_bound
           - errors
         properties:
           ok:
@@ -172,6 +179,8 @@ operations:
           multi_jurisdiction_review_bound:
             type: boolean
           distributed_signature_bound:
+            type: boolean
+          non_loopback_verifier_transport_bound:
             type: boolean
           errors:
             type: array

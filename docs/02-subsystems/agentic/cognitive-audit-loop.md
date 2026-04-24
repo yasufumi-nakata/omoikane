@@ -79,6 +79,11 @@ reference runtime では trigger を最大 4 件までに固定し、
   - reviewer jurisdictions: at least 2
   - required legal policy refs / jurisdiction bundle refs / legal execution ids
   - reviewer binding digest instead of raw credential or legal payload
+- `cognitive-audit-non-loopback-verifier-transport-v1`
+  - authenticated `distributed_transport_authority_route_trace`
+  - non-loopback / cross-host / socket trace / OS observer completion
+  - reviewer network receipt ids and reviewer binding digest repeated in the transport profile
+  - raw socket payloads are not copied into the governance binding
 - `execution_gate`
   - `oversight-attested-local`
   - `federation-attested-review`
@@ -99,8 +104,9 @@ reference runtime では trigger を最大 4 件までに固定し、
 6. `open-guardian-review` / `activate-containment` は network-bound reviewer receipt を持つ oversight event なしでは governance bind できない
 7. cognitive audit governance binding は少なくとも 2 法域の reviewer legal execution と jurisdiction bundle を束ねる
 8. Federation / Heritage returned result は signature binding なしでは governance binding digest に入れない
-9. Heritage `binding-rejected` returned result は local review action より優先して `preserve-boundary` に落とす
-10. Federation `binding-approved` と Heritage `binding-rejected` が同時に来た時は human governance へ escalate する
+9. reviewer verifier-network receipt は authenticated non-loopback authority route trace に束縛される
+10. Heritage `binding-rejected` returned result は local review action より優先して `preserve-boundary` に落とす
+11. Federation `binding-approved` と Heritage `binding-rejected` が同時に来た時は human governance へ escalate する
 
 ## Reference Runtime
 
@@ -113,6 +119,7 @@ reference runtime では trigger を最大 4 件までに固定し、
 - `cognitive-audit-governance-demo --json`
   - `cognitive.audit.resolved` を起点に reviewer verifier-network receipt を持つ oversight attestation
   - JP-13 / US-CA の multi-jurisdiction reviewer quorum と legal execution binding
+  - actual non-loopback mTLS authority route trace に由来する verifier transport binding
   - Federation / Heritage returned result の digest-only signature binding
   - Federation returned result による review preserve
   - Heritage returned result による boundary preserve

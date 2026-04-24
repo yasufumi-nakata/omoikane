@@ -32,6 +32,51 @@ COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_PROFILE_ID = (
     "distributed-council-verdict-signature-binding-v1"
 )
 COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM = "sha256-reference-signature-v1"
+COGNITIVE_AUDIT_VERIFIER_TRANSPORT_PROFILE_ID = (
+    "cognitive-audit-non-loopback-verifier-transport-v1"
+)
+COGNITIVE_AUDIT_VERIFIER_TRANSPORT_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
+COGNITIVE_AUDIT_VERIFIER_TRANSPORT_SOCKET_PROFILE = "mtls-socket-trace-v1"
+COGNITIVE_AUDIT_VERIFIER_TRANSPORT_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
+COGNITIVE_AUDIT_VERIFIER_TRANSPORT_ROUTE_TARGET_PROFILE = (
+    "bounded-authority-route-target-discovery-v1"
+)
+
+
+def _verifier_transport_digest_payload(profile: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "schema_version": profile["schema_version"],
+        "profile_id": profile["profile_id"],
+        "authority_route_trace_ref": profile["authority_route_trace_ref"],
+        "authority_route_trace_digest": profile["authority_route_trace_digest"],
+        "authority_plane_ref": profile["authority_plane_ref"],
+        "authority_plane_digest": profile["authority_plane_digest"],
+        "route_target_discovery_ref": profile["route_target_discovery_ref"],
+        "route_target_discovery_digest": profile["route_target_discovery_digest"],
+        "council_tier": profile["council_tier"],
+        "transport_profile": profile["transport_profile"],
+        "trace_profile": profile["trace_profile"],
+        "socket_trace_profile": profile["socket_trace_profile"],
+        "os_observer_profile": profile["os_observer_profile"],
+        "route_target_discovery_profile": profile["route_target_discovery_profile"],
+        "route_count": profile["route_count"],
+        "distinct_remote_host_count": profile["distinct_remote_host_count"],
+        "mtls_authenticated_count": profile["mtls_authenticated_count"],
+        "remote_host_refs": profile["remote_host_refs"],
+        "remote_host_attestation_refs": profile["remote_host_attestation_refs"],
+        "remote_jurisdictions": profile["remote_jurisdictions"],
+        "verifier_network_receipt_ids": profile["verifier_network_receipt_ids"],
+        "reviewer_jurisdiction_count": profile["reviewer_jurisdiction_count"],
+        "reviewer_binding_digest": profile["reviewer_binding_digest"],
+        "route_binding_digest": profile["route_binding_digest"],
+        "non_loopback_verified": profile["non_loopback_verified"],
+        "cross_host_verified": profile["cross_host_verified"],
+        "route_trace_authenticated": profile["route_trace_authenticated"],
+        "socket_trace_complete": profile["socket_trace_complete"],
+        "os_observer_complete": profile["os_observer_complete"],
+        "route_target_discovery_bound": profile["route_target_discovery_bound"],
+        "no_raw_socket_payload_exposed": profile["no_raw_socket_payload_exposed"],
+    }
 
 
 def _binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
@@ -49,6 +94,7 @@ def _binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
         "reviewer_binding_count": binding["reviewer_binding_count"],
         "network_receipt_ids": binding["network_receipt_ids"],
         "jurisdiction_review_profile": binding["jurisdiction_review_profile"],
+        "verifier_transport_profile": binding["verifier_transport_profile"],
         "continuity_guard": binding["continuity_guard"],
     }
 
@@ -66,6 +112,12 @@ def _unique_strings(values: Sequence[Any], field_name: str) -> List[str]:
         if normalized not in unique:
             unique.append(normalized)
     return unique
+
+
+def _int_at_least(value: Any, field_name: str, minimum: int) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+        raise ValueError(f"{field_name} must be an integer >= {minimum}")
+    return value
 
 
 class CognitiveAuditGovernanceService:
@@ -89,6 +141,9 @@ class CognitiveAuditGovernanceService:
                 COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM
             ),
             "distributed_verdict_signatures_required": True,
+            "verifier_transport_profile_id": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_PROFILE_ID,
+            "required_verifier_transport_trace_status": "authenticated",
+            "non_loopback_verifier_transport_required": True,
             "conflict_action": "escalate-to-human-governance",
             "heritage_veto_action": "preserve-boundary",
             "raw_payload_policy": "digest-and-ref-only",
@@ -101,6 +156,7 @@ class CognitiveAuditGovernanceService:
         *,
         distributed_resolutions: Sequence[Mapping[str, Any]] = (),
         oversight_event: Mapping[str, Any],
+        verifier_transport_trace: Mapping[str, Any],
     ) -> Dict[str, Any]:
         audit_ref = _non_empty_string(record.get("audit_id"), "record.audit_id")
         if local_resolution.get("audit_ref") != audit_ref:
@@ -114,6 +170,10 @@ class CognitiveAuditGovernanceService:
             raise ValueError("local_resolution.follow_up_action is invalid")
 
         normalized_oversight = self._normalize_oversight_event(oversight_event)
+        normalized_transport = self._normalize_verifier_transport_trace(
+            verifier_transport_trace,
+            normalized_oversight,
+        )
         distributed_verdicts = self._normalize_distributed_resolutions(distributed_resolutions)
 
         federation_approved = any(
@@ -178,6 +238,7 @@ class CognitiveAuditGovernanceService:
             "reviewer_binding_count": normalized_oversight["reviewer_binding_count"],
             "network_receipt_ids": normalized_oversight["network_receipt_ids"],
             "jurisdiction_review_profile": normalized_oversight["jurisdiction_review_profile"],
+            "verifier_transport_profile": normalized_transport,
             "continuity_guard": {
                 "local_resolution_preserved": True,
                 "distributed_refs_present": bool(distributed_verdicts),
@@ -189,6 +250,9 @@ class CognitiveAuditGovernanceService:
                 "distributed_verdict_signatures_bound": self._distributed_verdict_signatures_bound(
                     distributed_verdicts
                 ),
+                "non_loopback_verifier_transport_bound": normalized_transport[
+                    "route_trace_authenticated"
+                ],
                 "no_raw_payload_exposed": True,
                 "conflict_detected": conflict_detected,
             },
@@ -204,6 +268,7 @@ class CognitiveAuditGovernanceService:
         continuity_guard = binding.get("continuity_guard", {})
         network_receipt_ids = binding.get("network_receipt_ids", [])
         jurisdiction_review_profile = binding.get("jurisdiction_review_profile", {})
+        verifier_transport_profile = binding.get("verifier_transport_profile", {})
 
         if binding.get("kind") != "cognitive_audit_governance_binding":
             errors.append("kind must equal cognitive_audit_governance_binding")
@@ -233,6 +298,18 @@ class CognitiveAuditGovernanceService:
             errors.append("policy.distributed_verdict_signature_algorithm mismatch")
         if binding.get("policy", {}).get("distributed_verdict_signatures_required") is not True:
             errors.append("policy.distributed_verdict_signatures_required must be true")
+        if (
+            binding.get("policy", {}).get("verifier_transport_profile_id")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_PROFILE_ID
+        ):
+            errors.append("policy.verifier_transport_profile_id mismatch")
+        if (
+            binding.get("policy", {}).get("required_verifier_transport_trace_status")
+            != "authenticated"
+        ):
+            errors.append("policy.required_verifier_transport_trace_status mismatch")
+        if binding.get("policy", {}).get("non_loopback_verifier_transport_required") is not True:
+            errors.append("policy.non_loopback_verifier_transport_required must be true")
         if execution_gate not in COGNITIVE_AUDIT_ALLOWED_EXECUTION_GATES:
             errors.append("execution_gate invalid")
         if final_follow_up_action not in COGNITIVE_AUDIT_ALLOWED_FOLLOW_UP_ACTIONS:
@@ -256,6 +333,8 @@ class CognitiveAuditGovernanceService:
             errors.append("continuity_guard.multi_jurisdiction_review_bound must be true")
         if not continuity_guard.get("distributed_verdict_signatures_bound"):
             errors.append("continuity_guard.distributed_verdict_signatures_bound must be true")
+        if not continuity_guard.get("non_loopback_verifier_transport_bound"):
+            errors.append("continuity_guard.non_loopback_verifier_transport_bound must be true")
         if continuity_guard.get("no_raw_payload_exposed") is not True:
             errors.append("continuity_guard.no_raw_payload_exposed must be true")
         if not isinstance(jurisdiction_review_profile, Mapping):
@@ -279,6 +358,12 @@ class CognitiveAuditGovernanceService:
                 errors.append("jurisdiction_review_profile.multi_jurisdiction_quorum_met must be true")
             if jurisdiction_review_profile.get("network_receipt_count") != len(network_receipt_ids):
                 errors.append("jurisdiction_review_profile.network_receipt_count mismatch")
+        transport_errors = self._validate_verifier_transport_profile(
+            verifier_transport_profile,
+            network_receipt_ids,
+            jurisdiction_review_profile,
+        )
+        errors.extend(transport_errors)
 
         tiers = [verdict.get("council_tier") for verdict in distributed_verdicts]
         if len(tiers) != len(set(tiers)):
@@ -333,6 +418,10 @@ class CognitiveAuditGovernanceService:
             "distributed_signature_bound": (
                 continuity_guard.get("distributed_verdict_signatures_bound") is True
                 and not signature_errors
+            ),
+            "non_loopback_verifier_transport_bound": (
+                continuity_guard.get("non_loopback_verifier_transport_bound") is True
+                and not transport_errors
             ),
             "errors": errors,
         }
@@ -446,6 +535,273 @@ class CognitiveAuditGovernanceService:
             "reviewer_binding_digest": sha256_text(canonical_json(normalized_bindings)),
             "multi_jurisdiction_quorum_met": multi_jurisdiction_quorum_met,
         }
+
+    def _normalize_verifier_transport_trace(
+        self,
+        verifier_transport_trace: Mapping[str, Any],
+        normalized_oversight: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(verifier_transport_trace, Mapping):
+            raise ValueError("verifier_transport_trace must be a mapping")
+        if (
+            verifier_transport_trace.get("kind")
+            != "distributed_transport_authority_route_trace"
+        ):
+            raise ValueError("verifier_transport_trace.kind must be distributed_transport_authority_route_trace")
+        if verifier_transport_trace.get("trace_status") != "authenticated":
+            raise ValueError("verifier transport route trace must be authenticated")
+        if (
+            verifier_transport_trace.get("trace_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_TRACE_PROFILE
+        ):
+            raise ValueError("verifier transport trace_profile mismatch")
+        if (
+            verifier_transport_trace.get("socket_trace_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_SOCKET_PROFILE
+        ):
+            raise ValueError("verifier transport socket_trace_profile mismatch")
+        if (
+            verifier_transport_trace.get("os_observer_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_OS_OBSERVER_PROFILE
+        ):
+            raise ValueError("verifier transport os_observer_profile mismatch")
+        if (
+            verifier_transport_trace.get("route_target_discovery_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_ROUTE_TARGET_PROFILE
+        ):
+            raise ValueError("verifier transport route_target_discovery_profile mismatch")
+
+        for flag_name in (
+            "non_loopback_verified",
+            "authority_plane_bound",
+            "response_digest_bound",
+            "socket_trace_complete",
+            "os_observer_complete",
+            "route_target_discovery_bound",
+            "cross_host_verified",
+        ):
+            if verifier_transport_trace.get(flag_name) is not True:
+                raise ValueError(f"verifier transport {flag_name} must be true")
+
+        route_count = _int_at_least(verifier_transport_trace.get("route_count"), "route_count", 1)
+        distinct_remote_host_count = _int_at_least(
+            verifier_transport_trace.get("distinct_remote_host_count"),
+            "distinct_remote_host_count",
+            COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM,
+        )
+        mtls_authenticated_count = _int_at_least(
+            verifier_transport_trace.get("mtls_authenticated_count"),
+            "mtls_authenticated_count",
+            route_count,
+        )
+        if mtls_authenticated_count < route_count:
+            raise ValueError("verifier transport must authenticate every traced route")
+
+        route_bindings = verifier_transport_trace.get("route_bindings", [])
+        if not isinstance(route_bindings, list) or len(route_bindings) != route_count:
+            raise ValueError("verifier transport route_bindings must match route_count")
+
+        remote_host_refs: List[str] = []
+        remote_host_attestation_refs: List[str] = []
+        remote_jurisdictions: List[str] = []
+        route_binding_summaries: List[Dict[str, Any]] = []
+        for route_binding in route_bindings:
+            if not isinstance(route_binding, Mapping):
+                raise ValueError("verifier transport route_bindings must contain mappings")
+            remote_host_ref = _non_empty_string(
+                route_binding.get("remote_host_ref"),
+                "route_bindings[].remote_host_ref",
+            )
+            remote_host_attestation_ref = _non_empty_string(
+                route_binding.get("remote_host_attestation_ref"),
+                "route_bindings[].remote_host_attestation_ref",
+            )
+            remote_jurisdiction = _non_empty_string(
+                route_binding.get("remote_jurisdiction"),
+                "route_bindings[].remote_jurisdiction",
+            )
+            if remote_host_ref not in remote_host_refs:
+                remote_host_refs.append(remote_host_ref)
+            if remote_host_attestation_ref not in remote_host_attestation_refs:
+                remote_host_attestation_refs.append(remote_host_attestation_ref)
+            if remote_jurisdiction not in remote_jurisdictions:
+                remote_jurisdictions.append(remote_jurisdiction)
+            socket_trace = route_binding.get("socket_trace", {})
+            os_observer_receipt = route_binding.get("os_observer_receipt", {})
+            if not isinstance(socket_trace, Mapping) or not isinstance(
+                os_observer_receipt,
+                Mapping,
+            ):
+                raise ValueError("verifier transport route binding trace evidence must be mappings")
+            route_binding_summaries.append(
+                {
+                    "route_binding_ref": _non_empty_string(
+                        route_binding.get("route_binding_ref"),
+                        "route_bindings[].route_binding_ref",
+                    ),
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": remote_host_attestation_ref,
+                    "remote_jurisdiction": remote_jurisdiction,
+                    "socket_response_digest": _non_empty_string(
+                        socket_trace.get("response_digest"),
+                        "route_bindings[].socket_trace.response_digest",
+                    ),
+                    "os_observer_host_binding_digest": _non_empty_string(
+                        os_observer_receipt.get("host_binding_digest"),
+                        "route_bindings[].os_observer_receipt.host_binding_digest",
+                    ),
+                }
+            )
+
+        jurisdiction_profile = normalized_oversight["jurisdiction_review_profile"]
+        reviewer_jurisdictions = jurisdiction_profile["jurisdictions"]
+        missing_jurisdictions = [
+            jurisdiction
+            for jurisdiction in reviewer_jurisdictions
+            if jurisdiction not in remote_jurisdictions
+        ]
+        if missing_jurisdictions:
+            raise ValueError(
+                "verifier transport route trace must cover reviewer jurisdictions"
+            )
+
+        profile = {
+            "kind": "cognitive_audit_verifier_transport_binding",
+            "schema_version": COGNITIVE_AUDIT_GOVERNANCE_SCHEMA_VERSION,
+            "profile_id": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_PROFILE_ID,
+            "authority_route_trace_ref": _non_empty_string(
+                verifier_transport_trace.get("trace_ref"),
+                "verifier_transport_trace.trace_ref",
+            ),
+            "authority_route_trace_digest": _non_empty_string(
+                verifier_transport_trace.get("digest"),
+                "verifier_transport_trace.digest",
+            ),
+            "authority_plane_ref": _non_empty_string(
+                verifier_transport_trace.get("authority_plane_ref"),
+                "verifier_transport_trace.authority_plane_ref",
+            ),
+            "authority_plane_digest": _non_empty_string(
+                verifier_transport_trace.get("authority_plane_digest"),
+                "verifier_transport_trace.authority_plane_digest",
+            ),
+            "route_target_discovery_ref": _non_empty_string(
+                verifier_transport_trace.get("route_target_discovery_ref"),
+                "verifier_transport_trace.route_target_discovery_ref",
+            ),
+            "route_target_discovery_digest": _non_empty_string(
+                verifier_transport_trace.get("route_target_discovery_digest"),
+                "verifier_transport_trace.route_target_discovery_digest",
+            ),
+            "council_tier": _non_empty_string(
+                verifier_transport_trace.get("council_tier"),
+                "verifier_transport_trace.council_tier",
+            ),
+            "transport_profile": _non_empty_string(
+                verifier_transport_trace.get("transport_profile"),
+                "verifier_transport_trace.transport_profile",
+            ),
+            "trace_profile": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_TRACE_PROFILE,
+            "socket_trace_profile": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_SOCKET_PROFILE,
+            "os_observer_profile": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_OS_OBSERVER_PROFILE,
+            "route_target_discovery_profile": COGNITIVE_AUDIT_VERIFIER_TRANSPORT_ROUTE_TARGET_PROFILE,
+            "route_count": route_count,
+            "distinct_remote_host_count": distinct_remote_host_count,
+            "mtls_authenticated_count": mtls_authenticated_count,
+            "remote_host_refs": remote_host_refs,
+            "remote_host_attestation_refs": remote_host_attestation_refs,
+            "remote_jurisdictions": remote_jurisdictions,
+            "verifier_network_receipt_ids": list(normalized_oversight["network_receipt_ids"]),
+            "reviewer_jurisdiction_count": jurisdiction_profile["reviewer_jurisdiction_count"],
+            "reviewer_binding_digest": jurisdiction_profile["reviewer_binding_digest"],
+            "route_binding_digest": sha256_text(canonical_json(route_binding_summaries)),
+            "non_loopback_verified": True,
+            "cross_host_verified": True,
+            "route_trace_authenticated": True,
+            "socket_trace_complete": True,
+            "os_observer_complete": True,
+            "route_target_discovery_bound": True,
+            "no_raw_socket_payload_exposed": True,
+        }
+        profile["digest"] = sha256_text(canonical_json(_verifier_transport_digest_payload(profile)))
+        return profile
+
+    def _validate_verifier_transport_profile(
+        self,
+        profile: Any,
+        network_receipt_ids: Sequence[Any],
+        jurisdiction_review_profile: Any,
+    ) -> List[str]:
+        errors: List[str] = []
+        if not isinstance(profile, Mapping):
+            return ["verifier_transport_profile must be a mapping"]
+        if profile.get("kind") != "cognitive_audit_verifier_transport_binding":
+            errors.append("verifier_transport_profile.kind mismatch")
+        if profile.get("schema_version") != COGNITIVE_AUDIT_GOVERNANCE_SCHEMA_VERSION:
+            errors.append("verifier_transport_profile.schema_version mismatch")
+        if profile.get("profile_id") != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_PROFILE_ID:
+            errors.append("verifier_transport_profile.profile_id mismatch")
+        if profile.get("trace_profile") != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_TRACE_PROFILE:
+            errors.append("verifier_transport_profile.trace_profile mismatch")
+        if profile.get("socket_trace_profile") != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_SOCKET_PROFILE:
+            errors.append("verifier_transport_profile.socket_trace_profile mismatch")
+        if (
+            profile.get("os_observer_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_OS_OBSERVER_PROFILE
+        ):
+            errors.append("verifier_transport_profile.os_observer_profile mismatch")
+        if (
+            profile.get("route_target_discovery_profile")
+            != COGNITIVE_AUDIT_VERIFIER_TRANSPORT_ROUTE_TARGET_PROFILE
+        ):
+            errors.append("verifier_transport_profile.route_target_discovery_profile mismatch")
+        if profile.get("verifier_network_receipt_ids") != list(network_receipt_ids):
+            errors.append("verifier_transport_profile.verifier_network_receipt_ids mismatch")
+        if isinstance(jurisdiction_review_profile, Mapping):
+            if (
+                profile.get("reviewer_jurisdiction_count")
+                != jurisdiction_review_profile.get("reviewer_jurisdiction_count")
+            ):
+                errors.append("verifier_transport_profile.reviewer_jurisdiction_count mismatch")
+            if (
+                profile.get("reviewer_binding_digest")
+                != jurisdiction_review_profile.get("reviewer_binding_digest")
+            ):
+                errors.append("verifier_transport_profile.reviewer_binding_digest mismatch")
+            for jurisdiction in jurisdiction_review_profile.get("jurisdictions", []):
+                if jurisdiction not in profile.get("remote_jurisdictions", []):
+                    errors.append("verifier_transport_profile.remote_jurisdictions incomplete")
+                    break
+        if profile.get("route_count", 0) < COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM:
+            errors.append("verifier_transport_profile.route_count below reviewer quorum")
+        if profile.get("distinct_remote_host_count", 0) < COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM:
+            errors.append("verifier_transport_profile.distinct_remote_host_count below reviewer quorum")
+        if profile.get("mtls_authenticated_count", 0) < profile.get("route_count", 0):
+            errors.append("verifier_transport_profile.mtls_authenticated_count below route_count")
+        for flag_name in (
+            "non_loopback_verified",
+            "cross_host_verified",
+            "route_trace_authenticated",
+            "socket_trace_complete",
+            "os_observer_complete",
+            "route_target_discovery_bound",
+            "no_raw_socket_payload_exposed",
+        ):
+            if profile.get(flag_name) is not True:
+                errors.append(f"verifier_transport_profile.{flag_name} must be true")
+        if profile.get("digest"):
+            try:
+                expected_digest = sha256_text(
+                    canonical_json(_verifier_transport_digest_payload(profile))
+                )
+            except KeyError as exc:
+                errors.append(f"verifier_transport_profile missing {exc.args[0]}")
+            else:
+                if profile.get("digest") != expected_digest:
+                    errors.append("verifier_transport_profile.digest mismatch")
+        else:
+            errors.append("verifier_transport_profile.digest must be present")
+        return errors
 
     def _normalize_distributed_resolutions(
         self,

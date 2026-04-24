@@ -298,6 +298,16 @@ entries:
     rationale: Required to serialize one governance-bound cognitive audit follow-up with distributed council verdicts, network-attested oversight evidence, and multi-jurisdiction reviewer legal execution binding.
   - priority: P1
     kind: schema
+    file: specs/schemas/cognitive_audit_verifier_transport_binding.schema
+    consumers:
+      - specs/interfaces/agentic.cognitive_audit_governance.v0.idl
+      - specs/schemas/cognitive_audit_governance_binding.schema
+      - reference-runtime
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+      - evals/cognitive/cognitive_audit_verifier_transport.yaml
+    rationale: Required to serialize the digest-only binding between cognitive audit reviewer quorum and authenticated non-loopback verifier transport route traces.
+  - priority: P1
+    kind: schema
     file: specs/schemas/task_node.schema
     consumers:
       - specs/interfaces/agentic.task_graph.v0.idl
@@ -447,6 +457,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects network-attested oversight binding, multi-jurisdiction reviewer quorum, plus Federation/Heritage governance routing for cognitive audit follow-up.
+  - priority: P1
+    kind: eval
+    file: evals/cognitive/cognitive_audit_verifier_transport.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the actual non-loopback verifier transport binding used by cognitive audit governance reviewer quorum.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.ethics.v0.idl
