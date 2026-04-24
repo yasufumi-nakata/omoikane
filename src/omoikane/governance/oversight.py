@@ -66,6 +66,14 @@ VERIFIER_NETWORK_ENDPOINTS = {
         "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v1",
         "freshness_window_seconds": 900,
         "max_observed_latency_ms": 250.0,
+    },
+    "verifier://guardian-oversight.us": {
+        "supported_jurisdictions": ("US-CA",),
+        "authority_chain_ref": "authority://guardian-oversight.us/reviewer-attestation",
+        "trust_root_ref": "root://guardian-oversight.us/reviewer-live-pki",
+        "trust_root_digest": "sha256:guardian-oversight-us-reviewer-live-pki-v1",
+        "freshness_window_seconds": 900,
+        "max_observed_latency_ms": 275.0,
     }
 }
 DEFAULT_GUARDIAN_AGENT_BY_ROLE = {
@@ -610,6 +618,7 @@ class ReviewerBinding:
     verifier_ref: str
     challenge_digest: str
     transport_profile: str
+    jurisdiction: str
     jurisdiction_bundle_ref: str
     jurisdiction_bundle_digest: str
     legal_execution_id: str
@@ -637,6 +646,7 @@ class ReviewerBinding:
         self.challenge_digest = _normalize_non_empty(self.challenge_digest, "challenge_digest")
         if self.transport_profile not in VERIFICATION_TRANSPORT_PROFILES:
             raise ValueError(f"unsupported transport_profile: {self.transport_profile}")
+        self.jurisdiction = _normalize_non_empty(self.jurisdiction, "jurisdiction")
         self.jurisdiction_bundle_ref = _normalize_non_empty(
             self.jurisdiction_bundle_ref,
             "jurisdiction_bundle_ref",
@@ -1193,6 +1203,7 @@ class OversightService:
                 verifier_ref=verification.verifier_ref,
                 challenge_digest=verification.challenge_digest,
                 transport_profile=verification.transport_profile,
+                jurisdiction=verification.jurisdiction_bundle.jurisdiction,
                 jurisdiction_bundle_ref=verification.jurisdiction_bundle.package_ref,
                 jurisdiction_bundle_digest=verification.jurisdiction_bundle.package_digest,
                 legal_execution_id=verification.legal_execution.execution_id,

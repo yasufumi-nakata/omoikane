@@ -61,7 +61,8 @@ bounded Council review に束ねられ、continuity-safe な follow-up を返す
 network-attested reviewer quorum と Federation / Heritage returned result が
 cognitive audit follow-up に束縛され、
 review preserve / boundary preserve / human governance escalation を
-deterministic に切り替えられること。
+deterministic に切り替えられること。reviewer quorum は JP-13 / US-CA の
+multi-jurisdiction legal execution binding を満たすこと。
 
 ### Yaoyorozu Local Worker Dispatch
 repo-local `agents/` から選んだ builder handoff が

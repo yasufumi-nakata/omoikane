@@ -5,6 +5,7 @@ capabilities:
   - identity.veto
   - identity.escalate
   - identity.confirmation.review
+  - cognitive_audit.multi_jurisdiction_review
 trust_floor: 0.99
 input_schema_ref: specs/schemas/identity_confirmation_profile.schema
 output_schema_ref: specs/schemas/identity_confirmation_profile.schema
@@ -15,5 +16,6 @@ when_to_invoke: |
   - Fork / Terminate 提案時
   - Identity Confirmation Test 失敗時
   - Active 遷移前の identity_confirmation_profile witness quorum 確認時
+  - cognitive audit follow-up が JP-13 / US-CA など複数法域 reviewer quorum を満たすか確認する時
 when_not_to_invoke: |
   - 通常の SelfModel 更新

@@ -286,7 +286,7 @@ entries:
       - reference-runtime
       - docs/02-subsystems/agentic/cognitive-audit-loop.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to serialize one governance-bound cognitive audit follow-up with distributed council verdicts and network-attested oversight evidence.
+    rationale: Required to serialize one governance-bound cognitive audit follow-up with distributed council verdicts, network-attested oversight evidence, and multi-jurisdiction reviewer legal execution binding.
   - priority: P1
     kind: schema
     file: specs/schemas/task_node.schema
@@ -416,7 +416,7 @@ entries:
       - docs/02-subsystems/agentic/cognitive-audit-loop.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make cognitive audit follow-up binding across oversight, Federation, and Heritage review machine-readable.
+    rationale: Required to make cognitive audit follow-up binding across oversight, Federation, Heritage review, and multi-jurisdiction reviewer quorum machine-readable.
   - priority: P1
     kind: eval
     file: evals/agentic/consensus_bus_delivery_guard.yaml
@@ -437,7 +437,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects network-attested oversight binding plus Federation/Heritage governance routing for cognitive audit follow-up.
+    rationale: Protects network-attested oversight binding, multi-jurisdiction reviewer quorum, plus Federation/Heritage governance routing for cognitive audit follow-up.
   - priority: P1
     kind: idl
     file: specs/interfaces/kernel.ethics.v0.idl

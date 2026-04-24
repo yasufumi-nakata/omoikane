@@ -22,6 +22,7 @@ required:
   - oversight_event_ref
   - reviewer_binding_count
   - network_receipt_ids
+  - jurisdiction_review_profile
   - continuity_guard
   - digest
 properties:
@@ -45,6 +46,8 @@ properties:
       - max_distributed_verdicts
       - required_oversight_status
       - required_network_receipt_for_review
+      - jurisdiction_review_profile_id
+      - required_jurisdiction_quorum
       - conflict_action
       - heritage_veto_action
       - raw_payload_policy
@@ -68,6 +71,10 @@ properties:
         const: satisfied
       required_network_receipt_for_review:
         const: true
+      jurisdiction_review_profile_id:
+        const: cognitive-audit-multi-jurisdiction-review-v1
+      required_jurisdiction_quorum:
+        const: 2
       conflict_action:
         const: escalate-to-human-governance
       heritage_veto_action:
@@ -170,6 +177,64 @@ properties:
     items:
       type: string
       pattern: "^verifier-network-receipt-[a-f0-9]{12}$"
+  jurisdiction_review_profile:
+    type: object
+    additionalProperties: false
+    required:
+      - profile_id
+      - required_jurisdiction_quorum
+      - reviewer_jurisdiction_count
+      - jurisdictions
+      - legal_policy_refs
+      - jurisdiction_bundle_refs
+      - legal_execution_ids
+      - network_receipt_count
+      - reviewer_binding_digest
+      - multi_jurisdiction_quorum_met
+    properties:
+      profile_id:
+        const: cognitive-audit-multi-jurisdiction-review-v1
+      required_jurisdiction_quorum:
+        const: 2
+      reviewer_jurisdiction_count:
+        type: integer
+        minimum: 2
+      jurisdictions:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      legal_policy_refs:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^policy://"
+      jurisdiction_bundle_refs:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      legal_execution_ids:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      network_receipt_count:
+        type: integer
+        minimum: 2
+      reviewer_binding_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      multi_jurisdiction_quorum_met:
+        const: true
   continuity_guard:
     type: object
     additionalProperties: false
@@ -178,6 +243,7 @@ properties:
       - distributed_refs_present
       - oversight_quorum_satisfied
       - network_receipts_bound
+      - multi_jurisdiction_review_bound
       - no_raw_payload_exposed
       - conflict_detected
     properties:
@@ -188,6 +254,8 @@ properties:
       oversight_quorum_satisfied:
         const: true
       network_receipts_bound:
+        const: true
+      multi_jurisdiction_review_bound:
         const: true
       no_raw_payload_exposed:
         const: true
@@ -208,6 +276,8 @@ examples:
       max_distributed_verdicts: 2
       required_oversight_status: satisfied
       required_network_receipt_for_review: true
+      jurisdiction_review_profile_id: cognitive-audit-multi-jurisdiction-review-v1
+      required_jurisdiction_quorum: 2
       conflict_action: escalate-to-human-governance
       heritage_veto_action: preserve-boundary
       raw_payload_policy: digest-and-ref-only
@@ -243,11 +313,31 @@ examples:
     network_receipt_ids:
       - verifier-network-receipt-0123456789ab
       - verifier-network-receipt-89abcdef0123
+    jurisdiction_review_profile:
+      profile_id: cognitive-audit-multi-jurisdiction-review-v1
+      required_jurisdiction_quorum: 2
+      reviewer_jurisdiction_count: 2
+      jurisdictions:
+        - JP-13
+        - US-CA
+      legal_policy_refs:
+        - policy://guardian-oversight/jp-13/reviewer-attestation/v1
+        - policy://guardian-oversight/us-ca/reviewer-attestation/v1
+      jurisdiction_bundle_refs:
+        - legal://jp-13/cognitive-audit/v1
+        - legal://us-ca/cognitive-audit/v1
+      legal_execution_ids:
+        - legal-execution-0123456789ab
+        - legal-execution-89abcdef0123
+      network_receipt_count: 2
+      reviewer_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      multi_jurisdiction_quorum_met: true
     continuity_guard:
       local_resolution_preserved: true
       distributed_refs_present: true
       oversight_quorum_satisfied: true
       network_receipts_bound: true
+      multi_jurisdiction_review_bound: true
       no_raw_payload_exposed: true
       conflict_detected: true
     digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

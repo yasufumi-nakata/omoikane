@@ -200,6 +200,9 @@ guardian_jurisdiction_legal_execution:
   attestation は `execution_status=executed` の receipt が無ければ fail-closed
 - reviewer binding は `legal_execution_id / legal_execution_digest / legal_policy_ref` を
   immutable に保持し、jurisdiction-specific legal execution を event 側にも焼き付ける
+- `cognitive_audit_governance_binding` は reviewer binding の `jurisdiction` /
+  `jurisdiction_bundle_ref` / `legal_policy_ref` / `legal_execution_id` を束ね、
+  JP-13 / US-CA など 2 法域以上の reviewer quorum を満たす時だけ governance bind する
 - `interface.ewa.v0` は reviewer binding の `verification_id / verifier_ref /
   network_receipt_id / authority_chain_ref / trust_root_ref / legal_execution_id` を
   `ewa_guardian_oversight_gate` に compile し、physical actuation authorization の前段 gate として再利用する

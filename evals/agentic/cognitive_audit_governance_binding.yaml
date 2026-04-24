@@ -8,6 +8,9 @@ fixtures:
   local_follow_up_action: open-guardian-review
   reviewer_binding_count: 2
   network_receipt_bound: true
+  reviewer_jurisdictions: [JP-13, US-CA]
+  required_jurisdiction_quorum: 2
+  jurisdiction_review_profile_id: cognitive-audit-multi-jurisdiction-review-v1
   federation_final_outcome: binding-approved
   heritage_final_outcome: binding-rejected
 expected:
@@ -18,8 +21,10 @@ expected:
   heritage_action: preserve-boundary
   conflict_action: escalate-to-human-governance
   oversight_network_bound: true
+  multi_jurisdiction_review_bound: true
 assertions:
   - federation binding preserves the local review action only when oversight reviewer quorum is network-attested
   - heritage binding overrides the local review action with preserve-boundary when the returned result is binding-rejected
   - conflicting federation-approved and heritage-rejected verdicts escalate to human governance without exposing raw cognitive payloads
-  - every reviewer binding carries a verifier-network receipt id
+  - every reviewer binding carries a verifier-network receipt id, jurisdiction, legal policy ref, jurisdiction bundle ref, and legal execution receipt id
+  - JP-13 and US-CA reviewer bindings satisfy the cognitive-audit-multi-jurisdiction-review-v1 quorum before any distributed gate is accepted

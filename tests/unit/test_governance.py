@@ -149,7 +149,7 @@ class OversightServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported verifier network endpoint"):
             service.verify_reviewer_from_network(
                 "reviewer-unknown-endpoint",
-                verifier_ref="verifier://guardian-oversight.us/reviewer-unknown-endpoint",
+                verifier_ref="verifier://guardian-oversight.eu/reviewer-unknown-endpoint",
                 challenge_ref="challenge://guardian-oversight/reviewer-unknown-endpoint/2026-04-20T02:10:00Z",
                 challenge_digest="sha256:reviewer-unknown-endpoint-live-proof",
                 jurisdiction_bundle_ref="legal://jp-13/guardian-oversight/v1",

@@ -278,7 +278,9 @@ guardian-review metacognition report を 1 つの bounded Council review に束�
 
 `cognitive-audit-governance-demo` は cognitive audit governance binding の
 reference contract (`agentic.cognitive_audit_governance.v0`) を JSON で可視化し、
-network-attested reviewer quorum を持つ `guardian-oversight` event と、
+network-attested reviewer quorum と
+`cognitive-audit-multi-jurisdiction-review-v1` の
+JP-13 / US-CA 法域 quorum を持つ `guardian-oversight` event と、
 Federation の `binding-approved` returned result、
 Heritage の `binding-rejected` returned result を
 同一 cognitive audit follow-up に束ねつつ、

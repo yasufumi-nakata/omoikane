@@ -1417,6 +1417,8 @@ class CliIntegrationTests(unittest.TestCase):
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["all_bindings_valid"])
         self.assertTrue(result["validation"]["oversight_network_bound"])
+        self.assertTrue(result["validation"]["multi_jurisdiction_review_bound"])
+        self.assertEqual(["JP-13", "US-CA"], result["validation"]["reviewer_jurisdictions"])
         self.assertEqual(
             "federation-attested-review",
             result["bindings"]["federation"]["execution_gate"],

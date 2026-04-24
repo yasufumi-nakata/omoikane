@@ -1537,6 +1537,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["validation"]["all_bindings_valid"])
         self.assertTrue(result["validation"]["oversight_network_bound"])
+        self.assertTrue(result["validation"]["multi_jurisdiction_review_bound"])
+        self.assertEqual(["JP-13", "US-CA"], result["validation"]["reviewer_jurisdictions"])
         self.assertTrue(result["validation"]["federation_gate_preserves_review"])
         self.assertTrue(result["validation"]["heritage_gate_preserves_boundary"])
         self.assertTrue(result["validation"]["conflict_escalates_human_governance"])

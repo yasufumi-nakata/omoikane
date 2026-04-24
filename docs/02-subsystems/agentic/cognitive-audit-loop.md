@@ -70,6 +70,10 @@ reference runtime では trigger を最大 4 件までに固定し、
 - local `cognitive_audit_resolution`
 - optional Federation / Heritage `distributed_council_resolution`
 - network-attested `guardian_oversight` reviewer binding
+- `cognitive-audit-multi-jurisdiction-review-v1`
+  - reviewer jurisdictions: at least 2
+  - required legal policy refs / jurisdiction bundle refs / legal execution ids
+  - reviewer binding digest instead of raw credential or legal payload
 - `execution_gate`
   - `oversight-attested-local`
   - `federation-attested-review`
@@ -88,8 +92,9 @@ reference runtime では trigger を最大 4 件までに固定し、
 4. follow-up artifact は raw sensory embedding や private metacognition note を含まない
 5. `abrupt_change` を含む監査は `continue-monitoring` で閉じない
 6. `open-guardian-review` / `activate-containment` は network-bound reviewer receipt を持つ oversight event なしでは governance bind できない
-7. Heritage `binding-rejected` returned result は local review action より優先して `preserve-boundary` に落とす
-8. Federation `binding-approved` と Heritage `binding-rejected` が同時に来た時は human governance へ escalate する
+7. cognitive audit governance binding は少なくとも 2 法域の reviewer legal execution と jurisdiction bundle を束ねる
+8. Heritage `binding-rejected` returned result は local review action より優先して `preserve-boundary` に落とす
+9. Federation `binding-approved` と Heritage `binding-rejected` が同時に来た時は human governance へ escalate する
 
 ## Reference Runtime
 
@@ -101,6 +106,7 @@ reference runtime では trigger を最大 4 件までに固定し、
   - `cognitive.audit.resolved` ledger entry
 - `cognitive-audit-governance-demo --json`
   - `cognitive.audit.resolved` を起点に reviewer verifier-network receipt を持つ oversight attestation
+  - JP-13 / US-CA の multi-jurisdiction reviewer quorum と legal execution binding
   - Federation returned result による review preserve
   - Heritage returned result による boundary preserve
   - Federation / Heritage conflict 時の human governance escalation

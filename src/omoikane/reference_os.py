@@ -2978,7 +2978,7 @@ json.dump(response, sys.stdout)
             credential_id="credential-cognitive-beta",
             attestation_type="institutional-badge",
             proof_ref="proof://cognitive-audit/reviewer-beta/v1",
-            jurisdiction="JP-13",
+            jurisdiction="US-CA",
             valid_until="2027-04-20T00:00:00+00:00",
             liability_mode="joint",
             legal_ack_ref="legal://cognitive-audit/reviewer-beta/v1",
@@ -2998,11 +2998,11 @@ json.dump(response, sys.stdout)
         )
         reviewer_beta = self.oversight.verify_reviewer_from_network(
             reviewer_beta["reviewer_id"],
-            verifier_ref="verifier://guardian-oversight.jp/reviewer-cognitive-beta",
+            verifier_ref="verifier://guardian-oversight.us/reviewer-cognitive-beta",
             challenge_ref="challenge://cognitive-audit/reviewer-beta/2026-04-20T03:05:00Z",
             challenge_digest="sha256:cognitive-audit-reviewer-beta-20260420",
-            jurisdiction_bundle_ref="legal://jp-13/cognitive-audit/v1",
-            jurisdiction_bundle_digest="sha256:jp13-cognitive-audit-v1",
+            jurisdiction_bundle_ref="legal://us-ca/cognitive-audit/v1",
+            jurisdiction_bundle_digest="sha256:usca-cognitive-audit-v1",
             verified_at="2026-04-20T03:05:00+00:00",
             valid_until="2026-10-20T00:00:00+00:00",
         )
@@ -3210,6 +3210,17 @@ json.dump(response, sys.stdout)
                 "oversight_network_bound": all(
                     binding["network_receipt_id"] for binding in oversight_event["reviewer_bindings"]
                 ),
+                "multi_jurisdiction_review_bound": all(
+                    validation["multi_jurisdiction_review_bound"]
+                    for validation in (
+                        federation_validation,
+                        heritage_validation,
+                        conflict_validation,
+                    )
+                ),
+                "reviewer_jurisdictions": conflict_binding["jurisdiction_review_profile"][
+                    "jurisdictions"
+                ],
                 "federation_gate_preserves_review": (
                     federation_binding["execution_gate"] == "federation-attested-review"
                     and federation_binding["final_follow_up_action"] == "open-guardian-review"

@@ -89,6 +89,7 @@ properties:
         - verifier_ref
         - challenge_digest
         - transport_profile
+        - jurisdiction
         - jurisdiction_bundle_ref
         - jurisdiction_bundle_digest
         - legal_execution_id
@@ -129,6 +130,9 @@ properties:
           type: string
           enum:
             - reviewer-live-proof-bridge-v1
+        jurisdiction:
+          type: string
+          minLength: 1
         jurisdiction_bundle_ref:
           type: string
           minLength: 1
@@ -228,6 +232,7 @@ examples:
         verifier_ref: verifier://guardian-oversight.jp/reviewer-alpha
         challenge_digest: sha256:alpha-proof-bridge-20260419
         transport_profile: reviewer-live-proof-bridge-v1
+        jurisdiction: JP-13
         jurisdiction_bundle_ref: legal://jp-13/guardian-oversight/v1
         jurisdiction_bundle_digest: sha256:jp13-guardian-oversight-v1
         legal_execution_id: legal-execution-0123456789ab

@@ -95,6 +95,12 @@ operations:
                   required:
                     - reviewer_id
                     - network_receipt_id
+                    - jurisdiction
+                    - legal_policy_ref
+                    - jurisdiction_bundle_ref
+                    - jurisdiction_bundle_digest
+                    - legal_execution_id
+                    - legal_execution_digest
                   properties:
                     reviewer_id:
                       type: string
@@ -102,10 +108,29 @@ operations:
                     network_receipt_id:
                       type: string
                       pattern: "^verifier-network-receipt-[a-f0-9]{12}$"
+                    jurisdiction:
+                      type: string
+                      minLength: 1
+                    legal_policy_ref:
+                      type: string
+                      pattern: "^policy://"
+                    jurisdiction_bundle_ref:
+                      type: string
+                      minLength: 1
+                    jurisdiction_bundle_digest:
+                      type: string
+                      minLength: 1
+                    legal_execution_id:
+                      type: string
+                      minLength: 1
+                    legal_execution_digest:
+                      type: string
+                      minLength: 1
     output:
       schema_ref: cognitive_audit_governance_binding
     guarantees:
       - open-guardian-review and activate-containment require network-bound oversight evidence
+      - reviewer bindings must cover at least two jurisdictions, legal policy refs, jurisdiction bundle refs, and legal execution receipts before governance binding is accepted
       - heritage binding-rejected verdict overrides the local follow-up with preserve-boundary
       - conflicting federation-approved and heritage-rejected verdicts escalate to human governance
   validate_binding:
@@ -127,6 +152,7 @@ operations:
           - final_follow_up_action
           - distributed_verdict_count
           - oversight_network_bound
+          - multi_jurisdiction_review_bound
           - errors
         properties:
           ok:
@@ -139,6 +165,8 @@ operations:
             type: integer
             minimum: 0
           oversight_network_bound:
+            type: boolean
+          multi_jurisdiction_review_bound:
             type: boolean
           errors:
             type: array

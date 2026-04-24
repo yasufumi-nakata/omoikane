@@ -4148,10 +4148,26 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
             "reviewer_bindings": [
                 {
                     "reviewer_id": "human-reviewer-alpha",
+                    "jurisdiction": "JP-13",
+                    "jurisdiction_bundle_ref": "legal://jp-13/cognitive-audit/v1",
+                    "jurisdiction_bundle_digest": "sha256:jp13-cognitive-audit-v1",
+                    "legal_execution_id": "legal-execution-0123456789ab",
+                    "legal_execution_digest": (
+                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                    ),
+                    "legal_policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
                     "network_receipt_id": "verifier-network-receipt-0123456789ab",
                 },
                 {
                     "reviewer_id": "human-reviewer-beta",
+                    "jurisdiction": "US-CA",
+                    "jurisdiction_bundle_ref": "legal://us-ca/cognitive-audit/v1",
+                    "jurisdiction_bundle_digest": "sha256:usca-cognitive-audit-v1",
+                    "legal_execution_id": "legal-execution-89abcdef0123",
+                    "legal_execution_digest": (
+                        "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567"
+                    ),
+                    "legal_policy_ref": "policy://guardian-oversight/us-ca/reviewer-attestation/v1",
                     "network_receipt_id": "verifier-network-receipt-89abcdef0123",
                 },
             ],
@@ -4185,6 +4201,31 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertEqual("open-guardian-review", binding["final_follow_up_action"])
         self.assertEqual(1, validation["distributed_verdict_count"])
         self.assertTrue(validation["oversight_network_bound"])
+        self.assertTrue(validation["multi_jurisdiction_review_bound"])
+        self.assertEqual(
+            ["JP-13", "US-CA"],
+            binding["jurisdiction_review_profile"]["jurisdictions"],
+        )
+
+    def test_governance_binding_requires_multi_jurisdiction_reviewer_quorum(self) -> None:
+        service = CognitiveAuditGovernanceService()
+        record, resolution = self._build_record_and_resolution()
+        oversight_event = self._oversight_event()
+        oversight_event["reviewer_bindings"][1]["jurisdiction"] = "JP-13"
+        oversight_event["reviewer_bindings"][1][
+            "legal_policy_ref"
+        ] = "policy://guardian-oversight/jp-13/reviewer-attestation/v1"
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "multi-jurisdiction reviewer quorum",
+        ):
+            service.bind_governance(
+                record,
+                resolution,
+                distributed_resolutions=[],
+                oversight_event=oversight_event,
+            )
 
     def test_governance_binding_escalates_conflicting_distributed_verdicts(self) -> None:
         service = CognitiveAuditGovernanceService()
@@ -4223,6 +4264,7 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertEqual("distributed-conflict-human-escalation", binding["execution_gate"])
         self.assertEqual("escalate-to-human-governance", binding["final_follow_up_action"])
         self.assertTrue(binding["continuity_guard"]["conflict_detected"])
+        self.assertTrue(binding["continuity_guard"]["multi_jurisdiction_review_bound"])
         self.assertEqual(2, validation["distributed_verdict_count"])
 
 

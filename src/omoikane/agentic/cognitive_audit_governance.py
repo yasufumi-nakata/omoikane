@@ -24,6 +24,10 @@ COGNITIVE_AUDIT_ALLOWED_EXECUTION_GATES = {
 }
 COGNITIVE_AUDIT_ALLOWED_COUNCIL_TIERS = {"federation", "heritage"}
 COGNITIVE_AUDIT_MAX_DISTRIBUTED_VERDICTS = 2
+COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID = (
+    "cognitive-audit-multi-jurisdiction-review-v1"
+)
+COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM = 2
 
 
 def _binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
@@ -40,6 +44,7 @@ def _binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
         "oversight_event_ref": binding["oversight_event_ref"],
         "reviewer_binding_count": binding["reviewer_binding_count"],
         "network_receipt_ids": binding["network_receipt_ids"],
+        "jurisdiction_review_profile": binding["jurisdiction_review_profile"],
         "continuity_guard": binding["continuity_guard"],
     }
 
@@ -71,6 +76,8 @@ class CognitiveAuditGovernanceService:
             "max_distributed_verdicts": COGNITIVE_AUDIT_MAX_DISTRIBUTED_VERDICTS,
             "required_oversight_status": "satisfied",
             "required_network_receipt_for_review": True,
+            "jurisdiction_review_profile_id": COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID,
+            "required_jurisdiction_quorum": COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM,
             "conflict_action": "escalate-to-human-governance",
             "heritage_veto_action": "preserve-boundary",
             "raw_payload_policy": "digest-and-ref-only",
@@ -159,11 +166,15 @@ class CognitiveAuditGovernanceService:
             "oversight_event_ref": normalized_oversight["event_id"],
             "reviewer_binding_count": normalized_oversight["reviewer_binding_count"],
             "network_receipt_ids": normalized_oversight["network_receipt_ids"],
+            "jurisdiction_review_profile": normalized_oversight["jurisdiction_review_profile"],
             "continuity_guard": {
                 "local_resolution_preserved": True,
                 "distributed_refs_present": bool(distributed_verdicts),
                 "oversight_quorum_satisfied": True,
                 "network_receipts_bound": normalized_oversight["network_bound"],
+                "multi_jurisdiction_review_bound": normalized_oversight[
+                    "jurisdiction_review_profile"
+                ]["multi_jurisdiction_quorum_met"],
                 "no_raw_payload_exposed": True,
                 "conflict_detected": conflict_detected,
             },
@@ -178,6 +189,7 @@ class CognitiveAuditGovernanceService:
         distributed_verdicts = binding.get("distributed_verdicts", [])
         continuity_guard = binding.get("continuity_guard", {})
         network_receipt_ids = binding.get("network_receipt_ids", [])
+        jurisdiction_review_profile = binding.get("jurisdiction_review_profile", {})
 
         if binding.get("kind") != "cognitive_audit_governance_binding":
             errors.append("kind must equal cognitive_audit_governance_binding")
@@ -185,6 +197,16 @@ class CognitiveAuditGovernanceService:
             errors.append("schema_version mismatch")
         if binding.get("policy", {}).get("policy_id") != COGNITIVE_AUDIT_GOVERNANCE_POLICY_ID:
             errors.append("policy.policy_id mismatch")
+        if (
+            binding.get("policy", {}).get("jurisdiction_review_profile_id")
+            != COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID
+        ):
+            errors.append("policy.jurisdiction_review_profile_id mismatch")
+        if (
+            binding.get("policy", {}).get("required_jurisdiction_quorum")
+            != COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM
+        ):
+            errors.append("policy.required_jurisdiction_quorum mismatch")
         if execution_gate not in COGNITIVE_AUDIT_ALLOWED_EXECUTION_GATES:
             errors.append("execution_gate invalid")
         if final_follow_up_action not in COGNITIVE_AUDIT_ALLOWED_FOLLOW_UP_ACTIONS:
@@ -204,8 +226,31 @@ class CognitiveAuditGovernanceService:
             errors.append("continuity_guard.oversight_quorum_satisfied must be true")
         if not continuity_guard.get("network_receipts_bound"):
             errors.append("continuity_guard.network_receipts_bound must be true")
+        if not continuity_guard.get("multi_jurisdiction_review_bound"):
+            errors.append("continuity_guard.multi_jurisdiction_review_bound must be true")
         if continuity_guard.get("no_raw_payload_exposed") is not True:
             errors.append("continuity_guard.no_raw_payload_exposed must be true")
+        if not isinstance(jurisdiction_review_profile, Mapping):
+            errors.append("jurisdiction_review_profile must be a mapping")
+        else:
+            if (
+                jurisdiction_review_profile.get("profile_id")
+                != COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID
+            ):
+                errors.append("jurisdiction_review_profile.profile_id mismatch")
+            if (
+                jurisdiction_review_profile.get("required_jurisdiction_quorum")
+                != COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM
+            ):
+                errors.append("jurisdiction_review_profile.required_jurisdiction_quorum mismatch")
+            if jurisdiction_review_profile.get("reviewer_jurisdiction_count", 0) < (
+                COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM
+            ):
+                errors.append("jurisdiction_review_profile reviewer jurisdiction quorum not met")
+            if jurisdiction_review_profile.get("multi_jurisdiction_quorum_met") is not True:
+                errors.append("jurisdiction_review_profile.multi_jurisdiction_quorum_met must be true")
+            if jurisdiction_review_profile.get("network_receipt_count") != len(network_receipt_ids):
+                errors.append("jurisdiction_review_profile.network_receipt_count mismatch")
 
         tiers = [verdict.get("council_tier") for verdict in distributed_verdicts]
         if len(tiers) != len(set(tiers)):
@@ -249,6 +294,12 @@ class CognitiveAuditGovernanceService:
             "distributed_verdict_count": len(distributed_verdicts),
             "oversight_network_bound": bool(network_receipt_ids)
             and continuity_guard.get("network_receipts_bound") is True,
+            "multi_jurisdiction_review_bound": continuity_guard.get(
+                "multi_jurisdiction_review_bound"
+            )
+            is True
+            and isinstance(jurisdiction_review_profile, Mapping)
+            and jurisdiction_review_profile.get("multi_jurisdiction_quorum_met") is True,
             "errors": errors,
         }
 
@@ -270,11 +321,96 @@ class CognitiveAuditGovernanceService:
         )
         if len(network_receipt_ids) != len(reviewer_bindings):
             raise ValueError("each reviewer binding must carry one network_receipt_id")
+        jurisdiction_review_profile = self._build_jurisdiction_review_profile(reviewer_bindings)
         return {
             "event_id": event_id,
             "reviewer_binding_count": len(reviewer_bindings),
             "network_receipt_ids": network_receipt_ids,
             "network_bound": len(network_receipt_ids) == len(reviewer_bindings),
+            "jurisdiction_review_profile": jurisdiction_review_profile,
+        }
+
+    def _build_jurisdiction_review_profile(
+        self,
+        reviewer_bindings: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        normalized_bindings: List[Dict[str, Any]] = []
+        jurisdictions: List[str] = []
+        legal_policy_refs: List[str] = []
+        jurisdiction_bundle_refs: List[str] = []
+        legal_execution_ids: List[str] = []
+        network_receipt_ids: List[str] = []
+        for binding in reviewer_bindings:
+            reviewer_id = _non_empty_string(
+                binding.get("reviewer_id"),
+                "oversight_event.reviewer_bindings[].reviewer_id",
+            )
+            jurisdiction = _non_empty_string(
+                binding.get("jurisdiction"),
+                "oversight_event.reviewer_bindings[].jurisdiction",
+            )
+            legal_policy_ref = _non_empty_string(
+                binding.get("legal_policy_ref"),
+                "oversight_event.reviewer_bindings[].legal_policy_ref",
+            )
+            jurisdiction_bundle_ref = _non_empty_string(
+                binding.get("jurisdiction_bundle_ref"),
+                "oversight_event.reviewer_bindings[].jurisdiction_bundle_ref",
+            )
+            jurisdiction_bundle_digest = _non_empty_string(
+                binding.get("jurisdiction_bundle_digest"),
+                "oversight_event.reviewer_bindings[].jurisdiction_bundle_digest",
+            )
+            legal_execution_id = _non_empty_string(
+                binding.get("legal_execution_id"),
+                "oversight_event.reviewer_bindings[].legal_execution_id",
+            )
+            legal_execution_digest = _non_empty_string(
+                binding.get("legal_execution_digest"),
+                "oversight_event.reviewer_bindings[].legal_execution_digest",
+            )
+            network_receipt_id = _non_empty_string(
+                binding.get("network_receipt_id"),
+                "oversight_event.reviewer_bindings[].network_receipt_id",
+            )
+            if jurisdiction not in jurisdictions:
+                jurisdictions.append(jurisdiction)
+            if legal_policy_ref not in legal_policy_refs:
+                legal_policy_refs.append(legal_policy_ref)
+            if jurisdiction_bundle_ref not in jurisdiction_bundle_refs:
+                jurisdiction_bundle_refs.append(jurisdiction_bundle_ref)
+            if legal_execution_id not in legal_execution_ids:
+                legal_execution_ids.append(legal_execution_id)
+            if network_receipt_id not in network_receipt_ids:
+                network_receipt_ids.append(network_receipt_id)
+            normalized_bindings.append(
+                {
+                    "reviewer_id": reviewer_id,
+                    "jurisdiction": jurisdiction,
+                    "legal_policy_ref": legal_policy_ref,
+                    "jurisdiction_bundle_ref": jurisdiction_bundle_ref,
+                    "jurisdiction_bundle_digest": jurisdiction_bundle_digest,
+                    "legal_execution_id": legal_execution_id,
+                    "legal_execution_digest": legal_execution_digest,
+                    "network_receipt_id": network_receipt_id,
+                }
+            )
+        multi_jurisdiction_quorum_met = (
+            len(jurisdictions) >= COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM
+        )
+        if not multi_jurisdiction_quorum_met:
+            raise ValueError("cognitive audit governance requires multi-jurisdiction reviewer quorum")
+        return {
+            "profile_id": COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID,
+            "required_jurisdiction_quorum": COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM,
+            "reviewer_jurisdiction_count": len(jurisdictions),
+            "jurisdictions": jurisdictions,
+            "legal_policy_refs": legal_policy_refs,
+            "jurisdiction_bundle_refs": jurisdiction_bundle_refs,
+            "legal_execution_ids": legal_execution_ids,
+            "network_receipt_count": len(network_receipt_ids),
+            "reviewer_binding_digest": sha256_text(canonical_json(normalized_bindings)),
+            "multi_jurisdiction_quorum_met": multi_jurisdiction_quorum_met,
         }
 
     def _normalize_distributed_resolutions(
