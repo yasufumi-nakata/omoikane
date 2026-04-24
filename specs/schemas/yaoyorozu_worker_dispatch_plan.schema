@@ -196,6 +196,8 @@ properties:
       - source_bound_worker_count
       - guardian_preseed_gate_count
       - external_preseed_gate_count
+      - guardian_preseed_oversight_event_count
+      - external_preseed_oversight_satisfied_count
       - runtime_exec_ready
     properties:
       required_worker_count:
@@ -278,6 +280,12 @@ properties:
       external_preseed_gate_count:
         type: integer
         minimum: 0
+      guardian_preseed_oversight_event_count:
+        type: integer
+        minimum: 0
+      external_preseed_oversight_satisfied_count:
+        type: integer
+        minimum: 0
       runtime_exec_ready:
         type: boolean
   validation:
@@ -293,6 +301,8 @@ properties:
       - guardian_preseed_gate_bound
       - external_preseed_gate_required
       - all_external_preseed_gates_ready
+      - guardian_preseed_oversight_bound
+      - all_external_preseed_oversight_satisfied
       - profile_policy_ready
       - ok
     properties:
@@ -313,6 +323,10 @@ properties:
       external_preseed_gate_required:
         type: boolean
       all_external_preseed_gates_ready:
+        const: true
+      guardian_preseed_oversight_bound:
+        const: true
+      all_external_preseed_oversight_satisfied:
         const: true
       profile_policy_ready:
         const: true

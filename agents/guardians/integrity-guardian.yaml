@@ -5,6 +5,7 @@ capabilities:
   - integrity.check
   - rollback.trigger
   - workspace.preseed.attest
+  - workspace.preseed.oversight-bind
 trust_floor: 0.99
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
@@ -12,6 +13,6 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - builder staged rollout の regression を rollback 実行へ落とす時
-  - Yaoyorozu external workspace seed / execution root 作成前の integrity gate
+  - Yaoyorozu external workspace seed / execution root 作成前の HumanOversightChannel-bound integrity gate
 when_not_to_invoke: |
   - 設計議論

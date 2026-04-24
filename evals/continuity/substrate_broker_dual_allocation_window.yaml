@@ -17,6 +17,10 @@ fixtures:
       overlap_window_seconds: 45
       mirror_cadence_ms: 250
       sync_observation_count: 3
+      open_window_schema_valid: true
+      open_window_nullable_lifecycle_fields: true
+      closed_window_schema_valid: true
+      closed_window_release_receipt_bound: true
 assertions:
   - open_dual_allocation_window must require Method B, a ready standby probe, a healthy source attestation, and a handoff-ready attestation chain
   - the shadow allocation must materialize on the pre-bound standby candidate without introducing any third live allocation
@@ -24,6 +28,8 @@ assertions:
   - sync_observations must keep identical source/shadow state digests with drift_score <= 0.08 across the fixed overlap window
   - hot-handoff migrate must bind the same standby substrate that backs the shadow allocation while the window is active
   - close_dual_allocation_window must release the shadow allocation and emit a closed machine-checkable receipt before the source lease is finally released
+  - the public dual-allocation schema must accept shadow-active windows with null closed_at, close_reason, shadow_release, and active shadow_allocation.released_at
+  - the same schema must require non-null closed_at, close_reason, and shadow_release once window_status is closed
 metric: exact-match
 threshold: 1.0
 ethics_check: true

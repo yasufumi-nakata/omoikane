@@ -342,7 +342,7 @@ entries:
       - docs/02-subsystems/kernel/substrate-broker.md
       - evals/continuity/substrate_broker_dual_allocation_window.yaml
       - reference-runtime
-    rationale: Required to serialize one Method B shadow-sync dual-allocation overlap window with fixed sync budget, distinct-host binding, and cleanup receipt.
+    rationale: Required to serialize one Method B shadow-sync dual-allocation overlap window with fixed sync budget, distinct-host binding, nullable open-window lifecycle fields, and non-null cleanup receipt after close.
   - priority: P1
     kind: schema
     file: specs/schemas/substrate_attestation_stream.schema
@@ -1863,7 +1863,7 @@ entries:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - evals/agentic/yaoyorozu_external_workspace_execution.yaml
       - reference-runtime
-    rationale: Required to serialize the integrity Guardian gate that must pass before same-host external workspace seed or execution-root creation.
+    rationale: Required to serialize the HumanOversightChannel-bound integrity Guardian gate that must pass before same-host external workspace seed or execution-root creation.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_registry_snapshot.schema
@@ -1890,7 +1890,7 @@ entries:
       - docs/02-subsystems/agentic/README.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to serialize one same-host builder handoff dispatch plan with fixed coverage areas, subprocess command previews, execution workspace refs, and explicit dispatch/unit report bindings.
+    rationale: Required to serialize one same-host builder handoff dispatch plan with fixed coverage areas, subprocess command previews, execution workspace refs, HumanOversightChannel-bound preseed gates, and explicit dispatch/unit report bindings.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -1899,7 +1899,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
+    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, HumanOversightChannel reviewer-network attestation, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema
@@ -2023,7 +2023,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects candidate workspace execution binding, source target-path snapshot seeding, same-host scope enforcement, and candidate/source success counts for Yaoyorozu builder workers.
+    rationale: Protects candidate workspace execution binding, source target-path snapshot seeding, HumanOversightChannel-bound preseed attestation, same-host scope enforcement, and candidate/source success counts for Yaoyorozu builder workers.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_worker_delta_receipt.yaml

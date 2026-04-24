@@ -92,6 +92,8 @@ same-host worker dispatch receipt を JSON で可視化する。
 workspace discovery が bound される場合は
 non-source candidate workspace ごとに `same-host-external-workspace` execution root を作り、
 `same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate を
+HumanOversightChannel の
+`human-oversight-channel-preseed-attestation-v1` reviewer-network attested event に束縛してから
 workspace seed / execution-root creation より前に pass させ、
 source target-path snapshot を seed commit 付きで固定してから worker を実行する。
 必要時だけ `memory-edit-v1` は `schema` を、

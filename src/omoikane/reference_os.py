@@ -4229,11 +4229,23 @@ json.dump(response, sys.stdout)
                 "external_preseed_gates_passed": dispatch_receipt_validation[
                     "all_external_preseed_gates_passed"
                 ],
+                "guardian_preseed_oversight_bound": dispatch_receipt_validation[
+                    "guardian_preseed_oversight_bound"
+                ],
+                "external_preseed_oversight_satisfied": dispatch_receipt_validation[
+                    "all_external_preseed_oversight_satisfied"
+                ],
                 "external_preseed_gate_pass_count": dispatch_receipt["execution_summary"][
                     "external_preseed_gate_pass_count"
                 ],
+                "external_preseed_oversight_satisfied_count": dispatch_receipt[
+                    "execution_summary"
+                ]["external_preseed_oversight_satisfied_count"],
                 "preseed_gate_profile": dispatch_receipt["execution_summary"][
                     "preseed_gate_profile"
+                ],
+                "preseed_oversight_binding_profile": dispatch_receipt["execution_summary"][
+                    "preseed_oversight_binding_profile"
                 ],
                 "worker_delta_receipts_bound": dispatch_receipt_validation[
                     "all_delta_receipts_bound"

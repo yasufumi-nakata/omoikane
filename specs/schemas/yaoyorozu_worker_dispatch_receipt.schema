@@ -93,6 +93,13 @@ properties:
         - guardian_preseed_gate_status
         - guardian_preseed_gate_digest
         - guardian_preseed_gate_bound
+        - guardian_oversight_event_ref
+        - guardian_oversight_event_digest
+        - guardian_oversight_event_status
+        - guardian_preseed_oversight_bound
+        - reviewer_network_attested
+        - reviewer_quorum_required
+        - reviewer_quorum_received
         - report
       properties:
         unit_id:
@@ -198,6 +205,27 @@ properties:
           pattern: "^[a-f0-9]{64}$"
         guardian_preseed_gate_bound:
           const: true
+        guardian_oversight_event_ref:
+          type: string
+          pattern: "^$|^oversight://oversight-event-[a-f0-9]{12}$"
+        guardian_oversight_event_digest:
+          type: string
+          pattern: "^$|^[a-f0-9]{64}$"
+        guardian_oversight_event_status:
+          type: string
+          enum:
+            - satisfied
+            - not-required
+        guardian_preseed_oversight_bound:
+          const: true
+        reviewer_network_attested:
+          type: boolean
+        reviewer_quorum_required:
+          type: integer
+          minimum: 0
+        reviewer_quorum_received:
+          type: integer
+          minimum: 0
         report:
           type: object
           additionalProperties: false
@@ -423,8 +451,11 @@ properties:
       - highest_patch_priority_tier
       - highest_patch_priority_score
       - preseed_gate_profile
+      - preseed_oversight_binding_profile
       - guardian_preseed_gate_count
       - external_preseed_gate_pass_count
+      - guardian_preseed_oversight_event_count
+      - external_preseed_oversight_satisfied_count
     properties:
       launched_process_count:
         type: integer
@@ -530,10 +561,18 @@ properties:
         maximum: 100
       preseed_gate_profile:
         const: same-host-external-workspace-preseed-guardian-gate-v1
+      preseed_oversight_binding_profile:
+        const: human-oversight-channel-preseed-attestation-v1
       guardian_preseed_gate_count:
         type: integer
         minimum: 0
       external_preseed_gate_pass_count:
+        type: integer
+        minimum: 0
+      guardian_preseed_oversight_event_count:
+        type: integer
+        minimum: 0
+      external_preseed_oversight_satisfied_count:
         type: integer
         minimum: 0
   validation:
@@ -553,6 +592,8 @@ properties:
       - all_target_paths_ready
       - all_guardian_preseed_gates_bound
       - all_external_preseed_gates_passed
+      - guardian_preseed_oversight_bound
+      - all_external_preseed_oversight_satisfied
       - ok
     properties:
       command_digests_match:
@@ -580,6 +621,10 @@ properties:
       all_guardian_preseed_gates_bound:
         const: true
       all_external_preseed_gates_passed:
+        const: true
+      guardian_preseed_oversight_bound:
+        const: true
+      all_external_preseed_oversight_satisfied:
         const: true
       ok:
         const: true

@@ -196,13 +196,19 @@ properties:
     type: string
     format: date-time
   closed_at:
-    type: string
+    type:
+      - string
+      - "null"
     format: date-time
   close_reason:
-    type: string
+    type:
+      - string
+      - "null"
     minLength: 1
   shadow_release:
-    $ref: "./substrate_release.schema"
+    oneOf:
+      - $ref: "./substrate_release.schema"
+      - type: "null"
 allOf:
   - if:
       properties:
@@ -212,6 +218,12 @@ allOf:
       properties:
         dual_active:
           const: true
+        closed_at:
+          type: "null"
+        close_reason:
+          type: "null"
+        shadow_release:
+          type: "null"
   - if:
       properties:
         window_status:
@@ -224,6 +236,14 @@ allOf:
       properties:
         dual_active:
           const: false
+        closed_at:
+          type: string
+          format: date-time
+        close_reason:
+          type: string
+          minLength: 1
+        shadow_release:
+          $ref: "./substrate_release.schema"
 examples:
   - kind: substrate_dual_allocation_window
     schema_version: "1.0.0"

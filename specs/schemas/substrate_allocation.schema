@@ -57,5 +57,7 @@ properties:
       - allocated
       - released
   released_at:
-    type: string
+    type:
+      - string
+      - "null"
     format: date-time

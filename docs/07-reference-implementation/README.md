@@ -132,7 +132,8 @@ dual allocation window が pre-bound standby 上の second active allocation、
 `45s / 250ms / drift<=0.08` の overlap receipt、
 distinct-host pair、
 shared `substrate_cluster_ref`、
-`hot-handoff` destination binding、cleanup release を返すこと、
+`hot-handoff` destination binding、shadow-active 中は nullable lifecycle fields、
+closed 後は cleanup release を返すこと、
 selected standby がそのまま migration destination に束縛されることを
 1 シナリオで確認する。
 
@@ -367,6 +368,8 @@ requested optional coverage は candidate が無い場合に source fallback と
 `same-host-external-workspace` の execution root に source target-path snapshot を seed してから
 同じ local worker stub を実行し、
 `same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate が
+HumanOversightChannel の `human-oversight-channel-preseed-attestation-v1`
+reviewer-network attestation に束縛されたうえで
 workspace seed / execution-root creation 前に pass したこと、
 `workspace_seed_head_commit` と candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた

@@ -122,7 +122,8 @@ fixed 5 beat / 250ms cadence の keepalive を sealed receipt に落とし、
   ready standby probe + healthy attestation + handoff-ready chain の後段でのみ
   second active allocation を materialize し、
   `shadow-sync` / `authority-handoff` binding、distinct-host pair、
-  shared `substrate_cluster_ref`、fixed overlap budget を焼き付ける
+  shared `substrate_cluster_ref`、fixed overlap budget、
+  open window の nullable lifecycle fields を焼き付ける
 - `seal_attestation_stream` は shadow-active dual allocation window に束縛され、
   `5 healthy beats / 250ms cadence / drift<=0.08` の keepalive receipt を sealed した時だけ
   `hot-handoff` migrate に進める

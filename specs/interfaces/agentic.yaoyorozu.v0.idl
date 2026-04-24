@@ -144,6 +144,7 @@ operations:
       - every command preview must remain same-host, subprocess-bound, and temp-workspace-only
       - when workspace_discovery is bound, every dispatch unit must choose one profile-covered candidate workspace and bind execution_workspace_ref, selected_workspace_root, execution_workspace_root, and sandbox_seed_strategy
       - same-host external workspace units must carry one integrity Guardian preseed gate that passes before workspace seed or execution-root creation
+      - external preseed gates must bind a satisfied HumanOversightChannel reviewer-network attested oversight event before the gate is considered ready
       - every dispatch_coverage_area must map to exactly one dispatch unit
   execute_worker_dispatch:
     summary: >
@@ -162,6 +163,7 @@ operations:
     guarantees:
       - every launched worker must emit a ready report bound to the same dispatch_plan_ref and dispatch_unit_ref
       - external candidate workers must have a passing same-host-external-workspace-preseed-guardian-gate-v1 artifact before any snapshot seed or execution root creation occurs
+      - external candidate workers must carry the preseed gate's oversight event ref, digest, reviewer quorum, and verifier-network attestation status into the dispatch receipt
       - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt
       - worker reports must verify that every target path exists and remains inside the selected execution workspace
       - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit

@@ -24,6 +24,14 @@ required:
   - guardian_agent_id
   - guardian_role
   - oversight_category
+  - oversight_binding_profile
+  - guardian_oversight_event_ref
+  - guardian_oversight_event_digest
+  - guardian_oversight_event_status
+  - guardian_oversight_event
+  - reviewer_network_attested
+  - reviewer_quorum_required
+  - reviewer_quorum_received
   - required_before
   - gate_required
   - gate_status
@@ -93,6 +101,31 @@ properties:
     const: integrity
   oversight_category:
     const: attest
+  oversight_binding_profile:
+    const: human-oversight-channel-preseed-attestation-v1
+  guardian_oversight_event_ref:
+    type: string
+    pattern: "^$|^oversight://oversight-event-[a-f0-9]{12}$"
+  guardian_oversight_event_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  guardian_oversight_event_status:
+    type: string
+    enum:
+      - satisfied
+      - not-required
+  guardian_oversight_event:
+    oneOf:
+      - $ref: "guardian_oversight_event.schema"
+      - type: "null"
+  reviewer_network_attested:
+    type: boolean
+  reviewer_quorum_required:
+    type: integer
+    minimum: 0
+  reviewer_quorum_received:
+    type: integer
+    minimum: 0
   required_before:
     type: array
     minItems: 2
@@ -129,6 +162,14 @@ allOf:
           const: true
         gate_status:
           const: pass
+        guardian_oversight_event_status:
+          const: satisfied
+        reviewer_network_attested:
+          const: true
+        reviewer_quorum_required:
+          const: 2
+        reviewer_quorum_received:
+          const: 2
   - if:
       properties:
         workspace_scope:
@@ -141,3 +182,17 @@ allOf:
           const: false
         gate_status:
           const: not-required
+        guardian_oversight_event_ref:
+          const: ""
+        guardian_oversight_event_digest:
+          const: ""
+        guardian_oversight_event_status:
+          const: not-required
+        guardian_oversight_event:
+          type: "null"
+        reviewer_network_attested:
+          const: false
+        reviewer_quorum_required:
+          const: 0
+        reviewer_quorum_received:
+          const: 0

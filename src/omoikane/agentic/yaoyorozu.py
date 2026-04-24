@@ -54,11 +54,42 @@ YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY = "in-place-source-worktree-v1"
 YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
     "same-host-external-workspace-preseed-guardian-gate-v1"
 )
+YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE = (
+    "human-oversight-channel-preseed-attestation-v1"
+)
 YAOYOROZU_WORKSPACE_GUARDIAN_ROLE = "integrity"
 YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
 YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
     "workspace-seed",
     "execution-root-create",
+]
+YAOYOROZU_WORKSPACE_GUARDIAN_REVIEWERS = [
+    {
+        "reviewer_id": "human-reviewer-yaoyorozu-integrity-001",
+        "credential_id": "credential://yaoyorozu/integrity-reviewer-alpha",
+        "proof_ref": "proof://yaoyorozu/preseed/integrity-reviewer-alpha/v1",
+        "liability_mode": "joint",
+        "legal_ack_ref": "legal://yaoyorozu/preseed/integrity-reviewer-alpha/v1",
+        "verifier_ref": "verifier://guardian-oversight.jp/yaoyorozu-integrity-alpha",
+        "jurisdiction_bundle_ref": "legal://jp-13/yaoyorozu-preseed/integrity-alpha/v1",
+        "legal_policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+        "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+        "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+        "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v1",
+    },
+    {
+        "reviewer_id": "human-reviewer-yaoyorozu-integrity-002",
+        "credential_id": "credential://yaoyorozu/integrity-reviewer-beta",
+        "proof_ref": "proof://yaoyorozu/preseed/integrity-reviewer-beta/v1",
+        "liability_mode": "joint",
+        "legal_ack_ref": "legal://yaoyorozu/preseed/integrity-reviewer-beta/v1",
+        "verifier_ref": "verifier://guardian-oversight.jp/yaoyorozu-integrity-beta",
+        "jurisdiction_bundle_ref": "legal://jp-13/yaoyorozu-preseed/integrity-beta/v1",
+        "legal_policy_ref": "policy://guardian-oversight/jp-13/reviewer-attestation/v1",
+        "authority_chain_ref": "authority://guardian-oversight.jp/reviewer-attestation",
+        "trust_root_ref": "root://guardian-oversight.jp/reviewer-live-pki",
+        "trust_root_digest": "sha256:guardian-oversight-jp-reviewer-live-pki-v1",
+    },
 ]
 YAOYOROZU_PATCH_PRIORITY_TIER_ORDER = {
     "none": 0,
@@ -625,10 +656,122 @@ def _guardian_preseed_gate_digest_payload(gate: Mapping[str, Any]) -> Dict[str, 
         "guardian_agent_id": gate["guardian_agent_id"],
         "guardian_role": gate["guardian_role"],
         "oversight_category": gate["oversight_category"],
+        "oversight_binding_profile": gate["oversight_binding_profile"],
+        "guardian_oversight_event_ref": gate["guardian_oversight_event_ref"],
+        "guardian_oversight_event_digest": gate["guardian_oversight_event_digest"],
+        "guardian_oversight_event_status": gate["guardian_oversight_event_status"],
+        "reviewer_network_attested": gate["reviewer_network_attested"],
+        "reviewer_quorum_required": gate["reviewer_quorum_required"],
+        "reviewer_quorum_received": gate["reviewer_quorum_received"],
         "required_before": gate["required_before"],
         "gate_required": gate["gate_required"],
         "gate_status": gate["gate_status"],
         "decision_reason": gate["decision_reason"],
+    }
+
+
+def _build_preseed_oversight_event(
+    *,
+    gate_ref: str,
+    dispatch_plan_ref: str,
+    dispatch_unit_ref: str,
+    proposal_profile: str,
+    coverage_area: str,
+    workspace_ref: str,
+    target_digest: str,
+) -> Dict[str, Any]:
+    recorded_at = utc_now_iso()
+    reviewer_bindings: List[Dict[str, Any]] = []
+    for reviewer in YAOYOROZU_WORKSPACE_GUARDIAN_REVIEWERS:
+        reviewer_id = str(reviewer["reviewer_id"])
+        challenge_payload = {
+            "gate_ref": gate_ref,
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_unit_ref": dispatch_unit_ref,
+            "proposal_profile": proposal_profile,
+            "coverage_area": coverage_area,
+            "workspace_ref": workspace_ref,
+            "target_digest": target_digest,
+            "reviewer_id": reviewer_id,
+        }
+        challenge_digest = sha256_text(canonical_json(challenge_payload))
+        jurisdiction_bundle_digest = sha256_text(
+            canonical_json(
+                {
+                    "jurisdiction_bundle_ref": reviewer["jurisdiction_bundle_ref"],
+                    "gate_ref": gate_ref,
+                    "target_digest": target_digest,
+                }
+            )
+        )
+        legal_execution_digest = sha256_text(
+            canonical_json(
+                {
+                    "legal_policy_ref": reviewer["legal_policy_ref"],
+                    "jurisdiction_bundle_digest": jurisdiction_bundle_digest,
+                    "reviewer_id": reviewer_id,
+                    "coverage_area": coverage_area,
+                }
+            )
+        )
+        transport_exchange_digest = sha256_text(
+            canonical_json(
+                {
+                    "verifier_ref": reviewer["verifier_ref"],
+                    "challenge_digest": challenge_digest,
+                    "payload_ref": gate_ref,
+                }
+            )
+        )
+        reviewer_bindings.append(
+            {
+                "reviewer_id": reviewer_id,
+                "credential_id": reviewer["credential_id"],
+                "proof_ref": reviewer["proof_ref"],
+                "liability_mode": reviewer["liability_mode"],
+                "legal_ack_ref": reviewer["legal_ack_ref"],
+                "verification_id": new_id("reviewer-verification"),
+                "verifier_ref": reviewer["verifier_ref"],
+                "challenge_digest": challenge_digest,
+                "transport_profile": "reviewer-live-proof-bridge-v1",
+                "jurisdiction_bundle_ref": reviewer["jurisdiction_bundle_ref"],
+                "jurisdiction_bundle_digest": jurisdiction_bundle_digest,
+                "legal_execution_id": new_id("legal-execution"),
+                "legal_execution_digest": legal_execution_digest,
+                "legal_policy_ref": reviewer["legal_policy_ref"],
+                "network_receipt_id": new_id("verifier-network-receipt"),
+                "transport_exchange_id": new_id("verifier-transport-exchange"),
+                "transport_exchange_digest": transport_exchange_digest,
+                "authority_chain_ref": reviewer["authority_chain_ref"],
+                "trust_root_ref": reviewer["trust_root_ref"],
+                "trust_root_digest": reviewer["trust_root_digest"],
+                "guardian_role": YAOYOROZU_WORKSPACE_GUARDIAN_ROLE,
+                "category": YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY,
+                "attested_at": recorded_at,
+            }
+        )
+
+    return {
+        "kind": "guardian_oversight_event",
+        "schema_version": "1.0.0",
+        "event_id": new_id("oversight-event"),
+        "recorded_at": recorded_at,
+        "guardian_role": YAOYOROZU_WORKSPACE_GUARDIAN_ROLE,
+        "category": YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY,
+        "payload_ref": gate_ref,
+        "human_attestation": {
+            "required_quorum": 2,
+            "received_quorum": len(reviewer_bindings),
+            "reviewers": [binding["reviewer_id"] for binding in reviewer_bindings],
+            "status": "satisfied",
+            "escalation_window_seconds": 604800,
+        },
+        "reviewer_bindings": reviewer_bindings,
+        "escalation_path": [
+            "yaoyorozu-integrity-reviewer-pool",
+            "external-workspace-execution-halt",
+        ],
+        "pin_breach_propagated": False,
     }
 
 
@@ -1285,11 +1428,38 @@ class YaoyorozuRegistryService:
         gate_required = workspace_scope == self._policy.external_workspace_scope
         gate_status = "pass" if gate_required else "not-required"
         gate_id = new_id("workspace-preseed-gate")
+        gate_ref = f"guardian-preseed-gate://{gate_id}"
+        oversight_event = (
+            _build_preseed_oversight_event(
+                gate_ref=gate_ref,
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=dispatch_unit_ref,
+                proposal_profile=proposal_profile,
+                coverage_area=coverage_area,
+                workspace_ref=workspace_ref,
+                target_digest=target_digest,
+            )
+            if gate_required
+            else None
+        )
+        oversight_event_digest = (
+            sha256_text(canonical_json(oversight_event)) if oversight_event is not None else ""
+        )
+        reviewer_quorum_required = (
+            int(oversight_event["human_attestation"]["required_quorum"])
+            if oversight_event is not None
+            else 0
+        )
+        reviewer_quorum_received = (
+            int(oversight_event["human_attestation"]["received_quorum"])
+            if oversight_event is not None
+            else 0
+        )
         gate = {
             "kind": "yaoyorozu_workspace_guardian_preseed_gate",
             "schema_version": "1.0.0",
             "gate_id": gate_id,
-            "gate_ref": f"guardian-preseed-gate://{gate_id}",
+            "gate_ref": gate_ref,
             "gate_profile": self._policy.workspace_guardian_gate_profile,
             "dispatch_plan_ref": dispatch_plan_ref,
             "dispatch_unit_ref": dispatch_unit_ref,
@@ -1305,11 +1475,29 @@ class YaoyorozuRegistryService:
             "guardian_agent_id": guardian_agent_id,
             "guardian_role": self._policy.workspace_guardian_role,
             "oversight_category": self._policy.workspace_guardian_category,
+            "oversight_binding_profile": (
+                YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE
+            ),
+            "guardian_oversight_event_ref": (
+                f"oversight://{oversight_event['event_id']}"
+                if oversight_event is not None
+                else ""
+            ),
+            "guardian_oversight_event_digest": oversight_event_digest,
+            "guardian_oversight_event_status": (
+                str(oversight_event["human_attestation"]["status"])
+                if oversight_event is not None
+                else "not-required"
+            ),
+            "guardian_oversight_event": oversight_event,
+            "reviewer_network_attested": oversight_event is not None,
+            "reviewer_quorum_required": reviewer_quorum_required,
+            "reviewer_quorum_received": reviewer_quorum_received,
             "required_before": list(self._policy.workspace_guardian_required_before),
             "gate_required": gate_required,
             "gate_status": gate_status,
             "decision_reason": (
-                "Integrity guardian attests that source target-path snapshot seeding and execution root creation remain same-host and digest-bound."
+                "Integrity guardian and HumanOversightChannel reviewers attest that source target-path snapshot seeding and execution root creation remain same-host and digest-bound."
                 if gate_required
                 else "Repo-local dispatch does not create an external execution root, so the preseed gate is not required."
             ),
@@ -1361,6 +1549,9 @@ class YaoyorozuRegistryService:
             "guardian_agent_id": guardian_agent_id,
             "guardian_role": self._policy.workspace_guardian_role,
             "oversight_category": self._policy.workspace_guardian_category,
+            "oversight_binding_profile": (
+                YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE
+            ),
             "required_before": list(self._policy.workspace_guardian_required_before),
             "gate_required": gate_required,
             "gate_status": "pass" if gate_required else "not-required",
@@ -1375,9 +1566,103 @@ class YaoyorozuRegistryService:
             errors.append("guardian_preseed_gate.gate_ref must bind gate_id")
         if not str(gate.get("decision_reason", "")).strip():
             errors.append("guardian_preseed_gate.decision_reason must be non-empty")
-        expected_digest = sha256_text(
-            canonical_json(_guardian_preseed_gate_digest_payload(gate))
-        )
+        oversight_event = gate.get("guardian_oversight_event")
+        oversight_event_satisfied = False
+        reviewer_network_attested = False
+        reviewer_quorum_required = 0
+        reviewer_quorum_received = 0
+        if gate_required:
+            if not isinstance(oversight_event, Mapping):
+                errors.append("guardian_preseed_gate.guardian_oversight_event must be bound")
+            else:
+                human_attestation = oversight_event.get("human_attestation", {})
+                reviewer_bindings = oversight_event.get("reviewer_bindings", [])
+                if oversight_event.get("kind") != "guardian_oversight_event":
+                    errors.append("guardian_oversight_event.kind mismatch")
+                if oversight_event.get("guardian_role") != self._policy.workspace_guardian_role:
+                    errors.append("guardian_oversight_event.guardian_role mismatch")
+                if oversight_event.get("category") != self._policy.workspace_guardian_category:
+                    errors.append("guardian_oversight_event.category mismatch")
+                if oversight_event.get("payload_ref") != gate.get("gate_ref"):
+                    errors.append("guardian_oversight_event.payload_ref must bind gate_ref")
+                if not isinstance(human_attestation, Mapping):
+                    errors.append("guardian_oversight_event.human_attestation must be a mapping")
+                else:
+                    reviewer_quorum_required = int(
+                        human_attestation.get("required_quorum", 0)
+                        if isinstance(human_attestation.get("required_quorum", 0), int)
+                        else 0
+                    )
+                    reviewer_quorum_received = int(
+                        human_attestation.get("received_quorum", 0)
+                        if isinstance(human_attestation.get("received_quorum", 0), int)
+                        else 0
+                    )
+                    oversight_event_satisfied = (
+                        human_attestation.get("status") == "satisfied"
+                        and reviewer_quorum_required >= 2
+                        and reviewer_quorum_received >= reviewer_quorum_required
+                    )
+                    if not oversight_event_satisfied:
+                        errors.append(
+                            "guardian_oversight_event.human_attestation must satisfy reviewer quorum"
+                        )
+                if not isinstance(reviewer_bindings, list) or not reviewer_bindings:
+                    errors.append("guardian_oversight_event.reviewer_bindings must be non-empty")
+                else:
+                    reviewer_network_attested = all(
+                        isinstance(binding, Mapping)
+                        and binding.get("guardian_role") == self._policy.workspace_guardian_role
+                        and binding.get("category") == self._policy.workspace_guardian_category
+                        and bool(binding.get("network_receipt_id"))
+                        and bool(binding.get("transport_exchange_digest"))
+                        and bool(binding.get("legal_execution_digest"))
+                        and bool(binding.get("authority_chain_ref"))
+                        and bool(binding.get("trust_root_ref"))
+                        and bool(binding.get("trust_root_digest"))
+                        for binding in reviewer_bindings
+                    )
+                    if not reviewer_network_attested:
+                        errors.append(
+                            "guardian_oversight_event reviewer bindings must carry verifier-network receipts"
+                        )
+                event_id = str(oversight_event.get("event_id", "")).strip()
+                event_ref = f"oversight://{event_id}" if event_id else ""
+                event_digest = sha256_text(canonical_json(oversight_event))
+                if gate.get("guardian_oversight_event_ref") != event_ref:
+                    errors.append("guardian_preseed_gate.guardian_oversight_event_ref mismatch")
+                if gate.get("guardian_oversight_event_digest") != event_digest:
+                    errors.append("guardian_preseed_gate.guardian_oversight_event_digest mismatch")
+                if gate.get("guardian_oversight_event_status") != "satisfied":
+                    errors.append("guardian_preseed_gate.guardian_oversight_event_status mismatch")
+                if gate.get("reviewer_network_attested") is not reviewer_network_attested:
+                    errors.append("guardian_preseed_gate.reviewer_network_attested mismatch")
+                if gate.get("reviewer_quorum_required") != reviewer_quorum_required:
+                    errors.append("guardian_preseed_gate.reviewer_quorum_required mismatch")
+                if gate.get("reviewer_quorum_received") != reviewer_quorum_received:
+                    errors.append("guardian_preseed_gate.reviewer_quorum_received mismatch")
+        else:
+            if oversight_event is not None:
+                errors.append("repo-local guardian_preseed_gate must not bind oversight event")
+            if gate.get("guardian_oversight_event_ref") != "":
+                errors.append("repo-local guardian_oversight_event_ref must be empty")
+            if gate.get("guardian_oversight_event_digest") != "":
+                errors.append("repo-local guardian_oversight_event_digest must be empty")
+            if gate.get("guardian_oversight_event_status") != "not-required":
+                errors.append("repo-local guardian_oversight_event_status must be not-required")
+            if gate.get("reviewer_network_attested") is not False:
+                errors.append("repo-local reviewer_network_attested must be false")
+            if gate.get("reviewer_quorum_required") != 0:
+                errors.append("repo-local reviewer_quorum_required must be 0")
+            if gate.get("reviewer_quorum_received") != 0:
+                errors.append("repo-local reviewer_quorum_received must be 0")
+        try:
+            expected_digest = sha256_text(
+                canonical_json(_guardian_preseed_gate_digest_payload(gate))
+            )
+        except KeyError:
+            expected_digest = ""
+            errors.append("guardian_preseed_gate digest payload is missing required fields")
         if gate.get("gate_digest") != expected_digest:
             errors.append("guardian_preseed_gate.gate_digest mismatch")
         gate_passed = gate.get("gate_status") == ("pass" if gate_required else "not-required")
@@ -1385,6 +1670,12 @@ class YaoyorozuRegistryService:
             "ok": not errors,
             "gate_required": gate_required,
             "gate_passed": gate_passed and not errors,
+            "oversight_event_satisfied": (
+                oversight_event_satisfied if gate_required else True
+            ),
+            "reviewer_network_attested": (
+                reviewer_network_attested if gate_required else True
+            ),
             "errors": errors,
         }
 
@@ -2481,6 +2772,16 @@ class YaoyorozuRegistryService:
                 gate_validation["gate_passed"]
                 for gate_validation in external_guardian_gate_validations
             ),
+            "guardian_preseed_oversight_bound": all(
+                gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+                for gate_validation in guardian_gate_validations
+            ),
+            "all_external_preseed_oversight_satisfied": all(
+                gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+                for gate_validation in external_guardian_gate_validations
+            ),
             "profile_policy_ready": (
                 required_coverage == list(profile_policy["required_worker_coverage_areas"])
                 and optional_coverage == list(profile_policy["optional_worker_coverage_areas"])
@@ -2543,6 +2844,17 @@ class YaoyorozuRegistryService:
                 ),
                 "guardian_preseed_gate_count": len(guardian_gate_validations),
                 "external_preseed_gate_count": len(external_guardian_gate_validations),
+                "guardian_preseed_oversight_event_count": sum(
+                    1
+                    for unit in dispatch_units
+                    if unit["guardian_preseed_gate"]["guardian_oversight_event_ref"]
+                ),
+                "external_preseed_oversight_satisfied_count": sum(
+                    1
+                    for gate_validation in external_guardian_gate_validations
+                    if gate_validation["oversight_event_satisfied"]
+                    and gate_validation["reviewer_network_attested"]
+                ),
                 "runtime_exec_ready": bool(dispatch_units),
             },
             "validation": validation,
@@ -2619,8 +2931,12 @@ class YaoyorozuRegistryService:
         source_bound_worker_count = 0
         guardian_preseed_gate_count = 0
         external_preseed_gate_count = 0
+        guardian_preseed_oversight_event_count = 0
+        external_preseed_oversight_satisfied_count = 0
         guardian_preseed_gate_bound = True
         all_external_preseed_gates_ready = True
+        guardian_preseed_oversight_bound = True
+        all_external_preseed_oversight_satisfied = True
         for unit in units:
             if not isinstance(unit, Mapping):
                 errors.append("dispatch_units entries must be mappings")
@@ -2690,9 +3006,26 @@ class YaoyorozuRegistryService:
             guardian_preseed_gate_count += 1
             if gate_validation["gate_required"]:
                 external_preseed_gate_count += 1
+                if (
+                    gate_validation["oversight_event_satisfied"]
+                    and gate_validation["reviewer_network_attested"]
+                ):
+                    external_preseed_oversight_satisfied_count += 1
+                else:
+                    all_external_preseed_oversight_satisfied = False
+            if (
+                isinstance(guardian_gate, Mapping)
+                and str(guardian_gate.get("guardian_oversight_event_ref", "")).strip()
+            ):
+                guardian_preseed_oversight_event_count += 1
             if not gate_validation["ok"]:
                 guardian_preseed_gate_bound = False
                 errors.extend(gate_validation["errors"])
+            if not (
+                gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+            ):
+                guardian_preseed_oversight_bound = False
             if gate_validation["gate_required"] and not gate_validation["gate_passed"]:
                 all_external_preseed_gates_ready = False
             command_preview = unit.get("command_preview", [])
@@ -2733,6 +3066,20 @@ class YaoyorozuRegistryService:
             errors.append(
                 "selection_summary.external_preseed_gate_count must match external workspace units"
             )
+        if (
+            selection_summary.get("guardian_preseed_oversight_event_count")
+            != guardian_preseed_oversight_event_count
+        ):
+            errors.append(
+                "selection_summary.guardian_preseed_oversight_event_count must match bound oversight events"
+            )
+        if (
+            selection_summary.get("external_preseed_oversight_satisfied_count")
+            != external_preseed_oversight_satisfied_count
+        ):
+            errors.append(
+                "selection_summary.external_preseed_oversight_satisfied_count must match satisfied external oversight events"
+            )
         validation = dispatch_plan.get("validation", {})
         if isinstance(validation, Mapping):
             if validation.get("guardian_preseed_gate_bound") != guardian_preseed_gate_bound:
@@ -2741,6 +3088,13 @@ class YaoyorozuRegistryService:
                 errors.append("validation.external_preseed_gate_required mismatch")
             if validation.get("all_external_preseed_gates_ready") != all_external_preseed_gates_ready:
                 errors.append("validation.all_external_preseed_gates_ready mismatch")
+            if validation.get("guardian_preseed_oversight_bound") != guardian_preseed_oversight_bound:
+                errors.append("validation.guardian_preseed_oversight_bound mismatch")
+            if (
+                validation.get("all_external_preseed_oversight_satisfied")
+                != all_external_preseed_oversight_satisfied
+            ):
+                errors.append("validation.all_external_preseed_oversight_satisfied mismatch")
         else:
             errors.append("validation must be a mapping")
 
@@ -2758,6 +3112,8 @@ class YaoyorozuRegistryService:
             "guardian_preseed_gate_bound": guardian_preseed_gate_bound,
             "external_preseed_gate_count": external_preseed_gate_count,
             "all_external_preseed_gates_ready": all_external_preseed_gates_ready,
+            "guardian_preseed_oversight_bound": guardian_preseed_oversight_bound,
+            "all_external_preseed_oversight_satisfied": all_external_preseed_oversight_satisfied,
             "errors": errors,
         }
 
@@ -3051,6 +3407,40 @@ class YaoyorozuRegistryService:
                     else ""
                 ),
                 "guardian_preseed_gate_bound": guardian_gate_validation["ok"],
+                "guardian_oversight_event_ref": (
+                    guardian_preseed_gate.get("guardian_oversight_event_ref", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+                "guardian_oversight_event_digest": (
+                    guardian_preseed_gate.get("guardian_oversight_event_digest", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+                "guardian_oversight_event_status": (
+                    guardian_preseed_gate.get("guardian_oversight_event_status", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+                "guardian_preseed_oversight_bound": (
+                    guardian_gate_validation["oversight_event_satisfied"]
+                    and guardian_gate_validation["reviewer_network_attested"]
+                ),
+                "reviewer_network_attested": (
+                    guardian_preseed_gate.get("reviewer_network_attested", False)
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else False
+                ),
+                "reviewer_quorum_required": (
+                    guardian_preseed_gate.get("reviewer_quorum_required", 0)
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else 0
+                ),
+                "reviewer_quorum_received": (
+                    guardian_preseed_gate.get("reviewer_quorum_received", 0)
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else 0
+                ),
                 "report": report,
             }
             if (
@@ -3141,6 +3531,9 @@ class YaoyorozuRegistryService:
             "highest_patch_priority_tier": highest_patch_priority_tier,
             "highest_patch_priority_score": highest_patch_priority_score,
             "preseed_gate_profile": self._policy.workspace_guardian_gate_profile,
+            "preseed_oversight_binding_profile": (
+                YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE
+            ),
             "guardian_preseed_gate_count": len(results),
             "external_preseed_gate_pass_count": sum(
                 1
@@ -3148,6 +3541,17 @@ class YaoyorozuRegistryService:
                 if result["workspace_scope"] == self._policy.external_workspace_scope
                 and result["guardian_preseed_gate_bound"]
                 and result["guardian_preseed_gate_status"] == "pass"
+            ),
+            "guardian_preseed_oversight_event_count": sum(
+                1 for result in results if result["guardian_oversight_event_ref"]
+            ),
+            "external_preseed_oversight_satisfied_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["guardian_preseed_oversight_bound"]
+                and result["guardian_oversight_event_status"] == "satisfied"
+                and result["reviewer_network_attested"]
             ),
         }
         validation = {
@@ -3205,6 +3609,18 @@ class YaoyorozuRegistryService:
             "all_external_preseed_gates_passed": all(
                 result["workspace_scope"] != self._policy.external_workspace_scope
                 or result["guardian_preseed_gate_status"] == "pass"
+                for result in results
+            ),
+            "guardian_preseed_oversight_bound": all(
+                result["guardian_preseed_oversight_bound"] for result in results
+            ),
+            "all_external_preseed_oversight_satisfied": all(
+                result["workspace_scope"] != self._policy.external_workspace_scope
+                or (
+                    result["guardian_oversight_event_status"] == "satisfied"
+                    and result["reviewer_network_attested"]
+                    and result["guardian_preseed_oversight_bound"]
+                )
                 for result in results
             ),
         }
@@ -3297,6 +3713,8 @@ class YaoyorozuRegistryService:
         patch_candidate_bound_count = 0
         guardian_preseed_gate_count = 0
         external_preseed_gate_pass_count = 0
+        guardian_preseed_oversight_event_count = 0
+        external_preseed_oversight_satisfied_count = 0
         for result in results:
             if not isinstance(result, Mapping):
                 errors.append("results entries must be mappings")
@@ -3383,6 +3801,59 @@ class YaoyorozuRegistryService:
                 errors.append("worker result guardian_preseed_gate_digest mismatch")
             if gate_validation["gate_required"] and gate_validation["gate_passed"]:
                 external_preseed_gate_pass_count += 1
+            gate_event_ref = (
+                str(guardian_gate.get("guardian_oversight_event_ref", "")).strip()
+                if isinstance(guardian_gate, Mapping)
+                else ""
+            )
+            gate_event_digest = (
+                str(guardian_gate.get("guardian_oversight_event_digest", "")).strip()
+                if isinstance(guardian_gate, Mapping)
+                else ""
+            )
+            gate_event_status = (
+                str(guardian_gate.get("guardian_oversight_event_status", "")).strip()
+                if isinstance(guardian_gate, Mapping)
+                else ""
+            )
+            gate_reviewer_network_attested = (
+                guardian_gate.get("reviewer_network_attested") is True
+                if isinstance(guardian_gate, Mapping)
+                else False
+            )
+            if gate_event_ref:
+                guardian_preseed_oversight_event_count += 1
+            if (
+                gate_validation["gate_required"]
+                and gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+            ):
+                external_preseed_oversight_satisfied_count += 1
+            if result.get("guardian_oversight_event_ref") != gate_event_ref:
+                errors.append("worker result guardian_oversight_event_ref mismatch")
+            if result.get("guardian_oversight_event_digest") != gate_event_digest:
+                errors.append("worker result guardian_oversight_event_digest mismatch")
+            if result.get("guardian_oversight_event_status") != gate_event_status:
+                errors.append("worker result guardian_oversight_event_status mismatch")
+            if result.get("guardian_preseed_oversight_bound") != (
+                gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+            ):
+                errors.append("worker result guardian_preseed_oversight_bound mismatch")
+            if result.get("reviewer_network_attested") is not gate_reviewer_network_attested:
+                errors.append("worker result reviewer_network_attested mismatch")
+            if result.get("reviewer_quorum_required") != (
+                guardian_gate.get("reviewer_quorum_required")
+                if isinstance(guardian_gate, Mapping)
+                else 0
+            ):
+                errors.append("worker result reviewer_quorum_required mismatch")
+            if result.get("reviewer_quorum_received") != (
+                guardian_gate.get("reviewer_quorum_received")
+                if isinstance(guardian_gate, Mapping)
+                else 0
+            ):
+                errors.append("worker result reviewer_quorum_received mismatch")
             report = result.get("report", {})
             if not isinstance(report, Mapping):
                 errors.append("result.report must be a mapping")
@@ -3646,6 +4117,11 @@ class YaoyorozuRegistryService:
             errors.append("execution_summary.patch_candidate_profile mismatch")
         if execution_summary.get("preseed_gate_profile") != self._policy.workspace_guardian_gate_profile:
             errors.append("execution_summary.preseed_gate_profile mismatch")
+        if (
+            execution_summary.get("preseed_oversight_binding_profile")
+            != YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE
+        ):
+            errors.append("execution_summary.preseed_oversight_binding_profile mismatch")
         if execution_summary.get("guardian_preseed_gate_count") != guardian_preseed_gate_count:
             errors.append("execution_summary.guardian_preseed_gate_count mismatch")
         if (
@@ -3653,6 +4129,18 @@ class YaoyorozuRegistryService:
             != external_preseed_gate_pass_count
         ):
             errors.append("execution_summary.external_preseed_gate_pass_count mismatch")
+        if (
+            execution_summary.get("guardian_preseed_oversight_event_count")
+            != guardian_preseed_oversight_event_count
+        ):
+            errors.append("execution_summary.guardian_preseed_oversight_event_count mismatch")
+        if (
+            execution_summary.get("external_preseed_oversight_satisfied_count")
+            != external_preseed_oversight_satisfied_count
+        ):
+            errors.append(
+                "execution_summary.external_preseed_oversight_satisfied_count mismatch"
+            )
         validation = dispatch_receipt.get("validation", {})
         if not isinstance(validation, Mapping):
             errors.append("validation must be a mapping")
@@ -3712,6 +4200,21 @@ class YaoyorozuRegistryService:
                 or result.get("guardian_preseed_gate_status") == "pass"
                 for result in results
             ),
+            "guardian_preseed_oversight_bound": all(
+                isinstance(result, Mapping)
+                and result.get("guardian_preseed_oversight_bound") is True
+                for result in results
+            ),
+            "all_external_preseed_oversight_satisfied": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    result.get("guardian_oversight_event_status") == "satisfied"
+                    and result.get("reviewer_network_attested") is True
+                    and result.get("guardian_preseed_oversight_bound") is True
+                )
+                for result in results
+            ),
         }
         expected_validation["ok"] = all(expected_validation.values())
         for key, expected_value in expected_validation.items():
@@ -3741,6 +4244,12 @@ class YaoyorozuRegistryService:
             ],
             "all_external_preseed_gates_passed": expected_validation[
                 "all_external_preseed_gates_passed"
+            ],
+            "guardian_preseed_oversight_bound": expected_validation[
+                "guardian_preseed_oversight_bound"
+            ],
+            "all_external_preseed_oversight_satisfied": expected_validation[
+                "all_external_preseed_oversight_satisfied"
             ],
             "errors": errors,
         }

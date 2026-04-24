@@ -3290,8 +3290,12 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(plan["validation"]["guardian_preseed_gate_bound"])
         self.assertFalse(plan["validation"]["external_preseed_gate_required"])
         self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
+        self.assertTrue(plan["validation"]["guardian_preseed_oversight_bound"])
+        self.assertTrue(plan["validation"]["all_external_preseed_oversight_satisfied"])
         self.assertEqual(0, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(4, plan["selection_summary"]["source_bound_worker_count"])
+        self.assertEqual(0, plan["selection_summary"]["guardian_preseed_oversight_event_count"])
+        self.assertEqual(0, plan["selection_summary"]["external_preseed_oversight_satisfied_count"])
         self.assertTrue(
             all(
                 "dispatch_plan_ref" in unit["expected_report_fields"]
@@ -3357,9 +3361,13 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(plan["validation"]["guardian_preseed_gate_bound"])
         self.assertTrue(plan["validation"]["external_preseed_gate_required"])
         self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
+        self.assertTrue(plan["validation"]["guardian_preseed_oversight_bound"])
+        self.assertTrue(plan["validation"]["all_external_preseed_oversight_satisfied"])
         self.assertEqual(4, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(0, plan["selection_summary"]["source_bound_worker_count"])
         self.assertEqual(4, plan["selection_summary"]["external_preseed_gate_count"])
+        self.assertEqual(4, plan["selection_summary"]["guardian_preseed_oversight_event_count"])
+        self.assertEqual(4, plan["selection_summary"]["external_preseed_oversight_satisfied_count"])
         self.assertTrue(
             all(
                 unit["workspace_scope"] == "same-host-external-workspace"
@@ -3368,6 +3376,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and unit["execution_transport_profile"] == "same-host-python-subprocess-v1"
                 and unit["guardian_preseed_gate"]["gate_status"] == "pass"
                 and unit["guardian_preseed_gate"]["gate_required"] is True
+                and unit["guardian_preseed_gate"]["guardian_oversight_event_status"] == "satisfied"
+                and unit["guardian_preseed_gate"]["reviewer_network_attested"] is True
+                and unit["guardian_preseed_gate"]["reviewer_quorum_required"] == 2
+                and unit["guardian_preseed_gate"]["reviewer_quorum_received"] == 2
                 for unit in plan["dispatch_units"]
             )
         )
@@ -3591,7 +3603,11 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["external_workspace_seeded"])
         self.assertTrue(receipt["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(receipt["validation"]["all_external_preseed_gates_passed"])
+        self.assertTrue(receipt["validation"]["guardian_preseed_oversight_bound"])
+        self.assertTrue(receipt["validation"]["all_external_preseed_oversight_satisfied"])
         self.assertEqual(0, receipt["execution_summary"]["external_preseed_gate_pass_count"])
+        self.assertEqual(0, receipt["execution_summary"]["guardian_preseed_oversight_event_count"])
+        self.assertEqual(0, receipt["execution_summary"]["external_preseed_oversight_satisfied_count"])
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
         self.assertEqual(
             "target-delta-to-patch-candidate-v1",
@@ -3639,7 +3655,19 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_gates_passed"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["guardian_preseed_oversight_bound"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_oversight_satisfied"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["external_preseed_gate_pass_count"])
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"]["guardian_preseed_oversight_event_count"],
+        )
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_preseed_oversight_satisfied_count"
+            ],
+        )
         self.assertTrue(
             all(
                 process["workspace_scope"] == "same-host-external-workspace"
@@ -3647,9 +3675,24 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and len(process["workspace_seed_head_commit"]) == 40
                 and process["guardian_preseed_gate_status"] == "pass"
                 and process["guardian_preseed_gate_bound"]
+                and process["guardian_oversight_event_status"] == "satisfied"
+                and process["guardian_preseed_oversight_bound"]
+                and process["reviewer_network_attested"]
+                and process["reviewer_quorum_required"] == 2
+                and process["reviewer_quorum_received"] == 2
                 and process["report"]["workspace_root"] == process["execution_workspace_root"]
                 for process in result["dispatch_receipt"]["results"]
             )
+        )
+        first_gate = result["dispatch_receipt"]["results"][0]["guardian_preseed_gate"]
+        self.assertEqual("guardian_oversight_event", first_gate["guardian_oversight_event"]["kind"])
+        self.assertEqual(
+            first_gate["gate_ref"],
+            first_gate["guardian_oversight_event"]["payload_ref"],
+        )
+        self.assertEqual(
+            "satisfied",
+            first_gate["guardian_oversight_event"]["human_attestation"]["status"],
         )
 
     def test_worker_dispatch_receipt_rejects_tampered_external_preseed_gate(self) -> None:
@@ -3664,6 +3707,23 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["all_external_preseed_gates_passed"])
         self.assertIn("guardian_preseed_gate.gate_status mismatch", validation["errors"])
+
+    def test_worker_dispatch_receipt_rejects_tampered_preseed_oversight_event(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        gate = tampered["results"][0]["guardian_preseed_gate"]
+        gate["guardian_oversight_event"]["human_attestation"]["status"] = "pending"
+        tampered["results"][0]["guardian_oversight_event_status"] = "pending"
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["all_external_preseed_oversight_satisfied"])
+        self.assertIn(
+            "guardian_oversight_event.human_attestation must satisfy reviewer quorum",
+            validation["errors"],
+        )
 
     def test_task_graph_binding_groups_eval_and_docs_under_complexity_ceiling(self) -> None:
         result = OmoikaneReferenceOS().run_yaoyorozu_demo()

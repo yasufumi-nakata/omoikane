@@ -61,7 +61,8 @@ standby probe が readiness を満たし、healthy active attestation と
 ### Substrate Broker Dual Allocation Window
 Method B の `shadow-sync` が pre-bound standby 上に second active allocation を開き、
 fixed overlap budget 内で同一 state digest を保ったまま
-`authority-handoff` までに cleanup close できるか。
+shadow-active 中の nullable lifecycle fields と
+`authority-handoff` までの cleanup close receipt を同じ公開 schema で検証できるか。
 
 ### Scheduler Stage Rollback
 AscensionScheduler が Method A の固定順序を守り、timeout 超過時に前段 stage へ戻せるか。
