@@ -75,13 +75,19 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 receipt,
             )
         self._assert_schema_valid(
+            "specs/schemas/wms_approval_collection_receipt.schema",
+            result["scenarios"]["approval_collection_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/wms_physics_rules_change_receipt.schema",
             result["scenarios"]["physics_revert"],
         )
         self.assertTrue(result["validation"]["physics_change_reversible"])
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
+        self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
         self.assertTrue(result["validation"]["physics_change"]["digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_transport_digest_bound"])
+        self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 
 

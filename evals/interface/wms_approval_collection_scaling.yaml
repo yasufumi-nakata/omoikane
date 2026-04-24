@@ -1,0 +1,26 @@
+eval_id: wms_approval_collection_scaling
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の physics_rules approval collection が大人数 shared_reality
+  でも participant order、receipt digest set、bounded batch digest を崩さず、
+  complete collection receipt に束縛されることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  approval_collection_scaling_bound: true
+  approval_collection_policy_id: bounded-wms-approval-collection-v1
+  digest_profile: participant-ordered-batch-digest-v1
+  participant_count: 3
+  receipt_count: 3
+  max_batch_size: 2
+  batch_count: 2
+  collection_status: complete
+  approval_collection_complete: true
+  participant_order_bound: true
+  transport_receipt_set_complete: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

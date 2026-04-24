@@ -8,6 +8,7 @@ imports:
   wms_reconcile: ../schemas/wms_reconcile.schema
   wms_physics_rules_change_receipt: ../schemas/wms_physics_rules_change_receipt.schema
   wms_participant_approval_transport_receipt: ../schemas/wms_participant_approval_transport_receipt.schema
+  wms_approval_collection_receipt: ../schemas/wms_approval_collection_receipt.schema
 operations:
   snapshot:
     summary: Read the current world state for one WMS session.
@@ -62,6 +63,38 @@ operations:
       - affected_object_ratio < 0.05 must reconcile via consensus_round when proposer is attested
       - unauthorized or unattested diffs must isolate the session via guardian veto
       - time_rate deviation or affected_object_ratio >= 0.05 must offer private_reality escape
+  collect_approval_transport_receipts:
+    summary: Aggregate per-participant IMC approval transport receipts into bounded, ordered batches for one physics-rules proposal.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - approval_subject_digest
+          - approval_transport_receipts
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          approval_subject_digest:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          approval_transport_receipts:
+            type: array
+            minItems: 1
+            items:
+              schema_ref: wms_participant_approval_transport_receipt
+          max_batch_size:
+            type: integer
+            minimum: 1
+            default: 2
+    output:
+      schema_ref: wms_approval_collection_receipt
+    guarantees:
+      - required_participants must preserve current WMS session participant order
+      - covered_participants must match required_participants before collection_status becomes complete
+      - receipt_digests must be grouped into batches no larger than max_batch_size
+      - collection digest must bind the ordered participant list, ordered receipt digest set, and batch digests
   switch_mode:
     summary: Change a session between shared, private, and mixed world-model modes.
     input:
@@ -178,6 +211,8 @@ operations:
             minItems: 1
             items:
               schema_ref: wms_participant_approval_transport_receipt
+          approval_collection_receipt:
+            schema_ref: wms_approval_collection_receipt
           guardian_attested:
             type: boolean
           reversible:
@@ -192,6 +227,7 @@ operations:
       - requester must be a current session participant
       - participant approvals must cover every current session participant
       - each participant approval must be backed by one IMC approval transport receipt bound to the same approval_subject_digest
+      - each apply must bind one complete approval_collection_receipt with bounded ordered batches
       - Guardian attestation and a rollback token are required before apply
       - successful apply must bind rollback_physics_rules_ref to the previous physics_rules_ref
   revert_physics_rules_change:

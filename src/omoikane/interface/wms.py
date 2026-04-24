@@ -13,6 +13,8 @@ WMS_DEFAULT_TIME_RATE = 1.0
 WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
 WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
 WMS_APPROVAL_TRANSPORT_POLICY_ID = "imc-participant-approval-transport-v1"
+WMS_APPROVAL_COLLECTION_POLICY_ID = "bounded-wms-approval-collection-v1"
+WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE = 2
 WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
 WMS_ALLOWED_MODES = {"shared_reality", "private_reality", "mixed"}
@@ -39,6 +41,10 @@ def _approval_transport_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, 
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _approval_collection_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
 class WorldModelSync:
     """Deterministic L6 world-state reconciliation and escape model."""
 
@@ -57,6 +63,8 @@ class WorldModelSync:
                 "policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
                 "required_approval": "unanimous-participant-approval",
                 "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+                "approval_collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
+                "approval_collection_max_batch_size": WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
                 "approval_transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
                 "guardian_attestation_required": True,
                 "rollback_token_required": True,
@@ -167,6 +175,129 @@ class WorldModelSync:
         }
         receipt["digest"] = sha256_text(canonical_json(_approval_transport_digest_payload(receipt)))
         return receipt
+
+    def build_approval_collection_receipt(
+        self,
+        session_id: str,
+        *,
+        approval_subject_digest: str,
+        approval_transport_receipts: Sequence[Mapping[str, Any]],
+        max_batch_size: int = WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        subject_digest = self._normalize_digest(
+            approval_subject_digest,
+            "approval_subject_digest",
+        )
+        if not isinstance(max_batch_size, int) or max_batch_size < 1:
+            raise ValueError("max_batch_size must be a positive integer")
+        required_participants = list(session["current_state"]["participants"])
+        receipts = [deepcopy(receipt) for receipt in approval_transport_receipts]
+        receipts_by_participant: Dict[str, Mapping[str, Any]] = {}
+        duplicate_participants: List[str] = []
+        invalid_receipt_count = 0
+        for receipt in receipts:
+            validation = self.validate_approval_transport_receipt(
+                receipt,
+                approval_subject_digest=subject_digest,
+            )
+            participant_id = receipt.get("participant_id")
+            if (
+                not validation["ok"]
+                or not isinstance(participant_id, str)
+                or participant_id not in required_participants
+            ):
+                invalid_receipt_count += 1
+                continue
+            if participant_id in receipts_by_participant:
+                duplicate_participants.append(participant_id)
+                continue
+            receipts_by_participant[participant_id] = receipt
+
+        covered_participants = [
+            participant
+            for participant in required_participants
+            if participant in receipts_by_participant
+        ]
+        missing_participants = [
+            participant
+            for participant in required_participants
+            if participant not in receipts_by_participant
+        ]
+        receipt_digests = [
+            receipts_by_participant[participant]["digest"]
+            for participant in covered_participants
+        ]
+        batches = []
+        for index in range(0, len(covered_participants), max_batch_size):
+            batch_participants = covered_participants[index : index + max_batch_size]
+            batch_receipt_digests = [
+                receipts_by_participant[participant]["digest"]
+                for participant in batch_participants
+            ]
+            batch = {
+                "batch_id": f"wms-approval-batch-{len(batches) + 1:02d}",
+                "participant_ids": batch_participants,
+                "receipt_digests": batch_receipt_digests,
+                "batch_size": len(batch_participants),
+                "batch_index": len(batches),
+                "within_batch_limit": len(batch_participants) <= max_batch_size,
+            }
+            batch["batch_digest"] = sha256_text(canonical_json(batch))
+            batches.append(batch)
+
+        receipt = {
+            "kind": "wms_approval_collection_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
+            "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
+            "session_id": session_id,
+            "approval_subject_digest": subject_digest,
+            "required_participants": required_participants,
+            "participant_count": len(required_participants),
+            "covered_participants": covered_participants,
+            "missing_participants": missing_participants,
+            "duplicate_participants": _dedupe_preserve_order(duplicate_participants),
+            "invalid_receipt_count": invalid_receipt_count,
+            "receipt_count": len(covered_participants),
+            "receipt_digests": receipt_digests,
+            "receipt_set_digest": sha256_text(canonical_json(receipt_digests)),
+            "max_batch_size": max_batch_size,
+            "batch_count": len(batches),
+            "batches": batches,
+            "collection_status": (
+                "complete"
+                if not missing_participants
+                and invalid_receipt_count == 0
+                and not duplicate_participants
+                else "incomplete"
+            ),
+            "approval_quorum_met": not missing_participants,
+            "transport_receipt_set_complete": (
+                not missing_participants
+                and invalid_receipt_count == 0
+                and not duplicate_participants
+            ),
+            "participant_order_bound": covered_participants == required_participants,
+            "digest_profile": "participant-ordered-batch-digest-v1",
+        }
+        receipt["digest"] = sha256_text(canonical_json(_approval_collection_digest_payload(receipt)))
+        return receipt
+
+    def collect_approval_transport_receipts(
+        self,
+        session_id: str,
+        *,
+        approval_subject_digest: str,
+        approval_transport_receipts: Sequence[Mapping[str, Any]],
+        max_batch_size: int = WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
+    ) -> Dict[str, Any]:
+        return self.build_approval_collection_receipt(
+            session_id,
+            approval_subject_digest=approval_subject_digest,
+            approval_transport_receipts=approval_transport_receipts,
+            max_batch_size=max_batch_size,
+        )
 
     def create_session(
         self,
@@ -375,6 +506,7 @@ class WorldModelSync:
         reversible: bool = True,
         rollback_physics_rules_ref: str | None = None,
         approval_transport_receipts: Sequence[Mapping[str, Any]] | None = None,
+        approval_collection_receipt: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         requester = self._normalize_non_empty_string(requested_by, "requested_by")
@@ -410,6 +542,22 @@ class WorldModelSync:
             required_approvals=required_approvals,
             approval_subject_digest=approval_subject["digest"],
         )
+        collection_receipt = (
+            deepcopy(approval_collection_receipt)
+            if approval_collection_receipt is not None
+            else self.build_approval_collection_receipt(
+                session_id,
+                approval_subject_digest=approval_subject["digest"],
+                approval_transport_receipts=transport_receipts,
+            )
+        )
+        collection_validation = self.validate_approval_collection_receipt(
+            collection_receipt,
+            required_participants=required_approvals,
+            approval_subject_digest=approval_subject["digest"],
+            approval_transport_receipts=transport_receipts,
+        )
+        approval_collection_complete = collection_validation["ok"]
         requester_allowed = requester in required_approvals
         reversible_ok = bool(reversible) and rollback_ref == previous_ref
         guardian_ok = bool(guardian_attested)
@@ -417,6 +565,7 @@ class WorldModelSync:
             requester_allowed
             and approval_quorum_met
             and approval_transport_quorum_met
+            and approval_collection_complete
             and guardian_ok
             and reversible_ok
             and proposed_ref != previous_ref
@@ -450,6 +599,10 @@ class WorldModelSync:
             "approval_transport_receipts": transport_receipts,
             "approval_transport_quorum_met": approval_transport_quorum_met,
             "approval_transport_digest": sha256_text(canonical_json(transport_receipts)),
+            "approval_collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
+            "approval_collection_receipt": collection_receipt,
+            "approval_collection_digest": collection_receipt["digest"],
+            "approval_collection_complete": approval_collection_complete,
             "guardian_attested": guardian_ok,
             "reversible": bool(reversible),
             "rollback_physics_rules_ref": rollback_ref,
@@ -525,6 +678,10 @@ class WorldModelSync:
             "approval_transport_receipts": deepcopy(target_receipt["approval_transport_receipts"]),
             "approval_transport_quorum_met": target_receipt["approval_transport_quorum_met"],
             "approval_transport_digest": target_receipt["approval_transport_digest"],
+            "approval_collection_policy_id": target_receipt["approval_collection_policy_id"],
+            "approval_collection_receipt": deepcopy(target_receipt["approval_collection_receipt"]),
+            "approval_collection_digest": target_receipt["approval_collection_digest"],
+            "approval_collection_complete": target_receipt["approval_collection_complete"],
             "guardian_attested": True,
             "reversible": True,
             "rollback_physics_rules_ref": rollback_ref,
@@ -643,6 +800,171 @@ class WorldModelSync:
             "digest_bound": digest_bound,
         }
 
+    def validate_approval_collection_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        required_participants: Sequence[str] | None = None,
+        approval_subject_digest: str | None = None,
+        approval_transport_receipts: Sequence[Mapping[str, Any]] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_approval_collection_receipt":
+            errors.append("kind must equal wms_approval_collection_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("collection_policy_id") != WMS_APPROVAL_COLLECTION_POLICY_ID:
+            errors.append("collection_policy_id mismatch")
+        if receipt.get("approval_transport_policy_id") != WMS_APPROVAL_TRANSPORT_POLICY_ID:
+            errors.append("approval_transport_policy_id mismatch")
+
+        expected_subject = approval_subject_digest
+        if expected_subject is not None:
+            try:
+                expected_subject = self._normalize_digest(
+                    expected_subject,
+                    "approval_subject_digest",
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+        subject_digest = receipt.get("approval_subject_digest")
+        if not isinstance(subject_digest, str) or len(subject_digest) != 64:
+            errors.append("approval_subject_digest must be a sha256 hex digest")
+        elif expected_subject is not None and subject_digest != expected_subject:
+            errors.append("approval_subject_digest must match expected subject")
+
+        expected_required = list(required_participants or receipt.get("required_participants", []))
+        required = receipt.get("required_participants")
+        covered = receipt.get("covered_participants")
+        missing = receipt.get("missing_participants")
+        digest_list = receipt.get("receipt_digests")
+        batches = receipt.get("batches")
+        max_batch_size = receipt.get("max_batch_size")
+        if not isinstance(required, list) or not required:
+            errors.append("required_participants must be a non-empty list")
+            required = []
+        if expected_required and required != expected_required:
+            errors.append("required_participants must preserve WMS session participant order")
+        if not isinstance(covered, list):
+            errors.append("covered_participants must be a list")
+            covered = []
+        if not isinstance(missing, list):
+            errors.append("missing_participants must be a list")
+            missing = []
+        duplicate_participants = receipt.get("duplicate_participants")
+        if not isinstance(duplicate_participants, list):
+            errors.append("duplicate_participants must be a list")
+            duplicate_participants = []
+        invalid_receipt_count = receipt.get("invalid_receipt_count")
+        if not isinstance(invalid_receipt_count, int) or invalid_receipt_count < 0:
+            errors.append("invalid_receipt_count must be a non-negative integer")
+            invalid_receipt_count = 0
+        if not isinstance(digest_list, list):
+            errors.append("receipt_digests must be a list")
+            digest_list = []
+        if not isinstance(batches, list):
+            errors.append("batches must be a list")
+            batches = []
+        if not isinstance(max_batch_size, int) or max_batch_size < 1:
+            errors.append("max_batch_size must be a positive integer")
+            max_batch_size = 0
+
+        participant_order_bound = covered == required[: len(covered)]
+        if receipt.get("participant_order_bound") is not participant_order_bound:
+            errors.append("participant_order_bound must reflect covered participant ordering")
+        missing_expected = [participant for participant in required if participant not in covered]
+        if missing != missing_expected:
+            errors.append("missing_participants must reflect required minus covered participants")
+        coverage_complete = not missing_expected and bool(required)
+        collection_complete = (
+            coverage_complete
+            and invalid_receipt_count == 0
+            and not duplicate_participants
+        )
+        if receipt.get("approval_quorum_met") is not coverage_complete:
+            errors.append("approval_quorum_met must reflect missing participant coverage")
+        if receipt.get("transport_receipt_set_complete") is not collection_complete:
+            errors.append("transport_receipt_set_complete must reflect complete valid receipt coverage")
+        if receipt.get("collection_status") not in {"complete", "incomplete"}:
+            errors.append("collection_status must be complete or incomplete")
+        elif receipt.get("collection_status") == "complete" and not collection_complete:
+            errors.append("complete collection cannot have missing participants")
+
+        expected_receipt_digests: List[str] | None = None
+        if approval_transport_receipts is not None:
+            receipt_by_participant = {
+                item.get("participant_id"): item
+                for item in approval_transport_receipts
+                if isinstance(item, Mapping)
+            }
+            expected_receipt_digests = [
+                receipt_by_participant[participant]["digest"]
+                for participant in covered
+                if participant in receipt_by_participant
+            ]
+            if digest_list != expected_receipt_digests:
+                errors.append("receipt_digests must follow covered participant order")
+
+        receipt_set_digest_bound = receipt.get("receipt_set_digest") == sha256_text(
+            canonical_json(digest_list)
+        )
+        if not receipt_set_digest_bound:
+            errors.append("receipt_set_digest must match receipt_digests")
+        batches_within_limit = True
+        batch_digest_bound = True
+        flattened_batch_participants: List[str] = []
+        flattened_batch_digests: List[str] = []
+        for batch in batches:
+            if not isinstance(batch, Mapping):
+                errors.append("batches must contain objects")
+                batches_within_limit = False
+                batch_digest_bound = False
+                continue
+            batch_participants = batch.get("participant_ids")
+            batch_digests = batch.get("receipt_digests")
+            if not isinstance(batch_participants, list) or not isinstance(batch_digests, list):
+                errors.append("batch participants and receipt_digests must be lists")
+                batches_within_limit = False
+                batch_digest_bound = False
+                continue
+            flattened_batch_participants.extend(batch_participants)
+            flattened_batch_digests.extend(batch_digests)
+            if len(batch_participants) > max_batch_size or batch.get("within_batch_limit") is not True:
+                batches_within_limit = False
+                errors.append("batch exceeds max_batch_size")
+            expected_batch = {
+                key: deepcopy(value)
+                for key, value in batch.items()
+                if key != "batch_digest"
+            }
+            if batch.get("batch_digest") != sha256_text(canonical_json(expected_batch)):
+                batch_digest_bound = False
+                errors.append("batch_digest must bind batch payload")
+        if flattened_batch_participants != covered:
+            errors.append("batches must cover participants in collection order")
+        if flattened_batch_digests != digest_list:
+            errors.append("batches must cover receipt digests in collection order")
+        if receipt.get("batch_count") != len(batches):
+            errors.append("batch_count must equal batches length")
+        if receipt.get("receipt_count") != len(covered):
+            errors.append("receipt_count must equal covered participant count")
+        expected_digest = sha256_text(canonical_json(_approval_collection_digest_payload(receipt)))
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match approval collection receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "collection_complete": collection_complete,
+            "participant_order_bound": participant_order_bound,
+            "receipt_set_digest_bound": receipt_set_digest_bound,
+            "batches_within_limit": batches_within_limit,
+            "batch_digest_bound": batch_digest_bound,
+            "digest_bound": digest_bound,
+        }
+
     def validate_state(self, state: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
         self._check_non_empty_string(state.get("state_id"), "state_id", errors)
@@ -758,6 +1080,28 @@ class WorldModelSync:
         )
         if not approval_transport_digest_bound:
             errors.append("approval_transport_digest must match approval_transport_receipts")
+        if receipt.get("approval_collection_policy_id") != WMS_APPROVAL_COLLECTION_POLICY_ID:
+            errors.append("approval_collection_policy_id mismatch")
+        approval_collection_receipt = receipt.get("approval_collection_receipt")
+        approval_collection_validation = {"ok": False}
+        if not isinstance(approval_collection_receipt, Mapping):
+            errors.append("approval_collection_receipt must be an object")
+        else:
+            approval_collection_validation = self.validate_approval_collection_receipt(
+                approval_collection_receipt,
+                required_participants=required_approvals if isinstance(required_approvals, list) else [],
+                approval_subject_digest=approval_subject_digest,
+                approval_transport_receipts=approval_transport_receipts,
+            )
+            errors.extend(
+                f"approval_collection_receipt.{error}"
+                for error in approval_collection_validation["errors"]
+            )
+            if receipt.get("approval_collection_digest") != approval_collection_receipt.get("digest"):
+                errors.append("approval_collection_digest must match approval_collection_receipt.digest")
+        approval_collection_complete = approval_collection_validation["ok"]
+        if receipt.get("approval_collection_complete") is not approval_collection_complete:
+            errors.append("approval_collection_complete must reflect approval collection validation")
         if receipt.get("guardian_attested") is not True:
             errors.append("guardian_attested must be true")
         if receipt.get("reversible") is not True:
@@ -798,6 +1142,11 @@ class WorldModelSync:
             "approval_quorum_met": approval_quorum_met,
             "approval_transport_quorum_met": approval_transport_quorum_met,
             "approval_transport_digest_bound": approval_transport_digest_bound,
+            "approval_collection_complete": approval_collection_complete,
+            "approval_collection_digest_bound": (
+                isinstance(approval_collection_receipt, Mapping)
+                and receipt.get("approval_collection_digest") == approval_collection_receipt.get("digest")
+            ),
             "guardian_attested": receipt.get("guardian_attested") is True,
             "revert_bound": revert_bound,
             "digest_bound": digest_bound,

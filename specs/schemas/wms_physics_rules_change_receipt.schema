@@ -4,9 +4,9 @@ title: WMSPhysicsRulesChangeReceipt
 description: >
   Digest-bound receipt for World Model Sync physics-rules changes. The receipt
   requires unanimous participant approval, IMC transport-bound participant
-  receipts, Guardian attestation, a rollback token, and a first-class revert
-  operation so no shared-reality physics change can be applied without a
-  reversible path.
+  receipts, a batchable approval collection receipt, Guardian attestation, a
+  rollback token, and a first-class revert operation so no shared-reality
+  physics change can be applied without a reversible path.
 type: object
 additionalProperties: false
 required:
@@ -30,6 +30,10 @@ required:
   - approval_transport_receipts
   - approval_transport_quorum_met
   - approval_transport_digest
+  - approval_collection_policy_id
+  - approval_collection_receipt
+  - approval_collection_digest
+  - approval_collection_complete
   - guardian_attested
   - reversible
   - rollback_physics_rules_ref
@@ -114,6 +118,17 @@ properties:
   approval_transport_digest:
     type: string
     pattern: "^[0-9a-f]{64}$"
+  approval_collection_policy_id:
+    type: string
+    const: bounded-wms-approval-collection-v1
+  approval_collection_receipt:
+    $ref: wms_approval_collection_receipt.schema
+  approval_collection_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_collection_complete:
+    type: boolean
+    const: true
   guardian_attested:
     type: boolean
     const: true

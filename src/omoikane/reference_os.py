@@ -7434,8 +7434,12 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://wms-peer-demo/v1",
             metadata={"display_name": "Shared Peer"},
         )
+        observer = self.identity.create(
+            human_consent_proof="consent://wms-observer-demo/v1",
+            metadata={"display_name": "Shared Observer"},
+        )
         session = self.wms.create_session(
-            [identity.identity_id, peer.identity_id],
+            [identity.identity_id, peer.identity_id, observer.identity_id],
             objects=["atrium", "council-table", "shared-lantern"],
         )
         initial_state = self.wms.snapshot(session["session_id"])
@@ -7501,19 +7505,23 @@ json.dump(response, sys.stdout)
             "intimate_fields": [],
             "sealed_fields": [],
         }
-        approval_imc_session = self.imc.open_session(
-            initiator_id=identity.identity_id,
-            peer_id=peer.identity_id,
-            mode="text",
-            initiator_template=approval_payload_template,
-            peer_template=approval_payload_template,
-            peer_attested=True,
-            forward_secrecy=True,
-            council_witnessed=True,
-        )
+        approval_imc_sessions = []
         approval_messages = []
         approval_transport_receipts = []
-        for participant_id in [identity.identity_id, peer.identity_id]:
+        for participant_id in [identity.identity_id, peer.identity_id, observer.identity_id]:
+            approval_counterparty = (
+                peer.identity_id if participant_id == identity.identity_id else identity.identity_id
+            )
+            approval_imc_session = self.imc.open_session(
+                initiator_id=approval_counterparty,
+                peer_id=participant_id,
+                mode="text",
+                initiator_template=approval_payload_template,
+                peer_template=approval_payload_template,
+                peer_attested=True,
+                forward_secrecy=True,
+                council_witnessed=True,
+            )
             approval_message = self.imc.send(
                 approval_imc_session["session_id"],
                 sender_id=participant_id,
@@ -7528,6 +7536,7 @@ json.dump(response, sys.stdout)
                 },
             )
             approval_messages.append(approval_message)
+            approval_imc_sessions.append(self.imc.snapshot(approval_imc_session["session_id"]))
             approval_transport_receipts.append(
                 self.wms.build_participant_approval_transport_receipt(
                     session["session_id"],
@@ -7537,16 +7546,27 @@ json.dump(response, sys.stdout)
                     imc_message=approval_message,
                 )
             )
-        approval_imc_snapshot = self.imc.snapshot(approval_imc_session["session_id"])
+        approval_collection_receipt = self.wms.build_approval_collection_receipt(
+            session["session_id"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_transport_receipts=approval_transport_receipts,
+        )
+        approval_collection_validation = self.wms.validate_approval_collection_receipt(
+            approval_collection_receipt,
+            required_participants=session["current_state"]["participants"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_transport_receipts=approval_transport_receipts,
+        )
 
         physics_change = self.wms.propose_physics_rules_change(
             session["session_id"],
             requested_by=identity.identity_id,
             proposed_physics_rules_ref=proposed_physics_rules_ref,
             rationale=physics_change_rationale,
-            participant_approvals=[identity.identity_id, peer.identity_id],
+            participant_approvals=[identity.identity_id, peer.identity_id, observer.identity_id],
             guardian_attested=True,
             approval_transport_receipts=approval_transport_receipts,
+            approval_collection_receipt=approval_collection_receipt,
         )
         physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
         self.ledger.append(
@@ -7584,7 +7604,7 @@ json.dump(response, sys.stdout)
             requested_by=identity.identity_id,
             proposed_physics_rules_ref=proposed_physics_rules_ref,
             rationale="static participant list must not bypass live approval transport",
-            participant_approvals=[identity.identity_id, peer.identity_id],
+            participant_approvals=[identity.identity_id, peer.identity_id, observer.identity_id],
             guardian_attested=True,
         )
 
@@ -7621,6 +7641,7 @@ json.dump(response, sys.stdout)
                 "identity_id": identity.identity_id,
                 "lineage_id": identity.lineage_id,
                 "peer_identity_id": peer.identity_id,
+                "observer_identity_id": observer.identity_id,
             },
             "profile": self.wms.reference_profile(),
             "initial_state": initial_state,
@@ -7628,8 +7649,10 @@ json.dump(response, sys.stdout)
                 "minor_diff": minor_diff,
                 "major_diff": major_diff,
                 "approval_subject": approval_subject,
-                "approval_imc_session": approval_imc_snapshot,
+                "approval_imc_session": approval_imc_sessions[0],
+                "approval_imc_sessions": approval_imc_sessions,
                 "approval_messages": approval_messages,
+                "approval_collection_receipt": approval_collection_receipt,
                 "approval_transport_receipts": approval_transport_receipts,
                 "physics_change": physics_change,
                 "physics_revert": physics_revert,
@@ -7651,6 +7674,7 @@ json.dump(response, sys.stdout)
                 and final_state["authority"] == "local",
                 "physics_change": physics_change_validation,
                 "physics_revert": physics_revert_validation,
+                "approval_collection": approval_collection_validation,
                 "physics_approval_transport_bound": physics_change_validation["approval_transport_quorum_met"]
                 and physics_change_validation["approval_transport_digest_bound"]
                 and all(
@@ -7660,6 +7684,15 @@ json.dump(response, sys.stdout)
                     )["ok"]
                     for receipt in approval_transport_receipts
                 ),
+                "approval_collection_scaling_bound": approval_collection_validation["ok"]
+                and approval_collection_receipt["batch_count"] == 2
+                and all(
+                    batch["within_batch_limit"]
+                    for batch in approval_collection_receipt["batches"]
+                )
+                and physics_change_validation["approval_collection_complete"]
+                and physics_change["approval_collection_digest"]
+                == approval_collection_receipt["digest"],
                 "static_approval_without_transport_rejected": (
                     transportless_static_approval_rejection["decision"] == "rejected"
                     and transportless_static_approval_rejection["approval_quorum_met"]

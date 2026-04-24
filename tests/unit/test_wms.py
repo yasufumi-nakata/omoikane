@@ -33,18 +33,19 @@ class WorldModelSyncTests(unittest.TestCase):
             "intimate_fields": [],
             "sealed_fields": [],
         }
-        imc_session = imc.open_session(
-            initiator_id=participants[0],
-            peer_id=participants[1],
-            mode="text",
-            initiator_template=template,
-            peer_template=template,
-            peer_attested=True,
-            forward_secrecy=True,
-            council_witnessed=True,
-        )
         receipts = []
         for participant_id in participants:
+            counterparty = participants[1] if participant_id == participants[0] else participants[0]
+            imc_session = imc.open_session(
+                initiator_id=counterparty,
+                peer_id=participant_id,
+                mode="text",
+                initiator_template=template,
+                peer_template=template,
+                peer_attested=True,
+                forward_secrecy=True,
+                council_witnessed=True,
+            )
             message = imc.send(
                 imc_session["session_id"],
                 sender_id=participant_id,
@@ -168,6 +169,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(validation["approval_quorum_met"])
         self.assertTrue(validation["approval_transport_quorum_met"])
         self.assertTrue(validation["approval_transport_digest_bound"])
+        self.assertTrue(validation["approval_collection_complete"])
+        self.assertTrue(validation["approval_collection_digest_bound"])
         self.assertTrue(validation["revert_bound"])
         self.assertTrue(validation["digest_bound"])
         self.assertEqual("applied", receipt["decision"])
@@ -192,6 +195,52 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertEqual(receipt["change_id"], reverted["revert_of_change_id"])
         self.assertEqual(baseline["physics_rules_ref"], reverted_state["physics_rules_ref"])
         self.assertEqual(receipt["rollback_token_ref"], reverted["rollback_token_ref"])
+
+    def test_approval_collection_batches_participant_receipts(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer", "identity://observer"],
+            objects=["atrium", "council-table"],
+        )
+        proposed_ref = "physics://shared-atrium/low-gravity-v1"
+        rationale = "bounded rehearsal"
+        receipts = self._approval_transport_receipts(
+            sync,
+            session,
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+        )
+        subject = sync.build_physics_rules_approval_subject(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+        )
+
+        collection = sync.build_approval_collection_receipt(
+            session["session_id"],
+            approval_subject_digest=subject["digest"],
+            approval_transport_receipts=receipts,
+            max_batch_size=2,
+        )
+        validation = sync.validate_approval_collection_receipt(
+            collection,
+            required_participants=session["current_state"]["participants"],
+            approval_subject_digest=subject["digest"],
+            approval_transport_receipts=receipts,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["collection_complete"])
+        self.assertTrue(validation["participant_order_bound"])
+        self.assertTrue(validation["receipt_set_digest_bound"])
+        self.assertTrue(validation["batches_within_limit"])
+        self.assertEqual(2, collection["batch_count"])
+        self.assertEqual(
+            ["identity://primary", "identity://peer", "identity://observer"],
+            collection["covered_participants"],
+        )
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
         sync = WorldModelSync()

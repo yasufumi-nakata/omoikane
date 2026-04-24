@@ -53,12 +53,16 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 - reference runtime では満場一致 approval を静的な participant id だけで扱わず、
   `imc-participant-approval-transport-v1` receipt で IMC handshake、
   message digest、approval subject digest、forward secrecy を束縛する
+- 大人数 shared_reality の collection は `bounded-wms-approval-collection-v1`
+  receipt で participant order、receipt digest set、bounded batch digest を固定し、
+  complete collection だけを apply へ渡す
 
 ## API
 
 ```
 wms.snapshot(session_id) → WorldState
 wms.propose_diff(session_id, diff) → ReconcileOutcome
+wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
 wms.revert_physics_rules_change(session_id, change_id) → PhysicsRulesChangeReceipt
@@ -78,20 +82,24 @@ wms.observe_violation(session_id) → ViolationReport
 - `interface.wms.v0.idl` は `snapshot / propose_diff / switch_mode / observe_violation` に加え、
   `propose_physics_rules_change / revert_physics_rules_change` を固定する
 - `world_state.schema` / `wms_reconcile.schema` /
+  `wms_approval_collection_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
   `wms_participant_approval_transport_receipt.schema` を導入
 - `wms-demo` を CLI に追加し、minor reconcile → major escalation →
-  IMC transport-bound unanimous physics_rules change → rollback-token revert →
-  malicious veto → mode 切替を実行
+  3 participant の IMC transport-bound approval collection →
+  unanimous physics_rules change → rollback-token revert → malicious veto →
+  mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_physics_rules_revert.yaml` /
-  `evals/interface/wms_participant_approval_transport.yaml` で退避路、
-  physics_rules 可逆性、participant approval の live transport binding を保証
+  `evals/interface/wms_participant_approval_transport.yaml` /
+  `evals/interface/wms_approval_collection_scaling.yaml` で退避路、
+  physics_rules 可逆性、participant approval の live transport binding、
+  ordered batch collection を保証
 
 ## 未解決
 
 - substrate 間の time_rate 同期手法 → [../../05-research-frontiers/twin-integration.md](../../05-research-frontiers/twin-integration.md)
-- 大人数 shared_reality でのスケーリング
+- distributed Council transport への approval fan-out 実装
 - 物理法則改変時の知覚適応（[../../05-research-frontiers/qualia-encoding.md](../../05-research-frontiers/qualia-encoding.md)）
 
 ## 関連
