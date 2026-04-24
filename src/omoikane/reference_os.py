@@ -4196,10 +4196,32 @@ json.dump(response, sys.stdout)
                 "workspace_profile_policy_ready": convocation["validation"][
                     "workspace_profile_policy_ready"
                 ],
+                "workspace_execution_bound": convocation["validation"][
+                    "workspace_execution_bound"
+                ],
+                "workspace_execution_policy_ready": convocation["validation"][
+                    "workspace_execution_policy_ready"
+                ],
                 "worker_dispatch_plan_ok": dispatch_plan_validation["ok"],
                 "worker_dispatch_receipt_ok": dispatch_receipt_validation["ok"],
                 "worker_dispatch_coverage_complete": dispatch_receipt_validation[
                     "coverage_complete"
+                ],
+                "candidate_bound_dispatch_count": dispatch_plan["selection_summary"][
+                    "candidate_bound_worker_count"
+                ],
+                "source_bound_dispatch_count": dispatch_plan["selection_summary"][
+                    "source_bound_worker_count"
+                ],
+                "candidate_bound_success_count": dispatch_receipt["execution_summary"][
+                    "candidate_bound_success_count"
+                ],
+                "source_bound_success_count": dispatch_receipt["execution_summary"][
+                    "source_bound_success_count"
+                ],
+                "same_host_scope_only": dispatch_receipt_validation["same_host_scope_only"],
+                "external_workspace_seeded": dispatch_receipt_validation[
+                    "external_workspace_seeded"
                 ],
                 "worker_delta_receipts_bound": dispatch_receipt_validation[
                     "all_delta_receipts_bound"

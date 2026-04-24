@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_worker_patch_candidate_receipt
 target: agentic.yaoyorozu
 level: L4
-description: Repo-local Yaoyorozu worker reports must materialize patch_descriptor-compatible patch candidate receipts from dispatch-bound git delta evidence before the ready gate passes.
+description: Same-host Yaoyorozu worker reports must materialize patch_descriptor-compatible patch candidate receipts from dispatch-bound git delta evidence before the ready gate passes.
 inputs:
   - source_root: agents
   - proposal_profile: self-modify-patch-v1

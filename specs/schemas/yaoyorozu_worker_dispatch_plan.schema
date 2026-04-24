@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/yaoyorozu_worker_dispatch_plan.schema"
 title: YaoyorozuWorkerDispatchPlan
-description: Repo-local worker dispatch plan derived from a Council convocation builder handoff.
+description: Same-host worker dispatch plan derived from a Council convocation builder handoff.
 type: object
 additionalProperties: false
 required:
@@ -82,6 +82,13 @@ properties:
         - sandbox_mode
         - workspace_scope
         - entrypoint_ref
+        - execution_workspace_ref
+        - execution_workspace_root
+        - selected_workspace_root
+        - selected_workspace_role
+        - execution_host_ref
+        - execution_transport_profile
+        - sandbox_seed_strategy
         - command_preview
         - command_digest
         - target_paths
@@ -116,9 +123,35 @@ properties:
         sandbox_mode:
           const: temp-workspace-only
         workspace_scope:
-          const: repo-local
+          type: string
+          enum:
+            - repo-local
+            - same-host-external-workspace
         entrypoint_ref:
           const: python-module://omoikane.agentic.local_worker_stub
+        execution_workspace_ref:
+          type: string
+          pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+        execution_workspace_root:
+          type: string
+          minLength: 1
+        selected_workspace_root:
+          type: string
+          minLength: 1
+        selected_workspace_role:
+          type: string
+          enum:
+            - source
+            - candidate
+        execution_host_ref:
+          const: host://local-loopback
+        execution_transport_profile:
+          const: same-host-python-subprocess-v1
+        sandbox_seed_strategy:
+          type: string
+          enum:
+            - in-place-source-worktree-v1
+            - source-target-snapshot-copy-v1
         command_preview:
           type: array
           minItems: 14
@@ -152,6 +185,8 @@ properties:
       - selected_worker_count
       - unique_coverage_areas
       - missing_coverage
+      - candidate_bound_worker_count
+      - source_bound_worker_count
       - runtime_exec_ready
     properties:
       required_worker_count:
@@ -222,6 +257,12 @@ properties:
             - schema
             - eval
             - docs
+      candidate_bound_worker_count:
+        type: integer
+        minimum: 0
+      source_bound_worker_count:
+        type: integer
+        minimum: 0
       runtime_exec_ready:
         type: boolean
   validation:
@@ -232,7 +273,8 @@ properties:
       - convocation_bound
       - builder_coverage_ok
       - unique_command_digests
-      - repo_local_scope_only
+      - workspace_execution_bound
+      - same_host_scope_only
       - profile_policy_ready
       - ok
     properties:
@@ -244,7 +286,9 @@ properties:
         const: true
       unique_command_digests:
         const: true
-      repo_local_scope_only:
+      workspace_execution_bound:
+        type: boolean
+      same_host_scope_only:
         const: true
       profile_policy_ready:
         const: true
@@ -276,6 +320,13 @@ examples:
         sandbox_mode: temp-workspace-only
         workspace_scope: repo-local
         entrypoint_ref: python-module://omoikane.agentic.local_worker_stub
+        execution_workspace_ref: workspace://omoikane-01234567
+        execution_workspace_root: /Users/example/omoikane
+        selected_workspace_root: /Users/example/omoikane
+        selected_workspace_role: source
+        execution_host_ref: host://local-loopback
+        execution_transport_profile: same-host-python-subprocess-v1
+        sandbox_seed_strategy: in-place-source-worktree-v1
         command_preview:
           - python3
           - -m
@@ -331,12 +382,15 @@ examples:
       selected_worker_count: 4
       unique_coverage_areas: [docs, eval, runtime, schema]
       missing_coverage: []
+      candidate_bound_worker_count: 0
+      source_bound_worker_count: 4
       runtime_exec_ready: true
     validation:
       registry_bound: true
       convocation_bound: true
       builder_coverage_ok: true
       unique_command_digests: true
-      repo_local_scope_only: true
+      workspace_execution_bound: false
+      same_host_scope_only: true
       profile_policy_ready: true
       ok: true

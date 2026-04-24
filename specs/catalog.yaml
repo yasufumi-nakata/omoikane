@@ -1880,7 +1880,7 @@ entries:
       - docs/02-subsystems/agentic/README.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to serialize one repo-local builder handoff dispatch plan with fixed coverage areas, subprocess command previews, and explicit dispatch/unit report bindings.
+    rationale: Required to serialize one same-host builder handoff dispatch plan with fixed coverage areas, subprocess command previews, execution workspace refs, and explicit dispatch/unit report bindings.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -1889,7 +1889,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one repo-local worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
+    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema
@@ -1964,7 +1964,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and local worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and same-host worker dispatch machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -2006,7 +2006,14 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects repo-local subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
+    rationale: Protects same-host subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_external_workspace_execution.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects candidate workspace execution binding, source target-path snapshot seeding, same-host scope enforcement, and candidate/source success counts for Yaoyorozu builder workers.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_worker_delta_receipt.yaml

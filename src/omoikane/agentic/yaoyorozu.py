@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
@@ -45,6 +46,11 @@ YAOYOROZU_WORKER_DISPATCH_SCOPE = "repo-local-subprocess"
 YAOYOROZU_WORKER_SANDBOX_MODE = "temp-workspace-only"
 YAOYOROZU_WORKER_ENTRYPOINT_REF = "python-module://omoikane.agentic.local_worker_stub"
 YAOYOROZU_WORKSPACE_SCOPE = "repo-local"
+YAOYOROZU_EXTERNAL_WORKSPACE_SCOPE = "same-host-external-workspace"
+YAOYOROZU_WORKSPACE_EXECUTION_POLICY_ID = "proposal-profile-aware-external-workspace-execution-v1"
+YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE = "same-host-python-subprocess-v1"
+YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY = "source-target-snapshot-copy-v1"
+YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY = "in-place-source-worktree-v1"
 YAOYOROZU_PATCH_PRIORITY_TIER_ORDER = {
     "none": 0,
     "low": 1,
@@ -101,21 +107,25 @@ YAOYOROZU_BUILD_REQUEST_STATIC_OUTPUT_PATHS = [
 YAOYOROZU_PROFILE_BUILD_REQUEST_EVALS = {
     "self-modify-patch-v1": [
         "evals/agentic/yaoyorozu_local_worker_dispatch.yaml",
+        "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
         "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
         "evals/agentic/yaoyorozu_task_graph_binding.yaml",
     ],
     "memory-edit-v1": [
         "evals/agentic/yaoyorozu_memory_edit_profile.yaml",
+        "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
         "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
         "evals/agentic/yaoyorozu_task_graph_binding.yaml",
     ],
     "fork-request-v1": [
         "evals/agentic/yaoyorozu_fork_request_profile.yaml",
+        "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
         "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
         "evals/agentic/yaoyorozu_task_graph_binding.yaml",
     ],
     "inter-mind-negotiation-v1": [
         "evals/agentic/yaoyorozu_inter_mind_negotiation_profile.yaml",
+        "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
         "evals/agentic/yaoyorozu_consensus_dispatch.yaml",
         "evals/agentic/yaoyorozu_task_graph_binding.yaml",
     ],
@@ -363,6 +373,13 @@ def _dispatch_unit_digest_payload(unit: Mapping[str, Any]) -> Dict[str, Any]:
         "sandbox_mode": unit["sandbox_mode"],
         "workspace_scope": unit["workspace_scope"],
         "entrypoint_ref": unit["entrypoint_ref"],
+        "execution_workspace_ref": unit["execution_workspace_ref"],
+        "execution_workspace_root": unit["execution_workspace_root"],
+        "selected_workspace_root": unit["selected_workspace_root"],
+        "selected_workspace_role": unit["selected_workspace_role"],
+        "execution_host_ref": unit["execution_host_ref"],
+        "execution_transport_profile": unit["execution_transport_profile"],
+        "sandbox_seed_strategy": unit["sandbox_seed_strategy"],
         "command_preview": unit["command_preview"],
         "target_paths": unit["target_paths"],
     }
@@ -562,6 +579,19 @@ def _workspace_discovery_digest_payload(discovery: Mapping[str, Any]) -> Dict[st
     }
 
 
+def _workspace_execution_target_digest_payload(target: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "coverage_area": target["coverage_area"],
+        "workspace_ref": target["workspace_ref"],
+        "workspace_root": target["workspace_root"],
+        "workspace_role": target["workspace_role"],
+        "source_kind": target["source_kind"],
+        "workspace_scope": target["workspace_scope"],
+        "execution_transport_profile": target["execution_transport_profile"],
+        "sandbox_seed_strategy": target["sandbox_seed_strategy"],
+    }
+
+
 @dataclass(frozen=True)
 class YaoyorozuRegistryEntry:
     """One repo-local agent definition with trust-bound runtime metadata."""
@@ -613,6 +643,11 @@ class YaoyorozuRegistryPolicy:
     worker_sandbox_mode: str = YAOYOROZU_WORKER_SANDBOX_MODE
     worker_entrypoint_ref: str = YAOYOROZU_WORKER_ENTRYPOINT_REF
     worker_workspace_scope: str = YAOYOROZU_WORKSPACE_SCOPE
+    external_workspace_scope: str = YAOYOROZU_EXTERNAL_WORKSPACE_SCOPE
+    workspace_execution_policy_id: str = YAOYOROZU_WORKSPACE_EXECUTION_POLICY_ID
+    workspace_execution_transport_profile: str = YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE
+    inline_workspace_seed_strategy: str = YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY
+    external_workspace_seed_strategy: str = YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY
     workspace_discovery_profile: str = YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE
     workspace_discovery_scope: str = YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE
     workspace_discovery_host_ref: str = YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF
@@ -972,6 +1007,216 @@ class YaoyorozuRegistryService:
             ),
         }
 
+    def _workspace_index(
+        self,
+        workspace_discovery: Mapping[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        index: Dict[str, Dict[str, Any]] = {}
+        for workspace in workspace_discovery.get("workspaces", []):
+            if not isinstance(workspace, Mapping):
+                continue
+            workspace_ref = str(workspace.get("workspace_ref", "")).strip()
+            if workspace_ref:
+                index[workspace_ref] = dict(workspace)
+        return index
+
+    def _build_workspace_execution_binding(
+        self,
+        *,
+        workspace_discovery: Mapping[str, Any],
+        dispatch_builder_coverage: Sequence[str],
+        required_builder_coverage: Sequence[str],
+    ) -> Dict[str, Any]:
+        workspace_index = self._workspace_index(workspace_discovery)
+        source_workspace_ref = _non_empty_string(
+            workspace_discovery.get("source_workspace_ref"),
+            "workspace_discovery.source_workspace_ref",
+        )
+        source_workspace = workspace_index.get(source_workspace_ref)
+        if source_workspace is None:
+            raise ValueError("workspace_discovery source workspace must remain bound")
+
+        coverage_summary = workspace_discovery.get("coverage_summary", {})
+        if not isinstance(coverage_summary, Mapping):
+            raise ValueError("workspace_discovery.coverage_summary must be a mapping")
+        non_source_coverage_map = coverage_summary.get("non_source_coverage_to_workspace_refs", {})
+        if not isinstance(non_source_coverage_map, Mapping):
+            raise ValueError(
+                "workspace_discovery.coverage_summary.non_source_coverage_to_workspace_refs must be a mapping"
+            )
+
+        execution_targets: List[Dict[str, Any]] = []
+        candidate_bound_coverage_areas: List[str] = []
+        source_bound_coverage_areas: List[str] = []
+        for coverage_area in dispatch_builder_coverage:
+            candidate_refs = non_source_coverage_map.get(coverage_area, [])
+            if not isinstance(candidate_refs, list):
+                candidate_refs = []
+            selected_workspace = None
+            selected_scope = self._policy.worker_workspace_scope
+            sandbox_seed_strategy = self._policy.inline_workspace_seed_strategy
+            if candidate_refs:
+                for workspace_ref in candidate_refs:
+                    workspace = workspace_index.get(str(workspace_ref))
+                    if workspace is not None:
+                        selected_workspace = workspace
+                        break
+            if selected_workspace is None:
+                selected_workspace = source_workspace
+                source_bound_coverage_areas.append(str(coverage_area))
+            else:
+                selected_scope = self._policy.external_workspace_scope
+                sandbox_seed_strategy = self._policy.external_workspace_seed_strategy
+                candidate_bound_coverage_areas.append(str(coverage_area))
+
+            target = {
+                "coverage_area": str(coverage_area),
+                "workspace_ref": _non_empty_string(
+                    selected_workspace.get("workspace_ref"),
+                    f"workspace_execution_binding.{coverage_area}.workspace_ref",
+                ),
+                "workspace_root": _non_empty_string(
+                    selected_workspace.get("workspace_root"),
+                    f"workspace_execution_binding.{coverage_area}.workspace_root",
+                ),
+                "workspace_role": _non_empty_string(
+                    selected_workspace.get("workspace_role"),
+                    f"workspace_execution_binding.{coverage_area}.workspace_role",
+                ),
+                "source_kind": _non_empty_string(
+                    selected_workspace.get("source_kind"),
+                    f"workspace_execution_binding.{coverage_area}.source_kind",
+                ),
+                "workspace_scope": selected_scope,
+                "execution_transport_profile": self._policy.workspace_execution_transport_profile,
+                "sandbox_seed_strategy": sandbox_seed_strategy,
+            }
+            target["target_digest"] = sha256_text(
+                canonical_json(_workspace_execution_target_digest_payload(target))
+            )
+            execution_targets.append(target)
+
+        dispatch_builder_coverage_list = list(dispatch_builder_coverage)
+        required_builder_coverage_list = list(required_builder_coverage)
+        binding = {
+            "execution_policy_id": self._policy.workspace_execution_policy_id,
+            "host_ref": self._policy.workspace_discovery_host_ref,
+            "source_workspace_ref": source_workspace_ref,
+            "source_workspace_root": _non_empty_string(
+                source_workspace.get("workspace_root"),
+                "workspace_discovery.source_workspace_root",
+            ),
+            "dispatch_builder_coverage_areas": dispatch_builder_coverage_list,
+            "required_candidate_binding_areas": required_builder_coverage_list,
+            "candidate_bound_coverage_areas": candidate_bound_coverage_areas,
+            "source_bound_coverage_areas": source_bound_coverage_areas,
+            "execution_targets": execution_targets,
+        }
+        binding["binding_digest"] = sha256_text(canonical_json(binding))
+        return binding
+
+    @staticmethod
+    def _external_execution_workspace_root(
+        selected_workspace_root: str,
+        dispatch_id: str,
+        coverage_area: str,
+    ) -> Path:
+        return (
+            Path(selected_workspace_root).resolve()
+            / ".yaoyorozu-external-execution"
+            / dispatch_id
+            / coverage_area
+        )
+
+    @staticmethod
+    def _copy_target_path_into_workspace(
+        *,
+        source_root: Path,
+        execution_root: Path,
+        target_path: str,
+    ) -> None:
+        source_path = (source_root / target_path).resolve()
+        destination_path = (execution_root / target_path).resolve()
+        if not source_path.exists():
+            raise ValueError(f"source target path does not exist for external execution: {target_path}")
+        if source_path.is_dir():
+            shutil.copytree(
+                source_path,
+                destination_path,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(
+                    "__pycache__",
+                    "*.pyc",
+                    "*.pyo",
+                    ".mypy_cache",
+                    ".pytest_cache",
+                    ".ruff_cache",
+                ),
+            )
+            return
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, destination_path)
+
+    def _seed_external_execution_workspace(
+        self,
+        *,
+        source_root: Path,
+        execution_root: Path,
+        target_paths: Sequence[str],
+    ) -> str:
+        if execution_root.exists():
+            shutil.rmtree(execution_root)
+        execution_root.mkdir(parents=True, exist_ok=True)
+        for target_path in target_paths:
+            self._copy_target_path_into_workspace(
+                source_root=source_root,
+                execution_root=execution_root,
+                target_path=str(target_path),
+            )
+        subprocess.run(
+            ["git", "init"],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "yaoyorozu@example.local"],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Yaoyorozu External Dispatch"],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Seed external workspace dispatch sandbox"],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=execution_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return head.stdout.strip()
+
     def _task_graph_bundle_strategy(
         self,
         proposal_profile: str,
@@ -1295,7 +1540,11 @@ class YaoyorozuRegistryService:
             "profile_policy_bound": True,
             "cross_workspace_coverage_complete": not non_source_profile_missing_coverage_areas,
         }
-        validation["ok"] = all(validation.values())
+        validation["ok"] = all(
+            value
+            for key, value in validation.items()
+            if key != "workspace_execution_bound"
+        )
         discovery = {
             "kind": "yaoyorozu_workspace_discovery",
             "schema_version": "1.0.0",
@@ -1583,7 +1832,9 @@ class YaoyorozuRegistryService:
             requested_optional_builder_coverage,
         )
         workspace_discovery_binding: Dict[str, Any] | None = None
+        workspace_execution_binding: Dict[str, Any] | None = None
         workspace_profile_policy_ready = True
+        workspace_execution_policy_ready = True
         if workspace_discovery is not None:
             workspace_discovery_validation = self.validate_workspace_discovery(workspace_discovery)
             if workspace_discovery.get("proposal_profile") != profile_id:
@@ -1615,6 +1866,11 @@ class YaoyorozuRegistryService:
                     workspace_discovery_validation["cross_workspace_coverage_complete"]
                 ),
             }
+            workspace_execution_binding = self._build_workspace_execution_binding(
+                workspace_discovery=workspace_discovery,
+                dispatch_builder_coverage=dispatch_builder_coverage,
+                required_builder_coverage=required_builder_coverage,
+            )
             workspace_profile_policy_ready = (
                 workspace_discovery_binding["workspace_review_budget"]
                 == workspace_discovery.get("review_budget")
@@ -1625,6 +1881,20 @@ class YaoyorozuRegistryService:
                 and workspace_discovery_binding["optional_workspace_coverage_areas"]
                 == workspace_discovery.get("profile_policy", {}).get(
                     "optional_workspace_coverage_areas"
+                )
+            )
+            workspace_execution_policy_ready = (
+                workspace_execution_binding["dispatch_builder_coverage_areas"]
+                == list(dispatch_builder_coverage)
+                and workspace_execution_binding["required_candidate_binding_areas"]
+                == list(required_builder_coverage)
+                and all(
+                    coverage_area in workspace_execution_binding["candidate_bound_coverage_areas"]
+                    for coverage_area in required_builder_coverage
+                )
+                and not any(
+                    coverage_area in workspace_execution_binding["source_bound_coverage_areas"]
+                    for coverage_area in required_builder_coverage
                 )
             )
 
@@ -1720,11 +1990,13 @@ class YaoyorozuRegistryService:
             ),
             "workspace_discovery_bound": workspace_discovery_binding is not None,
             "workspace_profile_policy_ready": workspace_profile_policy_ready,
+            "workspace_execution_bound": workspace_execution_binding is not None,
+            "workspace_execution_policy_ready": workspace_execution_policy_ready,
         }
         validation["ok"] = all(
             value
             for key, value in validation.items()
-            if key != "workspace_discovery_bound"
+            if key not in {"workspace_discovery_bound", "workspace_execution_bound"}
         )
         session_body = {
             "registry_snapshot_ref": (
@@ -1756,6 +2028,8 @@ class YaoyorozuRegistryService:
         }
         if workspace_discovery_binding is not None:
             session_body["workspace_discovery_binding"] = workspace_discovery_binding
+        if workspace_execution_binding is not None:
+            session_body["workspace_execution_binding"] = workspace_execution_binding
         return {
             "kind": "council_convocation_session",
             "schema_version": "1.0.0",
@@ -1778,6 +2052,14 @@ class YaoyorozuRegistryService:
         repo_root = self._agents_root.parent
         dispatch_id = new_id("yaoyorozu-dispatch")
         dispatch_plan_ref = f"dispatch://{dispatch_id}"
+        workspace_execution_binding = convocation_session.get("workspace_execution_binding", {})
+        execution_target_index: Dict[str, Dict[str, Any]] = {}
+        if isinstance(workspace_execution_binding, Mapping):
+            for target in workspace_execution_binding.get("execution_targets", []):
+                if isinstance(target, Mapping):
+                    coverage_area = str(target.get("coverage_area", "")).strip()
+                    if coverage_area:
+                        execution_target_index[coverage_area] = dict(target)
         dispatch_units: List[Dict[str, Any]] = []
         selected_coverage: List[str] = []
         for selection in builder_handoff:
@@ -1790,6 +2072,44 @@ class YaoyorozuRegistryService:
                 continue
 
             target_paths = list(self._policy.worker_target_paths[coverage_area])
+            execution_target = execution_target_index.get(coverage_area)
+            selected_workspace_ref = _workspace_ref_from_root(repo_root)
+            selected_workspace_root = str(repo_root)
+            selected_workspace_role = "source"
+            workspace_scope = self._policy.worker_workspace_scope
+            sandbox_seed_strategy = self._policy.inline_workspace_seed_strategy
+            if execution_target is not None:
+                selected_workspace_ref = _non_empty_string(
+                    execution_target.get("workspace_ref"),
+                    "workspace_execution_binding.workspace_ref",
+                )
+                selected_workspace_root = _non_empty_string(
+                    execution_target.get("workspace_root"),
+                    "workspace_execution_binding.workspace_root",
+                )
+                selected_workspace_role = _non_empty_string(
+                    execution_target.get("workspace_role"),
+                    "workspace_execution_binding.workspace_role",
+                )
+                workspace_scope = _non_empty_string(
+                    execution_target.get("workspace_scope"),
+                    "workspace_execution_binding.workspace_scope",
+                )
+                sandbox_seed_strategy = _non_empty_string(
+                    execution_target.get("sandbox_seed_strategy"),
+                    "workspace_execution_binding.sandbox_seed_strategy",
+                )
+            execution_workspace_root = (
+                str(
+                    self._external_execution_workspace_root(
+                        selected_workspace_root,
+                        dispatch_id,
+                        coverage_area,
+                    )
+                )
+                if workspace_scope == self._policy.external_workspace_scope
+                else str(repo_root)
+            )
             unit_id = new_id("worker-dispatch")
             command_preview = [
                 "python3",
@@ -1804,13 +2124,13 @@ class YaoyorozuRegistryService:
                 "--dispatch-profile",
                 self._policy.worker_dispatch_profile,
                 "--workspace-scope",
-                self._policy.worker_workspace_scope,
+                workspace_scope,
                 "--dispatch-plan-ref",
                 dispatch_plan_ref,
                 "--dispatch-unit-ref",
                 unit_id,
                 "--workspace-root",
-                str(repo_root),
+                execution_workspace_root,
                 "--source-ref",
                 _non_empty_string(selection.get("source_ref"), "builder_handoff.source_ref"),
             ]
@@ -1830,10 +2150,17 @@ class YaoyorozuRegistryService:
                 "source_kind": "repo-local-agent",
                 "dispatch_scope": self._policy.worker_dispatch_scope,
                 "sandbox_mode": self._policy.worker_sandbox_mode,
-                "workspace_scope": self._policy.worker_workspace_scope,
+                "workspace_scope": workspace_scope,
                 "entrypoint_ref": self._policy.worker_entrypoint_ref,
                 "command_preview": command_preview,
                 "target_paths": target_paths,
+                "execution_workspace_ref": selected_workspace_ref,
+                "execution_workspace_root": execution_workspace_root,
+                "selected_workspace_root": selected_workspace_root,
+                "selected_workspace_role": selected_workspace_role,
+                "execution_host_ref": self._policy.workspace_discovery_host_ref,
+                "execution_transport_profile": self._policy.workspace_execution_transport_profile,
+                "sandbox_seed_strategy": sandbox_seed_strategy,
                 "expected_report_fields": list(YAOYOROZU_WORKER_REPORT_FIELDS),
             }
             unit["command_digest"] = sha256_text(canonical_json(_dispatch_unit_digest_payload(unit)))
@@ -1893,9 +2220,14 @@ class YaoyorozuRegistryService:
                 and len(dispatch_units) == len(dispatch_coverage)
             ),
             "unique_command_digests": unique_command_digests,
-            "repo_local_scope_only": all(
+            "workspace_execution_bound": any(
+                unit["workspace_scope"] == self._policy.external_workspace_scope
+                for unit in dispatch_units
+            ),
+            "same_host_scope_only": all(
                 unit["dispatch_scope"] == self._policy.worker_dispatch_scope
-                and unit["workspace_scope"] == self._policy.worker_workspace_scope
+                and unit["workspace_scope"]
+                in {self._policy.worker_workspace_scope, self._policy.external_workspace_scope}
                 for unit in dispatch_units
             ),
             "profile_policy_ready": (
@@ -1909,7 +2241,11 @@ class YaoyorozuRegistryService:
                 )
             ),
         }
-        validation["ok"] = all(validation.values())
+        validation["ok"] = all(
+            value
+            for key, value in validation.items()
+            if key != "workspace_execution_bound"
+        )
         dispatch_body = {
             "dispatch_profile": self._policy.worker_dispatch_profile,
             "registry_snapshot_ref": (
@@ -1944,6 +2280,16 @@ class YaoyorozuRegistryService:
                 "selected_worker_count": len(dispatch_units),
                 "unique_coverage_areas": sorted(set(selected_coverage)),
                 "missing_coverage": missing_coverage,
+                "candidate_bound_worker_count": sum(
+                    1
+                    for unit in dispatch_units
+                    if unit["workspace_scope"] == self._policy.external_workspace_scope
+                ),
+                "source_bound_worker_count": sum(
+                    1
+                    for unit in dispatch_units
+                    if unit["workspace_scope"] == self._policy.worker_workspace_scope
+                ),
                 "runtime_exec_ready": bool(dispatch_units),
             },
             "validation": validation,
@@ -2016,6 +2362,8 @@ class YaoyorozuRegistryService:
 
         coverage_areas: List[str] = []
         digests: List[str] = []
+        candidate_bound_worker_count = 0
+        source_bound_worker_count = 0
         for unit in units:
             if not isinstance(unit, Mapping):
                 errors.append("dispatch_units entries must be mappings")
@@ -2030,15 +2378,42 @@ class YaoyorozuRegistryService:
                 errors.append("dispatch unit must remain repo-local-subprocess scoped")
             if unit.get("sandbox_mode") != self._policy.worker_sandbox_mode:
                 errors.append("dispatch unit sandbox_mode must be temp-workspace-only")
-            if unit.get("workspace_scope") != self._policy.worker_workspace_scope:
-                errors.append("dispatch unit workspace_scope must be repo-local")
+            if unit.get("workspace_scope") not in {
+                self._policy.worker_workspace_scope,
+                self._policy.external_workspace_scope,
+            }:
+                errors.append("dispatch unit workspace_scope must stay within the same-host policy")
+            elif unit.get("workspace_scope") == self._policy.external_workspace_scope:
+                candidate_bound_worker_count += 1
+            else:
+                source_bound_worker_count += 1
             if unit.get("entrypoint_ref") != self._policy.worker_entrypoint_ref:
                 errors.append("dispatch unit entrypoint_ref mismatch")
+            if not str(unit.get("execution_workspace_ref", "")).strip():
+                errors.append("dispatch unit execution_workspace_ref must be a non-empty string")
+            if not str(unit.get("execution_workspace_root", "")).strip():
+                errors.append("dispatch unit execution_workspace_root must be a non-empty string")
+            if not str(unit.get("selected_workspace_root", "")).strip():
+                errors.append("dispatch unit selected_workspace_root must be a non-empty string")
+            if str(unit.get("selected_workspace_role", "")).strip() not in {"source", "candidate"}:
+                errors.append("dispatch unit selected_workspace_role mismatch")
+            if unit.get("execution_host_ref") != self._policy.workspace_discovery_host_ref:
+                errors.append("dispatch unit execution_host_ref mismatch")
+            if unit.get("execution_transport_profile") != self._policy.workspace_execution_transport_profile:
+                errors.append("dispatch unit execution_transport_profile mismatch")
+            sandbox_seed_strategy = unit.get("sandbox_seed_strategy")
+            if sandbox_seed_strategy not in {
+                self._policy.inline_workspace_seed_strategy,
+                self._policy.external_workspace_seed_strategy,
+            }:
+                errors.append("dispatch unit sandbox_seed_strategy mismatch")
             command_preview = unit.get("command_preview", [])
             if f"dispatch://{dispatch_plan.get('dispatch_id', '')}" not in command_preview:
                 errors.append("dispatch unit command preview must bind the dispatch plan ref")
             if str(unit.get("unit_id", "")) not in command_preview:
                 errors.append("dispatch unit command preview must bind the dispatch unit ref")
+            if str(unit.get("execution_workspace_root", "")) not in command_preview:
+                errors.append("dispatch unit command preview must bind the execution workspace root")
 
         missing_coverage = [coverage for coverage in dispatch_coverage if coverage not in coverage_areas]
         unexpected_coverage = [
@@ -2054,6 +2429,14 @@ class YaoyorozuRegistryService:
             errors.append("selection_summary.unique_coverage_areas must match dispatch unit coverage")
         if selection_summary.get("missing_coverage") != missing_coverage:
             errors.append("selection_summary.missing_coverage must match required coverage delta")
+        if selection_summary.get("candidate_bound_worker_count") != candidate_bound_worker_count:
+            errors.append(
+                "selection_summary.candidate_bound_worker_count must match external workspace units"
+            )
+        if selection_summary.get("source_bound_worker_count") != source_bound_worker_count:
+            errors.append(
+                "selection_summary.source_bound_worker_count must match repo-local units"
+            )
 
         return {
             "ok": not errors and not missing_coverage and not unexpected_coverage,
@@ -2098,10 +2481,26 @@ class YaoyorozuRegistryService:
             preview = unit.get("command_preview")
             if not isinstance(preview, list) or not all(isinstance(item, str) for item in preview):
                 raise ValueError("dispatch unit command_preview must be a list of strings")
+            workspace_scope = _non_empty_string(unit.get("workspace_scope"), "unit.workspace_scope")
+            selected_workspace_root = Path(
+                _non_empty_string(unit.get("selected_workspace_root"), "unit.selected_workspace_root")
+            ).resolve()
+            execution_root = Path(
+                _non_empty_string(unit.get("execution_workspace_root"), "unit.execution_workspace_root")
+            ).resolve()
+            workspace_seed_status = "inline"
+            workspace_seed_head_commit = ""
+            if workspace_scope == self._policy.external_workspace_scope:
+                workspace_seed_head_commit = self._seed_external_execution_workspace(
+                    source_root=repo_root,
+                    execution_root=execution_root,
+                    target_paths=list(unit["target_paths"]),
+                )
+                workspace_seed_status = "seeded"
             command = [sys.executable if preview[0] == "python3" else preview[0], *preview[1:]]
             process = subprocess.Popen(
                 command,
-                cwd=repo_root,
+                cwd=execution_root,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -2123,19 +2522,19 @@ class YaoyorozuRegistryService:
                 role_id=str(unit["role_id"]),
                 coverage_area=str(unit["coverage_area"]),
                 dispatch_profile=str(dispatch_plan["dispatch_profile"]),
-                workspace_scope=self._policy.worker_workspace_scope,
+                workspace_scope=workspace_scope,
                 source_ref=str(unit["source_ref"]),
-                workspace_root=str(repo_root),
+                workspace_root=str(execution_root),
                 target_paths=list(unit["target_paths"]),
             )
             workspace_delta_receipt = build_workspace_delta_receipt(
-                workspace_root=repo_root,
+                workspace_root=execution_root,
                 dispatch_plan_ref=dispatch_plan_ref,
                 dispatch_unit_ref=str(unit["unit_id"]),
                 target_paths=list(unit["target_paths"]),
             )
             patch_candidate_receipt = build_patch_candidate_receipt(
-                workspace_root=repo_root,
+                workspace_root=execution_root,
                 dispatch_plan_ref=dispatch_plan_ref,
                 dispatch_unit_ref=str(unit["unit_id"]),
                 source_ref=str(unit["source_ref"]),
@@ -2151,13 +2550,13 @@ class YaoyorozuRegistryService:
                     "role_id": unit["role_id"],
                     "coverage_area": unit["coverage_area"],
                     "dispatch_profile": dispatch_plan["dispatch_profile"],
-                    "workspace_scope": self._policy.worker_workspace_scope,
+                    "workspace_scope": workspace_scope,
                     "dispatch_plan_ref": dispatch_plan_ref,
                     "dispatch_unit_ref": unit["unit_id"],
                     "source_ref": unit["source_ref"],
                     "target_paths": list(unit["target_paths"]),
-                    "workspace_root": str(repo_root),
-                    "workspace_root_digest": sha256_text(str(repo_root)),
+                    "workspace_root": str(execution_root),
+                    "workspace_root_digest": sha256_text(str(execution_root)),
                     "invocation_digest": expected_binding_digest,
                     "target_path_observations": [],
                     "workspace_delta_receipt": workspace_delta_receipt,
@@ -2203,7 +2602,8 @@ class YaoyorozuRegistryService:
                 report.get("report_profile") == YAOYOROZU_WORKER_REPORT_PROFILE
                 and report.get("dispatch_plan_ref") == dispatch_plan_ref
                 and report.get("dispatch_unit_ref") == unit["unit_id"]
-                and report.get("workspace_root") == str(repo_root)
+                and report.get("workspace_root") == str(execution_root)
+                and report.get("workspace_scope") == workspace_scope
                 and report.get("invocation_digest") == expected_binding_digest
                 and report.get("source_ref") == unit["source_ref"]
                 and report.get("target_paths") == unit["target_paths"]
@@ -2214,7 +2614,7 @@ class YaoyorozuRegistryService:
                 and delta_receipt.get("profile_id") == YAOYOROZU_WORKER_DELTA_SCAN_PROFILE
                 and delta_receipt.get("dispatch_plan_ref") == dispatch_plan_ref
                 and delta_receipt.get("dispatch_unit_ref") == unit["unit_id"]
-                and delta_receipt.get("workspace_root") == str(repo_root)
+                and delta_receipt.get("workspace_root") == str(execution_root)
                 and delta_receipt.get("target_paths") == unit["target_paths"]
                 and delta_receipt.get("status") in {"clean", "delta-detected"}
                 and isinstance(delta_entries, list)
@@ -2232,7 +2632,7 @@ class YaoyorozuRegistryService:
                 == YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
                 and patch_candidate_receipt.get("dispatch_plan_ref") == dispatch_plan_ref
                 and patch_candidate_receipt.get("dispatch_unit_ref") == unit["unit_id"]
-                and patch_candidate_receipt.get("workspace_root") == str(repo_root)
+                and patch_candidate_receipt.get("workspace_root") == str(execution_root)
                 and patch_candidate_receipt.get("source_ref") == unit["source_ref"]
                 and patch_candidate_receipt.get("coverage_area") == unit["coverage_area"]
                 and patch_candidate_receipt.get("target_paths") == unit["target_paths"]
@@ -2291,6 +2691,16 @@ class YaoyorozuRegistryService:
                 "delta_receipt_ok": delta_receipt_ok,
                 "patch_candidate_receipt_ok": patch_candidate_receipt_ok,
                 "target_paths_ready": target_paths_ready,
+                "workspace_scope": workspace_scope,
+                "execution_workspace_ref": unit["execution_workspace_ref"],
+                "execution_workspace_root": str(execution_root),
+                "selected_workspace_root": str(selected_workspace_root),
+                "selected_workspace_role": unit["selected_workspace_role"],
+                "execution_host_ref": unit["execution_host_ref"],
+                "execution_transport_profile": unit["execution_transport_profile"],
+                "sandbox_seed_strategy": unit["sandbox_seed_strategy"],
+                "workspace_seed_status": workspace_seed_status,
+                "workspace_seed_head_commit": workspace_seed_head_commit,
                 "report": report,
             }
             if (
@@ -2340,6 +2750,7 @@ class YaoyorozuRegistryService:
                 and result["reported_status"] == "ready"
                 and result["report_binding_ok"]
                 and result["delta_receipt_ok"]
+                and result["patch_candidate_receipt_ok"]
                 and result["target_paths_ready"]
             ),
             "failed_role_ids": failed_role_ids,
@@ -2352,6 +2763,22 @@ class YaoyorozuRegistryService:
                 dispatch_plan["selection_summary"]["dispatch_coverage_areas"]
             ),
             "coverage_areas": [str(result["coverage_area"]) for result in results],
+            "candidate_bound_success_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["process_status"] == "completed"
+                and result["exit_code"] == 0
+                and result["reported_status"] == "ready"
+            ),
+            "source_bound_success_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.worker_workspace_scope
+                and result["process_status"] == "completed"
+                and result["exit_code"] == 0
+                and result["reported_status"] == "ready"
+            ),
             "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
             "delta_bound_count": sum(1 for result in results if result["delta_receipt_ok"]),
             "patch_candidate_bound_count": sum(
@@ -2376,6 +2803,21 @@ class YaoyorozuRegistryService:
             ),
             "all_processes_exited_zero": all(result["exit_code"] == 0 for result in results),
             "all_reports_ready": all(result["reported_status"] == "ready" for result in results),
+            "same_host_scope_only": all(
+                result["workspace_scope"]
+                in {self._policy.worker_workspace_scope, self._policy.external_workspace_scope}
+                for result in results
+            ),
+            "external_workspace_seeded": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or (
+                        result["workspace_seed_status"] == "seeded"
+                        and len(result["workspace_seed_head_commit"]) == 40
+                    )
+                )
+                for result in results
+            ),
             "profile_coverage_bound": (
                 execution_summary["required_coverage_areas"]
                 == list(dispatch_plan["selection_summary"]["required_coverage_areas"])
@@ -2479,11 +2921,61 @@ class YaoyorozuRegistryService:
             normalized_requested_optional = []
 
         coverage_areas: List[str] = []
+        candidate_bound_success_count = 0
+        source_bound_success_count = 0
+        completed_process_count = 0
+        failed_role_ids: List[str] = []
+        target_ready_count = 0
+        delta_bound_count = 0
+        patch_candidate_bound_count = 0
         for result in results:
             if not isinstance(result, Mapping):
                 errors.append("results entries must be mappings")
                 continue
             coverage_areas.append(str(result.get("coverage_area", "")))
+            if result.get("process_status") == "completed":
+                completed_process_count += 1
+            workspace_scope = result.get("workspace_scope")
+            if workspace_scope not in {
+                self._policy.worker_workspace_scope,
+                self._policy.external_workspace_scope,
+            }:
+                errors.append("worker result workspace_scope must stay within the same-host policy")
+            execution_workspace_ref = str(result.get("execution_workspace_ref", "")).strip()
+            if not execution_workspace_ref:
+                errors.append("worker result execution_workspace_ref must be a non-empty string")
+            execution_workspace_root = str(result.get("execution_workspace_root", "")).strip()
+            if not execution_workspace_root:
+                errors.append("worker result execution_workspace_root must be a non-empty string")
+            selected_workspace_root = str(result.get("selected_workspace_root", "")).strip()
+            if not selected_workspace_root:
+                errors.append("worker result selected_workspace_root must be a non-empty string")
+            selected_workspace_role = str(result.get("selected_workspace_role", "")).strip()
+            if not selected_workspace_role:
+                errors.append("worker result selected_workspace_role must be a non-empty string")
+            execution_host_ref = str(result.get("execution_host_ref", "")).strip()
+            if execution_host_ref != self._policy.workspace_discovery_host_ref:
+                errors.append("worker result execution_host_ref mismatch")
+            if result.get("execution_transport_profile") != self._policy.workspace_execution_transport_profile:
+                errors.append("worker result execution_transport_profile mismatch")
+            sandbox_seed_strategy = result.get("sandbox_seed_strategy")
+            if sandbox_seed_strategy not in {
+                self._policy.inline_workspace_seed_strategy,
+                self._policy.external_workspace_seed_strategy,
+            }:
+                errors.append("worker result sandbox_seed_strategy mismatch")
+            workspace_seed_status = result.get("workspace_seed_status")
+            workspace_seed_head_commit = str(result.get("workspace_seed_head_commit", "")).strip()
+            if workspace_scope == self._policy.external_workspace_scope:
+                if workspace_seed_status != "seeded":
+                    errors.append("external workspace results must record workspace_seed_status=seeded")
+                if len(workspace_seed_head_commit) != 40:
+                    errors.append("external workspace results must record a 40-char workspace_seed_head_commit")
+            else:
+                if workspace_seed_status != "inline":
+                    errors.append("repo-local workspace results must record workspace_seed_status=inline")
+                if workspace_seed_head_commit:
+                    errors.append("repo-local workspace results must not record workspace_seed_head_commit")
             report = result.get("report", {})
             if not isinstance(report, Mapping):
                 errors.append("result.report must be a mapping")
@@ -2494,12 +2986,14 @@ class YaoyorozuRegistryService:
                 errors.append("worker report profile mismatch")
             if report.get("status") != "ready":
                 errors.append("worker report status must be ready")
-            if report.get("workspace_scope") != self._policy.worker_workspace_scope:
-                errors.append("worker report workspace_scope must be repo-local")
+            if report.get("workspace_scope") != workspace_scope:
+                errors.append("worker report workspace_scope must match the result workspace_scope")
             if report.get("dispatch_profile") != self._policy.worker_dispatch_profile:
                 errors.append("worker report dispatch_profile mismatch")
             if report.get("dispatch_plan_ref") != dispatch_receipt.get("dispatch_plan_ref"):
                 errors.append("worker report dispatch_plan_ref must match receipt")
+            if report.get("workspace_root") != execution_workspace_root:
+                errors.append("worker report workspace_root must match execution_workspace_root")
             if result.get("report_binding_ok") is not True:
                 errors.append("worker report must remain bound to the dispatch unit")
             if result.get("delta_receipt_ok") is not True:
@@ -2508,6 +3002,27 @@ class YaoyorozuRegistryService:
                 errors.append("worker report must keep a delta-derived patch candidate receipt")
             if result.get("target_paths_ready") is not True:
                 errors.append("worker report must prove target path readiness")
+            successful_result = (
+                result.get("process_status") == "completed"
+                and result.get("exit_code") == 0
+                and result.get("reported_status") == "ready"
+                and result.get("report_binding_ok") is True
+                and result.get("delta_receipt_ok") is True
+                and result.get("patch_candidate_receipt_ok") is True
+                and result.get("target_paths_ready") is True
+            )
+            if successful_result and workspace_scope == self._policy.external_workspace_scope:
+                candidate_bound_success_count += 1
+            elif successful_result and workspace_scope == self._policy.worker_workspace_scope:
+                source_bound_success_count += 1
+            if not successful_result:
+                failed_role_ids.append(str(result.get("role_id", "")))
+            if result.get("target_paths_ready") is True:
+                target_ready_count += 1
+            if result.get("delta_receipt_ok") is True:
+                delta_bound_count += 1
+            if result.get("patch_candidate_receipt_ok") is True:
+                patch_candidate_bound_count += 1
             coverage_evidence = report.get("coverage_evidence", {})
             if not isinstance(coverage_evidence, Mapping):
                 errors.append("worker report coverage_evidence must be a mapping")
@@ -2544,6 +3059,8 @@ class YaoyorozuRegistryService:
                     errors.append("worker delta receipt dispatch_plan_ref must match receipt")
                 if delta_receipt.get("dispatch_unit_ref") != result.get("unit_id"):
                     errors.append("worker delta receipt dispatch_unit_ref must match the result unit")
+                if delta_receipt.get("workspace_root") != execution_workspace_root:
+                    errors.append("worker delta receipt workspace_root must match execution_workspace_root")
                 if delta_receipt.get("status") not in {"clean", "delta-detected"}:
                     errors.append("worker delta receipt must stay clean or delta-detected")
                 entries = delta_receipt.get("entries", [])
@@ -2572,6 +3089,10 @@ class YaoyorozuRegistryService:
                     errors.append("worker patch candidate receipt dispatch_plan_ref must match receipt")
                 if patch_candidate_receipt.get("dispatch_unit_ref") != result.get("unit_id"):
                     errors.append("worker patch candidate receipt dispatch_unit_ref must match the result unit")
+                if patch_candidate_receipt.get("workspace_root") != execution_workspace_root:
+                    errors.append(
+                        "worker patch candidate receipt workspace_root must match execution_workspace_root"
+                    )
                 if patch_candidate_receipt.get("status") not in {"no-candidates", "candidate-ready"}:
                     errors.append("worker patch candidate receipt must stay no-candidates or candidate-ready")
                 if (
@@ -2686,45 +3207,68 @@ class YaoyorozuRegistryService:
             errors.append("execution_summary.highest_patch_priority_score mismatch")
         if execution_summary.get("highest_patch_priority_tier") != expected_highest_patch_priority_tier:
             errors.append("execution_summary.highest_patch_priority_tier mismatch")
-        if execution_summary.get("successful_process_count") != sum(
-            1
-            for result in results
-            if isinstance(result, Mapping)
-            and result.get("process_status") == "completed"
-            and result.get("exit_code") == 0
-            and result.get("reported_status") == "ready"
-            and result.get("report_binding_ok") is True
-            and result.get("delta_receipt_ok") is True
-            and result.get("patch_candidate_receipt_ok") is True
-            and result.get("target_paths_ready") is True
-        ):
+        success_count = (
+            candidate_bound_success_count + source_bound_success_count
+        )
+        if execution_summary.get("launched_process_count") != len(results):
+            errors.append("execution_summary.launched_process_count must match results")
+        if execution_summary.get("completed_process_count") != completed_process_count:
+            errors.append("execution_summary.completed_process_count mismatch")
+        if execution_summary.get("successful_process_count") != success_count:
             errors.append("execution_summary.successful_process_count mismatch")
-        return {
-            "ok": not errors and not missing_coverage and not unexpected_coverage,
-            "completed_process_count": sum(
-                1
+        if execution_summary.get("failed_role_ids") != failed_role_ids:
+            errors.append("execution_summary.failed_role_ids must match failed results")
+        if execution_summary.get("candidate_bound_success_count") != candidate_bound_success_count:
+            errors.append("execution_summary.candidate_bound_success_count mismatch")
+        if execution_summary.get("source_bound_success_count") != source_bound_success_count:
+            errors.append("execution_summary.source_bound_success_count mismatch")
+        if execution_summary.get("target_ready_count") != target_ready_count:
+            errors.append("execution_summary.target_ready_count mismatch")
+        if execution_summary.get("delta_bound_count") != delta_bound_count:
+            errors.append("execution_summary.delta_bound_count mismatch")
+        if execution_summary.get("patch_candidate_bound_count") != patch_candidate_bound_count:
+            errors.append("execution_summary.patch_candidate_bound_count mismatch")
+        if execution_summary.get("ready_gate_profile") != YAOYOROZU_WORKER_READY_GATE_PROFILE:
+            errors.append("execution_summary.ready_gate_profile mismatch")
+        if execution_summary.get("delta_scan_profile") != YAOYOROZU_WORKER_DELTA_SCAN_PROFILE:
+            errors.append("execution_summary.delta_scan_profile mismatch")
+        if (
+            execution_summary.get("patch_candidate_profile")
+            != YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
+        ):
+            errors.append("execution_summary.patch_candidate_profile mismatch")
+        validation = dispatch_receipt.get("validation", {})
+        if not isinstance(validation, Mapping):
+            errors.append("validation must be a mapping")
+            validation = {}
+        expected_validation = {
+            "command_digests_match": all(
+                isinstance(result, Mapping) and str(result.get("command_digest", "")).strip()
                 for result in results
-                if isinstance(result, Mapping) and result.get("process_status") == "completed"
             ),
-            "success_count": sum(
-                1
+            "all_processes_exited_zero": all(result.get("exit_code") == 0 for result in results),
+            "all_reports_ready": all(result.get("reported_status") == "ready" for result in results),
+            "same_host_scope_only": all(
+                result.get("workspace_scope")
+                in {self._policy.worker_workspace_scope, self._policy.external_workspace_scope}
                 for result in results
-                if isinstance(result, Mapping)
-                and result.get("process_status") == "completed"
-                and result.get("exit_code") == 0
-                and result.get("reported_status") == "ready"
-                and result.get("report_binding_ok") is True
-                and result.get("delta_receipt_ok") is True
-                and result.get("patch_candidate_receipt_ok") is True
-                and result.get("target_paths_ready") is True
+            ),
+            "external_workspace_seeded": all(
+                result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    result.get("workspace_seed_status") == "seeded"
+                    and len(str(result.get("workspace_seed_head_commit", "")).strip()) == 40
+                )
+                for result in results
+            ),
+            "profile_coverage_bound": (
+                execution_summary.get("required_coverage_areas") == list(required_coverage)
+                and execution_summary.get("optional_coverage_areas") == list(optional_coverage)
+                and execution_summary.get("requested_optional_coverage_areas")
+                == list(normalized_requested_optional)
+                and execution_summary.get("dispatch_coverage_areas") == list(dispatch_coverage)
             ),
             "coverage_complete": not missing_coverage and not unexpected_coverage,
-            "missing_coverage": missing_coverage,
-            "unexpected_coverage": unexpected_coverage,
-            "required_coverage_areas": list(required_coverage),
-            "optional_coverage_areas": list(optional_coverage),
-            "requested_optional_coverage_areas": list(normalized_requested_optional),
-            "dispatch_coverage_areas": list(dispatch_coverage),
             "all_reports_bound_to_dispatch": all(
                 isinstance(result, Mapping) and result.get("report_binding_ok") is True
                 for result in results
@@ -2741,6 +3285,30 @@ class YaoyorozuRegistryService:
                 isinstance(result, Mapping) and result.get("target_paths_ready") is True
                 for result in results
             ),
+        }
+        expected_validation["ok"] = all(expected_validation.values())
+        for key, expected_value in expected_validation.items():
+            if validation.get(key) != expected_value:
+                errors.append(f"validation.{key} mismatch")
+        return {
+            "ok": not errors and not missing_coverage and not unexpected_coverage,
+            "completed_process_count": completed_process_count,
+            "success_count": success_count,
+            "coverage_complete": not missing_coverage and not unexpected_coverage,
+            "missing_coverage": missing_coverage,
+            "unexpected_coverage": unexpected_coverage,
+            "required_coverage_areas": list(required_coverage),
+            "optional_coverage_areas": list(optional_coverage),
+            "requested_optional_coverage_areas": list(normalized_requested_optional),
+            "dispatch_coverage_areas": list(dispatch_coverage),
+            "all_reports_bound_to_dispatch": expected_validation["all_reports_bound_to_dispatch"],
+            "all_delta_receipts_bound": expected_validation["all_delta_receipts_bound"],
+            "all_patch_candidate_receipts_bound": expected_validation[
+                "all_patch_candidate_receipts_bound"
+            ],
+            "all_target_paths_ready": expected_validation["all_target_paths_ready"],
+            "same_host_scope_only": expected_validation["same_host_scope_only"],
+            "external_workspace_seeded": expected_validation["external_workspace_seeded"],
             "errors": errors,
         }
 

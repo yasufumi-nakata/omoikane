@@ -66,7 +66,12 @@ request 内容は `requested_optional_builder_coverage_areas` /
 `dispatch_builder_coverage_areas` に first-class で残る。
 selected builder 群が dispatch/unit binding と workspace target 観測を伴う
 git-bound delta receipt と patch candidate receipt 付きの
-repo-local worker dispatch receipt として実行される。
+same-host worker dispatch receipt として実行される。
+workspace discovery が bound される場合は
+各 required coverage を non-source candidate workspace に束縛し、
+requested optional coverage は candidate が無い場合に source fallback として示し、
+source target-path snapshot を `same-host-external-workspace` execution root に seed してから
+worker を起動し、seed commit と candidate/source success count を receipt に残す。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
 さらに `--proposal-profile fork-request-v1` により

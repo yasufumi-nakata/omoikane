@@ -358,9 +358,15 @@ same-session Council artifact に束縛すること、
 さらに `memory-edit-v1` は `--include-optional-coverage schema`、
 `fork-request-v1` は `--include-optional-coverage eval` により
 optional coverage を requested dispatch として追加できること、
-さらにそれを repo-local subprocess worker へ展開した
+さらにそれを same-host subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されること、
+さらに `workspace_discovery_binding` が存在する場合は
+`workspace_execution_binding` により required coverage area を non-source candidate workspace へ割り当て、
+requested optional coverage は candidate が無い場合に source fallback として明示し、
+`same-host-external-workspace` の execution root に source target-path snapshot を seed してから
+同じ local worker stub を実行し、
+`workspace_seed_head_commit` と candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
 target path observation と git-bound target path delta receipt、
 および `patch_descriptor` 互換で top-priority summary を持つ patch candidate receipt を返すことを確認する。

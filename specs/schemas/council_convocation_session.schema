@@ -122,6 +122,133 @@ properties:
           pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
       cross_workspace_coverage_complete:
         const: true
+  workspace_execution_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - execution_policy_id
+      - host_ref
+      - source_workspace_ref
+      - source_workspace_root
+      - dispatch_builder_coverage_areas
+      - required_candidate_binding_areas
+      - candidate_bound_coverage_areas
+      - source_bound_coverage_areas
+      - execution_targets
+      - binding_digest
+    properties:
+      execution_policy_id:
+        const: proposal-profile-aware-external-workspace-execution-v1
+      host_ref:
+        const: host://local-loopback
+      source_workspace_ref:
+        type: string
+        pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+      source_workspace_root:
+        type: string
+        minLength: 1
+      dispatch_builder_coverage_areas:
+        type: array
+        minItems: 1
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      required_candidate_binding_areas:
+        type: array
+        minItems: 1
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      candidate_bound_coverage_areas:
+        type: array
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      source_bound_coverage_areas:
+        type: array
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+      execution_targets:
+        type: array
+        minItems: 1
+        maxItems: 4
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - coverage_area
+            - workspace_ref
+            - workspace_root
+            - workspace_role
+            - source_kind
+            - workspace_scope
+            - execution_transport_profile
+            - sandbox_seed_strategy
+            - target_digest
+          properties:
+            coverage_area:
+              type: string
+              enum:
+                - runtime
+                - schema
+                - eval
+                - docs
+            workspace_ref:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+            workspace_root:
+              type: string
+              minLength: 1
+            workspace_role:
+              type: string
+              enum:
+                - source
+                - candidate
+            source_kind:
+              const: local-workspace
+            workspace_scope:
+              type: string
+              enum:
+                - repo-local
+                - same-host-external-workspace
+            execution_transport_profile:
+              const: same-host-python-subprocess-v1
+            sandbox_seed_strategy:
+              type: string
+              enum:
+                - in-place-source-worktree-v1
+                - source-target-snapshot-copy-v1
+            target_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+      binding_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
   standing_roles:
     type: object
     additionalProperties: false
@@ -247,6 +374,8 @@ properties:
       - builder_profile_policy_ready
       - workspace_discovery_bound
       - workspace_profile_policy_ready
+      - workspace_execution_bound
+      - workspace_execution_policy_ready
       - ok
     properties:
       standing_roles_ready:
@@ -266,6 +395,10 @@ properties:
       workspace_discovery_bound:
         type: boolean
       workspace_profile_policy_ready:
+        type: boolean
+      workspace_execution_bound:
+        type: boolean
+      workspace_execution_policy_ready:
         type: boolean
       ok:
         type: boolean

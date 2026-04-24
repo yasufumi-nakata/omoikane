@@ -124,7 +124,7 @@ operations:
       - requested_optional_builder_coverage_areas, when present, must stay within the selected profile's optional coverage and become first-class dispatch_builder_coverage_areas
   prepare_worker_dispatch:
     summary: >
-      Convert one selected bounded Yaoyorozu convocation into a repo-local worker dispatch plan
+      Convert one selected bounded Yaoyorozu convocation into a same-host worker dispatch plan
       that launches bounded builder processes for the proposal profile's required worker coverage plus any explicitly requested optional coverage.
     input:
       inline_schema:
@@ -140,11 +140,12 @@ operations:
       - dispatch units must be derived only from selected builder_handoff entries
       - proposal_profile must fix the required and optional worker coverage policy echoed by the dispatch plan summary
       - requested optional worker coverage, when present, must remain a subset of the proposal profile's optional coverage and bind dispatch_coverage_areas deterministically
-      - every command preview must remain repo-local, subprocess-bound, and temp-workspace-only
+      - every command preview must remain same-host, subprocess-bound, and temp-workspace-only
+      - when workspace_discovery is bound, every dispatch unit must choose one profile-covered candidate workspace and bind execution_workspace_ref, selected_workspace_root, execution_workspace_root, and sandbox_seed_strategy
       - every dispatch_coverage_area must map to exactly one dispatch unit
   execute_worker_dispatch:
     summary: >
-      Execute one repo-local worker dispatch plan as bounded subprocess workers and return
+      Execute one same-host worker dispatch plan as bounded subprocess workers and return
       the resulting process-bound execution receipt.
     input:
       inline_schema:
@@ -158,11 +159,12 @@ operations:
       schema_ref: yaoyorozu_worker_dispatch_receipt
     guarantees:
       - every launched worker must emit a ready report bound to the same dispatch_plan_ref and dispatch_unit_ref
-      - worker reports must verify that every target path exists and remains inside the repo-local workspace
+      - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt
+      - worker reports must verify that every target path exists and remains inside the selected execution workspace
       - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit
       - worker reports must materialize one patch_descriptor-compatible patch candidate receipt from the same delta evidence before the ready gate passes
       - patch candidate receipts must expose deterministic priority ranks and top-priority summaries so builder apply review stays machine-checkable
-      - worker execution must stay inside the repo-local workspace and inherit the dispatch profile
+      - worker execution must stay inside repo-local or same-host-external-workspace scope and inherit the dispatch profile
       - only zero-exit, ready-reported workers count toward completed dispatch coverage, including explicitly requested optional coverage
   bind_consensus_dispatch:
     summary: >
@@ -343,8 +345,8 @@ compatibility:
   stability: bootstrap
   notes:
     - The reference runtime supports the bounded `self-modify-patch-v1`, `memory-edit-v1`, `fork-request-v1`, and `inter-mind-negotiation-v1` proposal profiles.
-    - Cross-workspace worker discovery is bounded to same-host local workspace catalogs with profile-aware review_budget, required coverage policy, and no external runtime execution.
+    - Cross-workspace worker discovery and execution are bounded to same-host local workspace catalogs, profile-aware review_budget, source target-path snapshot seeding, and local Python subprocess transport.
     - ConsensusBus handoff binding is fixed to the same convocation session_id as the Council artifact.
     - TaskGraph bundle binding keeps the proposal profile's dispatch coverage within the fixed 3-root complexity ceiling, with `self-modify` grouping eval+docs, `inter-mind-negotiation` grouping schema+docs, `memory-edit` optionally grouping eval+schema, and `fork-request` optionally grouping docs+eval.
     - L5 build_request handoff binding is fixed to `L5.PatchGenerator`, `emit_build_request`, and a patch-generator-allowed scope before the same-request execution chain extends to build_artifact, sandbox apply, live enactment, and rollback witness artifacts.
-    - Live process orchestration is intentionally bounded to repo-local subprocess workers and not external runtimes.
+    - Live process orchestration is intentionally bounded to repo-local or same-host-external-workspace subprocess workers and not remote runtimes.

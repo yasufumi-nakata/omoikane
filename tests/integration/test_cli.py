@@ -1602,6 +1602,10 @@ class CliIntegrationTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_build_request_binding.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
         self.assertTrue(result["validation"]["execution_chain_ok"])
         self.assertEqual("rollback", result["validation"]["execution_chain_rollout_decision"])
         self.assertTrue(result["validation"]["execution_chain_reviewer_network_attested"])
@@ -1614,6 +1618,10 @@ class CliIntegrationTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_execution_chain_binding.yaml",
             result["execution_chain"]["execution_summary"]["required_eval_refs"],
         )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
+        )
         self.assertTrue(result["validation"]["task_graph_worker_claims_bound"])
         self.assertTrue(result["validation"]["task_graph_coverage_grouping_ok"])
         self.assertEqual(
@@ -1622,17 +1630,29 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
+        self.assertTrue(result["validation"]["workspace_execution_bound"])
+        self.assertTrue(result["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(4, result["validation"]["candidate_bound_dispatch_count"])
+        self.assertEqual(0, result["validation"]["source_bound_dispatch_count"])
+        self.assertEqual(4, result["validation"]["candidate_bound_success_count"])
+        self.assertEqual(0, result["validation"]["source_bound_success_count"])
+        self.assertTrue(result["validation"]["same_host_scope_only"])
+        self.assertTrue(result["validation"]["external_workspace_seeded"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_reports_bound_to_dispatch"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_delta_receipts_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_patch_candidate_receipts_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_target_paths_ready"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["delta_bound_count"])
         self.assertEqual(
             4,
             result["dispatch_receipt"]["execution_summary"]["patch_candidate_bound_count"],
         )
+        self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["candidate_bound_success_count"])
+        self.assertEqual(0, result["dispatch_receipt"]["execution_summary"]["source_bound_success_count"])
         self.assertEqual(
             "target-delta-priority-ranking-v1",
             result["dispatch_receipt"]["execution_summary"]["patch_priority_profile"],

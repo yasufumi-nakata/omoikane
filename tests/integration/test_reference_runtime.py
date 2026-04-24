@@ -1748,7 +1748,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
         self.assertTrue(result["validation"]["builder_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
+        self.assertTrue(result["validation"]["workspace_execution_bound"])
+        self.assertTrue(result["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
+        self.assertEqual(4, result["validation"]["candidate_bound_dispatch_count"])
+        self.assertEqual(0, result["validation"]["source_bound_dispatch_count"])
+        self.assertEqual(4, result["validation"]["candidate_bound_success_count"])
+        self.assertEqual(0, result["validation"]["source_bound_success_count"])
+        self.assertTrue(result["validation"]["same_host_scope_only"])
+        self.assertTrue(result["validation"]["external_workspace_seeded"])
         self.assertTrue(result["validation"]["worker_delta_receipts_bound"])
         self.assertEqual("git-target-path-delta-v1", result["validation"]["worker_delta_scan_profile"])
         self.assertTrue(result["validation"]["worker_patch_candidate_receipts_bound"])
@@ -1801,7 +1809,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                process["report"]["workspace_scope"] == "repo-local"
+                process["workspace_scope"] == "same-host-external-workspace"
+                and process["workspace_seed_status"] == "seeded"
+                and len(process["workspace_seed_head_commit"]) == 40
+                and process["report"]["workspace_scope"] == "same-host-external-workspace"
                 for process in result["dispatch_receipt"]["results"]
             )
         )
@@ -1846,6 +1857,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "evals/agentic/yaoyorozu_build_request_binding.yaml",
             result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
         )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
+            result["build_request_binding"]["build_request"]["constraints"]["must_pass"],
+        )
         self.assertTrue(result["validation"]["execution_chain_ok"])
         self.assertEqual("rollback", result["validation"]["execution_chain_rollout_decision"])
         self.assertTrue(result["validation"]["execution_chain_reviewer_network_attested"])
@@ -1856,6 +1871,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("rolled-back", result["execution_chain"]["rollback_session"]["status"])
         self.assertIn(
             "evals/agentic/yaoyorozu_execution_chain_binding.yaml",
+            result["execution_chain"]["execution_summary"]["required_eval_refs"],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
             result["execution_chain"]["execution_summary"]["required_eval_refs"],
         )
         self.assertIn(

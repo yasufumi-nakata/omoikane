@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/yaoyorozu_worker_dispatch_receipt.schema"
 title: YaoyorozuWorkerDispatchReceipt
-description: Process-bound receipt for one repo-local Yaoyorozu worker dispatch plan.
+description: Process-bound receipt for one same-host Yaoyorozu worker dispatch plan.
 type: object
 additionalProperties: false
 required:
@@ -78,6 +78,16 @@ properties:
         - delta_receipt_ok
         - patch_candidate_receipt_ok
         - target_paths_ready
+        - workspace_scope
+        - execution_workspace_ref
+        - execution_workspace_root
+        - selected_workspace_root
+        - selected_workspace_role
+        - execution_host_ref
+        - execution_transport_profile
+        - sandbox_seed_strategy
+        - workspace_seed_status
+        - workspace_seed_head_commit
         - report
       properties:
         unit_id:
@@ -132,6 +142,42 @@ properties:
           const: true
         target_paths_ready:
           const: true
+        workspace_scope:
+          type: string
+          enum:
+            - repo-local
+            - same-host-external-workspace
+        execution_workspace_ref:
+          type: string
+          pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+        execution_workspace_root:
+          type: string
+          minLength: 1
+        selected_workspace_root:
+          type: string
+          minLength: 1
+        selected_workspace_role:
+          type: string
+          enum:
+            - source
+            - candidate
+        execution_host_ref:
+          const: host://local-loopback
+        execution_transport_profile:
+          const: same-host-python-subprocess-v1
+        sandbox_seed_strategy:
+          type: string
+          enum:
+            - in-place-source-worktree-v1
+            - source-target-snapshot-copy-v1
+        workspace_seed_status:
+          type: string
+          enum:
+            - inline
+            - seeded
+        workspace_seed_head_commit:
+          type: string
+          pattern: "^$|^[a-f0-9]{40}$"
         report:
           type: object
           additionalProperties: false
@@ -176,7 +222,10 @@ properties:
             dispatch_profile:
               const: repo-local-subprocess-worker-dispatch-v1
             workspace_scope:
-              const: repo-local
+              type: string
+              enum:
+                - repo-local
+                - same-host-external-workspace
             dispatch_plan_ref:
               type: string
               pattern: "^dispatch://"
@@ -342,6 +391,8 @@ properties:
       - requested_optional_coverage_areas
       - dispatch_coverage_areas
       - coverage_areas
+      - candidate_bound_success_count
+      - source_bound_success_count
       - target_ready_count
       - delta_bound_count
       - patch_candidate_bound_count
@@ -419,6 +470,12 @@ properties:
             - schema
             - eval
             - docs
+      candidate_bound_success_count:
+        type: integer
+        minimum: 0
+      source_bound_success_count:
+        type: integer
+        minimum: 0
       target_ready_count:
         type: integer
         minimum: 0
@@ -455,6 +512,8 @@ properties:
       - command_digests_match
       - all_processes_exited_zero
       - all_reports_ready
+      - same_host_scope_only
+      - external_workspace_seeded
       - profile_coverage_bound
       - coverage_complete
       - all_reports_bound_to_dispatch
@@ -468,6 +527,10 @@ properties:
       all_processes_exited_zero:
         const: true
       all_reports_ready:
+        const: true
+      same_host_scope_only:
+        const: true
+      external_workspace_seeded:
         const: true
       profile_coverage_bound:
         const: true
@@ -513,6 +576,16 @@ examples:
         delta_receipt_ok: true
         patch_candidate_receipt_ok: true
         target_paths_ready: true
+        workspace_scope: repo-local
+        execution_workspace_ref: workspace://omoikane-01234567
+        execution_workspace_root: /Users/example/omoikane
+        selected_workspace_root: /Users/example/omoikane
+        selected_workspace_role: source
+        execution_host_ref: host://local-loopback
+        execution_transport_profile: same-host-python-subprocess-v1
+        sandbox_seed_strategy: in-place-source-worktree-v1
+        workspace_seed_status: inline
+        workspace_seed_head_commit: ""
         report:
           kind: yaoyorozu_local_worker_report
           report_profile: repo-local-path-bound-worker-report-v3
@@ -675,6 +748,8 @@ examples:
       requested_optional_coverage_areas: []
       dispatch_coverage_areas: [runtime, schema, eval, docs]
       coverage_areas: [docs, eval, runtime, schema]
+      candidate_bound_success_count: 0
+      source_bound_success_count: 4
       target_ready_count: 4
       delta_bound_count: 4
       patch_candidate_bound_count: 4
@@ -688,6 +763,8 @@ examples:
       command_digests_match: true
       all_processes_exited_zero: true
       all_reports_ready: true
+      same_host_scope_only: true
+      external_workspace_seeded: true
       profile_coverage_bound: true
       coverage_complete: true
       all_reports_bound_to_dispatch: true

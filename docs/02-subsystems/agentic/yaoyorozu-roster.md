@@ -88,7 +88,10 @@ bounded proposal profile catalog、および
 `memory-edit-v1` では `runtime/eval/docs` の 3 coverage、
 `fork-request-v1` では `runtime/schema/docs` の 3 coverage、
 `inter-mind-negotiation-v1` では `runtime/schema/eval/docs` の 4 coverage を持つ
-repo-local worker dispatch receipt を JSON で可視化する。
+same-host worker dispatch receipt を JSON で可視化する。
+workspace discovery が bound される場合は
+non-source candidate workspace ごとに `same-host-external-workspace` execution root を作り、
+source target-path snapshot を seed commit 付きで固定してから worker を実行する。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

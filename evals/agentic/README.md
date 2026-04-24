@@ -64,6 +64,12 @@ repo-local `agents/` から選んだ builder handoff が
 selected proposal profile の required coverage へだけ分解され、
 actual subprocess worker receipt として machine-checkable に実行されること。
 
+### Yaoyorozu External Workspace Execution
+workspace discovery により選ばれた non-source candidate workspace へ
+profile-covered builder worker が束縛され、
+source target-path snapshot の seed commit と candidate/source success count が
+same-host worker dispatch receipt に残ること。
+
 ### Yaoyorozu Workspace Discovery
 same-host local workspace catalog が bounded `review_budget` 内で走査され、
 non-source workspace 群だけでも runtime / schema / eval / docs の coverage を
@@ -85,12 +91,12 @@ rollback witness まで 1 つの digest family に束縛され、
 reviewer-network-attested execution chain として返ること。
 
 ### Yaoyorozu Worker Delta Receipt
-repo-local worker dispatch が ready report だけでなく、
+same-host worker dispatch が ready report だけでなく、
 dispatch/unit binding と workspace-bounded target path observation に加えて、
 git-bound target path delta receipt を返すこと。
 
 ### Yaoyorozu Worker Patch Candidate Receipt
-repo-local worker dispatch が git-bound delta receipt に加えて、
+same-host worker dispatch が git-bound delta receipt に加えて、
 `patch_descriptor` 互換の patch candidate receipt を返し、
 各 delta entry を dispatch-bound target scope に沿って materialize すること。
 
@@ -143,6 +149,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `trust_score_update_guard.yaml`
 - `yaoyorozu_build_request_binding.yaml`
 - `yaoyorozu_execution_chain_binding.yaml`
+- `yaoyorozu_external_workspace_execution.yaml`
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_fork_request_profile.yaml`

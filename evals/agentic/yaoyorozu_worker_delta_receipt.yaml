@@ -1,7 +1,7 @@
 eval_id: yaoyorozu_worker_delta_receipt
 target: agentic.yaoyorozu
 level: L4
-description: Repo-local Yaoyorozu worker reports must bind git-target-path delta receipts to the same dispatch/unit scope and summarize them through the ready gate.
+description: Same-host Yaoyorozu worker reports must bind git-target-path delta receipts to the same dispatch/unit scope and summarize them through the ready gate.
 inputs:
   - source_root: agents
   - proposal_profile: self-modify-patch-v1

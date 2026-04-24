@@ -3285,7 +3285,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             ["docs", "eval", "runtime", "schema"],
             validation["unique_coverage_areas"],
         )
-        self.assertTrue(plan["validation"]["repo_local_scope_only"])
+        self.assertFalse(plan["validation"]["workspace_execution_bound"])
+        self.assertTrue(plan["validation"]["same_host_scope_only"])
+        self.assertEqual(0, plan["selection_summary"]["candidate_bound_worker_count"])
+        self.assertEqual(4, plan["selection_summary"]["source_bound_worker_count"])
         self.assertTrue(
             all(
                 "dispatch_plan_ref" in unit["expected_report_fields"]
@@ -3294,6 +3297,8 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and "workspace_delta_receipt" in unit["expected_report_fields"]
                 and "patch_candidate_receipt" in unit["expected_report_fields"]
                 and "coverage_evidence" in unit["expected_report_fields"]
+                and unit["workspace_scope"] == "repo-local"
+                and unit["execution_workspace_root"] == unit["selected_workspace_root"]
                 for unit in plan["dispatch_units"]
             )
         )
@@ -3301,6 +3306,61 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(
             ["runtime", "schema", "eval", "docs"],
             plan["selection_summary"]["dispatch_coverage_areas"],
+        )
+
+    def test_prepare_worker_dispatch_binds_external_workspace_targets_when_discovery_present(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        trust = TrustService()
+        seeds = [
+            ("design-architect", 0.72, {"council_deliberation": 0.8, "self_modify": 0.76}),
+            ("memory-archivist", 0.66, {"council_deliberation": 0.7, "memory_editing": 0.76}),
+            ("change-advocate", 0.68, {"council_deliberation": 0.72, "self_modify": 0.71}),
+            ("conservatism-advocate", 0.69, {"council_deliberation": 0.74, "self_modify": 0.7}),
+            ("ethics-committee", 0.82, {"council_deliberation": 0.88, "self_modify": 0.82}),
+            ("integrity-guardian", 0.99, {"council_deliberation": 0.99, "self_modify": 0.99}),
+            ("codex-builder", 0.9, {"self_modify": 0.96}),
+            ("schema-builder", 0.84, {"self_modify": 0.86}),
+            ("eval-builder", 0.85, {"self_modify": 0.87}),
+            ("doc-sync-builder", 0.83, {"self_modify": 0.85}),
+        ]
+        for agent_id, initial_score, per_domain in seeds:
+            kwargs = {
+                "agent_id": agent_id,
+                "initial_score": initial_score,
+                "per_domain": per_domain,
+            }
+            if agent_id == "integrity-guardian":
+                kwargs["pinned_by_human"] = True
+                kwargs["pinned_reason"] = "guardian bootstrap"
+            trust.register_agent(**kwargs)
+        service = YaoyorozuRegistryService(trust_service=trust)
+        service.sync_from_agents_directory(repo_root / "agents")
+
+        with OmoikaneReferenceOS()._yaoyorozu_demo_workspaces() as workspace_roots:
+            discovery = service.discover_workspace_workers(workspace_roots)
+            session = service.prepare_council_convocation(
+                target_identity_ref="identity://unit-test",
+                workspace_discovery=discovery,
+            )
+            plan = service.prepare_worker_dispatch(session)
+
+        validation = service.validate_worker_dispatch_plan(plan)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(session["validation"]["workspace_execution_bound"])
+        self.assertTrue(session["validation"]["workspace_execution_policy_ready"])
+        self.assertTrue(plan["validation"]["workspace_execution_bound"])
+        self.assertTrue(plan["validation"]["same_host_scope_only"])
+        self.assertEqual(4, plan["selection_summary"]["candidate_bound_worker_count"])
+        self.assertEqual(0, plan["selection_summary"]["source_bound_worker_count"])
+        self.assertTrue(
+            all(
+                unit["workspace_scope"] == "same-host-external-workspace"
+                and unit["execution_workspace_root"] != unit["selected_workspace_root"]
+                and unit["sandbox_seed_strategy"] == "source-target-snapshot-copy-v1"
+                and unit["execution_transport_profile"] == "same-host-python-subprocess-v1"
+                for unit in plan["dispatch_units"]
+            )
         )
 
     def test_prepare_worker_dispatch_can_materialize_requested_optional_memory_edit_coverage(self) -> None:
@@ -3512,10 +3572,14 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(4, receipt["execution_summary"]["target_ready_count"])
         self.assertEqual(4, receipt["execution_summary"]["delta_bound_count"])
         self.assertEqual(4, receipt["execution_summary"]["patch_candidate_bound_count"])
+        self.assertEqual(0, receipt["execution_summary"]["candidate_bound_success_count"])
+        self.assertEqual(4, receipt["execution_summary"]["source_bound_success_count"])
         self.assertEqual(
             "path-bound-target-delta-patch-candidate-v3",
             receipt["execution_summary"]["ready_gate_profile"],
         )
+        self.assertTrue(receipt["validation"]["same_host_scope_only"])
+        self.assertTrue(receipt["validation"]["external_workspace_seeded"])
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
         self.assertEqual(
             "target-delta-to-patch-candidate-v1",
@@ -3545,6 +3609,29 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and result["report"]["workspace_delta_receipt"]["status"] in {"clean", "delta-detected"}
                 and result["report"]["patch_candidate_receipt"]["status"] in {"no-candidates", "candidate-ready"}
                 for result in receipt["results"]
+            )
+        )
+
+    def test_run_yaoyorozu_demo_routes_workers_into_external_workspace_sandboxes(self) -> None:
+        result = OmoikaneReferenceOS().run_yaoyorozu_demo()
+
+        self.assertTrue(result["convocation"]["validation"]["workspace_execution_bound"])
+        self.assertTrue(result["convocation"]["validation"]["workspace_execution_policy_ready"])
+        self.assertTrue(result["dispatch_plan"]["validation"]["workspace_execution_bound"])
+        self.assertTrue(result["dispatch_plan"]["validation"]["same_host_scope_only"])
+        self.assertEqual(4, result["dispatch_plan"]["selection_summary"]["candidate_bound_worker_count"])
+        self.assertEqual(0, result["dispatch_plan"]["selection_summary"]["source_bound_worker_count"])
+        self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["candidate_bound_success_count"])
+        self.assertEqual(0, result["dispatch_receipt"]["execution_summary"]["source_bound_success_count"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
+        self.assertTrue(
+            all(
+                process["workspace_scope"] == "same-host-external-workspace"
+                and process["workspace_seed_status"] == "seeded"
+                and len(process["workspace_seed_head_commit"]) == 40
+                and process["report"]["workspace_root"] == process["execution_workspace_root"]
+                for process in result["dispatch_receipt"]["results"]
             )
         )
 
@@ -3672,6 +3759,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(
             "evals/continuity/council_output_build_request_pipeline.yaml",
             binding["build_request"]["constraints"]["must_pass"][0],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_external_workspace_execution.yaml",
+            binding["build_request"]["constraints"]["must_pass"],
         )
         self.assertEqual(
             binding["build_request"]["output_paths"],
