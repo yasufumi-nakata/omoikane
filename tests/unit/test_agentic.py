@@ -4202,6 +4202,18 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertEqual(1, validation["distributed_verdict_count"])
         self.assertTrue(validation["oversight_network_bound"])
         self.assertTrue(validation["multi_jurisdiction_review_bound"])
+        self.assertTrue(validation["distributed_signature_bound"])
+        self.assertTrue(binding["continuity_guard"]["distributed_verdict_signatures_bound"])
+        signature_binding = binding["distributed_verdicts"][0]["signature_binding"]
+        self.assertEqual(
+            "distributed-council-verdict-signature-binding-v1",
+            signature_binding["profile_id"],
+        )
+        self.assertEqual(
+            "council://federation/returned-result-signer/v1",
+            signature_binding["signer_ref"],
+        )
+        self.assertFalse(signature_binding["raw_signature_payload_exposed"])
         self.assertEqual(
             ["JP-13", "US-CA"],
             binding["jurisdiction_review_profile"]["jurisdictions"],
@@ -4265,7 +4277,44 @@ class CognitiveAuditGovernanceTests(unittest.TestCase):
         self.assertEqual("escalate-to-human-governance", binding["final_follow_up_action"])
         self.assertTrue(binding["continuity_guard"]["conflict_detected"])
         self.assertTrue(binding["continuity_guard"]["multi_jurisdiction_review_bound"])
+        self.assertTrue(binding["continuity_guard"]["distributed_verdict_signatures_bound"])
+        self.assertTrue(validation["distributed_signature_bound"])
         self.assertEqual(2, validation["distributed_verdict_count"])
+
+    def test_governance_binding_rejects_tampered_distributed_verdict_signature(self) -> None:
+        service = CognitiveAuditGovernanceService()
+        record, resolution = self._build_record_and_resolution()
+
+        binding = service.bind_governance(
+            record,
+            resolution,
+            distributed_resolutions=[
+                {
+                    "resolution_id": "distributed-council-fedcba987654",
+                    "topology_ref": "topology-13579bdf2468",
+                    "council_tier": "federation",
+                    "final_outcome": "binding-approved",
+                    "decision_mode": "federation-weighted-majority",
+                    "conflict_resolution": "federation-overrides-local",
+                    "follow_up_action": "open-shared-review-window",
+                    "external_resolution_refs": ["federation://identity-a/result"],
+                }
+            ],
+            oversight_event=self._oversight_event(),
+        )
+        tampered = dict(binding)
+        tampered["distributed_verdicts"] = [
+            dict(verdict) for verdict in binding["distributed_verdicts"]
+        ]
+        tampered["distributed_verdicts"][0]["follow_up_action"] = "tampered-action"
+
+        validation = service.validate_binding(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["distributed_signature_bound"])
+        self.assertTrue(
+            any("signature_binding.signed_payload_digest mismatch" in error for error in validation["errors"])
+        )
 
 
 if __name__ == "__main__":

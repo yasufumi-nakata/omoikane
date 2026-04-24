@@ -3218,6 +3218,14 @@ json.dump(response, sys.stdout)
                         conflict_validation,
                     )
                 ),
+                "distributed_signature_bound": all(
+                    validation["distributed_signature_bound"]
+                    for validation in (
+                        federation_validation,
+                        heritage_validation,
+                        conflict_validation,
+                    )
+                ),
                 "reviewer_jurisdictions": conflict_binding["jurisdiction_review_profile"][
                     "jurisdictions"
                 ],

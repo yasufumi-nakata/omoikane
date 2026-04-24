@@ -48,6 +48,9 @@ properties:
       - required_network_receipt_for_review
       - jurisdiction_review_profile_id
       - required_jurisdiction_quorum
+      - distributed_verdict_signature_profile_id
+      - distributed_verdict_signature_algorithm
+      - distributed_verdict_signatures_required
       - conflict_action
       - heritage_veto_action
       - raw_payload_policy
@@ -75,6 +78,12 @@ properties:
         const: cognitive-audit-multi-jurisdiction-review-v1
       required_jurisdiction_quorum:
         const: 2
+      distributed_verdict_signature_profile_id:
+        const: distributed-council-verdict-signature-binding-v1
+      distributed_verdict_signature_algorithm:
+        const: sha256-reference-signature-v1
+      distributed_verdict_signatures_required:
+        const: true
       conflict_action:
         const: escalate-to-human-governance
       heritage_veto_action:
@@ -128,6 +137,7 @@ properties:
         - conflict_resolution
         - follow_up_action
         - external_resolution_refs
+        - signature_binding
       properties:
         council_tier:
           type: string
@@ -160,6 +170,8 @@ properties:
           items:
             type: string
             minLength: 1
+        signature_binding:
+          $ref: distributed_council_verdict_signature.schema
   external_resolution_refs:
     type: array
     items:
@@ -244,6 +256,7 @@ properties:
       - oversight_quorum_satisfied
       - network_receipts_bound
       - multi_jurisdiction_review_bound
+      - distributed_verdict_signatures_bound
       - no_raw_payload_exposed
       - conflict_detected
     properties:
@@ -256,6 +269,8 @@ properties:
       network_receipts_bound:
         const: true
       multi_jurisdiction_review_bound:
+        const: true
+      distributed_verdict_signatures_bound:
         const: true
       no_raw_payload_exposed:
         const: true
@@ -278,6 +293,9 @@ examples:
       required_network_receipt_for_review: true
       jurisdiction_review_profile_id: cognitive-audit-multi-jurisdiction-review-v1
       required_jurisdiction_quorum: 2
+      distributed_verdict_signature_profile_id: distributed-council-verdict-signature-binding-v1
+      distributed_verdict_signature_algorithm: sha256-reference-signature-v1
+      distributed_verdict_signatures_required: true
       conflict_action: escalate-to-human-governance
       heritage_veto_action: preserve-boundary
       raw_payload_policy: digest-and-ref-only
@@ -296,6 +314,15 @@ examples:
         follow_up_action: execute-shared-reality-merge
         external_resolution_refs:
           - federation://identity-a/result
+        signature_binding:
+          profile_id: distributed-council-verdict-signature-binding-v1
+          signature_algorithm: sha256-reference-signature-v1
+          signer_ref: council://federation/returned-result-signer/v1
+          public_key_ref: key://federation/returned-result/reference-v1
+          signed_resolution_ref: distributed-council-fedcba987654
+          signed_payload_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          signature_digest: 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+          raw_signature_payload_exposed: false
       - council_tier: heritage
         resolution_ref: distributed-council-02468ace1357
         topology_ref: topology-abcdef012345
@@ -305,6 +332,15 @@ examples:
         follow_up_action: preserve-identity-boundary
         external_resolution_refs:
           - heritage://ethics/result
+        signature_binding:
+          profile_id: distributed-council-verdict-signature-binding-v1
+          signature_algorithm: sha256-reference-signature-v1
+          signer_ref: council://heritage/returned-result-signer/v1
+          public_key_ref: key://heritage/returned-result/reference-v1
+          signed_resolution_ref: distributed-council-02468ace1357
+          signed_payload_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          signature_digest: 76543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba98
+          raw_signature_payload_exposed: false
     external_resolution_refs:
       - federation://identity-a/result
       - heritage://ethics/result
@@ -338,6 +374,7 @@ examples:
       oversight_quorum_satisfied: true
       network_receipts_bound: true
       multi_jurisdiction_review_bound: true
+      distributed_verdict_signatures_bound: true
       no_raw_payload_exposed: true
       conflict_detected: true
     digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

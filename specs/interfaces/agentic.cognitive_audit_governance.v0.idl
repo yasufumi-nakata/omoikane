@@ -7,6 +7,7 @@ imports:
   cognitive_audit_record: ../schemas/cognitive_audit_record.schema
   cognitive_audit_resolution: ../schemas/cognitive_audit_resolution.schema
   cognitive_audit_governance_binding: ../schemas/cognitive_audit_governance_binding.schema
+  distributed_council_verdict_signature: ../schemas/distributed_council_verdict_signature.schema
 operations:
   bind_governance:
     summary: >
@@ -131,6 +132,7 @@ operations:
     guarantees:
       - open-guardian-review and activate-containment require network-bound oversight evidence
       - reviewer bindings must cover at least two jurisdictions, legal policy refs, jurisdiction bundle refs, and legal execution receipts before governance binding is accepted
+      - every Federation or Heritage returned result receives a distributed-council-verdict-signature-binding-v1 signature binding before it enters the governance binding digest
       - heritage binding-rejected verdict overrides the local follow-up with preserve-boundary
       - conflicting federation-approved and heritage-rejected verdicts escalate to human governance
   validate_binding:
@@ -153,6 +155,7 @@ operations:
           - distributed_verdict_count
           - oversight_network_bound
           - multi_jurisdiction_review_bound
+          - distributed_signature_bound
           - errors
         properties:
           ok:
@@ -167,6 +170,8 @@ operations:
           oversight_network_bound:
             type: boolean
           multi_jurisdiction_review_bound:
+            type: boolean
+          distributed_signature_bound:
             type: boolean
           errors:
             type: array

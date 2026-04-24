@@ -13,7 +13,9 @@
   `distributed-council-demo` が Federation binding / Heritage veto / human escalation を可視化し、
   `distributed-transport-demo` が participant attestation / transport authenticity /
   key rotation overlap / federated roots / bounded route target discovery / replay guard を可視化し、
-  `cognitive-audit-demo` が qualia / self-model / metacognition を bounded Council review に束ねる
+  `cognitive-audit-demo` が qualia / self-model / metacognition を bounded Council review に束ね、
+  `cognitive-audit-governance-demo` が Federation / Heritage returned result を
+  digest-only signature binding 付きで reviewer-network oversight に結合する
 
 ### YaoyorozuRegistry
 - 利用可能 Agent の登録簿

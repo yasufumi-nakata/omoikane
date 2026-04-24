@@ -7,6 +7,7 @@ capabilities:
   - ewa.stop-signal-adapter.attest
   - workspace.preseed.attest
   - workspace.preseed.oversight-bind
+  - cognitive-audit.distributed-verdict-signature.attest
 trust_floor: 0.99
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
@@ -16,5 +17,6 @@ when_to_invoke: |
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時
   - Yaoyorozu external workspace seed / execution root 作成前の HumanOversightChannel-bound integrity gate
+  - cognitive audit governance binding で Federation / Heritage returned result の signature binding を検証する時
 when_not_to_invoke: |
   - 設計議論

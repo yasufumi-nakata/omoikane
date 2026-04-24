@@ -1418,6 +1418,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["all_bindings_valid"])
         self.assertTrue(result["validation"]["oversight_network_bound"])
         self.assertTrue(result["validation"]["multi_jurisdiction_review_bound"])
+        self.assertTrue(result["validation"]["distributed_signature_bound"])
         self.assertEqual(["JP-13", "US-CA"], result["validation"]["reviewer_jurisdictions"])
         self.assertEqual(
             "federation-attested-review",
@@ -1430,6 +1431,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "distributed-conflict-human-escalation",
             result["bindings"]["conflict"]["execution_gate"],
+        )
+        self.assertEqual(
+            "distributed-council-verdict-signature-binding-v1",
+            result["bindings"]["conflict"]["distributed_verdicts"][0]["signature_binding"][
+                "profile_id"
+            ],
         )
 
     def test_task_graph_demo_emits_valid_json(self) -> None:

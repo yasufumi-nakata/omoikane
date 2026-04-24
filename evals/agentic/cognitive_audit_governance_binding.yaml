@@ -11,6 +11,8 @@ fixtures:
   reviewer_jurisdictions: [JP-13, US-CA]
   required_jurisdiction_quorum: 2
   jurisdiction_review_profile_id: cognitive-audit-multi-jurisdiction-review-v1
+  distributed_signature_profile_id: distributed-council-verdict-signature-binding-v1
+  distributed_signature_algorithm: sha256-reference-signature-v1
   federation_final_outcome: binding-approved
   heritage_final_outcome: binding-rejected
 expected:
@@ -22,9 +24,11 @@ expected:
   conflict_action: escalate-to-human-governance
   oversight_network_bound: true
   multi_jurisdiction_review_bound: true
+  distributed_signature_bound: true
 assertions:
   - federation binding preserves the local review action only when oversight reviewer quorum is network-attested
   - heritage binding overrides the local review action with preserve-boundary when the returned result is binding-rejected
   - conflicting federation-approved and heritage-rejected verdicts escalate to human governance without exposing raw cognitive payloads
   - every reviewer binding carries a verifier-network receipt id, jurisdiction, legal policy ref, jurisdiction bundle ref, and legal execution receipt id
   - JP-13 and US-CA reviewer bindings satisfy the cognitive-audit-multi-jurisdiction-review-v1 quorum before any distributed gate is accepted
+  - every Federation / Heritage returned result is wrapped in a distributed-council-verdict-signature-binding-v1 signature binding and the binding digest changes if the signed verdict payload is tampered

@@ -203,6 +203,10 @@ guardian_jurisdiction_legal_execution:
 - `cognitive_audit_governance_binding` は reviewer binding の `jurisdiction` /
   `jurisdiction_bundle_ref` / `legal_policy_ref` / `legal_execution_id` を束ね、
   JP-13 / US-CA など 2 法域以上の reviewer quorum を満たす時だけ governance bind する
+- 同じ binding は Federation / Heritage returned result を
+  `distributed-council-verdict-signature-binding-v1` で包み、
+  signed payload digest / signature digest / signer ref だけを保持して、
+  raw signature payload や participant credential body は保存しない
 - `interface.ewa.v0` は reviewer binding の `verification_id / verifier_ref /
   network_receipt_id / authority_chain_ref / trust_root_ref / legal_execution_id` を
   `ewa_guardian_oversight_gate` に compile し、physical actuation authorization の前段 gate として再利用する

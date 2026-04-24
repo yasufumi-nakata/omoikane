@@ -125,6 +125,15 @@ entries:
     rationale: Required to serialize returned Federation/Heritage results and cross-tier human escalation.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_council_verdict_signature.schema
+    consumers:
+      - specs/interfaces/agentic.cognitive_audit_governance.v0.idl
+      - specs/schemas/cognitive_audit_governance_binding.schema
+      - reference-runtime
+      - docs/02-subsystems/agentic/cognitive-audit-loop.md
+    rationale: Required to bind Federation/Heritage returned-result payload digests to cognitive audit governance without exposing raw signature payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/distributed_participant_attestation.schema
     consumers:
       - specs/interfaces/agentic.distributed_transport.v0.idl

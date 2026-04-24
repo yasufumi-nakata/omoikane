@@ -49,6 +49,7 @@
 - `distributed_transport_root_connectivity_receipt.schema`
 - `distributed_transport_root_directory.schema`
 - `distributed_transport_authority_seed_review_policy.schema`
+- `distributed_council_verdict_signature.schema`
 - `energy_floor.schema`
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`

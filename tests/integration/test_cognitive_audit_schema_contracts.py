@@ -51,6 +51,14 @@ class CognitiveAuditSchemaContractTests(unittest.TestCase):
                 binding,
             )
 
+    def test_distributed_verdict_signatures_match_public_schema(self) -> None:
+        for binding in self.result["bindings"].values():
+            for verdict in binding["distributed_verdicts"]:
+                self._assert_schema_valid(
+                    "specs/schemas/distributed_council_verdict_signature.schema",
+                    verdict["signature_binding"],
+                )
+
     def test_cognitive_audit_oversight_event_matches_public_schema(self) -> None:
         self._assert_schema_valid(
             "specs/schemas/guardian_oversight_event.schema",

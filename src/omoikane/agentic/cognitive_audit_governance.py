@@ -28,6 +28,10 @@ COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID = (
     "cognitive-audit-multi-jurisdiction-review-v1"
 )
 COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM = 2
+COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_PROFILE_ID = (
+    "distributed-council-verdict-signature-binding-v1"
+)
+COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM = "sha256-reference-signature-v1"
 
 
 def _binding_digest_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
@@ -78,6 +82,13 @@ class CognitiveAuditGovernanceService:
             "required_network_receipt_for_review": True,
             "jurisdiction_review_profile_id": COGNITIVE_AUDIT_JURISDICTION_REVIEW_PROFILE_ID,
             "required_jurisdiction_quorum": COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM,
+            "distributed_verdict_signature_profile_id": (
+                COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_PROFILE_ID
+            ),
+            "distributed_verdict_signature_algorithm": (
+                COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM
+            ),
+            "distributed_verdict_signatures_required": True,
             "conflict_action": "escalate-to-human-governance",
             "heritage_veto_action": "preserve-boundary",
             "raw_payload_policy": "digest-and-ref-only",
@@ -175,6 +186,9 @@ class CognitiveAuditGovernanceService:
                 "multi_jurisdiction_review_bound": normalized_oversight[
                     "jurisdiction_review_profile"
                 ]["multi_jurisdiction_quorum_met"],
+                "distributed_verdict_signatures_bound": self._distributed_verdict_signatures_bound(
+                    distributed_verdicts
+                ),
                 "no_raw_payload_exposed": True,
                 "conflict_detected": conflict_detected,
             },
@@ -207,6 +221,18 @@ class CognitiveAuditGovernanceService:
             != COGNITIVE_AUDIT_REQUIRED_JURISDICTION_QUORUM
         ):
             errors.append("policy.required_jurisdiction_quorum mismatch")
+        if (
+            binding.get("policy", {}).get("distributed_verdict_signature_profile_id")
+            != COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_PROFILE_ID
+        ):
+            errors.append("policy.distributed_verdict_signature_profile_id mismatch")
+        if (
+            binding.get("policy", {}).get("distributed_verdict_signature_algorithm")
+            != COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM
+        ):
+            errors.append("policy.distributed_verdict_signature_algorithm mismatch")
+        if binding.get("policy", {}).get("distributed_verdict_signatures_required") is not True:
+            errors.append("policy.distributed_verdict_signatures_required must be true")
         if execution_gate not in COGNITIVE_AUDIT_ALLOWED_EXECUTION_GATES:
             errors.append("execution_gate invalid")
         if final_follow_up_action not in COGNITIVE_AUDIT_ALLOWED_FOLLOW_UP_ACTIONS:
@@ -228,6 +254,8 @@ class CognitiveAuditGovernanceService:
             errors.append("continuity_guard.network_receipts_bound must be true")
         if not continuity_guard.get("multi_jurisdiction_review_bound"):
             errors.append("continuity_guard.multi_jurisdiction_review_bound must be true")
+        if not continuity_guard.get("distributed_verdict_signatures_bound"):
+            errors.append("continuity_guard.distributed_verdict_signatures_bound must be true")
         if continuity_guard.get("no_raw_payload_exposed") is not True:
             errors.append("continuity_guard.no_raw_payload_exposed must be true")
         if not isinstance(jurisdiction_review_profile, Mapping):
@@ -255,6 +283,8 @@ class CognitiveAuditGovernanceService:
         tiers = [verdict.get("council_tier") for verdict in distributed_verdicts]
         if len(tiers) != len(set(tiers)):
             errors.append("distributed_verdicts council_tier values must be unique")
+        signature_errors = self._validate_distributed_verdict_signatures(distributed_verdicts)
+        errors.extend(signature_errors)
 
         federation_approved = any(
             verdict.get("council_tier") == "federation"
@@ -300,6 +330,10 @@ class CognitiveAuditGovernanceService:
             is True
             and isinstance(jurisdiction_review_profile, Mapping)
             and jurisdiction_review_profile.get("multi_jurisdiction_quorum_met") is True,
+            "distributed_signature_bound": (
+                continuity_guard.get("distributed_verdict_signatures_bound") is True
+                and not signature_errors
+            ),
             "errors": errors,
         }
 
@@ -432,37 +466,95 @@ class CognitiveAuditGovernanceService:
             if council_tier in seen_tiers:
                 raise ValueError("distributed_resolution.council_tier values must be unique")
             seen_tiers.add(council_tier)
-            verdicts.append(
-                {
-                    "council_tier": council_tier,
-                    "resolution_ref": _non_empty_string(
-                        resolution.get("resolution_id"),
-                        "distributed_resolution.resolution_id",
-                    ),
-                    "topology_ref": _non_empty_string(
-                        resolution.get("topology_ref"),
-                        "distributed_resolution.topology_ref",
-                    ),
-                    "final_outcome": _non_empty_string(
-                        resolution.get("final_outcome"),
-                        "distributed_resolution.final_outcome",
-                    ),
-                    "decision_mode": _non_empty_string(
-                        resolution.get("decision_mode"),
-                        "distributed_resolution.decision_mode",
-                    ),
-                    "conflict_resolution": _non_empty_string(
-                        resolution.get("conflict_resolution"),
-                        "distributed_resolution.conflict_resolution",
-                    ),
-                    "follow_up_action": _non_empty_string(
-                        resolution.get("follow_up_action"),
-                        "distributed_resolution.follow_up_action",
-                    ),
-                    "external_resolution_refs": _unique_strings(
-                        resolution.get("external_resolution_refs", []),
-                        "distributed_resolution.external_resolution_refs",
-                    ),
-                }
-            )
+            verdict = {
+                "council_tier": council_tier,
+                "resolution_ref": _non_empty_string(
+                    resolution.get("resolution_id"),
+                    "distributed_resolution.resolution_id",
+                ),
+                "topology_ref": _non_empty_string(
+                    resolution.get("topology_ref"),
+                    "distributed_resolution.topology_ref",
+                ),
+                "final_outcome": _non_empty_string(
+                    resolution.get("final_outcome"),
+                    "distributed_resolution.final_outcome",
+                ),
+                "decision_mode": _non_empty_string(
+                    resolution.get("decision_mode"),
+                    "distributed_resolution.decision_mode",
+                ),
+                "conflict_resolution": _non_empty_string(
+                    resolution.get("conflict_resolution"),
+                    "distributed_resolution.conflict_resolution",
+                ),
+                "follow_up_action": _non_empty_string(
+                    resolution.get("follow_up_action"),
+                    "distributed_resolution.follow_up_action",
+                ),
+                "external_resolution_refs": _unique_strings(
+                    resolution.get("external_resolution_refs", []),
+                    "distributed_resolution.external_resolution_refs",
+                ),
+            }
+            verdict["signature_binding"] = self._build_distributed_verdict_signature(verdict)
+            verdicts.append(verdict)
         return verdicts
+
+    def _build_distributed_verdict_signature(
+        self,
+        verdict_without_signature: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        council_tier = _non_empty_string(
+            verdict_without_signature.get("council_tier"),
+            "distributed_verdict.council_tier",
+        )
+        resolution_ref = _non_empty_string(
+            verdict_without_signature.get("resolution_ref"),
+            "distributed_verdict.resolution_ref",
+        )
+        signer_ref = f"council://{council_tier}/returned-result-signer/v1"
+        public_key_ref = f"key://{council_tier}/returned-result/reference-v1"
+        signed_payload_digest = sha256_text(canonical_json(verdict_without_signature))
+        signature_payload = {
+            "profile_id": COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_PROFILE_ID,
+            "signature_algorithm": COGNITIVE_AUDIT_DISTRIBUTED_VERDICT_SIGNATURE_ALGORITHM,
+            "signer_ref": signer_ref,
+            "public_key_ref": public_key_ref,
+            "signed_resolution_ref": resolution_ref,
+            "signed_payload_digest": signed_payload_digest,
+        }
+        return {
+            **signature_payload,
+            "signature_digest": sha256_text(canonical_json(signature_payload)),
+            "raw_signature_payload_exposed": False,
+        }
+
+    def _distributed_verdict_signatures_bound(
+        self,
+        verdicts: Sequence[Mapping[str, Any]],
+    ) -> bool:
+        return not self._validate_distributed_verdict_signatures(verdicts)
+
+    def _validate_distributed_verdict_signatures(
+        self,
+        verdicts: Sequence[Any],
+    ) -> List[str]:
+        errors: List[str] = []
+        for index, verdict in enumerate(verdicts):
+            if not isinstance(verdict, Mapping):
+                errors.append(f"distributed_verdicts[{index}] must be a mapping")
+                continue
+            signature_binding = verdict.get("signature_binding")
+            if not isinstance(signature_binding, Mapping):
+                errors.append(f"distributed_verdicts[{index}].signature_binding must be present")
+                continue
+            unsigned_verdict = dict(verdict)
+            unsigned_verdict.pop("signature_binding", None)
+            expected_signature = self._build_distributed_verdict_signature(unsigned_verdict)
+            for field_name, expected_value in expected_signature.items():
+                if signature_binding.get(field_name) != expected_value:
+                    errors.append(
+                        f"distributed_verdicts[{index}].signature_binding.{field_name} mismatch"
+                    )
+        return errors

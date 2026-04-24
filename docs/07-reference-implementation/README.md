@@ -284,6 +284,9 @@ JP-13 / US-CA 法域 quorum を持つ `guardian-oversight` event と、
 Federation の `binding-approved` returned result、
 Heritage の `binding-rejected` returned result を
 同一 cognitive audit follow-up に束ねつつ、
+各 returned result を `distributed-council-verdict-signature-binding-v1` の
+digest-only signature binding へ包み、signed payload digest と signature digest を
+governance binding digest に含めつつ、
 `federation-attested-review` / `heritage-veto-boundary` /
 `distributed-conflict-human-escalation` の 3 gate を
 raw cognitive payload を露出せずに切り替えることを確認する。

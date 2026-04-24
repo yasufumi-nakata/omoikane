@@ -1,0 +1,49 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/distributed_council_verdict_signature.schema"
+title: DistributedCouncilVerdictSignature
+description: >
+  Digest-only reference signature binding for one Federation or Heritage
+  returned-result verdict before it is embedded in a cognitive audit governance
+  binding.
+type: object
+additionalProperties: false
+required:
+  - profile_id
+  - signature_algorithm
+  - signer_ref
+  - public_key_ref
+  - signed_resolution_ref
+  - signed_payload_digest
+  - signature_digest
+  - raw_signature_payload_exposed
+properties:
+  profile_id:
+    const: distributed-council-verdict-signature-binding-v1
+  signature_algorithm:
+    const: sha256-reference-signature-v1
+  signer_ref:
+    type: string
+    pattern: "^council://(federation|heritage)/returned-result-signer/v1$"
+  public_key_ref:
+    type: string
+    pattern: "^key://(federation|heritage)/returned-result/reference-v1$"
+  signed_resolution_ref:
+    type: string
+    pattern: "^distributed-council-[a-f0-9]{12}$"
+  signed_payload_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  signature_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  raw_signature_payload_exposed:
+    const: false
+examples:
+  - profile_id: distributed-council-verdict-signature-binding-v1
+    signature_algorithm: sha256-reference-signature-v1
+    signer_ref: council://federation/returned-result-signer/v1
+    public_key_ref: key://federation/returned-result/reference-v1
+    signed_resolution_ref: distributed-council-fedcba987654
+    signed_payload_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    signature_digest: 89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+    raw_signature_payload_exposed: false

@@ -1538,6 +1538,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["all_bindings_valid"])
         self.assertTrue(result["validation"]["oversight_network_bound"])
         self.assertTrue(result["validation"]["multi_jurisdiction_review_bound"])
+        self.assertTrue(result["validation"]["distributed_signature_bound"])
         self.assertEqual(["JP-13", "US-CA"], result["validation"]["reviewer_jurisdictions"])
         self.assertTrue(result["validation"]["federation_gate_preserves_review"])
         self.assertTrue(result["validation"]["heritage_gate_preserves_boundary"])
@@ -1547,6 +1548,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "distributed-conflict-human-escalation",
             result["bindings"]["conflict"]["execution_gate"],
+        )
+        self.assertEqual(
+            "distributed-council-verdict-signature-binding-v1",
+            result["bindings"]["conflict"]["distributed_verdicts"][0]["signature_binding"][
+                "profile_id"
+            ],
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["council-distributed"])
