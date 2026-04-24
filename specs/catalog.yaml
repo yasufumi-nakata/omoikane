@@ -2022,7 +2022,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, materialized-first dependency import precedence, HumanOversightChannel reviewer-network attestation, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
+    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, materialized-first dependency import precedence, actual worker module-origin binding, HumanOversightChannel reviewer-network attestation, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema
@@ -2097,7 +2097,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and same-host worker dispatch machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and same-host worker dispatch with module-origin proof machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -2146,7 +2146,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects candidate workspace execution binding, source target-path snapshot seeding, HumanOversightChannel-bound preseed attestation, same-host scope enforcement, and candidate/source success counts for Yaoyorozu builder workers.
+    rationale: Protects candidate workspace execution binding, source target-path snapshot seeding, HumanOversightChannel-bound preseed attestation, materialized dependency module-origin proof, same-host scope enforcement, and candidate/source success counts for Yaoyorozu builder workers.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_worker_delta_receipt.yaml

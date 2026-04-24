@@ -52,6 +52,7 @@
   `same-host-external-workspace` の execution root へ source target-path snapshot を seed してから worker を起動し、
   HumanOversightChannel reviewer-network attestation に束縛された preseed gate と
   dependency materialization manifest / materialized-first import precedence /
+  materialized dependency module-origin binding /
   seed commit / candidate-bound success count / source fallback count を receipt に残しつつ、
   同じ convocation session 上の `ConsensusBus` transcript と blocked direct handoff を
   `yaoyorozu_consensus_dispatch_binding` として束縛する。

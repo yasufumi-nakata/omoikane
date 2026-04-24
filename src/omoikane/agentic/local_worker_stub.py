@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 from typing import Any, Mapping
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
@@ -19,6 +20,9 @@ YAOYOROZU_WORKER_READY_GATE_PROFILE = "path-bound-target-delta-patch-candidate-v
 YAOYOROZU_WORKER_DELTA_SCAN_PROFILE = "git-target-path-delta-v1"
 YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE = "target-delta-to-patch-candidate-v1"
 YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE = "target-delta-priority-ranking-v1"
+YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE = "materialized-dependency-module-origin-v1"
+YAOYOROZU_WORKER_MODULE_NAME = "omoikane.agentic.local_worker_stub"
+YAOYOROZU_WORKER_MODULE_RELATIVE_PATH = "omoikane/agentic/local_worker_stub.py"
 YAOYOROZU_WORKER_SAMPLE_ENTRY_LIMIT = 3
 
 
@@ -113,6 +117,36 @@ def _run_argv_command(
         "stdout": completed.stdout,
         "stderr": completed.stderr,
     }
+
+
+def worker_module_origin_digest_payload(origin: Mapping[str, Any]) -> dict[str, object]:
+    return {
+        "profile": origin["profile"],
+        "module_name": origin["module_name"],
+        "module_file": origin["module_file"],
+        "module_digest": origin["module_digest"],
+        "search_path_head": origin["search_path_head"],
+    }
+
+
+def build_worker_module_origin() -> dict[str, object]:
+    module_file = Path(__file__).resolve()
+    module_text = module_file.read_text(encoding="utf-8", errors="replace")
+    search_path_head = [
+        str(Path(path_entry or os.getcwd()).resolve())
+        for path_entry in sys.path[:6]
+    ]
+    origin = {
+        "profile": YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE,
+        "module_name": YAOYOROZU_WORKER_MODULE_NAME,
+        "module_file": str(module_file),
+        "module_digest": sha256_text(module_text),
+        "search_path_head": search_path_head,
+    }
+    origin["origin_digest"] = sha256_text(
+        canonical_json(worker_module_origin_digest_payload(origin))
+    )
+    return origin
 
 
 def _compact_command_receipt(label: str, result: dict[str, object]) -> dict[str, object]:
@@ -737,6 +771,7 @@ def main() -> None:
         "target_path_observations": target_path_observations,
         "workspace_delta_receipt": workspace_delta_receipt,
         "patch_candidate_receipt": patch_candidate_receipt,
+        "worker_module_origin": build_worker_module_origin(),
         "coverage_evidence": coverage_evidence,
         "status": status,
     }

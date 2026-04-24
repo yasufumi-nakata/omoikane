@@ -3718,7 +3718,9 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(0, receipt["execution_summary"]["dependency_materialization_required_count"])
         self.assertEqual(0, receipt["execution_summary"]["external_dependency_materialized_count"])
         self.assertEqual(0, receipt["execution_summary"]["external_dependency_import_precedence_count"])
+        self.assertEqual(0, receipt["execution_summary"]["external_dependency_module_origin_count"])
         self.assertTrue(receipt["validation"]["external_dependency_import_precedence_bound"])
+        self.assertTrue(receipt["validation"]["external_dependency_module_origin_bound"])
         self.assertTrue(
             all(
                 result["dependency_import_precedence_profile"]
@@ -3727,6 +3729,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and result["dependency_import_path_order"] == [str(repo_root / "src")]
                 and result["dependency_import_precedence_status"] == "source-inline"
                 and result["dependency_import_precedence_bound"]
+                and result["dependency_module_origin_profile"]
+                == "materialized-dependency-module-origin-v1"
+                and result["dependency_module_origin_path"] == result["report"]["worker_module_origin"]["module_file"]
+                and result["dependency_module_origin_bound"]
                 for result in receipt["results"]
             )
         )
@@ -3778,6 +3784,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependencies_materialized"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependency_import_precedence_bound"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependency_module_origin_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_gates_passed"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["guardian_preseed_oversight_bound"])
@@ -3799,6 +3806,12 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             4,
             result["dispatch_receipt"]["execution_summary"][
                 "external_dependency_import_precedence_count"
+            ],
+        )
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_dependency_module_origin_count"
             ],
         )
         self.assertEqual(
@@ -3834,6 +3847,16 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and process["dependency_import_path_order"][1] == source_src_root
                 and process["dependency_import_precedence_status"] == "materialized-first"
                 and process["dependency_import_precedence_bound"]
+                and process["dependency_module_origin_profile"]
+                == "materialized-dependency-module-origin-v1"
+                and process["dependency_module_origin_path"].startswith(
+                    process["dependency_import_root"]
+                )
+                and process["dependency_module_origin_path"]
+                == process["report"]["worker_module_origin"]["module_file"]
+                and process["dependency_module_origin_digest"]
+                == process["report"]["worker_module_origin"]["module_digest"]
+                and process["dependency_module_origin_bound"]
                 and process["guardian_preseed_gate_status"] == "pass"
                 and process["guardian_preseed_gate_bound"]
                 and process["guardian_oversight_event_status"] == "satisfied"
@@ -3919,6 +3942,23 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             "external worker dependency import path order must put materialized src before source src",
             validation["errors"],
         )
+
+    def test_worker_dispatch_receipt_rejects_tampered_dependency_module_origin(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        tampered["results"][0]["report"]["worker_module_origin"]["module_file"] = (
+            tampered["workspace_root"] + "/src/omoikane/agentic/local_worker_stub.py"
+        )
+        tampered["results"][0]["dependency_module_origin_path"] = (
+            tampered["results"][0]["report"]["worker_module_origin"]["module_file"]
+        )
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["external_dependency_module_origin_bound"])
+        self.assertIn("worker_module_origin.module_file mismatch", validation["errors"])
 
     def test_task_graph_binding_groups_eval_and_docs_under_complexity_ceiling(self) -> None:
         result = OmoikaneReferenceOS().run_yaoyorozu_demo()

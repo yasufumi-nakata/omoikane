@@ -101,7 +101,10 @@ minimal runtime dependency snapshot を
 digest-bound に materialize し、
 `materialized-dependency-pythonpath-first-v1` により materialized `src` を
 source checkout の `src` より前に置いた path order を receipt に残してから
-worker を実行する。
+worker を実行し、
+`materialized-dependency-module-origin-v1` の `worker_module_origin` で
+実際の `omoikane.agentic.local_worker_stub` import 元ファイルと digest が
+materialized dependency snapshot 配下であることまで束縛する。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

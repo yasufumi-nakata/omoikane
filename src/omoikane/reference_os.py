@@ -4298,18 +4298,29 @@ json.dump(response, sys.stdout)
                         "external_dependency_import_precedence_bound"
                     ]
                 ),
+                "external_dependency_module_origin_bound": (
+                    dispatch_receipt_validation[
+                        "external_dependency_module_origin_bound"
+                    ]
+                ),
                 "external_dependency_materialized_count": dispatch_receipt[
                     "execution_summary"
                 ]["external_dependency_materialized_count"],
                 "external_dependency_import_precedence_count": dispatch_receipt[
                     "execution_summary"
                 ]["external_dependency_import_precedence_count"],
+                "external_dependency_module_origin_count": dispatch_receipt[
+                    "execution_summary"
+                ]["external_dependency_module_origin_count"],
                 "dependency_materialization_profile": dispatch_receipt[
                     "execution_summary"
                 ]["dependency_materialization_profile"],
                 "dependency_import_precedence_profile": dispatch_receipt[
                     "execution_summary"
                 ]["dependency_import_precedence_profile"],
+                "dependency_module_origin_profile": dispatch_receipt[
+                    "execution_summary"
+                ]["dependency_module_origin_profile"],
                 "guardian_preseed_gate_bound": dispatch_receipt_validation[
                     "all_guardian_preseed_gates_bound"
                 ],

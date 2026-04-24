@@ -405,7 +405,10 @@ workspace seed / execution-root creation / dependency materialization 前に pas
 `same-host-external-workspace-dependency-materialization-v1` manifest が
 minimal runtime dependency snapshot を external execution root へ digest-bound に固定したこと、
 `materialized-dependency-pythonpath-first-v1` により materialized `src` が
-source checkout `src` より先に import される path order を receipt に残すこと、
+source checkout `src` より先に import される path order を receipt に残し、
+`materialized-dependency-module-origin-v1` により
+worker が emit した `worker_module_origin` の `module_file` / digest / search path から
+`omoikane.agentic.local_worker_stub` が materialized snapshot 由来であることを固定すること、
 `workspace_seed_head_commit`、dependency manifest digest、candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
 target path observation と git-bound target path delta receipt、

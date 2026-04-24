@@ -6,7 +6,9 @@ from pathlib import Path
 import unittest
 
 from omoikane.agentic.local_worker_stub import (
+    YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE,
     YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
+    build_worker_module_origin,
     build_patch_candidate_receipt,
     build_workspace_delta_receipt,
 )
@@ -26,6 +28,16 @@ class LocalWorkerStubTests(unittest.TestCase):
         self._run_git(repo_root, "init", "-q")
         self._run_git(repo_root, "config", "user.name", "Codex Builder")
         self._run_git(repo_root, "config", "user.email", "codex@example.invalid")
+
+    def test_worker_module_origin_reports_actual_stub_file(self) -> None:
+        origin = build_worker_module_origin()
+
+        self.assertEqual(YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE, origin["profile"])
+        self.assertEqual("omoikane.agentic.local_worker_stub", origin["module_name"])
+        self.assertTrue(str(origin["module_file"]).endswith("omoikane/agentic/local_worker_stub.py"))
+        self.assertEqual(64, len(str(origin["module_digest"])))
+        self.assertEqual(64, len(str(origin["origin_digest"])))
+        self.assertTrue(origin["search_path_head"])
 
     def test_patch_candidate_receipt_ranks_runtime_before_test_coverage(self) -> None:
         with tempfile.TemporaryDirectory(prefix="omoikane-worker-stub-") as temp_dir:

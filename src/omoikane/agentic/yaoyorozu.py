@@ -18,7 +18,10 @@ from ..self_construction.builders import PatchGeneratorService
 from ..self_construction.design_reader import DesignReaderService
 from .consensus_bus import CONSENSUS_BUS_PHASE_ORDER, CONSENSUS_BUS_TRANSPORT_PROFILE
 from .local_worker_stub import (
+    YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE,
     YAOYOROZU_WORKER_DELTA_SCAN_PROFILE,
+    YAOYOROZU_WORKER_MODULE_NAME,
+    YAOYOROZU_WORKER_MODULE_RELATIVE_PATH,
     YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE,
     YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
     YAOYOROZU_WORKER_READY_GATE_PROFILE,
@@ -27,6 +30,7 @@ from .local_worker_stub import (
     build_patch_candidate_receipt,
     build_workspace_delta_receipt,
     build_worker_report_binding_digest,
+    worker_module_origin_digest_payload,
 )
 from .task_graph import TaskGraphService
 from .trust import TrustService
@@ -897,6 +901,7 @@ class YaoyorozuRegistryPolicy:
         default_factory=lambda: list(YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS)
     )
     dependency_import_precedence_profile: str = YAOYOROZU_DEPENDENCY_IMPORT_PRECEDENCE_PROFILE
+    dependency_module_origin_profile: str = YAOYOROZU_DEPENDENCY_MODULE_ORIGIN_PROFILE
     workspace_guardian_gate_profile: str = YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE
     workspace_guardian_role: str = YAOYOROZU_WORKSPACE_GUARDIAN_ROLE
     workspace_guardian_category: str = YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY
@@ -1654,6 +1659,86 @@ class YaoyorozuRegistryService:
             else 0,
             "manifest_ref": str(manifest.get("manifest_ref", "")),
             "manifest_digest": str(manifest.get("manifest_digest", "")),
+            "errors": errors,
+        }
+
+    def _validate_worker_module_origin(
+        self,
+        origin: Mapping[str, Any] | None,
+        *,
+        expected_module_root: str,
+        source_src_root: str,
+        workspace_scope: str,
+        expected_module_digest: str = "",
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(origin, Mapping):
+            return {
+                "ok": False,
+                "profile": self._policy.dependency_module_origin_profile,
+                "module_file": "",
+                "module_digest": "",
+                "errors": ["worker_module_origin must be bound"],
+            }
+        if origin.get("profile") != self._policy.dependency_module_origin_profile:
+            errors.append("worker_module_origin.profile mismatch")
+        if origin.get("module_name") != YAOYOROZU_WORKER_MODULE_NAME:
+            errors.append("worker_module_origin.module_name mismatch")
+        expected_module_file = str(
+            Path(expected_module_root) / YAOYOROZU_WORKER_MODULE_RELATIVE_PATH
+        )
+        module_file = str(origin.get("module_file", ""))
+        if module_file != expected_module_file:
+            errors.append("worker_module_origin.module_file mismatch")
+        module_path = Path(module_file)
+        if expected_module_digest:
+            expected_digest = expected_module_digest
+        elif module_path.is_file():
+            expected_digest = sha256_text(
+                module_path.read_text(encoding="utf-8", errors="replace")
+            )
+        else:
+            expected_digest = ""
+            errors.append("worker_module_origin.module_file must exist")
+        if origin.get("module_digest") != expected_digest:
+            errors.append("worker_module_origin.module_digest mismatch")
+        search_path_head = origin.get("search_path_head", [])
+        if not isinstance(search_path_head, list):
+            search_path_head = []
+            errors.append("worker_module_origin.search_path_head must be a list")
+        expected_module_root_text = str(Path(expected_module_root).resolve())
+        source_src_root_text = str(Path(source_src_root).resolve())
+        search_path_text = [str(path) for path in search_path_head]
+        if expected_module_root_text not in search_path_text:
+            errors.append("worker_module_origin.search_path_head missing expected module root")
+        if workspace_scope == self._policy.external_workspace_scope:
+            if source_src_root_text not in search_path_text:
+                errors.append("worker_module_origin.search_path_head missing source fallback root")
+            else:
+                expected_index = (
+                    search_path_text.index(expected_module_root_text)
+                    if expected_module_root_text in search_path_text
+                    else len(search_path_text)
+                )
+                source_index = search_path_text.index(source_src_root_text)
+                if expected_index >= source_index:
+                    errors.append(
+                        "worker_module_origin must resolve materialized root before source fallback"
+                    )
+        try:
+            expected_origin_digest = sha256_text(
+                canonical_json(worker_module_origin_digest_payload(origin))
+            )
+        except KeyError:
+            expected_origin_digest = ""
+            errors.append("worker_module_origin digest payload is missing required fields")
+        if origin.get("origin_digest") != expected_origin_digest:
+            errors.append("worker_module_origin.origin_digest mismatch")
+        return {
+            "ok": not errors,
+            "profile": str(origin.get("profile", "")),
+            "module_file": module_file,
+            "module_digest": str(origin.get("module_digest", "")),
             "errors": errors,
         }
 
@@ -3655,6 +3740,14 @@ class YaoyorozuRegistryService:
                     "target_path_observations": [],
                     "workspace_delta_receipt": workspace_delta_receipt,
                     "patch_candidate_receipt": patch_candidate_receipt,
+                    "worker_module_origin": {
+                        "profile": self._policy.dependency_module_origin_profile,
+                        "module_name": YAOYOROZU_WORKER_MODULE_NAME,
+                        "module_file": "",
+                        "module_digest": "",
+                        "search_path_head": [],
+                        "origin_digest": "",
+                    },
                     "coverage_evidence": {
                         "expected_target_count": len(unit["target_paths"]),
                         "observed_target_count": 0,
@@ -3683,6 +3776,20 @@ class YaoyorozuRegistryService:
                     },
                     "status": "failed",
                 }
+            worker_module_origin = (
+                report.get("worker_module_origin", {}) if isinstance(report, Mapping) else {}
+            )
+            expected_module_origin_root = (
+                dependency_import_root
+                if workspace_scope == self._policy.external_workspace_scope
+                else str(src_root)
+            )
+            module_origin_validation = self._validate_worker_module_origin(
+                worker_module_origin if isinstance(worker_module_origin, Mapping) else {},
+                expected_module_root=expected_module_origin_root,
+                source_src_root=str(src_root),
+                workspace_scope=workspace_scope,
+            )
             coverage_evidence = report.get("coverage_evidence", {})
             delta_receipt = report.get("workspace_delta_receipt", {})
             patch_candidate_receipt = report.get("patch_candidate_receipt", {})
@@ -3810,6 +3917,10 @@ class YaoyorozuRegistryService:
                 "dependency_import_path_order": dependency_import_path_order,
                 "dependency_import_precedence_status": dependency_import_precedence_status,
                 "dependency_import_precedence_bound": dependency_import_precedence_bound,
+                "dependency_module_origin_profile": module_origin_validation["profile"],
+                "dependency_module_origin_path": module_origin_validation["module_file"],
+                "dependency_module_origin_digest": module_origin_validation["module_digest"],
+                "dependency_module_origin_bound": module_origin_validation["ok"],
                 "guardian_preseed_gate": dict(guardian_preseed_gate)
                 if isinstance(guardian_preseed_gate, Mapping)
                 else {},
@@ -3867,6 +3978,7 @@ class YaoyorozuRegistryService:
                 or not delta_receipt_ok
                 or not patch_candidate_receipt_ok
                 or not target_paths_ready
+                or not module_origin_validation["ok"]
             ):
                 failed_role_ids.append(str(unit["role_id"]))
             results.append(result)
@@ -3909,6 +4021,7 @@ class YaoyorozuRegistryService:
                 and result["delta_receipt_ok"]
                 and result["patch_candidate_receipt_ok"]
                 and result["target_paths_ready"]
+                and result["dependency_module_origin_bound"]
             ),
             "failed_role_ids": failed_role_ids,
             "required_coverage_areas": list(dispatch_plan["selection_summary"]["required_coverage_areas"]),
@@ -3927,6 +4040,7 @@ class YaoyorozuRegistryService:
                 and result["process_status"] == "completed"
                 and result["exit_code"] == 0
                 and result["reported_status"] == "ready"
+                and result["dependency_module_origin_bound"]
             ),
             "source_bound_success_count": sum(
                 1
@@ -3935,6 +4049,7 @@ class YaoyorozuRegistryService:
                 and result["process_status"] == "completed"
                 and result["exit_code"] == 0
                 and result["reported_status"] == "ready"
+                and result["dependency_module_origin_bound"]
             ),
             "target_ready_count": sum(1 for result in results if result["target_paths_ready"]),
             "delta_bound_count": sum(1 for result in results if result["delta_receipt_ok"]),
@@ -4001,6 +4116,13 @@ class YaoyorozuRegistryService:
                 and result["dependency_import_precedence_status"]
                 == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
             ),
+            "dependency_module_origin_profile": self._policy.dependency_module_origin_profile,
+            "external_dependency_module_origin_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["dependency_module_origin_bound"]
+            ),
         }
         validation = {
             "command_digests_match": all(
@@ -4053,6 +4175,13 @@ class YaoyorozuRegistryService:
                         and result["dependency_import_path_order"][0]
                         == result["dependency_import_root"]
                     )
+                )
+                for result in results
+            ),
+            "external_dependency_module_origin_bound": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or result["dependency_module_origin_bound"]
                 )
                 for result in results
             ),
@@ -4194,6 +4323,8 @@ class YaoyorozuRegistryService:
         external_dependency_materialized_count = 0
         dependency_materialization_file_count = 0
         external_dependency_import_precedence_count = 0
+        external_dependency_module_origin_count = 0
+        external_dependency_module_origin_bound = True
         source_src_root = str(
             Path(str(dispatch_receipt.get("workspace_root", ""))).resolve() / "src"
         )
@@ -4236,6 +4367,7 @@ class YaoyorozuRegistryService:
             workspace_seed_status = result.get("workspace_seed_status")
             workspace_seed_head_commit = str(result.get("workspace_seed_head_commit", "")).strip()
             if workspace_scope == self._policy.external_workspace_scope:
+                expected_module_digest = ""
                 if workspace_seed_status != "seeded":
                     errors.append("external workspace results must record workspace_seed_status=seeded")
                 if len(workspace_seed_head_commit) != 40:
@@ -4317,7 +4449,25 @@ class YaoyorozuRegistryService:
                     and result.get("dependency_import_precedence_bound") is True
                 ):
                     external_dependency_import_precedence_count += 1
+                manifest_for_origin = result.get("dependency_materialization_manifest")
+                manifest_files = (
+                    manifest_for_origin.get("files", [])
+                    if isinstance(manifest_for_origin, Mapping)
+                    else []
+                )
+                for file_entry in manifest_files:
+                    if not isinstance(file_entry, Mapping):
+                        continue
+                    if file_entry.get("source_path") == (
+                        f"src/{YAOYOROZU_WORKER_MODULE_RELATIVE_PATH}"
+                    ):
+                        expected_module_digest = str(
+                            file_entry.get("materialized_digest", "")
+                        )
+                        break
+                expected_module_root = expected_import_root
             else:
+                expected_module_digest = ""
                 if workspace_seed_status != "inline":
                     errors.append("repo-local workspace results must record workspace_seed_status=inline")
                 if workspace_seed_head_commit:
@@ -4348,6 +4498,49 @@ class YaoyorozuRegistryService:
                     errors.append("repo-local dependency_import_precedence_status mismatch")
                 if result.get("dependency_import_precedence_bound") is not True:
                     errors.append("repo-local dependency_import_precedence_bound must be true")
+                expected_module_root = source_src_root
+            report_for_origin = result.get("report", {})
+            module_origin = (
+                report_for_origin.get("worker_module_origin", {})
+                if isinstance(report_for_origin, Mapping)
+                else {}
+            )
+            module_origin_validation = self._validate_worker_module_origin(
+                module_origin if isinstance(module_origin, Mapping) else {},
+                expected_module_root=expected_module_root,
+                source_src_root=source_src_root,
+                workspace_scope=str(workspace_scope),
+                expected_module_digest=expected_module_digest,
+            )
+            if not module_origin_validation["ok"]:
+                errors.extend(module_origin_validation["errors"])
+            if (
+                result.get("dependency_module_origin_profile")
+                != self._policy.dependency_module_origin_profile
+            ):
+                errors.append("worker result dependency_module_origin_profile mismatch")
+            if (
+                result.get("dependency_module_origin_path")
+                != module_origin_validation["module_file"]
+            ):
+                errors.append("worker result dependency_module_origin_path mismatch")
+            if (
+                result.get("dependency_module_origin_digest")
+                != module_origin_validation["module_digest"]
+            ):
+                errors.append("worker result dependency_module_origin_digest mismatch")
+            if result.get("dependency_module_origin_bound") != module_origin_validation["ok"]:
+                errors.append("worker result dependency_module_origin_bound mismatch")
+            if (
+                workspace_scope == self._policy.external_workspace_scope
+                and module_origin_validation["ok"]
+            ):
+                external_dependency_module_origin_count += 1
+            if (
+                workspace_scope == self._policy.external_workspace_scope
+                and not module_origin_validation["ok"]
+            ):
+                external_dependency_module_origin_bound = False
             workspace_target_digest = str(result.get("workspace_target_digest", "")).strip()
             if len(workspace_target_digest) != 64:
                 errors.append("worker result workspace_target_digest must be a sha256 digest")
@@ -4473,6 +4666,7 @@ class YaoyorozuRegistryService:
                 and result.get("delta_receipt_ok") is True
                 and result.get("patch_candidate_receipt_ok") is True
                 and result.get("target_paths_ready") is True
+                and result.get("dependency_module_origin_bound") is True
             )
             if successful_result and workspace_scope == self._policy.external_workspace_scope:
                 candidate_bound_success_count += 1
@@ -4761,6 +4955,16 @@ class YaoyorozuRegistryService:
             != external_dependency_import_precedence_count
         ):
             errors.append("execution_summary.external_dependency_import_precedence_count mismatch")
+        if (
+            execution_summary.get("dependency_module_origin_profile")
+            != self._policy.dependency_module_origin_profile
+        ):
+            errors.append("execution_summary.dependency_module_origin_profile mismatch")
+        if (
+            execution_summary.get("external_dependency_module_origin_count")
+            != external_dependency_module_origin_count
+        ):
+            errors.append("execution_summary.external_dependency_module_origin_count mismatch")
         validation = dispatch_receipt.get("validation", {})
         if not isinstance(validation, Mapping):
             errors.append("validation must be a mapping")
@@ -4814,6 +5018,15 @@ class YaoyorozuRegistryService:
                     )
                     and result.get("dependency_import_path_order", [None, None])[1]
                     == source_src_root
+                )
+                for result in results
+            ),
+            "external_dependency_module_origin_bound": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    result.get("dependency_module_origin_bound") is True
+                    and external_dependency_module_origin_bound
                 )
                 for result in results
             ),
@@ -4896,6 +5109,9 @@ class YaoyorozuRegistryService:
             ],
             "external_dependency_import_precedence_bound": expected_validation[
                 "external_dependency_import_precedence_bound"
+            ],
+            "external_dependency_module_origin_bound": expected_validation[
+                "external_dependency_module_origin_bound"
             ],
             "all_guardian_preseed_gates_bound": expected_validation[
                 "all_guardian_preseed_gates_bound"
