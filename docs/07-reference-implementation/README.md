@@ -224,6 +224,9 @@ rotated receipt verification に最終的に束縛されること、
 さらに `authority_churn` が overlap snapshot から stable snapshot への
 draining exit を `bounded-key-server-churn-window-v1` で証明すること、
 さらに live remote authority-cluster seed から得た
+`distributed_transport_authority_seed_review_policy` が
+seed 全件を review budget 内に収め、active key server coverage と
+single accepted cluster policy を digest-bound に固定してから、
 `distributed_transport_authority_cluster_discovery` が
 `candidate_targets` / `candidate_clusters` / `review_budget` /
 `accepted_route_catalog_ref` を first-class artifact として残し、

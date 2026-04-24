@@ -57,6 +57,8 @@ AUTHORITY_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
 AUTHORITY_ROUTE_TARGET_DISCOVERY_PROFILE = "bounded-authority-route-target-discovery-v1"
 AUTHORITY_CLUSTER_DISCOVERY_PROFILE = "review-capped-authority-cluster-discovery-v1"
 AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE = "live-http-json-authority-cluster-seed-v1"
+AUTHORITY_CLUSTER_SEED_REVIEW_POLICY_PROFILE = "budget-bound-authority-seed-review-policy-v1"
+AUTHORITY_CLUSTER_SEED_ACCEPTANCE_MODE = "single-accepted-cluster-after-budget-review-v1"
 AUTHORITY_ROUTE_PCAP_EXPORT_PROFILE = "trace-bound-pcap-export-v1"
 AUTHORITY_ROUTE_PCAP_ARTIFACT_FORMAT = "pcap"
 AUTHORITY_ROUTE_PCAP_READBACK_PROFILE = "pcap-readback-v1"
@@ -478,6 +480,60 @@ class DistributedTransportAuthorityChurnWindow:
 
 
 @dataclass
+class DistributedTransportAuthoritySeedReviewPolicy:
+    """First-class policy used before remote authority-cluster seed reduction."""
+
+    policy_ref: str
+    authority_plane_ref: str
+    authority_plane_digest: str
+    council_tier: str
+    transport_profile: str
+    policy_profile: str
+    seed_transport_profile: str
+    seed_refs: List[str]
+    review_budget: int
+    seed_count: int
+    request_timeout_ms: int
+    required_seed_coverage: str
+    acceptance_mode: str
+    required_coverage_status: str
+    required_host_attestation_status: str
+    required_authority_status: str
+    active_key_server_refs: List[str]
+    trusted_root_refs: List[str]
+    fail_closed_conditions: List[str]
+    recorded_at: str
+    digest: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "distributed_transport_authority_seed_review_policy",
+            "schema_version": "1.0.0",
+            "policy_ref": self.policy_ref,
+            "authority_plane_ref": self.authority_plane_ref,
+            "authority_plane_digest": self.authority_plane_digest,
+            "council_tier": self.council_tier,
+            "transport_profile": self.transport_profile,
+            "policy_profile": self.policy_profile,
+            "seed_transport_profile": self.seed_transport_profile,
+            "seed_refs": list(self.seed_refs),
+            "review_budget": self.review_budget,
+            "seed_count": self.seed_count,
+            "request_timeout_ms": self.request_timeout_ms,
+            "required_seed_coverage": self.required_seed_coverage,
+            "acceptance_mode": self.acceptance_mode,
+            "required_coverage_status": self.required_coverage_status,
+            "required_host_attestation_status": self.required_host_attestation_status,
+            "required_authority_status": self.required_authority_status,
+            "active_key_server_refs": list(self.active_key_server_refs),
+            "trusted_root_refs": list(self.trusted_root_refs),
+            "fail_closed_conditions": list(self.fail_closed_conditions),
+            "recorded_at": self.recorded_at,
+            "digest": self.digest,
+        }
+
+
+@dataclass
 class DistributedTransportAuthorityClusterDiscovery:
     """Review-capped remote authority-cluster discovery bound to one authority plane."""
 
@@ -490,6 +546,7 @@ class DistributedTransportAuthorityClusterDiscovery:
     seed_transport_profile: str
     seed_refs: List[str]
     review_budget: int
+    seed_review_policy: Dict[str, Any]
     candidate_targets: List[Dict[str, Any]]
     candidate_clusters: List[Dict[str, Any]]
     accepted_cluster_ref: str
@@ -516,6 +573,7 @@ class DistributedTransportAuthorityClusterDiscovery:
             "seed_transport_profile": self.seed_transport_profile,
             "seed_refs": list(self.seed_refs),
             "review_budget": self.review_budget,
+            "seed_review_policy": dict(self.seed_review_policy),
             "candidate_targets": [dict(target) for target in self.candidate_targets],
             "candidate_clusters": [dict(cluster) for cluster in self.candidate_clusters],
             "accepted_cluster_ref": self.accepted_cluster_ref,
@@ -1242,14 +1300,14 @@ class DistributedTransportService:
             digest=digest,
         )
 
-    def discover_remote_authority_clusters(
+    def build_authority_cluster_seed_review_policy(
         self,
         authority_plane: DistributedTransportAuthorityPlane,
         *,
         seed_refs: List[str],
         review_budget: int = 4,
         request_timeout_ms: int = 1_000,
-    ) -> DistributedTransportAuthorityClusterDiscovery:
+    ) -> DistributedTransportAuthoritySeedReviewPolicy:
         normalized_seed_refs = self._normalize_string_list(seed_refs, "seed_refs")
         normalized_review_budget = self._require_positive_int(review_budget, "review_budget")
         if len(normalized_seed_refs) > normalized_review_budget:
@@ -1268,6 +1326,88 @@ class DistributedTransportService:
             )
 
         timeout_ms = self._require_positive_int(request_timeout_ms, "request_timeout_ms")
+        recorded_at = utc_now_iso()
+        policy_ref = (
+            f"authority-seed-review-policy://{authority_plane.council_tier}/"
+            f"{authority_plane.authority_plane_ref.split('/')[-1]}"
+        )
+        fail_closed_conditions = [
+            "seed-count-exceeds-review-budget",
+            "missing-active-authority-plane-member",
+            "coverage-status-not-covered",
+            "host-attestation-status-not-complete",
+            "multiple-accepted-clusters",
+            "no-accepted-cluster",
+        ]
+        payload = {
+            "policy_ref": policy_ref,
+            "authority_plane_ref": authority_plane.authority_plane_ref,
+            "authority_plane_digest": authority_plane.digest,
+            "council_tier": authority_plane.council_tier,
+            "transport_profile": authority_plane.transport_profile,
+            "policy_profile": AUTHORITY_CLUSTER_SEED_REVIEW_POLICY_PROFILE,
+            "seed_transport_profile": AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
+            "seed_refs": normalized_seed_refs,
+            "review_budget": normalized_review_budget,
+            "seed_count": len(normalized_seed_refs),
+            "request_timeout_ms": timeout_ms,
+            "required_seed_coverage": "all-seed-refs-within-budget",
+            "acceptance_mode": AUTHORITY_CLUSTER_SEED_ACCEPTANCE_MODE,
+            "required_coverage_status": "covered",
+            "required_host_attestation_status": "complete",
+            "required_authority_status": "active",
+            "active_key_server_refs": sorted(active_authority_servers),
+            "trusted_root_refs": list(authority_plane.trusted_root_refs),
+            "fail_closed_conditions": fail_closed_conditions,
+            "recorded_at": recorded_at,
+        }
+        digest = sha256_text(canonical_json(payload))
+        return DistributedTransportAuthoritySeedReviewPolicy(
+            policy_ref=policy_ref,
+            authority_plane_ref=authority_plane.authority_plane_ref,
+            authority_plane_digest=authority_plane.digest,
+            council_tier=authority_plane.council_tier,
+            transport_profile=authority_plane.transport_profile,
+            policy_profile=AUTHORITY_CLUSTER_SEED_REVIEW_POLICY_PROFILE,
+            seed_transport_profile=AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
+            seed_refs=normalized_seed_refs,
+            review_budget=normalized_review_budget,
+            seed_count=len(normalized_seed_refs),
+            request_timeout_ms=timeout_ms,
+            required_seed_coverage="all-seed-refs-within-budget",
+            acceptance_mode=AUTHORITY_CLUSTER_SEED_ACCEPTANCE_MODE,
+            required_coverage_status="covered",
+            required_host_attestation_status="complete",
+            required_authority_status="active",
+            active_key_server_refs=sorted(active_authority_servers),
+            trusted_root_refs=list(authority_plane.trusted_root_refs),
+            fail_closed_conditions=fail_closed_conditions,
+            recorded_at=recorded_at,
+            digest=digest,
+        )
+
+    def discover_remote_authority_clusters(
+        self,
+        authority_plane: DistributedTransportAuthorityPlane,
+        *,
+        seed_refs: List[str],
+        review_budget: int = 4,
+        request_timeout_ms: int = 1_000,
+    ) -> DistributedTransportAuthorityClusterDiscovery:
+        seed_review_policy = self.build_authority_cluster_seed_review_policy(
+            authority_plane,
+            seed_refs=seed_refs,
+            review_budget=review_budget,
+            request_timeout_ms=request_timeout_ms,
+        )
+        normalized_seed_refs = list(seed_review_policy.seed_refs)
+        normalized_review_budget = seed_review_policy.review_budget
+        timeout_ms = seed_review_policy.request_timeout_ms
+        active_authority_servers = {
+            server["key_server_ref"]: dict(server)
+            for server in authority_plane.key_servers
+            if server["authority_status"] == seed_review_policy.required_authority_status
+        }
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         candidate_targets: List[Dict[str, Any]] = []
         candidate_clusters: List[Dict[str, Any]] = []
@@ -1373,6 +1513,8 @@ class DistributedTransportService:
                 {
                     "cluster_ref": cluster_ref,
                     "seed_ref": seed_ref,
+                    "review_policy_ref": seed_review_policy.policy_ref,
+                    "review_policy_digest": seed_review_policy.digest,
                     "observed_latency_ms": observed_latency_ms,
                     "http_status": http_status,
                     "response_digest": sha256_text(canonical_json(payload)),
@@ -1414,6 +1556,8 @@ class DistributedTransportService:
             canonical_json(
                 {
                     "authority_plane_ref": authority_plane.authority_plane_ref,
+                    "seed_review_policy_ref": seed_review_policy.policy_ref,
+                    "seed_review_policy_digest": seed_review_policy.digest,
                     "seed_refs": normalized_seed_refs,
                     "review_budget": normalized_review_budget,
                     "accepted_cluster_ref": accepted_cluster_ref,
@@ -1435,6 +1579,7 @@ class DistributedTransportService:
             "seed_transport_profile": AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
             "seed_refs": normalized_seed_refs,
             "review_budget": normalized_review_budget,
+            "seed_review_policy": seed_review_policy.to_dict(),
             "candidate_targets": candidate_targets,
             "candidate_clusters": candidate_clusters,
             "accepted_cluster_ref": accepted_cluster_ref,
@@ -1458,6 +1603,7 @@ class DistributedTransportService:
             seed_transport_profile=AUTHORITY_CLUSTER_SEED_TRANSPORT_PROFILE,
             seed_refs=normalized_seed_refs,
             review_budget=normalized_review_budget,
+            seed_review_policy=seed_review_policy.to_dict(),
             candidate_targets=candidate_targets,
             candidate_clusters=candidate_clusters,
             accepted_cluster_ref=accepted_cluster_ref,

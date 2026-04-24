@@ -137,14 +137,23 @@ stable な authority plane に対しては
 `discover_remote_authority_clusters` により、
 live remote authority-cluster seed を review-capped discovery artifact に縮約し、
 candidate cluster 群から 1 つの accepted route catalog を選ぶ。
+この前段で `build_authority_cluster_seed_review_policy` が
+`distributed_transport_authority_seed_review_policy` を発行し、
+review budget、active key server coverage、single accepted cluster policy、
+fail-closed 条件を digest-bound artifact として固定する。
 
 | 項目 | 固定値 |
 |---|---|
+| seed review policy | `budget-bound-authority-seed-review-policy-v1` |
 | discovery profile | `review-capped-authority-cluster-discovery-v1` |
 | seed transport | `live-http-json-authority-cluster-seed-v1` |
 | acceptance mode | `single accepted cluster after review` |
 | downstream handoff | `accepted_route_catalog -> discover_authority_route_targets` |
 
+- seed review policy は `seed_refs` 全件を `review_budget` 内に収め、
+  `active_key_server_refs` を authority plane の active member 全件に揃える
+- policy digest は candidate cluster review にも埋め込まれ、
+  discovery receipt の `seed_review_policy` と一致しなければ downstream へ進めない
 - discovery は `seed_refs` ごとに `candidate_targets` / `candidate_clusters` を記録し、
   `coverage_status`、`host_attestation_status`、`acceptance_status` を
   machine-checkable に残す
@@ -273,7 +282,7 @@ route trace / packet export / resolved interface へ束縛する。
 - `capture_command` は `tcpdump` / resolved interface / exact filter を含む preview として固定し、
   actual live capture 自体は repo 外の broker 実行面へ委譲する
 - residual scope は broad な cross-host authority routing 不在ではなく、
-  remote seed review の budget policy と accepted cluster selection の厳格化へ限定される
+  remote seed の実ネットワーク運用・external trust anchor 運用へ限定される
 
 ## Relay telemetry
 
@@ -304,6 +313,8 @@ receipt に束縛された bounded relay observability surface も返す。
 - schema: `specs/schemas/distributed_transport_root_connectivity_receipt.schema`
 - schema: `specs/schemas/distributed_transport_root_directory.schema`
 - schema: `specs/schemas/distributed_transport_authority_plane.schema`
+- schema: `specs/schemas/distributed_transport_authority_seed_review_policy.schema`
+- schema: `specs/schemas/distributed_transport_authority_cluster_discovery.schema`
 - schema: `specs/schemas/distributed_transport_authority_route_target_discovery.schema`
 - schema: `specs/schemas/distributed_transport_authority_churn_window.schema`
 - schema: `specs/schemas/distributed_transport_os_observer_receipt.schema`
@@ -316,6 +327,8 @@ receipt に束縛された bounded relay observability surface も返す。
 - eval: `evals/agentic/distributed_transport_relay_telemetry.yaml`
 - eval: `evals/agentic/distributed_transport_live_root_directory.yaml`
 - eval: `evals/agentic/distributed_transport_authority_plane.yaml`
+- eval: `evals/agentic/distributed_transport_authority_seed_review_policy.yaml`
+- eval: `evals/agentic/distributed_transport_authority_cluster_discovery.yaml`
 - eval: `evals/agentic/distributed_transport_authority_route_target_discovery.yaml`
 - eval: `evals/agentic/distributed_transport_authority_churn.yaml`
 - eval: `evals/agentic/distributed_transport_authority_route_trace.yaml`
@@ -328,6 +341,7 @@ receipt に束縛された bounded relay observability surface も返す。
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-plane.md`
 - decision log: `meta/decision-log/2026-04-20_distributed-transport-authority-churn.md`
 - decision log: `meta/decision-log/2026-04-22_distributed-transport-route-target-discovery.md`
+- decision log: `meta/decision-log/2026-04-24_distributed-transport-seed-review-policy.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-non-loopback-route-trace.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-os-observer-receipt.md`
 - decision log: `meta/decision-log/2026-04-21_distributed-transport-pcap-export.md`

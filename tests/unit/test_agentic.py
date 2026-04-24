@@ -1574,6 +1574,31 @@ json.dump(
         )
         self.assertEqual("authority-cluster://federation/review-window", discovery.accepted_cluster_ref)
         self.assertEqual(2, discovery.review_budget)
+        self.assertEqual(
+            "budget-bound-authority-seed-review-policy-v1",
+            discovery.seed_review_policy["policy_profile"],
+        )
+        self.assertEqual(
+            "single-accepted-cluster-after-budget-review-v1",
+            discovery.seed_review_policy["acceptance_mode"],
+        )
+        self.assertEqual(1, discovery.seed_review_policy["seed_count"])
+        self.assertEqual(2, discovery.seed_review_policy["review_budget"])
+        self.assertEqual(
+            [
+                "keyserver://federation/mirror-c-active",
+                "keyserver://federation/notary-a",
+            ],
+            discovery.seed_review_policy["active_key_server_refs"],
+        )
+        self.assertEqual(
+            discovery.seed_review_policy["digest"],
+            discovery.candidate_clusters[0]["review_policy_digest"],
+        )
+        self.assertEqual(
+            discovery.seed_review_policy["policy_ref"],
+            discovery.candidate_clusters[0]["review_policy_ref"],
+        )
         self.assertTrue(discovery.all_active_members_discovered)
         self.assertEqual(1, len(discovery.candidate_clusters))
         self.assertEqual("accepted", discovery.candidate_clusters[0]["acceptance_status"])

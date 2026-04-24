@@ -48,6 +48,7 @@
 - `distributed_transport_relay_telemetry.schema`
 - `distributed_transport_root_connectivity_receipt.schema`
 - `distributed_transport_root_directory.schema`
+- `distributed_transport_authority_seed_review_policy.schema`
 - `energy_floor.schema`
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`

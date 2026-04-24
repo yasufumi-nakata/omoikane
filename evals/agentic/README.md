@@ -49,6 +49,10 @@ reachable endpoint と root quorum を取得し、response digest つき receipt
 authority route trace が remote host / host attestation / authority cluster binding を
 OS observer receipt と同じ tuple evidence に束縛し、distinct remote host 条件を固定すること。
 
+### Distributed Transport Authority Seed Review Policy
+remote authority-cluster seed probing の前に review_budget、active key server coverage、
+single accepted cluster policy、fail-closed 条件を first-class policy として固定すること。
+
 ### Cognitive Audit Loop
 qualia checkpoint と self-model abrupt change と metacognition alert が
 bounded Council review に束ねられ、continuity-safe な follow-up を返すこと。
@@ -140,6 +144,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `distributed_transport_authority_plane.yaml`
 - `distributed_transport_authority_route_target_discovery.yaml`
 - `distributed_transport_authority_route_trace.yaml`
+- `distributed_transport_authority_seed_review_policy.yaml`
 - `distributed_transport_live_root_directory.yaml`
 - `distributed_transport_packet_capture_export.yaml`
 - `distributed_transport_privileged_capture_acquisition.yaml`

@@ -55,8 +55,9 @@
 ## 次段階
 
 inventory backlog は解消済みです。
-remote authority-cluster seed review policy のような exploratory surface は
-docs 側で設計を深めてから昇格させる。
+remote authority-cluster seed review policy は
+`agentic.distributed_transport.v0.idl` の `build_authority_cluster_seed_review_policy`
+operation と public schema へ昇格済みです。
 
 ## 形式
 

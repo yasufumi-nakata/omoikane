@@ -2156,6 +2156,16 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="council.distributed.transport_authority_seed_policy_bound",
+            payload=authority_cluster_discovery.seed_review_policy,
+            actor="DistributedTransportService",
+            category="council-distributed",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="council.distributed.transport_authority_cluster_discovered",
             payload=authority_cluster_discovery.to_dict(),
             actor="DistributedTransportService",
@@ -2444,6 +2454,9 @@ json.dump(response, sys.stdout)
             "authority_churn": {
                 "federation_rotated": authority_churn.to_dict(),
             },
+            "authority_seed_review_policy": {
+                "federation_rotated": authority_cluster_discovery.seed_review_policy,
+            },
             "authority_cluster_discovery": {
                 "federation_rotated": authority_cluster_discovery.to_dict(),
             },
@@ -2556,6 +2569,17 @@ json.dump(response, sys.stdout)
                     == "review-capped-authority-cluster-discovery-v1"
                     and authority_cluster_discovery.seed_transport_profile
                     == "live-http-json-authority-cluster-seed-v1"
+                    and authority_cluster_discovery.seed_review_policy["policy_profile"]
+                    == "budget-bound-authority-seed-review-policy-v1"
+                    and authority_cluster_discovery.seed_review_policy["policy_ref"].startswith(
+                        "authority-seed-review-policy://"
+                    )
+                    and authority_cluster_discovery.seed_review_policy["digest"]
+                    == authority_cluster_discovery.candidate_clusters[0]["review_policy_digest"]
+                    and authority_cluster_discovery.seed_review_policy["review_budget"] == 2
+                    and authority_cluster_discovery.seed_review_policy["seed_count"] == 1
+                    and authority_cluster_discovery.seed_review_policy["acceptance_mode"]
+                    == "single-accepted-cluster-after-budget-review-v1"
                     and authority_cluster_discovery.discovery_status == "discovered"
                     and authority_cluster_discovery.review_budget == 2
                     and authority_cluster_discovery.accepted_cluster_ref

@@ -189,10 +189,20 @@ entries:
     rationale: Required to serialize one bounded external key-server fleet snapshot, directory digest binding, trusted-root coverage, and draining-overlap churn safety for rotated transport envelopes.
   - priority: P1
     kind: schema
+    file: specs/schemas/distributed_transport_authority_seed_review_policy.schema
+    consumers:
+      - specs/interfaces/agentic.distributed_transport.v0.idl
+      - reference-runtime
+      - evals/agentic/distributed_transport_authority_seed_review_policy.yaml
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Required to serialize the budget-bound review policy that gates live remote authority-cluster seed probing before accepted route-catalog discovery.
+  - priority: P1
+    kind: schema
     file: specs/schemas/distributed_transport_authority_cluster_discovery.schema
     consumers:
       - specs/interfaces/agentic.distributed_transport.v0.idl
       - reference-runtime
+      - specs/schemas/distributed_transport_authority_seed_review_policy.schema
       - evals/agentic/distributed_transport_authority_cluster_discovery.yaml
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
     rationale: Required to serialize review-capped remote authority-cluster discovery, candidate-cluster triage, and one accepted route catalog before bounded route-target discovery continues.
@@ -1463,6 +1473,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects overlap-safe key-server churn handling so each trusted root retains active authority coverage during replacement handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_seed_review_policy.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the first-class seed review policy, including review-budget coverage, active member binding, and single-accepted-cluster fail-closed criteria before live seed discovery proceeds.
   - priority: P1
     kind: eval
     file: evals/agentic/distributed_transport_authority_cluster_discovery.yaml

@@ -1296,6 +1296,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["authority_cluster_discovery"]["federation_rotated"]["review_budget"],
         )
         self.assertEqual(
+            "budget-bound-authority-seed-review-policy-v1",
+            result["authority_seed_review_policy"]["federation_rotated"]["policy_profile"],
+        )
+        self.assertEqual(
+            "single-accepted-cluster-after-budget-review-v1",
+            result["authority_seed_review_policy"]["federation_rotated"]["acceptance_mode"],
+        )
+        self.assertEqual(
+            result["authority_seed_review_policy"]["federation_rotated"]["digest"],
+            result["authority_cluster_discovery"]["federation_rotated"]["candidate_clusters"][0][
+                "review_policy_digest"
+            ],
+        )
+        self.assertEqual(
             1,
             len(result["authority_cluster_discovery"]["federation_rotated"]["candidate_clusters"]),
         )

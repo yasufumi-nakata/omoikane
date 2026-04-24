@@ -10,6 +10,7 @@ imports:
   distributed_transport_relay_telemetry: ../schemas/distributed_transport_relay_telemetry.schema
   distributed_transport_root_directory: ../schemas/distributed_transport_root_directory.schema
   distributed_transport_authority_plane: ../schemas/distributed_transport_authority_plane.schema
+  distributed_transport_authority_seed_review_policy: ../schemas/distributed_transport_authority_seed_review_policy.schema
   distributed_transport_authority_cluster_discovery: ../schemas/distributed_transport_authority_cluster_discovery.schema
   distributed_transport_authority_route_target_discovery: ../schemas/distributed_transport_authority_route_target_discovery.schema
   distributed_transport_authority_churn_window: ../schemas/distributed_transport_authority_churn_window.schema
@@ -240,6 +241,45 @@ operations:
       - removed key servers must have been previously marked draining
       - quorum_requirement and trusted_root_refs must remain sufficient after churn
       - churn_profile must equal bounded-key-server-churn-window-v1
+  build_authority_cluster_seed_review_policy:
+    summary: >
+      Materialize the budget-bound policy used to review live remote authority-cluster seeds
+      before discovery probes run, so review_budget, active authority members, and fail-closed
+      acceptance criteria are digest-bound as a first-class artifact.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - authority_plane_ref
+          - authority_plane_digest
+          - seed_refs
+        properties:
+          authority_plane_ref:
+            type: string
+            pattern: "^authority-plane://"
+          authority_plane_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          seed_refs:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^https?://"
+          review_budget:
+            type: integer
+            minimum: 1
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: distributed_transport_authority_seed_review_policy
+    guarantees:
+      - review_budget must cover every seed_ref before any live seed is probed
+      - policy_profile must equal budget-bound-authority-seed-review-policy-v1
+      - active_key_server_refs must mirror the current active authority-plane members
+      - acceptance_mode must require exactly one accepted cluster after review
   discover_remote_authority_clusters:
     summary: >
       Probe one or more live remote authority-cluster seeds, reduce their candidate route targets
@@ -276,6 +316,7 @@ operations:
       schema_ref: distributed_transport_authority_cluster_discovery
     guarantees:
       - review_budget must cover every probed seed_ref
+      - seed_review_policy must be embedded and digest-bound to each candidate cluster review
       - accepted discovery must cover every reachable active authority-plane member
       - accepted clusters require complete remote_host_attestation_ref coverage
       - accepted_route_catalog must preserve authority-plane server_role, authority_status, and matched_root_refs for each discovered target

@@ -1,0 +1,30 @@
+eval_id: distributed_transport_authority_seed_review_policy
+target: agentic.distributed_transport
+level: L4
+description: >
+  Live remote authority-cluster seed probing must first emit a digest-bound review
+  policy that fixes review_budget, active authority-plane membership, accepted-cluster
+  mode, and fail-closed conditions.
+fixtures:
+  - scenario: federation_authority_seed_review_policy
+    council_tier: federation
+    policy_profile: budget-bound-authority-seed-review-policy-v1
+    authority_plane_ref: authority-plane://federation/route-nonce-example
+    expected:
+      seed_count: 1
+      review_budget: 2
+      required_seed_coverage: all-seed-refs-within-budget
+      acceptance_mode: single-accepted-cluster-after-budget-review-v1
+      required_coverage_status: covered
+      required_host_attestation_status: complete
+      required_authority_status: active
+      active_key_server_count: 2
+assertions:
+  - Policy creation must fail closed when seed_count exceeds review_budget
+  - Policy must list every active authority-plane key_server_ref before probing live seeds
+  - Policy digest must be embedded in each candidate cluster review
+  - Accepted discovery must use exactly one accepted cluster after budget review
+  - Fail-closed conditions must include no-accepted-cluster and multiple-accepted-clusters
+metric: exact-match
+threshold: 1.0
+ethics_check: true
