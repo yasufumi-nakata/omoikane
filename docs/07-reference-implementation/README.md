@@ -341,6 +341,10 @@ quorum へ昇格した `remote_verifier_federation` と、
 append-only lifecycle、fail-closed revocation action、`recovery_quorum_bound=true`
 に加えて full `trust_recovery_review` と
 redacted `recovery_review_bound=true` を 1 receipt で確認する。
+同じ recovery review は `notice_authority_refs` と
+`bounded-trust-recovery-legal-execution-scope-v1` の execution scope manifest を持ち、
+redacted export では `execution_scope_summary` と digest だけを公開して
+`recovery_notice_scope_bound=true` を返す。
 
 `yaoyorozu-demo` は L4 YaoyorozuRegistry / council convocation の reference contract
 (`agentic.yaoyorozu.v0`) を JSON で可視化し、

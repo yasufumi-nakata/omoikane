@@ -4,7 +4,8 @@ title: TrustRedactedDestinationRecoverySummary
 description: >
   Public redacted recovery-review summary bound to the recovered destination
   lifecycle entry, exposing rationale and legal proof summaries while sealing
-  raw rationale text and legal acknowledgement refs.
+  raw rationale text, legal acknowledgement refs, and the full legal execution
+  scope manifest.
 type: object
 additionalProperties: false
 required:
@@ -25,7 +26,7 @@ properties:
   kind:
     const: trust_redacted_destination_recovery_summary
   schema_version:
-    const: 1.0.0
+    const: 1.1.0
   summary_id:
     type: string
     pattern: "^trust-recovery-summary-[a-f0-9]{12}$"
@@ -74,9 +75,11 @@ properties:
     required:
       - policy_refs
       - jurisdiction_bundle_refs
+      - notice_authority_refs
       - liability_mode
       - reviewer_binding_digest
       - legal_ack_commitment_digest
+      - execution_scope_summary
       - legal_proof_digest
     properties:
       policy_refs:
@@ -93,6 +96,13 @@ properties:
         items:
           type: string
           minLength: 1
+      notice_authority_refs:
+        type: array
+        minItems: 3
+        maxItems: 3
+        items:
+          type: string
+          minLength: 1
       liability_mode:
         const: joint
       reviewer_binding_digest:
@@ -101,6 +111,33 @@ properties:
       legal_ack_commitment_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+      execution_scope_summary:
+        type: object
+        additionalProperties: false
+        required:
+          - scope_profile_id
+          - scope_ref
+          - scope_digest
+          - jurisdiction_count
+          - allowed_action_count
+          - blocked_action_count
+        properties:
+          scope_profile_id:
+            const: bounded-trust-recovery-legal-execution-scope-v1
+          scope_ref:
+            type: string
+            minLength: 1
+          scope_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          jurisdiction_count:
+            const: 3
+          allowed_action_count:
+            type: integer
+            minimum: 3
+          blocked_action_count:
+            type: integer
+            minimum: 3
       legal_proof_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
@@ -117,7 +154,7 @@ properties:
     pattern: "^[a-f0-9]{64}$"
 examples:
   - kind: trust_redacted_destination_recovery_summary
-    schema_version: 1.0.0
+    schema_version: 1.1.0
     summary_id: trust-recovery-summary-0123456789ab
     summary_ref: trust-redacted-recovery-summary://0123456789ab
     summary_profile_id: bounded-trust-transfer-redacted-destination-recovery-summary-v1
@@ -140,9 +177,20 @@ examples:
         - legal://jp-13/guardian-oversight/v1
         - legal://us-ca/guardian-oversight/v1
         - legal://eu-de/guardian-oversight/v1
+      notice_authority_refs:
+        - notice-authority://jp-13/digital-agency/trust-recovery/v1
+        - notice-authority://us-ca/ai-safety/trust-recovery/v1
+        - notice-authority://eu-de/data-protection/trust-recovery/v1
       liability_mode: joint
       reviewer_binding_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
       legal_ack_commitment_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      execution_scope_summary:
+        scope_profile_id: bounded-trust-recovery-legal-execution-scope-v1
+        scope_ref: trust-recovery-execution-scope://0123456789ab
+        scope_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        jurisdiction_count: 3
+        allowed_action_count: 3
+        blocked_action_count: 3
       legal_proof_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
     redaction_policy_id: bounded-trust-transfer-destination-recovery-summary-redaction-v1
     redacted_fields:
@@ -150,4 +198,5 @@ examples:
       - destination_lifecycle.history[].recovery_review.review_ref
       - destination_lifecycle.history[].recovery_review.rationale
       - destination_lifecycle.history[].recovery_review.legal_ack_refs
+      - destination_lifecycle.history[].recovery_review.execution_scope_manifest
     summary_digest: 1212121212121212121212121212121212121212121212121212121212121212

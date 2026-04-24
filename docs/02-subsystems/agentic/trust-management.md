@@ -147,9 +147,17 @@ source / destination の `trust_snapshot` を同一 receipt に束ね、
 - 同じ redacted profile では `trust_redacted_destination_recovery_summary` が
   recovered branch の `recovery_review` から
   `reason_codes` / summary text / rationale digest と、
-  `policy_refs` / `jurisdiction_bundle_refs` / `liability_mode` /
-  `reviewer_binding_digest` / legal-proof digests だけを公開し、
-  raw rationale と `legal_ack_refs` は `redacted_fields` へ退避する
+  `policy_refs` / `jurisdiction_bundle_refs` / `notice_authority_refs` /
+  `liability_mode` / `reviewer_binding_digest` / legal-proof digests /
+  `execution_scope_summary` だけを公開し、
+  raw rationale、`legal_ack_refs`、full `execution_scope_manifest` は
+  `redacted_fields` へ退避する
+- full `trust_recovery_review` は
+  `bounded-trust-recovery-legal-execution-scope-v1` により
+  `restore-destination-trust-usage` / `bind-recovered-verifier-federation` /
+  `publish-redacted-recovery-summary` だけを allowed action とし、
+  revocation history erase / stale verifier reuse / liability expansion を
+  blocked action として notice authority refs と同じ digest に束縛する
 - `bounded-trust-transfer-re-attestation-cadence-v1` による
   `renew_after=10m` / `grace_window=240s` / verifier freshness window 内 renew の固定
 - `bounded-trust-transfer-destination-lifecycle-v1` による

@@ -4,10 +4,12 @@ version: 0.1.0
 capabilities:
   - literature.survey
   - jurisdiction.compare
+  - trust.recovery.notice_scope.review
 trust_floor: 0.4
 ethics_constraints: []
 prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
 when_to_invoke: |
   - 法的人格 / governance 関連の文献調査
+  - Trust recovery の notice authority / legal execution scope が jurisdiction bundle と整合するか確認する時
 when_not_to_invoke: |
   - 設計判断

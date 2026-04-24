@@ -93,5 +93,6 @@ status: decided | superseded
 - [2026-04-20_sensory-loopback-reference-runtime.md](2026-04-20_sensory-loopback-reference-runtime.md)
 - [2026-04-22_distributed-transport-route-target-discovery.md](2026-04-22_distributed-transport-route-target-discovery.md)
 - [2026-04-18_trust-score-update-policy.md](2026-04-18_trust-score-update-policy.md)
+- [2026-04-24_trust-recovery-notice-scope-disclosure.md](2026-04-24_trust-recovery-notice-scope-disclosure.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

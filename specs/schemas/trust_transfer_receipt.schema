@@ -622,6 +622,7 @@ properties:
       - destination_recovery_history_bound
       - recovery_quorum_bound
       - recovery_review_bound
+      - recovery_notice_scope_bound
       - destination_current
       - destination_seeded
       - receipt_digest_bound
@@ -668,6 +669,8 @@ properties:
       recovery_quorum_bound:
         type: boolean
       recovery_review_bound:
+        type: boolean
+      recovery_notice_scope_bound:
         type: boolean
       destination_current:
         type: boolean
@@ -1062,6 +1065,9 @@ examples:
       destination_renewal_history_bound: true
       destination_revocation_history_bound: true
       destination_recovery_history_bound: true
+      recovery_quorum_bound: true
+      recovery_review_bound: true
+      recovery_notice_scope_bound: true
       destination_current: true
       destination_seeded: true
       receipt_digest_bound: true

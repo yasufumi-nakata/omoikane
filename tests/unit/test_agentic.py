@@ -2429,6 +2429,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["destination_recovery_history_bound"])
         self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
         self.assertTrue(receipt["validation"]["recovery_review_bound"])
+        self.assertTrue(receipt["validation"]["recovery_notice_scope_bound"])
         self.assertTrue(receipt["validation"]["destination_current"])
         self.assertEqual(receipt["source_snapshot"], receipt["destination_snapshot"])
         self.assertEqual("current", receipt["destination_lifecycle"]["current_status"])
@@ -2475,6 +2476,27 @@ class TrustServiceTests(unittest.TestCase):
             "joint",
             receipt["destination_lifecycle"]["history"][-1]["recovery_review"]["liability_mode"],
         )
+        recovery_review = receipt["destination_lifecycle"]["history"][-1]["recovery_review"]
+        self.assertEqual(
+            [
+                "notice-authority://eu-de/data-protection/trust-recovery/v1",
+                "notice-authority://jp-13/digital-agency/trust-recovery/v1",
+                "notice-authority://us-ca/ai-safety/trust-recovery/v1",
+            ],
+            recovery_review["notice_authority_refs"],
+        )
+        self.assertEqual(
+            "bounded-trust-recovery-legal-execution-scope-v1",
+            recovery_review["execution_scope_manifest"]["scope_profile_id"],
+        )
+        self.assertIn(
+            "restore-destination-trust-usage",
+            recovery_review["execution_scope_manifest"]["allowed_actions"],
+        )
+        self.assertIn(
+            "erase-revocation-history",
+            recovery_review["execution_scope_manifest"]["blocked_actions"],
+        )
         self.assertEqual(
             receipt["source_snapshot_digest"],
             sha256_text(canonical_json(receipt["source_snapshot"])),
@@ -2514,6 +2536,7 @@ class TrustServiceTests(unittest.TestCase):
         self.assertTrue(receipt["validation"]["remote_verifier_disclosure_bound"])
         self.assertTrue(receipt["validation"]["recovery_quorum_bound"])
         self.assertTrue(receipt["validation"]["recovery_review_bound"])
+        self.assertTrue(receipt["validation"]["recovery_notice_scope_bound"])
         self.assertNotIn("source_snapshot", receipt)
         self.assertNotIn("destination_snapshot", receipt)
         self.assertIn("source_snapshot_redacted", receipt)
@@ -2580,6 +2603,22 @@ class TrustServiceTests(unittest.TestCase):
         self.assertEqual(
             "joint",
             receipt["destination_lifecycle"]["recovery_summary"]["legal_proof_summary"]["liability_mode"],
+        )
+        self.assertEqual(
+            [
+                "notice-authority://eu-de/data-protection/trust-recovery/v1",
+                "notice-authority://jp-13/digital-agency/trust-recovery/v1",
+                "notice-authority://us-ca/ai-safety/trust-recovery/v1",
+            ],
+            receipt["destination_lifecycle"]["recovery_summary"]["legal_proof_summary"][
+                "notice_authority_refs"
+            ],
+        )
+        self.assertEqual(
+            "bounded-trust-recovery-legal-execution-scope-v1",
+            receipt["destination_lifecycle"]["recovery_summary"]["legal_proof_summary"][
+                "execution_scope_summary"
+            ]["scope_profile_id"],
         )
         self.assertTrue(destination.has_agent("design-architect"))
 
@@ -2787,6 +2826,36 @@ class TrustServiceTests(unittest.TestCase):
         self.assertFalse(validation["recovery_review_bound"])
         self.assertIn(
             "recovered destination lifecycle must bind the fixed recovery review surface",
+            validation["errors"],
+        )
+
+    def test_validate_transfer_receipt_rejects_recovery_notice_scope_drift(self) -> None:
+        source, destination = self._build_transfer_services()
+        receipt = source.transfer_snapshot_to(
+            "design-architect",
+            destination_service=destination,
+            source_substrate_ref="substrate://classical-silicon/trust-primary",
+            destination_substrate_ref="substrate://optical-neuromorphic/trust-standby",
+            destination_host_ref="host://guardian-reviewed-trust-standby",
+            source_guardian_agent_id="integrity-guardian",
+            destination_guardian_agent_id="identity-guardian",
+            human_reviewer_ref="human://yasufumi",
+            remote_verifier_receipts=self._build_remote_verifier_receipts(),
+            council_session_ref="council://trust-transfer/session-001",
+            rationale="cross-substrate trust carryover requires guardian and human attestation",
+        )
+        tampered = json.loads(json.dumps(receipt))
+        tampered["destination_lifecycle"]["history"][-1]["recovery_review"][
+            "execution_scope_manifest"
+        ]["allowed_actions"] = ["restore-destination-trust-usage"]
+        tampered["validation"] = source._transfer_validation_summary(tampered)
+
+        validation = source.validate_transfer_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["recovery_notice_scope_bound"])
+        self.assertIn(
+            "recovered destination lifecycle must bind notice authority and legal execution scope",
             validation["errors"],
         )
 

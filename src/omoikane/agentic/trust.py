@@ -11,7 +11,7 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 TRUST_SNAPSHOT_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_SCHEMA_VERSION = "1.7.0"
+TRUST_TRANSFER_SCHEMA_VERSION = "1.8.0"
 TRUST_TRANSFER_POLICY_ID = "bounded-cross-substrate-trust-transfer-v1"
 TRUST_TRANSFER_ATTESTATION_POLICY_ID = "bounded-trust-transfer-attestation-federation-v1"
 TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID = "snapshot-clone-with-history"
@@ -33,8 +33,8 @@ TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_SCHEMA_VERSION = "1.2.0"
 TRUST_TRANSFER_REDACTED_DESTINATION_LIFECYCLE_PROFILE_ID = (
     "bounded-trust-transfer-redacted-destination-lifecycle-v1"
 )
-TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION = "1.0.0"
-TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION = "1.0.0"
+TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION = "1.1.0"
+TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_SCHEMA_VERSION = "1.1.0"
 TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_SUMMARY_PROFILE_ID = (
     "bounded-trust-transfer-redacted-destination-recovery-summary-v1"
 )
@@ -73,10 +73,23 @@ TRUST_TRANSFER_DESTINATION_LIFECYCLE_POLICY_ID = (
 )
 TRUST_TRANSFER_RECOVERY_REVIEW_SCOPE = "destination-trust-recovery-review"
 TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE = "joint"
+TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_PROFILE_ID = (
+    "bounded-trust-recovery-legal-execution-scope-v1"
+)
 TRUST_TRANSFER_RECOVERY_REVIEW_REASON_CODES = (
     "revocation-signal-cleared",
     "multi-root-quorum-restored",
     "cross-jurisdiction-legal-review-cleared",
+)
+TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_ALLOWED_ACTIONS = (
+    "restore-destination-trust-usage",
+    "bind-recovered-verifier-federation",
+    "publish-redacted-recovery-summary",
+)
+TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_BLOCKED_ACTIONS = (
+    "erase-revocation-history",
+    "reuse-stale-verifier-receipts",
+    "expand-liability-without-review",
 )
 TRUST_TRANSFER_RECOVERY_RATIONALE_SUMMARY_TEXT = (
     "Destination trust was re-enabled after the revoked branch cleared a "
@@ -96,6 +109,11 @@ TRUST_TRANSFER_RECOVERY_LEGAL_ACK_REFS = {
     "EU-DE": "legal://trust-transfer/recovery/eu-de/reviewer-gamma/v1",
     "JP-13": "legal://trust-transfer/recovery/jp-13/reviewer-alpha/v1",
     "US-CA": "legal://trust-transfer/recovery/us-ca/reviewer-beta/v1",
+}
+TRUST_TRANSFER_RECOVERY_NOTICE_AUTHORITY_REFS = {
+    "EU-DE": "notice-authority://eu-de/data-protection/trust-recovery/v1",
+    "JP-13": "notice-authority://jp-13/digital-agency/trust-recovery/v1",
+    "US-CA": "notice-authority://us-ca/ai-safety/trust-recovery/v1",
 }
 TRUST_TRANSFER_DESTINATION_CURRENT_STATUS = "current"
 TRUST_TRANSFER_DESTINATION_REVOKED_STATUS = "revoked"
@@ -157,6 +175,7 @@ TRUST_TRANSFER_REDACTED_DESTINATION_RECOVERY_FIELDS = (
     "destination_lifecycle.history[].recovery_review.review_ref",
     "destination_lifecycle.history[].recovery_review.rationale",
     "destination_lifecycle.history[].recovery_review.legal_ack_refs",
+    "destination_lifecycle.history[].recovery_review.execution_scope_manifest",
 )
 TRUST_TRANSFER_SUPPORTED_EXPORT_PROFILES = (
     TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
@@ -442,6 +461,86 @@ def _trust_transfer_recovery_legal_ack_refs(
     return refs
 
 
+def _trust_transfer_recovery_notice_authority_refs(
+    jurisdictions: List[str],
+) -> List[str]:
+    refs: List[str] = []
+    for jurisdiction in jurisdictions:
+        ref = TRUST_TRANSFER_RECOVERY_NOTICE_AUTHORITY_REFS.get(str(jurisdiction))
+        if not ref:
+            raise ValueError(
+                f"unsupported trust recovery notice authority jurisdiction: {jurisdiction}"
+            )
+        refs.append(ref)
+    return refs
+
+
+def _trust_transfer_recovery_execution_scope_digest_payload(
+    scope_manifest: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "scope_profile_id": scope_manifest["scope_profile_id"],
+        "scope_ref": scope_manifest["scope_ref"],
+        "jurisdictions": scope_manifest["jurisdictions"],
+        "policy_refs": scope_manifest["policy_refs"],
+        "jurisdiction_bundle_refs": scope_manifest["jurisdiction_bundle_refs"],
+        "notice_authority_refs": scope_manifest["notice_authority_refs"],
+        "liability_mode": scope_manifest["liability_mode"],
+        "allowed_actions": scope_manifest["allowed_actions"],
+        "blocked_actions": scope_manifest["blocked_actions"],
+        "jurisdiction_count": scope_manifest["jurisdiction_count"],
+    }
+
+
+def _trust_transfer_recovery_execution_scope_digest(
+    scope_manifest: Mapping[str, Any],
+) -> Optional[str]:
+    try:
+        return sha256_text(
+            canonical_json(
+                _trust_transfer_recovery_execution_scope_digest_payload(scope_manifest)
+            )
+        )
+    except KeyError:
+        return None
+
+
+def _trust_transfer_recovery_execution_scope_manifest(
+    *,
+    jurisdictions: List[str],
+    policy_refs: List[str],
+    jurisdiction_bundle_refs: List[str],
+    notice_authority_refs: List[str],
+) -> Dict[str, Any]:
+    scope_ref = "trust-recovery-execution-scope://" + sha256_text(
+        canonical_json(
+            {
+                "jurisdictions": jurisdictions,
+                "policy_refs": policy_refs,
+                "jurisdiction_bundle_refs": jurisdiction_bundle_refs,
+                "notice_authority_refs": notice_authority_refs,
+            }
+        )
+    )[:12]
+    scope_manifest = {
+        "scope_profile_id": TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_PROFILE_ID,
+        "scope_ref": scope_ref,
+        "jurisdictions": list(jurisdictions),
+        "policy_refs": list(policy_refs),
+        "jurisdiction_bundle_refs": list(jurisdiction_bundle_refs),
+        "notice_authority_refs": list(notice_authority_refs),
+        "liability_mode": TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE,
+        "allowed_actions": list(TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_ALLOWED_ACTIONS),
+        "blocked_actions": list(TRUST_TRANSFER_RECOVERY_EXECUTION_SCOPE_BLOCKED_ACTIONS),
+        "jurisdiction_count": len(jurisdictions),
+        "scope_digest": "",
+    }
+    scope_manifest["scope_digest"] = str(
+        _trust_transfer_recovery_execution_scope_digest(scope_manifest)
+    )
+    return scope_manifest
+
+
 def _trust_transfer_recovery_review_digest_payload(
     review: Mapping[str, Any],
 ) -> Dict[str, Any]:
@@ -458,6 +557,8 @@ def _trust_transfer_recovery_review_digest_payload(
         "policy_refs": review["policy_refs"],
         "jurisdiction_bundle_refs": review["jurisdiction_bundle_refs"],
         "legal_ack_refs": review["legal_ack_refs"],
+        "notice_authority_refs": review["notice_authority_refs"],
+        "execution_scope_manifest": review["execution_scope_manifest"],
     }
 
 
@@ -498,6 +599,8 @@ def _trust_transfer_recovery_legal_proof_digest(
                     "policy_refs": review["policy_refs"],
                     "jurisdiction_bundle_refs": review["jurisdiction_bundle_refs"],
                     "legal_ack_refs": review["legal_ack_refs"],
+                    "notice_authority_refs": review["notice_authority_refs"],
+                    "execution_scope_manifest": review["execution_scope_manifest"],
                     "liability_mode": review["liability_mode"],
                     "reviewer_binding_digest": review["reviewer_binding_digest"],
                 }
@@ -1698,6 +1801,10 @@ class TrustService:
             errors.append(
                 "recovered destination lifecycle must bind the fixed recovery review surface"
             )
+        if not summary["recovery_notice_scope_bound"]:
+            errors.append(
+                "recovered destination lifecycle must bind notice authority and legal execution scope"
+            )
 
         if isinstance(source_snapshot, Mapping) and isinstance(destination_snapshot, Mapping):
             if receipt.get("agent_id") != source_snapshot.get("agent_id"):
@@ -2542,6 +2649,7 @@ class TrustService:
         destination_recovery_history_bound = False
         recovery_quorum_bound = False
         recovery_review_bound = False
+        recovery_notice_scope_bound = False
         destination_current = False
         if isinstance(federation_attestation, Mapping):
             attestors = federation_attestation.get("attestors", [])
@@ -3115,10 +3223,27 @@ class TrustService:
                         expected_legal_ack_refs = _trust_transfer_recovery_legal_ack_refs(
                             list(remote_verifier_federation.get("jurisdictions", []))
                         )
+                        expected_notice_authority_refs = (
+                            _trust_transfer_recovery_notice_authority_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                        expected_execution_scope_manifest = (
+                            _trust_transfer_recovery_execution_scope_manifest(
+                                jurisdictions=list(
+                                    remote_verifier_federation.get("jurisdictions", [])
+                                ),
+                                policy_refs=expected_policy_refs,
+                                jurisdiction_bundle_refs=expected_bundle_refs,
+                                notice_authority_refs=expected_notice_authority_refs,
+                            )
+                        )
                     except ValueError:
                         expected_policy_refs = []
                         expected_bundle_refs = []
                         expected_legal_ack_refs = []
+                        expected_notice_authority_refs = []
+                        expected_execution_scope_manifest = {}
                     recovery_review = (
                         recovered_entry.get("recovery_review")
                         if isinstance(recovered_entry, Mapping)
@@ -3142,9 +3267,31 @@ class TrustService:
                         and recovery_review.get("jurisdiction_bundle_refs")
                         == expected_bundle_refs
                         and recovery_review.get("legal_ack_refs") == expected_legal_ack_refs
+                        and recovery_review.get("notice_authority_refs")
+                        == expected_notice_authority_refs
+                        and recovery_review.get("execution_scope_manifest")
+                        == expected_execution_scope_manifest
                         and bool(recovery_review.get("rationale"))
                         and recovery_review.get("review_digest")
                         == _trust_transfer_recovery_review_digest(recovery_review)
+                    )
+                    recovery_notice_scope_bound = (
+                        recovery_review_bound
+                        and isinstance(recovery_review, Mapping)
+                        and recovery_review.get("notice_authority_refs")
+                        == expected_notice_authority_refs
+                        and isinstance(
+                            recovery_review.get("execution_scope_manifest"),
+                            Mapping,
+                        )
+                        and recovery_review.get("execution_scope_manifest")
+                        == expected_execution_scope_manifest
+                        and recovery_review["execution_scope_manifest"].get(
+                            "scope_digest"
+                        )
+                        == _trust_transfer_recovery_execution_scope_digest(
+                            recovery_review["execution_scope_manifest"]
+                        )
                     )
                     recovery_quorum_bound = (
                         destination_recovery_history_bound
@@ -3428,9 +3575,44 @@ class TrustService:
                                 list(remote_verifier_federation.get("jurisdictions", []))
                             )
                         )
+                        expected_notice_authority_refs = (
+                            _trust_transfer_recovery_notice_authority_refs(
+                                list(remote_verifier_federation.get("jurisdictions", []))
+                            )
+                        )
+                        expected_execution_scope_manifest = (
+                            _trust_transfer_recovery_execution_scope_manifest(
+                                jurisdictions=list(
+                                    remote_verifier_federation.get("jurisdictions", [])
+                                ),
+                                policy_refs=expected_policy_refs,
+                                jurisdiction_bundle_refs=expected_bundle_refs,
+                                notice_authority_refs=expected_notice_authority_refs,
+                            )
+                        )
+                        expected_execution_scope_summary = {
+                            "scope_profile_id": expected_execution_scope_manifest[
+                                "scope_profile_id"
+                            ],
+                            "scope_ref": expected_execution_scope_manifest["scope_ref"],
+                            "scope_digest": expected_execution_scope_manifest[
+                                "scope_digest"
+                            ],
+                            "jurisdiction_count": expected_execution_scope_manifest[
+                                "jurisdiction_count"
+                            ],
+                            "allowed_action_count": len(
+                                expected_execution_scope_manifest["allowed_actions"]
+                            ),
+                            "blocked_action_count": len(
+                                expected_execution_scope_manifest["blocked_actions"]
+                            ),
+                        }
                     except ValueError:
                         expected_policy_refs = []
                         expected_bundle_refs = []
+                        expected_notice_authority_refs = []
+                        expected_execution_scope_summary = {}
                     recovery_summary = destination_lifecycle.get("recovery_summary")
                     if isinstance(recovery_summary, Mapping):
                         recovery_rationale_summary = recovery_summary.get(
@@ -3481,6 +3663,8 @@ class TrustService:
                             == expected_policy_refs
                             and legal_proof_summary.get("jurisdiction_bundle_refs")
                             == expected_bundle_refs
+                            and legal_proof_summary.get("notice_authority_refs")
+                            == expected_notice_authority_refs
                             and legal_proof_summary.get("liability_mode")
                             == TRUST_TRANSFER_RECOVERY_REVIEW_LIABILITY_MODE
                             and legal_proof_summary.get("reviewer_binding_digest")
@@ -3488,7 +3672,21 @@ class TrustService:
                             and bool(
                                 legal_proof_summary.get("legal_ack_commitment_digest")
                             )
+                            and legal_proof_summary.get("execution_scope_summary")
+                            == expected_execution_scope_summary
                             and bool(legal_proof_summary.get("legal_proof_digest"))
+                        )
+                        recovery_notice_scope_bound = (
+                            recovery_review_bound
+                            and legal_proof_summary.get("notice_authority_refs")
+                            == expected_notice_authority_refs
+                            and legal_proof_summary.get("execution_scope_summary")
+                            == expected_execution_scope_summary
+                            and bool(
+                                legal_proof_summary.get("execution_scope_summary", {}).get(
+                                    "scope_digest"
+                                )
+                            )
                         )
                     recovery_quorum_bound = (
                         destination_recovery_history_bound
@@ -3554,6 +3752,7 @@ class TrustService:
             "destination_recovery_history_bound": destination_recovery_history_bound,
             "recovery_quorum_bound": recovery_quorum_bound,
             "recovery_review_bound": recovery_review_bound,
+            "recovery_notice_scope_bound": recovery_notice_scope_bound,
             "destination_current": destination_current,
             "destination_seeded": destination_seeded,
             "receipt_digest_bound": receipt_digest_bound,
@@ -4062,6 +4261,23 @@ class TrustService:
             + timedelta(seconds=TRUST_TRANSFER_DESTINATION_RECOVERY_ATTESTATION_OFFSET_SECONDS)
         ).isoformat()
         recovered_jurisdictions = list(recovered_federation.get("jurisdictions", []))
+        recovery_policy_refs = _trust_transfer_recovery_review_policy_refs(
+            recovered_jurisdictions
+        )
+        recovery_bundle_refs = _trust_transfer_recovery_jurisdiction_bundle_refs(
+            recovered_jurisdictions
+        )
+        recovery_notice_authority_refs = _trust_transfer_recovery_notice_authority_refs(
+            recovered_jurisdictions
+        )
+        recovery_execution_scope_manifest = (
+            _trust_transfer_recovery_execution_scope_manifest(
+                jurisdictions=recovered_jurisdictions,
+                policy_refs=recovery_policy_refs,
+                jurisdiction_bundle_refs=recovery_bundle_refs,
+                notice_authority_refs=recovery_notice_authority_refs,
+            )
+        )
         recovery_review = {
             "kind": "trust_recovery_review",
             "schema_version": TRUST_TRANSFER_RECOVERY_REVIEW_SCHEMA_VERSION,
@@ -4079,17 +4295,11 @@ class TrustService:
                 "multi-root verifier quorum recovery review and cross-jurisdiction "
                 "guardian legal acknowledgements"
             ),
-            "policy_refs": _trust_transfer_recovery_review_policy_refs(
-                recovered_jurisdictions
-            ),
-            "jurisdiction_bundle_refs": (
-                _trust_transfer_recovery_jurisdiction_bundle_refs(
-                    recovered_jurisdictions
-                )
-            ),
-            "legal_ack_refs": _trust_transfer_recovery_legal_ack_refs(
-                recovered_jurisdictions
-            ),
+            "policy_refs": recovery_policy_refs,
+            "jurisdiction_bundle_refs": recovery_bundle_refs,
+            "legal_ack_refs": _trust_transfer_recovery_legal_ack_refs(recovered_jurisdictions),
+            "notice_authority_refs": recovery_notice_authority_refs,
+            "execution_scope_manifest": recovery_execution_scope_manifest,
             "review_digest": "",
         }
         recovery_review["review_digest"] = str(
@@ -4316,11 +4526,32 @@ class TrustService:
                 "jurisdiction_bundle_refs": list(
                     recovery_review["jurisdiction_bundle_refs"]
                 ),
+                "notice_authority_refs": list(
+                    recovery_review["notice_authority_refs"]
+                ),
                 "liability_mode": recovery_review["liability_mode"],
                 "reviewer_binding_digest": recovery_review["reviewer_binding_digest"],
                 "legal_ack_commitment_digest": sha256_text(
                     canonical_json(list(recovery_review["legal_ack_refs"]))
                 ),
+                "execution_scope_summary": {
+                    "scope_profile_id": recovery_review["execution_scope_manifest"][
+                        "scope_profile_id"
+                    ],
+                    "scope_ref": recovery_review["execution_scope_manifest"]["scope_ref"],
+                    "scope_digest": recovery_review["execution_scope_manifest"][
+                        "scope_digest"
+                    ],
+                    "jurisdiction_count": recovery_review["execution_scope_manifest"][
+                        "jurisdiction_count"
+                    ],
+                    "allowed_action_count": len(
+                        recovery_review["execution_scope_manifest"]["allowed_actions"]
+                    ),
+                    "blocked_action_count": len(
+                        recovery_review["execution_scope_manifest"]["blocked_actions"]
+                    ),
+                },
                 "legal_proof_digest": str(
                     _trust_transfer_recovery_legal_proof_digest(recovery_review)
                 ),

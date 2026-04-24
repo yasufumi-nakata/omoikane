@@ -1608,6 +1608,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_recovery_history_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
         self.assertTrue(result["validation"]["recovery_review_bound"])
+        self.assertTrue(result["validation"]["recovery_notice_scope_bound"])
         self.assertTrue(result["validation"]["destination_current"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertTrue(result["validation"]["receipt_digest_bound"])
@@ -1648,6 +1649,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "trust_recovery_review",
             result["transfer"]["destination_lifecycle"]["history"][-1]["recovery_review"]["kind"],
         )
+        self.assertEqual(
+            "bounded-trust-recovery-legal-execution-scope-v1",
+            result["transfer"]["destination_lifecycle"]["history"][-1]["recovery_review"][
+                "execution_scope_manifest"
+            ]["scope_profile_id"],
+        )
 
     def test_trust_transfer_demo_can_emit_redacted_export_profile(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -1666,6 +1673,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["destination_lifecycle_disclosure_bound"])
         self.assertTrue(result["validation"]["recovery_quorum_bound"])
         self.assertTrue(result["validation"]["recovery_review_bound"])
+        self.assertTrue(result["validation"]["recovery_notice_scope_bound"])
         self.assertTrue(result["validation"]["destination_seeded"])
         self.assertNotIn("source_snapshot", result["transfer"])
         self.assertNotIn("destination_snapshot", result["transfer"])
@@ -1712,6 +1720,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "trust_redacted_destination_recovery_summary",
             result["transfer"]["destination_lifecycle"]["recovery_summary"]["kind"],
+        )
+        self.assertEqual(
+            "bounded-trust-recovery-legal-execution-scope-v1",
+            result["transfer"]["destination_lifecycle"]["recovery_summary"][
+                "legal_proof_summary"
+            ]["execution_scope_summary"]["scope_profile_id"],
         )
         self.assertEqual(
             result["transfer"]["destination_lifecycle"]["active_entry_digest"],

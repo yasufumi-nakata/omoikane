@@ -5,7 +5,7 @@ description: >
   substrate 境界を越えて export/import され、live remote verifier federation と
   fixed re-attestation cadence、multi-root / cross-jurisdiction recovery quorum、
   destination renewal/revocation/recovery lifecycle、recovered-branch review summary、
-  verifier disclosure floor を
+  notice authority / legal execution scope の disclosure floor、verifier disclosure floor を
   保持しつつ history・thresholds・eligibility を崩さず保持すること。
 scenarios:
   - name: trust transfer demo smoke
@@ -33,6 +33,7 @@ checks:
   destination_recovery_history_bound: true
   recovery_quorum_bound: true
   recovery_review_bound: true
+  recovery_notice_scope_bound: true
   destination_current: true
   destination_seeded: true
   receipt_digest_bound: true

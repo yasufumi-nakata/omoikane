@@ -1838,7 +1838,7 @@ entries:
       - specs/schemas/trust_transfer_receipt.schema
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize the full recovered-branch review with rationale, jurisdiction policy refs, and sealed legal acknowledgement refs before redaction.
+    rationale: Required to serialize the full recovered-branch review with rationale, jurisdiction policy refs, notice authority refs, bounded legal execution scope, and sealed legal acknowledgement refs before redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/trust_redacted_destination_lifecycle.schema
@@ -1854,7 +1854,7 @@ entries:
       - specs/schemas/trust_redacted_destination_lifecycle.schema
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize the recovered-branch rationale and legal-proof summary floor without exposing raw rationale text or legal acknowledgement refs.
+    rationale: Required to serialize the recovered-branch rationale, notice-authority, legal-proof, and execution-scope summary floor without exposing raw rationale text, full scope manifest, or legal acknowledgement refs.
   - priority: P1
     kind: schema
     file: specs/schemas/trust_redacted_verifier_receipt_summary.schema
@@ -1879,7 +1879,7 @@ entries:
       - specs/interfaces/agentic.trust.v0.idl
       - docs/02-subsystems/agentic/trust-management.md
       - reference-runtime
-    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and full-clone versus redacted export profile branching including verifier, lifecycle, and recovered-branch review disclosure-floor summaries.
+    rationale: Required to serialize one cross-substrate trust export/import receipt with guardian and human attestation quorum, destination lifecycle history, digest binding, and full-clone versus redacted export profile branching including verifier, lifecycle, recovered-branch review, notice-authority, and execution-scope disclosure-floor summaries.
   - priority: P1
     kind: idl
     file: specs/interfaces/agentic.trust.v0.idl
@@ -1901,7 +1901,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects digest-bound trust export/import, guardian and human attestation quorum, destination renewal/revocation lifecycle, and snapshot preservation across substrate boundaries.
+    rationale: Protects digest-bound trust export/import, guardian and human attestation quorum, destination renewal/revocation lifecycle, recovery notice/scope disclosure, and snapshot preservation across substrate boundaries.
   - priority: P1
     kind: schema
     file: specs/schemas/agent_registry_entry.schema
