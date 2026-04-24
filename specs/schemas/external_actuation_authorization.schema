@@ -35,6 +35,9 @@ required:
   - stop_signal_path_id
   - stop_signal_path_digest
   - stop_signal_path_profile_id
+  - stop_signal_adapter_receipt_id
+  - stop_signal_adapter_receipt_digest
+  - stop_signal_adapter_profile_id
   - legal_execution_id
   - legal_execution_digest
   - legal_execution_profile_id
@@ -140,6 +143,15 @@ properties:
   stop_signal_path_profile_id:
     type: string
     const: bounded-hardware-kill-switch-bus-v1
+  stop_signal_adapter_receipt_id:
+    type: string
+    pattern: "^ewa-stop-adapter-[a-f0-9]{12}$"
+  stop_signal_adapter_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  stop_signal_adapter_profile_id:
+    type: string
+    const: plc-firmware-stop-signal-adapter-v1
   legal_execution_id:
     type: string
     minLength: 8

@@ -74,7 +74,8 @@ procedural actuation bridge schema:
   `procedural_skill_enactment_session` を EWA の
   `external_actuation_authorization` と approved command audit に
   digest-bound で接続し、raw instruction text を保持せずに
-  legal execution / Guardian oversight gate / rollback token を確認する
+  PLC / firmware stop-signal adapter receipt / legal execution /
+  Guardian oversight gate / rollback token を確認する
 - ledger には `procedural-preview` category で source manifest / connectome digest と target path 一覧を残す
 - ledger には `procedural-writeback` category で output connectome digest、human reviewer quorum、rollback token を残す
 - ledger には `procedural-execution` category で executed skill label、sandbox session、rollback token を残す
@@ -86,7 +87,7 @@ procedural actuation bridge schema:
 - external actuation へ接続する場合は `mind.procedural_actuation.v0` の
   bridge receipt を介し、`interface.ewa.v0` の
   `external_actuation_authorization` artifact、guardian-reviewed jurisdiction evidence、
-  command digest binding、raw instruction redaction を満たす必要がある
+  stop-signal adapter receipt binding、command digest binding、raw instruction redaction を満たす必要がある
 
 ## 不変条件
 
@@ -97,7 +98,7 @@ procedural actuation bridge schema:
 5. すべての writeback は continuity diff と rollback token を残す
 6. skill execution は guardian witness 付き sandbox-only rehearsal に限り、external actuation を禁止する
 7. skill enactment は temp workspace cleanup と actual command receipt を必須とし、external actuation を禁止する
-8. procedural actuation bridge は passed enactment と EWA authorization / approved command の digest が一致する場合だけ成立する
+8. procedural actuation bridge は passed enactment と EWA authorization / approved command / stop-signal adapter receipt の digest が一致する場合だけ成立する
 
 ## 関連
 

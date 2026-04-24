@@ -1171,6 +1171,14 @@ entries:
     rationale: Required to serialize one armed hardware kill-switch wiring and stop-signal bus receipt before non-read-only EWA authorization.
   - priority: P1
     kind: schema
+    file: specs/schemas/ewa_stop_signal_adapter_receipt.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to serialize one PLC / firmware adapter receipt proving live armed stop-signal bus readiness before EWA authorization.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ewa_legal_execution.schema
     consumers:
       - specs/interfaces/interface.ewa.v0.idl
@@ -1249,6 +1257,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
     rationale: Protects armed stop-signal trigger coverage, motor-plan binding, and authorization gating for bounded hardware kill-switch routing at the EWA boundary.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_stop_signal_adapter_receipt.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+    rationale: Protects PLC / firmware adapter readiness, transcript digest binding, and authorization/emergency-stop binding for EWA stop-signal paths.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_motor_semantics_legal_execution.yaml

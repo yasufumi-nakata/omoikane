@@ -8,6 +8,7 @@ imports:
   ewa_audit: ../schemas/ewa_audit.schema
   ewa_motor_plan: ../schemas/ewa_motor_plan.schema
   ewa_stop_signal_path: ../schemas/ewa_stop_signal_path.schema
+  ewa_stop_signal_adapter_receipt: ../schemas/ewa_stop_signal_adapter_receipt.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
   ewa_guardian_oversight_gate: ../schemas/ewa_guardian_oversight_gate.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
@@ -239,6 +240,90 @@ operations:
             items:
               type: string
               minLength: 1
+  probe_stop_signal_adapter:
+    summary: Probe one bounded PLC / firmware adapter and bind live stop-signal bus readiness to an armed path before authorization.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - stop_signal_path
+          - adapter_endpoint_ref
+          - firmware_image_ref
+          - firmware_digest
+          - plc_program_ref
+          - plc_program_digest
+        properties:
+          stop_signal_path:
+            schema_ref: ewa_stop_signal_path
+          adapter_endpoint_ref:
+            type: string
+            minLength: 1
+          firmware_image_ref:
+            type: string
+            minLength: 1
+          firmware_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          plc_program_ref:
+            type: string
+            minLength: 1
+          plc_program_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+    output:
+      schema_ref: ewa_stop_signal_adapter_receipt
+    guarantees:
+      - adapter receipt must bind path_id, path_digest, command_id, stop_signal_bus_ref, and interlock_controller_ref
+      - firmware and PLC program digests must be verified sha256 refs
+      - observed_signal_bindings must cover the fixed four trigger sources as armed
+  validate_stop_signal_adapter_receipt:
+    summary: Validate one PLC / firmware adapter receipt against its bound stop-signal path.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+          - stop_signal_path
+        properties:
+          receipt:
+            schema_ref: ewa_stop_signal_adapter_receipt
+          stop_signal_path:
+            schema_ref: ewa_stop_signal_path
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - receipt_ready
+          - path_bound
+          - firmware_verified
+          - live_bus_state_armed
+          - trigger_coverage_confirmed
+          - transcript_digest_matches
+          - errors
+        properties:
+          ok:
+            type: boolean
+          receipt_ready:
+            type: boolean
+          path_bound:
+            type: boolean
+          firmware_verified:
+            type: boolean
+          live_bus_state_armed:
+            type: boolean
+          trigger_coverage_confirmed:
+            type: boolean
+          transcript_digest_matches:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   execute_legal_preflight:
     summary: Execute one jurisdiction-bound legal preflight before EWA actuation authorization is issued.
     input:
@@ -440,6 +525,7 @@ operations:
           - command
           - motor_plan
           - stop_signal_path
+          - stop_signal_adapter_receipt
           - legal_execution
           - guardian_oversight_gate
         properties:
@@ -449,6 +535,8 @@ operations:
             schema_ref: ewa_motor_plan
           stop_signal_path:
             schema_ref: ewa_stop_signal_path
+          stop_signal_adapter_receipt:
+            schema_ref: ewa_stop_signal_adapter_receipt
           legal_execution:
             schema_ref: ewa_legal_execution
           guardian_oversight_gate:
@@ -462,7 +550,7 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, stop_signal_adapter_receipt_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
       - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
@@ -505,9 +593,11 @@ operations:
           - jurisdiction_bundle_ready
           - motor_plan_ready
           - stop_signal_path_ready
+          - stop_signal_adapter_receipt_ready
           - legal_execution_ready
           - motor_plan_bound
           - stop_signal_path_bound
+          - stop_signal_adapter_receipt_bound
           - legal_execution_bound
           - window_open
           - status_authorized
@@ -530,11 +620,15 @@ operations:
             type: boolean
           stop_signal_path_ready:
             type: boolean
+          stop_signal_adapter_receipt_ready:
+            type: boolean
           legal_execution_ready:
             type: boolean
           motor_plan_bound:
             type: boolean
           stop_signal_path_bound:
+            type: boolean
+          stop_signal_adapter_receipt_bound:
             type: boolean
           legal_execution_bound:
             type: boolean

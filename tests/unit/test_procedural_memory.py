@@ -326,10 +326,15 @@ class ProceduralActuationBridgeServiceTests(unittest.TestCase):
         self.assertTrue(validation["authorization_digest_bound"])
         self.assertTrue(validation["authorization_validation_bound"])
         self.assertTrue(validation["command_bound_to_authorization"])
+        self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["legal_execution_bound"])
         self.assertTrue(validation["guardian_oversight_gate_bound"])
         self.assertTrue(validation["no_raw_instruction_text"])
         self.assertTrue(validation["rollback_token_preserved"])
+        self.assertEqual(
+            result["ewa"]["stop_signal_adapter_receipt"]["receipt_id"],
+            bridge["command_binding"]["stop_signal_adapter_receipt_id"],
+        )
         self.assertEqual("physical-device-actuation", validation["delivery_scope"])
         self.assertEqual("bridged", bridge["status"])
         self.assertEqual(

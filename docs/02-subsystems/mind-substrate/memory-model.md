@@ -145,7 +145,7 @@ and [specs/schemas/procedural_actuation_bridge_session.schema](../../../specs/sc
 reference runtime では `procedural-actuation-demo --json` と
 `procedural_actuation_bridge_session` により、passed enactment /
 EWA authorization / approved command / legal execution / Guardian oversight gate の
-digest binding と raw instruction redaction として固定する。
+digest binding、stop-signal adapter receipt binding、raw instruction redaction として固定する。
 
 ## 未解決
 

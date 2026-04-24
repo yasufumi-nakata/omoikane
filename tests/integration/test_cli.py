@@ -132,6 +132,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["motor_plan_bound"])
         self.assertTrue(result["validation"]["stop_signal_path_ok"])
         self.assertTrue(result["validation"]["stop_signal_path_bound"])
+        self.assertTrue(result["validation"]["stop_signal_adapter_receipt_ok"])
+        self.assertTrue(result["validation"]["stop_signal_adapter_receipt_bound"])
         self.assertTrue(result["validation"]["legal_execution_ok"])
         self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["guardian_oversight_gate_ok"])
@@ -141,6 +143,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["authorization_ready"])
         self.assertTrue(result["validation"]["authorization_matches_command"])
         self.assertTrue(result["validation"]["authorization_stop_signal_path_ready"])
+        self.assertTrue(result["validation"]["authorization_stop_signal_adapter_receipt_ready"])
         self.assertTrue(result["validation"]["authorization_guardian_oversight_gate_ready"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
@@ -167,6 +170,7 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["approved_command_motor_plan_bound"])
         self.assertTrue(result["validation"]["approved_command_stop_signal_path_bound"])
+        self.assertTrue(result["validation"]["approved_command_stop_signal_adapter_receipt_bound"])
         self.assertTrue(result["validation"]["approved_command_legal_execution_bound"])
         self.assertTrue(result["validation"]["emergency_stop_ok"])
         self.assertTrue(result["validation"]["emergency_stop_latched"])
@@ -174,6 +178,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["emergency_stop_bound_to_command"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_authorization"])
         self.assertTrue(result["validation"]["emergency_stop_bound_to_stop_signal_path"])
+        self.assertTrue(result["validation"]["emergency_stop_bound_to_stop_signal_adapter_receipt"])
         self.assertTrue(result["validation"]["release_after_stop"])
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
@@ -194,6 +199,10 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-plan"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-legal"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-ewa-stop-signal-adapter"],
+        )
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["guardian-oversight"])
         self.assertEqual(6, result["ledger_verification"]["category_counts"]["interface-ewa"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-veto"])
@@ -416,9 +425,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["bridge"]["ok"])
         self.assertTrue(result["validation"]["bridge"]["command_bound_to_authorization"])
         self.assertTrue(result["validation"]["bridge"]["authorization_digest_bound"])
+        self.assertTrue(result["validation"]["bridge"]["stop_signal_adapter_receipt_bound"])
+        self.assertTrue(result["validation"]["authorization"]["stop_signal_adapter_receipt_bound"])
         self.assertEqual(
             "physical-device-actuation",
             result["validation"]["bridge"]["delivery_scope"],
+        )
+        self.assertEqual(
+            result["ewa"]["stop_signal_adapter_receipt"]["receipt_id"],
+            result["procedural"]["actuation_bridge_session"]["command_binding"][
+                "stop_signal_adapter_receipt_id"
+            ],
         )
         self.assertEqual(
             "bridged",

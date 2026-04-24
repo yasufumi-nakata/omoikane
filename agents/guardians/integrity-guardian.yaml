@@ -4,6 +4,7 @@ version: 0.1.0
 capabilities:
   - integrity.check
   - rollback.trigger
+  - ewa.stop-signal-adapter.attest
   - workspace.preseed.attest
   - workspace.preseed.oversight-bind
 trust_floor: 0.99
@@ -12,6 +13,7 @@ prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
+  - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時
   - Yaoyorozu external workspace seed / execution root 作成前の HumanOversightChannel-bound integrity gate
 when_not_to_invoke: |

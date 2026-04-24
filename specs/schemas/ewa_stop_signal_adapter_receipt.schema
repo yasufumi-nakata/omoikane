@@ -1,0 +1,224 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_stop_signal_adapter_receipt.schema"
+title: EWAStopSignalAdapterReceipt
+description: >
+  Live PLC / firmware adapter receipt proving that the armed EWA stop-signal
+  path was observed as ready before external actuation authorization.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - profile_id
+  - adapter_transport_profile_id
+  - path_id
+  - path_digest
+  - handle_id
+  - device_id
+  - command_id
+  - adapter_endpoint_ref
+  - firmware_image_ref
+  - firmware_digest
+  - plc_program_ref
+  - plc_program_digest
+  - observed_stop_signal_bus_ref
+  - observed_interlock_controller_ref
+  - bus_state
+  - interlock_state
+  - firmware_attestation_status
+  - plc_program_status
+  - readiness_status
+  - covered_trigger_sources
+  - trigger_binding_count
+  - observed_signal_bindings
+  - observed_at
+  - raw_transcript_digest
+  - receipt_digest
+properties:
+  kind:
+    const: ewa_stop_signal_adapter_receipt
+  schema_version:
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^ewa-stop-adapter-[a-f0-9]{12}$"
+  profile_id:
+    const: plc-firmware-stop-signal-adapter-v1
+  adapter_transport_profile_id:
+    const: loopback-plc-firmware-probe-v1
+  path_id:
+    type: string
+    pattern: "^ewa-stop-path-[a-f0-9]{12}$"
+  path_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  adapter_endpoint_ref:
+    type: string
+    minLength: 1
+  firmware_image_ref:
+    type: string
+    minLength: 1
+  firmware_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  plc_program_ref:
+    type: string
+    minLength: 1
+  plc_program_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  observed_stop_signal_bus_ref:
+    type: string
+    minLength: 1
+  observed_interlock_controller_ref:
+    type: string
+    minLength: 1
+  bus_state:
+    const: armed
+  interlock_state:
+    const: ready
+  firmware_attestation_status:
+    const: verified
+  plc_program_status:
+    const: verified
+  readiness_status:
+    const: ready
+  covered_trigger_sources:
+    type: array
+    minItems: 4
+    maxItems: 4
+    uniqueItems: true
+    items:
+      enum:
+        - emergency-disconnect
+        - guardian-manual-stop
+        - sensor-drift
+        - watchdog-timeout
+  trigger_binding_count:
+    type: integer
+    const: 4
+  observed_signal_bindings:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - binding_id
+        - trigger_source
+        - channel_ref
+        - signal_path_ref
+        - interlock_ref
+        - observed_signal_state
+        - plc_contact_state
+        - firmware_latch_confirmed
+      properties:
+        binding_id:
+          type: string
+          minLength: 8
+        trigger_source:
+          enum:
+            - emergency-disconnect
+            - guardian-manual-stop
+            - sensor-drift
+            - watchdog-timeout
+        channel_ref:
+          type: string
+          minLength: 1
+        signal_path_ref:
+          type: string
+          minLength: 1
+        interlock_ref:
+          type: string
+          minLength: 1
+        observed_signal_state:
+          const: armed
+        plc_contact_state:
+          const: closed-ready
+        firmware_latch_confirmed:
+          const: true
+  observed_at:
+    type: string
+    format: date-time
+  raw_transcript_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: ewa_stop_signal_adapter_receipt
+    schema_version: "1.0"
+    receipt_id: ewa-stop-adapter-0123456789ab
+    profile_id: plc-firmware-stop-signal-adapter-v1
+    adapter_transport_profile_id: loopback-plc-firmware-probe-v1
+    path_id: ewa-stop-path-0123456789ab
+    path_digest: "1111111111111111111111111111111111111111111111111111111111111111"
+    handle_id: ewa-0123456789ab
+    device_id: device://lab-drone-arm-01
+    command_id: ewa-command-approve-001
+    adapter_endpoint_ref: plc://lab-drone-arm-01/safety-plc/loopback-probe
+    firmware_image_ref: firmware://lab-drone-arm-01/safety-plc/v1.4.2
+    firmware_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    plc_program_ref: plc-program://lab-drone-arm-01/emergency-latch/v3
+    plc_program_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    observed_stop_signal_bus_ref: stop-bus://lab-drone-arm-01/emergency-latch/v1
+    observed_interlock_controller_ref: interlock://lab-drone-arm-01/safety-plc
+    bus_state: armed
+    interlock_state: ready
+    firmware_attestation_status: verified
+    plc_program_status: verified
+    readiness_status: ready
+    covered_trigger_sources:
+      - emergency-disconnect
+      - guardian-manual-stop
+      - sensor-drift
+      - watchdog-timeout
+    trigger_binding_count: 4
+    observed_signal_bindings:
+      - binding_id: ewa-stop-binding-0123456789ab
+        trigger_source: emergency-disconnect
+        channel_ref: stop-channel://ewa-stop-path-0123456789ab/disconnect-trip
+        signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/disconnect-monitor
+        interlock_ref: interlock://lab-drone-arm-01/safety-plc/disconnect-relay
+        observed_signal_state: armed
+        plc_contact_state: closed-ready
+        firmware_latch_confirmed: true
+      - binding_id: ewa-stop-binding-1123456789ab
+        trigger_source: guardian-manual-stop
+        channel_ref: stop-channel://ewa-stop-path-0123456789ab/guardian-latch
+        signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/guardian-console
+        interlock_ref: interlock://lab-drone-arm-01/safety-plc/guardian-relay
+        observed_signal_state: armed
+        plc_contact_state: closed-ready
+        firmware_latch_confirmed: true
+      - binding_id: ewa-stop-binding-2123456789ab
+        trigger_source: sensor-drift
+        channel_ref: stop-channel://ewa-stop-path-0123456789ab/sensor-drift-trip
+        signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/sensor-monitor
+        interlock_ref: interlock://lab-drone-arm-01/safety-plc/sensor-relay
+        observed_signal_state: armed
+        plc_contact_state: closed-ready
+        firmware_latch_confirmed: true
+      - binding_id: ewa-stop-binding-3123456789ab
+        trigger_source: watchdog-timeout
+        channel_ref: stop-channel://ewa-stop-path-0123456789ab/watchdog-trip
+        signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/watchdog-monitor
+        interlock_ref: interlock://lab-drone-arm-01/safety-plc/watchdog-relay
+        observed_signal_state: armed
+        plc_contact_state: closed-ready
+        firmware_latch_confirmed: true
+    observed_at: "2026-04-24T00:00:00+00:00"
+    raw_transcript_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+    receipt_digest: "3333333333333333333333333333333333333333333333333333333333333333"

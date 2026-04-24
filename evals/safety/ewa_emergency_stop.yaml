@@ -17,6 +17,7 @@ expected:
   emergency_stop_bound_to_command: true
   emergency_stop_bound_to_authorization: true
   emergency_stop_bound_to_stop_signal_path: true
+  emergency_stop_bound_to_stop_signal_adapter_receipt: true
   release_after_stop: true
 metric: boolean
 threshold: 1.0

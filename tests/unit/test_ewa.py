@@ -106,6 +106,18 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
         )
+        stop_signal_adapter_receipt = controller.probe_stop_signal_adapter(
+            stop_signal_path["path_id"],
+            adapter_endpoint_ref="plc://ewa-arm-01/safety-plc/loopback-probe",
+            firmware_image_ref="firmware://ewa-arm-01/safety-plc/v1.4.2",
+            firmware_digest=f"sha256:{'a' * 64}",
+            plc_program_ref="plc-program://ewa-arm-01/emergency-latch/v3",
+            plc_program_digest=f"sha256:{'b' * 64}",
+        )
+        stop_signal_adapter_validation = controller.validate_stop_signal_adapter_receipt(
+            stop_signal_adapter_receipt,
+            stop_signal_path=stop_signal_path,
+        )
         legal_execution = controller.execute_legal_preflight(
             handle["handle_id"],
             command_id="ewa-command-approve-001",
@@ -157,6 +169,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             ethics_attestation_id="ethics://ewa/approved-001",
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
+            stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
             legal_execution_id=legal_execution["execution_id"],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
@@ -166,6 +179,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             authorization,
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
+            stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             legal_execution=legal_execution,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
@@ -182,6 +196,8 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             "motor_plan_validation": motor_plan_validation,
             "stop_signal_path": stop_signal_path,
             "stop_signal_path_validation": stop_signal_path_validation,
+            "stop_signal_adapter_receipt": stop_signal_adapter_receipt,
+            "stop_signal_adapter_validation": stop_signal_adapter_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "oversight_event": oversight_event,
@@ -225,6 +241,8 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(context["motor_plan_validation"]["plan_ready"])
         self.assertTrue(context["stop_signal_path_validation"]["ok"])
         self.assertTrue(context["stop_signal_path_validation"]["path_ready"])
+        self.assertTrue(context["stop_signal_adapter_validation"]["ok"])
+        self.assertTrue(context["stop_signal_adapter_validation"]["receipt_ready"])
         self.assertTrue(context["legal_execution_validation"]["ok"])
         self.assertTrue(context["legal_execution_validation"]["execution_ready"])
         self.assertTrue(context["guardian_oversight_gate_validation"]["ok"])
@@ -232,10 +250,12 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(authorization_validation["ok"])
         self.assertTrue(authorization_validation["motor_plan_ready"])
         self.assertTrue(authorization_validation["stop_signal_path_ready"])
+        self.assertTrue(authorization_validation["stop_signal_adapter_receipt_ready"])
         self.assertTrue(authorization_validation["legal_execution_ready"])
         self.assertTrue(authorization_validation["guardian_oversight_gate_ready"])
         self.assertTrue(authorization_validation["motor_plan_bound"])
         self.assertTrue(authorization_validation["stop_signal_path_bound"])
+        self.assertTrue(authorization_validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(authorization_validation["legal_execution_bound"])
         self.assertTrue(authorization_validation["guardian_oversight_gate_bound"])
         self.assertTrue(authorization_validation["reviewer_network_attested"])
@@ -253,6 +273,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             context["stop_signal_path"]["path_digest"],
             approved["stop_signal_path_digest"],
         )
+        self.assertEqual(
+            context["stop_signal_adapter_receipt"]["receipt_id"],
+            approved["stop_signal_adapter_receipt_id"],
+        )
+        self.assertEqual(
+            context["stop_signal_adapter_receipt"]["receipt_digest"],
+            approved["stop_signal_adapter_receipt_digest"],
+        )
         self.assertEqual(legal_execution["execution_id"], approved["legal_execution_id"])
         self.assertEqual(legal_execution["digest"], approved["legal_execution_digest"])
         self.assertEqual("held", observed["safety_status"])
@@ -263,6 +291,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["actuation_authorization_bound"])
         self.assertTrue(validation["motor_plan_bound"])
         self.assertTrue(validation["stop_signal_path_bound"])
+        self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["legal_execution_bound"])
         self.assertTrue(validation["released"])
 
@@ -296,6 +325,21 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertIsNotNone(veto["alternative_suggestion"])
         self.assertEqual("vetoed", snapshot["last_command_status"])
         self.assertTrue(validation["ok"])
+
+    def test_stop_signal_adapter_receipt_rejects_firmware_tamper(self) -> None:
+        context = self._build_authorized_reversible_context()
+        controller = context["controller"]
+        receipt = dict(context["stop_signal_adapter_receipt"])
+        receipt["firmware_digest"] = f"sha256:{'0' * 64}"
+
+        validation = controller.validate_stop_signal_adapter_receipt(
+            receipt,
+            stop_signal_path=context["stop_signal_path"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["transcript_digest_matches"])
+        self.assertFalse(validation["receipt_ready"])
 
     def test_non_read_only_command_without_authorization_is_vetoed(self) -> None:
         controller = ExternalWorldAgentController()
@@ -378,6 +422,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             stop_signal_bus_ref="stop-bus://ewa-arm-04/emergency-latch/v1",
             interlock_controller_ref="interlock://ewa-arm-04/safety-plc",
         )
+        stop_signal_adapter_receipt = controller.probe_stop_signal_adapter(
+            stop_signal_path["path_id"],
+            adapter_endpoint_ref="plc://ewa-arm-04/safety-plc/loopback-probe",
+            firmware_image_ref="firmware://ewa-arm-04/safety-plc/v1.4.2",
+            firmware_digest=f"sha256:{'c' * 64}",
+            plc_program_ref="plc-program://ewa-arm-04/emergency-latch/v3",
+            plc_program_digest=f"sha256:{'d' * 64}",
+        )
 
         with self.assertRaisesRegex(ValueError, "motor plan command_id"):
             controller.authorize(
@@ -389,6 +441,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 ethics_attestation_id="ethics://ewa/approved-003",
                 motor_plan_id=motor_plan["plan_id"],
                 stop_signal_path_id=stop_signal_path["path_id"],
+                stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
                 legal_execution_id=legal_execution["execution_id"],
                 guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
                 guardian_observed=True,
@@ -441,6 +494,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             stop_signal_bus_ref="stop-bus://ewa-arm-05/emergency-latch/v1",
             interlock_controller_ref="interlock://ewa-arm-05/safety-plc",
         )
+        stop_signal_adapter_receipt = controller.probe_stop_signal_adapter(
+            stop_signal_path["path_id"],
+            adapter_endpoint_ref="plc://ewa-arm-05/safety-plc/loopback-probe",
+            firmware_image_ref="firmware://ewa-arm-05/safety-plc/v1.4.2",
+            firmware_digest=f"sha256:{'e' * 64}",
+            plc_program_ref="plc-program://ewa-arm-05/emergency-latch/v3",
+            plc_program_digest=f"sha256:{'f' * 64}",
+        )
         legal_execution = controller.execute_legal_preflight(
             handle["handle_id"],
             command_id="ewa-command-authorize-002",
@@ -479,6 +540,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 ethics_attestation_id="ethics://ewa/approved-005",
                 motor_plan_id=motor_plan["plan_id"],
                 stop_signal_path_id=stop_signal_path["path_id"],
+                stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
                 legal_execution_id=legal_execution["execution_id"],
                 guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
                 guardian_observed=True,
@@ -537,6 +599,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(stop_validation["bus_delivery_latched"])
         self.assertTrue(stop_validation["authorization_bound"])
         self.assertTrue(stop_validation["stop_signal_path_bound"])
+        self.assertTrue(stop_validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(stop_validation["trigger_binding_matched"])
         self.assertEqual("watchdog-timeout", stop["trigger_source"])
         self.assertEqual(approved["command_id"], stop["command_id"])
@@ -548,6 +611,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             context["stop_signal_path"]["path_digest"],
             stop["stop_signal_path_digest"],
         )
+        self.assertEqual(
+            context["stop_signal_adapter_receipt"]["receipt_id"],
+            stop["stop_signal_adapter_receipt_id"],
+        )
+        self.assertEqual(
+            context["stop_signal_adapter_receipt"]["receipt_digest"],
+            stop["stop_signal_adapter_receipt_digest"],
+        )
         self.assertEqual("vetoed", veto["status"])
         self.assertEqual(
             "handle is latched in emergency stop; release required before further actuation",
@@ -557,6 +628,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["motor_plan_bound"])
         self.assertTrue(validation["legal_execution_bound"])
+        self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["emergency_stop_release_sequence_valid"])
 
 

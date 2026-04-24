@@ -723,6 +723,12 @@ armed `ewa_stop_signal_path` が
 `kill_switch_wiring_ref` / `stop_signal_bus_ref` /
 fixed 4 trigger binding (`guardian-manual-stop` / `watchdog-timeout` /
 `sensor-drift` / `emergency-disconnect`) を固定したうえで、
+`ewa_stop_signal_adapter_receipt` が
+`profile_id=plc-firmware-stop-signal-adapter-v1` /
+`adapter_transport_profile_id=loopback-plc-firmware-probe-v1` /
+firmware / PLC program sha256 refs、observed armed bus state、
+fixed 4 trigger の PLC contact readiness、raw transcript digest を
+stop-signal path digest に束縛したうえで、
 jurisdiction-bound `ewa_legal_execution` が
 `policy_ref` / `legal_basis_ref` / `guardian_verification_id` /
 `guardian_verifier_ref` / `notice_authority_ref` / `liability_mode` /
@@ -734,11 +740,13 @@ matched reviewer `verification_id` / `network_receipt_id` /
 `authority_chain_ref` / `trust_root_ref` を固定したうえで、
 `external_actuation_authorization` artifact が
 `instruction_digest` / `intent_summary_digest` / `motor_plan_id` / `stop_signal_path_id` /
+`stop_signal_adapter_receipt_id` /
 `legal_execution_id` / `guardian_verification_ref` /
 `guardian_oversight_gate_id` / `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 `watchdog-timeout` emergency stop が
 `command_id` / `bound_command_digest` / `bound_authorization_digest` /
+`stop_signal_adapter_receipt_id` /
 `activated_channel_ref` / `hardware_interlock_state=engaged` /
 `release_required=true` を返し、
 その後 forced release が実行されること、

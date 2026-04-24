@@ -2,8 +2,8 @@ eval_id: procedural_actuation_bridge
 target: mind.procedural_actuation
 summary: >
   Passed procedural skill enactment が external actuation へ移る時に、
-  EWA authorization artifact、approved command digest、legal execution、
-  guardian oversight gate、rollback token を同一 bridge receipt に束縛し、
+  EWA authorization artifact、approved command digest、stop-signal adapter receipt、
+  legal execution、guardian oversight gate、rollback token を同一 bridge receipt に束縛し、
   raw instruction text を保持しないこと。
 checks:
   - name: procedural actuation bridge demo smoke
@@ -14,6 +14,7 @@ expect:
   authorization_digest_bound: true
   authorization_validation_bound: true
   command_bound_to_authorization: true
+  stop_signal_adapter_receipt_bound: true
   legal_execution_bound: true
   guardian_oversight_gate_bound: true
   no_raw_instruction_text: true

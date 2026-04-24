@@ -13,6 +13,7 @@ when_to_invoke: |
   - Sandboxer の surrogate safety signal を追加・更新した時
   - builder staged rollout の rollback execution を continuity eval で固定したい時
   - EWA の external actuation authorization や safety gate を更新した時
+  - EWA の PLC / firmware stop-signal adapter receipt を authorization / emergency stop に束縛する時
   - Procedural enactment から EWA authorization への bridge eval を追加・更新した時
 when_not_to_invoke: |
   - 既存 eval の閾値調整のみ

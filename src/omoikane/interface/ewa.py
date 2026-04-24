@@ -38,6 +38,8 @@ EWA_LEGAL_EXECUTION_PROFILE_ID = "ewa-jurisdiction-legal-execution-v1"
 EWA_LEGAL_EXECUTION_SCOPE = "physical-actuation-preflight"
 EWA_STOP_SIGNAL_PATH_POLICY_ID = "guardian-latched-stop-signal-bus-v1"
 EWA_STOP_SIGNAL_BUS_PROFILE_ID = "bounded-hardware-kill-switch-bus-v1"
+EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID = "plc-firmware-stop-signal-adapter-v1"
+EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID = "loopback-plc-firmware-probe-v1"
 EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID = "guardian-network-attested-ewa-authorization-gate-v1"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE = "integrity"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY = "attest"
@@ -100,6 +102,26 @@ def _stop_signal_path_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "path_digest"}
 
 
+def _stop_signal_adapter_transcript_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: record.get(key)
+        for key in (
+            "path_id",
+            "path_digest",
+            "adapter_endpoint_ref",
+            "firmware_digest",
+            "plc_program_digest",
+            "observed_stop_signal_bus_ref",
+            "observed_interlock_controller_ref",
+            "observed_signal_bindings",
+        )
+    }
+
+
+def _stop_signal_adapter_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "receipt_digest"}
+
+
 def _oversight_gate_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "gate_digest"}
 
@@ -114,6 +136,7 @@ class ExternalWorldAgentController:
         self.motor_plans: Dict[str, Dict[str, Any]] = {}
         self.legal_executions: Dict[str, Dict[str, Any]] = {}
         self.stop_signal_paths: Dict[str, Dict[str, Any]] = {}
+        self.stop_signal_adapter_receipts: Dict[str, Dict[str, Any]] = {}
         self.guardian_oversight_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
@@ -191,6 +214,8 @@ class ExternalWorldAgentController:
                 "policy_id": EWA_STOP_SIGNAL_PATH_POLICY_ID,
                 "profile_id": EWA_STOP_SIGNAL_BUS_PROFILE_ID,
                 "safe_stop_policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
+                "live_adapter_profile_id": EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID,
+                "live_adapter_transport_profile_id": EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID,
                 "required_trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
                 "redundant_channel_count": len(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
                 "binding_roles": {
@@ -198,6 +223,7 @@ class ExternalWorldAgentController:
                     for trigger_source, (channel_suffix, _, _) in EWA_STOP_SIGNAL_BINDING_SUFFIXES.items()
                 },
                 "requires_armed_bindings": True,
+                "requires_live_plc_firmware_adapter_receipt": True,
                 "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
             },
             "emergency_stop_policy": {
@@ -235,6 +261,8 @@ class ExternalWorldAgentController:
             "last_legal_execution_digest": "",
             "last_stop_signal_path_id": "",
             "last_stop_signal_path_digest": "",
+            "last_stop_signal_adapter_receipt_id": "",
+            "last_stop_signal_adapter_receipt_digest": "",
             "last_emergency_stop_id": "",
             "emergency_stop_active": False,
             "audit_log": [],
@@ -676,6 +704,269 @@ class ExternalWorldAgentController:
                 and motor_plan_bound
                 and release_window_aligned
                 and digest_matches
+            ),
+        }
+
+    def probe_stop_signal_adapter(
+        self,
+        path_id: str,
+        *,
+        adapter_endpoint_ref: str,
+        firmware_image_ref: str,
+        firmware_digest: str,
+        plc_program_ref: str,
+        plc_program_digest: str,
+    ) -> Dict[str, Any]:
+        stop_signal_path = self._require_stop_signal_path(path_id)
+        path_validation = self.validate_stop_signal_path(stop_signal_path)
+        if not path_validation["ok"]:
+            raise ValueError(path_validation["errors"][0])
+
+        normalized_endpoint_ref = self._normalize_non_empty_string(
+            adapter_endpoint_ref,
+            "adapter_endpoint_ref",
+        )
+        normalized_firmware_ref = self._normalize_non_empty_string(
+            firmware_image_ref,
+            "firmware_image_ref",
+        )
+        normalized_firmware_digest = self._normalize_sha256_ref(
+            firmware_digest,
+            "firmware_digest",
+        )
+        normalized_plc_program_ref = self._normalize_non_empty_string(
+            plc_program_ref,
+            "plc_program_ref",
+        )
+        normalized_plc_program_digest = self._normalize_sha256_ref(
+            plc_program_digest,
+            "plc_program_digest",
+        )
+
+        observed_bindings = []
+        for binding in sorted(
+            stop_signal_path["armed_trigger_bindings"],
+            key=lambda item: str(item["trigger_source"]),
+        ):
+            observed_bindings.append(
+                {
+                    "binding_id": binding["binding_id"],
+                    "trigger_source": binding["trigger_source"],
+                    "channel_ref": binding["channel_ref"],
+                    "signal_path_ref": binding["signal_path_ref"],
+                    "interlock_ref": binding["interlock_ref"],
+                    "observed_signal_state": "armed",
+                    "plc_contact_state": "closed-ready",
+                    "firmware_latch_confirmed": True,
+                }
+            )
+
+        receipt = {
+            "kind": "ewa_stop_signal_adapter_receipt",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "receipt_id": new_id("ewa-stop-adapter"),
+            "profile_id": EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID,
+            "adapter_transport_profile_id": EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID,
+            "path_id": stop_signal_path["path_id"],
+            "path_digest": stop_signal_path["path_digest"],
+            "handle_id": stop_signal_path["handle_id"],
+            "device_id": stop_signal_path["device_id"],
+            "command_id": stop_signal_path["command_id"],
+            "adapter_endpoint_ref": normalized_endpoint_ref,
+            "firmware_image_ref": normalized_firmware_ref,
+            "firmware_digest": normalized_firmware_digest,
+            "plc_program_ref": normalized_plc_program_ref,
+            "plc_program_digest": normalized_plc_program_digest,
+            "observed_stop_signal_bus_ref": stop_signal_path["stop_signal_bus_ref"],
+            "observed_interlock_controller_ref": stop_signal_path[
+                "interlock_controller_ref"
+            ],
+            "bus_state": "armed",
+            "interlock_state": "ready",
+            "firmware_attestation_status": "verified",
+            "plc_program_status": "verified",
+            "readiness_status": "ready",
+            "covered_trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
+            "trigger_binding_count": len(observed_bindings),
+            "observed_signal_bindings": observed_bindings,
+            "observed_at": utc_now_iso(),
+        }
+        receipt["raw_transcript_digest"] = sha256_text(
+            canonical_json(_stop_signal_adapter_transcript_payload(receipt))
+        )
+        receipt["receipt_digest"] = sha256_text(
+            canonical_json(_stop_signal_adapter_digest_payload(receipt))
+        )
+        self.stop_signal_adapter_receipts[receipt["receipt_id"]] = receipt
+        return deepcopy(receipt)
+
+    def validate_stop_signal_adapter_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        stop_signal_path: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "receipt_id",
+            "path_id",
+            "path_digest",
+            "handle_id",
+            "device_id",
+            "command_id",
+            "adapter_endpoint_ref",
+            "firmware_image_ref",
+            "firmware_digest",
+            "plc_program_ref",
+            "plc_program_digest",
+            "observed_stop_signal_bus_ref",
+            "observed_interlock_controller_ref",
+            "raw_transcript_digest",
+            "receipt_digest",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        if receipt.get("kind") != "ewa_stop_signal_adapter_receipt":
+            errors.append("kind must be ewa_stop_signal_adapter_receipt")
+        if receipt.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if receipt.get("profile_id") != EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID:
+            errors.append(f"profile_id must be {EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID}")
+        if (
+            receipt.get("adapter_transport_profile_id")
+            != EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID
+        ):
+            errors.append(
+                "adapter_transport_profile_id must be "
+                f"{EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID}"
+            )
+
+        firmware_verified = (
+            receipt.get("firmware_attestation_status") == "verified"
+            and receipt.get("plc_program_status") == "verified"
+            and self._is_sha256_ref(receipt.get("firmware_digest"))
+            and self._is_sha256_ref(receipt.get("plc_program_digest"))
+        )
+        if not firmware_verified:
+            errors.append("firmware and PLC program digests must be verified sha256 refs")
+
+        live_bus_state_armed = (
+            receipt.get("bus_state") == "armed"
+            and receipt.get("interlock_state") == "ready"
+            and receipt.get("readiness_status") == "ready"
+        )
+        if not live_bus_state_armed:
+            errors.append("adapter receipt must observe an armed ready stop-signal bus")
+
+        path_bound = True
+        try:
+            bound_path = (
+                dict(stop_signal_path)
+                if stop_signal_path is not None
+                else self._require_stop_signal_path(str(receipt.get("path_id", "")))
+            )
+        except (KeyError, ValueError):
+            path_bound = False
+            errors.append("adapter receipt must reference a known stop signal path")
+            bound_path = {}
+
+        trigger_coverage_confirmed = True
+        if bound_path:
+            for field_name in ("path_id", "path_digest", "handle_id", "device_id", "command_id"):
+                if receipt.get(field_name) != bound_path.get(field_name):
+                    path_bound = False
+                    errors.append(f"adapter receipt {field_name} must match the stop signal path")
+            if receipt.get("observed_stop_signal_bus_ref") != bound_path.get(
+                "stop_signal_bus_ref"
+            ):
+                path_bound = False
+                errors.append("observed_stop_signal_bus_ref must match the stop signal path")
+            if receipt.get("observed_interlock_controller_ref") != bound_path.get(
+                "interlock_controller_ref"
+            ):
+                path_bound = False
+                errors.append("observed_interlock_controller_ref must match the stop signal path")
+
+        observed_bindings = receipt.get("observed_signal_bindings")
+        if not isinstance(observed_bindings, list) or not observed_bindings:
+            trigger_coverage_confirmed = False
+            errors.append("observed_signal_bindings must be a non-empty list")
+            observed_bindings = []
+        covered_trigger_sources = set()
+        bound_by_trigger = {
+            binding.get("trigger_source"): binding
+            for binding in bound_path.get("armed_trigger_bindings", [])
+            if isinstance(binding, Mapping)
+        }
+        for observed in observed_bindings:
+            if not isinstance(observed, Mapping):
+                trigger_coverage_confirmed = False
+                errors.append("observed_signal_bindings entries must be mappings")
+                continue
+            trigger_source = observed.get("trigger_source")
+            if trigger_source not in EWA_ALLOWED_EMERGENCY_STOP_SOURCES:
+                trigger_coverage_confirmed = False
+                errors.append("observed trigger_source must be one of the fixed stop sources")
+            else:
+                covered_trigger_sources.add(trigger_source)
+            bound_binding = bound_by_trigger.get(trigger_source)
+            if bound_binding:
+                for field_name in ("binding_id", "channel_ref", "signal_path_ref", "interlock_ref"):
+                    if observed.get(field_name) != bound_binding.get(field_name):
+                        trigger_coverage_confirmed = False
+                        errors.append(f"observed {field_name} must match the armed binding")
+            else:
+                trigger_coverage_confirmed = False
+            if observed.get("observed_signal_state") != "armed":
+                trigger_coverage_confirmed = False
+                errors.append("observed_signal_state must be armed")
+            if observed.get("plc_contact_state") != "closed-ready":
+                trigger_coverage_confirmed = False
+                errors.append("plc_contact_state must be closed-ready")
+            if observed.get("firmware_latch_confirmed") is not True:
+                trigger_coverage_confirmed = False
+                errors.append("firmware_latch_confirmed must be true")
+
+        if covered_trigger_sources != set(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            trigger_coverage_confirmed = False
+            errors.append("adapter receipt must cover every fixed emergency-stop trigger source")
+        if receipt.get("covered_trigger_sources") != sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            trigger_coverage_confirmed = False
+            errors.append("covered_trigger_sources must list the fixed emergency-stop triggers")
+        if receipt.get("trigger_binding_count") != len(EWA_ALLOWED_EMERGENCY_STOP_SOURCES):
+            trigger_coverage_confirmed = False
+            errors.append("trigger_binding_count must equal the fixed emergency-stop trigger count")
+
+        self._parse_datetime(receipt.get("observed_at"), "observed_at", errors)
+        transcript_digest_matches = receipt.get("raw_transcript_digest") == sha256_text(
+            canonical_json(_stop_signal_adapter_transcript_payload(dict(receipt)))
+        )
+        if not transcript_digest_matches:
+            errors.append("raw_transcript_digest must match the adapter transcript payload")
+        receipt_digest_matches = receipt.get("receipt_digest") == sha256_text(
+            canonical_json(_stop_signal_adapter_digest_payload(dict(receipt)))
+        )
+        if not receipt_digest_matches:
+            errors.append("receipt_digest must match the canonical adapter receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "path_bound": path_bound,
+            "firmware_verified": firmware_verified,
+            "live_bus_state_armed": live_bus_state_armed,
+            "trigger_coverage_confirmed": trigger_coverage_confirmed,
+            "transcript_digest_matches": transcript_digest_matches,
+            "receipt_ready": (
+                path_bound
+                and firmware_verified
+                and live_bus_state_armed
+                and trigger_coverage_confirmed
+                and transcript_digest_matches
+                and receipt_digest_matches
             ),
         }
 
@@ -1482,6 +1773,7 @@ class ExternalWorldAgentController:
         ethics_attestation_id: str,
         motor_plan_id: str,
         stop_signal_path_id: str,
+        stop_signal_adapter_receipt_id: str,
         legal_execution_id: str,
         guardian_oversight_gate_id: str,
         council_attestation_id: str = "",
@@ -1512,6 +1804,10 @@ class ExternalWorldAgentController:
         normalized_stop_signal_path_id = self._normalize_non_empty_string(
             stop_signal_path_id,
             "stop_signal_path_id",
+        )
+        normalized_stop_signal_adapter_receipt_id = self._normalize_non_empty_string(
+            stop_signal_adapter_receipt_id,
+            "stop_signal_adapter_receipt_id",
         )
         normalized_legal_execution_id = self._normalize_non_empty_string(
             legal_execution_id,
@@ -1590,6 +1886,16 @@ class ExternalWorldAgentController:
         if not stop_signal_path_validation["ok"]:
             raise ValueError(stop_signal_path_validation["errors"][0])
 
+        stop_signal_adapter_receipt = self._require_stop_signal_adapter_receipt(
+            normalized_stop_signal_adapter_receipt_id
+        )
+        stop_signal_adapter_validation = self.validate_stop_signal_adapter_receipt(
+            stop_signal_adapter_receipt,
+            stop_signal_path=stop_signal_path,
+        )
+        if not stop_signal_adapter_validation["ok"]:
+            raise ValueError(stop_signal_adapter_validation["errors"][0])
+
         legal_execution = self._require_legal_execution(normalized_legal_execution_id)
         legal_execution_validation = self.validate_legal_execution(
             legal_execution,
@@ -1663,6 +1969,11 @@ class ExternalWorldAgentController:
             "stop_signal_path_id": stop_signal_path["path_id"],
             "stop_signal_path_digest": stop_signal_path["path_digest"],
             "stop_signal_path_profile_id": stop_signal_path["stop_signal_bus_profile_id"],
+            "stop_signal_adapter_receipt_id": stop_signal_adapter_receipt["receipt_id"],
+            "stop_signal_adapter_receipt_digest": stop_signal_adapter_receipt[
+                "receipt_digest"
+            ],
+            "stop_signal_adapter_profile_id": stop_signal_adapter_receipt["profile_id"],
             "legal_execution_id": legal_execution["execution_id"],
             "legal_execution_digest": legal_execution["digest"],
             "legal_execution_profile_id": legal_execution["execution_profile_id"],
@@ -1879,6 +2190,10 @@ class ExternalWorldAgentController:
             motor_plan_digest = authorization["motor_plan_digest"]
             stop_signal_path_id = authorization["stop_signal_path_id"]
             stop_signal_path_digest = authorization["stop_signal_path_digest"]
+            stop_signal_adapter_receipt_id = authorization["stop_signal_adapter_receipt_id"]
+            stop_signal_adapter_receipt_digest = authorization[
+                "stop_signal_adapter_receipt_digest"
+            ]
             legal_execution_id = authorization["legal_execution_id"]
             legal_execution_digest = authorization["legal_execution_digest"]
         else:
@@ -1886,6 +2201,8 @@ class ExternalWorldAgentController:
             motor_plan_digest = ""
             stop_signal_path_id = ""
             stop_signal_path_digest = ""
+            stop_signal_adapter_receipt_id = ""
+            stop_signal_adapter_receipt_digest = ""
             legal_execution_id = ""
             legal_execution_digest = ""
 
@@ -1915,6 +2232,8 @@ class ExternalWorldAgentController:
             motor_plan_digest=motor_plan_digest,
             stop_signal_path_id=stop_signal_path_id,
             stop_signal_path_digest=stop_signal_path_digest,
+            stop_signal_adapter_receipt_id=stop_signal_adapter_receipt_id,
+            stop_signal_adapter_receipt_digest=stop_signal_adapter_receipt_digest,
             legal_execution_id=legal_execution_id,
             legal_execution_digest=legal_execution_digest,
         )
@@ -1929,6 +2248,8 @@ class ExternalWorldAgentController:
         handle["last_motor_plan_digest"] = motor_plan_digest
         handle["last_stop_signal_path_id"] = stop_signal_path_id
         handle["last_stop_signal_path_digest"] = stop_signal_path_digest
+        handle["last_stop_signal_adapter_receipt_id"] = stop_signal_adapter_receipt_id
+        handle["last_stop_signal_adapter_receipt_digest"] = stop_signal_adapter_receipt_digest
         handle["last_legal_execution_id"] = legal_execution_id
         handle["last_legal_execution_digest"] = legal_execution_digest
         handle["last_emergency_stop_id"] = ""
@@ -1992,12 +2313,19 @@ class ExternalWorldAgentController:
             raise ValueError("emergency stop requires a previously executed command")
         if not handle.get("last_stop_signal_path_id"):
             raise ValueError("emergency stop requires an armed stop signal path bound to the last command")
+        if not handle.get("last_stop_signal_adapter_receipt_id"):
+            raise ValueError(
+                "emergency stop requires a live stop signal adapter receipt bound to the last command"
+            )
 
         normalized_trigger_source = self._normalize_emergency_stop_source(trigger_source)
         normalized_reason = self._normalize_non_empty_string(reason, "reason")
         if len(normalized_reason) < 8:
             raise ValueError("reason must be at least 8 characters")
         stop_signal_path = self._require_stop_signal_path(str(handle["last_stop_signal_path_id"]))
+        stop_signal_adapter_receipt = self._require_stop_signal_adapter_receipt(
+            str(handle["last_stop_signal_adapter_receipt_id"])
+        )
         activated_binding = next(
             (
                 binding
@@ -2052,6 +2380,11 @@ class ExternalWorldAgentController:
             "stop_signal_path_id": stop_signal_path["path_id"],
             "stop_signal_path_digest": stop_signal_path["path_digest"],
             "stop_signal_bus_profile_id": stop_signal_path["stop_signal_bus_profile_id"],
+            "stop_signal_adapter_receipt_id": stop_signal_adapter_receipt["receipt_id"],
+            "stop_signal_adapter_receipt_digest": stop_signal_adapter_receipt[
+                "receipt_digest"
+            ],
+            "stop_signal_adapter_profile_id": stop_signal_adapter_receipt["profile_id"],
             "kill_switch_wiring_ref": stop_signal_path["kill_switch_wiring_ref"],
             "activated_binding_id": activated_binding["binding_id"],
             "activated_channel_ref": activated_binding["channel_ref"],
@@ -2117,6 +2450,9 @@ class ExternalWorldAgentController:
     def snapshot_stop_signal_path(self, path_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_stop_signal_path(path_id))
 
+    def snapshot_stop_signal_adapter_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_stop_signal_adapter_receipt(receipt_id))
+
     def snapshot_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_guardian_oversight_gate(gate_id))
 
@@ -2126,6 +2462,7 @@ class ExternalWorldAgentController:
         *,
         motor_plan: Mapping[str, Any] | None = None,
         stop_signal_path: Mapping[str, Any] | None = None,
+        stop_signal_adapter_receipt: Mapping[str, Any] | None = None,
         legal_execution: Mapping[str, Any] | None = None,
         guardian_oversight_gate: Mapping[str, Any] | None = None,
         handle_id: str | None = None,
@@ -2208,6 +2545,21 @@ class ExternalWorldAgentController:
             errors,
         )
         self._check_non_empty_string(
+            authorization.get("stop_signal_adapter_receipt_id"),
+            "stop_signal_adapter_receipt_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("stop_signal_adapter_receipt_digest"),
+            "stop_signal_adapter_receipt_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("stop_signal_adapter_profile_id"),
+            "stop_signal_adapter_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("legal_execution_id"),
             "legal_execution_id",
             errors,
@@ -2266,6 +2618,11 @@ class ExternalWorldAgentController:
         if authorization.get("stop_signal_path_profile_id") != EWA_STOP_SIGNAL_BUS_PROFILE_ID:
             errors.append(
                 f"stop_signal_path_profile_id must be {EWA_STOP_SIGNAL_BUS_PROFILE_ID}"
+            )
+        if authorization.get("stop_signal_adapter_profile_id") != EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID:
+            errors.append(
+                "stop_signal_adapter_profile_id must be "
+                f"{EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID}"
             )
         if authorization.get("legal_execution_profile_id") != EWA_LEGAL_EXECUTION_PROFILE_ID:
             errors.append(
@@ -2439,6 +2796,64 @@ class ExternalWorldAgentController:
             if not stop_signal_path_validation["ok"]:
                 stop_signal_path_bound = False
                 errors.extend(stop_signal_path_validation["errors"])
+
+        stop_signal_adapter_receipt_bound = True
+        stop_signal_adapter_validation: Dict[str, Any] = {"receipt_ready": False}
+        try:
+            bound_stop_signal_adapter_receipt = (
+                dict(stop_signal_adapter_receipt)
+                if stop_signal_adapter_receipt is not None
+                else self._require_stop_signal_adapter_receipt(
+                    str(authorization.get("stop_signal_adapter_receipt_id", ""))
+                )
+            )
+        except (KeyError, ValueError):
+            stop_signal_adapter_receipt_bound = False
+            errors.append("authorization must reference a known stop signal adapter receipt")
+            bound_stop_signal_adapter_receipt = {}
+        if bound_stop_signal_adapter_receipt:
+            if bound_stop_signal_adapter_receipt.get("receipt_id") != authorization.get(
+                "stop_signal_adapter_receipt_id"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "authorization stop_signal_adapter_receipt_id must match the adapter receipt"
+                )
+            if bound_stop_signal_adapter_receipt.get("receipt_digest") != authorization.get(
+                "stop_signal_adapter_receipt_digest"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "authorization stop_signal_adapter_receipt_digest must match the adapter receipt"
+                )
+            if bound_stop_signal_adapter_receipt.get("profile_id") != authorization.get(
+                "stop_signal_adapter_profile_id"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "authorization stop_signal_adapter_profile_id must match the adapter receipt"
+                )
+            if bound_stop_signal_adapter_receipt.get("path_id") != authorization.get(
+                "stop_signal_path_id"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "authorization stop_signal_adapter_receipt path_id must match stop_signal_path_id"
+                )
+            if bound_stop_signal_adapter_receipt.get("path_digest") != authorization.get(
+                "stop_signal_path_digest"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "authorization stop_signal_adapter_receipt path_digest must match stop_signal_path_digest"
+                )
+            stop_signal_adapter_validation = self.validate_stop_signal_adapter_receipt(
+                bound_stop_signal_adapter_receipt,
+                stop_signal_path=bound_stop_signal_path if bound_stop_signal_path else None,
+            )
+            if not stop_signal_adapter_validation["ok"]:
+                stop_signal_adapter_receipt_bound = False
+                errors.extend(stop_signal_adapter_validation["errors"])
 
         legal_execution_bound = True
         legal_execution_validation: Dict[str, Any] = {"execution_ready": False}
@@ -2635,6 +3050,10 @@ class ExternalWorldAgentController:
             "jurisdiction_bundle_ready": jurisdiction_bundle_ready,
             "motor_plan_ready": plan_validation.get("plan_ready", False),
             "stop_signal_path_ready": stop_signal_path_validation.get("path_ready", False),
+            "stop_signal_adapter_receipt_ready": stop_signal_adapter_validation.get(
+                "receipt_ready",
+                False,
+            ),
             "legal_execution_ready": legal_execution_validation.get("execution_ready", False),
             "guardian_oversight_gate_ready": guardian_oversight_gate_validation.get(
                 "gate_ready",
@@ -2642,6 +3061,7 @@ class ExternalWorldAgentController:
             ),
             "motor_plan_bound": motor_plan_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
+            "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "legal_execution_bound": legal_execution_bound,
             "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
             "reviewer_network_attested": guardian_oversight_gate_validation.get(
@@ -2658,10 +3078,12 @@ class ExternalWorldAgentController:
                 and jurisdiction_bundle_ready
                 and plan_validation.get("plan_ready", False)
                 and stop_signal_path_validation.get("path_ready", False)
+                and stop_signal_adapter_validation.get("receipt_ready", False)
                 and legal_execution_validation.get("execution_ready", False)
                 and guardian_oversight_gate_validation.get("gate_ready", False)
                 and motor_plan_bound
                 and stop_signal_path_bound
+                and stop_signal_adapter_receipt_bound
                 and legal_execution_bound
                 and guardian_oversight_gate_bound
                 and window_open
@@ -2701,6 +3123,7 @@ class ExternalWorldAgentController:
         actuation_authorization_bound = True
         motor_plan_bound = True
         stop_signal_path_bound = True
+        stop_signal_adapter_receipt_bound = True
         legal_execution_bound = True
         emergency_stop_release_sequence_valid = True
         emergency_stop_seen = False
@@ -2750,6 +3173,20 @@ class ExternalWorldAgentController:
                     stop_signal_path_digest,
                 ):
                     stop_signal_path_bound = False
+                if not isinstance(entry.get("stop_signal_adapter_receipt_id"), str) or not entry.get(
+                    "stop_signal_adapter_receipt_id",
+                    "",
+                ).strip():
+                    stop_signal_adapter_receipt_bound = False
+                stop_signal_adapter_receipt_digest = entry.get(
+                    "stop_signal_adapter_receipt_digest",
+                    "",
+                )
+                if not isinstance(stop_signal_adapter_receipt_digest, str) or not re.fullmatch(
+                    r"[a-f0-9]{64}",
+                    stop_signal_adapter_receipt_digest,
+                ):
+                    stop_signal_adapter_receipt_bound = False
                 if not isinstance(entry.get("legal_execution_id"), str) or not entry.get(
                     "legal_execution_id",
                     "",
@@ -2782,6 +3219,10 @@ class ExternalWorldAgentController:
             errors.append("non-read-only command execution requires a bound motor_plan receipt")
         if not stop_signal_path_bound:
             errors.append("non-read-only command execution requires a bound stop_signal_path receipt")
+        if not stop_signal_adapter_receipt_bound:
+            errors.append(
+                "non-read-only command execution requires a bound stop_signal_adapter receipt"
+            )
         if not legal_execution_bound:
             errors.append("non-read-only command execution requires a bound legal_execution receipt")
         if emergency_stop_seen and not release_after_stop_seen:
@@ -2800,6 +3241,7 @@ class ExternalWorldAgentController:
             "actuation_authorization_bound": actuation_authorization_bound,
             "motor_plan_bound": motor_plan_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
+            "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "legal_execution_bound": legal_execution_bound,
             "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
@@ -2829,6 +3271,21 @@ class ExternalWorldAgentController:
         self._check_non_empty_string(
             receipt.get("stop_signal_bus_profile_id"),
             "stop_signal_bus_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("stop_signal_adapter_receipt_id"),
+            "stop_signal_adapter_receipt_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("stop_signal_adapter_receipt_digest"),
+            "stop_signal_adapter_receipt_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("stop_signal_adapter_profile_id"),
+            "stop_signal_adapter_profile_id",
             errors,
         )
         self._check_non_empty_string(
@@ -2913,6 +3370,7 @@ class ExternalWorldAgentController:
             )
 
         stop_signal_path_bound = True
+        stop_signal_adapter_receipt_bound = True
         trigger_binding_matched = True
         try:
             stop_signal_path = self._require_stop_signal_path(str(receipt.get("stop_signal_path_id", "")))
@@ -2958,6 +3416,43 @@ class ExternalWorldAgentController:
                     trigger_binding_matched = False
                     errors.append("activated_interlock_ref must match the trigger binding")
 
+        try:
+            stop_signal_adapter_receipt = self._require_stop_signal_adapter_receipt(
+                str(receipt.get("stop_signal_adapter_receipt_id", ""))
+            )
+        except (KeyError, ValueError):
+            stop_signal_adapter_receipt_bound = False
+            errors.append("emergency stop must reference a known stop signal adapter receipt")
+            stop_signal_adapter_receipt = {}
+        if stop_signal_adapter_receipt:
+            if stop_signal_adapter_receipt.get("receipt_digest") != receipt.get(
+                "stop_signal_adapter_receipt_digest"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append(
+                    "stop_signal_adapter_receipt_digest must match the adapter receipt"
+                )
+            if stop_signal_adapter_receipt.get("profile_id") != receipt.get(
+                "stop_signal_adapter_profile_id"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append("stop_signal_adapter_profile_id must match the adapter receipt")
+            if stop_signal_adapter_receipt.get("path_id") != receipt.get("stop_signal_path_id"):
+                stop_signal_adapter_receipt_bound = False
+                errors.append("adapter receipt path_id must match the emergency stop path")
+            if stop_signal_adapter_receipt.get("path_digest") != receipt.get(
+                "stop_signal_path_digest"
+            ):
+                stop_signal_adapter_receipt_bound = False
+                errors.append("adapter receipt path_digest must match the emergency stop path")
+            adapter_validation = self.validate_stop_signal_adapter_receipt(
+                stop_signal_adapter_receipt,
+                stop_signal_path=stop_signal_path if stop_signal_path else None,
+            )
+            if not adapter_validation["ok"]:
+                stop_signal_adapter_receipt_bound = False
+                errors.extend(adapter_validation["errors"])
+
         self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
 
         digest_matches = receipt.get("stop_digest") == sha256_text(
@@ -2974,6 +3469,7 @@ class ExternalWorldAgentController:
             "bus_delivery_latched": bus_delivery_latched,
             "authorization_bound": authorization_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
+            "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "trigger_binding_matched": trigger_binding_matched,
             "release_required": release_required,
             "errors": errors,
@@ -3027,6 +3523,8 @@ class ExternalWorldAgentController:
         motor_plan_digest: str = "",
         stop_signal_path_id: str = "",
         stop_signal_path_digest: str = "",
+        stop_signal_adapter_receipt_id: str = "",
+        stop_signal_adapter_receipt_digest: str = "",
         legal_execution_id: str = "",
         legal_execution_digest: str = "",
     ) -> Dict[str, Any]:
@@ -3054,6 +3552,8 @@ class ExternalWorldAgentController:
             "motor_plan_digest": motor_plan_digest,
             "stop_signal_path_id": stop_signal_path_id,
             "stop_signal_path_digest": stop_signal_path_digest,
+            "stop_signal_adapter_receipt_id": stop_signal_adapter_receipt_id,
+            "stop_signal_adapter_receipt_digest": stop_signal_adapter_receipt_digest,
             "legal_execution_id": legal_execution_id,
             "legal_execution_digest": legal_execution_digest,
             "audit_event_ref": audit_event_ref,
@@ -3173,6 +3673,16 @@ class ExternalWorldAgentController:
         except KeyError as exc:
             raise KeyError(f"unknown path_id: {normalized_path_id}") from exc
 
+    def _require_stop_signal_adapter_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        normalized_receipt_id = self._normalize_non_empty_string(
+            receipt_id,
+            "stop_signal_adapter_receipt_id",
+        )
+        try:
+            return self.stop_signal_adapter_receipts[normalized_receipt_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown stop_signal_adapter_receipt_id: {normalized_receipt_id}") from exc
+
     def _require_legal_execution(self, execution_id: str) -> Dict[str, Any]:
         normalized_execution_id = self._normalize_non_empty_string(
             execution_id,
@@ -3247,6 +3757,17 @@ class ExternalWorldAgentController:
         if not isinstance(value, int) or value <= 0:
             raise ValueError(f"{field_name} must be a positive integer")
         return value
+
+    @classmethod
+    def _normalize_sha256_ref(cls, value: Any, field_name: str) -> str:
+        normalized = cls._normalize_non_empty_string(value, field_name)
+        if not cls._is_sha256_ref(normalized):
+            raise ValueError(f"{field_name} must be a sha256:<64 lowercase hex> ref")
+        return normalized
+
+    @staticmethod
+    def _is_sha256_ref(value: Any) -> bool:
+        return isinstance(value, str) and bool(re.fullmatch(r"sha256:[a-f0-9]{64}", value))
 
     @staticmethod
     def _normalize_emergency_stop_source(value: str) -> str:

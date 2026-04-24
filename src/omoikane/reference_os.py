@@ -6871,6 +6871,18 @@ json.dump(response, sys.stdout)
             device_id=handle["device_id"],
             command_id="ewa-command-approve-001",
         )
+        stop_signal_adapter_receipt = self.ewa.probe_stop_signal_adapter(
+            stop_signal_path["path_id"],
+            adapter_endpoint_ref="plc://lab-drone-arm-01/safety-plc/loopback-probe",
+            firmware_image_ref="firmware://lab-drone-arm-01/safety-plc/v1.4.2",
+            firmware_digest=f"sha256:{'a' * 64}",
+            plc_program_ref="plc-program://lab-drone-arm-01/emergency-latch/v3",
+            plc_program_digest=f"sha256:{'b' * 64}",
+        )
+        stop_signal_adapter_validation = self.ewa.validate_stop_signal_adapter_receipt(
+            stop_signal_adapter_receipt,
+            stop_signal_path=stop_signal_path,
+        )
         reviewer_alpha = self.oversight.register_reviewer(
             reviewer_id="human-reviewer-ewa-001",
             display_name="EWA Reviewer Alpha",
@@ -6980,6 +6992,7 @@ json.dump(response, sys.stdout)
             ethics_attestation_id="ethics://ewa/approved-001",
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
+            stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
             legal_execution_id=legal_execution["execution_id"],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
@@ -6990,6 +7003,7 @@ json.dump(response, sys.stdout)
             authorization,
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
+            stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             legal_execution=legal_execution,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
@@ -7059,10 +7073,15 @@ json.dump(response, sys.stdout)
             "actuation_authorization_bound": handle_validation["actuation_authorization_bound"],
             "motor_plan_ok": motor_plan_validation["ok"],
             "stop_signal_path_ok": stop_signal_path_validation["ok"],
+            "stop_signal_adapter_receipt_ok": stop_signal_adapter_validation["ok"],
             "motor_plan_bound": handle_validation["motor_plan_bound"]
             and authorization_validation["motor_plan_bound"],
             "stop_signal_path_bound": handle_validation["stop_signal_path_bound"]
             and authorization_validation["stop_signal_path_bound"],
+            "stop_signal_adapter_receipt_bound": handle_validation[
+                "stop_signal_adapter_receipt_bound"
+            ]
+            and authorization_validation["stop_signal_adapter_receipt_bound"],
             "legal_execution_ok": legal_execution_validation["ok"],
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
@@ -7078,6 +7097,12 @@ json.dump(response, sys.stdout)
             "approved_command_stop_signal_path_bound": (
                 approved_command["stop_signal_path_id"] == stop_signal_path["path_id"]
                 and approved_command["stop_signal_path_digest"] == stop_signal_path["path_digest"]
+            ),
+            "approved_command_stop_signal_adapter_receipt_bound": (
+                approved_command["stop_signal_adapter_receipt_id"]
+                == stop_signal_adapter_receipt["receipt_id"]
+                and approved_command["stop_signal_adapter_receipt_digest"]
+                == stop_signal_adapter_receipt["receipt_digest"]
             ),
             "approved_command_legal_execution_bound": (
                 approved_command["legal_execution_id"] == legal_execution["execution_id"]
@@ -7096,6 +7121,9 @@ json.dump(response, sys.stdout)
             and authorization_validation["intent_digest_matches"],
             "authorization_stop_signal_path_ready": authorization_validation[
                 "stop_signal_path_ready"
+            ],
+            "authorization_stop_signal_adapter_receipt_ready": authorization_validation[
+                "stop_signal_adapter_receipt_ready"
             ],
             "authorization_guardian_oversight_gate_ready": authorization_validation[
                 "guardian_oversight_gate_ready"
@@ -7125,11 +7153,19 @@ json.dump(response, sys.stdout)
             and emergency_stop_validation["trigger_binding_matched"]
             and emergency_stop["stop_signal_path_id"] == stop_signal_path["path_id"]
             and emergency_stop["stop_signal_path_digest"] == stop_signal_path["path_digest"],
+            "emergency_stop_bound_to_stop_signal_adapter_receipt": emergency_stop_validation[
+                "stop_signal_adapter_receipt_bound"
+            ]
+            and emergency_stop["stop_signal_adapter_receipt_id"]
+            == stop_signal_adapter_receipt["receipt_id"]
+            and emergency_stop["stop_signal_adapter_receipt_digest"]
+            == stop_signal_adapter_receipt["receipt_digest"],
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]
             and motor_plan_validation["ok"]
             and stop_signal_path_validation["ok"]
+            and stop_signal_adapter_validation["ok"]
             and legal_execution_validation["ok"]
             and guardian_oversight_gate_validation["ok"]
             and authorization_validation["ok"]
@@ -7162,6 +7198,16 @@ json.dump(response, sys.stdout)
             payload=stop_signal_path,
             actor="ExternalWorldAgentController",
             category="interface-ewa-stop-signal",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.stop_signal_adapter.probed",
+            payload=stop_signal_adapter_receipt,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-stop-signal-adapter",
             layer="L6",
             signature_roles=["guardian"],
             substrate="robotic-actuator",
@@ -7279,6 +7325,8 @@ json.dump(response, sys.stdout)
             "motor_plan_validation": motor_plan_validation,
             "stop_signal_path": stop_signal_path,
             "stop_signal_path_validation": stop_signal_path_validation,
+            "stop_signal_adapter_receipt": stop_signal_adapter_receipt,
+            "stop_signal_adapter_validation": stop_signal_adapter_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "reviewers": {
@@ -8857,6 +8905,14 @@ json.dump(response, sys.stdout)
             stop_signal_bus_ref="stop-bus://lab-drone-arm-03/emergency-latch/v1",
             interlock_controller_ref="interlock://lab-drone-arm-03/safety-plc",
         )
+        stop_signal_adapter_receipt = self.ewa.probe_stop_signal_adapter(
+            stop_signal_path["path_id"],
+            adapter_endpoint_ref="plc://lab-drone-arm-03/safety-plc/loopback-probe",
+            firmware_image_ref="firmware://lab-drone-arm-03/safety-plc/v1.4.2",
+            firmware_digest=f"sha256:{'c' * 64}",
+            plc_program_ref="plc-program://lab-drone-arm-03/emergency-latch/v3",
+            plc_program_digest=f"sha256:{'d' * 64}",
+        )
         reviewer_alpha = self.oversight.register_reviewer(
             reviewer_id="human-reviewer-procedural-actuation-001",
             display_name="Procedural Actuation Reviewer Alpha",
@@ -8951,6 +9007,7 @@ json.dump(response, sys.stdout)
             ethics_attestation_id="ethics://procedural-actuation/approved-001",
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
+            stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
             legal_execution_id=legal_execution["execution_id"],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
@@ -8961,6 +9018,7 @@ json.dump(response, sys.stdout)
             authorization,
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
+            stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             legal_execution=legal_execution,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
@@ -9029,6 +9087,16 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity_id,
+            event_type="ewa.stop_signal_adapter.probed",
+            payload=stop_signal_adapter_receipt,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-stop-signal-adapter",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
             event_type="ewa.legal_execution.prepared",
             payload=legal_execution,
             actor="ExternalWorldAgentController",
@@ -9081,6 +9149,12 @@ json.dump(response, sys.stdout)
                     "authorization_digest"
                 ],
                 "command_id": bridge_session["command_binding"]["command_id"],
+                "stop_signal_adapter_receipt_id": bridge_session["command_binding"][
+                    "stop_signal_adapter_receipt_id"
+                ],
+                "stop_signal_adapter_receipt_digest": bridge_session["command_binding"][
+                    "stop_signal_adapter_receipt_digest"
+                ],
                 "rollback_token": bridge_session["rollback_token"],
                 "delivery_scope": bridge_session["command_binding"]["delivery_scope"],
             },
@@ -9113,6 +9187,7 @@ json.dump(response, sys.stdout)
                 "handle_validation": handle_validation,
                 "motor_plan": motor_plan,
                 "stop_signal_path": stop_signal_path,
+                "stop_signal_adapter_receipt": stop_signal_adapter_receipt,
                 "reviewers": {
                     "alpha": reviewer_alpha,
                     "beta": reviewer_beta,

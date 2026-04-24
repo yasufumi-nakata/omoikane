@@ -4333,6 +4333,14 @@ class ProceduralActuationBridgeService:
                 "motor_plan_digest": authorization.get("motor_plan_digest", ""),
                 "stop_signal_path_id": authorization.get("stop_signal_path_id", ""),
                 "stop_signal_path_digest": authorization.get("stop_signal_path_digest", ""),
+                "stop_signal_adapter_receipt_id": authorization.get(
+                    "stop_signal_adapter_receipt_id",
+                    "",
+                ),
+                "stop_signal_adapter_receipt_digest": authorization.get(
+                    "stop_signal_adapter_receipt_digest",
+                    "",
+                ),
                 "legal_execution_id": authorization.get("legal_execution_id", ""),
                 "legal_execution_digest": authorization.get("legal_execution_digest", ""),
                 "guardian_oversight_gate_id": authorization.get(
@@ -4375,6 +4383,9 @@ class ProceduralActuationBridgeService:
                 "stop_signal_path_bound": bool(
                     authorization_validation.get("stop_signal_path_bound")
                 ),
+                "stop_signal_adapter_receipt_bound": bool(
+                    authorization_validation.get("stop_signal_adapter_receipt_bound")
+                ),
                 "legal_execution_bound": bool(
                     authorization_validation.get("legal_execution_bound")
                 ),
@@ -4397,6 +4408,7 @@ class ProceduralActuationBridgeService:
                 "command-bound-to-authorization",
                 "raw-instruction-redacted",
                 "rollback-token-retained",
+                "plc-firmware-stop-signal-adapter-bound",
                 "guardian-oversight-gate-bound",
             ],
             "status": "bridged",
@@ -4520,6 +4532,8 @@ class ProceduralActuationBridgeService:
                 "motor_plan_digest",
                 "stop_signal_path_id",
                 "stop_signal_path_digest",
+                "stop_signal_adapter_receipt_id",
+                "stop_signal_adapter_receipt_digest",
                 "legal_execution_id",
                 "legal_execution_digest",
                 "guardian_oversight_gate_id",
@@ -4558,6 +4572,7 @@ class ProceduralActuationBridgeService:
                 "intent_digest_matches",
                 "motor_plan_bound",
                 "stop_signal_path_bound",
+                "stop_signal_adapter_receipt_bound",
                 "legal_execution_bound",
                 "guardian_oversight_gate_bound",
                 "reviewer_network_attested",
@@ -4572,6 +4587,7 @@ class ProceduralActuationBridgeService:
             "command-bound-to-authorization",
             "raw-instruction-redacted",
             "rollback-token-retained",
+            "plc-firmware-stop-signal-adapter-bound",
             "guardian-oversight-gate-bound",
         ]
         if session.get("preserved_invariants") != expected_invariants:
@@ -4707,6 +4723,7 @@ class ProceduralActuationBridgeService:
 
         command_bound_to_authorization = False
         no_raw_instruction_text = False
+        stop_signal_adapter_receipt_bound = False
         legal_execution_bound = False
         guardian_oversight_gate_bound = False
         if isinstance(authorization, Mapping) and isinstance(approved_command, Mapping):
@@ -4729,6 +4746,18 @@ class ProceduralActuationBridgeService:
                 == authorization.get("stop_signal_path_id")
                 and approved_command.get("stop_signal_path_digest")
                 == authorization.get("stop_signal_path_digest")
+                and approved_command.get("stop_signal_adapter_receipt_id")
+                == authorization.get("stop_signal_adapter_receipt_id")
+                and approved_command.get("stop_signal_adapter_receipt_digest")
+                == authorization.get("stop_signal_adapter_receipt_digest")
+            )
+            stop_signal_adapter_receipt_bound = (
+                approved_command.get("stop_signal_adapter_receipt_id")
+                == authorization.get("stop_signal_adapter_receipt_id")
+                and approved_command.get("stop_signal_adapter_receipt_digest")
+                == authorization.get("stop_signal_adapter_receipt_digest")
+                and bool(authorization.get("stop_signal_adapter_receipt_id"))
+                and bool(authorization.get("stop_signal_adapter_receipt_digest"))
             )
             legal_execution_bound = (
                 approved_command.get("legal_execution_id")
@@ -4760,6 +4789,7 @@ class ProceduralActuationBridgeService:
                 and authorization_validation.get("intent_digest_matches") is True
                 and authorization_validation.get("motor_plan_bound") is True
                 and authorization_validation.get("stop_signal_path_bound") is True
+                and authorization_validation.get("stop_signal_adapter_receipt_bound") is True
                 and authorization_validation.get("legal_execution_bound") is True
                 and authorization_validation.get("guardian_oversight_gate_bound") is True
                 and authorization_validation.get("reviewer_network_attested") is True
@@ -4779,6 +4809,7 @@ class ProceduralActuationBridgeService:
             "authorization_digest_bound": authorization_digest_bound,
             "authorization_validation_bound": authorization_validation_bound,
             "command_bound_to_authorization": command_bound_to_authorization,
+            "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "legal_execution_bound": legal_execution_bound,
             "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
             "no_raw_instruction_text": no_raw_instruction_text,
