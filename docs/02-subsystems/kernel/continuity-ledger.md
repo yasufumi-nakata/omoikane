@@ -46,6 +46,22 @@ CI/automation で profile を壊さず回せるためである。これは **ref
 - **改竄検知**: ハッシュチェーンに加え、定期的なグループ署名（thresholdsig）による全検証
 - **可用性**: 一部消失しても、過半保管領域があれば再構成可能（Reed-Solomon）
 
+## 公開検証 bundle（2026-04-24）
+
+reference runtime では `continuity-public-verification-key-management-v1` を追加し、
+`continuity-demo --json` が次を返す。
+
+- ledger head、entry count、ledger verification digest
+- role ごとの verifier key ref、key digest、verification scope を持つ key roster
+- entry ごとの required / present role、signature digest、verifier key ref
+- `raw_key_material_exposed=false` と `raw_signature_payload_exposed=false`
+
+この bundle は `hmac-sha256` の秘密鍵や raw signature payload を公開しない。
+第三者・Integrity Guardian・将来の外部 verifier は、まず digest-bound な roster と
+ledger head の一致を確認し、その後に実運用署名方式へ差し替える。
+これにより「公開検証可能な署名方式へいつ移行するか」という保留を、
+reference runtime 上では key roster / digest contract として先に固定する。
+
 ## カテゴリ別の必要署名
 
 | カテゴリ | self | council | guardian | third_party |
@@ -82,4 +98,3 @@ CI/automation で profile を壊さず回せるためである。これは **ref
 
 - 量子状態を **古典ハッシュで鎖にする** ことは可能か（量子情報は no-cloning） → [docs/05-research-frontiers/quantum-continuity.md](../../05-research-frontiers/quantum-continuity.md)
 - 100 年・1000 年スケールでの保管メディア → [docs/05-research-frontiers/long-term-storage.md](../../05-research-frontiers/long-term-storage.md)
-- `hmac-sha256` から公開検証可能な署名方式へいつ移行するか → governance / key management の決定待ち

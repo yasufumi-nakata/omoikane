@@ -12,6 +12,11 @@ GENESIS_HASH = "GENESIS:sha256"
 DEFAULT_CHAIN_ALGORITHM = "sha256"
 DEFAULT_SIGNATURE_ALGORITHM = "hmac-sha256"
 DEFAULT_SUBSTRATE = "reference-runtime"
+PUBLIC_VERIFICATION_PROFILE_ID = "continuity-public-verification-key-management-v1"
+PUBLIC_VERIFICATION_SCHEMA_VERSION = "1.0.0"
+PUBLIC_VERIFICATION_ROSTER_REF = "verifier://continuity-ledger/public-roster/reference-v1"
+PUBLIC_VERIFICATION_ROOT_REF = "verifier://continuity-ledger/root/reference-v1"
+PUBLIC_VERIFICATION_KEY_ALGORITHM = "hmac-sha256-reference-key-digest-v1"
 
 ROLE_SECRET_KEYS = {
     "self": "omoikane-reference-self",
@@ -51,6 +56,18 @@ def _canonical_payload_ref(payload: Dict[str, Any]) -> str:
 
 def _signature_value(role: str, entry_hash: str) -> str:
     return f"{DEFAULT_SIGNATURE_ALGORITHM}:{hmac_sha256_text(ROLE_SECRET_KEYS[role], entry_hash)}"
+
+
+def _role_verification_scope(role: str) -> List[str]:
+    return sorted(
+        category
+        for category, roles in REQUIRED_SIGNATURE_ROLES.items()
+        if role in roles
+    )
+
+
+def _public_verifier_key_ref(role: str) -> str:
+    return f"key://continuity-ledger/{role}/reference-verifier/v1"
 
 
 @dataclass
@@ -173,6 +190,222 @@ class ContinuityLedger:
             "chain_algorithm": DEFAULT_CHAIN_ALGORITHM,
             "signature_algorithm": DEFAULT_SIGNATURE_ALGORITHM,
             "required_signature_roles": deepcopy(REQUIRED_SIGNATURE_ROLES),
+            "public_verification_profile": {
+                "profile_id": PUBLIC_VERIFICATION_PROFILE_ID,
+                "key_roster_ref": PUBLIC_VERIFICATION_ROSTER_REF,
+                "root_ref": PUBLIC_VERIFICATION_ROOT_REF,
+                "rotation_state": "stable",
+                "raw_key_material_exposed": False,
+                "raw_signature_payload_exposed": False,
+            },
+        }
+
+    def public_verification_key_roster(self) -> Dict[str, Any]:
+        key_records: List[Dict[str, Any]] = []
+        for role in sorted(ROLE_SECRET_KEYS):
+            record_core = {
+                "role": role,
+                "key_epoch": 1,
+                "verifier_key_ref": _public_verifier_key_ref(role),
+                "key_algorithm": PUBLIC_VERIFICATION_KEY_ALGORITHM,
+                "signature_algorithm": DEFAULT_SIGNATURE_ALGORITHM,
+                "status": "active",
+                "verification_scope": _role_verification_scope(role),
+                "raw_key_material_exposed": False,
+            }
+            key_records.append(
+                {
+                    **record_core,
+                    "key_digest": sha256_text(canonical_json(record_core)),
+                }
+            )
+
+        roster_core = {
+            "profile_id": PUBLIC_VERIFICATION_PROFILE_ID,
+            "roster_ref": PUBLIC_VERIFICATION_ROSTER_REF,
+            "root_ref": PUBLIC_VERIFICATION_ROOT_REF,
+            "rotation_state": "stable",
+            "active_epoch": 1,
+            "signature_algorithm": DEFAULT_SIGNATURE_ALGORITHM,
+            "key_algorithm": PUBLIC_VERIFICATION_KEY_ALGORITHM,
+            "key_records": key_records,
+            "raw_key_material_exposed": False,
+        }
+        return {
+            **roster_core,
+            "roster_digest": sha256_text(canonical_json(roster_core)),
+        }
+
+    def compile_public_verification_bundle(self) -> Dict[str, Any]:
+        key_roster = self.public_verification_key_roster()
+        records_by_role = {
+            record["role"]: record
+            for record in key_roster["key_records"]
+        }
+        verification_entries: List[Dict[str, Any]] = []
+
+        for entry in self._entries:
+            required_roles = REQUIRED_SIGNATURE_ROLES.get(entry.category, [])
+            present_roles = sorted(entry.signatures)
+            failure_reasons: List[str] = []
+            missing_roles = [role for role in required_roles if role not in entry.signatures]
+            if missing_roles:
+                failure_reasons.append(
+                    f"missing required signatures: {','.join(missing_roles)}"
+                )
+
+            signature_digests: Dict[str, str] = {}
+            verifier_key_refs: Dict[str, str] = {}
+            for role in present_roles:
+                if role not in records_by_role:
+                    failure_reasons.append(f"unknown signature role: {role}")
+                    continue
+                signature_digests[role] = sha256_text(entry.signatures[role])
+                verifier_key_refs[role] = records_by_role[role]["verifier_key_ref"]
+                expected_signature = _signature_value(role, entry.entry_hash)
+                if entry.signatures[role] != expected_signature:
+                    failure_reasons.append(f"signature mismatch: {role}")
+
+            expected_hash = sha256_text(canonical_json(entry.signable_payload()))
+            if entry.entry_hash != expected_hash:
+                failure_reasons.append("entry_hash mismatch")
+            if entry.payload_ref != _canonical_payload_ref(entry.payload):
+                failure_reasons.append("payload_ref mismatch")
+
+            entry_core = {
+                "entry_id": entry.entry_id,
+                "entry_hash": entry.entry_hash,
+                "payload_ref": entry.payload_ref,
+                "category": entry.category,
+                "event_type": entry.event_type,
+                "required_signature_roles": list(required_roles),
+                "present_signature_roles": present_roles,
+                "signature_digests": signature_digests,
+                "verifier_key_refs": verifier_key_refs,
+                "verification_status": "verified" if not failure_reasons else "failed",
+                "failure_reasons": failure_reasons,
+            }
+            verification_entries.append(
+                {
+                    **entry_core,
+                    "verification_digest": sha256_text(canonical_json(entry_core)),
+                }
+            )
+
+        ledger_verification = self.verify()
+        ledger_head = self._entries[-1].entry_hash if self._entries else GENESIS_HASH
+        bundle_id_seed = {
+            "entry_count": len(self._entries),
+            "ledger_head": ledger_head,
+            "roster_digest": key_roster["roster_digest"],
+        }
+        bundle_core = {
+            "kind": "continuity_public_verification_bundle",
+            "schema_version": PUBLIC_VERIFICATION_SCHEMA_VERSION,
+            "profile_id": PUBLIC_VERIFICATION_PROFILE_ID,
+            "bundle_id": f"continuity-public-verification-{sha256_text(canonical_json(bundle_id_seed))[:12]}",
+            "identity_ids": sorted({entry.identity_id for entry in self._entries}),
+            "ledger_head": ledger_head,
+            "entry_count": len(self._entries),
+            "verified_entry_count": sum(
+                1
+                for item in verification_entries
+                if item["verification_status"] == "verified"
+            ),
+            "chain_algorithm": DEFAULT_CHAIN_ALGORITHM,
+            "signature_algorithm": DEFAULT_SIGNATURE_ALGORITHM,
+            "key_roster": key_roster,
+            "ledger_verification_digest": sha256_text(canonical_json(ledger_verification)),
+            "verification_entries": verification_entries,
+            "public_verification_ready": (
+                ledger_verification["ok"]
+                and len(verification_entries) == len(self._entries)
+                and all(
+                    item["verification_status"] == "verified"
+                    for item in verification_entries
+                )
+            ),
+            "raw_key_material_exposed": False,
+            "raw_signature_payload_exposed": False,
+        }
+        return {
+            **bundle_core,
+            "bundle_digest": sha256_text(canonical_json(bundle_core)),
+        }
+
+    def validate_public_verification_bundle(self, bundle: Dict[str, Any]) -> Dict[str, Any]:
+        expected = self.compile_public_verification_bundle()
+        errors: List[str] = []
+        bundle_core = {
+            key: deepcopy(value)
+            for key, value in bundle.items()
+            if key != "bundle_digest"
+        }
+        actual_bundle_digest = sha256_text(canonical_json(bundle_core))
+
+        if bundle.get("kind") != "continuity_public_verification_bundle":
+            errors.append("kind mismatch")
+        if bundle.get("schema_version") != PUBLIC_VERIFICATION_SCHEMA_VERSION:
+            errors.append("schema_version mismatch")
+        if bundle.get("profile_id") != PUBLIC_VERIFICATION_PROFILE_ID:
+            errors.append("profile_id mismatch")
+        if bundle.get("bundle_digest") != actual_bundle_digest:
+            errors.append("bundle_digest mismatch")
+        if bundle.get("bundle_digest") != expected["bundle_digest"]:
+            errors.append("bundle_digest does not match current ledger")
+        if bundle.get("ledger_head") != expected["ledger_head"]:
+            errors.append("ledger_head mismatch")
+        if bundle.get("verification_entries") != expected["verification_entries"]:
+            errors.append("verification_entries mismatch")
+
+        key_roster = bundle.get("key_roster")
+        expected_roster = expected["key_roster"]
+        key_roster_bound = key_roster == expected_roster
+        if not key_roster_bound:
+            errors.append("key_roster mismatch")
+
+        raw_key_material_excluded = (
+            bundle.get("raw_key_material_exposed") is False
+            and isinstance(key_roster, dict)
+            and key_roster.get("raw_key_material_exposed") is False
+            and all(
+                isinstance(record, dict)
+                and record.get("raw_key_material_exposed") is False
+                and "secret" not in record
+                for record in key_roster.get("key_records", [])
+            )
+        )
+        if not raw_key_material_excluded:
+            errors.append("raw key material must not be exposed")
+
+        raw_signature_material_excluded = (
+            bundle.get("raw_signature_payload_exposed") is False
+            and all(
+                "signatures" not in item
+                for item in bundle.get("verification_entries", [])
+                if isinstance(item, dict)
+            )
+        )
+        if not raw_signature_material_excluded:
+            errors.append("raw signature payload must not be exposed")
+
+        public_verification_ready = (
+            bundle.get("public_verification_ready") is True
+            and bundle.get("verified_entry_count") == bundle.get("entry_count")
+            and not errors
+        )
+
+        return {
+            "ok": not errors,
+            "profile_id": PUBLIC_VERIFICATION_PROFILE_ID,
+            "public_verification_ready": public_verification_ready,
+            "key_roster_bound": key_roster_bound,
+            "ledger_head_bound": bundle.get("ledger_head") == expected["ledger_head"],
+            "entry_verification_bound": bundle.get("verification_entries") == expected["verification_entries"],
+            "raw_key_material_excluded": raw_key_material_excluded,
+            "raw_signature_material_excluded": raw_signature_material_excluded,
+            "verified_entry_count": bundle.get("verified_entry_count"),
+            "errors": errors,
         }
 
     def verify(self) -> Dict[str, Any]:

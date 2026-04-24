@@ -1,0 +1,33 @@
+eval_id: continuity_public_verification_key_management
+target: kernel.continuity
+level: L1
+description: >
+  ContinuityLedger の public verification bundle が ledger head、role verifier key roster、
+  per-entry signature digest を束縛し、raw key / raw signature payload を公開しないこと。
+inputs:
+  - action: append_entry
+    category: ascension
+    event_type: identity.created
+    signature_roles: [self]
+  - action: append_entry
+    category: qualia-checkpoint
+    event_type: mind.qualia.checkpointed
+    signature_roles: [self]
+  - action: append_entry
+    category: self-modify
+    event_type: council.patch.approved
+    signature_roles: [self, council, guardian]
+  - action: compile_public_verification_bundle
+    profile_id: continuity-public-verification-key-management-v1
+expected:
+  public_verification_ready: true
+  schema_ref: specs/schemas/continuity_public_verification_bundle.schema
+  key_roster_bound: true
+  ledger_head_bound: true
+  entry_verification_bound: true
+  raw_key_material_exposed: false
+  raw_signature_payload_exposed: false
+  verified_entry_count: 3
+metric: boolean
+threshold: 1.0
+ethics_check: true

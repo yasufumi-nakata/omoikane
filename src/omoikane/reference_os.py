@@ -13038,6 +13038,10 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        public_verification_bundle = self.ledger.compile_public_verification_bundle()
+        public_verification_validation = self.ledger.validate_public_verification_bundle(
+            public_verification_bundle
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -13046,4 +13050,6 @@ json.dump(response, sys.stdout)
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),
+            "public_verification_bundle": public_verification_bundle,
+            "public_verification_validation": public_verification_validation,
         }

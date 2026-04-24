@@ -1008,6 +1008,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("hmac-sha256", result["ledger_profile"]["signature_algorithm"])
         self.assertEqual(3, len(result["ledger_snapshot"]))
         self.assertEqual("self-modify", result["ledger_snapshot"][-1]["category"])
+        self.assertTrue(result["public_verification_validation"]["ok"])
+        self.assertTrue(result["public_verification_bundle"]["public_verification_ready"])
+        self.assertEqual(
+            "continuity-public-verification-key-management-v1",
+            result["public_verification_bundle"]["profile_id"],
+        )
+        self.assertEqual(
+            result["public_verification_bundle"]["entry_count"],
+            result["public_verification_bundle"]["verified_entry_count"],
+        )
+        self.assertFalse(result["public_verification_bundle"]["raw_signature_payload_exposed"])
 
     def test_identity_demo_reports_pause_resume_contract(self) -> None:
         runtime = OmoikaneReferenceOS()

@@ -55,6 +55,16 @@ entries:
     rationale: Required to encode append-only continuity evidence.
   - priority: P1
     kind: schema
+    file: specs/schemas/continuity_public_verification_bundle.schema
+    consumers:
+      - specs/interfaces/kernel.continuity.v0.idl
+      - reference-runtime
+      - evals/continuity/continuity_public_verification_key_management.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/kernel/continuity-ledger.md
+    rationale: Required to serialize digest-only public verification bundles that bind the ledger head, role verifier key roster, and signature evidence without exposing raw key material.
+  - priority: P1
+    kind: schema
     file: specs/schemas/identity_record.schema
     consumers:
       - specs/interfaces/kernel.identity.v0.idl
@@ -1323,6 +1333,15 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the bootstrap self-modify chain profile and required tri-signature policy.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/continuity_public_verification_key_management.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/kernel/continuity-ledger.md
+    rationale: Protects public verification bundle readiness, key roster binding, ledger-head binding, and raw key/signature non-disclosure.
   - priority: P1
     kind: eval
     file: evals/continuity/substrate_migration_continuity.yaml

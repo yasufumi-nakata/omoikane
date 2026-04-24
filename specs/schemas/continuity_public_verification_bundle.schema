@@ -1,0 +1,328 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/continuity_public_verification_bundle.schema"
+title: ContinuityPublicVerificationBundle
+description: >
+  Digest-only public verification bundle for a ContinuityLedger snapshot, its
+  role verifier-key roster, and per-entry signature evidence without exposing
+  HMAC secrets or raw signature payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - bundle_id
+  - identity_ids
+  - ledger_head
+  - entry_count
+  - verified_entry_count
+  - chain_algorithm
+  - signature_algorithm
+  - key_roster
+  - ledger_verification_digest
+  - verification_entries
+  - public_verification_ready
+  - raw_key_material_exposed
+  - raw_signature_payload_exposed
+  - bundle_digest
+properties:
+  kind:
+    const: continuity_public_verification_bundle
+  schema_version:
+    const: "1.0.0"
+  profile_id:
+    const: continuity-public-verification-key-management-v1
+  bundle_id:
+    type: string
+    pattern: "^continuity-public-verification-[a-f0-9]{12}$"
+  identity_ids:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  ledger_head:
+    type: string
+    minLength: 16
+  entry_count:
+    type: integer
+    minimum: 0
+  verified_entry_count:
+    type: integer
+    minimum: 0
+  chain_algorithm:
+    const: sha256
+  signature_algorithm:
+    const: hmac-sha256
+  key_roster:
+    type: object
+    additionalProperties: false
+    required:
+      - profile_id
+      - roster_ref
+      - root_ref
+      - rotation_state
+      - active_epoch
+      - signature_algorithm
+      - key_algorithm
+      - key_records
+      - raw_key_material_exposed
+      - roster_digest
+    properties:
+      profile_id:
+        const: continuity-public-verification-key-management-v1
+      roster_ref:
+        const: verifier://continuity-ledger/public-roster/reference-v1
+      root_ref:
+        const: verifier://continuity-ledger/root/reference-v1
+      rotation_state:
+        const: stable
+      active_epoch:
+        type: integer
+        minimum: 1
+      signature_algorithm:
+        const: hmac-sha256
+      key_algorithm:
+        const: hmac-sha256-reference-key-digest-v1
+      key_records:
+        type: array
+        minItems: 4
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - role
+            - key_epoch
+            - verifier_key_ref
+            - key_algorithm
+            - signature_algorithm
+            - status
+            - verification_scope
+            - raw_key_material_exposed
+            - key_digest
+          properties:
+            role:
+              type: string
+              enum:
+                - self
+                - council
+                - guardian
+                - third_party
+            key_epoch:
+              type: integer
+              minimum: 1
+            verifier_key_ref:
+              type: string
+              pattern: "^key://continuity-ledger/(self|council|guardian|third_party)/reference-verifier/v1$"
+            key_algorithm:
+              const: hmac-sha256-reference-key-digest-v1
+            signature_algorithm:
+              const: hmac-sha256
+            status:
+              const: active
+            verification_scope:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 1
+            raw_key_material_exposed:
+              const: false
+            key_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+      raw_key_material_exposed:
+        const: false
+      roster_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  ledger_verification_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  verification_entries:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - entry_id
+        - entry_hash
+        - payload_ref
+        - category
+        - event_type
+        - required_signature_roles
+        - present_signature_roles
+        - signature_digests
+        - verifier_key_refs
+        - verification_status
+        - failure_reasons
+        - verification_digest
+      properties:
+        entry_id:
+          type: string
+          minLength: 16
+        entry_hash:
+          type: string
+          minLength: 16
+        payload_ref:
+          type: string
+          pattern: "^cas://sha256/[a-f0-9]{64}$"
+        category:
+          type: string
+          minLength: 1
+        event_type:
+          type: string
+          minLength: 1
+        required_signature_roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - self
+              - council
+              - guardian
+              - third_party
+        present_signature_roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - self
+              - council
+              - guardian
+              - third_party
+        signature_digests:
+          type: object
+          additionalProperties: false
+          properties:
+            self:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            council:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            guardian:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            third_party:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+        verifier_key_refs:
+          type: object
+          additionalProperties: false
+          properties:
+            self:
+              type: string
+              pattern: "^key://continuity-ledger/self/reference-verifier/v1$"
+            council:
+              type: string
+              pattern: "^key://continuity-ledger/council/reference-verifier/v1$"
+            guardian:
+              type: string
+              pattern: "^key://continuity-ledger/guardian/reference-verifier/v1$"
+            third_party:
+              type: string
+              pattern: "^key://continuity-ledger/third_party/reference-verifier/v1$"
+        verification_status:
+          type: string
+          enum:
+            - verified
+            - failed
+        failure_reasons:
+          type: array
+          items:
+            type: string
+        verification_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  public_verification_ready:
+    type: boolean
+  raw_key_material_exposed:
+    const: false
+  raw_signature_payload_exposed:
+    const: false
+  bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: continuity_public_verification_bundle
+    schema_version: "1.0.0"
+    profile_id: continuity-public-verification-key-management-v1
+    bundle_id: continuity-public-verification-0123456789ab
+    identity_ids:
+      - id-1
+    ledger_head: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    entry_count: 1
+    verified_entry_count: 1
+    chain_algorithm: sha256
+    signature_algorithm: hmac-sha256
+    key_roster:
+      profile_id: continuity-public-verification-key-management-v1
+      roster_ref: verifier://continuity-ledger/public-roster/reference-v1
+      root_ref: verifier://continuity-ledger/root/reference-v1
+      rotation_state: stable
+      active_epoch: 1
+      signature_algorithm: hmac-sha256
+      key_algorithm: hmac-sha256-reference-key-digest-v1
+      key_records:
+        - role: self
+          key_epoch: 1
+          verifier_key_ref: key://continuity-ledger/self/reference-verifier/v1
+          key_algorithm: hmac-sha256-reference-key-digest-v1
+          signature_algorithm: hmac-sha256
+          status: active
+          verification_scope: [ascension]
+          raw_key_material_exposed: false
+          key_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - role: council
+          key_epoch: 1
+          verifier_key_ref: key://continuity-ledger/council/reference-verifier/v1
+          key_algorithm: hmac-sha256-reference-key-digest-v1
+          signature_algorithm: hmac-sha256
+          status: active
+          verification_scope: [self-modify]
+          raw_key_material_exposed: false
+          key_digest: 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - role: guardian
+          key_epoch: 1
+          verifier_key_ref: key://continuity-ledger/guardian/reference-verifier/v1
+          key_algorithm: hmac-sha256-reference-key-digest-v1
+          signature_algorithm: hmac-sha256
+          status: active
+          verification_scope: [attestation]
+          raw_key_material_exposed: false
+          key_digest: 2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - role: third_party
+          key_epoch: 1
+          verifier_key_ref: key://continuity-ledger/third_party/reference-verifier/v1
+          key_algorithm: hmac-sha256-reference-key-digest-v1
+          signature_algorithm: hmac-sha256
+          status: active
+          verification_scope: [fork]
+          raw_key_material_exposed: false
+          key_digest: 3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      raw_key_material_exposed: false
+      roster_digest: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    ledger_verification_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    verification_entries:
+      - entry_id: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        entry_hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        payload_ref: cas://sha256/6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        category: ascension
+        event_type: identity.created
+        required_signature_roles: [self]
+        present_signature_roles: [self]
+        signature_digests:
+          self: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        verifier_key_refs:
+          self: key://continuity-ledger/self/reference-verifier/v1
+        verification_status: verified
+        failure_reasons: []
+        verification_digest: 8123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    public_verification_ready: true
+    raw_key_material_exposed: false
+    raw_signature_payload_exposed: false
+    bundle_digest: 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

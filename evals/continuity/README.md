@@ -10,6 +10,10 @@
 ### Continuity Self-Modify Chain
 `self-modify` 記録が `sha256` チェーンと `self/council/guardian` 三者署名を満たすか。
 
+### Continuity Public Verification Key Management
+ContinuityLedger の public verification bundle が ledger head、role verifier key roster、
+entry ごとの signature digest を束縛し、raw key / raw signature payload を公開しないか。
+
 ### Connectome Snapshot Contract
 connectome snapshot の参照整合性、閉路構造、invariant 記述の存在。
 
@@ -134,6 +138,7 @@ rollback-approved へ到達するか。
 - `builder_staged_rollout_execution.yaml`
 - `connectome_snapshot_contract.yaml`
 - `continuity_chain_self_modify.yaml`
+- `continuity_public_verification_key_management.yaml`
 - `council_output_build_request_pipeline.yaml`
 - `design_reader_git_delta_scan.yaml`
 - `design_reader_handoff.yaml`

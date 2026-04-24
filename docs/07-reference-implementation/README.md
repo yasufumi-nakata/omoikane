@@ -90,6 +90,10 @@ python3 -m unittest discover -s tests -t .
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
 (`sha256` chain / `hmac-sha256` signatures / category ごとの required roles)
 を JSON で可視化する。
+同じ demo は `continuity-public-verification-key-management-v1` の
+digest-only public verification bundle も返し、ledger head、role verifier key roster、
+entry ごとの signature digest / verifier key ref、raw key / raw signature 非公開 flag を
+`continuity_public_verification_bundle.schema` で検証できる形に固定する。
 
 `gap-report` は open question / missing file / empty eval / placeholder に加えて、
 automation が前提にする repo-local `references/*.md` の欠落、

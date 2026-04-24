@@ -932,6 +932,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["ledger_verification"]["ok"])
         self.assertEqual("sha256", result["ledger_profile"]["chain_algorithm"])
         self.assertEqual(3, len(result["ledger_snapshot"]))
+        self.assertTrue(result["public_verification_validation"]["ok"])
+        self.assertTrue(result["public_verification_bundle"]["public_verification_ready"])
+        self.assertEqual(
+            "continuity-public-verification-key-management-v1",
+            result["public_verification_bundle"]["profile_id"],
+        )
 
     def test_identity_demo_emits_pause_resume_contract_json(self) -> None:
         stdout = io.StringIO()

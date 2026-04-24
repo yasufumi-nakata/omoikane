@@ -25,6 +25,7 @@
 - `connectome_document.schema`
 - `consensus_message.schema`
 - `continuity_log_entry.schema`
+- `continuity_public_verification_bundle.schema`
 - `council_argument.yaml`
 - `council_convocation_session.schema`
 - `council_input.yaml`

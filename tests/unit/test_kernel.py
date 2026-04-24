@@ -274,6 +274,74 @@ class KernelTests(unittest.TestCase):
         self.assertFalse(verification["ok"])
         self.assertTrue(any("signature mismatch" in item for item in verification["errors"]))
 
+    def test_continuity_public_verification_bundle_binds_roster_and_entries(self) -> None:
+        ledger = ContinuityLedger()
+        ledger.append(
+            "id-1",
+            "identity.created",
+            {"name": "yasufumi"},
+            "IdentityRegistry",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        ledger.append(
+            "id-1",
+            "council.patch.approved",
+            {"proposal_id": "proposal-1"},
+            "Council",
+            category="self-modify",
+            layer="L4",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        bundle = ledger.compile_public_verification_bundle()
+        validation = ledger.validate_public_verification_bundle(bundle)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["public_verification_ready"])
+        self.assertTrue(validation["key_roster_bound"])
+        self.assertTrue(validation["entry_verification_bound"])
+        self.assertTrue(validation["raw_key_material_excluded"])
+        self.assertTrue(validation["raw_signature_material_excluded"])
+        self.assertEqual(2, bundle["verified_entry_count"])
+        self.assertEqual("continuity-public-verification-key-management-v1", bundle["profile_id"])
+        self.assertEqual("stable", bundle["key_roster"]["rotation_state"])
+        self.assertFalse(bundle["raw_signature_payload_exposed"])
+        self.assertFalse(bundle["key_roster"]["raw_key_material_exposed"])
+        guardian_record = next(
+            record
+            for record in bundle["key_roster"]["key_records"]
+            if record["role"] == "guardian"
+        )
+        self.assertIn("self-modify", guardian_record["verification_scope"])
+        self.assertNotIn("signatures", bundle["verification_entries"][0])
+        self.assertIn("self", bundle["verification_entries"][0]["signature_digests"])
+
+    def test_continuity_public_verification_bundle_rejects_tamper(self) -> None:
+        ledger = ContinuityLedger()
+        ledger.append(
+            "id-1",
+            "identity.created",
+            {"name": "yasufumi"},
+            "IdentityRegistry",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+        bundle = ledger.compile_public_verification_bundle()
+        bundle["verification_entries"][0]["signature_digests"]["self"] = "0" * 64
+
+        validation = ledger.validate_public_verification_bundle(bundle)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["public_verification_ready"])
+        self.assertIn("bundle_digest mismatch", validation["errors"])
+        self.assertIn("verification_entries mismatch", validation["errors"])
+
     def test_ethics_blocks_immutable_self_modification(self) -> None:
         enforcer = EthicsEnforcer()
 

@@ -5,6 +5,7 @@ service: ContinuityLedgerService
 summary: Append-only continuity evidence logging and verification.
 imports:
   continuity_log_entry: ../schemas/continuity_log_entry.schema
+  continuity_public_verification_bundle: ../schemas/continuity_public_verification_bundle.schema
 operations:
   read_profile:
     summary: Return the active chain and signature profile for this continuity ledger.
@@ -90,6 +91,49 @@ operations:
               - hmac-sha256
           first_error:
             type: string
+  compile_public_verification_bundle:
+    summary: Compile a digest-only public verification bundle for the ledger head and verifier-key roster.
+    output:
+      schema_ref: continuity_public_verification_bundle
+  validate_public_verification_bundle:
+    summary: Verify that a public verification bundle still matches the ledger head, key roster, and digest-only signature evidence.
+    input:
+      schema_ref: continuity_public_verification_bundle
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - profile_id
+          - public_verification_ready
+          - key_roster_bound
+          - ledger_head_bound
+          - entry_verification_bound
+          - raw_key_material_excluded
+          - raw_signature_material_excluded
+        properties:
+          ok:
+            type: boolean
+          profile_id:
+            type: string
+          public_verification_ready:
+            type: boolean
+          key_roster_bound:
+            type: boolean
+          ledger_head_bound:
+            type: boolean
+          entry_verification_bound:
+            type: boolean
+          raw_key_material_excluded:
+            type: boolean
+          raw_signature_material_excluded:
+            type: boolean
+          verified_entry_count:
+            type: integer
+          errors:
+            type: array
+            items:
+              type: string
   mark_uncertain_interval:
     summary: Mark an interval as continuity-uncertain after verification failure.
     input:
