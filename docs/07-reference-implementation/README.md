@@ -798,6 +798,11 @@ message digest、forward secrecy、redaction-free approval payload を
 で ordered digest set と `max_batch_size=2` の bounded batches に集約し、
 `wms_approval_collection_receipt.schema` と physics change receipt の
 `approval_collection_digest` が同じ collection を指すことを確認する。
+同じ collection は `distributed-council-approval-fanout-v1` により
+Federation distributed transport envelope / authenticated receipt / participant approval
+result digest の ordered set へ fan-out され、
+`wms_distributed_approval_fanout_receipt.schema` と physics change receipt の
+`approval_fanout_digest` が同じ digest-only fan-out receipt を指すことも確認する。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

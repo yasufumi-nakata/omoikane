@@ -1,0 +1,28 @@
+eval_id: wms_distributed_approval_fanout
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の physics_rules approval collection が distributed Council
+  transport へ fan-out される際に、participant order、approval result digest、
+  Federation envelope digest、authenticated transport receipt digest、collection
+  digest が同じ fanout receipt に束縛されることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  distributed_approval_fanout_bound: true
+  fanout_policy_id: distributed-council-approval-fanout-v1
+  digest_profile: transport-result-bound-approval-fanout-v1
+  distributed_transport_profile: federation-mtls-quorum-v1
+  council_tier: federation
+  participant_count: 3
+  result_count: 3
+  fanout_status: complete
+  approval_collection_complete: true
+  transport_receipt_set_authenticated: true
+  participant_order_bound: true
+  approval_fanout_complete: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

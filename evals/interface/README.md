@@ -31,6 +31,11 @@ IMC handshake / message digest / approval subject digest / forward secrecy に
 `max_batch_size=2` の bounded batch に集約し、physics_rules change が
 complete collection receipt へ束縛されることを確認する。
 
+### WMS Distributed Approval Fanout
+complete approval collection を Federation distributed transport envelope /
+authenticated receipt / participant approval result digest の ordered set へ
+fan-out し、physics_rules change が同じ fanout digest を参照することを確認する。
+
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
@@ -44,6 +49,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `sensory_loopback_guard.yaml`
 - `sensory_loopback_multi_self_arbitration.yaml`
 - `wms_approval_collection_scaling.yaml`
+- `wms_distributed_approval_fanout.yaml`
 - `wms_participant_approval_transport.yaml`
 - `wms_physics_rules_revert.yaml`
 - `wms_private_reality_escape.yaml`

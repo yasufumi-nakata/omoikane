@@ -36,7 +36,8 @@
 - 不整合時の自動退避
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli wms-demo --json`
   で minor reconcile、major divergence、unanimous / Guardian-attested physics rules change、
-  rollback-token revert、malicious inject、private reality escape を検証する
+  ordered approval collection、distributed approval fan-out、rollback-token revert、
+  malicious inject、private reality escape を検証する
 
 ### Sensory Loopback (SL)
 - 感覚出力（音／映像／触覚）のフィードバック

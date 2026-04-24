@@ -825,19 +825,33 @@ entries:
       - evals/interface/wms_physics_rules_revert.yaml
       - evals/interface/wms_participant_approval_transport.yaml
       - evals/interface/wms_approval_collection_scaling.yaml
+      - evals/interface/wms_distributed_approval_fanout.yaml
       - docs/02-subsystems/interface/wms-spec.md
       - reference-runtime
-    rationale: Required to encode unanimous, IMC-transport-bound, Guardian-attested, rollback-token-bound physics_rules changes and first-class revert receipts.
+    rationale: Required to encode unanimous, IMC-transport-bound, approval-collection-bound, fanout-bound, Guardian-attested, rollback-token-bound physics_rules changes and first-class revert receipts.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_approval_collection_receipt.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl
       - specs/schemas/wms_physics_rules_change_receipt.schema
+      - specs/schemas/wms_distributed_approval_fanout_receipt.schema
       - evals/interface/wms_approval_collection_scaling.yaml
+      - evals/interface/wms_distributed_approval_fanout.yaml
       - docs/02-subsystems/interface/wms-spec.md
       - reference-runtime
     rationale: Required to prove large shared-reality participant approval collection with ordered receipt digests and bounded batch digests before a physics_rules change can apply.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_distributed_approval_fanout_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_physics_rules_change_receipt.schema
+      - evals/interface/wms_distributed_approval_fanout.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to prove WMS approval collection fan-out through authenticated Federation distributed transport receipts before shared-reality physics_rules changes bind remote Council transport evidence.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_participant_approval_transport_receipt.schema
@@ -845,8 +859,10 @@ entries:
       - specs/interfaces/interface.wms.v0.idl
       - specs/schemas/wms_physics_rules_change_receipt.schema
       - specs/schemas/wms_approval_collection_receipt.schema
+      - specs/schemas/wms_distributed_approval_fanout_receipt.schema
       - evals/interface/wms_participant_approval_transport.yaml
       - evals/interface/wms_approval_collection_scaling.yaml
+      - evals/interface/wms_distributed_approval_fanout.yaml
       - docs/02-subsystems/interface/wms-spec.md
       - reference-runtime
     rationale: Required to prove each WMS participant approval traveled through an attested, forward-secret IMC message bound to the same physics change approval subject digest.
@@ -1196,6 +1212,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects ordered, batchable approval receipt collection for multi-participant WMS physics_rules changes.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_distributed_approval_fanout.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects distributed Council transport fan-out binding for complete WMS approval collections before shared-reality physics_rules changes apply.
   - priority: P1
     kind: eval
     file: evals/interface/wms_participant_approval_transport.yaml

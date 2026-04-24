@@ -129,6 +129,17 @@ properties:
   approval_collection_complete:
     type: boolean
     const: true
+  approval_fanout_policy_id:
+    type: string
+    const: distributed-council-approval-fanout-v1
+  approval_fanout_receipt:
+    $ref: wms_distributed_approval_fanout_receipt.schema
+  approval_fanout_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_fanout_complete:
+    type: boolean
+    const: true
   guardian_attested:
     type: boolean
     const: true

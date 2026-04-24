@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from omoikane.agentic.distributed_transport import DistributedTransportService
 from omoikane.interface.imc import InterMindChannel
 from omoikane.interface.wms import WorldModelSync
 
@@ -241,6 +242,111 @@ class WorldModelSyncTests(unittest.TestCase):
             ["identity://primary", "identity://peer", "identity://observer"],
             collection["covered_participants"],
         )
+
+    def test_distributed_approval_fanout_binds_transport_results(self) -> None:
+        sync = WorldModelSync()
+        transport = DistributedTransportService()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer", "identity://observer"],
+            objects=["atrium", "council-table"],
+        )
+        proposed_ref = "physics://shared-atrium/low-gravity-v1"
+        rationale = "bounded rehearsal"
+        receipts = self._approval_transport_receipts(
+            sync,
+            session,
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+        )
+        subject = sync.build_physics_rules_approval_subject(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+        )
+        collection = sync.build_approval_collection_receipt(
+            session["session_id"],
+            approval_subject_digest=subject["digest"],
+            approval_transport_receipts=receipts,
+            max_batch_size=2,
+        )
+        fanout_results = []
+        for index, participant_id in enumerate(session["current_state"]["participants"], start=1):
+            participant_pair = (
+                ["identity://primary", "identity://peer"]
+                if participant_id == "identity://primary"
+                else ["identity://primary", participant_id]
+            )
+            result_digest = sync.build_distributed_approval_result_digest(
+                approval_subject_digest=subject["digest"],
+                participant_id=participant_id,
+                approval_collection_digest=collection["digest"],
+            )
+            envelope = transport.issue_federation_handoff(
+                topology_ref=f"topology://wms-test/{index}",
+                proposal_ref=f"wms-approval://{index}",
+                payload_ref=f"cas://sha256/{subject['digest']}",
+                payload_digest=subject["digest"],
+                participant_identity_ids=participant_pair,
+            )
+            transport_receipt = transport.record_receipt(
+                envelope,
+                result_ref=f"resolution://wms-test/{index}",
+                result_digest=result_digest,
+                participant_ids=[
+                    attestation.participant_id
+                    for attestation in envelope.participant_attestations
+                ],
+                channel_binding_ref=envelope.channel_binding_ref,
+                verified_root_refs=["root://federation/pki-a"],
+                key_epoch=1,
+                hop_nonce_chain=[f"hop://wms-test/{index}/relay-a"],
+            )
+            fanout_results.append(
+                {
+                    "participant_id": participant_id,
+                    "approval_result_ref": f"resolution://wms-test/{index}",
+                    "approval_result_digest": result_digest,
+                    "transport_envelope": envelope.to_dict(),
+                    "transport_receipt": transport_receipt.to_dict(),
+                }
+            )
+
+        fanout = sync.build_distributed_approval_fanout_receipt(
+            session["session_id"],
+            approval_subject_digest=subject["digest"],
+            approval_collection_receipt=collection,
+            participant_fanout_results=fanout_results,
+        )
+        validation = sync.validate_distributed_approval_fanout_receipt(
+            fanout,
+            required_participants=session["current_state"]["participants"],
+            approval_subject_digest=subject["digest"],
+            approval_collection_digest=collection["digest"],
+        )
+        physics_change = sync.propose_physics_rules_change(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+            participant_approvals=session["current_state"]["participants"],
+            guardian_attested=True,
+            approval_transport_receipts=receipts,
+            approval_collection_receipt=collection,
+            approval_fanout_receipt=fanout,
+        )
+        physics_validation = sync.validate_physics_rules_change(physics_change)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["fanout_complete"])
+        self.assertTrue(validation["transport_receipt_set_authenticated"])
+        self.assertTrue(validation["result_digest_bound"])
+        self.assertTrue(physics_validation["ok"])
+        self.assertTrue(physics_validation["approval_fanout_complete"])
+        self.assertTrue(physics_validation["approval_fanout_digest_bound"])
+        self.assertEqual("complete", fanout["fanout_status"])
+        self.assertEqual(3, fanout["result_count"])
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
         sync = WorldModelSync()

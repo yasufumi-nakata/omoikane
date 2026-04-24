@@ -1,0 +1,199 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_distributed_approval_fanout_receipt.schema"
+title: WMSDistributedApprovalFanoutReceipt
+description: >
+  Digest-bound receipt proving that a WMS physics_rules approval collection was
+  fanned out through authenticated Federation distributed transport receipts
+  before the shared-reality change was applied. The receipt stores only
+  envelope/receipt digests and bounded transport artifacts, not raw approval
+  conversations.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - fanout_policy_id
+  - digest_profile
+  - session_id
+  - approval_subject_digest
+  - approval_collection_policy_id
+  - approval_collection_digest
+  - approval_collection_receipt
+  - approval_collection_complete
+  - distributed_transport_profile
+  - council_tier
+  - required_participants
+  - participant_count
+  - covered_participants
+  - missing_participants
+  - duplicate_participants
+  - invalid_result_count
+  - result_count
+  - participant_result_digests
+  - transport_envelope_digests
+  - transport_receipt_digests
+  - transport_receipt_set_digest
+  - participant_fanout_results
+  - fanout_status
+  - transport_receipt_set_authenticated
+  - participant_order_bound
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_distributed_approval_fanout_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  fanout_policy_id:
+    type: string
+    const: distributed-council-approval-fanout-v1
+  digest_profile:
+    type: string
+    const: transport-result-bound-approval-fanout-v1
+  session_id:
+    type: string
+    minLength: 8
+  approval_subject_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_collection_policy_id:
+    type: string
+    const: bounded-wms-approval-collection-v1
+  approval_collection_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  approval_collection_receipt:
+    $ref: wms_approval_collection_receipt.schema
+  approval_collection_complete:
+    type: boolean
+    const: true
+  distributed_transport_profile:
+    type: string
+    const: federation-mtls-quorum-v1
+  council_tier:
+    type: string
+    const: federation
+  required_participants:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  participant_count:
+    type: integer
+    minimum: 1
+  covered_participants:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  missing_participants:
+    type: array
+    maxItems: 0
+    items:
+      type: string
+  duplicate_participants:
+    type: array
+    maxItems: 0
+    items:
+      type: string
+  invalid_result_count:
+    type: integer
+    const: 0
+  result_count:
+    type: integer
+    minimum: 1
+  participant_result_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  transport_envelope_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  transport_receipt_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  transport_receipt_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  participant_fanout_results:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - participant_id
+        - approval_result_ref
+        - approval_result_digest
+        - expected_approval_result_digest
+        - transport_envelope
+        - transport_receipt
+        - transport_envelope_digest
+        - transport_receipt_digest
+        - transport_authenticated
+        - result_digest_bound
+        - council_tier
+        - transport_profile
+      properties:
+        participant_id:
+          type: string
+          minLength: 1
+        approval_result_ref:
+          type: string
+          minLength: 1
+        approval_result_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        expected_approval_result_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        transport_envelope:
+          $ref: distributed_transport_envelope.schema
+        transport_receipt:
+          $ref: distributed_transport_receipt.schema
+        transport_envelope_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        transport_receipt_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        transport_authenticated:
+          type: boolean
+          const: true
+        result_digest_bound:
+          type: boolean
+          const: true
+        council_tier:
+          type: string
+          const: federation
+        transport_profile:
+          type: string
+          const: federation-mtls-quorum-v1
+  fanout_status:
+    type: string
+    const: complete
+  transport_receipt_set_authenticated:
+    type: boolean
+    const: true
+  participant_order_bound:
+    type: boolean
+    const: true
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

@@ -7557,6 +7557,72 @@ json.dump(response, sys.stdout)
             approval_subject_digest=approval_subject["digest"],
             approval_transport_receipts=approval_transport_receipts,
         )
+        approval_fanout_results = []
+        for index, participant_id in enumerate(
+            [identity.identity_id, peer.identity_id, observer.identity_id],
+            start=1,
+        ):
+            participant_pair = (
+                [identity.identity_id, peer.identity_id]
+                if participant_id == identity.identity_id
+                else [identity.identity_id, participant_id]
+            )
+            approval_result_digest = self.wms.build_distributed_approval_result_digest(
+                approval_subject_digest=approval_subject["digest"],
+                participant_id=participant_id,
+                approval_collection_digest=approval_collection_receipt["digest"],
+            )
+            fanout_envelope = self.distributed_transport.issue_federation_handoff(
+                topology_ref=f"topology://wms-approval-fanout/{session['session_id']}/{index}",
+                proposal_ref=f"wms-physics-approval://{approval_subject['digest'][:16]}/{index}",
+                payload_ref=f"cas://sha256/{approval_subject['digest']}",
+                payload_digest=approval_subject["digest"],
+                participant_identity_ids=participant_pair,
+            )
+            fanout_receipt = self.distributed_transport.record_receipt(
+                fanout_envelope,
+                result_ref=f"resolution://wms-approval/{index}",
+                result_digest=approval_result_digest,
+                participant_ids=[
+                    attestation.participant_id
+                    for attestation in fanout_envelope.participant_attestations
+                ],
+                channel_binding_ref=fanout_envelope.channel_binding_ref,
+                verified_root_refs=["root://federation/pki-a"],
+                key_epoch=1,
+                hop_nonce_chain=[f"hop://wms-approval/{index}/relay-a"],
+            )
+            approval_fanout_results.append(
+                {
+                    "participant_id": participant_id,
+                    "approval_result_ref": f"resolution://wms-approval/{index}",
+                    "approval_result_digest": approval_result_digest,
+                    "transport_envelope": fanout_envelope.to_dict(),
+                    "transport_receipt": fanout_receipt.to_dict(),
+                }
+            )
+        approval_fanout_receipt = self.wms.build_distributed_approval_fanout_receipt(
+            session["session_id"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_collection_receipt=approval_collection_receipt,
+            participant_fanout_results=approval_fanout_results,
+        )
+        approval_fanout_validation = self.wms.validate_distributed_approval_fanout_receipt(
+            approval_fanout_receipt,
+            required_participants=session["current_state"]["participants"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_collection_digest=approval_collection_receipt["digest"],
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.approval_fanout.bound",
+            payload=approval_fanout_receipt,
+            actor="WorldModelSync",
+            category="interface-wms-approval",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         physics_change = self.wms.propose_physics_rules_change(
             session["session_id"],
@@ -7567,6 +7633,7 @@ json.dump(response, sys.stdout)
             guardian_attested=True,
             approval_transport_receipts=approval_transport_receipts,
             approval_collection_receipt=approval_collection_receipt,
+            approval_fanout_receipt=approval_fanout_receipt,
         )
         physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
         self.ledger.append(
@@ -7653,6 +7720,8 @@ json.dump(response, sys.stdout)
                 "approval_imc_sessions": approval_imc_sessions,
                 "approval_messages": approval_messages,
                 "approval_collection_receipt": approval_collection_receipt,
+                "approval_fanout_receipt": approval_fanout_receipt,
+                "approval_fanout_results": approval_fanout_results,
                 "approval_transport_receipts": approval_transport_receipts,
                 "physics_change": physics_change,
                 "physics_revert": physics_revert,
@@ -7675,6 +7744,7 @@ json.dump(response, sys.stdout)
                 "physics_change": physics_change_validation,
                 "physics_revert": physics_revert_validation,
                 "approval_collection": approval_collection_validation,
+                "approval_fanout": approval_fanout_validation,
                 "physics_approval_transport_bound": physics_change_validation["approval_transport_quorum_met"]
                 and physics_change_validation["approval_transport_digest_bound"]
                 and all(
@@ -7693,6 +7763,11 @@ json.dump(response, sys.stdout)
                 and physics_change_validation["approval_collection_complete"]
                 and physics_change["approval_collection_digest"]
                 == approval_collection_receipt["digest"],
+                "distributed_approval_fanout_bound": approval_fanout_validation["ok"]
+                and physics_change_validation["approval_fanout_complete"]
+                and physics_change_validation["approval_fanout_digest_bound"]
+                and physics_change["approval_fanout_digest"]
+                == approval_fanout_receipt["digest"],
                 "static_approval_without_transport_rejected": (
                     transportless_static_approval_rejection["decision"] == "rejected"
                     and transportless_static_approval_rejection["approval_quorum_met"]

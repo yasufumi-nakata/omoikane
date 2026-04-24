@@ -14,6 +14,10 @@ WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
 WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
 WMS_APPROVAL_TRANSPORT_POLICY_ID = "imc-participant-approval-transport-v1"
 WMS_APPROVAL_COLLECTION_POLICY_ID = "bounded-wms-approval-collection-v1"
+WMS_APPROVAL_FANOUT_POLICY_ID = "distributed-council-approval-fanout-v1"
+WMS_APPROVAL_FANOUT_DIGEST_PROFILE = "transport-result-bound-approval-fanout-v1"
+WMS_APPROVAL_FANOUT_COUNCIL_TIER = "federation"
+WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE = "federation-mtls-quorum-v1"
 WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE = 2
 WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
@@ -45,6 +49,10 @@ def _approval_collection_digest_payload(receipt: Mapping[str, Any]) -> Dict[str,
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _approval_fanout_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
 class WorldModelSync:
     """Deterministic L6 world-state reconciliation and escape model."""
 
@@ -64,6 +72,9 @@ class WorldModelSync:
                 "required_approval": "unanimous-participant-approval",
                 "approval_transport_policy_id": WMS_APPROVAL_TRANSPORT_POLICY_ID,
                 "approval_collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
+                "approval_fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
+                "approval_fanout_digest_profile": WMS_APPROVAL_FANOUT_DIGEST_PROFILE,
+                "approval_fanout_transport_profile": WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE,
                 "approval_collection_max_batch_size": WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
                 "approval_transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
                 "guardian_attestation_required": True,
@@ -282,6 +293,200 @@ class WorldModelSync:
             "digest_profile": "participant-ordered-batch-digest-v1",
         }
         receipt["digest"] = sha256_text(canonical_json(_approval_collection_digest_payload(receipt)))
+        return receipt
+
+    def build_distributed_approval_result_digest(
+        self,
+        *,
+        approval_subject_digest: str,
+        participant_id: str,
+        approval_collection_digest: str,
+    ) -> str:
+        subject_digest = self._normalize_digest(
+            approval_subject_digest,
+            "approval_subject_digest",
+        )
+        participant = self._normalize_non_empty_string(participant_id, "participant_id")
+        collection_digest = self._normalize_digest(
+            approval_collection_digest,
+            "approval_collection_digest",
+        )
+        return sha256_text(
+            canonical_json(
+                {
+                    "approval_subject_digest": subject_digest,
+                    "participant_id": participant,
+                    "approval_decision": WMS_APPROVAL_DECISION,
+                    "approval_collection_digest": collection_digest,
+                    "fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
+                }
+            )
+        )
+
+    def build_distributed_approval_fanout_receipt(
+        self,
+        session_id: str,
+        *,
+        approval_subject_digest: str,
+        approval_collection_receipt: Mapping[str, Any],
+        participant_fanout_results: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        subject_digest = self._normalize_digest(
+            approval_subject_digest,
+            "approval_subject_digest",
+        )
+        if not isinstance(approval_collection_receipt, Mapping):
+            raise ValueError("approval_collection_receipt must be a mapping")
+        collection_receipt = deepcopy(approval_collection_receipt)
+        collection_digest = self._normalize_digest(
+            collection_receipt.get("digest"),
+            "approval_collection_digest",
+        )
+        required_participants = list(session["current_state"]["participants"])
+        collection_validation = self.validate_approval_collection_receipt(
+            collection_receipt,
+            required_participants=required_participants,
+            approval_subject_digest=subject_digest,
+        )
+
+        results_by_participant: Dict[str, Dict[str, Any]] = {}
+        duplicate_participants: List[str] = []
+        invalid_result_count = 0
+        for result in participant_fanout_results:
+            if not isinstance(result, Mapping):
+                invalid_result_count += 1
+                continue
+            participant_id = result.get("participant_id")
+            if not isinstance(participant_id, str) or not participant_id.strip():
+                invalid_result_count += 1
+                continue
+            participant = participant_id.strip()
+            if participant not in required_participants:
+                invalid_result_count += 1
+                continue
+            if participant in results_by_participant:
+                duplicate_participants.append(participant)
+                continue
+            envelope = result.get("transport_envelope")
+            transport_receipt = result.get("transport_receipt")
+            approval_result_digest = result.get("approval_result_digest")
+            if not isinstance(envelope, Mapping) or not isinstance(transport_receipt, Mapping):
+                invalid_result_count += 1
+                continue
+            expected_result_digest = self.build_distributed_approval_result_digest(
+                approval_subject_digest=subject_digest,
+                participant_id=participant,
+                approval_collection_digest=collection_digest,
+            )
+            authenticity_checks = transport_receipt.get("authenticity_checks")
+            if not isinstance(authenticity_checks, Mapping):
+                authenticity_checks = {}
+            transport_authenticated = (
+                envelope.get("kind") == "distributed_transport_envelope"
+                and transport_receipt.get("kind") == "distributed_transport_receipt"
+                and envelope.get("council_tier") == WMS_APPROVAL_FANOUT_COUNCIL_TIER
+                and transport_receipt.get("council_tier") == WMS_APPROVAL_FANOUT_COUNCIL_TIER
+                and envelope.get("transport_profile") == WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE
+                and transport_receipt.get("transport_profile")
+                == WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE
+                and transport_receipt.get("envelope_ref") == envelope.get("envelope_id")
+                and transport_receipt.get("envelope_digest") == envelope.get("envelope_digest")
+                and transport_receipt.get("receipt_status") == "authenticated"
+                and authenticity_checks.get("channel_authenticated") is True
+                and authenticity_checks.get("required_roles_satisfied") is True
+                and authenticity_checks.get("quorum_attested") is True
+                and authenticity_checks.get("federated_roots_verified") is True
+                and authenticity_checks.get("key_epoch_accepted") is True
+                and authenticity_checks.get("replay_guard_status") == "accepted"
+                and authenticity_checks.get("multi_hop_replay_status") == "accepted"
+            )
+            result_digest_bound = (
+                isinstance(approval_result_digest, str)
+                and approval_result_digest == expected_result_digest
+                and transport_receipt.get("result_digest") == expected_result_digest
+            )
+            if not transport_authenticated or not result_digest_bound:
+                invalid_result_count += 1
+                continue
+            results_by_participant[participant] = {
+                "participant_id": participant,
+                "approval_result_ref": self._normalize_non_empty_string(
+                    str(result.get("approval_result_ref") or transport_receipt.get("result_ref")),
+                    "approval_result_ref",
+                ),
+                "approval_result_digest": expected_result_digest,
+                "expected_approval_result_digest": expected_result_digest,
+                "transport_envelope": deepcopy(envelope),
+                "transport_receipt": deepcopy(transport_receipt),
+                "transport_envelope_digest": envelope["envelope_digest"],
+                "transport_receipt_digest": transport_receipt["digest"],
+                "transport_authenticated": transport_authenticated,
+                "result_digest_bound": result_digest_bound,
+                "council_tier": WMS_APPROVAL_FANOUT_COUNCIL_TIER,
+                "transport_profile": WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE,
+            }
+
+        covered_participants = [
+            participant
+            for participant in required_participants
+            if participant in results_by_participant
+        ]
+        missing_participants = [
+            participant
+            for participant in required_participants
+            if participant not in results_by_participant
+        ]
+        ordered_results = [
+            results_by_participant[participant] for participant in covered_participants
+        ]
+        participant_result_digests = [
+            result["approval_result_digest"] for result in ordered_results
+        ]
+        transport_envelope_digests = [
+            result["transport_envelope_digest"] for result in ordered_results
+        ]
+        transport_receipt_digests = [
+            result["transport_receipt_digest"] for result in ordered_results
+        ]
+        complete = (
+            collection_validation["ok"]
+            and not missing_participants
+            and invalid_result_count == 0
+            and not duplicate_participants
+        )
+        receipt = {
+            "kind": "wms_distributed_approval_fanout_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
+            "digest_profile": WMS_APPROVAL_FANOUT_DIGEST_PROFILE,
+            "session_id": session_id,
+            "approval_subject_digest": subject_digest,
+            "approval_collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
+            "approval_collection_digest": collection_digest,
+            "approval_collection_receipt": collection_receipt,
+            "approval_collection_complete": collection_validation["ok"],
+            "distributed_transport_profile": WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE,
+            "council_tier": WMS_APPROVAL_FANOUT_COUNCIL_TIER,
+            "required_participants": required_participants,
+            "participant_count": len(required_participants),
+            "covered_participants": covered_participants,
+            "missing_participants": missing_participants,
+            "duplicate_participants": _dedupe_preserve_order(duplicate_participants),
+            "invalid_result_count": invalid_result_count,
+            "result_count": len(covered_participants),
+            "participant_result_digests": participant_result_digests,
+            "transport_envelope_digests": transport_envelope_digests,
+            "transport_receipt_digests": transport_receipt_digests,
+            "transport_receipt_set_digest": sha256_text(
+                canonical_json(transport_receipt_digests)
+            ),
+            "participant_fanout_results": ordered_results,
+            "fanout_status": "complete" if complete else "incomplete",
+            "transport_receipt_set_authenticated": complete,
+            "participant_order_bound": covered_participants == required_participants,
+        }
+        receipt["digest"] = sha256_text(canonical_json(_approval_fanout_digest_payload(receipt)))
         return receipt
 
     def collect_approval_transport_receipts(
@@ -507,6 +712,7 @@ class WorldModelSync:
         rollback_physics_rules_ref: str | None = None,
         approval_transport_receipts: Sequence[Mapping[str, Any]] | None = None,
         approval_collection_receipt: Mapping[str, Any] | None = None,
+        approval_fanout_receipt: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         requester = self._normalize_non_empty_string(requested_by, "requested_by")
@@ -558,6 +764,17 @@ class WorldModelSync:
             approval_transport_receipts=transport_receipts,
         )
         approval_collection_complete = collection_validation["ok"]
+        fanout_receipt = deepcopy(approval_fanout_receipt) if approval_fanout_receipt is not None else None
+        fanout_validation = (
+            self.validate_distributed_approval_fanout_receipt(
+                fanout_receipt,
+                required_participants=required_approvals,
+                approval_subject_digest=approval_subject["digest"],
+                approval_collection_digest=collection_receipt["digest"],
+            )
+            if isinstance(fanout_receipt, Mapping)
+            else {"ok": False, "digest_bound": False}
+        )
         requester_allowed = requester in required_approvals
         reversible_ok = bool(reversible) and rollback_ref == previous_ref
         guardian_ok = bool(guardian_attested)
@@ -613,6 +830,15 @@ class WorldModelSync:
             "resulting_state_id": session["current_state"]["state_id"],
             "audit_event_ref": f"ledger://wms-physics/{change_id}",
         }
+        if fanout_receipt is not None:
+            receipt.update(
+                {
+                    "approval_fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
+                    "approval_fanout_receipt": fanout_receipt,
+                    "approval_fanout_digest": fanout_receipt["digest"],
+                    "approval_fanout_complete": fanout_validation["ok"],
+                }
+            )
         receipt["digest"] = sha256_text(canonical_json(_physics_rules_change_digest_payload(receipt)))
         session["physics_change_log"].append(deepcopy(receipt))
         return deepcopy(receipt)
@@ -692,6 +918,15 @@ class WorldModelSync:
             "resulting_state_id": session["current_state"]["state_id"],
             "audit_event_ref": f"ledger://wms-physics-revert/{revert_id}",
         }
+        if "approval_fanout_receipt" in target_receipt:
+            receipt.update(
+                {
+                    "approval_fanout_policy_id": target_receipt["approval_fanout_policy_id"],
+                    "approval_fanout_receipt": deepcopy(target_receipt["approval_fanout_receipt"]),
+                    "approval_fanout_digest": target_receipt["approval_fanout_digest"],
+                    "approval_fanout_complete": target_receipt["approval_fanout_complete"],
+                }
+            )
         receipt["digest"] = sha256_text(canonical_json(_physics_rules_change_digest_payload(receipt)))
         session["physics_change_log"].append(deepcopy(receipt))
         return deepcopy(receipt)
@@ -965,6 +1200,239 @@ class WorldModelSync:
             "digest_bound": digest_bound,
         }
 
+    def validate_distributed_approval_fanout_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        required_participants: Sequence[str] | None = None,
+        approval_subject_digest: str | None = None,
+        approval_collection_digest: str | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_distributed_approval_fanout_receipt":
+            errors.append("kind must equal wms_distributed_approval_fanout_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("fanout_policy_id") != WMS_APPROVAL_FANOUT_POLICY_ID:
+            errors.append("fanout_policy_id mismatch")
+        if receipt.get("digest_profile") != WMS_APPROVAL_FANOUT_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if receipt.get("distributed_transport_profile") != WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE:
+            errors.append("distributed_transport_profile mismatch")
+        if receipt.get("council_tier") != WMS_APPROVAL_FANOUT_COUNCIL_TIER:
+            errors.append("council_tier must be federation")
+
+        expected_subject = approval_subject_digest
+        if expected_subject is not None:
+            try:
+                expected_subject = self._normalize_digest(
+                    expected_subject,
+                    "approval_subject_digest",
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+        subject_digest = receipt.get("approval_subject_digest")
+        if not isinstance(subject_digest, str) or len(subject_digest) != 64:
+            errors.append("approval_subject_digest must be a sha256 hex digest")
+            subject_digest = None
+        elif expected_subject is not None and subject_digest != expected_subject:
+            errors.append("approval_subject_digest must match expected subject")
+
+        collection_digest = receipt.get("approval_collection_digest")
+        if not isinstance(collection_digest, str) or len(collection_digest) != 64:
+            errors.append("approval_collection_digest must be a sha256 hex digest")
+            collection_digest = None
+        elif approval_collection_digest is not None:
+            try:
+                expected_collection_digest = self._normalize_digest(
+                    approval_collection_digest,
+                    "approval_collection_digest",
+                )
+                if collection_digest != expected_collection_digest:
+                    errors.append("approval_collection_digest must match expected collection")
+            except ValueError as exc:
+                errors.append(str(exc))
+
+        collection_receipt = receipt.get("approval_collection_receipt")
+        collection_validation = {"ok": False}
+        if not isinstance(collection_receipt, Mapping):
+            errors.append("approval_collection_receipt must be an object")
+        else:
+            if collection_digest is not None and collection_receipt.get("digest") != collection_digest:
+                errors.append("approval_collection_digest must match collection receipt digest")
+            collection_validation = self.validate_approval_collection_receipt(
+                collection_receipt,
+                required_participants=required_participants,
+                approval_subject_digest=subject_digest,
+            )
+            errors.extend(
+                f"approval_collection_receipt.{error}"
+                for error in collection_validation["errors"]
+            )
+        if receipt.get("approval_collection_complete") is not collection_validation["ok"]:
+            errors.append("approval_collection_complete must reflect collection validation")
+
+        expected_required = list(required_participants or receipt.get("required_participants", []))
+        required = receipt.get("required_participants")
+        covered = receipt.get("covered_participants")
+        missing = receipt.get("missing_participants")
+        fanout_results = receipt.get("participant_fanout_results")
+        if not isinstance(required, list) or not required:
+            errors.append("required_participants must be a non-empty list")
+            required = []
+        if expected_required and required != expected_required:
+            errors.append("required_participants must preserve WMS session order")
+        if not isinstance(covered, list):
+            errors.append("covered_participants must be a list")
+            covered = []
+        if not isinstance(missing, list):
+            errors.append("missing_participants must be a list")
+            missing = []
+        if not isinstance(fanout_results, list):
+            errors.append("participant_fanout_results must be a list")
+            fanout_results = []
+        duplicate_participants = receipt.get("duplicate_participants")
+        if not isinstance(duplicate_participants, list):
+            errors.append("duplicate_participants must be a list")
+            duplicate_participants = []
+        invalid_result_count = receipt.get("invalid_result_count")
+        if not isinstance(invalid_result_count, int) or invalid_result_count < 0:
+            errors.append("invalid_result_count must be a non-negative integer")
+            invalid_result_count = 0
+
+        participant_order_bound = covered == required[: len(covered)]
+        if receipt.get("participant_order_bound") is not participant_order_bound:
+            errors.append("participant_order_bound must reflect covered participant ordering")
+        expected_missing = [participant for participant in required if participant not in covered]
+        if missing != expected_missing:
+            errors.append("missing_participants must reflect required minus covered participants")
+        if receipt.get("participant_count") != len(required):
+            errors.append("participant_count must equal required_participants length")
+        if receipt.get("result_count") != len(covered):
+            errors.append("result_count must equal covered_participants length")
+
+        expected_result_digests: List[str] = []
+        expected_envelope_digests: List[str] = []
+        expected_receipt_digests: List[str] = []
+        all_transport_authenticated = True
+        all_result_digest_bound = True
+        for participant, result in zip(covered, fanout_results):
+            if not isinstance(result, Mapping):
+                errors.append("participant_fanout_results must contain objects")
+                all_transport_authenticated = False
+                all_result_digest_bound = False
+                continue
+            if result.get("participant_id") != participant:
+                errors.append("participant_fanout_results must follow covered participant order")
+            if result.get("council_tier") != WMS_APPROVAL_FANOUT_COUNCIL_TIER:
+                errors.append("fanout result council_tier mismatch")
+            if result.get("transport_profile") != WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE:
+                errors.append("fanout result transport_profile mismatch")
+            envelope = result.get("transport_envelope")
+            transport_receipt = result.get("transport_receipt")
+            if not isinstance(envelope, Mapping) or not isinstance(transport_receipt, Mapping):
+                errors.append("fanout result must carry transport_envelope and transport_receipt")
+                all_transport_authenticated = False
+                all_result_digest_bound = False
+                continue
+            expected_digest = (
+                self.build_distributed_approval_result_digest(
+                    approval_subject_digest=subject_digest,
+                    participant_id=participant,
+                    approval_collection_digest=collection_digest,
+                )
+                if isinstance(subject_digest, str) and isinstance(collection_digest, str)
+                else ""
+            )
+            expected_result_digests.append(expected_digest)
+            expected_envelope_digests.append(str(envelope.get("envelope_digest")))
+            expected_receipt_digests.append(str(transport_receipt.get("digest")))
+            if result.get("approval_result_digest") != expected_digest:
+                all_result_digest_bound = False
+                errors.append("approval_result_digest must bind participant, subject, and collection")
+            if result.get("expected_approval_result_digest") != expected_digest:
+                all_result_digest_bound = False
+                errors.append("expected_approval_result_digest must match computed digest")
+            if transport_receipt.get("result_digest") != expected_digest:
+                all_result_digest_bound = False
+                errors.append("transport receipt result_digest must match approval result digest")
+            authenticity_checks = transport_receipt.get("authenticity_checks")
+            if not isinstance(authenticity_checks, Mapping):
+                authenticity_checks = {}
+            authenticated = (
+                envelope.get("kind") == "distributed_transport_envelope"
+                and transport_receipt.get("kind") == "distributed_transport_receipt"
+                and transport_receipt.get("receipt_status") == "authenticated"
+                and transport_receipt.get("envelope_ref") == envelope.get("envelope_id")
+                and transport_receipt.get("envelope_digest") == envelope.get("envelope_digest")
+                and authenticity_checks.get("channel_authenticated") is True
+                and authenticity_checks.get("required_roles_satisfied") is True
+                and authenticity_checks.get("quorum_attested") is True
+                and authenticity_checks.get("federated_roots_verified") is True
+                and authenticity_checks.get("key_epoch_accepted") is True
+                and authenticity_checks.get("replay_guard_status") == "accepted"
+                and authenticity_checks.get("multi_hop_replay_status") == "accepted"
+            )
+            if result.get("transport_authenticated") is not authenticated or not authenticated:
+                all_transport_authenticated = False
+                errors.append("fanout transport receipt must be authenticated and bound")
+            if result.get("result_digest_bound") is not (transport_receipt.get("result_digest") == expected_digest):
+                all_result_digest_bound = False
+                errors.append("result_digest_bound must reflect transport receipt result digest")
+            if result.get("transport_envelope_digest") != envelope.get("envelope_digest"):
+                errors.append("transport_envelope_digest must match envelope")
+            if result.get("transport_receipt_digest") != transport_receipt.get("digest"):
+                errors.append("transport_receipt_digest must match receipt")
+
+        if len(fanout_results) != len(covered):
+            errors.append("participant_fanout_results length must equal covered_participants length")
+        if receipt.get("participant_result_digests") != expected_result_digests:
+            errors.append("participant_result_digests must follow covered participant order")
+        if receipt.get("transport_envelope_digests") != expected_envelope_digests:
+            errors.append("transport_envelope_digests must follow covered participant order")
+        if receipt.get("transport_receipt_digests") != expected_receipt_digests:
+            errors.append("transport_receipt_digests must follow covered participant order")
+        receipt_set_digest_bound = receipt.get("transport_receipt_set_digest") == sha256_text(
+            canonical_json(receipt.get("transport_receipt_digests", []))
+        )
+        if not receipt_set_digest_bound:
+            errors.append("transport_receipt_set_digest must bind transport_receipt_digests")
+        complete = (
+            collection_validation["ok"]
+            and not expected_missing
+            and invalid_result_count == 0
+            and not duplicate_participants
+            and all_transport_authenticated
+            and all_result_digest_bound
+        )
+        if receipt.get("fanout_status") not in {"complete", "incomplete"}:
+            errors.append("fanout_status must be complete or incomplete")
+        elif receipt.get("fanout_status") == "complete" and not complete:
+            errors.append("complete fanout requires all participant transport results")
+        if receipt.get("transport_receipt_set_authenticated") is not complete:
+            errors.append("transport_receipt_set_authenticated must reflect complete transport fanout")
+        expected_digest = sha256_text(canonical_json(_approval_fanout_digest_payload(receipt)))
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match approval fanout receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "approval_collection_complete": collection_validation["ok"],
+            "fanout_complete": complete,
+            "transport_receipt_set_authenticated": complete,
+            "result_digest_bound": all_result_digest_bound,
+            "participant_order_bound": participant_order_bound,
+            "collection_digest_bound": (
+                isinstance(collection_receipt, Mapping)
+                and receipt.get("approval_collection_digest") == collection_receipt.get("digest")
+            ),
+            "receipt_set_digest_bound": receipt_set_digest_bound,
+            "digest_bound": digest_bound,
+        }
+
     def validate_state(self, state: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []
         self._check_non_empty_string(state.get("state_id"), "state_id", errors)
@@ -1102,6 +1570,35 @@ class WorldModelSync:
         approval_collection_complete = approval_collection_validation["ok"]
         if receipt.get("approval_collection_complete") is not approval_collection_complete:
             errors.append("approval_collection_complete must reflect approval collection validation")
+        fanout_receipt = receipt.get("approval_fanout_receipt")
+        approval_fanout_complete = False
+        approval_fanout_digest_bound = False
+        if fanout_receipt is not None:
+            if receipt.get("approval_fanout_policy_id") != WMS_APPROVAL_FANOUT_POLICY_ID:
+                errors.append("approval_fanout_policy_id mismatch")
+            if not isinstance(fanout_receipt, Mapping):
+                errors.append("approval_fanout_receipt must be an object when present")
+            else:
+                fanout_validation = self.validate_distributed_approval_fanout_receipt(
+                    fanout_receipt,
+                    required_participants=required_approvals
+                    if isinstance(required_approvals, list)
+                    else [],
+                    approval_subject_digest=approval_subject_digest,
+                    approval_collection_digest=receipt.get("approval_collection_digest"),
+                )
+                errors.extend(
+                    f"approval_fanout_receipt.{error}"
+                    for error in fanout_validation["errors"]
+                )
+                approval_fanout_complete = fanout_validation["ok"]
+                approval_fanout_digest_bound = (
+                    receipt.get("approval_fanout_digest") == fanout_receipt.get("digest")
+                )
+                if not approval_fanout_digest_bound:
+                    errors.append("approval_fanout_digest must match approval_fanout_receipt.digest")
+            if receipt.get("approval_fanout_complete") is not approval_fanout_complete:
+                errors.append("approval_fanout_complete must reflect fanout validation")
         if receipt.get("guardian_attested") is not True:
             errors.append("guardian_attested must be true")
         if receipt.get("reversible") is not True:
@@ -1147,6 +1644,8 @@ class WorldModelSync:
                 isinstance(approval_collection_receipt, Mapping)
                 and receipt.get("approval_collection_digest") == approval_collection_receipt.get("digest")
             ),
+            "approval_fanout_complete": approval_fanout_complete,
+            "approval_fanout_digest_bound": approval_fanout_digest_bound,
             "guardian_attested": receipt.get("guardian_attested") is True,
             "revert_bound": revert_bound,
             "digest_bound": digest_bound,
