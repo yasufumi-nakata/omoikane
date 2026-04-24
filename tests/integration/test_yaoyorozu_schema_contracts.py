@@ -92,6 +92,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["dispatch_receipt"]["results"][0]["guardian_preseed_gate"],
         )
 
+    def test_dependency_materialization_manifest_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_dependency_materialization_manifest.schema",
+            result["dispatch_receipt"]["results"][0]["dependency_materialization_manifest"],
+        )
+
     def test_worker_workspace_delta_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
 

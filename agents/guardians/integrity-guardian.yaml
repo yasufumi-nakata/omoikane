@@ -8,6 +8,7 @@ capabilities:
   - ewa.stop-signal-adapter.attest
   - workspace.preseed.attest
   - workspace.preseed.oversight-bind
+  - workspace.dependency-materialization.attest
   - cognitive-audit.distributed-verdict-signature.attest
   - cognitive-audit.verifier-transport-trace.attest
 trust_floor: 0.99
@@ -19,7 +20,7 @@ when_to_invoke: |
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時
-  - Yaoyorozu external workspace seed / execution root 作成前の HumanOversightChannel-bound integrity gate
+  - Yaoyorozu external workspace seed / execution root 作成 / dependency materialization 前の HumanOversightChannel-bound integrity gate
   - cognitive audit governance binding で Federation / Heritage returned result の signature binding を検証する時
   - cognitive audit governance binding で verifier transport profile の non-loopback / cross-host / OS observer trace digest を検証する時
 when_not_to_invoke: |

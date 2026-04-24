@@ -51,6 +51,21 @@ YAOYOROZU_WORKSPACE_EXECUTION_POLICY_ID = "proposal-profile-aware-external-works
 YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE = "same-host-python-subprocess-v1"
 YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY = "source-target-snapshot-copy-v1"
 YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY = "in-place-source-worktree-v1"
+YAOYOROZU_DEPENDENCY_MATERIALIZATION_PROFILE = (
+    "same-host-external-workspace-dependency-materialization-v1"
+)
+YAOYOROZU_EXTERNAL_DEPENDENCY_MATERIALIZATION_STRATEGY = (
+    "source-runtime-dependency-snapshot-v1"
+)
+YAOYOROZU_INLINE_DEPENDENCY_MATERIALIZATION_STRATEGY = "in-place-source-runtime-v1"
+YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT = ".yaoyorozu-dependencies"
+YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS = [
+    "pyproject.toml",
+    "src/omoikane/__init__.py",
+    "src/omoikane/common.py",
+    "src/omoikane/agentic/__init__.py",
+    "src/omoikane/agentic/local_worker_stub.py",
+]
 YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
     "same-host-external-workspace-preseed-guardian-gate-v1"
 )
@@ -62,6 +77,7 @@ YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
 YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
     "workspace-seed",
     "execution-root-create",
+    "dependency-materialization",
 ]
 YAOYOROZU_WORKSPACE_GUARDIAN_REVIEWERS = [
     {
@@ -423,6 +439,10 @@ def _dispatch_unit_digest_payload(unit: Mapping[str, Any]) -> Dict[str, Any]:
         "execution_transport_profile": unit["execution_transport_profile"],
         "sandbox_seed_strategy": unit["sandbox_seed_strategy"],
         "workspace_target_digest": unit["workspace_target_digest"],
+        "dependency_materialization_profile": unit["dependency_materialization_profile"],
+        "dependency_materialization_strategy": unit["dependency_materialization_strategy"],
+        "dependency_materialization_required": unit["dependency_materialization_required"],
+        "dependency_materialization_paths": unit["dependency_materialization_paths"],
         "guardian_preseed_gate": unit["guardian_preseed_gate"],
         "command_preview": unit["command_preview"],
         "target_paths": unit["target_paths"],
@@ -633,6 +653,10 @@ def _workspace_execution_target_digest_payload(target: Mapping[str, Any]) -> Dic
         "workspace_scope": target["workspace_scope"],
         "execution_transport_profile": target["execution_transport_profile"],
         "sandbox_seed_strategy": target["sandbox_seed_strategy"],
+        "dependency_materialization_profile": target["dependency_materialization_profile"],
+        "dependency_materialization_strategy": target["dependency_materialization_strategy"],
+        "dependency_materialization_required": target["dependency_materialization_required"],
+        "dependency_materialization_paths": target["dependency_materialization_paths"],
         "guardian_preseed_gate_required": target["guardian_preseed_gate_required"],
     }
 
@@ -669,6 +693,29 @@ def _guardian_preseed_gate_digest_payload(gate: Mapping[str, Any]) -> Dict[str, 
         "gate_required": gate["gate_required"],
         "gate_status": gate["gate_status"],
         "decision_reason": gate["decision_reason"],
+    }
+
+
+def _dependency_materialization_manifest_digest_payload(
+    manifest: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": manifest["kind"],
+        "schema_version": manifest["schema_version"],
+        "manifest_id": manifest["manifest_id"],
+        "manifest_ref": manifest["manifest_ref"],
+        "profile": manifest["profile"],
+        "strategy": manifest["strategy"],
+        "dispatch_plan_ref": manifest["dispatch_plan_ref"],
+        "dispatch_unit_ref": manifest["dispatch_unit_ref"],
+        "coverage_area": manifest["coverage_area"],
+        "workspace_root": manifest["workspace_root"],
+        "dependency_root": manifest["dependency_root"],
+        "manifest_path": manifest["manifest_path"],
+        "required": manifest["required"],
+        "status": manifest["status"],
+        "file_count": manifest["file_count"],
+        "files": manifest["files"],
     }
 
 
@@ -834,6 +881,16 @@ class YaoyorozuRegistryPolicy:
     workspace_execution_transport_profile: str = YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE
     inline_workspace_seed_strategy: str = YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY
     external_workspace_seed_strategy: str = YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY
+    dependency_materialization_profile: str = YAOYOROZU_DEPENDENCY_MATERIALIZATION_PROFILE
+    external_dependency_materialization_strategy: str = (
+        YAOYOROZU_EXTERNAL_DEPENDENCY_MATERIALIZATION_STRATEGY
+    )
+    inline_dependency_materialization_strategy: str = (
+        YAOYOROZU_INLINE_DEPENDENCY_MATERIALIZATION_STRATEGY
+    )
+    dependency_materialization_paths: List[str] = field(
+        default_factory=lambda: list(YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS)
+    )
     workspace_guardian_gate_profile: str = YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE
     workspace_guardian_role: str = YAOYOROZU_WORKSPACE_GUARDIAN_ROLE
     workspace_guardian_category: str = YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY
@@ -1260,6 +1317,19 @@ class YaoyorozuRegistryService:
                 selected_scope = self._policy.external_workspace_scope
                 sandbox_seed_strategy = self._policy.external_workspace_seed_strategy
                 candidate_bound_coverage_areas.append(str(coverage_area))
+            dependency_materialization_required = (
+                selected_scope == self._policy.external_workspace_scope
+            )
+            dependency_materialization_strategy = (
+                self._policy.external_dependency_materialization_strategy
+                if dependency_materialization_required
+                else self._policy.inline_dependency_materialization_strategy
+            )
+            dependency_materialization_paths = (
+                list(self._policy.dependency_materialization_paths)
+                if dependency_materialization_required
+                else []
+            )
 
             target = {
                 "coverage_area": str(coverage_area),
@@ -1282,6 +1352,12 @@ class YaoyorozuRegistryService:
                 "workspace_scope": selected_scope,
                 "execution_transport_profile": self._policy.workspace_execution_transport_profile,
                 "sandbox_seed_strategy": sandbox_seed_strategy,
+                "dependency_materialization_profile": (
+                    self._policy.dependency_materialization_profile
+                ),
+                "dependency_materialization_strategy": dependency_materialization_strategy,
+                "dependency_materialization_required": dependency_materialization_required,
+                "dependency_materialization_paths": dependency_materialization_paths,
                 "guardian_preseed_gate_required": (
                     selected_scope == self._policy.external_workspace_scope
                 ),
@@ -1412,6 +1488,169 @@ class YaoyorozuRegistryService:
         )
         return head.stdout.strip()
 
+    def _materialize_external_execution_dependencies(
+        self,
+        *,
+        source_root: Path,
+        execution_root: Path,
+        dispatch_plan_ref: str,
+        dispatch_unit_ref: str,
+        coverage_area: str,
+        dependency_paths: Sequence[str],
+    ) -> Dict[str, Any]:
+        dependency_root = execution_root / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
+        if dependency_root.exists():
+            shutil.rmtree(dependency_root)
+        dependency_root.mkdir(parents=True, exist_ok=True)
+
+        files: List[Dict[str, Any]] = []
+        for dependency_path in dependency_paths:
+            relative_path = str(dependency_path).strip()
+            if not relative_path or relative_path.startswith("../") or relative_path.startswith("/"):
+                raise ValueError("dependency materialization paths must stay repo-relative")
+            source_path = (source_root / relative_path).resolve()
+            if not source_path.is_file():
+                raise ValueError(
+                    f"dependency materialization source file does not exist: {relative_path}"
+                )
+            materialized_path = (dependency_root / relative_path).resolve()
+            materialized_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, materialized_path)
+            source_text = source_path.read_text(encoding="utf-8", errors="replace")
+            materialized_text = materialized_path.read_text(encoding="utf-8", errors="replace")
+            source_digest = sha256_text(source_text)
+            materialized_digest = sha256_text(materialized_text)
+            file_entry = {
+                "source_path": relative_path,
+                "materialized_path": str(materialized_path),
+                "source_digest": source_digest,
+                "materialized_digest": materialized_digest,
+                "byte_count": len(materialized_text.encode("utf-8")),
+                "status": "copied" if source_digest == materialized_digest else "mismatch",
+            }
+            file_entry["entry_digest"] = sha256_text(canonical_json(file_entry))
+            files.append(file_entry)
+
+        manifest_id = new_id("yaoyorozu-dependencies")
+        manifest_path = dependency_root / "manifest.json"
+        manifest = {
+            "kind": "yaoyorozu_dependency_materialization_manifest",
+            "schema_version": "1.0.0",
+            "manifest_id": manifest_id,
+            "manifest_ref": f"dependency-manifest://{manifest_id}",
+            "profile": self._policy.dependency_materialization_profile,
+            "strategy": self._policy.external_dependency_materialization_strategy,
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_unit_ref": dispatch_unit_ref,
+            "coverage_area": coverage_area,
+            "workspace_root": str(execution_root),
+            "dependency_root": str(dependency_root),
+            "manifest_path": str(manifest_path),
+            "required": True,
+            "status": "materialized"
+            if files and all(file_entry["status"] == "copied" for file_entry in files)
+            else "blocked",
+            "file_count": len(files),
+            "files": files,
+        }
+        manifest["manifest_digest"] = sha256_text(
+            canonical_json(_dependency_materialization_manifest_digest_payload(manifest))
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=True, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return manifest
+
+    def _validate_dependency_materialization_manifest(
+        self,
+        manifest: Mapping[str, Any] | None,
+        *,
+        dispatch_plan_ref: str,
+        dispatch_unit_ref: str,
+        coverage_area: str,
+        workspace_root: str,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(manifest, Mapping):
+            return {
+                "ok": False,
+                "status": "missing",
+                "file_count": 0,
+                "manifest_ref": "",
+                "manifest_digest": "",
+                "errors": ["dependency_materialization_manifest must be bound"],
+            }
+        if manifest.get("kind") != "yaoyorozu_dependency_materialization_manifest":
+            errors.append("dependency_materialization_manifest.kind mismatch")
+        if manifest.get("schema_version") != "1.0.0":
+            errors.append("dependency_materialization_manifest.schema_version mismatch")
+        if manifest.get("profile") != self._policy.dependency_materialization_profile:
+            errors.append("dependency_materialization_manifest.profile mismatch")
+        if manifest.get("strategy") != self._policy.external_dependency_materialization_strategy:
+            errors.append("dependency_materialization_manifest.strategy mismatch")
+        if manifest.get("dispatch_plan_ref") != dispatch_plan_ref:
+            errors.append("dependency_materialization_manifest.dispatch_plan_ref mismatch")
+        if manifest.get("dispatch_unit_ref") != dispatch_unit_ref:
+            errors.append("dependency_materialization_manifest.dispatch_unit_ref mismatch")
+        if manifest.get("coverage_area") != coverage_area:
+            errors.append("dependency_materialization_manifest.coverage_area mismatch")
+        if manifest.get("workspace_root") != workspace_root:
+            errors.append("dependency_materialization_manifest.workspace_root mismatch")
+        if manifest.get("required") is not True:
+            errors.append("dependency_materialization_manifest.required must be true")
+        files = manifest.get("files", [])
+        if not isinstance(files, list):
+            errors.append("dependency_materialization_manifest.files must be a list")
+            files = []
+        if manifest.get("file_count") != len(files):
+            errors.append("dependency_materialization_manifest.file_count mismatch")
+        if manifest.get("file_count") != len(self._policy.dependency_materialization_paths):
+            errors.append("dependency_materialization_manifest.file_count must match policy paths")
+        expected_paths = list(self._policy.dependency_materialization_paths)
+        observed_paths = [
+            str(file_entry.get("source_path", ""))
+            for file_entry in files
+            if isinstance(file_entry, Mapping)
+        ]
+        if observed_paths != expected_paths:
+            errors.append("dependency_materialization_manifest source paths mismatch")
+        dependency_root = str(manifest.get("dependency_root", "")).strip()
+        if not dependency_root.endswith(YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT):
+            errors.append("dependency_materialization_manifest.dependency_root mismatch")
+        for file_entry in files:
+            if not isinstance(file_entry, Mapping):
+                errors.append("dependency materialization file entries must be mappings")
+                continue
+            if file_entry.get("status") != "copied":
+                errors.append("dependency materialization file status must be copied")
+            if file_entry.get("source_digest") != file_entry.get("materialized_digest"):
+                errors.append("dependency materialization file digest mismatch")
+            if not str(file_entry.get("entry_digest", "")).strip():
+                errors.append("dependency materialization file entry_digest must be present")
+            materialized_path = str(file_entry.get("materialized_path", ""))
+            if dependency_root and not materialized_path.startswith(f"{dependency_root}/"):
+                errors.append("dependency materialization file must live under dependency_root")
+        try:
+            expected_digest = sha256_text(
+                canonical_json(_dependency_materialization_manifest_digest_payload(manifest))
+            )
+        except KeyError:
+            expected_digest = ""
+            errors.append("dependency_materialization_manifest digest payload is missing required fields")
+        if manifest.get("manifest_digest") != expected_digest:
+            errors.append("dependency_materialization_manifest.manifest_digest mismatch")
+        return {
+            "ok": not errors,
+            "status": str(manifest.get("status", "")),
+            "file_count": int(manifest.get("file_count", 0))
+            if isinstance(manifest.get("file_count", 0), int)
+            else 0,
+            "manifest_ref": str(manifest.get("manifest_ref", "")),
+            "manifest_digest": str(manifest.get("manifest_digest", "")),
+            "errors": errors,
+        }
+
     def _build_guardian_preseed_gate(
         self,
         *,
@@ -1500,7 +1739,7 @@ class YaoyorozuRegistryService:
             "gate_required": gate_required,
             "gate_status": gate_status,
             "decision_reason": (
-                "Integrity guardian and HumanOversightChannel reviewers attest that source target-path snapshot seeding and execution root creation remain same-host and digest-bound."
+                "Integrity guardian and HumanOversightChannel reviewers attest that source target-path snapshot seeding, execution root creation, and dependency materialization remain same-host and digest-bound."
                 if gate_required
                 else "Repo-local dispatch does not create an external execution root, so the preseed gate is not required."
             ),
@@ -2594,6 +2833,22 @@ class YaoyorozuRegistryService:
                     "workspace_scope": workspace_scope,
                     "execution_transport_profile": self._policy.workspace_execution_transport_profile,
                     "sandbox_seed_strategy": sandbox_seed_strategy,
+                    "dependency_materialization_profile": (
+                        self._policy.dependency_materialization_profile
+                    ),
+                    "dependency_materialization_strategy": (
+                        self._policy.external_dependency_materialization_strategy
+                        if workspace_scope == self._policy.external_workspace_scope
+                        else self._policy.inline_dependency_materialization_strategy
+                    ),
+                    "dependency_materialization_required": (
+                        workspace_scope == self._policy.external_workspace_scope
+                    ),
+                    "dependency_materialization_paths": (
+                        list(self._policy.dependency_materialization_paths)
+                        if workspace_scope == self._policy.external_workspace_scope
+                        else []
+                    ),
                     "guardian_preseed_gate_required": (
                         workspace_scope == self._policy.external_workspace_scope
                     ),
@@ -2611,6 +2866,19 @@ class YaoyorozuRegistryService:
                 )
                 if workspace_scope == self._policy.external_workspace_scope
                 else str(repo_root)
+            )
+            dependency_materialization_required = (
+                workspace_scope == self._policy.external_workspace_scope
+            )
+            dependency_materialization_strategy = (
+                self._policy.external_dependency_materialization_strategy
+                if dependency_materialization_required
+                else self._policy.inline_dependency_materialization_strategy
+            )
+            dependency_materialization_paths = (
+                list(self._policy.dependency_materialization_paths)
+                if dependency_materialization_required
+                else []
             )
             unit_id = new_id("worker-dispatch")
             command_preview = [
@@ -2678,6 +2946,12 @@ class YaoyorozuRegistryService:
                 "execution_transport_profile": self._policy.workspace_execution_transport_profile,
                 "sandbox_seed_strategy": sandbox_seed_strategy,
                 "workspace_target_digest": workspace_target_digest,
+                "dependency_materialization_profile": (
+                    self._policy.dependency_materialization_profile
+                ),
+                "dependency_materialization_strategy": dependency_materialization_strategy,
+                "dependency_materialization_required": dependency_materialization_required,
+                "dependency_materialization_paths": dependency_materialization_paths,
                 "guardian_preseed_gate": guardian_preseed_gate,
                 "expected_report_fields": list(YAOYOROZU_WORKER_REPORT_FIELDS),
             }
@@ -2785,6 +3059,25 @@ class YaoyorozuRegistryService:
                 and gate_validation["reviewer_network_attested"]
                 for gate_validation in external_guardian_gate_validations
             ),
+            "dependency_materialization_bound": all(
+                unit["dependency_materialization_profile"]
+                == self._policy.dependency_materialization_profile
+                and unit["dependency_materialization_required"]
+                == (unit["workspace_scope"] == self._policy.external_workspace_scope)
+                and unit["dependency_materialization_strategy"]
+                == (
+                    self._policy.external_dependency_materialization_strategy
+                    if unit["workspace_scope"] == self._policy.external_workspace_scope
+                    else self._policy.inline_dependency_materialization_strategy
+                )
+                and (
+                    unit["dependency_materialization_paths"]
+                    == list(self._policy.dependency_materialization_paths)
+                    if unit["workspace_scope"] == self._policy.external_workspace_scope
+                    else unit["dependency_materialization_paths"] == []
+                )
+                for unit in dispatch_units
+            ),
             "profile_policy_ready": (
                 required_coverage == list(profile_policy["required_worker_coverage_areas"])
                 and optional_coverage == list(profile_policy["optional_worker_coverage_areas"])
@@ -2857,6 +3150,11 @@ class YaoyorozuRegistryService:
                     for gate_validation in external_guardian_gate_validations
                     if gate_validation["oversight_event_satisfied"]
                     and gate_validation["reviewer_network_attested"]
+                ),
+                "dependency_materialization_required_count": sum(
+                    1
+                    for unit in dispatch_units
+                    if unit["dependency_materialization_required"]
                 ),
                 "runtime_exec_ready": bool(dispatch_units),
             },
@@ -2936,10 +3234,12 @@ class YaoyorozuRegistryService:
         external_preseed_gate_count = 0
         guardian_preseed_oversight_event_count = 0
         external_preseed_oversight_satisfied_count = 0
+        dependency_materialization_required_count = 0
         guardian_preseed_gate_bound = True
         all_external_preseed_gates_ready = True
         guardian_preseed_oversight_bound = True
         all_external_preseed_oversight_satisfied = True
+        dependency_materialization_bound = True
         for unit in units:
             if not isinstance(unit, Mapping):
                 errors.append("dispatch_units entries must be mappings")
@@ -2983,6 +3283,36 @@ class YaoyorozuRegistryService:
                 self._policy.external_workspace_seed_strategy,
             }:
                 errors.append("dispatch unit sandbox_seed_strategy mismatch")
+            dependency_required = unit.get("dependency_materialization_required")
+            expected_dependency_required = (
+                unit.get("workspace_scope") == self._policy.external_workspace_scope
+            )
+            if dependency_required is not expected_dependency_required:
+                dependency_materialization_bound = False
+                errors.append("dispatch unit dependency_materialization_required mismatch")
+            if (
+                unit.get("dependency_materialization_profile")
+                != self._policy.dependency_materialization_profile
+            ):
+                dependency_materialization_bound = False
+                errors.append("dispatch unit dependency_materialization_profile mismatch")
+            expected_dependency_strategy = (
+                self._policy.external_dependency_materialization_strategy
+                if expected_dependency_required
+                else self._policy.inline_dependency_materialization_strategy
+            )
+            if unit.get("dependency_materialization_strategy") != expected_dependency_strategy:
+                dependency_materialization_bound = False
+                errors.append("dispatch unit dependency_materialization_strategy mismatch")
+            dependency_paths = unit.get("dependency_materialization_paths", [])
+            if expected_dependency_required:
+                dependency_materialization_required_count += 1
+                if dependency_paths != list(self._policy.dependency_materialization_paths):
+                    dependency_materialization_bound = False
+                    errors.append("external dispatch dependency_materialization_paths mismatch")
+            elif dependency_paths != []:
+                dependency_materialization_bound = False
+                errors.append("repo-local dispatch dependency_materialization_paths must be empty")
             workspace_target_digest = str(unit.get("workspace_target_digest", "")).strip()
             if len(workspace_target_digest) != 64:
                 errors.append("dispatch unit workspace_target_digest must be a sha256 digest")
@@ -3083,6 +3413,13 @@ class YaoyorozuRegistryService:
             errors.append(
                 "selection_summary.external_preseed_oversight_satisfied_count must match satisfied external oversight events"
             )
+        if (
+            selection_summary.get("dependency_materialization_required_count")
+            != dependency_materialization_required_count
+        ):
+            errors.append(
+                "selection_summary.dependency_materialization_required_count must match external workspace units"
+            )
         validation = dispatch_plan.get("validation", {})
         if isinstance(validation, Mapping):
             if validation.get("guardian_preseed_gate_bound") != guardian_preseed_gate_bound:
@@ -3098,6 +3435,8 @@ class YaoyorozuRegistryService:
                 != all_external_preseed_oversight_satisfied
             ):
                 errors.append("validation.all_external_preseed_oversight_satisfied mismatch")
+            if validation.get("dependency_materialization_bound") != dependency_materialization_bound:
+                errors.append("validation.dependency_materialization_bound mismatch")
         else:
             errors.append("validation must be a mapping")
 
@@ -3117,6 +3456,8 @@ class YaoyorozuRegistryService:
             "all_external_preseed_gates_ready": all_external_preseed_gates_ready,
             "guardian_preseed_oversight_bound": guardian_preseed_oversight_bound,
             "all_external_preseed_oversight_satisfied": all_external_preseed_oversight_satisfied,
+            "dependency_materialization_bound": dependency_materialization_bound,
+            "dependency_materialization_required_count": dependency_materialization_required_count,
             "errors": errors,
         }
 
@@ -3184,6 +3525,12 @@ class YaoyorozuRegistryService:
                 )
             workspace_seed_status = "inline"
             workspace_seed_head_commit = ""
+            dependency_materialization_status = "inline"
+            dependency_materialization_manifest: Dict[str, Any] | None = None
+            dependency_materialization_manifest_ref = ""
+            dependency_materialization_manifest_digest = ""
+            dependency_materialization_file_count = 0
+            command_env = env.copy()
             if workspace_scope == self._policy.external_workspace_scope:
                 workspace_seed_head_commit = self._seed_external_execution_workspace(
                     source_root=repo_root,
@@ -3191,11 +3538,39 @@ class YaoyorozuRegistryService:
                     target_paths=list(unit["target_paths"]),
                 )
                 workspace_seed_status = "seeded"
+                dependency_materialization_manifest = (
+                    self._materialize_external_execution_dependencies(
+                        source_root=repo_root,
+                        execution_root=execution_root,
+                        dispatch_plan_ref=dispatch_plan_ref,
+                        dispatch_unit_ref=str(unit["unit_id"]),
+                        coverage_area=str(unit["coverage_area"]),
+                        dependency_paths=list(unit["dependency_materialization_paths"]),
+                    )
+                )
+                dependency_materialization_status = str(
+                    dependency_materialization_manifest["status"]
+                )
+                dependency_materialization_manifest_ref = str(
+                    dependency_materialization_manifest["manifest_ref"]
+                )
+                dependency_materialization_manifest_digest = str(
+                    dependency_materialization_manifest["manifest_digest"]
+                )
+                dependency_materialization_file_count = int(
+                    dependency_materialization_manifest["file_count"]
+                )
+                materialized_src_root = (
+                    execution_root
+                    / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
+                    / "src"
+                )
+                command_env["PYTHONPATH"] = f"{env['PYTHONPATH']}{os.pathsep}{materialized_src_root}"
             command = [sys.executable if preview[0] == "python3" else preview[0], *preview[1:]]
             process = subprocess.Popen(
                 command,
                 cwd=execution_root,
-                env=env,
+                env=command_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -3396,6 +3771,13 @@ class YaoyorozuRegistryService:
                 "workspace_target_digest": unit["workspace_target_digest"],
                 "workspace_seed_status": workspace_seed_status,
                 "workspace_seed_head_commit": workspace_seed_head_commit,
+                "dependency_materialization_status": dependency_materialization_status,
+                "dependency_materialization_manifest_ref": dependency_materialization_manifest_ref,
+                "dependency_materialization_manifest_digest": (
+                    dependency_materialization_manifest_digest
+                ),
+                "dependency_materialization_file_count": dependency_materialization_file_count,
+                "dependency_materialization_manifest": dependency_materialization_manifest,
                 "guardian_preseed_gate": dict(guardian_preseed_gate)
                 if isinstance(guardian_preseed_gate, Mapping)
                 else {},
@@ -3556,6 +3938,26 @@ class YaoyorozuRegistryService:
                 and result["guardian_oversight_event_status"] == "satisfied"
                 and result["reviewer_network_attested"]
             ),
+            "dependency_materialization_profile": self._policy.dependency_materialization_profile,
+            "dependency_materialization_strategy": (
+                self._policy.external_dependency_materialization_strategy
+            ),
+            "dependency_materialization_required_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+            ),
+            "external_dependency_materialized_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["dependency_materialization_status"] == "materialized"
+                and result["dependency_materialization_file_count"]
+                == len(self._policy.dependency_materialization_paths)
+            ),
+            "dependency_materialization_file_count": sum(
+                int(result["dependency_materialization_file_count"]) for result in results
+            ),
         }
         validation = {
             "command_digests_match": all(
@@ -3580,6 +3982,19 @@ class YaoyorozuRegistryService:
                     or (
                         result["workspace_seed_status"] == "seeded"
                         and len(result["workspace_seed_head_commit"]) == 40
+                    )
+                )
+                for result in results
+            ),
+            "external_dependencies_materialized": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or (
+                        result["dependency_materialization_status"] == "materialized"
+                        and result["dependency_materialization_manifest_ref"]
+                        and result["dependency_materialization_manifest_digest"]
+                        and result["dependency_materialization_file_count"]
+                        == len(self._policy.dependency_materialization_paths)
                     )
                 )
                 for result in results
@@ -3718,6 +4133,9 @@ class YaoyorozuRegistryService:
         external_preseed_gate_pass_count = 0
         guardian_preseed_oversight_event_count = 0
         external_preseed_oversight_satisfied_count = 0
+        dependency_materialization_required_count = 0
+        external_dependency_materialized_count = 0
+        dependency_materialization_file_count = 0
         for result in results:
             if not isinstance(result, Mapping):
                 errors.append("results entries must be mappings")
@@ -3761,11 +4179,58 @@ class YaoyorozuRegistryService:
                     errors.append("external workspace results must record workspace_seed_status=seeded")
                 if len(workspace_seed_head_commit) != 40:
                     errors.append("external workspace results must record a 40-char workspace_seed_head_commit")
+                dependency_materialization_required_count += 1
+                dependency_validation = self._validate_dependency_materialization_manifest(
+                    result.get("dependency_materialization_manifest"),
+                    dispatch_plan_ref=str(dispatch_receipt.get("dispatch_plan_ref", "")),
+                    dispatch_unit_ref=str(result.get("unit_id", "")),
+                    coverage_area=str(result.get("coverage_area", "")),
+                    workspace_root=execution_workspace_root,
+                )
+                if not dependency_validation["ok"]:
+                    errors.extend(dependency_validation["errors"])
+                if result.get("dependency_materialization_status") != dependency_validation["status"]:
+                    errors.append("worker result dependency_materialization_status mismatch")
+                if (
+                    result.get("dependency_materialization_manifest_ref")
+                    != dependency_validation["manifest_ref"]
+                ):
+                    errors.append("worker result dependency_materialization_manifest_ref mismatch")
+                if (
+                    result.get("dependency_materialization_manifest_digest")
+                    != dependency_validation["manifest_digest"]
+                ):
+                    errors.append("worker result dependency_materialization_manifest_digest mismatch")
+                if (
+                    result.get("dependency_materialization_file_count")
+                    != dependency_validation["file_count"]
+                ):
+                    errors.append("worker result dependency_materialization_file_count mismatch")
+                dependency_materialization_file_count += int(
+                    dependency_validation["file_count"]
+                )
+                if (
+                    dependency_validation["ok"]
+                    and dependency_validation["status"] == "materialized"
+                    and dependency_validation["file_count"]
+                    == len(self._policy.dependency_materialization_paths)
+                ):
+                    external_dependency_materialized_count += 1
             else:
                 if workspace_seed_status != "inline":
                     errors.append("repo-local workspace results must record workspace_seed_status=inline")
                 if workspace_seed_head_commit:
                     errors.append("repo-local workspace results must not record workspace_seed_head_commit")
+                if result.get("dependency_materialization_status") != "inline":
+                    errors.append("repo-local dependency_materialization_status must be inline")
+                if result.get("dependency_materialization_manifest_ref") != "":
+                    errors.append("repo-local dependency_materialization_manifest_ref must be empty")
+                if result.get("dependency_materialization_manifest_digest") != "":
+                    errors.append("repo-local dependency_materialization_manifest_digest must be empty")
+                if result.get("dependency_materialization_file_count") != 0:
+                    errors.append("repo-local dependency_materialization_file_count must be 0")
+                if result.get("dependency_materialization_manifest") is not None:
+                    errors.append("repo-local dependency_materialization_manifest must be null")
             workspace_target_digest = str(result.get("workspace_target_digest", "")).strip()
             if len(workspace_target_digest) != 64:
                 errors.append("worker result workspace_target_digest must be a sha256 digest")
@@ -4144,6 +4609,31 @@ class YaoyorozuRegistryService:
             errors.append(
                 "execution_summary.external_preseed_oversight_satisfied_count mismatch"
             )
+        if (
+            execution_summary.get("dependency_materialization_profile")
+            != self._policy.dependency_materialization_profile
+        ):
+            errors.append("execution_summary.dependency_materialization_profile mismatch")
+        if (
+            execution_summary.get("dependency_materialization_strategy")
+            != self._policy.external_dependency_materialization_strategy
+        ):
+            errors.append("execution_summary.dependency_materialization_strategy mismatch")
+        if (
+            execution_summary.get("dependency_materialization_required_count")
+            != dependency_materialization_required_count
+        ):
+            errors.append("execution_summary.dependency_materialization_required_count mismatch")
+        if (
+            execution_summary.get("external_dependency_materialized_count")
+            != external_dependency_materialized_count
+        ):
+            errors.append("execution_summary.external_dependency_materialized_count mismatch")
+        if (
+            execution_summary.get("dependency_materialization_file_count")
+            != dependency_materialization_file_count
+        ):
+            errors.append("execution_summary.dependency_materialization_file_count mismatch")
         validation = dispatch_receipt.get("validation", {})
         if not isinstance(validation, Mapping):
             errors.append("validation must be a mapping")
@@ -4165,6 +4655,18 @@ class YaoyorozuRegistryService:
                 or (
                     result.get("workspace_seed_status") == "seeded"
                     and len(str(result.get("workspace_seed_head_commit", "")).strip()) == 40
+                )
+                for result in results
+            ),
+            "external_dependencies_materialized": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    result.get("dependency_materialization_status") == "materialized"
+                    and result.get("dependency_materialization_manifest_ref")
+                    and result.get("dependency_materialization_manifest_digest")
+                    and result.get("dependency_materialization_file_count")
+                    == len(self._policy.dependency_materialization_paths)
                 )
                 for result in results
             ),
@@ -4242,6 +4744,9 @@ class YaoyorozuRegistryService:
             "all_target_paths_ready": expected_validation["all_target_paths_ready"],
             "same_host_scope_only": expected_validation["same_host_scope_only"],
             "external_workspace_seeded": expected_validation["external_workspace_seeded"],
+            "external_dependencies_materialized": expected_validation[
+                "external_dependencies_materialized"
+            ],
             "all_guardian_preseed_gates_bound": expected_validation[
                 "all_guardian_preseed_gates_bound"
             ],

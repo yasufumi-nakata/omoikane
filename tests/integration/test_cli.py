@@ -1744,13 +1744,22 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(0, result["validation"]["source_bound_success_count"])
         self.assertTrue(result["validation"]["same_host_scope_only"])
         self.assertTrue(result["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["validation"]["external_dependencies_materialized"])
+        self.assertEqual(4, result["validation"]["external_dependency_materialized_count"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_reports_bound_to_dispatch"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_delta_receipts_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_patch_candidate_receipts_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_target_paths_ready"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependencies_materialized"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_dependency_materialized_count"
+            ],
+        )
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["delta_bound_count"])
         self.assertEqual(
             4,

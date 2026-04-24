@@ -89,6 +89,11 @@ properties:
         - workspace_target_digest
         - workspace_seed_status
         - workspace_seed_head_commit
+        - dependency_materialization_status
+        - dependency_materialization_manifest_ref
+        - dependency_materialization_manifest_digest
+        - dependency_materialization_file_count
+        - dependency_materialization_manifest
         - guardian_preseed_gate
         - guardian_preseed_gate_status
         - guardian_preseed_gate_digest
@@ -193,6 +198,24 @@ properties:
         workspace_seed_head_commit:
           type: string
           pattern: "^$|^[a-f0-9]{40}$"
+        dependency_materialization_status:
+          type: string
+          enum:
+            - inline
+            - materialized
+        dependency_materialization_manifest_ref:
+          type: string
+          pattern: "^$|^dependency-manifest://yaoyorozu-dependencies-[a-f0-9]{12}$"
+        dependency_materialization_manifest_digest:
+          type: string
+          pattern: "^$|^[a-f0-9]{64}$"
+        dependency_materialization_file_count:
+          type: integer
+          minimum: 0
+        dependency_materialization_manifest:
+          oneOf:
+            - $ref: "yaoyorozu_dependency_materialization_manifest.schema"
+            - type: "null"
         guardian_preseed_gate:
           $ref: "yaoyorozu_workspace_guardian_preseed_gate.schema"
         guardian_preseed_gate_status:
@@ -456,6 +479,11 @@ properties:
       - external_preseed_gate_pass_count
       - guardian_preseed_oversight_event_count
       - external_preseed_oversight_satisfied_count
+      - dependency_materialization_profile
+      - dependency_materialization_strategy
+      - dependency_materialization_required_count
+      - external_dependency_materialized_count
+      - dependency_materialization_file_count
     properties:
       launched_process_count:
         type: integer
@@ -575,6 +603,19 @@ properties:
       external_preseed_oversight_satisfied_count:
         type: integer
         minimum: 0
+      dependency_materialization_profile:
+        const: same-host-external-workspace-dependency-materialization-v1
+      dependency_materialization_strategy:
+        const: source-runtime-dependency-snapshot-v1
+      dependency_materialization_required_count:
+        type: integer
+        minimum: 0
+      external_dependency_materialized_count:
+        type: integer
+        minimum: 0
+      dependency_materialization_file_count:
+        type: integer
+        minimum: 0
   validation:
     type: object
     additionalProperties: false
@@ -584,6 +625,7 @@ properties:
       - all_reports_ready
       - same_host_scope_only
       - external_workspace_seeded
+      - external_dependencies_materialized
       - profile_coverage_bound
       - coverage_complete
       - all_reports_bound_to_dispatch
@@ -605,6 +647,8 @@ properties:
       same_host_scope_only:
         const: true
       external_workspace_seeded:
+        const: true
+      external_dependencies_materialized:
         const: true
       profile_coverage_bound:
         const: true

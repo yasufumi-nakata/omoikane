@@ -149,6 +149,7 @@
 - `yaoyorozu_build_request_binding.schema`
 - `yaoyorozu_execution_chain_binding.schema`
 - `yaoyorozu_task_graph_binding.schema`
+- `yaoyorozu_dependency_materialization_manifest.schema`
 - `yaoyorozu_workspace_discovery.schema`
 - `yaoyorozu_workspace_guardian_preseed_gate.schema`
 - `yaoyorozu_worker_dispatch_plan.schema`

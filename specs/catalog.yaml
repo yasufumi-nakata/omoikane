@@ -1975,7 +1975,18 @@ entries:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - evals/agentic/yaoyorozu_external_workspace_execution.yaml
       - reference-runtime
-    rationale: Required to serialize the HumanOversightChannel-bound integrity Guardian gate that must pass before same-host external workspace seed or execution-root creation.
+    rationale: Required to serialize the HumanOversightChannel-bound integrity Guardian gate that must pass before same-host external workspace seed, execution-root creation, or dependency materialization.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_dependency_materialization_manifest.schema
+    consumers:
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - evals/agentic/yaoyorozu_external_workspace_execution.yaml
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize the minimal runtime dependency snapshot copied into same-host external Yaoyorozu execution workspaces after the preseed gate and before worker launch.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_registry_snapshot.schema

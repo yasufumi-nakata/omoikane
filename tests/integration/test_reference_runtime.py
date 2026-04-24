@@ -1878,6 +1878,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, result["validation"]["source_bound_success_count"])
         self.assertTrue(result["validation"]["same_host_scope_only"])
         self.assertTrue(result["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["validation"]["external_dependencies_materialized"])
+        self.assertEqual(4, result["validation"]["external_dependency_materialized_count"])
+        self.assertEqual(
+            "same-host-external-workspace-dependency-materialization-v1",
+            result["validation"]["dependency_materialization_profile"],
+        )
         self.assertTrue(result["validation"]["guardian_preseed_gate_bound"])
         self.assertTrue(result["validation"]["external_preseed_gates_passed"])
         self.assertEqual(4, result["validation"]["external_preseed_gate_pass_count"])
@@ -1897,6 +1903,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["validation"]["worker_patch_priority_profile"],
         )
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["successful_process_count"])
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_dependency_materialized_count"
+            ],
+        )
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["target_ready_count"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["delta_bound_count"])
         self.assertEqual(

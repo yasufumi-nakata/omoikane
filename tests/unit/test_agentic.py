@@ -3386,10 +3386,12 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
         self.assertTrue(plan["validation"]["guardian_preseed_oversight_bound"])
         self.assertTrue(plan["validation"]["all_external_preseed_oversight_satisfied"])
+        self.assertTrue(plan["validation"]["dependency_materialization_bound"])
         self.assertEqual(0, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(4, plan["selection_summary"]["source_bound_worker_count"])
         self.assertEqual(0, plan["selection_summary"]["guardian_preseed_oversight_event_count"])
         self.assertEqual(0, plan["selection_summary"]["external_preseed_oversight_satisfied_count"])
+        self.assertEqual(0, plan["selection_summary"]["dependency_materialization_required_count"])
         self.assertTrue(
             all(
                 "dispatch_plan_ref" in unit["expected_report_fields"]
@@ -3457,19 +3459,29 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
         self.assertTrue(plan["validation"]["guardian_preseed_oversight_bound"])
         self.assertTrue(plan["validation"]["all_external_preseed_oversight_satisfied"])
+        self.assertTrue(plan["validation"]["dependency_materialization_bound"])
         self.assertEqual(4, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(0, plan["selection_summary"]["source_bound_worker_count"])
         self.assertEqual(4, plan["selection_summary"]["external_preseed_gate_count"])
         self.assertEqual(4, plan["selection_summary"]["guardian_preseed_oversight_event_count"])
         self.assertEqual(4, plan["selection_summary"]["external_preseed_oversight_satisfied_count"])
+        self.assertEqual(4, plan["selection_summary"]["dependency_materialization_required_count"])
         self.assertTrue(
             all(
                 unit["workspace_scope"] == "same-host-external-workspace"
                 and unit["execution_workspace_root"] != unit["selected_workspace_root"]
                 and unit["sandbox_seed_strategy"] == "source-target-snapshot-copy-v1"
+                and unit["dependency_materialization_profile"]
+                == "same-host-external-workspace-dependency-materialization-v1"
+                and unit["dependency_materialization_strategy"]
+                == "source-runtime-dependency-snapshot-v1"
+                and unit["dependency_materialization_required"] is True
+                and unit["dependency_materialization_paths"]
                 and unit["execution_transport_profile"] == "same-host-python-subprocess-v1"
                 and unit["guardian_preseed_gate"]["gate_status"] == "pass"
                 and unit["guardian_preseed_gate"]["gate_required"] is True
+                and "dependency-materialization"
+                in unit["guardian_preseed_gate"]["required_before"]
                 and unit["guardian_preseed_gate"]["guardian_oversight_event_status"] == "satisfied"
                 and unit["guardian_preseed_gate"]["reviewer_network_attested"] is True
                 and unit["guardian_preseed_gate"]["reviewer_quorum_required"] == 2
@@ -3695,6 +3707,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         )
         self.assertTrue(receipt["validation"]["same_host_scope_only"])
         self.assertTrue(receipt["validation"]["external_workspace_seeded"])
+        self.assertTrue(receipt["validation"]["external_dependencies_materialized"])
         self.assertTrue(receipt["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(receipt["validation"]["all_external_preseed_gates_passed"])
         self.assertTrue(receipt["validation"]["guardian_preseed_oversight_bound"])
@@ -3702,6 +3715,8 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(0, receipt["execution_summary"]["external_preseed_gate_pass_count"])
         self.assertEqual(0, receipt["execution_summary"]["guardian_preseed_oversight_event_count"])
         self.assertEqual(0, receipt["execution_summary"]["external_preseed_oversight_satisfied_count"])
+        self.assertEqual(0, receipt["execution_summary"]["dependency_materialization_required_count"])
+        self.assertEqual(0, receipt["execution_summary"]["external_dependency_materialized_count"])
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
         self.assertEqual(
             "target-delta-to-patch-candidate-v1",
@@ -3747,11 +3762,24 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(0, result["dispatch_receipt"]["execution_summary"]["source_bound_success_count"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["external_dependencies_materialized"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_guardian_preseed_gates_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_gates_passed"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["guardian_preseed_oversight_bound"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_oversight_satisfied"])
         self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["external_preseed_gate_pass_count"])
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "dependency_materialization_required_count"
+            ],
+        )
+        self.assertEqual(
+            4,
+            result["dispatch_receipt"]["execution_summary"][
+                "external_dependency_materialized_count"
+            ],
+        )
         self.assertEqual(
             4,
             result["dispatch_receipt"]["execution_summary"]["guardian_preseed_oversight_event_count"],
@@ -3767,6 +3795,14 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 process["workspace_scope"] == "same-host-external-workspace"
                 and process["workspace_seed_status"] == "seeded"
                 and len(process["workspace_seed_head_commit"]) == 40
+                and process["dependency_materialization_status"] == "materialized"
+                and process["dependency_materialization_manifest_ref"].startswith(
+                    "dependency-manifest://yaoyorozu-dependencies-"
+                )
+                and len(process["dependency_materialization_manifest_digest"]) == 64
+                and process["dependency_materialization_file_count"] >= 5
+                and process["dependency_materialization_manifest"]["status"]
+                == "materialized"
                 and process["guardian_preseed_gate_status"] == "pass"
                 and process["guardian_preseed_gate_bound"]
                 and process["guardian_oversight_event_status"] == "satisfied"
@@ -3788,6 +3824,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             "satisfied",
             first_gate["guardian_oversight_event"]["human_attestation"]["status"],
         )
+        self.assertIn("dependency-materialization", first_gate["required_before"])
 
     def test_worker_dispatch_receipt_rejects_tampered_external_preseed_gate(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -3816,6 +3853,23 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertFalse(validation["all_external_preseed_oversight_satisfied"])
         self.assertIn(
             "guardian_oversight_event.human_attestation must satisfy reviewer quorum",
+            validation["errors"],
+        )
+
+    def test_worker_dispatch_receipt_rejects_tampered_dependency_materialization(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        manifest = tampered["results"][0]["dependency_materialization_manifest"]
+        manifest["files"][0]["materialized_digest"] = "0" * 64
+        tampered["results"][0]["dependency_materialization_status"] = "blocked"
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["external_dependencies_materialized"])
+        self.assertIn(
+            "dependency materialization file digest mismatch",
             validation["errors"],
         )
 

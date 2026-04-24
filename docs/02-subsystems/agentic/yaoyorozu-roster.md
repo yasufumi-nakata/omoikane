@@ -94,8 +94,11 @@ non-source candidate workspace ごとに `same-host-external-workspace` executio
 `same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate を
 HumanOversightChannel の
 `human-oversight-channel-preseed-attestation-v1` reviewer-network attested event に束縛してから
-workspace seed / execution-root creation より前に pass させ、
-source target-path snapshot を seed commit 付きで固定してから worker を実行する。
+workspace seed / execution-root creation / dependency materialization より前に pass させ、
+source target-path snapshot を seed commit 付きで固定し、
+minimal runtime dependency snapshot を
+`same-host-external-workspace-dependency-materialization-v1` manifest として
+digest-bound に materialize してから worker を実行する。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

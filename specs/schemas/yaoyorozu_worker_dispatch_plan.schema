@@ -90,6 +90,10 @@ properties:
         - execution_transport_profile
         - sandbox_seed_strategy
         - workspace_target_digest
+        - dependency_materialization_profile
+        - dependency_materialization_strategy
+        - dependency_materialization_required
+        - dependency_materialization_paths
         - guardian_preseed_gate
         - command_preview
         - command_digest
@@ -157,6 +161,21 @@ properties:
         workspace_target_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        dependency_materialization_profile:
+          const: same-host-external-workspace-dependency-materialization-v1
+        dependency_materialization_strategy:
+          type: string
+          enum:
+            - in-place-source-runtime-v1
+            - source-runtime-dependency-snapshot-v1
+        dependency_materialization_required:
+          type: boolean
+        dependency_materialization_paths:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
         guardian_preseed_gate:
           $ref: "yaoyorozu_workspace_guardian_preseed_gate.schema"
         command_preview:
@@ -198,6 +217,7 @@ properties:
       - external_preseed_gate_count
       - guardian_preseed_oversight_event_count
       - external_preseed_oversight_satisfied_count
+      - dependency_materialization_required_count
       - runtime_exec_ready
     properties:
       required_worker_count:
@@ -286,6 +306,9 @@ properties:
       external_preseed_oversight_satisfied_count:
         type: integer
         minimum: 0
+      dependency_materialization_required_count:
+        type: integer
+        minimum: 0
       runtime_exec_ready:
         type: boolean
   validation:
@@ -303,6 +326,7 @@ properties:
       - all_external_preseed_gates_ready
       - guardian_preseed_oversight_bound
       - all_external_preseed_oversight_satisfied
+      - dependency_materialization_bound
       - profile_policy_ready
       - ok
     properties:
@@ -327,6 +351,8 @@ properties:
       guardian_preseed_oversight_bound:
         const: true
       all_external_preseed_oversight_satisfied:
+        const: true
+      dependency_materialization_bound:
         const: true
       profile_policy_ready:
         const: true

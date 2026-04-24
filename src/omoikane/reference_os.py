@@ -4290,6 +4290,15 @@ json.dump(response, sys.stdout)
                 "external_workspace_seeded": dispatch_receipt_validation[
                     "external_workspace_seeded"
                 ],
+                "external_dependencies_materialized": dispatch_receipt_validation[
+                    "external_dependencies_materialized"
+                ],
+                "external_dependency_materialized_count": dispatch_receipt[
+                    "execution_summary"
+                ]["external_dependency_materialized_count"],
+                "dependency_materialization_profile": dispatch_receipt[
+                    "execution_summary"
+                ]["dependency_materialization_profile"],
                 "guardian_preseed_gate_bound": dispatch_receipt_validation[
                     "all_guardian_preseed_gates_bound"
                 ],

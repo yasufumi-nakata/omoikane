@@ -1,0 +1,106 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_dependency_materialization_manifest.schema"
+title: YaoyorozuDependencyMaterializationManifest
+description: Digest-bound manifest for the minimal runtime dependency snapshot copied into one same-host external Yaoyorozu execution workspace before worker launch.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - manifest_id
+  - manifest_ref
+  - profile
+  - strategy
+  - dispatch_plan_ref
+  - dispatch_unit_ref
+  - coverage_area
+  - workspace_root
+  - dependency_root
+  - manifest_path
+  - required
+  - status
+  - file_count
+  - files
+  - manifest_digest
+properties:
+  kind:
+    const: yaoyorozu_dependency_materialization_manifest
+  schema_version:
+    const: 1.0.0
+  manifest_id:
+    type: string
+    pattern: "^yaoyorozu-dependencies-[a-f0-9]{12}$"
+  manifest_ref:
+    type: string
+    pattern: "^dependency-manifest://yaoyorozu-dependencies-[a-f0-9]{12}$"
+  profile:
+    const: same-host-external-workspace-dependency-materialization-v1
+  strategy:
+    const: source-runtime-dependency-snapshot-v1
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://yaoyorozu-dispatch-[a-f0-9]{12}$"
+  dispatch_unit_ref:
+    type: string
+    pattern: "^worker-dispatch-[a-f0-9]{12}$"
+  coverage_area:
+    type: string
+    enum:
+      - runtime
+      - schema
+      - eval
+      - docs
+  workspace_root:
+    type: string
+    minLength: 1
+  dependency_root:
+    type: string
+    pattern: ".*/\\.yaoyorozu-dependencies$"
+  manifest_path:
+    type: string
+    pattern: ".*/\\.yaoyorozu-dependencies/manifest\\.json$"
+  required:
+    const: true
+  status:
+    const: materialized
+  file_count:
+    type: integer
+    minimum: 1
+  files:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - source_path
+        - materialized_path
+        - source_digest
+        - materialized_digest
+        - byte_count
+        - status
+        - entry_digest
+      properties:
+        source_path:
+          type: string
+          minLength: 1
+        materialized_path:
+          type: string
+          minLength: 1
+        source_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        materialized_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        byte_count:
+          type: integer
+          minimum: 0
+        status:
+          const: copied
+        entry_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

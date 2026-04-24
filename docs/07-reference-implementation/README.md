@@ -401,8 +401,10 @@ requested optional coverage は candidate が無い場合に source fallback と
 `same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate が
 HumanOversightChannel の `human-oversight-channel-preseed-attestation-v1`
 reviewer-network attestation に束縛されたうえで
-workspace seed / execution-root creation 前に pass したこと、
-`workspace_seed_head_commit` と candidate/source 成功 count を receipt に残すこと、
+workspace seed / execution-root creation / dependency materialization 前に pass したこと、
+`same-host-external-workspace-dependency-materialization-v1` manifest が
+minimal runtime dependency snapshot を external execution root へ digest-bound に固定したこと、
+`workspace_seed_head_commit`、dependency manifest digest、candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
 target path observation と git-bound target path delta receipt、
 および `patch_descriptor` 互換で top-priority summary を持つ patch candidate receipt を返すことを確認する。

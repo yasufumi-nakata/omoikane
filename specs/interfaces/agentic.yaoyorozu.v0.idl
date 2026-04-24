@@ -2,10 +2,11 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Guardian-gated external workspace seeding, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
+summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_workspace_guardian_preseed_gate: ../schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
+  yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -143,7 +144,8 @@ operations:
       - requested optional worker coverage, when present, must remain a subset of the proposal profile's optional coverage and bind dispatch_coverage_areas deterministically
       - every command preview must remain same-host, subprocess-bound, and temp-workspace-only
       - when workspace_discovery is bound, every dispatch unit must choose one profile-covered candidate workspace and bind execution_workspace_ref, selected_workspace_root, execution_workspace_root, and sandbox_seed_strategy
-      - same-host external workspace units must carry one integrity Guardian preseed gate that passes before workspace seed or execution-root creation
+      - same-host external workspace units must carry one integrity Guardian preseed gate that passes before workspace seed, execution-root creation, or dependency materialization
+      - same-host external workspace units must declare the fixed dependency materialization profile and source runtime dependency snapshot path set in the dispatch plan
       - external preseed gates must bind a satisfied HumanOversightChannel reviewer-network attested oversight event before the gate is considered ready
       - every dispatch_coverage_area must map to exactly one dispatch unit
   execute_worker_dispatch:
@@ -162,9 +164,9 @@ operations:
       schema_ref: yaoyorozu_worker_dispatch_receipt
     guarantees:
       - every launched worker must emit a ready report bound to the same dispatch_plan_ref and dispatch_unit_ref
-      - external candidate workers must have a passing same-host-external-workspace-preseed-guardian-gate-v1 artifact before any snapshot seed or execution root creation occurs
+      - external candidate workers must have a passing same-host-external-workspace-preseed-guardian-gate-v1 artifact before any snapshot seed, execution root creation, or dependency materialization occurs
       - external candidate workers must carry the preseed gate's oversight event ref, digest, reviewer quorum, and verifier-network attestation status into the dispatch receipt
-      - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt
+      - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt and a same-host-external-workspace-dependency-materialization-v1 manifest for the minimal runtime dependency snapshot
       - worker reports must verify that every target path exists and remains inside the selected execution workspace
       - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit
       - worker reports must materialize one patch_descriptor-compatible patch candidate receipt from the same delta evidence before the ready gate passes
