@@ -1757,6 +1757,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, result["validation"]["source_bound_success_count"])
         self.assertTrue(result["validation"]["same_host_scope_only"])
         self.assertTrue(result["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["validation"]["guardian_preseed_gate_bound"])
+        self.assertTrue(result["validation"]["external_preseed_gates_passed"])
+        self.assertEqual(4, result["validation"]["external_preseed_gate_pass_count"])
+        self.assertEqual(
+            "same-host-external-workspace-preseed-guardian-gate-v1",
+            result["validation"]["preseed_gate_profile"],
+        )
         self.assertTrue(result["validation"]["worker_delta_receipts_bound"])
         self.assertEqual("git-target-path-delta-v1", result["validation"]["worker_delta_scan_profile"])
         self.assertTrue(result["validation"]["worker_patch_candidate_receipts_bound"])
@@ -1812,6 +1819,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 process["workspace_scope"] == "same-host-external-workspace"
                 and process["workspace_seed_status"] == "seeded"
                 and len(process["workspace_seed_head_commit"]) == 40
+                and process["guardian_preseed_gate_status"] == "pass"
+                and process["guardian_preseed_gate_bound"]
+                and process["guardian_preseed_gate"]["gate_profile"]
+                == "same-host-external-workspace-preseed-guardian-gate-v1"
                 and process["report"]["workspace_scope"] == "same-host-external-workspace"
                 for process in result["dispatch_receipt"]["results"]
             )

@@ -91,6 +91,8 @@ bounded proposal profile catalog、および
 same-host worker dispatch receipt を JSON で可視化する。
 workspace discovery が bound される場合は
 non-source candidate workspace ごとに `same-host-external-workspace` execution root を作り、
+`same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate を
+workspace seed / execution-root creation より前に pass させ、
 source target-path snapshot を seed commit 付きで固定してから worker を実行する。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、

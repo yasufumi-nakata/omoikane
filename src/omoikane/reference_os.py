@@ -4223,6 +4223,18 @@ json.dump(response, sys.stdout)
                 "external_workspace_seeded": dispatch_receipt_validation[
                     "external_workspace_seeded"
                 ],
+                "guardian_preseed_gate_bound": dispatch_receipt_validation[
+                    "all_guardian_preseed_gates_bound"
+                ],
+                "external_preseed_gates_passed": dispatch_receipt_validation[
+                    "all_external_preseed_gates_passed"
+                ],
+                "external_preseed_gate_pass_count": dispatch_receipt["execution_summary"][
+                    "external_preseed_gate_pass_count"
+                ],
+                "preseed_gate_profile": dispatch_receipt["execution_summary"][
+                    "preseed_gate_profile"
+                ],
                 "worker_delta_receipts_bound": dispatch_receipt_validation[
                     "all_delta_receipts_bound"
                 ],

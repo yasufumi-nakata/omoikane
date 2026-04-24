@@ -366,6 +366,8 @@ optional coverage を requested dispatch として追加できること、
 requested optional coverage は candidate が無い場合に source fallback として明示し、
 `same-host-external-workspace` の execution root に source target-path snapshot を seed してから
 同じ local worker stub を実行し、
+`same-host-external-workspace-preseed-guardian-gate-v1` の integrity Guardian gate が
+workspace seed / execution-root creation 前に pass したこと、
 `workspace_seed_head_commit` と candidate/source 成功 count を receipt に残すこと、
 さらに各 worker report が dispatch plan / dispatch unit と workspace root に結び付いた
 target path observation と git-bound target path delta receipt、

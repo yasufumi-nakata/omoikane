@@ -209,6 +209,7 @@ properties:
             - workspace_scope
             - execution_transport_profile
             - sandbox_seed_strategy
+            - guardian_preseed_gate_required
             - target_digest
           properties:
             coverage_area:
@@ -243,6 +244,8 @@ properties:
               enum:
                 - in-place-source-worktree-v1
                 - source-target-snapshot-copy-v1
+            guardian_preseed_gate_required:
+              type: boolean
             target_digest:
               type: string
               pattern: "^[a-f0-9]{64}$"

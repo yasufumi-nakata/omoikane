@@ -89,6 +89,8 @@ properties:
         - execution_host_ref
         - execution_transport_profile
         - sandbox_seed_strategy
+        - workspace_target_digest
+        - guardian_preseed_gate
         - command_preview
         - command_digest
         - target_paths
@@ -152,6 +154,11 @@ properties:
           enum:
             - in-place-source-worktree-v1
             - source-target-snapshot-copy-v1
+        workspace_target_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        guardian_preseed_gate:
+          $ref: "yaoyorozu_workspace_guardian_preseed_gate.schema"
         command_preview:
           type: array
           minItems: 14
@@ -187,6 +194,8 @@ properties:
       - missing_coverage
       - candidate_bound_worker_count
       - source_bound_worker_count
+      - guardian_preseed_gate_count
+      - external_preseed_gate_count
       - runtime_exec_ready
     properties:
       required_worker_count:
@@ -263,6 +272,12 @@ properties:
       source_bound_worker_count:
         type: integer
         minimum: 0
+      guardian_preseed_gate_count:
+        type: integer
+        minimum: 0
+      external_preseed_gate_count:
+        type: integer
+        minimum: 0
       runtime_exec_ready:
         type: boolean
   validation:
@@ -275,6 +290,9 @@ properties:
       - unique_command_digests
       - workspace_execution_bound
       - same_host_scope_only
+      - guardian_preseed_gate_bound
+      - external_preseed_gate_required
+      - all_external_preseed_gates_ready
       - profile_policy_ready
       - ok
     properties:
@@ -289,6 +307,12 @@ properties:
       workspace_execution_bound:
         type: boolean
       same_host_scope_only:
+        const: true
+      guardian_preseed_gate_bound:
+        const: true
+      external_preseed_gate_required:
+        type: boolean
+      all_external_preseed_gates_ready:
         const: true
       profile_policy_ready:
         const: true

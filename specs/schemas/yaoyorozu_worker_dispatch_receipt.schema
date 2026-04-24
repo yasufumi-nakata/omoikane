@@ -86,8 +86,13 @@ properties:
         - execution_host_ref
         - execution_transport_profile
         - sandbox_seed_strategy
+        - workspace_target_digest
         - workspace_seed_status
         - workspace_seed_head_commit
+        - guardian_preseed_gate
+        - guardian_preseed_gate_status
+        - guardian_preseed_gate_digest
+        - guardian_preseed_gate_bound
         - report
       properties:
         unit_id:
@@ -170,6 +175,9 @@ properties:
           enum:
             - in-place-source-worktree-v1
             - source-target-snapshot-copy-v1
+        workspace_target_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
         workspace_seed_status:
           type: string
           enum:
@@ -178,6 +186,18 @@ properties:
         workspace_seed_head_commit:
           type: string
           pattern: "^$|^[a-f0-9]{40}$"
+        guardian_preseed_gate:
+          $ref: "yaoyorozu_workspace_guardian_preseed_gate.schema"
+        guardian_preseed_gate_status:
+          type: string
+          enum:
+            - pass
+            - not-required
+        guardian_preseed_gate_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        guardian_preseed_gate_bound:
+          const: true
         report:
           type: object
           additionalProperties: false
@@ -402,6 +422,9 @@ properties:
       - patch_priority_profile
       - highest_patch_priority_tier
       - highest_patch_priority_score
+      - preseed_gate_profile
+      - guardian_preseed_gate_count
+      - external_preseed_gate_pass_count
     properties:
       launched_process_count:
         type: integer
@@ -505,6 +528,14 @@ properties:
         type: integer
         minimum: 0
         maximum: 100
+      preseed_gate_profile:
+        const: same-host-external-workspace-preseed-guardian-gate-v1
+      guardian_preseed_gate_count:
+        type: integer
+        minimum: 0
+      external_preseed_gate_pass_count:
+        type: integer
+        minimum: 0
   validation:
     type: object
     additionalProperties: false
@@ -520,6 +551,8 @@ properties:
       - all_delta_receipts_bound
       - all_patch_candidate_receipts_bound
       - all_target_paths_ready
+      - all_guardian_preseed_gates_bound
+      - all_external_preseed_gates_passed
       - ok
     properties:
       command_digests_match:
@@ -543,6 +576,10 @@ properties:
       all_patch_candidate_receipts_bound:
         const: true
       all_target_paths_ready:
+        const: true
+      all_guardian_preseed_gates_bound:
+        const: true
+      all_external_preseed_gates_passed:
         const: true
       ok:
         const: true

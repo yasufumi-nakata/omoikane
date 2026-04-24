@@ -1856,6 +1856,16 @@ entries:
     rationale: Required to serialize one bounded same-host workspace catalog with proposal-profile-selected review budget, required cross-workspace coverage, and accepted candidate ordering before any Yaoyorozu handoff.
   - priority: P1
     kind: schema
+    file: specs/schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
+    consumers:
+      - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - evals/agentic/yaoyorozu_external_workspace_execution.yaml
+      - reference-runtime
+    rationale: Required to serialize the integrity Guardian gate that must pass before same-host external workspace seed or execution-root creation.
+  - priority: P1
+    kind: schema
     file: specs/schemas/yaoyorozu_registry_snapshot.schema
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl

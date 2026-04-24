@@ -84,6 +84,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["dispatch_receipt"],
         )
 
+    def test_workspace_guardian_preseed_gate_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_workspace_guardian_preseed_gate.schema",
+            result["dispatch_receipt"]["results"][0]["guardian_preseed_gate"],
+        )
+
     def test_worker_workspace_delta_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
 

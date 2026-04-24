@@ -1,15 +1,19 @@
 eval_id: yaoyorozu_external_workspace_execution
 target: agentic.yaoyorozu
 level: L4
-description: Yaoyorozu must route profile-covered builder workers into same-host external execution workspaces, seed source target-path snapshots, and bind candidate/source execution counts in the dispatch receipt.
+description: Yaoyorozu must route profile-covered builder workers into same-host external execution workspaces, pass an integrity Guardian preseed gate before seed/root creation, seed source target-path snapshots, and bind candidate/source execution counts in the dispatch receipt.
 inputs:
   - source_root: agents
   - proposal_profile: self-modify-patch-v1
   - workspace_discovery: same-host-local-workspace-discovery-v1
   - execution_policy_id: proposal-profile-aware-external-workspace-execution-v1
+  - preseed_gate_profile: same-host-external-workspace-preseed-guardian-gate-v1
 expected:
   workspace_execution_bound: true
   workspace_execution_policy_ready: true
+  guardian_preseed_gate_bound: true
+  external_preseed_gates_passed: true
+  external_preseed_gate_pass_count: 4
   candidate_bound_dispatch_count: 4
   source_bound_dispatch_count: 0
   candidate_bound_success_count: 4

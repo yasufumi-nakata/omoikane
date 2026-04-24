@@ -143,6 +143,7 @@
 - `yaoyorozu_execution_chain_binding.schema`
 - `yaoyorozu_task_graph_binding.schema`
 - `yaoyorozu_workspace_discovery.schema`
+- `yaoyorozu_workspace_guardian_preseed_gate.schema`
 - `yaoyorozu_worker_dispatch_plan.schema`
 - `yaoyorozu_worker_dispatch_receipt.schema`
 - `yaoyorozu_worker_patch_candidate_receipt.schema`

@@ -3287,6 +3287,9 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         )
         self.assertFalse(plan["validation"]["workspace_execution_bound"])
         self.assertTrue(plan["validation"]["same_host_scope_only"])
+        self.assertTrue(plan["validation"]["guardian_preseed_gate_bound"])
+        self.assertFalse(plan["validation"]["external_preseed_gate_required"])
+        self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
         self.assertEqual(0, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(4, plan["selection_summary"]["source_bound_worker_count"])
         self.assertTrue(
@@ -3351,14 +3354,20 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(session["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(plan["validation"]["workspace_execution_bound"])
         self.assertTrue(plan["validation"]["same_host_scope_only"])
+        self.assertTrue(plan["validation"]["guardian_preseed_gate_bound"])
+        self.assertTrue(plan["validation"]["external_preseed_gate_required"])
+        self.assertTrue(plan["validation"]["all_external_preseed_gates_ready"])
         self.assertEqual(4, plan["selection_summary"]["candidate_bound_worker_count"])
         self.assertEqual(0, plan["selection_summary"]["source_bound_worker_count"])
+        self.assertEqual(4, plan["selection_summary"]["external_preseed_gate_count"])
         self.assertTrue(
             all(
                 unit["workspace_scope"] == "same-host-external-workspace"
                 and unit["execution_workspace_root"] != unit["selected_workspace_root"]
                 and unit["sandbox_seed_strategy"] == "source-target-snapshot-copy-v1"
                 and unit["execution_transport_profile"] == "same-host-python-subprocess-v1"
+                and unit["guardian_preseed_gate"]["gate_status"] == "pass"
+                and unit["guardian_preseed_gate"]["gate_required"] is True
                 for unit in plan["dispatch_units"]
             )
         )
@@ -3580,6 +3589,9 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         )
         self.assertTrue(receipt["validation"]["same_host_scope_only"])
         self.assertTrue(receipt["validation"]["external_workspace_seeded"])
+        self.assertTrue(receipt["validation"]["all_guardian_preseed_gates_bound"])
+        self.assertTrue(receipt["validation"]["all_external_preseed_gates_passed"])
+        self.assertEqual(0, receipt["execution_summary"]["external_preseed_gate_pass_count"])
         self.assertEqual("git-target-path-delta-v1", receipt["execution_summary"]["delta_scan_profile"])
         self.assertEqual(
             "target-delta-to-patch-candidate-v1",
@@ -3625,15 +3637,33 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertEqual(0, result["dispatch_receipt"]["execution_summary"]["source_bound_success_count"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["same_host_scope_only"])
         self.assertTrue(result["dispatch_receipt"]["validation"]["external_workspace_seeded"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_guardian_preseed_gates_bound"])
+        self.assertTrue(result["dispatch_receipt"]["validation"]["all_external_preseed_gates_passed"])
+        self.assertEqual(4, result["dispatch_receipt"]["execution_summary"]["external_preseed_gate_pass_count"])
         self.assertTrue(
             all(
                 process["workspace_scope"] == "same-host-external-workspace"
                 and process["workspace_seed_status"] == "seeded"
                 and len(process["workspace_seed_head_commit"]) == 40
+                and process["guardian_preseed_gate_status"] == "pass"
+                and process["guardian_preseed_gate_bound"]
                 and process["report"]["workspace_root"] == process["execution_workspace_root"]
                 for process in result["dispatch_receipt"]["results"]
             )
         )
+
+    def test_worker_dispatch_receipt_rejects_tampered_external_preseed_gate(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        tampered["results"][0]["guardian_preseed_gate"]["gate_status"] = "not-required"
+        tampered["results"][0]["guardian_preseed_gate_status"] = "not-required"
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["all_external_preseed_gates_passed"])
+        self.assertIn("guardian_preseed_gate.gate_status mismatch", validation["errors"])
 
     def test_task_graph_binding_groups_eval_and_docs_under_complexity_ceiling(self) -> None:
         result = OmoikaneReferenceOS().run_yaoyorozu_demo()

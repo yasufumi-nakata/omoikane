@@ -51,6 +51,15 @@ YAOYOROZU_WORKSPACE_EXECUTION_POLICY_ID = "proposal-profile-aware-external-works
 YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE = "same-host-python-subprocess-v1"
 YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY = "source-target-snapshot-copy-v1"
 YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY = "in-place-source-worktree-v1"
+YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
+    "same-host-external-workspace-preseed-guardian-gate-v1"
+)
+YAOYOROZU_WORKSPACE_GUARDIAN_ROLE = "integrity"
+YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
+YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
+    "workspace-seed",
+    "execution-root-create",
+]
 YAOYOROZU_PATCH_PRIORITY_TIER_ORDER = {
     "none": 0,
     "low": 1,
@@ -380,6 +389,8 @@ def _dispatch_unit_digest_payload(unit: Mapping[str, Any]) -> Dict[str, Any]:
         "execution_host_ref": unit["execution_host_ref"],
         "execution_transport_profile": unit["execution_transport_profile"],
         "sandbox_seed_strategy": unit["sandbox_seed_strategy"],
+        "workspace_target_digest": unit["workspace_target_digest"],
+        "guardian_preseed_gate": unit["guardian_preseed_gate"],
         "command_preview": unit["command_preview"],
         "target_paths": unit["target_paths"],
     }
@@ -589,6 +600,35 @@ def _workspace_execution_target_digest_payload(target: Mapping[str, Any]) -> Dic
         "workspace_scope": target["workspace_scope"],
         "execution_transport_profile": target["execution_transport_profile"],
         "sandbox_seed_strategy": target["sandbox_seed_strategy"],
+        "guardian_preseed_gate_required": target["guardian_preseed_gate_required"],
+    }
+
+
+def _guardian_preseed_gate_digest_payload(gate: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "kind": gate["kind"],
+        "schema_version": gate["schema_version"],
+        "gate_id": gate["gate_id"],
+        "gate_ref": gate["gate_ref"],
+        "gate_profile": gate["gate_profile"],
+        "dispatch_plan_ref": gate["dispatch_plan_ref"],
+        "dispatch_unit_ref": gate["dispatch_unit_ref"],
+        "proposal_profile": gate["proposal_profile"],
+        "coverage_area": gate["coverage_area"],
+        "workspace_ref": gate["workspace_ref"],
+        "selected_workspace_root": gate["selected_workspace_root"],
+        "execution_workspace_root": gate["execution_workspace_root"],
+        "execution_host_ref": gate["execution_host_ref"],
+        "workspace_scope": gate["workspace_scope"],
+        "sandbox_seed_strategy": gate["sandbox_seed_strategy"],
+        "target_digest": gate["target_digest"],
+        "guardian_agent_id": gate["guardian_agent_id"],
+        "guardian_role": gate["guardian_role"],
+        "oversight_category": gate["oversight_category"],
+        "required_before": gate["required_before"],
+        "gate_required": gate["gate_required"],
+        "gate_status": gate["gate_status"],
+        "decision_reason": gate["decision_reason"],
     }
 
 
@@ -648,6 +688,12 @@ class YaoyorozuRegistryPolicy:
     workspace_execution_transport_profile: str = YAOYOROZU_WORKSPACE_EXECUTION_TRANSPORT_PROFILE
     inline_workspace_seed_strategy: str = YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY
     external_workspace_seed_strategy: str = YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY
+    workspace_guardian_gate_profile: str = YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE
+    workspace_guardian_role: str = YAOYOROZU_WORKSPACE_GUARDIAN_ROLE
+    workspace_guardian_category: str = YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY
+    workspace_guardian_required_before: List[str] = field(
+        default_factory=lambda: list(YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE)
+    )
     workspace_discovery_profile: str = YAOYOROZU_WORKSPACE_DISCOVERY_PROFILE
     workspace_discovery_scope: str = YAOYOROZU_WORKSPACE_DISCOVERY_SCOPE
     workspace_discovery_host_ref: str = YAOYOROZU_WORKSPACE_DISCOVERY_HOST_REF
@@ -1090,6 +1136,9 @@ class YaoyorozuRegistryService:
                 "workspace_scope": selected_scope,
                 "execution_transport_profile": self._policy.workspace_execution_transport_profile,
                 "sandbox_seed_strategy": sandbox_seed_strategy,
+                "guardian_preseed_gate_required": (
+                    selected_scope == self._policy.external_workspace_scope
+                ),
             }
             target["target_digest"] = sha256_text(
                 canonical_json(_workspace_execution_target_digest_payload(target))
@@ -1216,6 +1265,128 @@ class YaoyorozuRegistryService:
             text=True,
         )
         return head.stdout.strip()
+
+    def _build_guardian_preseed_gate(
+        self,
+        *,
+        dispatch_plan_ref: str,
+        dispatch_unit_ref: str,
+        proposal_profile: str,
+        coverage_area: str,
+        workspace_ref: str,
+        selected_workspace_root: str,
+        execution_workspace_root: str,
+        execution_host_ref: str,
+        workspace_scope: str,
+        sandbox_seed_strategy: str,
+        target_digest: str,
+        guardian_agent_id: str,
+    ) -> Dict[str, Any]:
+        gate_required = workspace_scope == self._policy.external_workspace_scope
+        gate_status = "pass" if gate_required else "not-required"
+        gate_id = new_id("workspace-preseed-gate")
+        gate = {
+            "kind": "yaoyorozu_workspace_guardian_preseed_gate",
+            "schema_version": "1.0.0",
+            "gate_id": gate_id,
+            "gate_ref": f"guardian-preseed-gate://{gate_id}",
+            "gate_profile": self._policy.workspace_guardian_gate_profile,
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_unit_ref": dispatch_unit_ref,
+            "proposal_profile": proposal_profile,
+            "coverage_area": coverage_area,
+            "workspace_ref": workspace_ref,
+            "selected_workspace_root": selected_workspace_root,
+            "execution_workspace_root": execution_workspace_root,
+            "execution_host_ref": execution_host_ref,
+            "workspace_scope": workspace_scope,
+            "sandbox_seed_strategy": sandbox_seed_strategy,
+            "target_digest": target_digest,
+            "guardian_agent_id": guardian_agent_id,
+            "guardian_role": self._policy.workspace_guardian_role,
+            "oversight_category": self._policy.workspace_guardian_category,
+            "required_before": list(self._policy.workspace_guardian_required_before),
+            "gate_required": gate_required,
+            "gate_status": gate_status,
+            "decision_reason": (
+                "Integrity guardian attests that source target-path snapshot seeding and execution root creation remain same-host and digest-bound."
+                if gate_required
+                else "Repo-local dispatch does not create an external execution root, so the preseed gate is not required."
+            ),
+        }
+        gate["gate_digest"] = sha256_text(canonical_json(_guardian_preseed_gate_digest_payload(gate)))
+        return gate
+
+    def _validate_guardian_preseed_gate(
+        self,
+        gate: Mapping[str, Any],
+        *,
+        dispatch_plan_ref: str,
+        dispatch_unit_ref: str,
+        proposal_profile: str,
+        coverage_area: str,
+        workspace_ref: str,
+        selected_workspace_root: str,
+        execution_workspace_root: str,
+        execution_host_ref: str,
+        workspace_scope: str,
+        sandbox_seed_strategy: str,
+        target_digest: str,
+        guardian_agent_id: str,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        gate_required = workspace_scope == self._policy.external_workspace_scope
+        if not isinstance(gate, Mapping):
+            return {
+                "ok": False,
+                "gate_required": gate_required,
+                "gate_passed": False,
+                "errors": ["guardian_preseed_gate must be a mapping"],
+            }
+        expected = {
+            "kind": "yaoyorozu_workspace_guardian_preseed_gate",
+            "schema_version": "1.0.0",
+            "gate_profile": self._policy.workspace_guardian_gate_profile,
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_unit_ref": dispatch_unit_ref,
+            "proposal_profile": proposal_profile,
+            "coverage_area": coverage_area,
+            "workspace_ref": workspace_ref,
+            "selected_workspace_root": selected_workspace_root,
+            "execution_workspace_root": execution_workspace_root,
+            "execution_host_ref": execution_host_ref,
+            "workspace_scope": workspace_scope,
+            "sandbox_seed_strategy": sandbox_seed_strategy,
+            "target_digest": target_digest,
+            "guardian_agent_id": guardian_agent_id,
+            "guardian_role": self._policy.workspace_guardian_role,
+            "oversight_category": self._policy.workspace_guardian_category,
+            "required_before": list(self._policy.workspace_guardian_required_before),
+            "gate_required": gate_required,
+            "gate_status": "pass" if gate_required else "not-required",
+        }
+        for key, expected_value in expected.items():
+            if gate.get(key) != expected_value:
+                errors.append(f"guardian_preseed_gate.{key} mismatch")
+        gate_id = str(gate.get("gate_id", "")).strip()
+        if not gate_id.startswith("workspace-preseed-gate-"):
+            errors.append("guardian_preseed_gate.gate_id must use workspace-preseed-gate prefix")
+        if gate.get("gate_ref") != f"guardian-preseed-gate://{gate_id}":
+            errors.append("guardian_preseed_gate.gate_ref must bind gate_id")
+        if not str(gate.get("decision_reason", "")).strip():
+            errors.append("guardian_preseed_gate.decision_reason must be non-empty")
+        expected_digest = sha256_text(
+            canonical_json(_guardian_preseed_gate_digest_payload(gate))
+        )
+        if gate.get("gate_digest") != expected_digest:
+            errors.append("guardian_preseed_gate.gate_digest mismatch")
+        gate_passed = gate.get("gate_status") == ("pass" if gate_required else "not-required")
+        return {
+            "ok": not errors,
+            "gate_required": gate_required,
+            "gate_passed": gate_passed and not errors,
+            "errors": errors,
+        }
 
     def _task_graph_bundle_strategy(
         self,
@@ -1540,11 +1711,7 @@ class YaoyorozuRegistryService:
             "profile_policy_bound": True,
             "cross_workspace_coverage_complete": not non_source_profile_missing_coverage_areas,
         }
-        validation["ok"] = all(
-            value
-            for key, value in validation.items()
-            if key != "workspace_execution_bound"
-        )
+        validation["ok"] = all(validation.values())
         discovery = {
             "kind": "yaoyorozu_workspace_discovery",
             "schema_version": "1.0.0",
@@ -2060,6 +2227,20 @@ class YaoyorozuRegistryService:
                     coverage_area = str(target.get("coverage_area", "")).strip()
                     if coverage_area:
                         execution_target_index[coverage_area] = dict(target)
+        standing_roles = convocation_session.get("standing_roles", {})
+        guardian_liaison = (
+            standing_roles.get("guardian_liaison", {})
+            if isinstance(standing_roles, Mapping)
+            else {}
+        )
+        guardian_agent_id = _non_empty_string(
+            guardian_liaison.get("selected_agent_id"),
+            "convocation_session.standing_roles.guardian_liaison.selected_agent_id",
+        )
+        proposal_profile = _non_empty_string(
+            convocation_session.get("proposal_profile"),
+            "convocation_session.proposal_profile",
+        )
         dispatch_units: List[Dict[str, Any]] = []
         selected_coverage: List[str] = []
         for selection in builder_handoff:
@@ -2076,8 +2257,10 @@ class YaoyorozuRegistryService:
             selected_workspace_ref = _workspace_ref_from_root(repo_root)
             selected_workspace_root = str(repo_root)
             selected_workspace_role = "source"
+            selected_workspace_source_kind = "local-workspace"
             workspace_scope = self._policy.worker_workspace_scope
             sandbox_seed_strategy = self._policy.inline_workspace_seed_strategy
+            workspace_target_digest = ""
             if execution_target is not None:
                 selected_workspace_ref = _non_empty_string(
                     execution_target.get("workspace_ref"),
@@ -2091,6 +2274,10 @@ class YaoyorozuRegistryService:
                     execution_target.get("workspace_role"),
                     "workspace_execution_binding.workspace_role",
                 )
+                selected_workspace_source_kind = _non_empty_string(
+                    execution_target.get("source_kind"),
+                    "workspace_execution_binding.source_kind",
+                )
                 workspace_scope = _non_empty_string(
                     execution_target.get("workspace_scope"),
                     "workspace_execution_binding.workspace_scope",
@@ -2098,6 +2285,27 @@ class YaoyorozuRegistryService:
                 sandbox_seed_strategy = _non_empty_string(
                     execution_target.get("sandbox_seed_strategy"),
                     "workspace_execution_binding.sandbox_seed_strategy",
+                )
+                workspace_target_digest = _non_empty_string(
+                    execution_target.get("target_digest"),
+                    "workspace_execution_binding.target_digest",
+                )
+            if not workspace_target_digest:
+                workspace_target = {
+                    "coverage_area": coverage_area,
+                    "workspace_ref": selected_workspace_ref,
+                    "workspace_root": selected_workspace_root,
+                    "workspace_role": selected_workspace_role,
+                    "source_kind": selected_workspace_source_kind,
+                    "workspace_scope": workspace_scope,
+                    "execution_transport_profile": self._policy.workspace_execution_transport_profile,
+                    "sandbox_seed_strategy": sandbox_seed_strategy,
+                    "guardian_preseed_gate_required": (
+                        workspace_scope == self._policy.external_workspace_scope
+                    ),
+                }
+                workspace_target_digest = sha256_text(
+                    canonical_json(_workspace_execution_target_digest_payload(workspace_target))
                 )
             execution_workspace_root = (
                 str(
@@ -2137,6 +2345,20 @@ class YaoyorozuRegistryService:
             for target_path in target_paths:
                 command_preview.extend(["--target-path", target_path])
 
+            guardian_preseed_gate = self._build_guardian_preseed_gate(
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=unit_id,
+                proposal_profile=proposal_profile,
+                coverage_area=coverage_area,
+                workspace_ref=selected_workspace_ref,
+                selected_workspace_root=selected_workspace_root,
+                execution_workspace_root=execution_workspace_root,
+                execution_host_ref=self._policy.workspace_discovery_host_ref,
+                workspace_scope=workspace_scope,
+                sandbox_seed_strategy=sandbox_seed_strategy,
+                target_digest=workspace_target_digest,
+                guardian_agent_id=guardian_agent_id,
+            )
             unit = {
                 "unit_id": unit_id,
                 "role_id": _non_empty_string(selection.get("role_id"), "builder_handoff.role_id"),
@@ -2161,16 +2383,14 @@ class YaoyorozuRegistryService:
                 "execution_host_ref": self._policy.workspace_discovery_host_ref,
                 "execution_transport_profile": self._policy.workspace_execution_transport_profile,
                 "sandbox_seed_strategy": sandbox_seed_strategy,
+                "workspace_target_digest": workspace_target_digest,
+                "guardian_preseed_gate": guardian_preseed_gate,
                 "expected_report_fields": list(YAOYOROZU_WORKER_REPORT_FIELDS),
             }
             unit["command_digest"] = sha256_text(canonical_json(_dispatch_unit_digest_payload(unit)))
             dispatch_units.append(unit)
             selected_coverage.append(coverage_area)
 
-        proposal_profile = _non_empty_string(
-            convocation_session.get("proposal_profile"),
-            "convocation_session.proposal_profile",
-        )
         profile_policy = self._proposal_profile_policy(proposal_profile)
         selection_summary = convocation_session.get("selection_summary", {})
         required_coverage = (
@@ -2211,6 +2431,29 @@ class YaoyorozuRegistryService:
             coverage for coverage in selected_coverage if coverage not in dispatch_coverage
         ]
         unique_command_digests = len({unit["command_digest"] for unit in dispatch_units}) == len(dispatch_units)
+        guardian_gate_validations = [
+            self._validate_guardian_preseed_gate(
+                unit["guardian_preseed_gate"],
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=str(unit["unit_id"]),
+                proposal_profile=proposal_profile,
+                coverage_area=str(unit["coverage_area"]),
+                workspace_ref=str(unit["execution_workspace_ref"]),
+                selected_workspace_root=str(unit["selected_workspace_root"]),
+                execution_workspace_root=str(unit["execution_workspace_root"]),
+                execution_host_ref=str(unit["execution_host_ref"]),
+                workspace_scope=str(unit["workspace_scope"]),
+                sandbox_seed_strategy=str(unit["sandbox_seed_strategy"]),
+                target_digest=str(unit["workspace_target_digest"]),
+                guardian_agent_id=guardian_agent_id,
+            )
+            for unit in dispatch_units
+        ]
+        external_guardian_gate_validations = [
+            validation
+            for validation in guardian_gate_validations
+            if validation["gate_required"]
+        ]
         validation = {
             "registry_bound": bool(self._last_snapshot_id),
             "convocation_bound": bool(convocation_session.get("session_id")),
@@ -2230,6 +2473,14 @@ class YaoyorozuRegistryService:
                 in {self._policy.worker_workspace_scope, self._policy.external_workspace_scope}
                 for unit in dispatch_units
             ),
+            "guardian_preseed_gate_bound": all(
+                gate_validation["ok"] for gate_validation in guardian_gate_validations
+            ),
+            "external_preseed_gate_required": bool(external_guardian_gate_validations),
+            "all_external_preseed_gates_ready": all(
+                gate_validation["gate_passed"]
+                for gate_validation in external_guardian_gate_validations
+            ),
             "profile_policy_ready": (
                 required_coverage == list(profile_policy["required_worker_coverage_areas"])
                 and optional_coverage == list(profile_policy["optional_worker_coverage_areas"])
@@ -2244,7 +2495,7 @@ class YaoyorozuRegistryService:
         validation["ok"] = all(
             value
             for key, value in validation.items()
-            if key != "workspace_execution_bound"
+            if key not in {"workspace_execution_bound", "external_preseed_gate_required"}
         )
         dispatch_body = {
             "dispatch_profile": self._policy.worker_dispatch_profile,
@@ -2290,6 +2541,8 @@ class YaoyorozuRegistryService:
                     for unit in dispatch_units
                     if unit["workspace_scope"] == self._policy.worker_workspace_scope
                 ),
+                "guardian_preseed_gate_count": len(guardian_gate_validations),
+                "external_preseed_gate_count": len(external_guardian_gate_validations),
                 "runtime_exec_ready": bool(dispatch_units),
             },
             "validation": validation,
@@ -2364,6 +2617,10 @@ class YaoyorozuRegistryService:
         digests: List[str] = []
         candidate_bound_worker_count = 0
         source_bound_worker_count = 0
+        guardian_preseed_gate_count = 0
+        external_preseed_gate_count = 0
+        guardian_preseed_gate_bound = True
+        all_external_preseed_gates_ready = True
         for unit in units:
             if not isinstance(unit, Mapping):
                 errors.append("dispatch_units entries must be mappings")
@@ -2407,6 +2664,37 @@ class YaoyorozuRegistryService:
                 self._policy.external_workspace_seed_strategy,
             }:
                 errors.append("dispatch unit sandbox_seed_strategy mismatch")
+            workspace_target_digest = str(unit.get("workspace_target_digest", "")).strip()
+            if len(workspace_target_digest) != 64:
+                errors.append("dispatch unit workspace_target_digest must be a sha256 digest")
+            guardian_gate = unit.get("guardian_preseed_gate", {})
+            gate_validation = self._validate_guardian_preseed_gate(
+                guardian_gate if isinstance(guardian_gate, Mapping) else {},
+                dispatch_plan_ref=f"dispatch://{dispatch_plan.get('dispatch_id', '')}",
+                dispatch_unit_ref=str(unit.get("unit_id", "")),
+                proposal_profile=str(proposal_profile),
+                coverage_area=str(coverage_area),
+                workspace_ref=str(unit.get("execution_workspace_ref", "")),
+                selected_workspace_root=str(unit.get("selected_workspace_root", "")),
+                execution_workspace_root=str(unit.get("execution_workspace_root", "")),
+                execution_host_ref=str(unit.get("execution_host_ref", "")),
+                workspace_scope=str(unit.get("workspace_scope", "")),
+                sandbox_seed_strategy=str(sandbox_seed_strategy),
+                target_digest=workspace_target_digest,
+                guardian_agent_id=str(
+                    (guardian_gate if isinstance(guardian_gate, Mapping) else {}).get(
+                        "guardian_agent_id", ""
+                    )
+                ),
+            )
+            guardian_preseed_gate_count += 1
+            if gate_validation["gate_required"]:
+                external_preseed_gate_count += 1
+            if not gate_validation["ok"]:
+                guardian_preseed_gate_bound = False
+                errors.extend(gate_validation["errors"])
+            if gate_validation["gate_required"] and not gate_validation["gate_passed"]:
+                all_external_preseed_gates_ready = False
             command_preview = unit.get("command_preview", [])
             if f"dispatch://{dispatch_plan.get('dispatch_id', '')}" not in command_preview:
                 errors.append("dispatch unit command preview must bind the dispatch plan ref")
@@ -2437,6 +2725,24 @@ class YaoyorozuRegistryService:
             errors.append(
                 "selection_summary.source_bound_worker_count must match repo-local units"
             )
+        if selection_summary.get("guardian_preseed_gate_count") != guardian_preseed_gate_count:
+            errors.append(
+                "selection_summary.guardian_preseed_gate_count must match dispatch units"
+            )
+        if selection_summary.get("external_preseed_gate_count") != external_preseed_gate_count:
+            errors.append(
+                "selection_summary.external_preseed_gate_count must match external workspace units"
+            )
+        validation = dispatch_plan.get("validation", {})
+        if isinstance(validation, Mapping):
+            if validation.get("guardian_preseed_gate_bound") != guardian_preseed_gate_bound:
+                errors.append("validation.guardian_preseed_gate_bound mismatch")
+            if validation.get("external_preseed_gate_required") != bool(external_preseed_gate_count):
+                errors.append("validation.external_preseed_gate_required mismatch")
+            if validation.get("all_external_preseed_gates_ready") != all_external_preseed_gates_ready:
+                errors.append("validation.all_external_preseed_gates_ready mismatch")
+        else:
+            errors.append("validation must be a mapping")
 
         return {
             "ok": not errors and not missing_coverage and not unexpected_coverage,
@@ -2449,6 +2755,9 @@ class YaoyorozuRegistryService:
             "requested_optional_coverage_areas": list(normalized_requested_optional),
             "dispatch_coverage_areas": list(dispatch_coverage),
             "runtime_exec_ready": bool(units),
+            "guardian_preseed_gate_bound": guardian_preseed_gate_bound,
+            "external_preseed_gate_count": external_preseed_gate_count,
+            "all_external_preseed_gates_ready": all_external_preseed_gates_ready,
             "errors": errors,
         }
 
@@ -2488,6 +2797,32 @@ class YaoyorozuRegistryService:
             execution_root = Path(
                 _non_empty_string(unit.get("execution_workspace_root"), "unit.execution_workspace_root")
             ).resolve()
+            guardian_preseed_gate = unit.get("guardian_preseed_gate", {})
+            guardian_gate_validation = self._validate_guardian_preseed_gate(
+                guardian_preseed_gate if isinstance(guardian_preseed_gate, Mapping) else {},
+                dispatch_plan_ref=dispatch_plan_ref,
+                dispatch_unit_ref=str(unit["unit_id"]),
+                proposal_profile=str(dispatch_plan["proposal_profile"]),
+                coverage_area=str(unit["coverage_area"]),
+                workspace_ref=str(unit["execution_workspace_ref"]),
+                selected_workspace_root=str(unit["selected_workspace_root"]),
+                execution_workspace_root=str(execution_root),
+                execution_host_ref=str(unit["execution_host_ref"]),
+                workspace_scope=workspace_scope,
+                sandbox_seed_strategy=str(unit["sandbox_seed_strategy"]),
+                target_digest=str(unit["workspace_target_digest"]),
+                guardian_agent_id=str(
+                    guardian_preseed_gate.get("guardian_agent_id", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+            )
+            if workspace_scope == self._policy.external_workspace_scope and not guardian_gate_validation[
+                "gate_passed"
+            ]:
+                raise ValueError(
+                    "external workspace dispatch requires a passing guardian preseed gate before seeding"
+                )
             workspace_seed_status = "inline"
             workspace_seed_head_commit = ""
             if workspace_scope == self._policy.external_workspace_scope:
@@ -2699,8 +3034,23 @@ class YaoyorozuRegistryService:
                 "execution_host_ref": unit["execution_host_ref"],
                 "execution_transport_profile": unit["execution_transport_profile"],
                 "sandbox_seed_strategy": unit["sandbox_seed_strategy"],
+                "workspace_target_digest": unit["workspace_target_digest"],
                 "workspace_seed_status": workspace_seed_status,
                 "workspace_seed_head_commit": workspace_seed_head_commit,
+                "guardian_preseed_gate": dict(guardian_preseed_gate)
+                if isinstance(guardian_preseed_gate, Mapping)
+                else {},
+                "guardian_preseed_gate_status": (
+                    guardian_preseed_gate.get("gate_status", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+                "guardian_preseed_gate_digest": (
+                    guardian_preseed_gate.get("gate_digest", "")
+                    if isinstance(guardian_preseed_gate, Mapping)
+                    else ""
+                ),
+                "guardian_preseed_gate_bound": guardian_gate_validation["ok"],
                 "report": report,
             }
             if (
@@ -2790,6 +3140,15 @@ class YaoyorozuRegistryService:
             "patch_priority_profile": YAOYOROZU_WORKER_PATCH_PRIORITY_PROFILE,
             "highest_patch_priority_tier": highest_patch_priority_tier,
             "highest_patch_priority_score": highest_patch_priority_score,
+            "preseed_gate_profile": self._policy.workspace_guardian_gate_profile,
+            "guardian_preseed_gate_count": len(results),
+            "external_preseed_gate_pass_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and result["guardian_preseed_gate_bound"]
+                and result["guardian_preseed_gate_status"] == "pass"
+            ),
         }
         validation = {
             "command_digests_match": all(
@@ -2840,6 +3199,14 @@ class YaoyorozuRegistryService:
                 result["patch_candidate_receipt_ok"] for result in results
             ),
             "all_target_paths_ready": all(result["target_paths_ready"] for result in results),
+            "all_guardian_preseed_gates_bound": all(
+                result["guardian_preseed_gate_bound"] for result in results
+            ),
+            "all_external_preseed_gates_passed": all(
+                result["workspace_scope"] != self._policy.external_workspace_scope
+                or result["guardian_preseed_gate_status"] == "pass"
+                for result in results
+            ),
         }
         validation["ok"] = all(validation.values())
         receipt = {
@@ -2928,6 +3295,8 @@ class YaoyorozuRegistryService:
         target_ready_count = 0
         delta_bound_count = 0
         patch_candidate_bound_count = 0
+        guardian_preseed_gate_count = 0
+        external_preseed_gate_pass_count = 0
         for result in results:
             if not isinstance(result, Mapping):
                 errors.append("results entries must be mappings")
@@ -2976,6 +3345,44 @@ class YaoyorozuRegistryService:
                     errors.append("repo-local workspace results must record workspace_seed_status=inline")
                 if workspace_seed_head_commit:
                     errors.append("repo-local workspace results must not record workspace_seed_head_commit")
+            workspace_target_digest = str(result.get("workspace_target_digest", "")).strip()
+            if len(workspace_target_digest) != 64:
+                errors.append("worker result workspace_target_digest must be a sha256 digest")
+            guardian_gate = result.get("guardian_preseed_gate", {})
+            gate_validation = self._validate_guardian_preseed_gate(
+                guardian_gate if isinstance(guardian_gate, Mapping) else {},
+                dispatch_plan_ref=str(dispatch_receipt.get("dispatch_plan_ref", "")),
+                dispatch_unit_ref=str(result.get("unit_id", "")),
+                proposal_profile=str(proposal_profile),
+                coverage_area=str(result.get("coverage_area", "")),
+                workspace_ref=execution_workspace_ref,
+                selected_workspace_root=selected_workspace_root,
+                execution_workspace_root=execution_workspace_root,
+                execution_host_ref=execution_host_ref,
+                workspace_scope=str(workspace_scope),
+                sandbox_seed_strategy=str(sandbox_seed_strategy),
+                target_digest=workspace_target_digest,
+                guardian_agent_id=str(
+                    (guardian_gate if isinstance(guardian_gate, Mapping) else {}).get(
+                        "guardian_agent_id", ""
+                    )
+                ),
+            )
+            guardian_preseed_gate_count += 1
+            if not gate_validation["ok"]:
+                errors.extend(gate_validation["errors"])
+            if result.get("guardian_preseed_gate_bound") != gate_validation["ok"]:
+                errors.append("worker result guardian_preseed_gate_bound mismatch")
+            if result.get("guardian_preseed_gate_status") != (
+                "pass" if gate_validation["gate_required"] else "not-required"
+            ):
+                errors.append("worker result guardian_preseed_gate_status mismatch")
+            if result.get("guardian_preseed_gate_digest") != (
+                guardian_gate.get("gate_digest") if isinstance(guardian_gate, Mapping) else ""
+            ):
+                errors.append("worker result guardian_preseed_gate_digest mismatch")
+            if gate_validation["gate_required"] and gate_validation["gate_passed"]:
+                external_preseed_gate_pass_count += 1
             report = result.get("report", {})
             if not isinstance(report, Mapping):
                 errors.append("result.report must be a mapping")
@@ -3237,6 +3644,15 @@ class YaoyorozuRegistryService:
             != YAOYOROZU_WORKER_PATCH_CANDIDATE_PROFILE
         ):
             errors.append("execution_summary.patch_candidate_profile mismatch")
+        if execution_summary.get("preseed_gate_profile") != self._policy.workspace_guardian_gate_profile:
+            errors.append("execution_summary.preseed_gate_profile mismatch")
+        if execution_summary.get("guardian_preseed_gate_count") != guardian_preseed_gate_count:
+            errors.append("execution_summary.guardian_preseed_gate_count mismatch")
+        if (
+            execution_summary.get("external_preseed_gate_pass_count")
+            != external_preseed_gate_pass_count
+        ):
+            errors.append("execution_summary.external_preseed_gate_pass_count mismatch")
         validation = dispatch_receipt.get("validation", {})
         if not isinstance(validation, Mapping):
             errors.append("validation must be a mapping")
@@ -3285,6 +3701,17 @@ class YaoyorozuRegistryService:
                 isinstance(result, Mapping) and result.get("target_paths_ready") is True
                 for result in results
             ),
+            "all_guardian_preseed_gates_bound": all(
+                isinstance(result, Mapping)
+                and result.get("guardian_preseed_gate_bound") is True
+                for result in results
+            ),
+            "all_external_preseed_gates_passed": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or result.get("guardian_preseed_gate_status") == "pass"
+                for result in results
+            ),
         }
         expected_validation["ok"] = all(expected_validation.values())
         for key, expected_value in expected_validation.items():
@@ -3309,6 +3736,12 @@ class YaoyorozuRegistryService:
             "all_target_paths_ready": expected_validation["all_target_paths_ready"],
             "same_host_scope_only": expected_validation["same_host_scope_only"],
             "external_workspace_seeded": expected_validation["external_workspace_seeded"],
+            "all_guardian_preseed_gates_bound": expected_validation[
+                "all_guardian_preseed_gates_bound"
+            ],
+            "all_external_preseed_gates_passed": expected_validation[
+                "all_external_preseed_gates_passed"
+            ],
             "errors": errors,
         }
 
