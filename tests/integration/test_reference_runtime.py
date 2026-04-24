@@ -977,6 +977,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertIsNone(result["transitions"]["self_pause"]["pause_state"]["council_resolution_ref"])
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["identity-lifecycle"])
 
+    def test_identity_confirmation_demo_reports_multidimensional_profile(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_identity_confirmation_demo()
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["all_required_dimensions_present"])
+        self.assertTrue(result["validation"]["all_required_dimensions_pass"])
+        self.assertTrue(result["validation"]["subjective_self_report_bound"])
+        self.assertTrue(result["validation"]["third_party_witness_quorum_met"])
+        self.assertTrue(result["validation"]["confirmation_digest_bound"])
+        self.assertTrue(result["validation"]["ledger_event_bound"])
+        self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
+        self.assertEqual("passed", result["confirmation_profile"]["result"])
+        self.assertTrue(result["confirmation_profile"]["active_transition_allowed"])
+        self.assertEqual("failed", result["blocked_profile"]["result"])
+        self.assertFalse(result["blocked_profile"]["active_transition_allowed"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])
+
     def test_scheduler_demo_reports_timeout_rollback_and_completion(self) -> None:
         runtime = OmoikaneReferenceOS()
 

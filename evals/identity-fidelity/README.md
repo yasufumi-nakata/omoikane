@@ -5,6 +5,7 @@
 ## 実装済み eval
 
 - `identity_pause_resume_contract.yaml`
+- `identity_confirmation_profile.yaml`
 - `self_model_stability.yaml`
 - `naming_policy_contract.yaml`
 
@@ -14,6 +15,11 @@
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が
 `identity_record.pause_state` に残ることを保護する。
+
+`identity_confirmation_profile.yaml` は `identity-confirmation-demo` の
+multidimensional confirmation profile と対応し、episodic recall / SelfModel /
+subjective self-report / third-party witness quorum が揃った時だけ
+Active 遷移を許可することを保護する。
 
 ## 評価項目（暫定）
 

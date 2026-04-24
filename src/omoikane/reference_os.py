@@ -12400,6 +12400,137 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_identity_confirmation_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://identity-confirmation-demo/v1",
+            metadata={
+                "display_name": "Identity Confirmation Sandbox",
+                "lifecycle_phase": "ascending",
+            },
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.created",
+            payload={
+                "display_name": "Identity Confirmation Sandbox",
+                "lineage_id": identity.lineage_id,
+                "lifecycle_phase": "ascending",
+            },
+            actor="IdentityRegistry",
+            category="ascension",
+            layer="L1",
+            signature_roles=["self"],
+            substrate="classical-silicon",
+        )
+
+        profile = self.identity.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-demo/v1",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation",
+            episodic_recall_ref="episodic://identity-confirmation-demo/recall-window",
+            self_model_ref="self-model://identity-confirmation-demo/stable-snapshot",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-demo/v1",
+                "statement": "I experience this active transition as the same continuing self.",
+                "continuity_score": 0.92,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician-primary",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/episodic-recall",
+                    "alignment_score": 0.88,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation/guardian-observer",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation/self-model-check",
+                    "alignment_score": 0.9,
+                },
+            ],
+        )
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+        ledger_event = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="identity.confirmed",
+            payload={
+                "confirmation_id": profile["confirmation_id"],
+                "profile_id": profile["profile_id"],
+                "confirmation_digest": profile["confirmation_digest"],
+                "active_transition_allowed": profile["active_transition_allowed"],
+                "aggregate_score": profile["aggregate_score"],
+                "witness_quorum_status": profile["witness_quorum"]["status"],
+            },
+            actor="IdentityRegistry",
+            category="identity-fidelity",
+            layer="L1",
+            signature_roles=["self", "council", "guardian", "third_party"],
+            substrate="classical-silicon",
+        )
+
+        blocked_profile = self.identity.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-demo/blocked",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-blocked",
+            episodic_recall_ref="episodic://identity-confirmation-demo/blocked-recall",
+            self_model_ref="self-model://identity-confirmation-demo/blocked-snapshot",
+            episodic_recall_score=0.91,
+            self_model_alignment_score=0.83,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-demo/blocked",
+                "statement": "I cannot confirm continuity with the pre-upload self.",
+                "continuity_score": 0.42,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician-secondary",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/blocked-recall",
+                    "alignment_score": 0.79,
+                }
+            ],
+        )
+        blocked_validation = IdentityRegistry.validate_identity_confirmation(blocked_profile)
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "policy": {
+                "profile_id": profile["profile_id"],
+                "transition": profile["transition"],
+                "required_dimensions": profile["required_dimensions"],
+                "aggregate_threshold": profile["aggregate_threshold"],
+                "witness_quorum": profile["witness_quorum"],
+                "failure_action": "failed-ascension-or-repeat-ascending",
+            },
+            "confirmation_profile": profile,
+            "blocked_profile": blocked_profile,
+            "validation": {
+                **validation,
+                "blocked_profile_fail_closed": (
+                    blocked_profile["result"] == "failed"
+                    and blocked_profile["active_transition_allowed"] is False
+                    and "subjective-self-report-not-bound"
+                    in blocked_profile["failure_reasons"]
+                    and "third-party-witness-quorum-not-met"
+                    in blocked_profile["failure_reasons"]
+                    and blocked_validation["ok"] is False
+                    and blocked_validation["confirmation_digest_bound"] is True
+                ),
+                "ledger_event_bound": (
+                    ledger_event.payload["confirmation_digest"]
+                    == profile["confirmation_digest"]
+                ),
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_continuity_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://continuity-demo/v1",

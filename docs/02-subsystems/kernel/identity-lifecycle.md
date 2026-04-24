@@ -52,6 +52,14 @@
 - `pause(requested_by=council)` は fail-closed で `council_resolution_ref` を必須にする
 - `resume` は `self_proof` を必須にし、直前の `pause_state` に `resumed_at` と `resume_self_proof_ref` を残す
 - `identity_record.pause_state` は最新 1 回分の pause/resume cycle を machine-readable に保持する
+- `confirm_identity` は `multidimensional-identity-confirmation-v1` に固定し、
+  episodic recall、SelfModel alignment、subjective self-report、
+  third-party witness alignment を同一 profile へ束ねる
+- Active 遷移は 4 dimension 全 pass、aggregate score `>=0.85`、
+  subjective self-report digest binding、clinician + guardian の witness quorum
+  が揃った場合のみ許可する
+- 失敗時は `active_transition_allowed=false` と
+  `failure_action=failed-ascension-or-repeat-ascending` を返し、Active へ進めない
 
 ## 自己同一性確認テスト（Identity Confirmation）
 
@@ -63,6 +71,11 @@ Ascending → Active への遷移時に必ず実施：
 4. 第三者観察記録との照合
 
 すべて pass しなければ Active へ遷移しない（Failed か再 Ascending）。
+
+reference runtime ではこの確認を `identity_confirmation_profile.schema` で
+machine-readable に固定する。生の主観報告文や第三者観察本文は保持せず、
+`self_report.statement_digest`、各 dimension の `evidence_digest`、
+`confirmation_digest` を ContinuityLedger の `identity-fidelity` event へ束縛する。
 
 ## Fork（複製）の特殊性
 

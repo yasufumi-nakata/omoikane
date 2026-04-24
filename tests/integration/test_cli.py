@@ -915,6 +915,29 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["identity-lifecycle"])
 
+    def test_identity_confirmation_demo_emits_profile_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "identity-confirmation-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["subjective_self_report_bound"])
+        self.assertTrue(result["validation"]["third_party_witness_quorum_met"])
+        self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
+        self.assertEqual(
+            "multidimensional-identity-confirmation-v1",
+            result["confirmation_profile"]["profile_id"],
+        )
+        self.assertEqual("passed", result["confirmation_profile"]["result"])
+        self.assertEqual("met", result["confirmation_profile"]["witness_quorum"]["status"])
+        self.assertEqual("failed", result["blocked_profile"]["result"])
+
     def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:
         stdout = io.StringIO()
 

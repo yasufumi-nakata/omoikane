@@ -265,6 +265,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     identity_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    identity_confirmation_parser = subparsers.add_parser(
+        "identity-confirmation-demo",
+        help="Run the L1 identity confirmation profile scenario",
+    )
+    identity_confirmation_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON only",
+    )
+
     scheduler_parser = subparsers.add_parser(
         "scheduler-demo",
         help="Run the L1 ascension scheduler Method A/B/C, artifact sync, and verifier rotation scenario",
@@ -574,6 +584,10 @@ def main() -> None:
 
     if args.command == "identity-demo":
         _print_result(runtime.run_identity_demo(), args.json)
+        return
+
+    if args.command == "identity-confirmation-demo":
+        _print_result(runtime.run_identity_confirmation_demo(), args.json)
         return
 
     if args.command == "scheduler-demo":

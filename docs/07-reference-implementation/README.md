@@ -23,6 +23,7 @@ PYTHONPATH=src python3 -m omoikane.cli version-demo --json
 PYTHONPATH=src python3 -m omoikane.cli naming-demo --json
 PYTHONPATH=src python3 -m omoikane.cli continuity-demo --json
 PYTHONPATH=src python3 -m omoikane.cli identity-demo --json
+PYTHONPATH=src python3 -m omoikane.cli identity-confirmation-demo --json
 PYTHONPATH=src python3 -m omoikane.cli council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli multi-council-demo --json
 PYTHONPATH=src python3 -m omoikane.cli distributed-council-demo --json
@@ -108,6 +109,16 @@ frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
 Council resolution 付き pause、self proof のみ許可する resume、
 self-initiated pause では `council_resolution_ref` を持たないこと、
 最新 pause/resume cycle を `pause_state` と `identity-lifecycle` ledger event に残すことを確認する。
+
+`identity-confirmation-demo` は L1 IdentityRegistry の Ascending → Active
+identity confirmation contract (`kernel.identity.v0`) を JSON で可視化し、
+`multidimensional-identity-confirmation-v1` profile 上で
+episodic recall、SelfModel alignment、subjective self-report、
+third-party witness alignment の 4 dimension を固定し、
+subjective self-report digest と clinician + guardian witness quorum が揃った時だけ
+`active_transition_allowed=true` になることを確認する。
+同じ demo は低い self-report と witness quorum 不足を
+`failed-ascension-or-repeat-ascending` へ fail-closed する blocked profile も返す。
 
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、

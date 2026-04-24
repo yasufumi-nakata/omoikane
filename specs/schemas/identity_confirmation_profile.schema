@@ -1,0 +1,304 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/identity_confirmation_profile.schema"
+title: IdentityConfirmationProfile
+description: Digest-bound multidimensional identity confirmation profile for the Ascending to Active transition.
+type: object
+additionalProperties: false
+required:
+  - confirmation_id
+  - confirmed_at
+  - profile_id
+  - identity_id
+  - lineage_id
+  - transition
+  - consent_ref
+  - scheduler_stage_ref
+  - required_dimensions
+  - dimensions
+  - aggregate_score
+  - aggregate_threshold
+  - self_report
+  - third_party_witness_receipts
+  - witness_quorum
+  - result
+  - active_transition_allowed
+  - failure_action
+  - failure_reasons
+  - confirmation_digest
+properties:
+  confirmation_id:
+    type: string
+    pattern: "^identity-confirmation-[0-9a-f]{12}$"
+  confirmed_at:
+    type: string
+    format: date-time
+  profile_id:
+    type: string
+    const: multidimensional-identity-confirmation-v1
+  identity_id:
+    type: string
+    minLength: 1
+  lineage_id:
+    type: string
+    minLength: 1
+  transition:
+    type: string
+    const: ascending-to-active
+  consent_ref:
+    type: string
+    minLength: 1
+  scheduler_stage_ref:
+    type: string
+    minLength: 1
+  required_dimensions:
+    type: array
+    minItems: 4
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - episodic_recall
+        - self_model_alignment
+        - subjective_self_report
+        - third_party_witness_alignment
+  dimensions:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - dimension_id
+        - source_ref
+        - score
+        - threshold
+        - status
+        - evidence_digest
+      properties:
+        dimension_id:
+          type: string
+          enum:
+            - episodic_recall
+            - self_model_alignment
+            - subjective_self_report
+            - third_party_witness_alignment
+        source_ref:
+          type: string
+          minLength: 1
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          type: string
+          enum: [pass, fail]
+        evidence_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+  aggregate_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  aggregate_threshold:
+    type: number
+    const: 0.85
+  self_report:
+    type: object
+    additionalProperties: false
+    required:
+      - report_ref
+      - statement_digest
+      - continuity_score
+      - threshold
+      - status
+      - evidence_digest
+    properties:
+      report_ref:
+        type: string
+        minLength: 1
+      statement_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      continuity_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      threshold:
+        type: number
+        const: 0.85
+      status:
+        type: string
+        enum: [pass, fail]
+      evidence_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  third_party_witness_receipts:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - witness_id
+        - witness_role
+        - observation_ref
+        - alignment_score
+        - threshold
+        - status
+        - evidence_digest
+      properties:
+        witness_id:
+          type: string
+          minLength: 1
+        witness_role:
+          type: string
+          minLength: 1
+        observation_ref:
+          type: string
+          minLength: 1
+        alignment_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        threshold:
+          type: number
+          const: 0.8
+        status:
+          type: string
+          enum: [pass, fail]
+        evidence_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+  witness_quorum:
+    type: object
+    additionalProperties: false
+    required:
+      - required_count
+      - accepted_count
+      - required_roles
+      - accepted_roles
+      - status
+    properties:
+      required_count:
+        type: integer
+        const: 2
+      accepted_count:
+        type: integer
+        minimum: 0
+      required_roles:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          enum: [clinician, guardian]
+      accepted_roles:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      status:
+        type: string
+        enum: [met, missing]
+  result:
+    type: string
+    enum: [passed, failed]
+  active_transition_allowed:
+    type: boolean
+  failure_action:
+    type: string
+    enum: [none, failed-ascension-or-repeat-ascending]
+  failure_reasons:
+    type: array
+    items:
+      type: string
+      enum:
+        - dimension-threshold-not-met
+        - subjective-self-report-not-bound
+        - third-party-witness-quorum-not-met
+        - aggregate-threshold-not-met
+  confirmation_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - confirmation_id: identity-confirmation-123456789abc
+    confirmed_at: "2026-04-24T12:00:00+00:00"
+    profile_id: multidimensional-identity-confirmation-v1
+    identity_id: id-0001
+    lineage_id: id-0001
+    transition: ascending-to-active
+    consent_ref: consent://identity-confirmation-demo/v1
+    scheduler_stage_ref: scheduler://method-a/identity-confirmation
+    required_dimensions:
+      - episodic_recall
+      - self_model_alignment
+      - subjective_self_report
+      - third_party_witness_alignment
+    dimensions:
+      - dimension_id: episodic_recall
+        source_ref: episodic://identity-confirmation-demo/recall-window
+        score: 0.93
+        threshold: 0.85
+        status: pass
+        evidence_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      - dimension_id: self_model_alignment
+        source_ref: self-model://identity-confirmation-demo/stable-snapshot
+        score: 0.89
+        threshold: 0.8
+        status: pass
+        evidence_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      - dimension_id: subjective_self_report
+        source_ref: self-report://identity-confirmation-demo/v1
+        score: 0.92
+        threshold: 0.85
+        status: pass
+        evidence_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      - dimension_id: third_party_witness_alignment
+        source_ref: witness-quorum://identity-confirmation
+        score: 0.89
+        threshold: 0.8
+        status: pass
+        evidence_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    aggregate_score: 0.908
+    aggregate_threshold: 0.85
+    self_report:
+      report_ref: self-report://identity-confirmation-demo/v1
+      statement_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      continuity_score: 0.92
+      threshold: 0.85
+      status: pass
+      evidence_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    third_party_witness_receipts:
+      - witness_id: witness://identity-confirmation/clinician-primary
+        witness_role: clinician
+        observation_ref: observation://identity-confirmation/episodic-recall
+        alignment_score: 0.88
+        threshold: 0.8
+        status: pass
+        evidence_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      - witness_id: witness://identity-confirmation/guardian-observer
+        witness_role: guardian
+        observation_ref: observation://identity-confirmation/self-model-check
+        alignment_score: 0.9
+        threshold: 0.8
+        status: pass
+        evidence_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    witness_quorum:
+      required_count: 2
+      accepted_count: 2
+      required_roles: [clinician, guardian]
+      accepted_roles: [clinician, guardian]
+      status: met
+    result: passed
+    active_transition_allowed: true
+    failure_action: none
+    failure_reasons: []
+    confirmation_digest: "1111111111111111111111111111111111111111111111111111111111111111"

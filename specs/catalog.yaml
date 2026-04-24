@@ -63,6 +63,15 @@ entries:
     rationale: Required to serialize the reference identity lifecycle record, including the bounded pause/resume cycle metadata.
   - priority: P1
     kind: schema
+    file: specs/schemas/identity_confirmation_profile.schema
+    consumers:
+      - specs/interfaces/kernel.identity.v0.idl
+      - reference-runtime
+      - docs/02-subsystems/kernel/identity-lifecycle.md
+      - evals/identity-fidelity/identity_confirmation_profile.yaml
+    rationale: Required to serialize the multidimensional Ascending to Active identity confirmation profile with self-report and third-party witness quorum binding.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ethics_event.schema
     consumers:
       - specs/schemas/ethics_decision.yaml
@@ -2330,6 +2339,15 @@ entries:
       - docs/02-subsystems/kernel/identity-lifecycle.md
       - agents/builders/eval-builder.yaml
     rationale: Protects council-approved pause, self-only resume, and last pause-cycle audit metadata across the identity lifecycle contract.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/identity_confirmation_profile.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/kernel/identity-lifecycle.md
+      - agents/guardians/identity-guardian.yaml
+      - agents/builders/eval-builder.yaml
+    rationale: Protects the multidimensional identity confirmation profile, subjective self-report digest binding, and clinician plus guardian witness quorum before Active transition.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_stability.yaml

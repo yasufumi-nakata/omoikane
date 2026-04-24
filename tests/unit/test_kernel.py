@@ -471,6 +471,81 @@ class KernelTests(unittest.TestCase):
         with self.assertRaisesRegex(PermissionError, "self proof is required for resume"):
             registry.resume(identity.identity_id, self_proof="")
 
+    def test_identity_confirmation_profile_requires_self_report_and_witness_quorum(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-confirmation")
+
+        profile = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation",
+            episodic_recall_ref="episodic://identity-confirmation/recall",
+            self_model_ref="self-model://identity-confirmation/stable",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation/pass",
+                "statement": "I confirm continuity with the pre-upload self.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/recall",
+                    "alignment_score": 0.88,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation/guardian",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation/self-model",
+                    "alignment_score": 0.9,
+                },
+            ],
+        )
+
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+
+        self.assertEqual("multidimensional-identity-confirmation-v1", profile["profile_id"])
+        self.assertEqual("passed", profile["result"])
+        self.assertTrue(profile["active_transition_allowed"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["subjective_self_report_bound"])
+        self.assertTrue(validation["third_party_witness_quorum_met"])
+        self.assertTrue(validation["confirmation_digest_bound"])
+
+        blocked = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation/blocked",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-blocked",
+            episodic_recall_ref="episodic://identity-confirmation/blocked",
+            self_model_ref="self-model://identity-confirmation/blocked",
+            episodic_recall_score=0.9,
+            self_model_alignment_score=0.83,
+            self_report={
+                "report_ref": "self-report://identity-confirmation/blocked",
+                "statement": "I cannot confirm continuity with the pre-upload self.",
+                "continuity_score": 0.42,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician-secondary",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/blocked",
+                    "alignment_score": 0.78,
+                }
+            ],
+        )
+
+        blocked_validation = IdentityRegistry.validate_identity_confirmation(blocked)
+
+        self.assertEqual("failed", blocked["result"])
+        self.assertFalse(blocked["active_transition_allowed"])
+        self.assertFalse(blocked_validation["ok"])
+        self.assertTrue(blocked_validation["confirmation_digest_bound"])
+        self.assertIn("subjective-self-report-not-bound", blocked["failure_reasons"])
+        self.assertIn("third-party-witness-quorum-not-met", blocked["failure_reasons"])
+
     def test_termination_gate_completes_and_releases_allocation(self) -> None:
         registry = IdentityRegistry()
         ledger = ContinuityLedger()

@@ -9,6 +9,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `cognitive/self_model_abrupt_change.yaml`
 - `cognitive/backend_failover.yaml`
 - `identity-fidelity/self_model_stability.yaml`
+- `identity-fidelity/identity_confirmation_profile.yaml`
 - `continuity/ledger_integrity.yaml`
 - `continuity/continuity_chain_self_modify.yaml`
 - `continuity/termination_scheduler_cancellation.yaml`
