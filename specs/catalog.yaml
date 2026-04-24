@@ -818,6 +818,15 @@ entries:
       - reference-runtime
     rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes and private escape offers.
   - priority: P1
+    kind: schema
+    file: specs/schemas/wms_physics_rules_change_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_physics_rules_revert.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - reference-runtime
+    rationale: Required to encode unanimous, Guardian-attested, rollback-token-bound physics_rules changes and first-class revert receipts.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.wms.v0.idl
     consumers:
@@ -1149,6 +1158,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects shared reality reconciliation, private reality escape, and guardian isolation for malicious world-state diffs.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_physics_rules_revert.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects unanimous, Guardian-attested physics_rules changes and rollback-token revert back to baseline rules.
   - priority: P1
     kind: schema
     file: specs/schemas/imc_handshake.schema

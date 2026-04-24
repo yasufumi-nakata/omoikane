@@ -120,6 +120,30 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("private_reality", result["wms"]["escape"]["new_mode"])
 
+    def test_wms_demo_emits_reversible_physics_rules_change(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "wms-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["minor_reconciled"])
+        self.assertTrue(result["validation"]["major_escape_offered"])
+        self.assertTrue(result["validation"]["malicious_isolated"])
+        self.assertTrue(result["validation"]["private_escape_honored"])
+        self.assertTrue(result["validation"]["physics_change_reversible"])
+        self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
+        self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
+        self.assertEqual(
+            result["scenarios"]["physics_change"]["change_id"],
+            result["scenarios"]["physics_revert"]["revert_of_change_id"],
+        )
+        self.assertEqual(
+            result["initial_state"]["physics_rules_ref"],
+            result["final_state"]["physics_rules_ref"],
+        )
+
     def test_ewa_demo_emits_vetoed_irreversible_command(self) -> None:
         stdout = io.StringIO()
 

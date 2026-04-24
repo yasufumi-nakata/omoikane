@@ -6,6 +6,7 @@ summary: Canonical L6 contract for deterministic shared/private world-state reco
 imports:
   world_state: ../schemas/world_state.schema
   wms_reconcile: ../schemas/wms_reconcile.schema
+  wms_physics_rules_change_receipt: ../schemas/wms_physics_rules_change_receipt.schema
 operations:
   snapshot:
     summary: Read the current world state for one WMS session.
@@ -139,6 +140,85 @@ operations:
           audit_event_ref:
             type: string
             minLength: 1
+  propose_physics_rules_change:
+    summary: Apply one reversible shared-reality physics-rules change after unanimous participant approval and Guardian attestation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - requested_by
+          - proposed_physics_rules_ref
+          - rationale
+          - participant_approvals
+          - guardian_attested
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          requested_by:
+            type: string
+            minLength: 1
+          proposed_physics_rules_ref:
+            type: string
+            minLength: 1
+          rationale:
+            type: string
+            minLength: 1
+          participant_approvals:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          guardian_attested:
+            type: boolean
+          reversible:
+            type: boolean
+            default: true
+          rollback_physics_rules_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: wms_physics_rules_change_receipt
+    guarantees:
+      - requester must be a current session participant
+      - participant approvals must cover every current session participant
+      - Guardian attestation and a rollback token are required before apply
+      - successful apply must bind rollback_physics_rules_ref to the previous physics_rules_ref
+  revert_physics_rules_change:
+    summary: Revert one applied physics-rules change through its bound rollback token.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - change_id
+          - requested_by
+          - reason
+          - guardian_attested
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          change_id:
+            type: string
+            minLength: 8
+          requested_by:
+            type: string
+            minLength: 1
+          reason:
+            type: string
+            minLength: 1
+          guardian_attested:
+            type: boolean
+    output:
+      schema_ref: wms_physics_rules_change_receipt
+    guarantees:
+      - change_id must refer to a prior applied physics-rules change in the same session
+      - revert must restore the bound rollback_physics_rules_ref and preserve the original rollback token
+      - a physics-rules change can be reverted only once
   observe_violation:
     summary: Read the most recent WMS violation or malicious injection report.
     input:
@@ -220,3 +300,9 @@ events:
           audit_event_ref:
             type: string
             minLength: 1
+  wms.physics_rules_changed:
+    payload:
+      schema_ref: wms_physics_rules_change_receipt
+  wms.physics_rules_reverted:
+    payload:
+      schema_ref: wms_physics_rules_change_receipt

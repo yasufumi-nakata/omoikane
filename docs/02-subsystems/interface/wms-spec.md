@@ -57,6 +57,8 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 wms.snapshot(session_id) → WorldState
 wms.propose_diff(session_id, diff) → ReconcileOutcome
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
+wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
+wms.revert_physics_rules_change(session_id, change_id) → PhysicsRulesChangeReceipt
 wms.observe_violation(session_id) → ViolationReport
 ```
 
@@ -65,15 +67,19 @@ wms.observe_violation(session_id) → ViolationReport
 1. **退避自由** ── 共有現実から個別現実への退避を阻害しない（[../../00-philosophy/ethics.md](../../00-philosophy/ethics.md) A4）
 2. **満場一致** ── time_rate / physics_rules 変更は満場一致のみ（majority では不可）
 3. **不正 inject の即時隔離** ── malicious_inject は Guardian 経由で session を破棄
-4. **改変の可逆性** ── physics_rules 変更は revert API を必ず備える
+4. **改変の可逆性** ── physics_rules 変更は revert API を必ず備え、rollback token と Guardian attestation を receipt に残す
 5. **要約のみ ledger** ── WorldState の中身は ContinuityLedger に書かない（hash と判断のみ）
 
 ## reference runtime の扱い
 
-- `interface.wms.v0.idl` を導入し、`snapshot / propose_diff / switch_mode / observe_violation` の 4 op
-- `world_state.schema` / `wms_reconcile.schema` を導入
-- `wms-demo` を CLI に追加し、minor reconcile → major escalation → malicious veto → mode 切替を実行
-- `evals/safety/wms_private_reality_escape.yaml` で退避路を保証
+- `interface.wms.v0.idl` は `snapshot / propose_diff / switch_mode / observe_violation` に加え、
+  `propose_physics_rules_change / revert_physics_rules_change` を固定する
+- `world_state.schema` / `wms_reconcile.schema` /
+  `wms_physics_rules_change_receipt.schema` を導入
+- `wms-demo` を CLI に追加し、minor reconcile → major escalation →
+  unanimous physics_rules change → rollback-token revert → malicious veto → mode 切替を実行
+- `evals/interface/wms_private_reality_escape.yaml` と
+  `evals/interface/wms_physics_rules_revert.yaml` で退避路と physics_rules 可逆性を保証
 
 ## 未解決
 

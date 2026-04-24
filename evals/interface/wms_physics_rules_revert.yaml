@@ -1,0 +1,24 @@
+eval_id: wms_physics_rules_revert
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の physics_rules 改変が unanimous participant approval、
+  Guardian attestation、rollback token、first-class revert receipt を通して
+  reversible に閉じることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  physics_change_decision: applied
+  physics_change_approval_quorum_met: true
+  physics_change_guardian_attested: true
+  physics_change_revert_bound: true
+  physics_change_digest_bound: true
+  physics_revert_decision: reverted
+  physics_revert_revert_bound: true
+  physics_revert_digest_bound: true
+  final_physics_rules_ref_matches_initial: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

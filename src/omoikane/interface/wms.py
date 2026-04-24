@@ -5,14 +5,17 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Sequence
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 WMS_SCHEMA_VERSION = "1.0"
 WMS_MINOR_DIFF_THRESHOLD = 0.05
 WMS_DEFAULT_TIME_RATE = 1.0
 WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
+WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
 WMS_ALLOWED_MODES = {"shared_reality", "private_reality", "mixed"}
 WMS_ALLOWED_AUTHORITIES = {"consensus", "local", "broker"}
+WMS_PHYSICS_CHANGE_OPERATIONS = {"apply", "revert"}
+WMS_PHYSICS_CHANGE_DECISIONS = {"applied", "reverted", "rejected"}
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -23,6 +26,10 @@ def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
             seen.add(value)
             ordered.append(value)
     return ordered
+
+
+def _physics_rules_change_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
 class WorldModelSync:
@@ -39,6 +46,13 @@ class WorldModelSync:
             "default_time_rate": WMS_DEFAULT_TIME_RATE,
             "private_escape_free": True,
             "malicious_inject_action": "guardian-veto",
+            "physics_rules_change_policy": {
+                "policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
+                "required_approval": "unanimous-participant-approval",
+                "guardian_attestation_required": True,
+                "rollback_token_required": True,
+                "revert_operation_required": True,
+            },
             "consensus_policy": {
                 "minor_diff": "consensus_round",
                 "major_diff": "offer-private-reality",
@@ -89,6 +103,7 @@ class WorldModelSync:
             "consensus_rounds": 0,
             "last_reconcile": None,
             "last_violation": None,
+            "physics_change_log": [],
         }
         self.sessions[session_id] = session
         return deepcopy(session)
@@ -240,6 +255,158 @@ class WorldModelSync:
             "audit_event_ref": f"ledger://wms-mode/{new_id('wms-mode')}",
         }
 
+    def propose_physics_rules_change(
+        self,
+        session_id: str,
+        *,
+        requested_by: str,
+        proposed_physics_rules_ref: str,
+        rationale: str,
+        participant_approvals: Sequence[str],
+        guardian_attested: bool,
+        reversible: bool = True,
+        rollback_physics_rules_ref: str | None = None,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        requester = self._normalize_non_empty_string(requested_by, "requested_by")
+        proposed_ref = self._normalize_non_empty_string(
+            proposed_physics_rules_ref,
+            "proposed_physics_rules_ref",
+        )
+        rationale_text = self._normalize_non_empty_string(rationale, "rationale")
+        approvals = self._normalize_string_list(
+            participant_approvals,
+            "participant_approvals",
+        )
+        previous_ref = session["current_state"]["physics_rules_ref"]
+        rollback_ref = (
+            self._normalize_non_empty_string(
+                rollback_physics_rules_ref,
+                "rollback_physics_rules_ref",
+            )
+            if rollback_physics_rules_ref is not None
+            else previous_ref
+        )
+        required_approvals = list(session["current_state"]["participants"])
+        approval_quorum_met = set(required_approvals).issubset(set(approvals))
+        requester_allowed = requester in required_approvals
+        reversible_ok = bool(reversible) and rollback_ref == previous_ref
+        guardian_ok = bool(guardian_attested)
+        can_apply = (
+            requester_allowed
+            and approval_quorum_met
+            and guardian_ok
+            and reversible_ok
+            and proposed_ref != previous_ref
+        )
+        change_id = new_id("wms-physics-change")
+        recorded_at = utc_now_iso()
+        resulting_ref = proposed_ref if can_apply else previous_ref
+        if can_apply:
+            session["current_state"]["physics_rules_ref"] = proposed_ref
+            session["current_state"]["state_id"] = new_id("world-state")
+            session["current_state"]["recorded_at"] = recorded_at
+
+        receipt = {
+            "kind": "wms_physics_rules_change_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "operation": "apply",
+            "change_id": change_id,
+            "session_id": session_id,
+            "requested_by": requester,
+            "recorded_at": recorded_at,
+            "rationale": rationale_text,
+            "previous_physics_rules_ref": previous_ref,
+            "proposed_physics_rules_ref": proposed_ref,
+            "resulting_physics_rules_ref": resulting_ref,
+            "approval_policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
+            "required_approvals": required_approvals,
+            "participant_approvals": approvals,
+            "approval_quorum_met": approval_quorum_met,
+            "guardian_attested": guardian_ok,
+            "reversible": bool(reversible),
+            "rollback_physics_rules_ref": rollback_ref,
+            "rollback_token_ref": f"rollback://wms-physics/{change_id}",
+            "decision": "applied" if can_apply else "rejected",
+            "revert_of_change_id": "",
+            "reverted": False,
+            "resulting_state_id": session["current_state"]["state_id"],
+            "audit_event_ref": f"ledger://wms-physics/{change_id}",
+        }
+        receipt["digest"] = sha256_text(canonical_json(_physics_rules_change_digest_payload(receipt)))
+        session["physics_change_log"].append(deepcopy(receipt))
+        return deepcopy(receipt)
+
+    def revert_physics_rules_change(
+        self,
+        session_id: str,
+        *,
+        change_id: str,
+        requested_by: str,
+        reason: str,
+        guardian_attested: bool,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        target_change_id = self._normalize_non_empty_string(change_id, "change_id")
+        requester = self._normalize_non_empty_string(requested_by, "requested_by")
+        reason_text = self._normalize_non_empty_string(reason, "reason")
+        participants = list(session["current_state"]["participants"])
+        if requester not in participants:
+            raise ValueError("requested_by must be a session participant")
+        if not guardian_attested:
+            raise ValueError("guardian_attested must be true for physics rules revert")
+        target_receipt = None
+        for receipt in session["physics_change_log"]:
+            if receipt.get("change_id") == target_change_id and receipt.get("operation") == "apply":
+                target_receipt = receipt
+                break
+        if target_receipt is None or target_receipt.get("decision") != "applied":
+            raise ValueError("change_id must refer to an applied physics rules change")
+        if any(
+            receipt.get("operation") == "revert"
+            and receipt.get("revert_of_change_id") == target_change_id
+            for receipt in session["physics_change_log"]
+        ):
+            raise ValueError("physics rules change has already been reverted")
+
+        revert_id = new_id("wms-physics-revert")
+        recorded_at = utc_now_iso()
+        previous_ref = session["current_state"]["physics_rules_ref"]
+        rollback_ref = target_receipt["rollback_physics_rules_ref"]
+        session["current_state"]["physics_rules_ref"] = rollback_ref
+        session["current_state"]["state_id"] = new_id("world-state")
+        session["current_state"]["recorded_at"] = recorded_at
+
+        receipt = {
+            "kind": "wms_physics_rules_change_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "operation": "revert",
+            "change_id": revert_id,
+            "session_id": session_id,
+            "requested_by": requester,
+            "recorded_at": recorded_at,
+            "rationale": reason_text,
+            "previous_physics_rules_ref": previous_ref,
+            "proposed_physics_rules_ref": target_receipt["proposed_physics_rules_ref"],
+            "resulting_physics_rules_ref": rollback_ref,
+            "approval_policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
+            "required_approvals": participants,
+            "participant_approvals": participants,
+            "approval_quorum_met": True,
+            "guardian_attested": True,
+            "reversible": True,
+            "rollback_physics_rules_ref": rollback_ref,
+            "rollback_token_ref": target_receipt["rollback_token_ref"],
+            "decision": "reverted",
+            "revert_of_change_id": target_change_id,
+            "reverted": True,
+            "resulting_state_id": session["current_state"]["state_id"],
+            "audit_event_ref": f"ledger://wms-physics-revert/{revert_id}",
+        }
+        receipt["digest"] = sha256_text(canonical_json(_physics_rules_change_digest_payload(receipt)))
+        session["physics_change_log"].append(deepcopy(receipt))
+        return deepcopy(receipt)
+
     def observe_violation(self, session_id: str) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if session["last_violation"] is None:
@@ -292,6 +459,101 @@ class WorldModelSync:
             "time_rate_locked": float(time_rate or 0) == WMS_DEFAULT_TIME_RATE,
             "authority_valid": authority in WMS_ALLOWED_AUTHORITIES,
             "participants_count": len(participants) if isinstance(participants, list) else 0,
+        }
+
+    def validate_physics_rules_change(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        if receipt.get("kind") != "wms_physics_rules_change_receipt":
+            errors.append("kind must equal wms_physics_rules_change_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        operation = receipt.get("operation")
+        if operation not in WMS_PHYSICS_CHANGE_OPERATIONS:
+            errors.append(f"operation must be one of {sorted(WMS_PHYSICS_CHANGE_OPERATIONS)}")
+        decision = receipt.get("decision")
+        if decision not in WMS_PHYSICS_CHANGE_DECISIONS:
+            errors.append(f"decision must be one of {sorted(WMS_PHYSICS_CHANGE_DECISIONS)}")
+        for field_name in (
+            "change_id",
+            "session_id",
+            "requested_by",
+            "recorded_at",
+            "rationale",
+            "previous_physics_rules_ref",
+            "proposed_physics_rules_ref",
+            "resulting_physics_rules_ref",
+            "rollback_physics_rules_ref",
+            "rollback_token_ref",
+            "resulting_state_id",
+            "audit_event_ref",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        if receipt.get("approval_policy_id") != WMS_PHYSICS_CHANGE_POLICY_ID:
+            errors.append("approval_policy_id mismatch")
+        required_approvals = receipt.get("required_approvals")
+        participant_approvals = receipt.get("participant_approvals")
+        required_set: set[str] = set()
+        approval_set: set[str] = set()
+        if not isinstance(required_approvals, list) or not required_approvals:
+            errors.append("required_approvals must be a non-empty list")
+        else:
+            required_set = {
+                value for value in required_approvals if isinstance(value, str) and value.strip()
+            }
+            if len(required_set) != len(required_approvals):
+                errors.append("required_approvals must contain unique non-empty strings")
+        if not isinstance(participant_approvals, list) or not participant_approvals:
+            errors.append("participant_approvals must be a non-empty list")
+        else:
+            approval_set = {
+                value for value in participant_approvals if isinstance(value, str) and value.strip()
+            }
+            if len(approval_set) != len(participant_approvals):
+                errors.append("participant_approvals must contain unique non-empty strings")
+        approval_quorum_met = bool(required_set) and required_set.issubset(approval_set)
+        if receipt.get("approval_quorum_met") is not approval_quorum_met:
+            errors.append("approval_quorum_met must reflect required_approvals subset")
+        if receipt.get("guardian_attested") is not True:
+            errors.append("guardian_attested must be true")
+        if receipt.get("reversible") is not True:
+            errors.append("reversible must be true")
+        revert_bound = False
+        if operation == "apply":
+            if decision == "applied":
+                revert_bound = (
+                    receipt.get("rollback_physics_rules_ref")
+                    == receipt.get("previous_physics_rules_ref")
+                    and receipt.get("resulting_physics_rules_ref")
+                    == receipt.get("proposed_physics_rules_ref")
+                    and receipt.get("revert_of_change_id") == ""
+                    and receipt.get("reverted") is False
+                )
+                if not revert_bound:
+                    errors.append("applied physics change must bind rollback to previous rules")
+            elif decision != "rejected":
+                errors.append("apply operation decision must be applied or rejected")
+        if operation == "revert":
+            revert_bound = (
+                decision == "reverted"
+                and receipt.get("rollback_physics_rules_ref")
+                == receipt.get("resulting_physics_rules_ref")
+                and isinstance(receipt.get("revert_of_change_id"), str)
+                and bool(receipt.get("revert_of_change_id"))
+                and receipt.get("reverted") is True
+            )
+            if not revert_bound:
+                errors.append("revert operation must restore rollback rules and bind revert_of_change_id")
+        expected_digest = sha256_text(canonical_json(_physics_rules_change_digest_payload(receipt)))
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match physics rules change receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "approval_quorum_met": approval_quorum_met,
+            "guardian_attested": receipt.get("guardian_attested") is True,
+            "revert_bound": revert_bound,
+            "digest_bound": digest_bound,
         }
 
     def _classify_diff(

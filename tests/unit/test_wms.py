@@ -75,6 +75,74 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertEqual("isolate-session", violation["guardian_action"])
         self.assertTrue(violation["violation_detected"])
 
+    def test_physics_rules_change_requires_unanimous_reversible_receipt(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+        baseline = sync.snapshot(session["session_id"])
+
+        receipt = sync.propose_physics_rules_change(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref="physics://shared-atrium/low-gravity-v1",
+            rationale="bounded rehearsal",
+            participant_approvals=["identity://primary", "identity://peer"],
+            guardian_attested=True,
+        )
+        changed = sync.snapshot(session["session_id"])
+        validation = sync.validate_physics_rules_change(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["approval_quorum_met"])
+        self.assertTrue(validation["revert_bound"])
+        self.assertTrue(validation["digest_bound"])
+        self.assertEqual("applied", receipt["decision"])
+        self.assertEqual(
+            "physics://shared-atrium/low-gravity-v1",
+            changed["physics_rules_ref"],
+        )
+        self.assertEqual(baseline["physics_rules_ref"], receipt["rollback_physics_rules_ref"])
+
+        reverted = sync.revert_physics_rules_change(
+            session["session_id"],
+            change_id=receipt["change_id"],
+            requested_by="identity://primary",
+            reason="rehearsal complete",
+            guardian_attested=True,
+        )
+        reverted_state = sync.snapshot(session["session_id"])
+        revert_validation = sync.validate_physics_rules_change(reverted)
+
+        self.assertTrue(revert_validation["ok"])
+        self.assertEqual("reverted", reverted["decision"])
+        self.assertEqual(receipt["change_id"], reverted["revert_of_change_id"])
+        self.assertEqual(baseline["physics_rules_ref"], reverted_state["physics_rules_ref"])
+        self.assertEqual(receipt["rollback_token_ref"], reverted["rollback_token_ref"])
+
+    def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+        baseline = sync.snapshot(session["session_id"])
+
+        receipt = sync.propose_physics_rules_change(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref="physics://shared-atrium/low-gravity-v1",
+            rationale="bounded rehearsal",
+            participant_approvals=["identity://primary"],
+            guardian_attested=True,
+        )
+        unchanged = sync.snapshot(session["session_id"])
+
+        self.assertEqual("rejected", receipt["decision"])
+        self.assertFalse(receipt["approval_quorum_met"])
+        self.assertEqual(baseline["physics_rules_ref"], unchanged["physics_rules_ref"])
+
 
 if __name__ == "__main__":
     unittest.main()

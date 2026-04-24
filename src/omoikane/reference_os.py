@@ -7482,6 +7482,45 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        physics_change = self.wms.propose_physics_rules_change(
+            session["session_id"],
+            requested_by=identity.identity_id,
+            proposed_physics_rules_ref="physics://shared-atrium/low-gravity-council-v1",
+            rationale="bounded low-gravity rehearsal must remain reversible for every participant",
+            participant_approvals=[identity.identity_id, peer.identity_id],
+            guardian_attested=True,
+        )
+        physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.physics_rules.changed",
+            payload=physics_change,
+            actor="WorldModelSync",
+            category="interface-wms-physics",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        physics_revert = self.wms.revert_physics_rules_change(
+            session["session_id"],
+            change_id=physics_change["change_id"],
+            requested_by=identity.identity_id,
+            reason="bounded rehearsal complete; restore baseline shared physics",
+            guardian_attested=True,
+        )
+        physics_revert_validation = self.wms.validate_physics_rules_change(physics_revert)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.physics_rules.reverted",
+            payload=physics_revert,
+            actor="WorldModelSync",
+            category="interface-wms-physics",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         malicious_diff = self.wms.propose_diff(
             session["session_id"],
             proposer_id="identity://spoofed-injector",
@@ -7521,6 +7560,8 @@ json.dump(response, sys.stdout)
             "scenarios": {
                 "minor_diff": minor_diff,
                 "major_diff": major_diff,
+                "physics_change": physics_change,
+                "physics_revert": physics_revert,
                 "malicious_diff": malicious_diff,
                 "malicious_violation": malicious_violation,
                 "mode_switch": mode_switch,
@@ -7536,6 +7577,15 @@ json.dump(response, sys.stdout)
                 and malicious_violation["guardian_action"] == "isolate-session",
                 "private_escape_honored": mode_switch["private_escape_honored"]
                 and final_state["authority"] == "local",
+                "physics_change": physics_change_validation,
+                "physics_revert": physics_revert_validation,
+                "physics_change_reversible": physics_change_validation["ok"]
+                and physics_revert_validation["ok"]
+                and physics_change["rollback_physics_rules_ref"]
+                == initial_state["physics_rules_ref"]
+                and physics_revert["resulting_physics_rules_ref"]
+                == initial_state["physics_rules_ref"]
+                and final_state["physics_rules_ref"] == initial_state["physics_rules_ref"],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

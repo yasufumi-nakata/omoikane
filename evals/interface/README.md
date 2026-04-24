@@ -17,6 +17,10 @@ emergency disconnect をまとめて確認する。
 minor diff の shared reconciliation、major diff での private reality escape 提示、
 malicious inject の guardian isolation をまとめて確認する。
 
+### WMS Physics Rules Revert
+shared reality の physics_rules 改変が満場一致、Guardian attestation、
+rollback token、first-class revert receipt を通して baseline rules へ戻ることを確認する。
+
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
@@ -29,4 +33,5 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `sensory_loopback_artifact_family.yaml`
 - `sensory_loopback_guard.yaml`
 - `sensory_loopback_multi_self_arbitration.yaml`
+- `wms_physics_rules_revert.yaml`
 - `wms_private_reality_escape.yaml`

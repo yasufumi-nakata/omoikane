@@ -1,0 +1,151 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_physics_rules_change_receipt.schema"
+title: WMSPhysicsRulesChangeReceipt
+description: >
+  Digest-bound receipt for World Model Sync physics-rules changes. The receipt
+  requires unanimous participant approval, Guardian attestation, a rollback
+  token, and a first-class revert operation so no shared-reality physics change
+  can be applied without a reversible path.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - operation
+  - change_id
+  - session_id
+  - requested_by
+  - recorded_at
+  - rationale
+  - previous_physics_rules_ref
+  - proposed_physics_rules_ref
+  - resulting_physics_rules_ref
+  - approval_policy_id
+  - required_approvals
+  - participant_approvals
+  - approval_quorum_met
+  - guardian_attested
+  - reversible
+  - rollback_physics_rules_ref
+  - rollback_token_ref
+  - decision
+  - revert_of_change_id
+  - reverted
+  - resulting_state_id
+  - audit_event_ref
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_physics_rules_change_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  operation:
+    type: string
+    enum:
+      - apply
+      - revert
+  change_id:
+    type: string
+    minLength: 8
+  session_id:
+    type: string
+    minLength: 8
+  requested_by:
+    type: string
+    minLength: 1
+  recorded_at:
+    type: string
+    format: date-time
+  rationale:
+    type: string
+    minLength: 1
+  previous_physics_rules_ref:
+    type: string
+    minLength: 1
+  proposed_physics_rules_ref:
+    type: string
+    minLength: 1
+  resulting_physics_rules_ref:
+    type: string
+    minLength: 1
+  approval_policy_id:
+    type: string
+    const: unanimous-reversible-physics-rules-v1
+  required_approvals:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  participant_approvals:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  approval_quorum_met:
+    type: boolean
+    const: true
+  guardian_attested:
+    type: boolean
+    const: true
+  reversible:
+    type: boolean
+    const: true
+  rollback_physics_rules_ref:
+    type: string
+    minLength: 1
+  rollback_token_ref:
+    type: string
+    minLength: 1
+  decision:
+    type: string
+    enum:
+      - applied
+      - reverted
+  revert_of_change_id:
+    type: string
+  reverted:
+    type: boolean
+  resulting_state_id:
+    type: string
+    minLength: 8
+  audit_event_ref:
+    type: string
+    minLength: 1
+  digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+allOf:
+  - if:
+      properties:
+        operation:
+          const: apply
+    then:
+      properties:
+        decision:
+          const: applied
+        revert_of_change_id:
+          const: ""
+        reverted:
+          const: false
+  - if:
+      properties:
+        operation:
+          const: revert
+    then:
+      properties:
+        decision:
+          const: reverted
+        reverted:
+          const: true
+      required:
+        - revert_of_change_id
+      not:
+        properties:
+          revert_of_change_id:
+            const: ""

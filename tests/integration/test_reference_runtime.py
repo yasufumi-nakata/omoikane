@@ -79,6 +79,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
 
+    def test_wms_demo_reports_reversible_physics_rules_change(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_wms_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["minor_reconciled"])
+        self.assertTrue(result["validation"]["major_escape_offered"])
+        self.assertTrue(result["validation"]["malicious_isolated"])
+        self.assertTrue(result["validation"]["private_escape_honored"])
+        self.assertTrue(result["validation"]["physics_change_reversible"])
+        self.assertTrue(result["validation"]["physics_change"]["revert_bound"])
+        self.assertTrue(result["validation"]["physics_revert"]["revert_bound"])
+        self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
+        self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-physics"])
+
     def test_ewa_demo_reports_veto_and_release(self) -> None:
         runtime = OmoikaneReferenceOS()
 
