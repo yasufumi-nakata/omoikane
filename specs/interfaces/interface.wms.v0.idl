@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: interface.wms.v0
 service: WorldModelSyncService
-summary: Canonical L6 contract for deterministic shared/private world-state reconciliation.
+summary: Canonical L6 contract for deterministic shared/private world-state reconciliation and fixed-time-rate escape.
 imports:
   world_state: ../schemas/world_state.schema
   wms_reconcile: ../schemas/wms_reconcile.schema
@@ -63,7 +63,7 @@ operations:
     guarantees:
       - affected_object_ratio < 0.05 must reconcile via consensus_round when proposer is attested
       - unauthorized or unattested diffs must isolate the session via guardian veto
-      - time_rate deviation or affected_object_ratio >= 0.05 must offer private_reality escape
+      - requested_time_rate deviation from baseline 1.0 must return fixed-time-rate-private-escape-v1 evidence and offer private_reality escape without mutating WorldState.time_rate
   collect_approval_transport_receipts:
     summary: Aggregate per-participant IMC approval transport receipts into bounded, ordered batches for one physics-rules proposal.
     input:

@@ -10,6 +10,7 @@ capabilities:
   - workspace.preseed.oversight-bind
   - workspace.dependency-materialization.attest
   - workspace.dependency-module-origin.attest
+  - wms.time-rate-deviation.attest
   - wms.distributed-approval-fanout.attest
   - wms.approval-collection-scaling.attest
   - wms.participant-approval-transport.attest
@@ -28,6 +29,7 @@ when_to_invoke: |
   - Yaoyorozu external workspace seed / execution root 作成 / dependency materialization 前の HumanOversightChannel-bound integrity gate
   - Yaoyorozu external workspace worker が materialized dependency snapshot を source checkout より前に import する receipt を検証する時
   - Yaoyorozu external workspace worker の `worker_module_origin` が materialized dependency snapshot 由来であることを検証する時
+  - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時
   - WMS shared reality の complete approval collection が Federation distributed transport fan-out receipt に束縛されていることを検証する時
   - WMS shared reality の participant approval collection が ordered digest set と bounded batch digest に束縛されていることを検証する時
   - WMS shared reality の physics_rules change 前に participant approval が IMC transport receipt に束縛されていることを検証する時

@@ -7486,6 +7486,25 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        time_rate_deviation = self.wms.propose_diff(
+            session["session_id"],
+            proposer_id=observer.identity_id,
+            candidate_objects=["atrium", "council-table", "shared-lantern", "memory-banner"],
+            affected_object_ratio=0.01,
+            attested=True,
+            requested_time_rate=1.25,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.time_rate.deviation",
+            payload=time_rate_deviation,
+            actor="WorldModelSync",
+            category="interface-wms",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         proposed_physics_rules_ref = "physics://shared-atrium/low-gravity-council-v1"
         physics_change_rationale = (
             "bounded low-gravity rehearsal must remain reversible for every participant"
@@ -7715,6 +7734,7 @@ json.dump(response, sys.stdout)
             "scenarios": {
                 "minor_diff": minor_diff,
                 "major_diff": major_diff,
+                "time_rate_deviation": time_rate_deviation,
                 "approval_subject": approval_subject,
                 "approval_imc_session": approval_imc_sessions[0],
                 "approval_imc_sessions": approval_imc_sessions,
@@ -7737,6 +7757,20 @@ json.dump(response, sys.stdout)
                 and minor_diff["decision"] == "consensus-round",
                 "major_escape_offered": major_diff["classification"] == "major_diff"
                 and major_diff["escape_offered"],
+                "time_rate_deviation_escape_bound": (
+                    time_rate_deviation["classification"] == "major_diff"
+                    and time_rate_deviation["decision"] == "offer-private-reality"
+                    and time_rate_deviation["escape_offered"]
+                    and time_rate_deviation["time_rate_policy_id"]
+                    == "fixed-time-rate-private-escape-v1"
+                    and time_rate_deviation["baseline_time_rate"] == initial_state["time_rate"]
+                    and time_rate_deviation["requested_time_rate"] == 1.25
+                    and time_rate_deviation["time_rate_deviation_detected"]
+                    and time_rate_deviation["time_rate_escape_required"]
+                    and time_rate_deviation["time_rate_state_locked"]
+                    and len(time_rate_deviation["time_rate_deviation_digest"]) == 64
+                    and final_state["time_rate"] == initial_state["time_rate"]
+                ),
                 "malicious_isolated": malicious_diff["classification"] == "malicious_inject"
                 and malicious_violation["guardian_action"] == "isolate-session",
                 "private_escape_honored": mode_switch["private_escape_honored"]

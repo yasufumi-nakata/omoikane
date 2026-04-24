@@ -1,0 +1,26 @@
+eval_id: wms_time_rate_deviation_escape
+target: interface.wms
+level: L6
+description: >
+  World Model Sync が shared_reality の time_rate を reference runtime では
+  1.0 に固定し、deviation 要求を digest-bound evidence と private_reality
+  escape offer へ縮退できることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  time_rate_deviation_escape_bound: true
+  time_rate_policy_id: fixed-time-rate-private-escape-v1
+  digest_profile: baseline-requested-time-rate-delta-v1
+  baseline_time_rate: 1.0
+  requested_time_rate: 1.25
+  time_rate_delta: 0.25
+  time_rate_deviation_detected: true
+  time_rate_state_locked: true
+  time_rate_escape_required: true
+  decision: offer-private-reality
+  resulting_world_state_time_rate: 1.0
+metric: boolean
+threshold: 1.0
+ethics_check: true

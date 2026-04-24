@@ -2,7 +2,8 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/wms_reconcile.schema"
 title: WMSReconcileOutcome
 description: >
-  Deterministic outcome of one World Model Sync diff proposal.
+  Deterministic outcome of one World Model Sync diff proposal, including
+  fixed-time-rate deviation handling for shared-reality private escape.
 type: object
 additionalProperties: false
 required:
@@ -20,6 +21,14 @@ required:
   - resulting_state_id
   - affected_object_ratio
   - requested_time_rate
+  - time_rate_policy_id
+  - baseline_time_rate
+  - time_rate_delta
+  - time_rate_deviation_detected
+  - time_rate_state_locked
+  - time_rate_escape_required
+  - time_rate_deviation_digest_profile
+  - time_rate_deviation_digest
   - audit_event_ref
 properties:
   schema_version:
@@ -75,7 +84,26 @@ properties:
     minimum: 0
     maximum: 1
   requested_time_rate:
+    type: number
+    minimum: 0.001
+  time_rate_policy_id:
+    const: fixed-time-rate-private-escape-v1
+  baseline_time_rate:
     const: 1.0
+  time_rate_delta:
+    type: number
+    minimum: 0
+  time_rate_deviation_detected:
+    type: boolean
+  time_rate_state_locked:
+    const: true
+  time_rate_escape_required:
+    type: boolean
+  time_rate_deviation_digest_profile:
+    const: baseline-requested-time-rate-delta-v1
+  time_rate_deviation_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
   audit_event_ref:
     type: string
     minLength: 1

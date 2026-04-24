@@ -87,6 +87,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["minor_reconciled"])
         self.assertTrue(result["validation"]["major_escape_offered"])
+        self.assertTrue(result["validation"]["time_rate_deviation_escape_bound"])
         self.assertTrue(result["validation"]["malicious_isolated"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["physics_change_reversible"])
@@ -103,6 +104,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, len(result["scenarios"]["approval_transport_receipts"]))
         self.assertEqual(2, result["scenarios"]["approval_collection_receipt"]["batch_count"])
         self.assertEqual("complete", result["scenarios"]["approval_fanout_receipt"]["fanout_status"])
+        self.assertEqual("major_diff", result["scenarios"]["time_rate_deviation"]["classification"])
+        self.assertEqual(1.25, result["scenarios"]["time_rate_deviation"]["requested_time_rate"])
+        self.assertTrue(result["scenarios"]["time_rate_deviation"]["time_rate_state_locked"])
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-physics"])
 

@@ -130,6 +130,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["minor_reconciled"])
         self.assertTrue(result["validation"]["major_escape_offered"])
+        self.assertTrue(result["validation"]["time_rate_deviation_escape_bound"])
         self.assertTrue(result["validation"]["malicious_isolated"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["physics_change_reversible"])
@@ -141,6 +142,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(3, len(result["scenarios"]["approval_transport_receipts"]))
         self.assertEqual(2, result["scenarios"]["approval_collection_receipt"]["batch_count"])
         self.assertEqual("complete", result["scenarios"]["approval_fanout_receipt"]["fanout_status"])
+        self.assertEqual("offer-private-reality", result["scenarios"]["time_rate_deviation"]["decision"])
+        self.assertTrue(result["scenarios"]["time_rate_deviation"]["time_rate_deviation_detected"])
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(
             result["scenarios"]["physics_change"]["change_id"],

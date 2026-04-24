@@ -59,6 +59,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self._assert_schema_valid(
             "specs/schemas/wms_reconcile.schema",
+            result["scenarios"]["time_rate_deviation"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/wms_reconcile.schema",
             result["scenarios"]["malicious_diff"],
         )
 

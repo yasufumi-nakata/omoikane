@@ -815,8 +815,9 @@ entries:
     consumers:
       - specs/interfaces/interface.wms.v0.idl
       - evals/interface/wms_private_reality_escape.yaml
+      - evals/interface/wms_time_rate_deviation_escape.yaml
       - reference-runtime
-    rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes and private escape offers.
+    rationale: Required to encode deterministic minor/major/malicious reconciliation outcomes, fixed-time-rate deviation evidence, and private escape offers.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_physics_rules_change_receipt.schema
@@ -1198,6 +1199,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects shared reality reconciliation, private reality escape, and guardian isolation for malicious world-state diffs.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_time_rate_deviation_escape.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects fixed-time-rate shared reality behavior by binding requested time_rate deviation to private escape evidence without mutating WorldState.time_rate.
   - priority: P1
     kind: eval
     file: evals/interface/wms_physics_rules_revert.yaml

@@ -42,7 +42,9 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 - 異なる substrate では主観時間の進み方が異なりうる
 - shared_reality 参加者は session 開始時に `time_rate` を **満場一致** で合意
 - 合意できない場合は private_reality へ退避（shared_reality に **強制ロックイン禁止**）
-- reference runtime では `time_rate` は 1.0 固定で **deviation を検出するのみ**
+- reference runtime では `time_rate` は 1.0 固定で、requested deviation を
+  `fixed-time-rate-private-escape-v1` の digest-bound evidence として残し、
+  WorldState を変更せず private_reality 退避を提示する
 
 ## physics_rules
 
@@ -92,16 +94,18 @@ wms.observe_violation(session_id) → ViolationReport
   `wms_physics_rules_change_receipt.schema` /
   `wms_participant_approval_transport_receipt.schema` を導入
 - `wms-demo` を CLI に追加し、minor reconcile → major escalation →
+  time_rate deviation の fixed-time-rate private escape →
   3 participant の IMC transport-bound approval collection →
   distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → malicious veto →
   mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
+  `evals/interface/wms_time_rate_deviation_escape.yaml` /
   `evals/interface/wms_physics_rules_revert.yaml` /
   `evals/interface/wms_participant_approval_transport.yaml` /
   `evals/interface/wms_approval_collection_scaling.yaml` /
   `evals/interface/wms_distributed_approval_fanout.yaml` で退避路、
-  physics_rules 可逆性、participant approval の live transport binding、
+  time_rate deviation escape、physics_rules 可逆性、participant approval の live transport binding、
   ordered batch collection、distributed Council transport fan-out を保証
 
 ## 未解決

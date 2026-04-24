@@ -17,6 +17,10 @@ emergency disconnect をまとめて確認する。
 minor diff の shared reconciliation、major diff での private reality escape 提示、
 malicious inject の guardian isolation をまとめて確認する。
 
+### WMS Time Rate Deviation Escape
+requested time_rate deviation を fixed-time-rate evidence と private escape offer
+へ縮退し、WorldState.time_rate が 1.0 に固定されたまま残ることを確認する。
+
 ### WMS Physics Rules Revert
 shared reality の physics_rules 改変が満場一致、Guardian attestation、
 rollback token、first-class revert receipt を通して baseline rules へ戻ることを確認する。
@@ -53,3 +57,4 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `wms_participant_approval_transport.yaml`
 - `wms_physics_rules_revert.yaml`
 - `wms_private_reality_escape.yaml`
+- `wms_time_rate_deviation_escape.yaml`

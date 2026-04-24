@@ -116,6 +116,37 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(switched["private_escape_honored"])
         self.assertEqual("local", snapshot["authority"])
 
+    def test_time_rate_deviation_offers_escape_without_mutating_state(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+
+        outcome = sync.propose_diff(
+            session["session_id"],
+            proposer_id="identity://peer",
+            candidate_objects=["atrium", "council-table"],
+            affected_object_ratio=0.01,
+            attested=True,
+            requested_time_rate=1.25,
+        )
+        snapshot = sync.snapshot(session["session_id"])
+
+        self.assertEqual("major_diff", outcome["classification"])
+        self.assertEqual("offer-private-reality", outcome["decision"])
+        self.assertTrue(outcome["escape_offered"])
+        self.assertEqual("fixed-time-rate-private-escape-v1", outcome["time_rate_policy_id"])
+        self.assertEqual(1.0, outcome["baseline_time_rate"])
+        self.assertEqual(1.25, outcome["requested_time_rate"])
+        self.assertEqual(0.25, outcome["time_rate_delta"])
+        self.assertTrue(outcome["time_rate_deviation_detected"])
+        self.assertTrue(outcome["time_rate_escape_required"])
+        self.assertTrue(outcome["time_rate_state_locked"])
+        self.assertEqual("baseline-requested-time-rate-delta-v1", outcome["time_rate_deviation_digest_profile"])
+        self.assertEqual(64, len(outcome["time_rate_deviation_digest"]))
+        self.assertEqual(1.0, snapshot["time_rate"])
+
     def test_unauthorized_diff_isolated_as_malicious_inject(self) -> None:
         sync = WorldModelSync()
         session = sync.create_session(

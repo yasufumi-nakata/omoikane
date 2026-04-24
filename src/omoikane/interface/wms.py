@@ -10,6 +10,8 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 WMS_SCHEMA_VERSION = "1.0"
 WMS_MINOR_DIFF_THRESHOLD = 0.05
 WMS_DEFAULT_TIME_RATE = 1.0
+WMS_TIME_RATE_POLICY_ID = "fixed-time-rate-private-escape-v1"
+WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE = "baseline-requested-time-rate-delta-v1"
 WMS_DEFAULT_PHYSICS_RULES_REF = "baseline-physical-consensus-v1"
 WMS_PHYSICS_CHANGE_POLICY_ID = "unanimous-reversible-physics-rules-v1"
 WMS_APPROVAL_TRANSPORT_POLICY_ID = "imc-participant-approval-transport-v1"
@@ -67,6 +69,13 @@ class WorldModelSync:
             "default_time_rate": WMS_DEFAULT_TIME_RATE,
             "private_escape_free": True,
             "malicious_inject_action": "guardian-veto",
+            "time_rate_policy": {
+                "policy_id": WMS_TIME_RATE_POLICY_ID,
+                "default_time_rate": WMS_DEFAULT_TIME_RATE,
+                "deviation_action": "offer-private-reality",
+                "state_mutation_allowed": False,
+                "digest_profile": WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE,
+            },
             "physics_rules_change_policy": {
                 "policy_id": WMS_PHYSICS_CHANGE_POLICY_ID,
                 "required_approval": "unanimous-participant-approval",
@@ -579,6 +588,11 @@ class WorldModelSync:
             attested=attested,
             requested_time_rate=time_rate,
         )
+        time_rate_fields = self._time_rate_deviation_fields(
+            session,
+            requested_time_rate=time_rate,
+            classification=classification,
+        )
         reconcile_id = new_id("wms-reconcile")
         recorded_at = utc_now_iso()
         audit_event_ref = f"ledger://wms-reconcile/{reconcile_id}"
@@ -609,6 +623,7 @@ class WorldModelSync:
                 "resulting_state_id": session["current_state"]["state_id"],
                 "affected_object_ratio": ratio,
                 "requested_time_rate": time_rate,
+                **time_rate_fields,
                 "audit_event_ref": audit_event_ref,
             }
             session["last_reconcile"] = result
@@ -658,6 +673,7 @@ class WorldModelSync:
             ),
             "affected_object_ratio": ratio,
             "requested_time_rate": time_rate,
+            **time_rate_fields,
             "audit_event_ref": audit_event_ref,
         }
         session["last_reconcile"] = result
@@ -1692,6 +1708,38 @@ class WorldModelSync:
             "guardian_action": "isolate-session",
             "requires_council_review": False,
             "audit_event_ref": audit_event_ref,
+        }
+
+    def _time_rate_deviation_fields(
+        self,
+        session: Mapping[str, Any],
+        *,
+        requested_time_rate: float,
+        classification: str,
+    ) -> Dict[str, Any]:
+        baseline_time_rate = float(session["current_state"]["time_rate"])
+        delta = round(abs(requested_time_rate - baseline_time_rate), 3)
+        deviation_detected = delta > 0
+        digest_payload = {
+            "session_id": session["session_id"],
+            "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
+            "baseline_time_rate": baseline_time_rate,
+            "requested_time_rate": requested_time_rate,
+            "time_rate_delta": delta,
+            "time_rate_deviation_detected": deviation_detected,
+            "time_rate_state_locked": baseline_time_rate == WMS_DEFAULT_TIME_RATE,
+            "time_rate_escape_required": deviation_detected,
+            "classification": classification,
+        }
+        return {
+            "time_rate_policy_id": WMS_TIME_RATE_POLICY_ID,
+            "baseline_time_rate": baseline_time_rate,
+            "time_rate_delta": delta,
+            "time_rate_deviation_detected": deviation_detected,
+            "time_rate_state_locked": baseline_time_rate == WMS_DEFAULT_TIME_RATE,
+            "time_rate_escape_required": deviation_detected,
+            "time_rate_deviation_digest_profile": WMS_TIME_RATE_DEVIATION_DIGEST_PROFILE,
+            "time_rate_deviation_digest": sha256_text(canonical_json(digest_payload)),
         }
 
     @staticmethod
