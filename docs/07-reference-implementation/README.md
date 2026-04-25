@@ -446,7 +446,10 @@ HumanOversightChannel の `human-oversight-channel-preseed-attestation-v1`
 reviewer-network attestation に束縛されたうえで
 workspace seed / execution-root creation / dependency materialization 前に pass したこと、
 `same-host-external-workspace-dependency-materialization-v1` manifest が
-minimal runtime dependency snapshot を external execution root へ digest-bound に固定したこと、
+minimal runtime dependency snapshot を external execution root へ digest-bound に固定し、
+`materialized-dependency-lockfile-v1` の dependency lockfile と
+`materialized-dependency-wheel-attestation-v1` の sealed wheel artifact digest /
+attestation digest を同じ manifest に束縛したこと、
 `materialized-dependency-sealed-import-v1` により materialized `src` だけが
 worker の `PYTHONPATH` に入る path order を receipt に残し、
 `materialized-dependency-module-origin-v1` により

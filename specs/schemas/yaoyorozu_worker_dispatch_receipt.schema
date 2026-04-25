@@ -553,6 +553,10 @@ properties:
       - dependency_materialization_required_count
       - external_dependency_materialized_count
       - dependency_materialization_file_count
+      - dependency_lockfile_profile
+      - external_dependency_lockfile_attested_count
+      - dependency_wheel_attestation_profile
+      - external_dependency_wheel_attested_count
       - dependency_import_precedence_profile
       - external_dependency_import_precedence_count
       - dependency_module_origin_profile
@@ -689,6 +693,16 @@ properties:
       dependency_materialization_file_count:
         type: integer
         minimum: 0
+      dependency_lockfile_profile:
+        const: materialized-dependency-lockfile-v1
+      external_dependency_lockfile_attested_count:
+        type: integer
+        minimum: 0
+      dependency_wheel_attestation_profile:
+        const: materialized-dependency-wheel-attestation-v1
+      external_dependency_wheel_attested_count:
+        type: integer
+        minimum: 0
       dependency_import_precedence_profile:
         const: materialized-dependency-sealed-import-v1
       external_dependency_import_precedence_count:
@@ -709,6 +723,8 @@ properties:
       - same_host_scope_only
       - external_workspace_seeded
       - external_dependencies_materialized
+      - external_dependency_lockfile_attested
+      - external_dependency_wheel_attested
       - external_dependency_import_precedence_bound
       - external_dependency_module_origin_bound
       - profile_coverage_bound
@@ -734,6 +750,10 @@ properties:
       external_workspace_seeded:
         const: true
       external_dependencies_materialized:
+        const: true
+      external_dependency_lockfile_attested:
+        const: true
+      external_dependency_wheel_attested:
         const: true
       external_dependency_import_precedence_bound:
         const: true

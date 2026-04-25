@@ -10,6 +10,8 @@ inputs:
   - preseed_gate_profile: same-host-external-workspace-preseed-guardian-gate-v1
   - preseed_oversight_binding_profile: human-oversight-channel-preseed-attestation-v1
   - dependency_materialization_profile: same-host-external-workspace-dependency-materialization-v1
+  - dependency_lockfile_profile: materialized-dependency-lockfile-v1
+  - dependency_wheel_attestation_profile: materialized-dependency-wheel-attestation-v1
   - dependency_import_precedence_profile: materialized-dependency-sealed-import-v1
   - dependency_module_origin_profile: materialized-dependency-module-origin-v1
 expected:
@@ -31,8 +33,12 @@ expected:
   same_host_scope_only: true
   external_workspace_seeded: true
   external_dependencies_materialized: true
+  external_dependency_lockfile_attested: true
+  external_dependency_wheel_attested: true
   external_dependency_import_precedence_bound: true
   external_dependency_module_origin_bound: true
+  external_dependency_lockfile_attested_count: 4
+  external_dependency_wheel_attested_count: 4
   external_dependency_import_precedence_count: 4
   external_dependency_module_origin_count: 4
   external_dependency_materialized_count: 4

@@ -9,6 +9,7 @@ capabilities:
   - workspace.preseed.attest
   - workspace.preseed.oversight-bind
   - workspace.dependency-materialization.attest
+  - workspace.dependency-lockfile-wheel.attest
   - workspace.dependency-module-origin.attest
   - wms.time-rate-deviation.attest
   - wms.time-rate-attestation-transport.attest
@@ -37,6 +38,7 @@ when_to_invoke: |
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時
   - Yaoyorozu external workspace seed / execution root 作成 / dependency materialization 前の HumanOversightChannel-bound integrity gate
+  - Yaoyorozu external workspace dependency snapshot が lockfile digest と sealed wheel artifact attestation に束縛されていることを検証する時
   - Yaoyorozu external workspace worker が source checkout fallback 無しで sealed materialized dependency snapshot だけを import root にする receipt を検証する時
   - Yaoyorozu external workspace worker の `worker_module_origin` が sealed materialized dependency snapshot 由来であることを検証する時
   - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時

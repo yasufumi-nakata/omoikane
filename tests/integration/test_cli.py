@@ -1951,11 +1951,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["same_host_scope_only"])
         self.assertTrue(result["validation"]["external_workspace_seeded"])
         self.assertTrue(result["validation"]["external_dependencies_materialized"])
+        self.assertTrue(result["validation"]["external_dependency_lockfile_attested"])
+        self.assertTrue(result["validation"]["external_dependency_wheel_attested"])
         self.assertTrue(result["validation"]["external_dependency_import_precedence_bound"])
         self.assertTrue(result["validation"]["external_dependency_module_origin_bound"])
         self.assertEqual(4, result["validation"]["external_dependency_materialized_count"])
+        self.assertEqual(4, result["validation"]["external_dependency_lockfile_attested_count"])
+        self.assertEqual(4, result["validation"]["external_dependency_wheel_attested_count"])
         self.assertEqual(4, result["validation"]["external_dependency_import_precedence_count"])
         self.assertEqual(4, result["validation"]["external_dependency_module_origin_count"])
+        self.assertEqual(
+            "materialized-dependency-lockfile-v1",
+            result["validation"]["dependency_lockfile_profile"],
+        )
+        self.assertEqual(
+            "materialized-dependency-wheel-attestation-v1",
+            result["validation"]["dependency_wheel_attestation_profile"],
+        )
         self.assertEqual(
             "materialized-dependency-sealed-import-v1",
             result["validation"]["dependency_import_precedence_profile"],

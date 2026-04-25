@@ -167,6 +167,7 @@ operations:
       - external candidate workers must have a passing same-host-external-workspace-preseed-guardian-gate-v1 artifact before any snapshot seed, execution root creation, or dependency materialization occurs
       - external candidate workers must carry the preseed gate's oversight event ref, digest, reviewer quorum, and verifier-network attestation status into the dispatch receipt
       - external candidate workers must first receive a source target-path snapshot copy in an execution workspace with a seed commit receipt and a same-host-external-workspace-dependency-materialization-v1 manifest for the minimal runtime dependency snapshot
+      - external candidate dependency manifests must bind a materialized-dependency-lockfile-v1 digest and a materialized-dependency-wheel-attestation-v1 sealed wheel artifact digest before worker launch
       - external candidate workers must launch with materialized-dependency-sealed-import-v1 import isolation, placing only the materialized dependency src root in the receipt-bound path order and omitting the source checkout fallback
       - external candidate workers must bind materialized-dependency-module-origin-v1 so the emitted worker_module_origin proves omoikane.agentic.local_worker_stub was imported from the sealed materialized dependency snapshot
       - worker reports must verify that every target path exists and remains inside the selected execution workspace

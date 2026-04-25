@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from dataclasses import asdict, dataclass, field
 from itertools import combinations
 from pathlib import Path
@@ -63,6 +65,13 @@ YAOYOROZU_EXTERNAL_DEPENDENCY_MATERIALIZATION_STRATEGY = (
 )
 YAOYOROZU_INLINE_DEPENDENCY_MATERIALIZATION_STRATEGY = "in-place-source-runtime-v1"
 YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT = ".yaoyorozu-dependencies"
+YAOYOROZU_DEPENDENCY_LOCKFILE_PROFILE = "materialized-dependency-lockfile-v1"
+YAOYOROZU_DEPENDENCY_WHEEL_ATTESTATION_PROFILE = (
+    "materialized-dependency-wheel-attestation-v1"
+)
+YAOYOROZU_DEPENDENCY_WHEEL_ARTIFACT_NAME = (
+    "omoikane_reference_runtime-0.0.0-py3-none-any.whl"
+)
 YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS = [
     "pyproject.toml",
     "src/omoikane/__init__.py",
@@ -371,6 +380,10 @@ def _ordered_unique(values: Sequence[str]) -> List[str]:
         if normalized and normalized not in ordered:
             ordered.append(normalized)
     return ordered
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def _parse_agent_definition(path: Path) -> Dict[str, Any]:
@@ -725,6 +738,41 @@ def _dependency_materialization_manifest_digest_payload(
         "status": manifest["status"],
         "file_count": manifest["file_count"],
         "files": manifest["files"],
+        "lockfile_profile": manifest["lockfile_profile"],
+        "lockfile_path": manifest["lockfile_path"],
+        "lockfile_digest": manifest["lockfile_digest"],
+        "lockfile_byte_count": manifest["lockfile_byte_count"],
+        "lockfile_status": manifest["lockfile_status"],
+        "wheel_artifact_ref": manifest["wheel_artifact_ref"],
+        "wheel_artifact_path": manifest["wheel_artifact_path"],
+        "wheel_artifact_digest": manifest["wheel_artifact_digest"],
+        "wheel_artifact_byte_count": manifest["wheel_artifact_byte_count"],
+        "wheel_artifact_status": manifest["wheel_artifact_status"],
+        "wheel_attestation_profile": manifest["wheel_attestation_profile"],
+        "wheel_attestation_digest": manifest["wheel_attestation_digest"],
+        "attested_file_count": manifest["attested_file_count"],
+    }
+
+
+def _dependency_wheel_attestation_digest_payload(
+    manifest: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "profile": manifest["wheel_attestation_profile"],
+        "dispatch_plan_ref": manifest["dispatch_plan_ref"],
+        "dispatch_unit_ref": manifest["dispatch_unit_ref"],
+        "coverage_area": manifest["coverage_area"],
+        "manifest_ref": manifest["manifest_ref"],
+        "lockfile_profile": manifest["lockfile_profile"],
+        "lockfile_digest": manifest["lockfile_digest"],
+        "wheel_artifact_ref": manifest["wheel_artifact_ref"],
+        "wheel_artifact_digest": manifest["wheel_artifact_digest"],
+        "attested_file_count": manifest["attested_file_count"],
+        "file_entry_digests": [
+            str(file_entry.get("entry_digest", ""))
+            for file_entry in manifest["files"]
+            if isinstance(file_entry, Mapping)
+        ],
     }
 
 
@@ -891,6 +939,8 @@ class YaoyorozuRegistryPolicy:
     inline_workspace_seed_strategy: str = YAOYOROZU_INLINE_SANDBOX_SEED_STRATEGY
     external_workspace_seed_strategy: str = YAOYOROZU_EXTERNAL_SANDBOX_SEED_STRATEGY
     dependency_materialization_profile: str = YAOYOROZU_DEPENDENCY_MATERIALIZATION_PROFILE
+    dependency_lockfile_profile: str = YAOYOROZU_DEPENDENCY_LOCKFILE_PROFILE
+    dependency_wheel_attestation_profile: str = YAOYOROZU_DEPENDENCY_WHEEL_ATTESTATION_PROFILE
     external_dependency_materialization_strategy: str = (
         YAOYOROZU_EXTERNAL_DEPENDENCY_MATERIALIZATION_STRATEGY
     )
@@ -1543,6 +1593,61 @@ class YaoyorozuRegistryService:
             files.append(file_entry)
 
         manifest_id = new_id("yaoyorozu-dependencies")
+        lockfile_path = dependency_root / "dependency-lockfile.json"
+        lockfile_payload = {
+            "kind": "yaoyorozu_dependency_lockfile",
+            "schema_version": "1.0.0",
+            "lockfile_profile": self._policy.dependency_lockfile_profile,
+            "manifest_ref": f"dependency-manifest://{manifest_id}",
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "dispatch_unit_ref": dispatch_unit_ref,
+            "coverage_area": coverage_area,
+            "dependency_paths": [
+                {
+                    "source_path": file_entry["source_path"],
+                    "source_digest": file_entry["source_digest"],
+                    "materialized_digest": file_entry["materialized_digest"],
+                    "byte_count": file_entry["byte_count"],
+                    "entry_digest": file_entry["entry_digest"],
+                }
+                for file_entry in files
+            ],
+            "file_count": len(files),
+        }
+        lockfile_digest = sha256_text(canonical_json(lockfile_payload))
+        lockfile_payload["lockfile_digest"] = lockfile_digest
+        lockfile_path.write_text(
+            json.dumps(lockfile_payload, ensure_ascii=True, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        wheel_dir = dependency_root / "sealed-wheel"
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        wheel_path = wheel_dir / YAOYOROZU_DEPENDENCY_WHEEL_ARTIFACT_NAME
+        with zipfile.ZipFile(
+            wheel_path,
+            "w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=9,
+        ) as archive:
+            for file_entry in files:
+                source_path = str(file_entry["source_path"])
+                materialized_path = Path(str(file_entry["materialized_path"]))
+                archive_path = f"omoikane_reference_runtime/{source_path}"
+                info = zipfile.ZipInfo(archive_path, date_time=(2026, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                archive.writestr(info, materialized_path.read_bytes())
+            lock_info = zipfile.ZipInfo(
+                "omoikane_reference_runtime/dependency-lockfile.json",
+                date_time=(2026, 1, 1, 0, 0, 0),
+            )
+            lock_info.compress_type = zipfile.ZIP_DEFLATED
+            lock_info.external_attr = 0o644 << 16
+            archive.writestr(lock_info, lockfile_path.read_bytes())
+        wheel_bytes = wheel_path.read_bytes()
+        wheel_artifact_ref = (
+            f"wheel-artifact://{manifest_id}/{YAOYOROZU_DEPENDENCY_WHEEL_ARTIFACT_NAME}"
+        )
         manifest_path = dependency_root / "manifest.json"
         manifest = {
             "kind": "yaoyorozu_dependency_materialization_manifest",
@@ -1563,7 +1668,25 @@ class YaoyorozuRegistryService:
             else "blocked",
             "file_count": len(files),
             "files": files,
+            "lockfile_profile": self._policy.dependency_lockfile_profile,
+            "lockfile_path": str(lockfile_path),
+            "lockfile_digest": lockfile_digest,
+            "lockfile_byte_count": len(lockfile_path.read_bytes()),
+            "lockfile_status": "attested" if files else "blocked",
+            "wheel_artifact_ref": wheel_artifact_ref,
+            "wheel_artifact_path": str(wheel_path),
+            "wheel_artifact_digest": _sha256_bytes(wheel_bytes),
+            "wheel_artifact_byte_count": len(wheel_bytes),
+            "wheel_artifact_status": "attested" if files else "blocked",
+            "wheel_attestation_profile": (
+                self._policy.dependency_wheel_attestation_profile
+            ),
+            "wheel_attestation_digest": "",
+            "attested_file_count": len(files),
         }
+        manifest["wheel_attestation_digest"] = sha256_text(
+            canonical_json(_dependency_wheel_attestation_digest_payload(manifest))
+        )
         manifest["manifest_digest"] = sha256_text(
             canonical_json(_dependency_materialization_manifest_digest_payload(manifest))
         )
@@ -1590,6 +1713,8 @@ class YaoyorozuRegistryService:
                 "file_count": 0,
                 "manifest_ref": "",
                 "manifest_digest": "",
+                "lockfile_attested": False,
+                "wheel_attested": False,
                 "errors": ["dependency_materialization_manifest must be bound"],
             }
         if manifest.get("kind") != "yaoyorozu_dependency_materialization_manifest":
@@ -1618,6 +1743,8 @@ class YaoyorozuRegistryService:
             errors.append("dependency_materialization_manifest.file_count mismatch")
         if manifest.get("file_count") != len(self._policy.dependency_materialization_paths):
             errors.append("dependency_materialization_manifest.file_count must match policy paths")
+        if manifest.get("attested_file_count") != manifest.get("file_count"):
+            errors.append("dependency_materialization_manifest.attested_file_count mismatch")
         expected_paths = list(self._policy.dependency_materialization_paths)
         observed_paths = [
             str(file_entry.get("source_path", ""))
@@ -1642,6 +1769,73 @@ class YaoyorozuRegistryService:
             materialized_path = str(file_entry.get("materialized_path", ""))
             if dependency_root and not materialized_path.startswith(f"{dependency_root}/"):
                 errors.append("dependency materialization file must live under dependency_root")
+        if manifest.get("lockfile_profile") != self._policy.dependency_lockfile_profile:
+            errors.append("dependency_materialization_manifest.lockfile_profile mismatch")
+        lockfile_path = str(manifest.get("lockfile_path", "")).strip()
+        if dependency_root and not lockfile_path.startswith(f"{dependency_root}/"):
+            errors.append("dependency lockfile must live under dependency_root")
+        if manifest.get("lockfile_status") != "attested":
+            errors.append("dependency lockfile status must be attested")
+        lockfile_file = Path(lockfile_path) if lockfile_path else Path()
+        if lockfile_file.is_file():
+            try:
+                lockfile_payload = json.loads(lockfile_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                lockfile_payload = {}
+                errors.append("dependency lockfile must be valid JSON")
+            if isinstance(lockfile_payload, Mapping):
+                lockfile_payload_for_digest = dict(lockfile_payload)
+                observed_lockfile_digest = str(
+                    lockfile_payload_for_digest.pop("lockfile_digest", "")
+                )
+                expected_lockfile_digest = sha256_text(
+                    canonical_json(lockfile_payload_for_digest)
+                )
+                if observed_lockfile_digest != expected_lockfile_digest:
+                    errors.append("dependency lockfile embedded digest mismatch")
+                if manifest.get("lockfile_digest") != expected_lockfile_digest:
+                    errors.append("dependency lockfile digest mismatch")
+                if lockfile_payload.get("file_count") != manifest.get("file_count"):
+                    errors.append("dependency lockfile file_count mismatch")
+        else:
+            errors.append("dependency lockfile path must exist")
+        try:
+            lockfile_byte_count = lockfile_file.stat().st_size
+        except OSError:
+            lockfile_byte_count = -1
+        if manifest.get("lockfile_byte_count") != lockfile_byte_count:
+            errors.append("dependency lockfile byte_count mismatch")
+        if (
+            manifest.get("wheel_attestation_profile")
+            != self._policy.dependency_wheel_attestation_profile
+        ):
+            errors.append("dependency wheel_attestation_profile mismatch")
+        if manifest.get("wheel_artifact_status") != "attested":
+            errors.append("dependency wheel artifact status must be attested")
+        wheel_artifact_ref = str(manifest.get("wheel_artifact_ref", "")).strip()
+        if not wheel_artifact_ref.startswith(f"wheel-artifact://{manifest.get('manifest_id', '')}/"):
+            errors.append("dependency wheel_artifact_ref must bind manifest_id")
+        wheel_artifact_path = str(manifest.get("wheel_artifact_path", "")).strip()
+        if dependency_root and not wheel_artifact_path.startswith(f"{dependency_root}/"):
+            errors.append("dependency wheel artifact must live under dependency_root")
+        wheel_file = Path(wheel_artifact_path) if wheel_artifact_path else Path()
+        if wheel_file.is_file():
+            wheel_bytes = wheel_file.read_bytes()
+            if manifest.get("wheel_artifact_digest") != _sha256_bytes(wheel_bytes):
+                errors.append("dependency wheel artifact digest mismatch")
+            if manifest.get("wheel_artifact_byte_count") != len(wheel_bytes):
+                errors.append("dependency wheel artifact byte_count mismatch")
+        else:
+            errors.append("dependency wheel artifact path must exist")
+        try:
+            expected_attestation_digest = sha256_text(
+                canonical_json(_dependency_wheel_attestation_digest_payload(manifest))
+            )
+        except KeyError:
+            expected_attestation_digest = ""
+            errors.append("dependency wheel attestation payload is missing required fields")
+        if manifest.get("wheel_attestation_digest") != expected_attestation_digest:
+            errors.append("dependency wheel attestation digest mismatch")
         try:
             expected_digest = sha256_text(
                 canonical_json(_dependency_materialization_manifest_digest_payload(manifest))
@@ -1659,6 +1853,16 @@ class YaoyorozuRegistryService:
             else 0,
             "manifest_ref": str(manifest.get("manifest_ref", "")),
             "manifest_digest": str(manifest.get("manifest_digest", "")),
+            "lockfile_attested": (
+                not errors
+                and manifest.get("lockfile_status") == "attested"
+                and bool(manifest.get("lockfile_digest"))
+            ),
+            "wheel_attested": (
+                not errors
+                and manifest.get("wheel_artifact_status") == "attested"
+                and bool(manifest.get("wheel_attestation_digest"))
+            ),
             "errors": errors,
         }
 
@@ -4091,6 +4295,34 @@ class YaoyorozuRegistryService:
             "dependency_materialization_file_count": sum(
                 int(result["dependency_materialization_file_count"]) for result in results
             ),
+            "dependency_lockfile_profile": self._policy.dependency_lockfile_profile,
+            "external_dependency_lockfile_attested_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and isinstance(result["dependency_materialization_manifest"], Mapping)
+                and result["dependency_materialization_manifest"].get("lockfile_status")
+                == "attested"
+                and bool(result["dependency_materialization_manifest"].get("lockfile_digest"))
+            ),
+            "dependency_wheel_attestation_profile": (
+                self._policy.dependency_wheel_attestation_profile
+            ),
+            "external_dependency_wheel_attested_count": sum(
+                1
+                for result in results
+                if result["workspace_scope"] == self._policy.external_workspace_scope
+                and isinstance(result["dependency_materialization_manifest"], Mapping)
+                and result["dependency_materialization_manifest"].get(
+                    "wheel_artifact_status"
+                )
+                == "attested"
+                and bool(
+                    result["dependency_materialization_manifest"].get(
+                        "wheel_attestation_digest"
+                    )
+                )
+            ),
             "dependency_import_precedence_profile": (
                 self._policy.dependency_import_precedence_profile
             ),
@@ -4146,6 +4378,50 @@ class YaoyorozuRegistryService:
                         and result["dependency_materialization_manifest_digest"]
                         and result["dependency_materialization_file_count"]
                         == len(self._policy.dependency_materialization_paths)
+                    )
+                )
+                for result in results
+            ),
+            "external_dependency_lockfile_attested": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or (
+                        isinstance(result["dependency_materialization_manifest"], Mapping)
+                        and result["dependency_materialization_manifest"].get(
+                            "lockfile_profile"
+                        )
+                        == self._policy.dependency_lockfile_profile
+                        and result["dependency_materialization_manifest"].get(
+                            "lockfile_status"
+                        )
+                        == "attested"
+                        and bool(
+                            result["dependency_materialization_manifest"].get(
+                                "lockfile_digest"
+                            )
+                        )
+                    )
+                )
+                for result in results
+            ),
+            "external_dependency_wheel_attested": all(
+                (
+                    result["workspace_scope"] != self._policy.external_workspace_scope
+                    or (
+                        isinstance(result["dependency_materialization_manifest"], Mapping)
+                        and result["dependency_materialization_manifest"].get(
+                            "wheel_attestation_profile"
+                        )
+                        == self._policy.dependency_wheel_attestation_profile
+                        and result["dependency_materialization_manifest"].get(
+                            "wheel_artifact_status"
+                        )
+                        == "attested"
+                        and bool(
+                            result["dependency_materialization_manifest"].get(
+                                "wheel_attestation_digest"
+                            )
+                        )
                     )
                 )
                 for result in results
@@ -4309,6 +4585,8 @@ class YaoyorozuRegistryService:
         dependency_materialization_required_count = 0
         external_dependency_materialized_count = 0
         dependency_materialization_file_count = 0
+        external_dependency_lockfile_attested_count = 0
+        external_dependency_wheel_attested_count = 0
         external_dependency_import_precedence_count = 0
         external_dependency_module_origin_count = 0
         external_dependency_module_origin_bound = True
@@ -4396,6 +4674,10 @@ class YaoyorozuRegistryService:
                     == len(self._policy.dependency_materialization_paths)
                 ):
                     external_dependency_materialized_count += 1
+                if dependency_validation["lockfile_attested"]:
+                    external_dependency_lockfile_attested_count += 1
+                if dependency_validation["wheel_attested"]:
+                    external_dependency_wheel_attested_count += 1
                 expected_import_root = str(
                     Path(execution_workspace_root)
                     / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
@@ -4931,6 +5213,30 @@ class YaoyorozuRegistryService:
         ):
             errors.append("execution_summary.dependency_materialization_file_count mismatch")
         if (
+            execution_summary.get("dependency_lockfile_profile")
+            != self._policy.dependency_lockfile_profile
+        ):
+            errors.append("execution_summary.dependency_lockfile_profile mismatch")
+        if (
+            execution_summary.get("external_dependency_lockfile_attested_count")
+            != external_dependency_lockfile_attested_count
+        ):
+            errors.append(
+                "execution_summary.external_dependency_lockfile_attested_count mismatch"
+            )
+        if (
+            execution_summary.get("dependency_wheel_attestation_profile")
+            != self._policy.dependency_wheel_attestation_profile
+        ):
+            errors.append("execution_summary.dependency_wheel_attestation_profile mismatch")
+        if (
+            execution_summary.get("external_dependency_wheel_attested_count")
+            != external_dependency_wheel_attested_count
+        ):
+            errors.append(
+                "execution_summary.external_dependency_wheel_attested_count mismatch"
+            )
+        if (
             execution_summary.get("dependency_import_precedence_profile")
             != self._policy.dependency_import_precedence_profile
         ):
@@ -4983,6 +5289,48 @@ class YaoyorozuRegistryService:
                     and result.get("dependency_materialization_manifest_digest")
                     and result.get("dependency_materialization_file_count")
                     == len(self._policy.dependency_materialization_paths)
+                )
+                for result in results
+            ),
+            "external_dependency_lockfile_attested": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    isinstance(result.get("dependency_materialization_manifest"), Mapping)
+                    and result["dependency_materialization_manifest"].get(
+                        "lockfile_profile"
+                    )
+                    == self._policy.dependency_lockfile_profile
+                    and result["dependency_materialization_manifest"].get(
+                        "lockfile_status"
+                    )
+                    == "attested"
+                    and bool(
+                        result["dependency_materialization_manifest"].get(
+                            "lockfile_digest"
+                        )
+                    )
+                )
+                for result in results
+            ),
+            "external_dependency_wheel_attested": all(
+                not isinstance(result, Mapping)
+                or result.get("workspace_scope") != self._policy.external_workspace_scope
+                or (
+                    isinstance(result.get("dependency_materialization_manifest"), Mapping)
+                    and result["dependency_materialization_manifest"].get(
+                        "wheel_attestation_profile"
+                    )
+                    == self._policy.dependency_wheel_attestation_profile
+                    and result["dependency_materialization_manifest"].get(
+                        "wheel_artifact_status"
+                    )
+                    == "attested"
+                    and bool(
+                        result["dependency_materialization_manifest"].get(
+                            "wheel_attestation_digest"
+                        )
+                    )
                 )
                 for result in results
             ),
@@ -5089,6 +5437,12 @@ class YaoyorozuRegistryService:
             "external_workspace_seeded": expected_validation["external_workspace_seeded"],
             "external_dependencies_materialized": expected_validation[
                 "external_dependencies_materialized"
+            ],
+            "external_dependency_lockfile_attested": expected_validation[
+                "external_dependency_lockfile_attested"
+            ],
+            "external_dependency_wheel_attested": expected_validation[
+                "external_dependency_wheel_attested"
             ],
             "external_dependency_import_precedence_bound": expected_validation[
                 "external_dependency_import_precedence_bound"

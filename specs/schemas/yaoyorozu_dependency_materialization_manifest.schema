@@ -21,6 +21,19 @@ required:
   - status
   - file_count
   - files
+  - lockfile_profile
+  - lockfile_path
+  - lockfile_digest
+  - lockfile_byte_count
+  - lockfile_status
+  - wheel_artifact_ref
+  - wheel_artifact_path
+  - wheel_artifact_digest
+  - wheel_artifact_byte_count
+  - wheel_artifact_status
+  - wheel_attestation_profile
+  - wheel_attestation_digest
+  - attested_file_count
   - manifest_digest
 properties:
   kind:
@@ -101,6 +114,41 @@ properties:
         entry_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+  lockfile_profile:
+    const: materialized-dependency-lockfile-v1
+  lockfile_path:
+    type: string
+    pattern: ".*/\\.yaoyorozu-dependencies/dependency-lockfile\\.json$"
+  lockfile_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  lockfile_byte_count:
+    type: integer
+    minimum: 1
+  lockfile_status:
+    const: attested
+  wheel_artifact_ref:
+    type: string
+    pattern: "^wheel-artifact://yaoyorozu-dependencies-[a-f0-9]{12}/omoikane_reference_runtime-0\\.0\\.0-py3-none-any\\.whl$"
+  wheel_artifact_path:
+    type: string
+    pattern: ".*/\\.yaoyorozu-dependencies/sealed-wheel/omoikane_reference_runtime-0\\.0\\.0-py3-none-any\\.whl$"
+  wheel_artifact_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  wheel_artifact_byte_count:
+    type: integer
+    minimum: 1
+  wheel_artifact_status:
+    const: attested
+  wheel_attestation_profile:
+    const: materialized-dependency-wheel-attestation-v1
+  wheel_attestation_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  attested_file_count:
+    type: integer
+    minimum: 1
   manifest_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"

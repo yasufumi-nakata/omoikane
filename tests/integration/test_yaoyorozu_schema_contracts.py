@@ -94,11 +94,20 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
 
     def test_dependency_materialization_manifest_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
+        manifest = result["dispatch_receipt"]["results"][0]["dependency_materialization_manifest"]
 
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_dependency_materialization_manifest.schema",
-            result["dispatch_receipt"]["results"][0]["dependency_materialization_manifest"],
+            manifest,
         )
+        self.assertEqual("materialized-dependency-lockfile-v1", manifest["lockfile_profile"])
+        self.assertEqual("attested", manifest["lockfile_status"])
+        self.assertEqual(
+            "materialized-dependency-wheel-attestation-v1",
+            manifest["wheel_attestation_profile"],
+        )
+        self.assertEqual("attested", manifest["wheel_artifact_status"])
+        self.assertEqual(manifest["file_count"], manifest["attested_file_count"])
 
     def test_worker_workspace_delta_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

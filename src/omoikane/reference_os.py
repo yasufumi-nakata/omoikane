@@ -4308,6 +4308,18 @@ json.dump(response, sys.stdout)
                 "external_dependency_materialized_count": dispatch_receipt[
                     "execution_summary"
                 ]["external_dependency_materialized_count"],
+                "external_dependency_lockfile_attested": (
+                    dispatch_receipt_validation["external_dependency_lockfile_attested"]
+                ),
+                "external_dependency_wheel_attested": (
+                    dispatch_receipt_validation["external_dependency_wheel_attested"]
+                ),
+                "external_dependency_lockfile_attested_count": dispatch_receipt[
+                    "execution_summary"
+                ]["external_dependency_lockfile_attested_count"],
+                "external_dependency_wheel_attested_count": dispatch_receipt[
+                    "execution_summary"
+                ]["external_dependency_wheel_attested_count"],
                 "external_dependency_import_precedence_count": dispatch_receipt[
                     "execution_summary"
                 ]["external_dependency_import_precedence_count"],
@@ -4317,6 +4329,12 @@ json.dump(response, sys.stdout)
                 "dependency_materialization_profile": dispatch_receipt[
                     "execution_summary"
                 ]["dependency_materialization_profile"],
+                "dependency_lockfile_profile": dispatch_receipt[
+                    "execution_summary"
+                ]["dependency_lockfile_profile"],
+                "dependency_wheel_attestation_profile": dispatch_receipt[
+                    "execution_summary"
+                ]["dependency_wheel_attestation_profile"],
                 "dependency_import_precedence_profile": dispatch_receipt[
                     "execution_summary"
                 ]["dependency_import_precedence_profile"],

@@ -98,7 +98,9 @@ workspace seed / execution-root creation / dependency materialization より前�
 source target-path snapshot を seed commit 付きで固定し、
 minimal runtime dependency snapshot を
 `same-host-external-workspace-dependency-materialization-v1` manifest として
-digest-bound に materialize し、
+digest-bound に materialize し、同じ manifest 上で
+`materialized-dependency-lockfile-v1` の lockfile digest と
+`materialized-dependency-wheel-attestation-v1` の sealed wheel artifact digest を attest し、
 `materialized-dependency-sealed-import-v1` により materialized `src` だけを
 `PYTHONPATH` に置いた path order を receipt に残してから
 worker を実行し、

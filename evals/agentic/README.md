@@ -74,7 +74,8 @@ workspace discovery により選ばれた non-source candidate workspace へ
 profile-covered builder worker が束縛され、
 integrity Guardian の preseed gate が workspace seed / execution-root creation 前に pass し、
 その gate が HumanOversightChannel の reviewer-network attested oversight event に束縛され、
-source target-path snapshot の seed commit と candidate/source success count が
+source target-path snapshot の seed commit、dependency lockfile / sealed wheel attestation、
+candidate/source success count が
 same-host worker dispatch receipt に残ること。
 
 ### Yaoyorozu Workspace Discovery
