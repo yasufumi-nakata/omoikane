@@ -3724,7 +3724,7 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(
             all(
                 result["dependency_import_precedence_profile"]
-                == "materialized-dependency-pythonpath-first-v1"
+                == "materialized-dependency-sealed-import-v1"
                 and result["dependency_import_root"] == ""
                 and result["dependency_import_path_order"] == [str(repo_root / "src")]
                 and result["dependency_import_precedence_status"] == "source-inline"
@@ -3838,14 +3838,15 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 and process["dependency_materialization_manifest"]["status"]
                 == "materialized"
                 and process["dependency_import_precedence_profile"]
-                == "materialized-dependency-pythonpath-first-v1"
+                == "materialized-dependency-sealed-import-v1"
                 and process["dependency_import_root"].endswith(
                     "/.yaoyorozu-dependencies/src"
                 )
-                and process["dependency_import_path_order"][0]
-                == process["dependency_import_root"]
-                and process["dependency_import_path_order"][1] == source_src_root
-                and process["dependency_import_precedence_status"] == "materialized-first"
+                and process["dependency_import_path_order"]
+                == [process["dependency_import_root"]]
+                and source_src_root
+                not in process["report"]["worker_module_origin"]["search_path_head"]
+                and process["dependency_import_precedence_status"] == "materialized-only"
                 and process["dependency_import_precedence_bound"]
                 and process["dependency_module_origin_profile"]
                 == "materialized-dependency-module-origin-v1"
@@ -3932,14 +3933,35 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         result = runtime.run_yaoyorozu_demo()
         tampered = json.loads(json.dumps(result["dispatch_receipt"]))
         path_order = tampered["results"][0]["dependency_import_path_order"]
-        tampered["results"][0]["dependency_import_path_order"] = list(reversed(path_order))
+        tampered["results"][0]["dependency_import_path_order"] = [
+            *path_order,
+            str(Path(tampered["workspace_root"]) / "src"),
+        ]
 
         validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
 
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["external_dependency_import_precedence_bound"])
         self.assertIn(
-            "external worker dependency import path order must put materialized src before source src",
+            "external worker dependency import path order must contain only materialized src",
+            validation["errors"],
+        )
+
+    def test_worker_dispatch_receipt_rejects_source_fallback_module_origin(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["dispatch_receipt"]))
+        source_src_root = str(Path(tampered["workspace_root"]) / "src")
+        tampered["results"][0]["report"]["worker_module_origin"]["search_path_head"].append(
+            source_src_root
+        )
+
+        validation = runtime.yaoyorozu.validate_worker_dispatch_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["external_dependency_module_origin_bound"])
+        self.assertIn(
+            "worker_module_origin.search_path_head must omit source fallback root",
             validation["errors"],
         )
 

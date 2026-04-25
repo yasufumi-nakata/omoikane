@@ -2220,7 +2220,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, materialized-first dependency import precedence, actual worker module-origin binding, HumanOversightChannel reviewer-network attestation, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
+    rationale: Required to prove one same-host worker dispatch executed as bounded subprocess receipts with coverage-complete ready reports, dispatch/unit binding, external workspace seed receipts, sealed materialized-only dependency import isolation, actual worker module-origin binding, HumanOversightChannel reviewer-network attestation, workspace-bounded target path observations, git-bound target path delta receipts, and delta-derived patch candidate receipts.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_patch_candidate_receipt.schema

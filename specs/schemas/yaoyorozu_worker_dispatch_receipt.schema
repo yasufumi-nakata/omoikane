@@ -226,13 +226,13 @@ properties:
             - $ref: "yaoyorozu_dependency_materialization_manifest.schema"
             - type: "null"
         dependency_import_precedence_profile:
-          const: materialized-dependency-pythonpath-first-v1
+          const: materialized-dependency-sealed-import-v1
         dependency_import_root:
           type: string
         dependency_import_path_order:
           type: array
           minItems: 1
-          maxItems: 2
+          maxItems: 1
           items:
             type: string
             minLength: 1
@@ -240,7 +240,7 @@ properties:
           type: string
           enum:
             - source-inline
-            - materialized-first
+            - materialized-only
         dependency_import_precedence_bound:
           const: true
         dependency_module_origin_profile:
@@ -690,7 +690,7 @@ properties:
         type: integer
         minimum: 0
       dependency_import_precedence_profile:
-        const: materialized-dependency-pythonpath-first-v1
+        const: materialized-dependency-sealed-import-v1
       external_dependency_import_precedence_count:
         type: integer
         minimum: 0

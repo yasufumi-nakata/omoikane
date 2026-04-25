@@ -1799,7 +1799,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(4, result["validation"]["external_dependency_import_precedence_count"])
         self.assertEqual(4, result["validation"]["external_dependency_module_origin_count"])
         self.assertEqual(
-            "materialized-dependency-pythonpath-first-v1",
+            "materialized-dependency-sealed-import-v1",
             result["validation"]["dependency_import_precedence_profile"],
         )
         self.assertEqual(

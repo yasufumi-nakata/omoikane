@@ -1963,7 +1963,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["validation"]["dependency_materialization_profile"],
         )
         self.assertEqual(
-            "materialized-dependency-pythonpath-first-v1",
+            "materialized-dependency-sealed-import-v1",
             result["validation"]["dependency_import_precedence_profile"],
         )
         self.assertEqual(

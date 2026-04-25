@@ -73,7 +73,7 @@ requested optional coverage は candidate が無い場合に source fallback と
 source target-path snapshot を `same-host-external-workspace` execution root に seed してから
 worker を起動し、HumanOversightChannel reviewer-network attestation 付きの
 preseed integrity Guardian gate、dependency materialization manifest、
-materialized-first import precedence、materialized dependency module-origin binding、seed commit、
+sealed materialized-only import isolation、materialized dependency module-origin binding、seed commit、
 candidate/source success count を receipt に残す。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。

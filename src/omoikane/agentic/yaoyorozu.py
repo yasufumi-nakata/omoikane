@@ -71,9 +71,9 @@ YAOYOROZU_DEPENDENCY_MATERIALIZATION_PATHS = [
     "src/omoikane/agentic/local_worker_stub.py",
 ]
 YAOYOROZU_DEPENDENCY_IMPORT_PRECEDENCE_PROFILE = (
-    "materialized-dependency-pythonpath-first-v1"
+    "materialized-dependency-sealed-import-v1"
 )
-YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS = "materialized-first"
+YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS = "materialized-only"
 YAOYOROZU_INLINE_DEPENDENCY_IMPORT_STATUS = "source-inline"
 YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
     "same-host-external-workspace-preseed-guardian-gate-v1"
@@ -1712,19 +1712,8 @@ class YaoyorozuRegistryService:
         if expected_module_root_text not in search_path_text:
             errors.append("worker_module_origin.search_path_head missing expected module root")
         if workspace_scope == self._policy.external_workspace_scope:
-            if source_src_root_text not in search_path_text:
-                errors.append("worker_module_origin.search_path_head missing source fallback root")
-            else:
-                expected_index = (
-                    search_path_text.index(expected_module_root_text)
-                    if expected_module_root_text in search_path_text
-                    else len(search_path_text)
-                )
-                source_index = search_path_text.index(source_src_root_text)
-                if expected_index >= source_index:
-                    errors.append(
-                        "worker_module_origin must resolve materialized root before source fallback"
-                    )
+            if source_src_root_text in search_path_text:
+                errors.append("worker_module_origin.search_path_head must omit source fallback root")
         try:
             expected_origin_digest = sha256_text(
                 canonical_json(worker_module_origin_digest_payload(origin))
@@ -3661,7 +3650,7 @@ class YaoyorozuRegistryService:
                     / "src"
                 )
                 dependency_import_root = str(materialized_src_root)
-                dependency_import_path_order = [dependency_import_root, str(src_root)]
+                dependency_import_path_order = [dependency_import_root]
                 dependency_import_precedence_status = (
                     YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
                     if dependency_materialization_status == "materialized"
@@ -3671,11 +3660,8 @@ class YaoyorozuRegistryService:
                     dependency_import_precedence_status
                     == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
                     and dependency_import_path_order[0] == dependency_import_root
-                    and dependency_import_path_order[1] == str(src_root)
                 )
-                command_env["PYTHONPATH"] = (
-                    f"{dependency_import_root}{os.pathsep}{env['PYTHONPATH']}"
-                )
+                command_env["PYTHONPATH"] = dependency_import_root
             command = [sys.executable if preview[0] == "python3" else preview[0], *preview[1:]]
             process = subprocess.Popen(
                 command,
@@ -4172,6 +4158,7 @@ class YaoyorozuRegistryService:
                         and result["dependency_import_precedence_status"]
                         == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
                         and result["dependency_import_path_order"]
+                        and len(result["dependency_import_path_order"]) == 1
                         and result["dependency_import_path_order"][0]
                         == result["dependency_import_root"]
                     )
@@ -4425,12 +4412,11 @@ class YaoyorozuRegistryService:
                     errors.append("worker result dependency_import_path_order must be a list")
                     dependency_import_path_order = []
                 if (
-                    len(dependency_import_path_order) < 2
+                    len(dependency_import_path_order) != 1
                     or dependency_import_path_order[0] != expected_import_root
-                    or dependency_import_path_order[1] != source_src_root
                 ):
                     errors.append(
-                        "external worker dependency import path order must put materialized src before source src"
+                        "external worker dependency import path order must contain only materialized src"
                     )
                 if (
                     result.get("dependency_import_precedence_status")
@@ -4441,9 +4427,8 @@ class YaoyorozuRegistryService:
                     errors.append("external worker dependency_import_precedence_bound must be true")
                 if (
                     isinstance(dependency_import_path_order, list)
-                    and len(dependency_import_path_order) >= 2
+                    and len(dependency_import_path_order) == 1
                     and dependency_import_path_order[0] == expected_import_root
-                    and dependency_import_path_order[1] == source_src_root
                     and result.get("dependency_import_precedence_status")
                     == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
                     and result.get("dependency_import_precedence_bound") is True
@@ -5009,15 +4994,13 @@ class YaoyorozuRegistryService:
                     == YAOYOROZU_EXTERNAL_DEPENDENCY_IMPORT_STATUS
                     and result.get("dependency_import_precedence_bound") is True
                     and isinstance(result.get("dependency_import_path_order"), list)
-                    and len(result.get("dependency_import_path_order", [])) >= 2
+                    and len(result.get("dependency_import_path_order", [])) == 1
                     and result.get("dependency_import_path_order", [None])[0]
                     == str(
                         Path(str(result.get("execution_workspace_root", "")))
                         / YAOYOROZU_DEPENDENCY_MATERIALIZATION_ROOT
                         / "src"
                     )
-                    and result.get("dependency_import_path_order", [None, None])[1]
-                    == source_src_root
                 )
                 for result in results
             ),
