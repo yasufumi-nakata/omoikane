@@ -24,6 +24,8 @@ fixtures:
     funding_policy_signer_jurisdiction: JP-13
     audit_authority_jurisdiction: JP-13
     authority_policy_id: jurisdiction-bound-energy-subsidy-authority-v1
+    verifier_quorum_policy_id: multi-jurisdiction-energy-subsidy-verifier-quorum-v1
+    verifier_jurisdictions: [JP-13, SG-01]
 expected:
   policy_id: consent-bound-energy-budget-voluntary-subsidy-v1
   digest_profile: energy-budget-voluntary-subsidy-digest-v1
@@ -42,6 +44,9 @@ expected:
   all_parties_in_pool: true
   all_consent_digests_valid: true
   funding_policy_signature_bound: true
+  signer_roster_verifier_bound: true
+  signer_roster_verifier_quorum_bound: true
+  signer_roster_verifier_quorum_status: complete
   revocation_registry_bound: true
   audit_authority_bound: true
   jurisdiction_authority_bound: true
@@ -55,6 +60,7 @@ assertions:
   - subsidy may consume only donor surplus after that donor's own floor is preserved
   - recipient shortfall may be reduced only by explicit donor consent digest and revocation ref
   - funding policy signature must be bound to a jurisdiction-specific signer roster and signer key ref
+  - signer roster verifier evidence must be confirmed by a live HTTP multi-authority quorum before subsidy acceptance
   - offer revocation refs must be covered by a digest-only revocation registry
   - audit authority jurisdiction must match the signer jurisdiction before subsidy acceptance
   - surplus must not be used as a cross-identity offset during pool floor validation

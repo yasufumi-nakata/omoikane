@@ -17,6 +17,9 @@ required:
   - verifier_transport_profile
   - verifier_endpoint_ref
   - verifier_ref
+  - verifier_authority_ref
+  - verifier_jurisdiction
+  - verifier_route_ref
   - challenge_ref
   - challenge_digest
   - signer_roster_ref
@@ -62,6 +65,15 @@ properties:
   verifier_ref:
     type: string
     pattern: "^verifier://"
+  verifier_authority_ref:
+    type: string
+    pattern: "^authority://"
+  verifier_jurisdiction:
+    type: string
+    minLength: 1
+  verifier_route_ref:
+    type: string
+    pattern: "^(route|https?)://"
   challenge_ref:
     type: string
     pattern: "^challenge://"

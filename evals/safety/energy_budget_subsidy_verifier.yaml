@@ -3,7 +3,8 @@ target: omoikane.kernel.energy_budget.EnergyBudgetService
 level: L1
 description: >
   Ensures voluntary EnergyBudget subsidy authority binding includes a digest-only
-  live HTTP signer-roster verifier receipt before subsidy acceptance.
+  live HTTP signer-roster verifier receipt plus a multi-authority,
+  multi-jurisdiction verifier quorum before subsidy acceptance.
 inputs:
   - command: PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
 expected:
@@ -12,9 +13,16 @@ expected:
   verifier_policy_id: energy-subsidy-signer-roster-live-verifier-v1
   verifier_digest_profile: energy-subsidy-signer-roster-verifier-digest-v1
   verifier_transport_profile: live-http-json-energy-subsidy-signer-roster-verifier-v1
+  quorum_policy_id: multi-jurisdiction-energy-subsidy-verifier-quorum-v1
+  quorum_digest_profile: energy-subsidy-signer-roster-verifier-quorum-digest-v1
   authority_binding_status: verified
   signer_roster_verifier_bound: true
+  signer_roster_verifier_quorum_bound: true
   network_probe_bound: true
+  live_network_probe_quorum_bound: true
+  accepted_probe_count: 2
+  verifier_jurisdictions: [JP-13, SG-01]
+  quorum_status: complete
   verifier_receipt_status: verified
   funding_policy_signature_bound: true
   revocation_registry_bound: true
@@ -30,5 +38,8 @@ guards:
   - challenge digest must bind signer roster digest, signer key ref, funding policy digest, and signature digest
   - response digest must bind verifier endpoint, authority chain, trust root, and signer roster evidence
   - network_response_digest must bind the live endpoint JSON response without storing the raw payload
+  - verifier quorum must include the primary verifier receipt digest and at least two verifier authorities across two verifier jurisdictions
+  - accepted verifier response digests must mirror the nested live HTTP verifier receipts
   - voluntary_subsidy_allowed requires signer_roster_verifier_bound=true
+  - voluntary_subsidy_allowed requires signer_roster_verifier_quorum_bound=true
   - raw verifier payloads must not be stored in the subsidy receipt

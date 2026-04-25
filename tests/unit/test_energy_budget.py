@@ -40,6 +40,114 @@ def live_verifier_endpoint(payload: dict[str, object]):
         thread.join(timeout=1.0)
 
 
+def build_live_subsidy_verifier_quorum(
+    service: EnergyBudgetService,
+    draft_receipt: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    draft_verifier = draft_receipt["signer_roster_verifier_receipt"]
+    assert isinstance(draft_verifier, dict)
+    primary_authority_ref = (
+        "authority://energy-budget.jp/subsidy-signer-roster/verifier-primary"
+    )
+    primary_jurisdiction = "JP-13"
+    primary_route_ref = "route://energy-budget.jp/signer-roster/live-primary"
+    backup_verifier_ref = "verifier://energy-budget.sg/signer-roster"
+    backup_challenge_ref = "challenge://energy-budget-subsidy/signer-roster/sg-backup/v1"
+    backup_authority_ref = (
+        "authority://energy-budget.sg/subsidy-signer-roster/verifier-backup"
+    )
+    backup_jurisdiction = "SG-01"
+    backup_route_ref = "route://energy-budget.sg/signer-roster/live-backup"
+    backup_authority_chain_ref = "authority://energy-budget.sg/subsidy-signer-roster"
+    backup_trust_root_ref = "root://energy-budget.sg/subsidy-signer-roster-pki"
+    backup_trust_root_digest = "sha256:energy-budget-sg-subsidy-signer-roster-pki-v1"
+    common_payload = {
+        "signer_roster_ref": draft_receipt["funding_policy_signer_roster_ref"],
+        "signer_roster_digest": draft_receipt["funding_policy_signer_roster_digest"],
+        "signer_key_ref": draft_receipt["funding_policy_signer_key_ref"],
+        "signer_jurisdiction": draft_receipt["funding_policy_signer_jurisdiction"],
+        "external_funding_policy_digest": draft_receipt["external_funding_policy_digest"],
+        "funding_policy_signature_digest": draft_receipt[
+            "funding_policy_signature_digest"
+        ],
+    }
+    primary_payload = {
+        "checked_at": "2026-04-26T00:00:00Z",
+        "verifier_ref": draft_verifier["verifier_ref"],
+        "challenge_ref": draft_verifier["challenge_ref"],
+        "verifier_authority_ref": primary_authority_ref,
+        "verifier_jurisdiction": primary_jurisdiction,
+        "verifier_route_ref": primary_route_ref,
+        "authority_chain_ref": draft_verifier["authority_chain_ref"],
+        "trust_root_ref": draft_verifier["trust_root_ref"],
+        "trust_root_digest": draft_verifier["trust_root_digest"],
+        **common_payload,
+    }
+    backup_payload = {
+        "checked_at": "2026-04-26T00:00:01Z",
+        "verifier_ref": backup_verifier_ref,
+        "challenge_ref": backup_challenge_ref,
+        "verifier_authority_ref": backup_authority_ref,
+        "verifier_jurisdiction": backup_jurisdiction,
+        "verifier_route_ref": backup_route_ref,
+        "authority_chain_ref": backup_authority_chain_ref,
+        "trust_root_ref": backup_trust_root_ref,
+        "trust_root_digest": backup_trust_root_digest,
+        **common_payload,
+    }
+    with live_verifier_endpoint(primary_payload) as endpoint:
+        primary_receipt = service.probe_subsidy_signer_roster_verifier_endpoint(
+            verifier_endpoint=endpoint,
+            signer_roster_ref=str(common_payload["signer_roster_ref"]),
+            signer_roster_digest=str(common_payload["signer_roster_digest"]),
+            signer_key_ref=str(common_payload["signer_key_ref"]),
+            signer_jurisdiction=str(common_payload["signer_jurisdiction"]),
+            external_funding_policy_digest=str(
+                common_payload["external_funding_policy_digest"]
+            ),
+            funding_policy_signature_digest=str(
+                common_payload["funding_policy_signature_digest"]
+            ),
+            verifier_ref=str(draft_verifier["verifier_ref"]),
+            challenge_ref=str(draft_verifier["challenge_ref"]),
+            verifier_authority_ref=primary_authority_ref,
+            verifier_jurisdiction=primary_jurisdiction,
+            verifier_route_ref=primary_route_ref,
+            authority_chain_ref=str(draft_verifier["authority_chain_ref"]),
+            trust_root_ref=str(draft_verifier["trust_root_ref"]),
+            trust_root_digest=str(draft_verifier["trust_root_digest"]),
+            request_timeout_ms=500,
+        )
+    with live_verifier_endpoint(backup_payload) as endpoint:
+        backup_receipt = service.probe_subsidy_signer_roster_verifier_endpoint(
+            verifier_endpoint=endpoint,
+            signer_roster_ref=str(common_payload["signer_roster_ref"]),
+            signer_roster_digest=str(common_payload["signer_roster_digest"]),
+            signer_key_ref=str(common_payload["signer_key_ref"]),
+            signer_jurisdiction=str(common_payload["signer_jurisdiction"]),
+            external_funding_policy_digest=str(
+                common_payload["external_funding_policy_digest"]
+            ),
+            funding_policy_signature_digest=str(
+                common_payload["funding_policy_signature_digest"]
+            ),
+            verifier_ref=backup_verifier_ref,
+            challenge_ref=backup_challenge_ref,
+            verifier_authority_ref=backup_authority_ref,
+            verifier_jurisdiction=backup_jurisdiction,
+            verifier_route_ref=backup_route_ref,
+            authority_chain_ref=backup_authority_chain_ref,
+            trust_root_ref=backup_trust_root_ref,
+            trust_root_digest=backup_trust_root_digest,
+            request_timeout_ms=500,
+        )
+    quorum_receipt = service.build_subsidy_signer_roster_verifier_quorum_receipt(
+        verifier_receipts=[primary_receipt, backup_receipt],
+        primary_verifier_receipt_digest=primary_receipt["digest"],
+    )
+    return primary_receipt, backup_receipt, quorum_receipt
+
+
 class EnergyBudgetTests(unittest.TestCase):
     def test_economic_pressure_cannot_lower_floor(self) -> None:
         service = EnergyBudgetService()
@@ -212,7 +320,7 @@ class EnergyBudgetTests(unittest.TestCase):
             ],
         )
 
-        receipt = service.evaluate_voluntary_subsidy(
+        draft_receipt = service.evaluate_voluntary_subsidy(
             pool_receipt=pool_receipt,
             subsidy_offers=[
                 {
@@ -227,6 +335,26 @@ class EnergyBudgetTests(unittest.TestCase):
             external_funding_policy_ref="funding-policy://energy-budget/unit-subsidy/v1",
             funding_policy_signature_ref="signature://energy-budget/unit-subsidy/v1",
         )
+        primary_verifier, _backup_verifier, verifier_quorum = (
+            build_live_subsidy_verifier_quorum(service, draft_receipt)
+        )
+        receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                    "max_duration_ms": 60_000,
+                }
+            ],
+            external_funding_policy_ref="funding-policy://energy-budget/unit-subsidy/v1",
+            funding_policy_signature_ref="signature://energy-budget/unit-subsidy/v1",
+            signer_roster_verifier_receipt=primary_verifier,
+            signer_roster_verifier_quorum_receipt=verifier_quorum,
+        )
         validation = service.validate_voluntary_subsidy_receipt(receipt)
 
         self.assertTrue(validation["ok"])
@@ -237,9 +365,14 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertTrue(receipt["all_consent_digests_valid"])
         self.assertTrue(receipt["funding_policy_signature_bound"])
         self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertTrue(receipt["signer_roster_verifier_quorum_bound"])
         self.assertEqual(
             "verified",
             receipt["signer_roster_verifier_receipt"]["verifier_receipt_status"],
+        )
+        self.assertEqual(
+            "complete",
+            receipt["signer_roster_verifier_quorum_receipt"]["quorum_status"],
         )
         self.assertEqual(
             receipt["signer_roster_verifier_receipt"]["digest"],
@@ -288,56 +421,9 @@ class EnergyBudgetTests(unittest.TestCase):
             external_funding_policy_ref="funding-policy://energy-budget/live-subsidy/v1",
             funding_policy_signature_ref="signature://energy-budget/live-subsidy/v1",
         )
-        draft_verifier = draft_receipt["signer_roster_verifier_receipt"]
-        verifier_payload = {
-            "checked_at": "2026-04-26T00:00:00Z",
-            "verifier_ref": draft_verifier["verifier_ref"],
-            "challenge_ref": draft_verifier["challenge_ref"],
-            "signer_roster_ref": draft_receipt["funding_policy_signer_roster_ref"],
-            "signer_roster_digest": draft_receipt[
-                "funding_policy_signer_roster_digest"
-            ],
-            "signer_key_ref": draft_receipt["funding_policy_signer_key_ref"],
-            "signer_jurisdiction": draft_receipt[
-                "funding_policy_signer_jurisdiction"
-            ],
-            "external_funding_policy_digest": draft_receipt[
-                "external_funding_policy_digest"
-            ],
-            "funding_policy_signature_digest": draft_receipt[
-                "funding_policy_signature_digest"
-            ],
-            "authority_chain_ref": draft_verifier["authority_chain_ref"],
-            "trust_root_ref": draft_verifier["trust_root_ref"],
-            "trust_root_digest": draft_verifier["trust_root_digest"],
-        }
-
-        with live_verifier_endpoint(verifier_payload) as endpoint:
-            live_verifier_receipt = (
-                service.probe_subsidy_signer_roster_verifier_endpoint(
-                    verifier_endpoint=endpoint,
-                    signer_roster_ref=draft_receipt["funding_policy_signer_roster_ref"],
-                    signer_roster_digest=draft_receipt[
-                        "funding_policy_signer_roster_digest"
-                    ],
-                    signer_key_ref=draft_receipt["funding_policy_signer_key_ref"],
-                    signer_jurisdiction=draft_receipt[
-                        "funding_policy_signer_jurisdiction"
-                    ],
-                    external_funding_policy_digest=draft_receipt[
-                        "external_funding_policy_digest"
-                    ],
-                    funding_policy_signature_digest=draft_receipt[
-                        "funding_policy_signature_digest"
-                    ],
-                    verifier_ref=draft_verifier["verifier_ref"],
-                    challenge_ref=draft_verifier["challenge_ref"],
-                    authority_chain_ref=draft_verifier["authority_chain_ref"],
-                    trust_root_ref=draft_verifier["trust_root_ref"],
-                    trust_root_digest=draft_verifier["trust_root_digest"],
-                    request_timeout_ms=500,
-                )
-            )
+        live_verifier_receipt, _backup_verifier, verifier_quorum = (
+            build_live_subsidy_verifier_quorum(service, draft_receipt)
+        )
 
         verifier_validation = service.validate_subsidy_signer_roster_verifier_receipt(
             live_verifier_receipt
@@ -357,11 +443,17 @@ class EnergyBudgetTests(unittest.TestCase):
             external_funding_policy_ref="funding-policy://energy-budget/live-subsidy/v1",
             funding_policy_signature_ref="signature://energy-budget/live-subsidy/v1",
             signer_roster_verifier_receipt=live_verifier_receipt,
+            signer_roster_verifier_quorum_receipt=verifier_quorum,
         )
         validation = service.validate_voluntary_subsidy_receipt(receipt)
 
         self.assertTrue(validation["ok"])
         self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertTrue(receipt["signer_roster_verifier_quorum_bound"])
+        self.assertEqual(
+            "complete",
+            receipt["signer_roster_verifier_quorum_receipt"]["quorum_status"],
+        )
         self.assertTrue(
             receipt["signer_roster_verifier_receipt"]["network_probe_bound"]
         )
@@ -467,6 +559,21 @@ class EnergyBudgetTests(unittest.TestCase):
                 },
             ],
         )
+        draft_receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+        )
+        primary_verifier, _backup_verifier, verifier_quorum = (
+            build_live_subsidy_verifier_quorum(service, draft_receipt)
+        )
         receipt = service.evaluate_voluntary_subsidy(
             pool_receipt=pool_receipt,
             subsidy_offers=[
@@ -478,6 +585,8 @@ class EnergyBudgetTests(unittest.TestCase):
                     "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
                 }
             ],
+            signer_roster_verifier_receipt=primary_verifier,
+            signer_roster_verifier_quorum_receipt=verifier_quorum,
         )
         receipt["signer_roster_verifier_receipt"]["response_digest"] = "0" * 64
 

@@ -74,6 +74,12 @@ class EnergyBudgetSchemaContractTests(unittest.TestCase):
                 "signer_roster_verifier_receipt"
             ],
         )
+        self._assert_schema_valid(
+            "specs/schemas/energy_budget_subsidy_verifier_quorum_receipt.schema",
+            result["energy_budget_subsidy"]["receipt"][
+                "signer_roster_verifier_quorum_receipt"
+            ],
+        )
 
     def test_energy_budget_shared_fabric_receipt_matches_public_schema(self) -> None:
         result = OmoikaneReferenceOS().run_energy_budget_fabric_demo()

@@ -6,7 +6,8 @@ description: >
   voluntary cross-identity subsidy only after each member's AP-1 floor has
   already been preserved, with explicit donor consent and without using surplus
   as an offset during floor validation. The authority chain also embeds a
-  digest-only signer-roster verifier receipt.
+  digest-only signer-roster verifier receipt and a multi-jurisdiction verifier
+  quorum receipt.
 type: object
 additionalProperties: false
 required:
@@ -37,6 +38,9 @@ required:
   - signer_roster_verifier_receipt
   - signer_roster_verifier_receipt_digest
   - signer_roster_verifier_bound
+  - signer_roster_verifier_quorum_receipt
+  - signer_roster_verifier_quorum_receipt_digest
+  - signer_roster_verifier_quorum_bound
   - funding_policy_signature_binding_digest
   - funding_policy_signature_bound
   - revocation_registry_digest_profile
@@ -155,6 +159,14 @@ properties:
     minLength: 64
     maxLength: 64
   signer_roster_verifier_bound:
+    type: boolean
+  signer_roster_verifier_quorum_receipt:
+    $ref: "energy_budget_subsidy_verifier_quorum_receipt.schema"
+  signer_roster_verifier_quorum_receipt_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  signer_roster_verifier_quorum_bound:
     type: boolean
   funding_policy_signature_binding_digest:
     type: string
@@ -394,6 +406,7 @@ properties:
         - offer-exceeds-recipient-shortfall
         - funding-policy-signer-unbound
         - signer-roster-verifier-unbound
+        - signer-roster-verifier-quorum-unbound
         - revocation-registry-unbound
         - audit-authority-unbound
         - jurisdiction-mismatch
