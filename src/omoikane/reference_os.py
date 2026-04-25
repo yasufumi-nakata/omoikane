@@ -92,6 +92,7 @@ from .interface.sensory_loopback import SensoryLoopbackService
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.broker import SubstrateBrokerService
+from .kernel.energy_budget import EnergyBudgetService
 from .kernel.ethics import ActionRequest, EthicsEnforcer
 from .kernel.identity import ForkApprovals, IdentityRegistry
 from .kernel.scheduler import AscensionScheduler
@@ -135,6 +136,7 @@ class OmoikaneReferenceOS:
         self.identity = IdentityRegistry()
         self.ledger = ContinuityLedger()
         self.ethics = EthicsEnforcer()
+        self.energy_budget = EnergyBudgetService()
         self.scheduler = AscensionScheduler(self.ledger)
         self.termination = TerminationGate(
             self.identity,
@@ -6452,6 +6454,89 @@ json.dump(response, sys.stdout)
                     and transfer.host_binding_digest == attestation_stream.host_binding_digest
                 ),
                 "release_completes_source_lease": release["status"] == "released",
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_energy_budget_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://energy-budget-demo/v1",
+            metadata={"display_name": "AP-1 Energy Budget Floor Sandbox"},
+        )
+        allocation = self.broker.lease(
+            identity_id=identity.identity_id,
+            units=72,
+            purpose="energy-budget-floor-guard-eval",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        lease_state = self.broker.observe(identity.identity_id)
+        energy_floor = lease_state["energy_floor"]
+        requested_budget_jps = int(energy_floor["minimum_joules_per_second"]) - 8
+        observed_capacity_jps = int(energy_floor["minimum_joules_per_second"]) - 2
+        broker_signal = self.broker.handle_energy_floor_signal(
+            identity.identity_id,
+            current_joules_per_second=observed_capacity_jps,
+        )
+        receipt = self.energy_budget.evaluate_floor(
+            identity_id=identity.identity_id,
+            workload_class="migration",
+            requested_budget_jps=requested_budget_jps,
+            observed_capacity_jps=observed_capacity_jps,
+            energy_floor=energy_floor,
+            broker_signal=broker_signal,
+        )
+        receipt_validation = self.energy_budget.validate_floor_receipt(receipt)
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="kernel.energy_budget.floor_protected",
+            payload={
+                "receipt_id": receipt["receipt_id"],
+                "digest": receipt["digest"],
+                "policy_id": receipt["policy_id"],
+                "ap1_guard_status": receipt["ap1_guard_status"],
+                "broker_signal_ref": receipt["broker_signal_ref"],
+            },
+            actor="EnergyBudgetService",
+            category="energy-budget",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate=allocation.substrate,
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "energy_budget": {
+                "receipt": receipt,
+                "broker_signal": broker_signal,
+                "lease": asdict(allocation),
+                "lease_state": lease_state,
+            },
+            "validation": {
+                "ok": bool(
+                    receipt_validation["ok"]
+                    and receipt["floor_preserved"]
+                    and receipt["economic_pressure_detected"]
+                    and receipt["degradation_allowed"] is False
+                    and receipt["scheduler_signal_required"]
+                    and receipt["broker_recommended_action"] == "migrate-standby"
+                    and receipt["broker_signal_bound"]
+                    and receipt["raw_economic_payload_stored"] is False
+                ),
+                "floor_preserved": receipt_validation["floor_preserved"],
+                "economic_pressure_blocked": receipt_validation[
+                    "economic_pressure_blocked"
+                ],
+                "broker_signal_bound": receipt_validation["broker_signal_bound"],
+                "raw_payload_redacted": receipt_validation["raw_payload_redacted"],
+                "ap1_guard_status": receipt["ap1_guard_status"],
+                "budget_status": receipt["budget_status"],
+                "recommended_action": receipt["broker_recommended_action"],
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

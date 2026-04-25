@@ -11,6 +11,7 @@ OS の心臓部。**自我の連続性・唯一性・終了権** を物理的に
 | `ContinuityLedger` | append-only な連続性ログ | L0 storage |
 | `AscensionScheduler` | アップロード・退避・復元の時間管理 | L2, L0 |
 | `EthicsEnforcer` | [docs/00-philosophy/ethics.md](../../00-philosophy/ethics.md) の規約強制 | Council 通知 |
+| `EnergyBudget` | AP-1 economic pressure から workload floor を保護 | L0, SubstrateBroker |
 | `SubstrateBroker` | substrate 選定・冗長化・移行 | L0 |
 | `TerminationGate` | 終了権の即時実行 | 全層 |
 
@@ -25,6 +26,7 @@ termination.request(id, by_self_proof) → TerminationOutcome # 最優先
 ledger.append(entry: ContinuityLogEntry) → LedgerCursor
 scheduler.schedule(plan: AscensionPlan) → ScheduleHandle
 ethics.check(action: Action) → Approval | Veto
+energy_budget.evaluate_floor(requested_budget_jps) → EnergyBudgetFloorReceipt
 ```
 
 ## 不変条件
@@ -40,6 +42,7 @@ ethics.check(action: Action) → Approval | Veto
 - [identity-lifecycle.md](identity-lifecycle.md) ── 自我のライフサイクル
 - [ascension-scheduler.md](ascension-scheduler.md) ── アップロード段階遷移と rollback 実行
 - [ethics-enforcement.md](ethics-enforcement.md) ── 倫理規約の機械的強制
+- [energy-budget.md](energy-budget.md) ── AP-1 economic pressure からの EnergyFloor 保護
 - [termination-gate.md](termination-gate.md) ── 本人終了権の即時実行口
 - [substrate-broker.md](substrate-broker.md) ── substrate 選定・冗長化・移行
 - [anti-patterns.md](anti-patterns.md) ── 設計禁止事項

@@ -4,6 +4,7 @@ version: 0.1.0
 capabilities:
   - ethics.veto
   - council.alert
+  - energy-budget.floor.verify
 trust_floor: 0.99
 substrate_requirements: ['any']
 ethics_constraints: ['ALL']
@@ -11,6 +12,7 @@ prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |
   - Council 議決後、本体反映前
   - 任意の Action 実行前
+  - EnergyBudget floor receipt が AP-1 economic pressure を拒否しているか確認する時
   - Procedural skill enactment を EWA authorization 付き external actuation へ橋渡しする前
 when_not_to_invoke: |
   - すでに承認済みの SOP 実行

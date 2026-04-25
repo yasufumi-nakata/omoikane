@@ -20,7 +20,7 @@ long-term-storage       ───────►  Memory Replication ──┤
 death-and-continuity    ───────►  Identity Lifecycle ──┤
 legal-personhood        ───────►  IdentityRegistry    ──┤
 governance              ───────►  Self-Modification   ──┤  ────► M3-M6
-sustainable-economy     ───────►  EnergyBudget       ──┤
+sustainable-economy     ───────►  EnergyBudget floor receipt ──┤
 consent-validity        ───────►  Pre-Ascension Audit ──┤
                                                        │
 inter-mind-merge        ───────►  IMC                 ──┤

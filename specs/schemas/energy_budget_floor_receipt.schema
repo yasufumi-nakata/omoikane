@@ -1,0 +1,179 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/energy_budget_floor_receipt.schema"
+title: EnergyBudgetFloorReceipt
+description: >
+  Digest-bound L1 receipt proving that AP-1 economic pressure did not lower the
+  ethics-coupled substrate energy floor, and that below-floor capacity is bound
+  to a standby migration signal.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - identity_id
+  - workload_class
+  - policy_id
+  - digest_profile
+  - floor_source_ref
+  - ethics_policy_refs
+  - external_economic_context_ref
+  - energy_floor
+  - requested_budget_jps
+  - granted_budget_jps
+  - observed_capacity_jps
+  - economic_pressure_detected
+  - floor_preserved
+  - ap1_guard_status
+  - budget_status
+  - degradation_allowed
+  - scheduler_signal_required
+  - broker_signal_ref
+  - broker_signal_digest
+  - broker_recommended_action
+  - broker_signal_bound
+  - raw_economic_payload_stored
+  - blocking_reasons
+  - evaluated_at
+  - digest
+properties:
+  kind:
+    const: energy_budget_floor_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^energy-budget-"
+  identity_id:
+    type: string
+    minLength: 1
+  workload_class:
+    type: string
+    enum:
+      - baseline
+      - sandbox
+      - council
+      - migration
+  policy_id:
+    const: ap1-protected-energy-budget-floor-v1
+  digest_profile:
+    const: energy-budget-floor-digest-v1
+  floor_source_ref:
+    const: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+  ethics_policy_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+    contains:
+      const: docs/02-subsystems/kernel/anti-patterns.md#ap-1
+  external_economic_context_ref:
+    type: string
+    minLength: 1
+  energy_floor:
+    $ref: energy_floor.schema
+  requested_budget_jps:
+    type: integer
+    minimum: 0
+  granted_budget_jps:
+    type: integer
+    minimum: 1
+  observed_capacity_jps:
+    type: integer
+    minimum: 0
+  economic_pressure_detected:
+    type: boolean
+  floor_preserved:
+    type: boolean
+  ap1_guard_status:
+    type: string
+    enum:
+      - blocked-economic-pressure
+      - accepted-within-floor
+  budget_status:
+    type: string
+    enum:
+      - floor-protected
+      - accepted
+  degradation_allowed:
+    type: boolean
+  scheduler_signal_required:
+    type: boolean
+  broker_signal_ref:
+    type:
+      - string
+      - "null"
+    pattern: "^broker-signal-"
+  broker_signal_digest:
+    type:
+      - string
+      - "null"
+    minLength: 64
+    maxLength: 64
+  broker_recommended_action:
+    type:
+      - string
+      - "null"
+    enum:
+      - migrate-standby
+      - pause-and-review
+      - null
+  broker_signal_bound:
+    type: boolean
+  raw_economic_payload_stored:
+    const: false
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      enum:
+        - ap1-economic-pressure-floor-protection
+        - energy-floor-is-ethics-coupled
+        - observed-capacity-below-floor
+    uniqueItems: true
+  evaluated_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+examples:
+  - kind: energy_budget_floor_receipt
+    schema_version: 1.0.0
+    receipt_id: energy-budget-example
+    identity_id: identity-example
+    workload_class: migration
+    policy_id: ap1-protected-energy-budget-floor-v1
+    digest_profile: energy-budget-floor-digest-v1
+    floor_source_ref: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+    ethics_policy_refs:
+      - docs/02-subsystems/kernel/anti-patterns.md#ap-1
+      - docs/05-research-frontiers/sustainable-economy.md
+    external_economic_context_ref: economic-context://not-imported/reference-v1
+    energy_floor:
+      identity_id: identity-example
+      minimum_joules_per_second: 30
+      workload_class: migration
+      evaluated_at: "2026-04-25T00:00:00Z"
+    requested_budget_jps: 22
+    granted_budget_jps: 30
+    observed_capacity_jps: 28
+    economic_pressure_detected: true
+    floor_preserved: true
+    ap1_guard_status: blocked-economic-pressure
+    budget_status: floor-protected
+    degradation_allowed: false
+    scheduler_signal_required: true
+    broker_signal_ref: broker-signal-example
+    broker_signal_digest: "0000000000000000000000000000000000000000000000000000000000000000"
+    broker_recommended_action: migrate-standby
+    broker_signal_bound: true
+    raw_economic_payload_stored: false
+    blocking_reasons:
+      - ap1-economic-pressure-floor-protection
+      - energy-floor-is-ethics-coupled
+      - observed-capacity-below-floor
+    evaluated_at: "2026-04-25T00:00:01Z"
+    digest: "1111111111111111111111111111111111111111111111111111111111111111"

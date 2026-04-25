@@ -1,0 +1,98 @@
+idl_version: 1
+kind: service
+namespace: kernel.energy_budget.v0
+service: EnergyBudgetService
+summary: AP-1 protected L1 contract for preserving ethics-coupled energy budget floors under economic pressure.
+imports:
+  energy_budget_floor_receipt: ../schemas/energy_budget_floor_receipt.schema
+  energy_floor: ../schemas/energy_floor.schema
+operations:
+  evaluate_floor:
+    summary: >
+      Evaluate one requested energy budget against the substrate energy floor,
+      block economic pressure from lowering the floor, and optionally bind a
+      broker standby migration signal when observed capacity is below the floor.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - workload_class
+          - requested_budget_jps
+          - observed_capacity_jps
+        additionalProperties: false
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          workload_class:
+            type: string
+            enum:
+              - baseline
+              - sandbox
+              - council
+              - migration
+          requested_budget_jps:
+            type: integer
+            minimum: 0
+          observed_capacity_jps:
+            type: integer
+            minimum: 0
+          energy_floor:
+            $ref: ../schemas/energy_floor.schema
+          broker_signal:
+            type:
+              - object
+              - "null"
+          external_economic_context_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: energy_budget_floor_receipt
+    guarantees:
+      - requested_budget_jps below the workload floor must set economic_pressure_detected=true
+      - granted_budget_jps must never be lower than energy_floor.minimum_joules_per_second
+      - economic pressure must set degradation_allowed=false and budget_status=floor-protected
+      - observed capacity below the floor must bind a critical broker signal with recommended_action=migrate-standby
+      - raw economic context must remain a reference only; raw_economic_payload_stored is always false
+  validate_floor_receipt:
+    summary: Validate one EnergyBudgetFloorReceipt against the AP-1 floor contract and digest profile.
+    input:
+      schema_ref: energy_budget_floor_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - floor_preserved
+          - economic_pressure_blocked
+          - broker_signal_bound
+          - raw_payload_redacted
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          floor_preserved:
+            type: boolean
+          economic_pressure_blocked:
+            type: boolean
+          broker_signal_bound:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+    guarantees:
+      - digest must match the receipt payload under energy-budget-floor-digest-v1
+      - AP-1 blocking fields must agree with requested_budget_jps and workload floor
+events:
+  energy_budget.floor_protected:
+    summary: ContinuityLedger event emitted after an AP-1 protected floor receipt is accepted.
+    payload_schema: energy_budget_floor_receipt
+    category: energy-budget
+    required_roles:
+      - self
+      - guardian

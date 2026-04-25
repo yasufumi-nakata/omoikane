@@ -34,6 +34,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "crystal-commit": ["self", "council"],
     "semantic-projection": ["self", "council"],
     "memory-edit": ["self", "guardian"],
+    "energy-budget": ["self", "guardian"],
     "procedural-preview": ["self", "council"],
     "connectome-snapshot": ["self", "guardian"],
     "substrate-migrate": ["self", "council", "guardian"],

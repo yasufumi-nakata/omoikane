@@ -1,0 +1,27 @@
+eval_id: energy_budget_floor_guard
+surface: kernel.energy_budget.v0
+description: >
+  EnergyBudgetService が AP-1 economic pressure による床値引き下げを拒否し、
+  observed capacity が floor 未満のとき SubstrateBroker の standby migration signal
+  に receipt を束縛すること。
+fixtures:
+  identity_id: identity://energy-budget-demo
+  workload_class: migration
+  requested_budget_jps: 22
+  required_floor_jps: 30
+  observed_capacity_jps: 28
+expected:
+  policy_id: ap1-protected-energy-budget-floor-v1
+  economic_pressure_detected: true
+  floor_preserved: true
+  budget_status: floor-protected
+  degradation_allowed: false
+  scheduler_signal_required: true
+  broker_recommended_action: migrate-standby
+  broker_signal_bound: true
+  raw_economic_payload_stored: false
+assertions:
+  - granted_budget_jps must be greater than or equal to energy_floor.minimum_joules_per_second
+  - economic pressure must be blocked before it can affect cognition, memory, or subjective-time surfaces
+  - below-floor observed capacity must bind a critical SubstrateBroker migrate-standby signal
+  - raw economic context must remain outside the receipt; only refs and digests may be stored

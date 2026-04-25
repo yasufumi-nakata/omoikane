@@ -90,6 +90,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertLessEqual(result["cycle"]["roundtrip_latency_ms"], 5.0)
         self.assertLessEqual(result["fallback"]["failover_latency_ms"], 1.0)
 
+    def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "energy-budget-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("floor-protected", result["validation"]["budget_status"])
+        self.assertEqual("migrate-standby", result["validation"]["recommended_action"])
+        self.assertTrue(result["energy_budget"]["receipt"]["floor_preserved"])
+        self.assertFalse(result["energy_budget"]["receipt"]["raw_economic_payload_stored"])
+
     def test_imc_demo_emits_disclosure_safe_json(self) -> None:
         stdout = io.StringIO()
 

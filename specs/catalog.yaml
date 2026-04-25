@@ -2682,5 +2682,30 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects runtime semver, contract stability tables, and catalog snapshot hash consistency.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/energy_budget_floor_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.energy_budget.v0.idl
+      - reference-runtime
+      - evals/safety/energy_budget_floor_guard.yaml
+      - docs/02-subsystems/kernel/energy-budget.md
+    rationale: Required to serialize AP-1 protected energy budget floor receipts that block economic pressure from lowering substrate workload floors.
+  - priority: P1
+    kind: interface
+    file: specs/interfaces/kernel.energy_budget.v0.idl
+    consumers:
+      - reference-runtime
+      - agents/guardians/ethics-guardian.yaml
+      - docs/02-subsystems/kernel/energy-budget.md
+    rationale: Required to expose EnergyBudgetService floor evaluation and validation as a kernel contract.
+  - priority: P1
+    kind: eval
+    file: evals/safety/energy_budget_floor_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/ethics-guardian.yaml
+    rationale: Protects AP-1 behavior by requiring below-floor budget requests to be blocked and broker standby migration signals to be bound.
 next_priority:
   # Future automation can append the next missing contract here.

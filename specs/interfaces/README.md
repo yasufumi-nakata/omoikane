@@ -29,6 +29,7 @@
 - `interface.wms.v0.idl`
 - `kernel.broker.v0.idl`
 - `kernel.continuity.v0.idl`
+- `kernel.energy_budget.v0.idl`
 - `kernel.ethics.v0.idl`
 - `kernel.identity.v0.idl`
 - `kernel.scheduler.v0.idl`

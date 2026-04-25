@@ -1073,6 +1073,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("released", result["broker"]["release"]["status"])
         self.assertEqual("released", result["broker"]["final_state"]["release"]["status"])
 
+    def test_energy_budget_demo_blocks_ap1_pressure_and_binds_broker_signal(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_energy_budget_demo()
+        receipt = result["energy_budget"]["receipt"]
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["floor_preserved"])
+        self.assertTrue(result["validation"]["economic_pressure_blocked"])
+        self.assertTrue(result["validation"]["broker_signal_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertEqual("blocked-economic-pressure", receipt["ap1_guard_status"])
+        self.assertEqual("floor-protected", receipt["budget_status"])
+        self.assertFalse(receipt["degradation_allowed"])
+        self.assertEqual("migrate-standby", receipt["broker_recommended_action"])
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["energy-budget"])
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
 
