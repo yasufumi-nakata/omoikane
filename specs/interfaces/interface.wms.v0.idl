@@ -12,6 +12,7 @@ imports:
   wms_approval_collection_receipt: ../schemas/wms_approval_collection_receipt.schema
   wms_distributed_approval_fanout_receipt: ../schemas/wms_distributed_approval_fanout_receipt.schema
   wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
+  wms_engine_route_binding_receipt: ../schemas/wms_engine_route_binding_receipt.schema
   wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
@@ -190,6 +191,31 @@ operations:
       - source artifact digests must match the WMS reconcile, approval collection, fan-out, apply, and revert receipts supplied by the reference runtime
       - raw engine payloads and raw world-state bodies must not be stored in the transaction log receipt
       - engine_binding_status can become complete only when all required operations are covered and digest-bound
+  bind_engine_route_trace:
+    summary: Bind a completed WMS engine transaction log to authenticated cross-host distributed transport route evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - engine_transaction_log_receipt
+          - authority_route_trace
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          engine_transaction_log_receipt:
+            schema_ref: wms_engine_transaction_log
+          authority_route_trace:
+            type: object
+    output:
+      schema_ref: wms_engine_route_binding_receipt
+    guarantees:
+      - engine transaction log digest, ordered transaction ids, and ordered entry digests must match the supplied transaction log receipt
+      - authority_route_trace must be an authenticated non-loopback mTLS authority route with cross_host_verified=true
+      - route binding refs, remote host refs, OS observer tuple digests, and host-binding digests must be copied as digest-only evidence
+      - raw engine payloads, raw route payloads, and packet bodies must not be stored in the binding receipt
+      - engine_route_binding_status can become complete only when the engine log and route trace are both digest-bound
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a deterministic adaptive retry budget and engine transaction evidence.
     input:

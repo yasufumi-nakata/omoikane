@@ -133,6 +133,144 @@ class WorldModelSyncTests(unittest.TestCase):
             )
         return receipts
 
+    def _authority_route_trace(self, *, trace_ref: str = "authority-route-trace://federation/test") -> dict:
+        route_bindings = []
+        for index, remote_host_ref in enumerate(
+            [
+                "host://federation/wms-engine-edge-a",
+                "host://federation/wms-engine-edge-b",
+            ],
+            start=1,
+        ):
+            remote_ip = "192.0.2.10" if index == 1 else "198.51.100.20"
+            route_binding_ref = f"authority-route://federation/test-{index}"
+            tuple_digest = sha256_text(
+                canonical_json(
+                    {
+                        "local_ip": "203.0.113.5",
+                        "local_port": 53000 + index,
+                        "remote_ip": remote_ip,
+                        "remote_port": 44300 + index,
+                    }
+                )
+            )
+            host_binding_digest = sha256_text(
+                canonical_json(
+                    {
+                        "tuple_digest": tuple_digest,
+                        "remote_host_ref": remote_host_ref,
+                        "remote_host_attestation_ref": (
+                            f"host-attestation://federation/wms-engine-edge-{index}"
+                        ),
+                        "authority_cluster_ref": "authority-cluster://federation/wms-engine",
+                    }
+                )
+            )
+            route_bindings.append(
+                {
+                    "key_server_ref": f"keyserver://federation/wms-engine-{index}",
+                    "server_role": "quorum-notary" if index == 1 else "directory-mirror",
+                    "authority_status": "active",
+                    "server_endpoint": f"https://{remote_ip}:4430{index}/route",
+                    "server_name": "authority.local",
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": (
+                        f"host-attestation://federation/wms-engine-edge-{index}"
+                    ),
+                    "authority_cluster_ref": "authority-cluster://federation/wms-engine",
+                    "remote_jurisdiction": "JP-13" if index == 1 else "US-CA",
+                    "remote_network_zone": "apne1" if index == 1 else "usw2",
+                    "route_binding_ref": route_binding_ref,
+                    "matched_root_refs": [f"root://federation/pki-{index}"],
+                    "mtls_status": "authenticated",
+                    "response_digest_bound": True,
+                    "os_observer_receipt": {
+                        "kind": "distributed_transport_os_observer_receipt",
+                        "schema_version": "1.0.0",
+                        "receipt_id": f"authority-os-observer://test-{index}",
+                        "observer_profile": "os-native-tcp-observer-v1",
+                        "observed_at": "2026-04-25T02:30:00Z",
+                        "local_ip": "203.0.113.5",
+                        "local_port": 53000 + index,
+                        "remote_ip": remote_ip,
+                        "remote_port": 44300 + index,
+                        "remote_host_ref": remote_host_ref,
+                        "remote_host_attestation_ref": (
+                            f"host-attestation://federation/wms-engine-edge-{index}"
+                        ),
+                        "authority_cluster_ref": "authority-cluster://federation/wms-engine",
+                        "owning_pid": 1000 + index,
+                        "observed_sources": ["lsof", "netstat"],
+                        "connection_states": ["ESTABLISHED"],
+                        "tuple_digest": tuple_digest,
+                        "host_binding_digest": host_binding_digest,
+                        "receipt_status": "observed",
+                    },
+                    "socket_trace": {
+                        "local_ip": "203.0.113.5",
+                        "local_port": 53000 + index,
+                        "remote_ip": remote_ip,
+                        "remote_port": 44300 + index,
+                        "non_loopback": True,
+                        "transport_profile": "mtls-socket-trace-v1",
+                        "tls_version": "TLSv1.3",
+                        "cipher_suite": "TLS_AES_256_GCM_SHA384",
+                        "peer_certificate_fingerprint": sha256_text(f"peer-{index}"),
+                        "client_certificate_fingerprint": sha256_text("client"),
+                        "request_bytes": 128,
+                        "response_bytes": 512,
+                        "http_status": 200,
+                        "response_digest": sha256_text(f"response-{index}"),
+                        "connect_latency_ms": 4.0,
+                        "tls_handshake_latency_ms": 9.0,
+                        "round_trip_latency_ms": 13.0,
+                    },
+                }
+            )
+        trace = {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_ref": trace_ref,
+            "authority_plane_ref": "authority-plane://federation/test",
+            "authority_plane_digest": sha256_text("authority-plane://federation/test"),
+            "route_target_discovery_ref": "authority-route-targets://federation/test",
+            "route_target_discovery_digest": sha256_text(
+                "authority-route-targets://federation/test"
+            ),
+            "envelope_ref": "distributed-envelope-test00000000",
+            "envelope_digest": sha256_text("distributed-envelope-test"),
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "trace_profile": "non-loopback-mtls-authority-route-v1",
+            "socket_trace_profile": "mtls-socket-trace-v1",
+            "os_observer_profile": "os-native-tcp-observer-v1",
+            "cross_host_binding_profile": "attested-cross-host-authority-binding-v1",
+            "route_target_discovery_profile": "bounded-authority-route-target-discovery-v1",
+            "ca_bundle_ref": "cert://authority-ca",
+            "client_certificate_ref": "cert://authority-client",
+            "server_name": "authority.local",
+            "authority_cluster_ref": "authority-cluster://federation/wms-engine",
+            "route_count": 2,
+            "distinct_remote_host_count": 2,
+            "mtls_authenticated_count": 2,
+            "trusted_root_refs": ["root://federation/pki-1", "root://federation/pki-2"],
+            "non_loopback_verified": True,
+            "authority_plane_bound": True,
+            "response_digest_bound": True,
+            "socket_trace_complete": True,
+            "os_observer_complete": True,
+            "route_target_discovery_bound": True,
+            "cross_host_verified": True,
+            "route_bindings": route_bindings,
+            "trace_status": "authenticated",
+            "recorded_at": "2026-04-25T02:30:00Z",
+            "total_connect_latency_ms": 8.0,
+            "total_handshake_latency_ms": 18.0,
+            "total_round_trip_latency_ms": 26.0,
+        }
+        trace["digest"] = sha256_text(canonical_json(trace))
+        return trace
+
     def test_minor_diff_reconciles_via_consensus_round(self) -> None:
         sync = WorldModelSync()
         session = sync.create_session(
@@ -655,6 +793,69 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertEqual(receipt["required_operations"], receipt["covered_operations"])
         self.assertFalse(tampered_validation["ok"])
         self.assertFalse(tampered_validation["source_artifacts_bound"])
+
+    def test_engine_route_binding_binds_transaction_log_to_authority_trace(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+        state_digest = sha256_text(canonical_json(sync.snapshot(session["session_id"])))
+        engine_session_ref = f"engine-session://test/{session['session_id']}"
+        source_digest = sha256_text("approval-fanout")
+        entry = sync.build_engine_transaction_entry(
+            transaction_id="engine-txn://test/route-binding/001",
+            transaction_index=1,
+            operation="approval_fanout_bound",
+            source_artifact_kind="wms_distributed_approval_fanout_receipt",
+            source_artifact_ref="artifact://approval-fanout",
+            source_artifact_digest=source_digest,
+            engine_session_ref=engine_session_ref,
+            engine_state_before_digest=state_digest,
+            engine_state_after_digest=state_digest,
+            participant_ids=session["current_state"]["participants"],
+        )
+        engine_log = sync.build_engine_transaction_log_receipt(
+            session["session_id"],
+            engine_adapter_ref="engine-adapter://test/reference",
+            engine_session_ref=engine_session_ref,
+            transaction_log_ref=f"engine-log://test/{session['session_id']}",
+            transaction_entries=[entry],
+            required_operations=["approval_fanout_bound"],
+            source_artifact_digests={"approval_fanout_bound": source_digest},
+        )
+        route_trace = self._authority_route_trace()
+
+        receipt = sync.build_engine_route_binding_receipt(
+            session["session_id"],
+            engine_transaction_log_receipt=engine_log,
+            authority_route_trace=route_trace,
+        )
+        validation = sync.validate_engine_route_binding_receipt(
+            receipt,
+            engine_transaction_log_receipt=engine_log,
+            authority_route_trace=route_trace,
+        )
+        tampered_trace = dict(route_trace)
+        tampered_trace["digest"] = sha256_text("tampered-route-trace")
+        tampered_validation = sync.validate_engine_route_binding_receipt(
+            receipt,
+            engine_transaction_log_receipt=engine_log,
+            authority_route_trace=tampered_trace,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["engine_log_bound"])
+        self.assertTrue(validation["authority_route_trace_bound"])
+        self.assertTrue(validation["cross_host_route_bound"])
+        self.assertTrue(validation["engine_route_binding_complete"])
+        self.assertEqual("complete", receipt["engine_route_binding_status"])
+        self.assertFalse(receipt["raw_engine_payload_stored"])
+        self.assertFalse(receipt["raw_route_payload_stored"])
+        self.assertEqual(route_trace["digest"], receipt["authority_route_trace_digest"])
+        self.assertEqual(engine_log["digest"], receipt["engine_transaction_log_digest"])
+        self.assertFalse(tampered_validation["ok"])
+        self.assertFalse(tampered_validation["authority_route_trace_bound"])
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
         sync = WorldModelSync()

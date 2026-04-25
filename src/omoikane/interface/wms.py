@@ -58,6 +58,13 @@ WMS_ENGINE_TRANSACTION_LOG_POLICY_ID = "digest-bound-wms-engine-transaction-log-
 WMS_ENGINE_ADAPTER_PROFILE = "reference-wms-engine-adapter-v1"
 WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE = "wms-engine-transaction-entry-digest-v1"
 WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE = "wms-engine-transaction-log-digest-v1"
+WMS_ENGINE_ROUTE_BINDING_POLICY_ID = "distributed-transport-bound-wms-engine-adapter-route-v1"
+WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE = "wms-engine-route-binding-digest-v1"
+WMS_ENGINE_ROUTE_TRACE_PROFILE = "non-loopback-mtls-authority-route-v1"
+WMS_ENGINE_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
+WMS_ENGINE_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
+WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
+WMS_ENGINE_ROUTE_TARGET_DISCOVERY_PROFILE = "bounded-authority-route-target-discovery-v1"
 WMS_ENGINE_TRANSACTION_OPERATIONS = {
     "time_rate_escape_evidence",
     "approval_collection_bound",
@@ -143,6 +150,14 @@ def _engine_transaction_log_digest_payload(receipt: Mapping[str, Any]) -> Dict[s
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _engine_route_binding_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _route_trace_digest_payload(trace: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in trace.items() if key != "digest"}
+
+
 class WorldModelSync:
     """Deterministic L6 world-state reconciliation and escape model."""
 
@@ -194,6 +209,10 @@ class WorldModelSync:
                 "engine_transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
                 "engine_adapter_profile": WMS_ENGINE_ADAPTER_PROFILE,
                 "engine_transaction_operations": sorted(WMS_ENGINE_TRANSACTION_OPERATIONS),
+                "engine_route_binding_policy_id": WMS_ENGINE_ROUTE_BINDING_POLICY_ID,
+                "engine_route_binding_digest_profile": WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE,
+                "engine_route_trace_profile": WMS_ENGINE_ROUTE_TRACE_PROFILE,
+                "engine_route_cross_host_profile": WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE,
             },
             "consensus_policy": {
                 "minor_diff": "consensus_round",
@@ -1162,6 +1181,128 @@ class WorldModelSync:
         }
         receipt["digest"] = sha256_text(
             canonical_json(_engine_transaction_log_digest_payload(receipt))
+        )
+        return receipt
+
+    def build_engine_route_binding_receipt(
+        self,
+        session_id: str,
+        *,
+        engine_transaction_log_receipt: Mapping[str, Any],
+        authority_route_trace: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        self._require_session(session_id)
+        if not isinstance(engine_transaction_log_receipt, Mapping):
+            raise ValueError("engine_transaction_log_receipt must be a mapping")
+        if not isinstance(authority_route_trace, Mapping):
+            raise ValueError("authority_route_trace must be a mapping")
+        engine_log = deepcopy(engine_transaction_log_receipt)
+        route_trace = deepcopy(authority_route_trace)
+        engine_log_digest = self._normalize_digest(
+            engine_log.get("digest"),
+            "engine_transaction_log_digest",
+        )
+        route_trace_digest = self._normalize_digest(
+            route_trace.get("digest"),
+            "authority_route_trace_digest",
+        )
+        engine_log_validation = self.validate_engine_transaction_log_receipt(engine_log)
+        route_trace_validation = self._validate_engine_authority_route_trace(route_trace)
+
+        transaction_ids = [
+            str(transaction_id)
+            for transaction_id in engine_log.get("ordered_transaction_ids", [])
+            if isinstance(transaction_id, str)
+        ]
+        transaction_entry_digests = [
+            str(entry_digest)
+            for entry_digest in engine_log.get("ordered_entry_digests", [])
+            if isinstance(entry_digest, str)
+        ]
+        route_binding_refs = route_trace_validation["route_binding_refs"]
+        remote_host_refs = route_trace_validation["remote_host_refs"]
+        remote_host_attestation_refs = route_trace_validation[
+            "remote_host_attestation_refs"
+        ]
+        os_observer_tuple_digests = route_trace_validation["os_observer_tuple_digests"]
+        os_observer_host_binding_digests = route_trace_validation[
+            "os_observer_host_binding_digests"
+        ]
+        route_binding_digest_set_digest = sha256_text(canonical_json(route_binding_refs))
+        transaction_digest_set_digest = sha256_text(canonical_json(transaction_entry_digests))
+        engine_log_bound = (
+            engine_log_validation["ok"]
+            and engine_log.get("engine_binding_status") == "complete"
+            and engine_log.get("digest") == engine_log_digest
+        )
+        authority_route_trace_bound = route_trace_validation["ok"]
+        cross_host_route_bound = route_trace_validation["cross_host_route_bound"]
+        redaction_complete = (
+            engine_log.get("redaction_complete") is True
+            and all(
+                entry.get("payload_redacted") is True
+                and entry.get("raw_payload_stored") is False
+                for entry in engine_log.get("transaction_entries", [])
+                if isinstance(entry, Mapping)
+            )
+        )
+        complete = (
+            engine_log_bound
+            and authority_route_trace_bound
+            and cross_host_route_bound
+            and redaction_complete
+        )
+        receipt = {
+            "kind": "wms_engine_route_binding_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "binding_policy_id": WMS_ENGINE_ROUTE_BINDING_POLICY_ID,
+            "digest_profile": WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE,
+            "session_id": session_id,
+            "engine_transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
+            "engine_transaction_log_digest": engine_log_digest,
+            "engine_adapter_ref": engine_log["engine_adapter_ref"],
+            "engine_session_ref": engine_log["engine_session_ref"],
+            "transaction_log_ref": engine_log["transaction_log_ref"],
+            "engine_transaction_ids": transaction_ids,
+            "engine_transaction_entry_digests": transaction_entry_digests,
+            "engine_transaction_digest_set_digest": transaction_digest_set_digest,
+            "transaction_entry_count": len(transaction_entry_digests),
+            "authority_route_trace_ref": route_trace["trace_ref"],
+            "authority_route_trace_digest": route_trace_digest,
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "route_target_discovery_ref": route_trace["route_target_discovery_ref"],
+            "route_target_discovery_digest": route_trace[
+                "route_target_discovery_digest"
+            ],
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "trace_profile": route_trace["trace_profile"],
+            "socket_trace_profile": route_trace["socket_trace_profile"],
+            "os_observer_profile": route_trace["os_observer_profile"],
+            "cross_host_binding_profile": route_trace["cross_host_binding_profile"],
+            "route_target_discovery_profile": route_trace[
+                "route_target_discovery_profile"
+            ],
+            "route_count": int(route_trace["route_count"]),
+            "mtls_authenticated_count": int(route_trace["mtls_authenticated_count"]),
+            "distinct_remote_host_count": int(route_trace["distinct_remote_host_count"]),
+            "route_binding_refs": route_binding_refs,
+            "route_binding_digest_set_digest": route_binding_digest_set_digest,
+            "remote_host_refs": remote_host_refs,
+            "remote_host_attestation_refs": remote_host_attestation_refs,
+            "os_observer_tuple_digests": os_observer_tuple_digests,
+            "os_observer_host_binding_digests": os_observer_host_binding_digests,
+            "engine_log_bound": engine_log_bound,
+            "authority_route_trace_bound": authority_route_trace_bound,
+            "cross_host_route_bound": cross_host_route_bound,
+            "redaction_complete": redaction_complete,
+            "raw_engine_payload_stored": False,
+            "raw_route_payload_stored": False,
+            "engine_route_binding_status": "complete" if complete else "incomplete",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_engine_route_binding_digest_payload(receipt))
         )
         return receipt
 
@@ -3114,6 +3255,408 @@ class WorldModelSync:
             "missing_operations": missing_operations,
         }
 
+    def validate_engine_route_binding_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        engine_transaction_log_receipt: Mapping[str, Any] | None = None,
+        authority_route_trace: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_engine_route_binding_receipt":
+            errors.append("kind must equal wms_engine_route_binding_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("binding_policy_id") != WMS_ENGINE_ROUTE_BINDING_POLICY_ID:
+            errors.append("binding_policy_id mismatch")
+        if receipt.get("digest_profile") != WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if receipt.get("engine_transaction_log_policy_id") != WMS_ENGINE_TRANSACTION_LOG_POLICY_ID:
+            errors.append("engine_transaction_log_policy_id mismatch")
+        for field_name in (
+            "session_id",
+            "engine_adapter_ref",
+            "engine_session_ref",
+            "transaction_log_ref",
+            "authority_route_trace_ref",
+            "authority_plane_ref",
+            "route_target_discovery_ref",
+            "council_tier",
+            "transport_profile",
+            "trace_profile",
+            "socket_trace_profile",
+            "os_observer_profile",
+            "cross_host_binding_profile",
+            "route_target_discovery_profile",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        for field_name in (
+            "engine_transaction_log_digest",
+            "engine_transaction_digest_set_digest",
+            "authority_route_trace_digest",
+            "authority_plane_digest",
+            "route_target_discovery_digest",
+            "route_binding_digest_set_digest",
+        ):
+            self._check_digest(receipt.get(field_name), field_name, errors)
+        if receipt.get("trace_profile") != WMS_ENGINE_ROUTE_TRACE_PROFILE:
+            errors.append("trace_profile mismatch")
+        if receipt.get("socket_trace_profile") != WMS_ENGINE_ROUTE_SOCKET_PROFILE:
+            errors.append("socket_trace_profile mismatch")
+        if receipt.get("os_observer_profile") != WMS_ENGINE_ROUTE_OS_OBSERVER_PROFILE:
+            errors.append("os_observer_profile mismatch")
+        if receipt.get("cross_host_binding_profile") != WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE:
+            errors.append("cross_host_binding_profile mismatch")
+        if (
+            receipt.get("route_target_discovery_profile")
+            != WMS_ENGINE_ROUTE_TARGET_DISCOVERY_PROFILE
+        ):
+            errors.append("route_target_discovery_profile mismatch")
+
+        engine_transaction_ids = receipt.get("engine_transaction_ids")
+        if not isinstance(engine_transaction_ids, list) or not engine_transaction_ids:
+            errors.append("engine_transaction_ids must be a non-empty list")
+            engine_transaction_ids = []
+        engine_transaction_entry_digests = receipt.get("engine_transaction_entry_digests")
+        if (
+            not isinstance(engine_transaction_entry_digests, list)
+            or not engine_transaction_entry_digests
+        ):
+            errors.append("engine_transaction_entry_digests must be a non-empty list")
+            engine_transaction_entry_digests = []
+        else:
+            for entry_digest in engine_transaction_entry_digests:
+                self._check_digest(entry_digest, "engine_transaction_entry_digest", errors)
+        if receipt.get("transaction_entry_count") != len(engine_transaction_entry_digests):
+            errors.append("transaction_entry_count must equal engine transaction digest count")
+        if receipt.get("engine_transaction_digest_set_digest") != sha256_text(
+            canonical_json(engine_transaction_entry_digests)
+        ):
+            errors.append("engine_transaction_digest_set_digest must bind entry digests")
+
+        route_binding_refs = receipt.get("route_binding_refs")
+        if not isinstance(route_binding_refs, list) or not route_binding_refs:
+            errors.append("route_binding_refs must be a non-empty list")
+            route_binding_refs = []
+        else:
+            for route_ref in route_binding_refs:
+                self._check_non_empty_string(route_ref, "route_binding_ref", errors)
+        if receipt.get("route_binding_digest_set_digest") != sha256_text(
+            canonical_json(route_binding_refs)
+        ):
+            errors.append("route_binding_digest_set_digest must bind route refs")
+        for list_field in (
+            "remote_host_refs",
+            "remote_host_attestation_refs",
+            "os_observer_tuple_digests",
+            "os_observer_host_binding_digests",
+        ):
+            value = receipt.get(list_field)
+            if not isinstance(value, list) or len(value) != len(route_binding_refs):
+                errors.append(f"{list_field} must align with route_binding_refs")
+            elif list_field.endswith("digests"):
+                for digest in value:
+                    self._check_digest(digest, list_field[:-1], errors)
+            else:
+                for item in value:
+                    self._check_non_empty_string(item, list_field[:-1], errors)
+
+        engine_log_bound = receipt.get("engine_log_bound") is True
+        if engine_transaction_log_receipt is not None:
+            if not isinstance(engine_transaction_log_receipt, Mapping):
+                raise ValueError("engine_transaction_log_receipt must be a mapping")
+            engine_validation = self.validate_engine_transaction_log_receipt(
+                engine_transaction_log_receipt
+            )
+            expected_engine_entry_digests = list(
+                engine_transaction_log_receipt.get("ordered_entry_digests", [])
+            )
+            expected_engine_transaction_ids = list(
+                engine_transaction_log_receipt.get("ordered_transaction_ids", [])
+            )
+            engine_log_bound = (
+                engine_validation["ok"]
+                and receipt.get("engine_transaction_log_digest")
+                == engine_transaction_log_receipt.get("digest")
+                and receipt.get("engine_adapter_ref")
+                == engine_transaction_log_receipt.get("engine_adapter_ref")
+                and receipt.get("engine_session_ref")
+                == engine_transaction_log_receipt.get("engine_session_ref")
+                and receipt.get("transaction_log_ref")
+                == engine_transaction_log_receipt.get("transaction_log_ref")
+                and engine_transaction_entry_digests == expected_engine_entry_digests
+                and engine_transaction_ids == expected_engine_transaction_ids
+                and receipt.get("transaction_entry_count")
+                == engine_transaction_log_receipt.get("transaction_entry_count")
+            )
+            if not engine_log_bound:
+                errors.append("engine log fields must bind the supplied transaction log")
+        if receipt.get("engine_log_bound") is not engine_log_bound:
+            errors.append("engine_log_bound must reflect engine transaction log binding")
+
+        authority_route_trace_bound = receipt.get("authority_route_trace_bound") is True
+        cross_host_route_bound = receipt.get("cross_host_route_bound") is True
+        if authority_route_trace is not None:
+            if not isinstance(authority_route_trace, Mapping):
+                raise ValueError("authority_route_trace must be a mapping")
+            trace_validation = self._validate_engine_authority_route_trace(
+                authority_route_trace
+            )
+            authority_route_trace_bound = (
+                trace_validation["ok"]
+                and receipt.get("authority_route_trace_ref")
+                == authority_route_trace.get("trace_ref")
+                and receipt.get("authority_route_trace_digest")
+                == authority_route_trace.get("digest")
+                and receipt.get("authority_plane_ref")
+                == authority_route_trace.get("authority_plane_ref")
+                and receipt.get("authority_plane_digest")
+                == authority_route_trace.get("authority_plane_digest")
+                and receipt.get("route_target_discovery_ref")
+                == authority_route_trace.get("route_target_discovery_ref")
+                and receipt.get("route_target_discovery_digest")
+                == authority_route_trace.get("route_target_discovery_digest")
+                and receipt.get("council_tier") == authority_route_trace.get("council_tier")
+                and receipt.get("transport_profile")
+                == authority_route_trace.get("transport_profile")
+                and route_binding_refs == trace_validation["route_binding_refs"]
+                and receipt.get("remote_host_refs") == trace_validation["remote_host_refs"]
+                and receipt.get("remote_host_attestation_refs")
+                == trace_validation["remote_host_attestation_refs"]
+                and receipt.get("os_observer_tuple_digests")
+                == trace_validation["os_observer_tuple_digests"]
+                and receipt.get("os_observer_host_binding_digests")
+                == trace_validation["os_observer_host_binding_digests"]
+            )
+            cross_host_route_bound = trace_validation["cross_host_route_bound"]
+            if not authority_route_trace_bound:
+                errors.append("authority route fields must bind the supplied route trace")
+        if receipt.get("authority_route_trace_bound") is not authority_route_trace_bound:
+            errors.append("authority_route_trace_bound must reflect route trace binding")
+        if receipt.get("cross_host_route_bound") is not cross_host_route_bound:
+            errors.append("cross_host_route_bound must reflect route trace cross-host checks")
+
+        route_count = receipt.get("route_count")
+        mtls_authenticated_count = receipt.get("mtls_authenticated_count")
+        distinct_remote_host_count = receipt.get("distinct_remote_host_count")
+        if not isinstance(route_count, int) or route_count < 1:
+            errors.append("route_count must be a positive integer")
+            route_count = 0
+        if not isinstance(mtls_authenticated_count, int) or mtls_authenticated_count < 0:
+            errors.append("mtls_authenticated_count must be a non-negative integer")
+            mtls_authenticated_count = -1
+        if not isinstance(distinct_remote_host_count, int) or distinct_remote_host_count < 1:
+            errors.append("distinct_remote_host_count must be a positive integer")
+            distinct_remote_host_count = 0
+        if route_count != len(route_binding_refs):
+            errors.append("route_count must equal route_binding_refs length")
+        raw_flags_clear = (
+            receipt.get("raw_engine_payload_stored") is False
+            and receipt.get("raw_route_payload_stored") is False
+        )
+        if receipt.get("redaction_complete") is not raw_flags_clear:
+            errors.append("redaction_complete must reflect raw payload flags")
+        if not raw_flags_clear:
+            errors.append("raw payload flags must be false")
+        complete = (
+            engine_log_bound
+            and authority_route_trace_bound
+            and cross_host_route_bound
+            and raw_flags_clear
+            and mtls_authenticated_count == route_count
+            and distinct_remote_host_count == route_count
+            and route_count >= 2
+        )
+        expected_status = "complete" if complete else "incomplete"
+        if receipt.get("engine_route_binding_status") != expected_status:
+            errors.append("engine_route_binding_status must reflect binding completeness")
+        expected_digest = sha256_text(
+            canonical_json(_engine_route_binding_digest_payload(receipt))
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match engine route binding receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "engine_log_bound": engine_log_bound,
+            "authority_route_trace_bound": authority_route_trace_bound,
+            "cross_host_route_bound": cross_host_route_bound,
+            "redaction_complete": raw_flags_clear,
+            "engine_route_binding_complete": complete,
+            "digest_bound": digest_bound,
+        }
+
+    def _validate_engine_authority_route_trace(
+        self,
+        trace: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(trace, Mapping):
+            raise ValueError("authority_route_trace must be a mapping")
+        if trace.get("kind") != "distributed_transport_authority_route_trace":
+            errors.append("route trace kind mismatch")
+        if trace.get("schema_version") != "1.0.0":
+            errors.append("route trace schema_version mismatch")
+        for field_name in (
+            "trace_ref",
+            "authority_plane_ref",
+            "route_target_discovery_ref",
+            "envelope_ref",
+            "council_tier",
+            "transport_profile",
+            "trace_profile",
+            "socket_trace_profile",
+            "os_observer_profile",
+            "cross_host_binding_profile",
+            "route_target_discovery_profile",
+            "authority_cluster_ref",
+            "trace_status",
+        ):
+            self._check_non_empty_string(trace.get(field_name), field_name, errors)
+        for field_name in (
+            "digest",
+            "authority_plane_digest",
+            "route_target_discovery_digest",
+            "envelope_digest",
+        ):
+            self._check_digest(trace.get(field_name), field_name, errors)
+        expected_trace_digest = sha256_text(canonical_json(_route_trace_digest_payload(trace)))
+        digest_bound = trace.get("digest") == expected_trace_digest
+        if not digest_bound:
+            errors.append("route trace digest must bind trace payload")
+        if trace.get("trace_profile") != WMS_ENGINE_ROUTE_TRACE_PROFILE:
+            errors.append("route trace profile mismatch")
+        if trace.get("socket_trace_profile") != WMS_ENGINE_ROUTE_SOCKET_PROFILE:
+            errors.append("route socket trace profile mismatch")
+        if trace.get("os_observer_profile") != WMS_ENGINE_ROUTE_OS_OBSERVER_PROFILE:
+            errors.append("route os observer profile mismatch")
+        if trace.get("cross_host_binding_profile") != WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE:
+            errors.append("route cross-host profile mismatch")
+        if (
+            trace.get("route_target_discovery_profile")
+            != WMS_ENGINE_ROUTE_TARGET_DISCOVERY_PROFILE
+        ):
+            errors.append("route target discovery profile mismatch")
+
+        route_bindings = trace.get("route_bindings")
+        if not isinstance(route_bindings, list) or not route_bindings:
+            errors.append("route_bindings must be a non-empty list")
+            route_bindings = []
+        route_binding_refs: List[str] = []
+        remote_host_refs: List[str] = []
+        remote_host_attestation_refs: List[str] = []
+        os_observer_tuple_digests: List[str] = []
+        os_observer_host_binding_digests: List[str] = []
+        route_binding_errors = 0
+        for binding in route_bindings:
+            if not isinstance(binding, Mapping):
+                errors.append("route_bindings must contain objects")
+                route_binding_errors += 1
+                continue
+            for field_name in (
+                "route_binding_ref",
+                "remote_host_ref",
+                "remote_host_attestation_ref",
+                "authority_cluster_ref",
+                "mtls_status",
+            ):
+                self._check_non_empty_string(binding.get(field_name), field_name, errors)
+            if binding.get("mtls_status") != "authenticated":
+                errors.append("route binding mtls_status must be authenticated")
+                route_binding_errors += 1
+            if binding.get("response_digest_bound") is not True:
+                errors.append("route binding response_digest_bound must be true")
+                route_binding_errors += 1
+            route_binding_refs.append(str(binding.get("route_binding_ref")))
+            remote_host_refs.append(str(binding.get("remote_host_ref")))
+            remote_host_attestation_refs.append(
+                str(binding.get("remote_host_attestation_ref"))
+            )
+            os_observer_receipt = binding.get("os_observer_receipt")
+            if not isinstance(os_observer_receipt, Mapping):
+                errors.append("route binding os_observer_receipt must be an object")
+                route_binding_errors += 1
+            else:
+                if os_observer_receipt.get("observer_profile") != WMS_ENGINE_ROUTE_OS_OBSERVER_PROFILE:
+                    errors.append("os observer profile mismatch")
+                    route_binding_errors += 1
+                if os_observer_receipt.get("receipt_status") != "observed":
+                    errors.append("os observer receipt_status must be observed")
+                    route_binding_errors += 1
+                for field_name in ("tuple_digest", "host_binding_digest"):
+                    self._check_digest(os_observer_receipt.get(field_name), field_name, errors)
+                if isinstance(os_observer_receipt.get("tuple_digest"), str):
+                    os_observer_tuple_digests.append(str(os_observer_receipt["tuple_digest"]))
+                if isinstance(os_observer_receipt.get("host_binding_digest"), str):
+                    os_observer_host_binding_digests.append(
+                        str(os_observer_receipt["host_binding_digest"])
+                    )
+            socket_trace = binding.get("socket_trace")
+            if not isinstance(socket_trace, Mapping):
+                errors.append("route binding socket_trace must be an object")
+                route_binding_errors += 1
+            else:
+                if socket_trace.get("transport_profile") != WMS_ENGINE_ROUTE_SOCKET_PROFILE:
+                    errors.append("socket trace profile mismatch")
+                    route_binding_errors += 1
+                if socket_trace.get("non_loopback") is not True:
+                    errors.append("socket trace non_loopback must be true")
+                    route_binding_errors += 1
+                if socket_trace.get("http_status") != 200:
+                    errors.append("socket trace http_status must be 200")
+                    route_binding_errors += 1
+                self._check_digest(
+                    socket_trace.get("response_digest"),
+                    "socket_trace.response_digest",
+                    errors,
+                )
+
+        route_count = trace.get("route_count")
+        mtls_authenticated_count = trace.get("mtls_authenticated_count")
+        distinct_remote_host_count = trace.get("distinct_remote_host_count")
+        if not isinstance(route_count, int) or route_count != len(route_bindings):
+            errors.append("route_count must equal route_bindings length")
+            route_count = len(route_bindings)
+        if not isinstance(mtls_authenticated_count, int):
+            errors.append("mtls_authenticated_count must be an integer")
+            mtls_authenticated_count = -1
+        if not isinstance(distinct_remote_host_count, int):
+            errors.append("distinct_remote_host_count must be an integer")
+            distinct_remote_host_count = -1
+        computed_distinct_remote_host_count = len(set(remote_host_refs))
+        if distinct_remote_host_count != computed_distinct_remote_host_count:
+            errors.append("distinct_remote_host_count must reflect remote_host_refs")
+        cross_host_route_bound = (
+            trace.get("trace_status") == "authenticated"
+            and trace.get("non_loopback_verified") is True
+            and trace.get("authority_plane_bound") is True
+            and trace.get("response_digest_bound") is True
+            and trace.get("socket_trace_complete") is True
+            and trace.get("os_observer_complete") is True
+            and trace.get("route_target_discovery_bound") is True
+            and trace.get("cross_host_verified") is True
+            and route_count >= 2
+            and mtls_authenticated_count == route_count
+            and distinct_remote_host_count == route_count
+            and route_binding_errors == 0
+        )
+        if not cross_host_route_bound:
+            errors.append("route trace must be authenticated cross-host route evidence")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "digest_bound": digest_bound,
+            "cross_host_route_bound": cross_host_route_bound,
+            "route_binding_refs": route_binding_refs,
+            "remote_host_refs": remote_host_refs,
+            "remote_host_attestation_refs": remote_host_attestation_refs,
+            "os_observer_tuple_digests": os_observer_tuple_digests,
+            "os_observer_host_binding_digests": os_observer_host_binding_digests,
+        }
+
     @staticmethod
     def _normalize_engine_required_operations(
         required_operations: Sequence[str] | None,
@@ -3655,6 +4198,15 @@ class WorldModelSync:
         ):
             raise ValueError(f"{field_name} must be a sha256 hex digest")
         return value
+
+    @staticmethod
+    def _check_digest(value: Any, field_name: str, errors: List[str]) -> None:
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(char not in "0123456789abcdef" for char in value)
+        ):
+            errors.append(f"{field_name} must be a sha256 hex digest")
 
     @staticmethod
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:

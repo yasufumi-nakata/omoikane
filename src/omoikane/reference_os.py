@@ -7425,6 +7425,180 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    @staticmethod
+    def _wms_engine_route_trace_fixture(session_id: str) -> Dict[str, Any]:
+        trace_suffix = sha256_text(f"wms-engine-route:{session_id}")[:16]
+        authority_plane_ref = f"authority-plane://federation/{trace_suffix}"
+        route_target_discovery_ref = f"authority-route-targets://federation/{trace_suffix}"
+        authority_cluster_ref = "authority-cluster://federation/wms-engine-adapter"
+        route_bindings: List[Dict[str, Any]] = []
+        route_specs = [
+            {
+                "key_server_ref": "keyserver://federation/wms-engine-notary-a",
+                "server_role": "quorum-notary",
+                "server_endpoint": "https://192.0.2.10:44310/wms-engine-route-1",
+                "remote_host_ref": "host://federation/wms-engine-edge-a",
+                "remote_host_attestation_ref": "host-attestation://federation/wms-engine-edge-a/2026-04-25",
+                "remote_ip": "192.0.2.10",
+                "remote_jurisdiction": "JP-13",
+                "remote_network_zone": "apne1",
+                "matched_root_refs": ["root://federation/pki-a"],
+            },
+            {
+                "key_server_ref": "keyserver://federation/wms-engine-mirror-b",
+                "server_role": "directory-mirror",
+                "server_endpoint": "https://198.51.100.20:44320/wms-engine-route-2",
+                "remote_host_ref": "host://federation/wms-engine-edge-b",
+                "remote_host_attestation_ref": "host-attestation://federation/wms-engine-edge-b/2026-04-25",
+                "remote_ip": "198.51.100.20",
+                "remote_jurisdiction": "US-CA",
+                "remote_network_zone": "usw2",
+                "matched_root_refs": ["root://federation/pki-b"],
+            },
+        ]
+        for index, spec in enumerate(route_specs, start=1):
+            route_binding_ref = f"authority-route://federation/wms-engine-{index}"
+            local_ip = "203.0.113.5"
+            local_port = 53100 + index
+            remote_port = 44300 + (index * 10)
+            tuple_digest = sha256_text(
+                canonical_json(
+                    {
+                        "local_ip": local_ip,
+                        "local_port": local_port,
+                        "remote_ip": spec["remote_ip"],
+                        "remote_port": remote_port,
+                    }
+                )
+            )
+            host_binding_digest = sha256_text(
+                canonical_json(
+                    {
+                        "tuple_digest": tuple_digest,
+                        "remote_host_ref": spec["remote_host_ref"],
+                        "remote_host_attestation_ref": spec[
+                            "remote_host_attestation_ref"
+                        ],
+                        "authority_cluster_ref": authority_cluster_ref,
+                    }
+                )
+            )
+            response_digest = sha256_text(
+                canonical_json(
+                    {
+                        "route_binding_ref": route_binding_ref,
+                        "engine_adapter": "reference-wms",
+                        "session_id": session_id,
+                    }
+                )
+            )
+            route_bindings.append(
+                {
+                    "key_server_ref": spec["key_server_ref"],
+                    "server_role": spec["server_role"],
+                    "authority_status": "active",
+                    "server_endpoint": spec["server_endpoint"],
+                    "server_name": MTLS_SERVER_NAME,
+                    "remote_host_ref": spec["remote_host_ref"],
+                    "remote_host_attestation_ref": spec["remote_host_attestation_ref"],
+                    "authority_cluster_ref": authority_cluster_ref,
+                    "remote_jurisdiction": spec["remote_jurisdiction"],
+                    "remote_network_zone": spec["remote_network_zone"],
+                    "route_binding_ref": route_binding_ref,
+                    "matched_root_refs": spec["matched_root_refs"],
+                    "mtls_status": "authenticated",
+                    "response_digest_bound": True,
+                    "os_observer_receipt": {
+                        "kind": "distributed_transport_os_observer_receipt",
+                        "schema_version": "1.0.0",
+                        "receipt_id": f"authority-os-observer://wms-engine-{index}",
+                        "observer_profile": "os-native-tcp-observer-v1",
+                        "observed_at": "2026-04-25T02:30:00Z",
+                        "local_ip": local_ip,
+                        "local_port": local_port,
+                        "remote_ip": spec["remote_ip"],
+                        "remote_port": remote_port,
+                        "remote_host_ref": spec["remote_host_ref"],
+                        "remote_host_attestation_ref": spec[
+                            "remote_host_attestation_ref"
+                        ],
+                        "authority_cluster_ref": authority_cluster_ref,
+                        "owning_pid": 24000 + index,
+                        "observed_sources": ["lsof", "netstat"],
+                        "connection_states": ["ESTABLISHED"],
+                        "tuple_digest": tuple_digest,
+                        "host_binding_digest": host_binding_digest,
+                        "receipt_status": "observed",
+                    },
+                    "socket_trace": {
+                        "local_ip": local_ip,
+                        "local_port": local_port,
+                        "remote_ip": spec["remote_ip"],
+                        "remote_port": remote_port,
+                        "non_loopback": True,
+                        "transport_profile": "mtls-socket-trace-v1",
+                        "tls_version": "TLSv1.3",
+                        "cipher_suite": "TLS_AES_256_GCM_SHA384",
+                        "peer_certificate_fingerprint": sha256_text(
+                            f"peer-cert-{index}"
+                        ),
+                        "client_certificate_fingerprint": sha256_text(
+                            "client-cert-reference-wms"
+                        ),
+                        "request_bytes": 128,
+                        "response_bytes": 512 + index,
+                        "http_status": 200,
+                        "response_digest": response_digest,
+                        "connect_latency_ms": 4.0 + index,
+                        "tls_handshake_latency_ms": 9.5 + index,
+                        "round_trip_latency_ms": 13.0 + index,
+                    },
+                }
+            )
+        payload = {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_ref": f"authority-route-trace://federation/{trace_suffix}",
+            "authority_plane_ref": authority_plane_ref,
+            "authority_plane_digest": sha256_text(authority_plane_ref),
+            "route_target_discovery_ref": route_target_discovery_ref,
+            "route_target_discovery_digest": sha256_text(route_target_discovery_ref),
+            "envelope_ref": f"distributed-envelope-{trace_suffix[:12]}",
+            "envelope_digest": sha256_text(f"distributed-envelope:{trace_suffix}"),
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "trace_profile": "non-loopback-mtls-authority-route-v1",
+            "socket_trace_profile": "mtls-socket-trace-v1",
+            "os_observer_profile": "os-native-tcp-observer-v1",
+            "cross_host_binding_profile": "attested-cross-host-authority-binding-v1",
+            "route_target_discovery_profile": "bounded-authority-route-target-discovery-v1",
+            "ca_bundle_ref": CA_BUNDLE_REF,
+            "client_certificate_ref": CLIENT_CERTIFICATE_REF,
+            "server_name": MTLS_SERVER_NAME,
+            "authority_cluster_ref": authority_cluster_ref,
+            "route_count": len(route_bindings),
+            "distinct_remote_host_count": len(
+                {binding["remote_host_ref"] for binding in route_bindings}
+            ),
+            "mtls_authenticated_count": len(route_bindings),
+            "trusted_root_refs": ["root://federation/pki-a", "root://federation/pki-b"],
+            "non_loopback_verified": True,
+            "authority_plane_bound": True,
+            "response_digest_bound": True,
+            "socket_trace_complete": True,
+            "os_observer_complete": True,
+            "route_target_discovery_bound": True,
+            "cross_host_verified": True,
+            "route_bindings": route_bindings,
+            "trace_status": "authenticated",
+            "recorded_at": "2026-04-25T02:30:00Z",
+            "total_connect_latency_ms": 11.0,
+            "total_handshake_latency_ms": 22.0,
+            "total_round_trip_latency_ms": 29.0,
+        }
+        payload["digest"] = sha256_text(canonical_json(payload))
+        return payload
+
     def run_wms_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://wms-demo/v1",
@@ -7891,6 +8065,30 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        engine_authority_route_trace = self._wms_engine_route_trace_fixture(
+            session["session_id"]
+        )
+        engine_route_binding = self.wms.build_engine_route_binding_receipt(
+            session["session_id"],
+            engine_transaction_log_receipt=engine_transaction_log,
+            authority_route_trace=engine_authority_route_trace,
+        )
+        engine_route_binding_validation = self.wms.validate_engine_route_binding_receipt(
+            engine_route_binding,
+            engine_transaction_log_receipt=engine_transaction_log,
+            authority_route_trace=engine_authority_route_trace,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.engine.route_trace_bound",
+            payload=engine_route_binding,
+            actor="WorldModelSync",
+            category="interface-wms-engine",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         remote_authority_retry_budget = self.wms.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref=(
@@ -8005,6 +8203,8 @@ json.dump(response, sys.stdout)
                 "physics_revert": physics_revert,
                 "engine_transaction_log": engine_transaction_log,
                 "engine_transaction_entries": engine_transaction_entries,
+                "engine_authority_route_trace": engine_authority_route_trace,
+                "engine_route_binding": engine_route_binding,
                 "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
@@ -8102,6 +8302,19 @@ json.dump(response, sys.stdout)
                     and engine_transaction_log["engine_binding_status"] == "complete"
                 ),
                 "engine_transaction_log": engine_transaction_log_validation,
+                "engine_route_binding_bound": (
+                    engine_route_binding_validation["ok"]
+                    and engine_route_binding_validation["engine_log_bound"]
+                    and engine_route_binding_validation["authority_route_trace_bound"]
+                    and engine_route_binding_validation["cross_host_route_bound"]
+                    and engine_route_binding_validation[
+                        "engine_route_binding_complete"
+                    ]
+                    and engine_route_binding["engine_route_binding_status"] == "complete"
+                    and engine_route_binding["raw_engine_payload_stored"] is False
+                    and engine_route_binding["raw_route_payload_stored"] is False
+                ),
+                "engine_route_binding": engine_route_binding_validation,
                 "remote_authority_retry_budget_bound": (
                     remote_authority_retry_budget_validation["ok"]
                     and remote_authority_retry_budget_validation[

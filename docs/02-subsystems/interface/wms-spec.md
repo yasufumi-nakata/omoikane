@@ -75,6 +75,12 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   time_rate escape evidence、approval collection、distributed fan-out、
   physics_rules apply、revert の各 source artifact digest を ordered committed
   transaction entry に束縛し、raw engine payload / raw world-state body は保存しない
+- same adapter の route 境界は
+  `distributed-transport-bound-wms-engine-adapter-route-v1` receipt で固定する。
+  completed engine transaction log digest、ordered transaction entry digest set、
+  authenticated non-loopback authority-route trace digest、cross-host remote host ref、
+  OS observer tuple / host-binding digest を同じ digest-only receipt に束縛し、
+  raw engine payload / raw route payload / packet body は保存しない
 - real remote authority に近い partial outage recovery は
   `bounded-remote-authority-adaptive-retry-budget-v1` receipt で固定する。
   route-health observation digest、`base_retry_after_ms=250` /
@@ -90,6 +96,7 @@ wms.propose_diff(session_id, diff, time_rate_attestation_receipts) → Reconcile
 wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
 wms.collect_distributed_approval_fanout(session_id, collection, transport_results, retry_attempts) → DistributedApprovalFanoutReceipt
 wms.bind_engine_transaction_log(session_id, entries) → EngineTransactionLogReceipt
+wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
 wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
@@ -113,6 +120,7 @@ wms.observe_violation(session_id) → ViolationReport
   `wms_approval_collection_receipt.schema` /
   `wms_distributed_approval_fanout_receipt.schema` /
   `wms_engine_transaction_log.schema` /
+  `wms_engine_route_binding_receipt.schema` /
   `wms_remote_authority_retry_budget_receipt.schema` /
   `wms_time_rate_attestation_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
@@ -122,7 +130,7 @@ wms.observe_violation(session_id) → ViolationReport
   3 participant の IMC transport-bound approval collection →
   partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → engine transaction log →
-  remote authority retry budget → malicious veto → mode 切替を実行
+  engine route binding → remote authority retry budget → malicious veto → mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_time_rate_deviation_escape.yaml` /
   `evals/interface/wms_time_rate_attestation_transport.yaml` /
@@ -138,6 +146,9 @@ wms.observe_violation(session_id) → ViolationReport
 - `evals/interface/wms_engine_transaction_log.yaml` で external WMS engine adapter
   transaction log が ordered committed entry、source artifact digest set、
   state transition digest、payload redaction flag を持つことを保証
+- `evals/interface/wms_engine_route_binding.yaml` で completed engine transaction log が
+  authenticated cross-host distributed transport authority-route trace、OS observer digest、
+  route binding ref set と raw payload 無しで束縛されることを保証
 - `evals/interface/wms_remote_authority_retry_budget.yaml` で recovered fan-out retry が
   route-health observation、fixed exponential backoff schedule、engine transaction log
   digest に束縛され、raw remote authority transcript を保存しないことを保証

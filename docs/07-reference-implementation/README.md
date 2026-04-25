@@ -824,6 +824,12 @@ time_rate escape evidence、approval collection、distributed fan-out、
 physics_rules apply、physics_rules revert の 5 committed transaction entry が
 `wms_engine_transaction_log.schema` に従って ordered entry digest set、
 source artifact digest set、state transition digest、redaction flags を共有することを確認する。
+さらに completed engine transaction log を
+`distributed-transport-bound-wms-engine-adapter-route-v1` の route binding receipt へ束ね、
+authenticated cross-host authority-route trace digest、route binding refs、
+remote host refs、OS observer tuple / host-binding digests を
+`wms_engine_route_binding_receipt.schema` に従って raw engine payload / raw route
+payload 無しで共有することを確認する。
 さらに recovered fan-out retry を
 `bounded-remote-authority-adaptive-retry-budget-v1` の
 remote authority route-health observation と

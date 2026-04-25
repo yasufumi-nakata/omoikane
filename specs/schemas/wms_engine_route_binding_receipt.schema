@@ -1,0 +1,200 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_engine_route_binding_receipt.schema"
+title: WMSEngineRouteBindingReceipt
+description: >
+  Digest-only receipt proving that a WMS external engine transaction log is
+  bound to an authenticated cross-host distributed transport authority-route
+  trace. The receipt carries route refs and observer digests, not raw engine
+  payloads, raw route payloads, or raw packet bodies.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_policy_id
+  - digest_profile
+  - session_id
+  - engine_transaction_log_policy_id
+  - engine_transaction_log_digest
+  - engine_adapter_ref
+  - engine_session_ref
+  - transaction_log_ref
+  - engine_transaction_ids
+  - engine_transaction_entry_digests
+  - engine_transaction_digest_set_digest
+  - transaction_entry_count
+  - authority_route_trace_ref
+  - authority_route_trace_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - route_target_discovery_ref
+  - route_target_discovery_digest
+  - council_tier
+  - transport_profile
+  - trace_profile
+  - socket_trace_profile
+  - os_observer_profile
+  - cross_host_binding_profile
+  - route_target_discovery_profile
+  - route_count
+  - mtls_authenticated_count
+  - distinct_remote_host_count
+  - route_binding_refs
+  - route_binding_digest_set_digest
+  - remote_host_refs
+  - remote_host_attestation_refs
+  - os_observer_tuple_digests
+  - os_observer_host_binding_digests
+  - engine_log_bound
+  - authority_route_trace_bound
+  - cross_host_route_bound
+  - redaction_complete
+  - raw_engine_payload_stored
+  - raw_route_payload_stored
+  - engine_route_binding_status
+  - digest
+properties:
+  kind:
+    const: wms_engine_route_binding_receipt
+  schema_version:
+    const: "1.0"
+  binding_policy_id:
+    const: distributed-transport-bound-wms-engine-adapter-route-v1
+  digest_profile:
+    const: wms-engine-route-binding-digest-v1
+  session_id:
+    type: string
+    minLength: 8
+  engine_transaction_log_policy_id:
+    const: digest-bound-wms-engine-transaction-log-v1
+  engine_transaction_log_digest:
+    $ref: "#/$defs/sha256"
+  engine_adapter_ref:
+    type: string
+    pattern: "^engine-adapter://"
+  engine_session_ref:
+    type: string
+    pattern: "^engine-session://"
+  transaction_log_ref:
+    type: string
+    pattern: "^engine-log://"
+  engine_transaction_ids:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^engine-txn://"
+  engine_transaction_entry_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  engine_transaction_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  transaction_entry_count:
+    type: integer
+    minimum: 1
+  authority_route_trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  authority_route_trace_digest:
+    $ref: "#/$defs/sha256"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    $ref: "#/$defs/sha256"
+  route_target_discovery_ref:
+    type: string
+    pattern: "^authority-route-targets://"
+  route_target_discovery_digest:
+    $ref: "#/$defs/sha256"
+  council_tier:
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  trace_profile:
+    const: non-loopback-mtls-authority-route-v1
+  socket_trace_profile:
+    const: mtls-socket-trace-v1
+  os_observer_profile:
+    const: os-native-tcp-observer-v1
+  cross_host_binding_profile:
+    const: attested-cross-host-authority-binding-v1
+  route_target_discovery_profile:
+    const: bounded-authority-route-target-discovery-v1
+  route_count:
+    type: integer
+    minimum: 2
+  mtls_authenticated_count:
+    type: integer
+    minimum: 2
+  distinct_remote_host_count:
+    type: integer
+    minimum: 2
+  route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  route_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  remote_host_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^host://"
+  remote_host_attestation_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^host-attestation://"
+  os_observer_tuple_digests:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  os_observer_host_binding_digests:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  engine_log_bound:
+    type: boolean
+    const: true
+  authority_route_trace_bound:
+    type: boolean
+    const: true
+  cross_host_route_bound:
+    type: boolean
+    const: true
+  redaction_complete:
+    type: boolean
+    const: true
+  raw_engine_payload_stored:
+    type: boolean
+    const: false
+  raw_route_payload_stored:
+    type: boolean
+    const: false
+  engine_route_binding_status:
+    const: complete
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

@@ -1,0 +1,28 @@
+eval_id: wms_engine_route_binding
+target: interface.wms
+level: L6
+description: >
+  Completed WMS engine transaction log が authenticated cross-host distributed
+  transport authority-route trace に digest-only で束縛され、raw engine payload、
+  raw route payload、packet body を保存しないことを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  engine_route_binding_bound: true
+  binding_policy_id: distributed-transport-bound-wms-engine-adapter-route-v1
+  digest_profile: wms-engine-route-binding-digest-v1
+  route_count: 2
+  mtls_authenticated_count: 2
+  distinct_remote_host_count: 2
+  engine_log_bound: true
+  authority_route_trace_bound: true
+  cross_host_route_bound: true
+  redaction_complete: true
+  raw_engine_payload_stored: false
+  raw_route_payload_stored: false
+  engine_route_binding_status: complete
+metric: boolean
+threshold: 1.0
+ethics_check: true

@@ -55,6 +55,11 @@ reference WMS decisions を external engine adapter の ordered committed
 transaction log receipt へ digest-only で束縛し、raw payload を保存せずに
 source artifact set と state transition digest を検証できることを確認する。
 
+### WMS Engine Route Binding
+completed WMS engine transaction log が authenticated cross-host distributed
+transport authority-route trace、OS observer digest、route binding ref set に
+raw payload 無しで束縛されることを確認する。
+
 ### WMS Remote Authority Retry Budget
 recovered fan-out retry を remote authority route-health observation、
 fixed exponential backoff schedule、engine transaction log の
@@ -75,6 +80,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `wms_approval_collection_scaling.yaml`
 - `wms_distributed_approval_fanout.yaml`
 - `wms_distributed_approval_fanout_retry.yaml`
+- `wms_engine_route_binding.yaml`
 - `wms_engine_transaction_log.yaml`
 - `wms_participant_approval_transport.yaml`
 - `wms_physics_rules_revert.yaml`

@@ -97,6 +97,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["distributed_approval_fanout_bound"])
         self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
+        self.assertTrue(result["validation"]["engine_route_binding_bound"])
         self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertTrue(result["validation"]["physics_change"]["revert_bound"])
@@ -104,6 +105,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_change"]["approval_fanout_complete"])
         self.assertTrue(result["validation"]["engine_transaction_log"]["engine_binding_complete"])
+        self.assertTrue(result["validation"]["engine_route_binding"]["engine_route_binding_complete"])
         self.assertTrue(result["validation"]["physics_revert"]["revert_bound"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
         self.assertEqual(3, len(result["scenarios"]["approval_transport_receipts"]))
@@ -117,6 +119,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             "complete",
+            result["scenarios"]["engine_route_binding"]["engine_route_binding_status"],
+        )
+        self.assertEqual(
+            "complete",
             result["scenarios"]["remote_authority_retry_budget"]["budget_status"],
         )
         self.assertEqual(
@@ -127,6 +133,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["scenarios"]["remote_authority_retry_budget"]["engine_log_fanout_bound"]
         )
         self.assertEqual(5, result["scenarios"]["engine_transaction_log"]["transaction_entry_count"])
+        self.assertEqual(2, result["scenarios"]["engine_route_binding"]["route_count"])
         self.assertEqual("major_diff", result["scenarios"]["time_rate_deviation"]["classification"])
         self.assertEqual(1.25, result["scenarios"]["time_rate_deviation"]["requested_time_rate"])
         self.assertTrue(result["scenarios"]["time_rate_deviation"]["time_rate_state_locked"])
@@ -136,7 +143,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, len(result["scenarios"]["time_rate_attestation_receipts"]))
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])
         self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-physics"])
-        self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-wms-engine"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["interface-wms-engine"])
 
     def test_ewa_demo_reports_veto_and_release(self) -> None:
         runtime = OmoikaneReferenceOS()
