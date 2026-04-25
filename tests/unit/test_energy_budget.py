@@ -1,9 +1,43 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
 import unittest
 
 from omoikane.kernel.energy_budget import EnergyBudgetService
 from omoikane.substrate.adapter import ClassicalSiliconAdapter
+
+
+@contextmanager
+def live_verifier_endpoint(payload: dict[str, object]):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self) -> None:  # noqa: N802
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+            self.close_connection = True
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/signer-roster"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1.0)
 
 
 class EnergyBudgetTests(unittest.TestCase):
@@ -219,6 +253,121 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertFalse(receipt["raw_funding_payload_stored"])
         self.assertFalse(receipt["raw_authority_payload_stored"])
         self.assertEqual(8, receipt["total_accepted_jps"])
+
+    def test_live_subsidy_verifier_endpoint_binds_network_response_digest(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://subsidy-live-verifier",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/subsidy-live-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 22,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/subsidy-live-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 38,
+                    "observed_capacity_jps": 32,
+                },
+            ],
+        )
+        subsidy_offers = [
+            {
+                "donor_identity_id": "identity://energy-budget/subsidy-live-b",
+                "recipient_identity_id": "identity://energy-budget/subsidy-live-a",
+                "offered_jps": 8,
+                "consent_ref": "consent://energy-budget/live-b-to-a/v1",
+                "revocation_ref": "revocation://energy-budget/live-b-to-a/v1",
+            }
+        ]
+        draft_receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=subsidy_offers,
+            external_funding_policy_ref="funding-policy://energy-budget/live-subsidy/v1",
+            funding_policy_signature_ref="signature://energy-budget/live-subsidy/v1",
+        )
+        draft_verifier = draft_receipt["signer_roster_verifier_receipt"]
+        verifier_payload = {
+            "checked_at": "2026-04-26T00:00:00Z",
+            "verifier_ref": draft_verifier["verifier_ref"],
+            "challenge_ref": draft_verifier["challenge_ref"],
+            "signer_roster_ref": draft_receipt["funding_policy_signer_roster_ref"],
+            "signer_roster_digest": draft_receipt[
+                "funding_policy_signer_roster_digest"
+            ],
+            "signer_key_ref": draft_receipt["funding_policy_signer_key_ref"],
+            "signer_jurisdiction": draft_receipt[
+                "funding_policy_signer_jurisdiction"
+            ],
+            "external_funding_policy_digest": draft_receipt[
+                "external_funding_policy_digest"
+            ],
+            "funding_policy_signature_digest": draft_receipt[
+                "funding_policy_signature_digest"
+            ],
+            "authority_chain_ref": draft_verifier["authority_chain_ref"],
+            "trust_root_ref": draft_verifier["trust_root_ref"],
+            "trust_root_digest": draft_verifier["trust_root_digest"],
+        }
+
+        with live_verifier_endpoint(verifier_payload) as endpoint:
+            live_verifier_receipt = (
+                service.probe_subsidy_signer_roster_verifier_endpoint(
+                    verifier_endpoint=endpoint,
+                    signer_roster_ref=draft_receipt["funding_policy_signer_roster_ref"],
+                    signer_roster_digest=draft_receipt[
+                        "funding_policy_signer_roster_digest"
+                    ],
+                    signer_key_ref=draft_receipt["funding_policy_signer_key_ref"],
+                    signer_jurisdiction=draft_receipt[
+                        "funding_policy_signer_jurisdiction"
+                    ],
+                    external_funding_policy_digest=draft_receipt[
+                        "external_funding_policy_digest"
+                    ],
+                    funding_policy_signature_digest=draft_receipt[
+                        "funding_policy_signature_digest"
+                    ],
+                    verifier_ref=draft_verifier["verifier_ref"],
+                    challenge_ref=draft_verifier["challenge_ref"],
+                    authority_chain_ref=draft_verifier["authority_chain_ref"],
+                    trust_root_ref=draft_verifier["trust_root_ref"],
+                    trust_root_digest=draft_verifier["trust_root_digest"],
+                    request_timeout_ms=500,
+                )
+            )
+
+        verifier_validation = service.validate_subsidy_signer_roster_verifier_receipt(
+            live_verifier_receipt
+        )
+        self.assertTrue(verifier_validation["ok"])
+        self.assertTrue(verifier_validation["network_probe_bound"])
+        self.assertEqual(
+            "live-http-json-energy-subsidy-signer-roster-verifier-v1",
+            live_verifier_receipt["verifier_transport_profile"],
+        )
+        self.assertTrue(live_verifier_receipt["verifier_endpoint_ref"].startswith("http://"))
+        self.assertEqual(64, len(live_verifier_receipt["network_response_digest"]))
+
+        receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=subsidy_offers,
+            external_funding_policy_ref="funding-policy://energy-budget/live-subsidy/v1",
+            funding_policy_signature_ref="signature://energy-budget/live-subsidy/v1",
+            signer_roster_verifier_receipt=live_verifier_receipt,
+        )
+        validation = service.validate_voluntary_subsidy_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertTrue(
+            receipt["signer_roster_verifier_receipt"]["network_probe_bound"]
+        )
+        self.assertFalse(
+            receipt["signer_roster_verifier_receipt"]["raw_verifier_payload_stored"]
+        )
 
     def test_voluntary_subsidy_validation_rejects_tampered_consent_digest(self) -> None:
         service = EnergyBudgetService()

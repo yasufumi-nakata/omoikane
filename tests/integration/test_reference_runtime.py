@@ -1174,6 +1174,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "verified",
             result["validation"]["signer_roster_verifier_status"],
         )
+        self.assertEqual(
+            "live-http-json-energy-subsidy-signer-roster-verifier-v1",
+            result["validation"]["signer_roster_verifier_transport_profile"],
+        )
+        self.assertTrue(
+            result["validation"]["signer_roster_verifier_network_probe_bound"]
+        )
+        self.assertEqual(
+            64,
+            len(result["validation"]["signer_roster_verifier_network_response_digest"]),
+        )
         self.assertTrue(result["validation"]["raw_verifier_payload_redacted"])
         self.assertTrue(result["validation"]["revocation_registry_bound"])
         self.assertTrue(result["validation"]["audit_authority_bound"])

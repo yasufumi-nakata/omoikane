@@ -2718,7 +2718,7 @@ entries:
       - reference-runtime
       - evals/safety/energy_budget_subsidy_verifier.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to serialize digest-only signer roster verifier receipts that bind voluntary subsidy authority evidence to a bounded loopback live verifier bridge without storing raw verifier payloads.
+    rationale: Required to serialize digest-only signer roster verifier receipts that bind voluntary subsidy authority evidence to a bounded loopback or live HTTP verifier bridge without storing raw verifier payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema
@@ -2767,7 +2767,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/ethics-guardian.yaml
-    rationale: Protects voluntary subsidy authority binding by requiring the signer roster, signer key, funding policy digest, and signature digest to be confirmed by a digest-only live verifier receipt.
+    rationale: Protects voluntary subsidy authority binding by requiring the signer roster, signer key, funding policy digest, and signature digest to be confirmed by a digest-only live HTTP verifier receipt.
   - priority: P1
     kind: eval
     file: evals/safety/energy_budget_shared_fabric_allocation.yaml

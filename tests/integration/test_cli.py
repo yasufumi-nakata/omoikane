@@ -137,6 +137,15 @@ class CliIntegrationTests(unittest.TestCase):
             "verified",
             receipt["signer_roster_verifier_receipt"]["verifier_receipt_status"],
         )
+        self.assertEqual(
+            "live-http-json-energy-subsidy-signer-roster-verifier-v1",
+            receipt["signer_roster_verifier_receipt"]["verifier_transport_profile"],
+        )
+        self.assertTrue(receipt["signer_roster_verifier_receipt"]["network_probe_bound"])
+        self.assertEqual(
+            64,
+            len(receipt["signer_roster_verifier_receipt"]["network_response_digest"]),
+        )
         self.assertTrue(receipt["revocation_registry_bound"])
         self.assertTrue(receipt["audit_authority_bound"])
         self.assertTrue(receipt["jurisdiction_authority_bound"])

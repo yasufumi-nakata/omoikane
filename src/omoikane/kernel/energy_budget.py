@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import json
+import time
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from urllib import error, request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 from ..substrate.adapter import ClassicalSiliconAdapter, EnergyFloor
@@ -46,6 +49,13 @@ ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE = (
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE = (
     "loopback-energy-subsidy-signer-roster-verifier-v1"
 )
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LIVE_HTTP_TRANSPORT_PROFILE = (
+    "live-http-json-energy-subsidy-signer-roster-verifier-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILES = {
+    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE,
+    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LIVE_HTTP_TRANSPORT_PROFILE,
+}
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS = 250.0
 ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID = (
     "ap1-shared-fabric-capacity-allocation-v1"
@@ -511,9 +521,25 @@ class EnergyBudgetService:
         trust_root_digest: str = "sha256:energy-budget-jp-subsidy-signer-roster-pki-v1",
         observed_latency_ms: float = 42.0,
         http_status: int = 200,
+        verifier_transport_profile: str = (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE
+        ),
+        request_timeout_ms: Optional[int] = None,
+        network_response_digest: Optional[str] = None,
+        network_probe_status: str = "not-applicable",
+        checked_at: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Return a digest-only loopback verifier receipt for one subsidy signer roster."""
+        """Return a digest-only verifier receipt for one subsidy signer roster."""
 
+        normalized_transport_profile = self._normalize_non_empty_string(
+            verifier_transport_profile,
+            "verifier_transport_profile",
+        )
+        if (
+            normalized_transport_profile
+            not in ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILES
+        ):
+            raise ValueError("unsupported verifier_transport_profile")
         normalized_verifier_ref = self._normalize_non_empty_string(
             verifier_ref,
             "verifier_ref",
@@ -564,6 +590,46 @@ class EnergyBudgetService:
         )
         normalized_latency_ms = round(float(observed_latency_ms), 3)
         normalized_http_status = int(http_status)
+        normalized_timeout_ms = None
+        if request_timeout_ms is not None:
+            normalized_timeout_ms = int(request_timeout_ms)
+            if normalized_timeout_ms <= 0:
+                raise ValueError("request_timeout_ms must be positive")
+        normalized_network_response_digest = (
+            self._normalize_non_empty_string(
+                network_response_digest,
+                "network_response_digest",
+            )
+            if network_response_digest is not None
+            else None
+        )
+        normalized_network_probe_status = self._normalize_non_empty_string(
+            network_probe_status,
+            "network_probe_status",
+        )
+        if normalized_network_probe_status not in {"not-applicable", "reachable"}:
+            raise ValueError("network_probe_status must be not-applicable or reachable")
+        live_http_transport = (
+            normalized_transport_profile
+            == ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LIVE_HTTP_TRANSPORT_PROFILE
+        )
+        endpoint_transport_bound = (
+            _is_live_http_endpoint(normalized_endpoint_ref)
+            if live_http_transport
+            else normalized_endpoint_ref.startswith("verifier://")
+        )
+        live_network_probe_bound = bool(
+            live_http_transport
+            and endpoint_transport_bound
+            and normalized_timeout_ms is not None
+            and normalized_timeout_ms > 0
+            and normalized_network_response_digest is not None
+            and len(normalized_network_response_digest) == 64
+            and normalized_network_probe_status == "reachable"
+        )
+        transport_probe_requirement_satisfied = (
+            live_network_probe_bound if live_http_transport else True
+        )
         challenge_digest = _subsidy_verifier_challenge_digest(
             challenge_ref=normalized_challenge_ref,
             signer_roster_digest=normalized_signer_roster_digest,
@@ -587,7 +653,7 @@ class EnergyBudgetService:
         )
         verifier_bound = bool(
             normalized_verifier_ref.startswith("verifier://")
-            and normalized_endpoint_ref.startswith("verifier://")
+            and endpoint_transport_bound
             and normalized_signer_roster_ref.startswith("signer-roster://")
             and normalized_signer_key_ref.startswith("signer-key://")
             and normalized_authority_chain_ref.startswith("authority://")
@@ -595,6 +661,7 @@ class EnergyBudgetService:
             and normalized_http_status == 200
             and normalized_latency_ms
             <= ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
+            and transport_probe_requirement_satisfied
         )
         receipt = {
             "kind": "energy_budget_subsidy_verifier_receipt",
@@ -604,9 +671,7 @@ class EnergyBudgetService:
             "verifier_digest_profile": (
                 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE
             ),
-            "verifier_transport_profile": (
-                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE
-            ),
+            "verifier_transport_profile": normalized_transport_profile,
             "verifier_endpoint_ref": normalized_endpoint_ref,
             "verifier_ref": normalized_verifier_ref,
             "challenge_ref": normalized_challenge_ref,
@@ -625,15 +690,154 @@ class EnergyBudgetService:
                 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
             ),
             "http_status": normalized_http_status,
+            "request_timeout_ms": normalized_timeout_ms,
+            "network_response_digest": normalized_network_response_digest,
+            "network_probe_status": normalized_network_probe_status,
+            "network_probe_bound": live_network_probe_bound,
             "response_digest": response_digest,
             "verifier_receipt_status": "verified" if verifier_bound else "rejected",
             "raw_verifier_payload_stored": False,
-            "checked_at": utc_now_iso(),
+            "checked_at": checked_at or utc_now_iso(),
         }
         receipt["digest"] = sha256_text(
             canonical_json(_subsidy_verifier_receipt_digest_payload(receipt))
         )
         return receipt
+
+    def probe_subsidy_signer_roster_verifier_endpoint(
+        self,
+        *,
+        verifier_endpoint: str,
+        signer_roster_ref: str,
+        signer_roster_digest: str,
+        signer_key_ref: str,
+        signer_jurisdiction: str,
+        external_funding_policy_digest: str,
+        funding_policy_signature_digest: str,
+        verifier_ref: str = "verifier://energy-budget.jp/signer-roster",
+        challenge_ref: str = "challenge://energy-budget-subsidy/signer-roster/v1",
+        authority_chain_ref: str = "authority://energy-budget.jp/subsidy-signer-roster",
+        trust_root_ref: str = "root://energy-budget.jp/subsidy-signer-roster-pki",
+        trust_root_digest: str = "sha256:energy-budget-jp-subsidy-signer-roster-pki-v1",
+        request_timeout_ms: int = 1_000,
+    ) -> Dict[str, Any]:
+        """Probe one live JSON verifier endpoint and return a digest-only receipt."""
+
+        normalized_endpoint = self._normalize_non_empty_string(
+            verifier_endpoint,
+            "verifier_endpoint",
+        )
+        if not _is_live_http_endpoint(normalized_endpoint):
+            raise ValueError("verifier_endpoint must be http:// or https://")
+        normalized_timeout_ms = int(request_timeout_ms)
+        if normalized_timeout_ms <= 0:
+            raise ValueError("request_timeout_ms must be positive")
+
+        request_started = time.monotonic()
+        try:
+            with request.urlopen(
+                normalized_endpoint,
+                timeout=normalized_timeout_ms / 1000.0,
+            ) as response:
+                http_status = int(getattr(response, "status", 200))
+                payload_text = response.read().decode("utf-8")
+        except error.URLError as exc:
+            raise ValueError(
+                f"subsidy verifier endpoint unreachable: {normalized_endpoint}"
+            ) from exc
+        observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 3)
+        if http_status != 200:
+            raise ValueError(
+                f"subsidy verifier endpoint returned unexpected status {http_status}"
+            )
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("subsidy verifier endpoint must return JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("subsidy verifier endpoint payload must be a mapping")
+
+        expected_fields = {
+            "verifier_ref": self._normalize_non_empty_string(
+                verifier_ref,
+                "verifier_ref",
+            ),
+            "challenge_ref": self._normalize_non_empty_string(
+                challenge_ref,
+                "challenge_ref",
+            ),
+            "signer_roster_ref": self._normalize_non_empty_string(
+                signer_roster_ref,
+                "signer_roster_ref",
+            ),
+            "signer_roster_digest": self._normalize_non_empty_string(
+                signer_roster_digest,
+                "signer_roster_digest",
+            ),
+            "signer_key_ref": self._normalize_non_empty_string(
+                signer_key_ref,
+                "signer_key_ref",
+            ),
+            "signer_jurisdiction": self._normalize_non_empty_string(
+                signer_jurisdiction,
+                "signer_jurisdiction",
+            ),
+            "external_funding_policy_digest": self._normalize_non_empty_string(
+                external_funding_policy_digest,
+                "external_funding_policy_digest",
+            ),
+            "funding_policy_signature_digest": self._normalize_non_empty_string(
+                funding_policy_signature_digest,
+                "funding_policy_signature_digest",
+            ),
+            "authority_chain_ref": self._normalize_non_empty_string(
+                authority_chain_ref,
+                "authority_chain_ref",
+            ),
+            "trust_root_ref": self._normalize_non_empty_string(
+                trust_root_ref,
+                "trust_root_ref",
+            ),
+            "trust_root_digest": self._normalize_non_empty_string(
+                trust_root_digest,
+                "trust_root_digest",
+            ),
+        }
+        for field_name, expected_value in expected_fields.items():
+            if payload.get(field_name) != expected_value:
+                raise ValueError(f"subsidy verifier endpoint field mismatch: {field_name}")
+        checked_at = self._normalize_non_empty_string(
+            payload.get("checked_at"),
+            "verifier_payload.checked_at",
+        )
+
+        return self.build_subsidy_signer_roster_verifier_receipt(
+            signer_roster_ref=expected_fields["signer_roster_ref"],
+            signer_roster_digest=expected_fields["signer_roster_digest"],
+            signer_key_ref=expected_fields["signer_key_ref"],
+            signer_jurisdiction=expected_fields["signer_jurisdiction"],
+            external_funding_policy_digest=expected_fields[
+                "external_funding_policy_digest"
+            ],
+            funding_policy_signature_digest=expected_fields[
+                "funding_policy_signature_digest"
+            ],
+            verifier_ref=expected_fields["verifier_ref"],
+            challenge_ref=expected_fields["challenge_ref"],
+            verifier_endpoint_ref=normalized_endpoint,
+            authority_chain_ref=expected_fields["authority_chain_ref"],
+            trust_root_ref=expected_fields["trust_root_ref"],
+            trust_root_digest=expected_fields["trust_root_digest"],
+            observed_latency_ms=observed_latency_ms,
+            http_status=http_status,
+            verifier_transport_profile=(
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LIVE_HTTP_TRANSPORT_PROFILE
+            ),
+            request_timeout_ms=normalized_timeout_ms,
+            network_response_digest=sha256_text(canonical_json(payload)),
+            network_probe_status="reachable",
+            checked_at=checked_at,
+        )
 
     def validate_subsidy_signer_roster_verifier_receipt(
         self,
@@ -652,8 +856,10 @@ class EnergyBudgetService:
             ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE
         ):
             errors.append("verifier_digest_profile mismatch")
-        if receipt.get("verifier_transport_profile") != (
-            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE
+        verifier_transport_profile = str(receipt.get("verifier_transport_profile", ""))
+        if (
+            verifier_transport_profile
+            not in ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILES
         ):
             errors.append("verifier_transport_profile mismatch")
         if receipt.get("raw_verifier_payload_stored") is not False:
@@ -703,9 +909,49 @@ class EnergyBudgetService:
         except (TypeError, ValueError):
             observed_latency_ms = ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS + 1.0
             errors.append("observed_latency_ms must be numeric")
+        live_http_transport = (
+            verifier_transport_profile
+            == ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LIVE_HTTP_TRANSPORT_PROFILE
+        )
+        endpoint_ref = str(receipt.get("verifier_endpoint_ref", ""))
+        endpoint_transport_bound = (
+            _is_live_http_endpoint(endpoint_ref)
+            if live_http_transport
+            else endpoint_ref.startswith("verifier://")
+        )
+        request_timeout_ms = receipt.get("request_timeout_ms")
+        if live_http_transport:
+            if not isinstance(request_timeout_ms, int) or request_timeout_ms <= 0:
+                errors.append("request_timeout_ms must be positive for live verifier transport")
+            network_response_digest = receipt.get("network_response_digest")
+            if not isinstance(network_response_digest, str) or len(network_response_digest) != 64:
+                errors.append(
+                    "network_response_digest must be a sha256 digest for live verifier transport"
+                )
+        elif request_timeout_ms is not None:
+            errors.append("request_timeout_ms must be null for loopback verifier transport")
+        if not live_http_transport and receipt.get("network_response_digest") is not None:
+            errors.append("network_response_digest must be null for loopback verifier transport")
+        expected_network_probe_status = "reachable" if live_http_transport else "not-applicable"
+        if receipt.get("network_probe_status") != expected_network_probe_status:
+            errors.append("network_probe_status mismatch")
+        live_network_probe_bound = bool(
+            live_http_transport
+            and endpoint_transport_bound
+            and isinstance(request_timeout_ms, int)
+            and request_timeout_ms > 0
+            and isinstance(receipt.get("network_response_digest"), str)
+            and len(str(receipt.get("network_response_digest"))) == 64
+            and receipt.get("network_probe_status") == "reachable"
+        )
+        if receipt.get("network_probe_bound") is not live_network_probe_bound:
+            errors.append("network_probe_bound mismatch")
+        transport_probe_requirement_satisfied = (
+            live_network_probe_bound if live_http_transport else True
+        )
         verifier_bound = bool(
             str(receipt.get("verifier_ref", "")).startswith("verifier://")
-            and str(receipt.get("verifier_endpoint_ref", "")).startswith("verifier://")
+            and endpoint_transport_bound
             and str(receipt.get("signer_roster_ref", "")).startswith("signer-roster://")
             and str(receipt.get("signer_key_ref", "")).startswith("signer-key://")
             and str(receipt.get("authority_chain_ref", "")).startswith("authority://")
@@ -713,6 +959,7 @@ class EnergyBudgetService:
             and receipt.get("http_status") == 200
             and observed_latency_ms
             <= ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
+            and transport_probe_requirement_satisfied
             and receipt.get("challenge_digest") == expected_challenge_digest
             and receipt.get("response_digest") == expected_response_digest
             and receipt.get("raw_verifier_payload_stored") is False
@@ -725,6 +972,7 @@ class EnergyBudgetService:
             "errors": errors,
             "signer_roster_verifier_bound": verifier_bound,
             "verifier_receipt_status": expected_status,
+            "network_probe_bound": live_network_probe_bound,
             "raw_payload_redacted": receipt.get("raw_verifier_payload_stored") is False,
         }
 
@@ -758,6 +1006,7 @@ class EnergyBudgetService:
             "challenge://energy-budget-subsidy/signer-roster/v1"
         ),
         signer_roster_verifier_endpoint_ref: Optional[str] = None,
+        signer_roster_verifier_receipt: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Return a post-floor voluntary subsidy receipt without changing floor guards."""
 
@@ -868,19 +1117,25 @@ class EnergyBudgetService:
             signer_roster_digest=signer_roster_digest,
             policy_digest=external_funding_policy_digest,
         )
-        signer_roster_verifier_receipt = (
-            self.build_subsidy_signer_roster_verifier_receipt(
-                signer_roster_ref=signer_roster_ref,
-                signer_roster_digest=signer_roster_digest,
-                signer_key_ref=signer_key_ref,
-                signer_jurisdiction=signer_jurisdiction,
-                external_funding_policy_digest=external_funding_policy_digest,
-                funding_policy_signature_digest=funding_policy_signature_digest,
-                verifier_ref=signer_roster_verifier_ref,
-                challenge_ref=signer_roster_verifier_challenge_ref,
-                verifier_endpoint_ref=signer_roster_verifier_endpoint_ref,
+        if signer_roster_verifier_receipt is None:
+            resolved_signer_roster_verifier_receipt = (
+                self.build_subsidy_signer_roster_verifier_receipt(
+                    signer_roster_ref=signer_roster_ref,
+                    signer_roster_digest=signer_roster_digest,
+                    signer_key_ref=signer_key_ref,
+                    signer_jurisdiction=signer_jurisdiction,
+                    external_funding_policy_digest=external_funding_policy_digest,
+                    funding_policy_signature_digest=funding_policy_signature_digest,
+                    verifier_ref=signer_roster_verifier_ref,
+                    challenge_ref=signer_roster_verifier_challenge_ref,
+                    verifier_endpoint_ref=signer_roster_verifier_endpoint_ref,
+                )
             )
-        )
+        else:
+            resolved_signer_roster_verifier_receipt = dict(
+                signer_roster_verifier_receipt
+            )
+        signer_roster_verifier_receipt = resolved_signer_roster_verifier_receipt
         signer_roster_verifier_validation = (
             self.validate_subsidy_signer_roster_verifier_receipt(
                 signer_roster_verifier_receipt
@@ -1978,6 +2233,10 @@ def _verifier_endpoint_from_ref(verifier_ref: str) -> str:
     if len(parts) < 3 or not parts[2]:
         return verifier_ref
     return f"verifier://{parts[2]}"
+
+
+def _is_live_http_endpoint(endpoint_ref: str) -> bool:
+    return endpoint_ref.startswith("http://") or endpoint_ref.startswith("https://")
 
 
 def _shared_fabric_floor_allocations(

@@ -184,12 +184,13 @@ signature digest 付きで束縛する。receipt は
 surplus を floor validation 中の cross-identity offset として使わない。
 同じ receipt は `jurisdiction-bound-energy-subsidy-authority-v1` により
 funding policy signature を `JP-13` の signer roster / signer key ref へ束縛し、
-`energy-subsidy-signer-roster-live-verifier-v1` の loopback verifier receipt で
-signer roster digest / signer key ref / funding policy signature digest も確認し、
+`energy-subsidy-signer-roster-live-verifier-v1` の live HTTP verifier receipt で
+signer roster digest / signer key ref / funding policy signature digest / network response digest も確認し、
 offer revocation refs を revocation registry digest に束ね、
 audit authority digest が signer roster と revocation registry の両方を同じ法域で監査する。
 `authority_binding_status=verified`、`funding_policy_signature_bound=true`、
-`signer_roster_verifier_bound=true`、`revocation_registry_bound=true`、`audit_authority_bound=true`、
+`signer_roster_verifier_bound=true`、`network_probe_bound=true`、
+`revocation_registry_bound=true`、`audit_authority_bound=true`、
 `jurisdiction_authority_bound=true`、`raw_verifier_payload_stored=false`、
 `raw_authority_payload_stored=false` が
 `energy_budget_subsidy_verifier_receipt.schema` /
