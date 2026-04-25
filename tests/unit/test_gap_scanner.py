@@ -350,6 +350,64 @@ class GapScannerTests(unittest.TestCase):
                 report["decision_log_frontier_hits"][0]["decision_date"],
             )
 
+    def test_scan_reports_remaining_scope_operational_followups(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-23_wms-adapter-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Remaining scope\n"
+                "- real WMS engine adapter の transaction log 統合は adapter surface を持つ段階で扱う\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_frontier_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-23_wms-adapter-gap.md",
+                report["decision_log_frontier_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "2026-04-23_wms-adapter-gap.md#gap-1",
+                report["decision_log_frontier_hits"][0]["next_gap_ref"],
+            )
+
+    def test_scan_suppresses_closed_remaining_scope_followups(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "2026-04-23_wms-adapter-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n\n"
+                "## Deferred scope\n"
+                "- real WMS engine adapter の transaction log 統合は adapter surface を持つ段階で扱う\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_wms-adapter-closed.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "closes_next_gaps:\n"
+                "  - 2026-04-23_wms-adapter-gap.md#gap-1\n"
+                "---\n\n"
+                "## Consequences\n"
+                "- engine adapter transaction log surface is now covered by schema/runtime/eval\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["decision_log_frontier_count"])
+            self.assertEqual([], report["decision_log_frontier_hits"])
+
     def test_scan_ignores_superseded_latest_decision_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

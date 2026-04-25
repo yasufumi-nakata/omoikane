@@ -7748,6 +7748,7 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        pre_physics_state = self.wms.snapshot(session["session_id"])
         physics_change = self.wms.propose_physics_rules_change(
             session["session_id"],
             requested_by=identity.identity_id,
@@ -7759,6 +7760,7 @@ json.dump(response, sys.stdout)
             approval_collection_receipt=approval_collection_receipt,
             approval_fanout_receipt=approval_fanout_retry_receipt,
         )
+        post_physics_state = self.wms.snapshot(session["session_id"])
         physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7778,6 +7780,7 @@ json.dump(response, sys.stdout)
             reason="bounded rehearsal complete; restore baseline shared physics",
             guardian_attested=True,
         )
+        post_revert_state = self.wms.snapshot(session["session_id"])
         physics_revert_validation = self.wms.validate_physics_rules_change(physics_revert)
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7785,6 +7788,104 @@ json.dump(response, sys.stdout)
             payload=physics_revert,
             actor="WorldModelSync",
             category="interface-wms-physics",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
+        engine_session_ref = f"engine-session://wms-demo/{session['session_id']}"
+        engine_transaction_log_ref = f"engine-log://wms-demo/{session['session_id']}/transactions"
+        pre_physics_state_digest = sha256_text(canonical_json(pre_physics_state))
+        post_physics_state_digest = sha256_text(canonical_json(post_physics_state))
+        post_revert_state_digest = sha256_text(canonical_json(post_revert_state))
+        time_rate_deviation_digest = sha256_text(canonical_json(time_rate_deviation))
+        engine_source_artifact_digests = {
+            "time_rate_escape_evidence": time_rate_deviation_digest,
+            "approval_collection_bound": approval_collection_receipt["digest"],
+            "approval_fanout_bound": approval_fanout_retry_receipt["digest"],
+            "physics_rules_apply": physics_change["digest"],
+            "physics_rules_revert": physics_revert["digest"],
+        }
+        engine_transaction_entries = [
+            self.wms.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://wms-demo/{session['session_id']}/001",
+                transaction_index=1,
+                operation="time_rate_escape_evidence",
+                source_artifact_kind="wms_reconcile",
+                source_artifact_ref=f"wms-reconcile://{time_rate_deviation['reconcile_id']}",
+                source_artifact_digest=time_rate_deviation_digest,
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=pre_physics_state_digest,
+                engine_state_after_digest=pre_physics_state_digest,
+                participant_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            ),
+            self.wms.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://wms-demo/{session['session_id']}/002",
+                transaction_index=2,
+                operation="approval_collection_bound",
+                source_artifact_kind="wms_approval_collection_receipt",
+                source_artifact_ref=f"wms-approval-collection://{approval_collection_receipt['digest'][:16]}",
+                source_artifact_digest=approval_collection_receipt["digest"],
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=pre_physics_state_digest,
+                engine_state_after_digest=pre_physics_state_digest,
+                participant_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            ),
+            self.wms.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://wms-demo/{session['session_id']}/003",
+                transaction_index=3,
+                operation="approval_fanout_bound",
+                source_artifact_kind="wms_distributed_approval_fanout_receipt",
+                source_artifact_ref=f"wms-approval-fanout://{approval_fanout_retry_receipt['digest'][:16]}",
+                source_artifact_digest=approval_fanout_retry_receipt["digest"],
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=pre_physics_state_digest,
+                engine_state_after_digest=pre_physics_state_digest,
+                participant_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            ),
+            self.wms.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://wms-demo/{session['session_id']}/004",
+                transaction_index=4,
+                operation="physics_rules_apply",
+                source_artifact_kind="wms_physics_rules_change_receipt",
+                source_artifact_ref=f"wms-physics-change://{physics_change['change_id']}",
+                source_artifact_digest=physics_change["digest"],
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=pre_physics_state_digest,
+                engine_state_after_digest=post_physics_state_digest,
+                participant_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            ),
+            self.wms.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://wms-demo/{session['session_id']}/005",
+                transaction_index=5,
+                operation="physics_rules_revert",
+                source_artifact_kind="wms_physics_rules_change_receipt",
+                source_artifact_ref=f"wms-physics-revert://{physics_revert['change_id']}",
+                source_artifact_digest=physics_revert["digest"],
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=post_physics_state_digest,
+                engine_state_after_digest=post_revert_state_digest,
+                participant_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            ),
+        ]
+        engine_transaction_log = self.wms.build_engine_transaction_log_receipt(
+            session["session_id"],
+            engine_adapter_ref="engine-adapter://reference-wms/multi-user-transaction-log",
+            engine_session_ref=engine_session_ref,
+            transaction_log_ref=engine_transaction_log_ref,
+            transaction_entries=engine_transaction_entries,
+            source_artifact_digests=engine_source_artifact_digests,
+        )
+        engine_transaction_log_validation = self.wms.validate_engine_transaction_log_receipt(
+            engine_transaction_log,
+            source_artifact_digests=engine_source_artifact_digests,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.engine.transaction_log_bound",
+            payload=engine_transaction_log,
+            actor="WorldModelSync",
+            category="interface-wms-engine",
             layer="L6",
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
@@ -7856,6 +7957,8 @@ json.dump(response, sys.stdout)
                 "approval_transport_receipts": approval_transport_receipts,
                 "physics_change": physics_change,
                 "physics_revert": physics_revert,
+                "engine_transaction_log": engine_transaction_log,
+                "engine_transaction_entries": engine_transaction_entries,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
                 "malicious_violation": malicious_violation,
@@ -7941,6 +8044,17 @@ json.dump(response, sys.stdout)
                     and approval_fanout_retry_receipt["outage_participants"]
                     == [observer.identity_id]
                 ),
+                "engine_transaction_log_bound": (
+                    engine_transaction_log_validation["ok"]
+                    and engine_transaction_log_validation["engine_binding_complete"]
+                    and engine_transaction_log_validation["entry_order_bound"]
+                    and engine_transaction_log_validation["source_artifacts_bound"]
+                    and engine_transaction_log_validation["redaction_complete"]
+                    and engine_transaction_log["covered_operations"]
+                    == engine_transaction_log["required_operations"]
+                    and engine_transaction_log["engine_binding_status"] == "complete"
+                ),
+                "engine_transaction_log": engine_transaction_log_validation,
                 "static_approval_without_transport_rejected": (
                     transportless_static_approval_rejection["decision"] == "rejected"
                     and transportless_static_approval_rejection["approval_quorum_met"]

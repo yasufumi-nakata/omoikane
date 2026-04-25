@@ -18,6 +18,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/procedural_actuation_bridge.yaml`
 - `identity-fidelity/naming_policy_contract.yaml`
 - `interface/bdb_fail_safe_reversibility.yaml`
+- `interface/wms_engine_transaction_log.yaml`
 - `safety/immutable_boundary.yaml`
 - `safety/ethics_rule_tree_contract.yaml`
 - `safety/ewa_external_actuation_authorization.yaml`

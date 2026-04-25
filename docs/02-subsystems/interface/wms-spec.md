@@ -70,6 +70,11 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   `max_retry_attempts=2` / `retry_window_ms=1500` に制限し、
   retry の recovery result digest と transport receipt digest が
   最終 fan-out result に一致した時だけ `fanout_status=complete` に戻す
+- reference runtime の external engine adapter 境界は
+  `digest-bound-wms-engine-transaction-log-v1` receipt で固定する。
+  time_rate escape evidence、approval collection、distributed fan-out、
+  physics_rules apply、revert の各 source artifact digest を ordered committed
+  transaction entry に束縛し、raw engine payload / raw world-state body は保存しない
 
 ## API
 
@@ -78,6 +83,7 @@ wms.snapshot(session_id) → WorldState
 wms.propose_diff(session_id, diff, time_rate_attestation_receipts) → ReconcileOutcome
 wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
 wms.collect_distributed_approval_fanout(session_id, collection, transport_results, retry_attempts) → DistributedApprovalFanoutReceipt
+wms.bind_engine_transaction_log(session_id, entries) → EngineTransactionLogReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
 wms.revert_physics_rules_change(session_id, change_id) → PhysicsRulesChangeReceipt
@@ -99,6 +105,7 @@ wms.observe_violation(session_id) → ViolationReport
 - `world_state.schema` / `wms_reconcile.schema` /
   `wms_approval_collection_receipt.schema` /
   `wms_distributed_approval_fanout_receipt.schema` /
+  `wms_engine_transaction_log.schema` /
   `wms_time_rate_attestation_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
   `wms_participant_approval_transport_receipt.schema` を導入
@@ -120,6 +127,9 @@ wms.observe_violation(session_id) → ViolationReport
   physics_rules 可逆性、participant approval の live transport binding、
   ordered batch collection、distributed Council transport fan-out、
   partial outage retry recovery を保証
+- `evals/interface/wms_engine_transaction_log.yaml` で external WMS engine adapter
+  transaction log が ordered committed entry、source artifact digest set、
+  state transition digest、payload redaction flag を持つことを保証
 
 ## 未解決
 

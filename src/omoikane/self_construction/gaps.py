@@ -23,10 +23,19 @@ DECISION_LOG_FRONTIER_MARKERS = (
     "next-stage frontier",
     "次段の frontier",
 )
+DECISION_LOG_OPERATIONAL_FOLLOWUP_MARKERS = (
+    "engine adapter",
+    "transaction log",
+    "adapter surface",
+)
 DECISION_LOG_GAP_MARKER_RULES = (
     ("decision-log-residual", DECISION_LOG_RESIDUAL_MARKERS),
     ("decision-log-frontier", DECISION_LOG_FRONTIER_MARKERS),
 )
+DECISION_LOG_FOLLOWUP_SECTIONS = {
+    "## Remaining scope",
+    "## Deferred scope",
+}
 DECISION_LOG_IGNORED_NAME_SNIPPETS = ("gap-report",)
 DECISION_LOG_NEXT_GAP_IDS_KEY = "next_gap_ids"
 DECISION_LOG_CLOSES_NEXT_GAPS_KEY = "closes_next_gaps"
@@ -381,18 +390,24 @@ class GapScanner:
                 path, DECISION_LOG_NEXT_GAP_IDS_KEY
             )
             in_consequences = False
+            in_followup_scope = False
             matched_gap_count = 0
             for line in text.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("## "):
                     in_consequences = stripped == "## Consequences"
+                    in_followup_scope = stripped in DECISION_LOG_FOLLOWUP_SECTIONS
                     continue
-                if not in_consequences:
+                if not in_consequences and not in_followup_scope:
                     continue
                 lowered = stripped.lower()
                 if not stripped.startswith("- "):
                     continue
-                hit_kind = self._decision_log_hit_kind(lowered)
+                hit_kind = (
+                    self._decision_log_hit_kind(lowered)
+                    if in_consequences
+                    else self._decision_log_followup_hit_kind(lowered)
+                )
                 if hit_kind is None:
                     continue
                 next_gap_id = (
@@ -424,6 +439,12 @@ class GapScanner:
         for hit_kind, markers in DECISION_LOG_GAP_MARKER_RULES:
             if any(marker in line_lowered for marker in markers):
                 return hit_kind
+        return None
+
+    @staticmethod
+    def _decision_log_followup_hit_kind(line_lowered: str) -> str | None:
+        if any(marker in line_lowered for marker in DECISION_LOG_OPERATIONAL_FOLLOWUP_MARKERS):
+            return "decision-log-frontier"
         return None
 
     def _closed_decision_log_gap_refs(self, decision_logs: List[Path]) -> set[str]:

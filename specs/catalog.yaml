@@ -864,10 +864,22 @@ entries:
       - specs/schemas/wms_physics_rules_change_receipt.schema
       - evals/interface/wms_distributed_approval_fanout.yaml
       - evals/interface/wms_distributed_approval_fanout_retry.yaml
+      - specs/schemas/wms_engine_transaction_log.schema
       - docs/02-subsystems/interface/wms-spec.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
     rationale: Required to prove WMS approval collection fan-out through authenticated Federation distributed transport receipts and bounded partial-outage retry recovery before shared-reality physics_rules changes bind remote Council transport evidence.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_engine_transaction_log.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_engine_transaction_log.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind reference WMS source artifacts to ordered committed external engine adapter transaction entries without storing raw world-state or engine payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_participant_approval_transport_receipt.schema
@@ -1258,6 +1270,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects bounded retry recovery for partial distributed approval fan-out outages before shared-reality physics_rules changes accept complete remote transport evidence.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_engine_transaction_log.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects digest-only external WMS engine adapter transaction logs that bind time_rate escape, approval collection, fan-out, apply, and revert source artifacts without raw payload retention.
   - priority: P1
     kind: eval
     file: evals/interface/wms_participant_approval_transport.yaml

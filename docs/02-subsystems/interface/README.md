@@ -38,7 +38,7 @@
   で minor reconcile、major divergence、subjective-time attested time_rate deviation escape、
   unanimous / Guardian-attested physics rules change、ordered approval collection、
   distributed approval fan-out、rollback-token revert、malicious inject、
-  private reality escape を検証する
+  private reality escape、external engine transaction log binding を検証する
 
 ### Sensory Loopback (SL)
 - 感覚出力（音／映像／触覚）のフィードバック

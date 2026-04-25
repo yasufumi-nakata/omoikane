@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from omoikane.agentic.distributed_transport import DistributedTransportService
+from omoikane.common import canonical_json, sha256_text
 from omoikane.interface.imc import InterMindChannel
 from omoikane.interface.wms import WorldModelSync
 
@@ -524,6 +525,71 @@ class WorldModelSyncTests(unittest.TestCase):
             fanout["outage_participants"],
         )
         self.assertEqual(3, fanout["result_count"])
+
+    def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+        state_digest = sha256_text(canonical_json(sync.snapshot(session["session_id"])))
+        engine_session_ref = f"engine-session://test/{session['session_id']}"
+        source_digests = {
+            "time_rate_escape_evidence": sha256_text("time-rate-evidence"),
+            "approval_collection_bound": sha256_text("approval-collection"),
+            "approval_fanout_bound": sha256_text("approval-fanout"),
+            "physics_rules_apply": sha256_text("physics-apply"),
+            "physics_rules_revert": sha256_text("physics-revert"),
+        }
+        entries = [
+            sync.build_engine_transaction_entry(
+                transaction_id=f"engine-txn://test/{index}",
+                transaction_index=index,
+                operation=operation,
+                source_artifact_kind=(
+                    "wms_reconcile"
+                    if operation == "time_rate_escape_evidence"
+                    else "wms_physics_rules_change_receipt"
+                ),
+                source_artifact_ref=f"artifact://{operation}",
+                source_artifact_digest=source_digests[operation],
+                engine_session_ref=engine_session_ref,
+                engine_state_before_digest=state_digest,
+                engine_state_after_digest=state_digest,
+                participant_ids=session["current_state"]["participants"],
+            )
+            for index, operation in enumerate(source_digests, start=1)
+        ]
+
+        receipt = sync.build_engine_transaction_log_receipt(
+            session["session_id"],
+            engine_adapter_ref="engine-adapter://test/reference",
+            engine_session_ref=engine_session_ref,
+            transaction_log_ref=f"engine-log://test/{session['session_id']}",
+            transaction_entries=entries,
+            source_artifact_digests=source_digests,
+        )
+        validation = sync.validate_engine_transaction_log_receipt(
+            receipt,
+            source_artifact_digests=source_digests,
+        )
+        tampered = dict(receipt)
+        tampered["transaction_entries"] = [dict(entry) for entry in receipt["transaction_entries"]]
+        tampered["transaction_entries"][0]["source_artifact_digest"] = sha256_text("tampered")
+        tampered_validation = sync.validate_engine_transaction_log_receipt(
+            tampered,
+            source_artifact_digests=source_digests,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["engine_binding_complete"])
+        self.assertTrue(validation["entry_order_bound"])
+        self.assertTrue(validation["source_artifacts_bound"])
+        self.assertTrue(validation["redaction_complete"])
+        self.assertEqual("complete", receipt["engine_binding_status"])
+        self.assertEqual(receipt["required_operations"], receipt["covered_operations"])
+        self.assertFalse(tampered_validation["ok"])
+        self.assertFalse(tampered_validation["source_artifacts_bound"])
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
         sync = WorldModelSync()

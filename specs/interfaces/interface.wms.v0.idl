@@ -11,6 +11,7 @@ imports:
   wms_participant_approval_transport_receipt: ../schemas/wms_participant_approval_transport_receipt.schema
   wms_approval_collection_receipt: ../schemas/wms_approval_collection_receipt.schema
   wms_distributed_approval_fanout_receipt: ../schemas/wms_distributed_approval_fanout_receipt.schema
+  wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
 operations:
   snapshot:
     summary: Read the current world state for one WMS session.
@@ -140,6 +141,54 @@ operations:
       - partial distributed transport outages must be represented as bounded-distributed-approval-fanout-retry-v1 retry attempts with max_retry_attempts=2 and retry_window_ms=1500
       - recovered retry attempts must bind their recovery_result_digest and recovery_transport_receipt_digest to the final participant fan-out result before fanout_status becomes complete
       - fanout digest must bind ordered participant result digests, envelope digests, receipt digests, and the approval collection digest
+  bind_engine_transaction_log:
+    summary: Bind reference WMS decisions to a bounded external engine adapter transaction log without storing raw engine payloads.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - engine_adapter_ref
+          - engine_session_ref
+          - transaction_log_ref
+          - transaction_entries
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          engine_adapter_ref:
+            type: string
+            minLength: 1
+          engine_session_ref:
+            type: string
+            minLength: 1
+          transaction_log_ref:
+            type: string
+            minLength: 1
+          transaction_entries:
+            type: array
+            minItems: 1
+            items:
+              type: object
+          required_operations:
+            type: array
+            default:
+              - time_rate_escape_evidence
+              - approval_collection_bound
+              - approval_fanout_bound
+              - physics_rules_apply
+              - physics_rules_revert
+            items:
+              type: string
+          source_artifact_digests:
+            type: object
+    output:
+      schema_ref: wms_engine_transaction_log
+    guarantees:
+      - transaction entries must be ordered, committed, payload-redacted, and bound to the same engine_session_ref
+      - source artifact digests must match the WMS reconcile, approval collection, fan-out, apply, and revert receipts supplied by the reference runtime
+      - raw engine payloads and raw world-state bodies must not be stored in the transaction log receipt
+      - engine_binding_status can become complete only when all required operations are covered and digest-bound
   switch_mode:
     summary: Change a session between shared, private, and mixed world-model modes.
     input:

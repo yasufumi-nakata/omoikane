@@ -818,6 +818,12 @@ fan-out 中の partial outage は
 `max_retry_attempts=2` / `retry_window_ms=1500` の範囲で retry し、
 recovery result digest と recovery transport receipt digest が最終 fan-out result に
 一致した時だけ `partial_outage_status=recovered` として physics change へ渡す。
+さらに同じ source artifacts を
+`digest-bound-wms-engine-transaction-log-v1` の external engine adapter receipt へ束ね、
+time_rate escape evidence、approval collection、distributed fan-out、
+physics_rules apply、physics_rules revert の 5 committed transaction entry が
+`wms_engine_transaction_log.schema` に従って ordered entry digest set、
+source artifact digest set、state transition digest、redaction flags を共有することを確認する。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

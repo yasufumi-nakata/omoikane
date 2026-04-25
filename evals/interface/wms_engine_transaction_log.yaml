@@ -1,0 +1,28 @@
+eval_id: wms_engine_transaction_log
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の reference decisions が external WMS engine adapter の
+  ordered committed transaction log receipt に digest-only で束縛され、
+  raw engine payload や raw world-state body を保存せずに source artifact set と
+  state transition digest を検証できることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  engine_transaction_log_bound: true
+  transaction_log_policy_id: digest-bound-wms-engine-transaction-log-v1
+  engine_adapter_profile: reference-wms-engine-adapter-v1
+  entry_digest_profile: wms-engine-transaction-entry-digest-v1
+  digest_profile: wms-engine-transaction-log-digest-v1
+  required_operation_count: 5
+  transaction_entry_count: 5
+  entry_order_bound: true
+  source_artifacts_bound: true
+  redaction_complete: true
+  state_transition_bound: true
+  engine_binding_status: complete
+metric: boolean
+threshold: 1.0
+ethics_check: true

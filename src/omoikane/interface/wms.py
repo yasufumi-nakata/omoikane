@@ -36,6 +36,17 @@ WMS_APPROVAL_FANOUT_OUTAGE_KINDS = {
 WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE = 2
 WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
+WMS_ENGINE_TRANSACTION_LOG_POLICY_ID = "digest-bound-wms-engine-transaction-log-v1"
+WMS_ENGINE_ADAPTER_PROFILE = "reference-wms-engine-adapter-v1"
+WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE = "wms-engine-transaction-entry-digest-v1"
+WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE = "wms-engine-transaction-log-digest-v1"
+WMS_ENGINE_TRANSACTION_OPERATIONS = {
+    "time_rate_escape_evidence",
+    "approval_collection_bound",
+    "approval_fanout_bound",
+    "physics_rules_apply",
+    "physics_rules_revert",
+}
 WMS_ALLOWED_MODES = {"shared_reality", "private_reality", "mixed"}
 WMS_ALLOWED_AUTHORITIES = {"consensus", "local", "broker"}
 WMS_PHYSICS_CHANGE_OPERATIONS = {"apply", "revert"}
@@ -77,6 +88,14 @@ def _fanout_retry_attempt_digest_payload(attempt: Mapping[str, Any]) -> Dict[str
 
 
 def _time_rate_attestation_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _engine_transaction_entry_digest_payload(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in entry.items() if key != "entry_digest"}
+
+
+def _engine_transaction_log_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
@@ -122,6 +141,9 @@ class WorldModelSync:
                 "guardian_attestation_required": True,
                 "rollback_token_required": True,
                 "revert_operation_required": True,
+                "engine_transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
+                "engine_adapter_profile": WMS_ENGINE_ADAPTER_PROFILE,
+                "engine_transaction_operations": sorted(WMS_ENGINE_TRANSACTION_OPERATIONS),
             },
             "consensus_policy": {
                 "minor_diff": "consensus_round",
@@ -691,6 +713,213 @@ class WorldModelSync:
             "participant_order_bound": covered_participants == required_participants,
         }
         receipt["digest"] = sha256_text(canonical_json(_approval_fanout_digest_payload(receipt)))
+        return receipt
+
+    def build_engine_transaction_entry(
+        self,
+        *,
+        transaction_id: str,
+        transaction_index: int,
+        operation: str,
+        source_artifact_kind: str,
+        source_artifact_ref: str,
+        source_artifact_digest: str,
+        engine_session_ref: str,
+        engine_state_before_digest: str,
+        engine_state_after_digest: str,
+        participant_ids: Sequence[str],
+        committed_at: str | None = None,
+    ) -> Dict[str, Any]:
+        normalized_operation = self._normalize_non_empty_string(operation, "operation")
+        if normalized_operation not in WMS_ENGINE_TRANSACTION_OPERATIONS:
+            raise ValueError("operation is not allowed")
+        if not isinstance(transaction_index, int) or transaction_index < 1:
+            raise ValueError("transaction_index must be a positive integer")
+        entry = {
+            "kind": "wms_engine_transaction_entry",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "entry_digest_profile": WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE,
+            "transaction_id": self._normalize_non_empty_string(
+                transaction_id,
+                "transaction_id",
+            ),
+            "transaction_index": transaction_index,
+            "operation": normalized_operation,
+            "source_artifact_kind": self._normalize_non_empty_string(
+                source_artifact_kind,
+                "source_artifact_kind",
+            ),
+            "source_artifact_ref": self._normalize_non_empty_string(
+                source_artifact_ref,
+                "source_artifact_ref",
+            ),
+            "source_artifact_digest": self._normalize_digest(
+                source_artifact_digest,
+                "source_artifact_digest",
+            ),
+            "engine_session_ref": self._normalize_non_empty_string(
+                engine_session_ref,
+                "engine_session_ref",
+            ),
+            "engine_state_before_digest": self._normalize_digest(
+                engine_state_before_digest,
+                "engine_state_before_digest",
+            ),
+            "engine_state_after_digest": self._normalize_digest(
+                engine_state_after_digest,
+                "engine_state_after_digest",
+            ),
+            "participant_ids": self._normalize_string_list(
+                participant_ids,
+                "participant_ids",
+            ),
+            "payload_redacted": True,
+            "raw_payload_stored": False,
+            "transaction_status": "committed",
+            "committed_at": committed_at or utc_now_iso(),
+        }
+        entry["entry_digest"] = sha256_text(
+            canonical_json(_engine_transaction_entry_digest_payload(entry))
+        )
+        return entry
+
+    def build_engine_transaction_log_receipt(
+        self,
+        session_id: str,
+        *,
+        engine_adapter_ref: str,
+        engine_session_ref: str,
+        transaction_log_ref: str,
+        transaction_entries: Sequence[Mapping[str, Any]],
+        required_operations: Sequence[str] | None = None,
+        source_artifact_digests: Mapping[str, str] | None = None,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        adapter_ref = self._normalize_non_empty_string(
+            engine_adapter_ref,
+            "engine_adapter_ref",
+        )
+        engine_session = self._normalize_non_empty_string(
+            engine_session_ref,
+            "engine_session_ref",
+        )
+        log_ref = self._normalize_non_empty_string(transaction_log_ref, "transaction_log_ref")
+        required = self._normalize_engine_required_operations(required_operations)
+        expected_digests = {
+            operation: self._normalize_digest(digest, f"source_artifact_digests.{operation}")
+            for operation, digest in (source_artifact_digests or {}).items()
+        }
+
+        normalized_entries: List[Dict[str, Any]] = []
+        invalid_transaction_count = 0
+        duplicate_transaction_ids: List[str] = []
+        seen_transaction_ids: set[str] = set()
+        for raw_entry in transaction_entries:
+            if not isinstance(raw_entry, Mapping):
+                invalid_transaction_count += 1
+                continue
+            entry = deepcopy(raw_entry)
+            if entry.get("transaction_id") in seen_transaction_ids:
+                duplicate_transaction_ids.append(str(entry.get("transaction_id")))
+                continue
+            try:
+                self._validate_engine_transaction_entry(
+                    entry,
+                    expected_index=len(normalized_entries) + 1,
+                    engine_session_ref=engine_session,
+                    source_artifact_digests=expected_digests,
+                )
+            except ValueError:
+                invalid_transaction_count += 1
+                continue
+            seen_transaction_ids.add(str(entry["transaction_id"]))
+            normalized_entries.append(entry)
+
+        covered_operations = [
+            entry["operation"]
+            for entry in normalized_entries
+            if entry["operation"] in required
+        ]
+        missing_operations = [
+            operation for operation in required if operation not in covered_operations
+        ]
+        ordered_entry_digests = [entry["entry_digest"] for entry in normalized_entries]
+        source_artifact_digests_ordered = [
+            entry["source_artifact_digest"] for entry in normalized_entries
+        ]
+        state_transition_pairs = [
+            {
+                "transaction_id": entry["transaction_id"],
+                "operation": entry["operation"],
+                "engine_state_before_digest": entry["engine_state_before_digest"],
+                "engine_state_after_digest": entry["engine_state_after_digest"],
+            }
+            for entry in normalized_entries
+        ]
+        entry_order_bound = [
+            entry["transaction_index"] for entry in normalized_entries
+        ] == list(range(1, len(normalized_entries) + 1))
+        redaction_complete = all(
+            entry.get("payload_redacted") is True
+            and entry.get("raw_payload_stored") is False
+            for entry in normalized_entries
+        )
+        source_artifacts_bound = not missing_operations and all(
+            not expected_digests
+            or entry["operation"] not in expected_digests
+            or entry["source_artifact_digest"] == expected_digests[entry["operation"]]
+            for entry in normalized_entries
+        )
+        complete = (
+            bool(normalized_entries)
+            and not missing_operations
+            and invalid_transaction_count == 0
+            and not duplicate_transaction_ids
+            and entry_order_bound
+            and redaction_complete
+            and source_artifacts_bound
+        )
+        receipt = {
+            "kind": "wms_engine_transaction_log",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
+            "engine_adapter_profile": WMS_ENGINE_ADAPTER_PROFILE,
+            "entry_digest_profile": WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE,
+            "digest_profile": WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE,
+            "session_id": session_id,
+            "engine_adapter_ref": adapter_ref,
+            "engine_session_ref": engine_session,
+            "transaction_log_ref": log_ref,
+            "required_operations": required,
+            "covered_operations": covered_operations,
+            "missing_operations": missing_operations,
+            "duplicate_transaction_ids": _dedupe_preserve_order(duplicate_transaction_ids),
+            "invalid_transaction_count": invalid_transaction_count,
+            "transaction_entry_count": len(normalized_entries),
+            "transaction_entries": normalized_entries,
+            "ordered_transaction_ids": [
+                entry["transaction_id"] for entry in normalized_entries
+            ],
+            "ordered_entry_digests": ordered_entry_digests,
+            "transaction_set_digest": sha256_text(canonical_json(ordered_entry_digests)),
+            "source_artifact_digest_set_digest": sha256_text(
+                canonical_json(source_artifact_digests_ordered)
+            ),
+            "engine_state_transition_digest": sha256_text(
+                canonical_json(state_transition_pairs)
+            ),
+            "current_wms_state_digest": sha256_text(
+                canonical_json(session["current_state"])
+            ),
+            "entry_order_bound": entry_order_bound,
+            "source_artifacts_bound": source_artifacts_bound,
+            "redaction_complete": redaction_complete,
+            "state_transition_bound": bool(normalized_entries),
+            "engine_binding_status": "complete" if complete else "incomplete",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_engine_transaction_log_digest_payload(receipt))
+        )
         return receipt
 
     def collect_approval_transport_receipts(
@@ -2054,6 +2283,258 @@ class WorldModelSync:
             errors.append("retry attempts exceed bounded retry policy")
             retry_policy_bound = False
         return retry_policy_bound
+
+    def validate_engine_transaction_log_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        required_operations: Sequence[str] | None = None,
+        source_artifact_digests: Mapping[str, str] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_engine_transaction_log":
+            errors.append("kind must equal wms_engine_transaction_log")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("transaction_log_policy_id") != WMS_ENGINE_TRANSACTION_LOG_POLICY_ID:
+            errors.append("transaction_log_policy_id mismatch")
+        if receipt.get("engine_adapter_profile") != WMS_ENGINE_ADAPTER_PROFILE:
+            errors.append("engine_adapter_profile mismatch")
+        if receipt.get("entry_digest_profile") != WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE:
+            errors.append("entry_digest_profile mismatch")
+        if receipt.get("digest_profile") != WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        for field_name in ("session_id", "engine_adapter_ref", "engine_session_ref", "transaction_log_ref"):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        required = self._normalize_engine_required_operations(
+            required_operations or receipt.get("required_operations")
+        )
+        if receipt.get("required_operations") != required:
+            errors.append("required_operations must match the bounded operation set")
+        expected_digests = {
+            operation: self._normalize_digest(digest, f"source_artifact_digests.{operation}")
+            for operation, digest in (source_artifact_digests or {}).items()
+        }
+        entries = receipt.get("transaction_entries")
+        if not isinstance(entries, list) or not entries:
+            errors.append("transaction_entries must be a non-empty list")
+            entries = []
+
+        entry_errors: List[str] = []
+        normalized_entry_digests: List[str] = []
+        ordered_transaction_ids: List[str] = []
+        source_artifact_digests_ordered: List[str] = []
+        state_transition_pairs: List[Dict[str, Any]] = []
+        covered_operations: List[str] = []
+        duplicate_transaction_ids: List[str] = []
+        seen_transaction_ids: set[str] = set()
+        invalid_transaction_count = 0
+        engine_session_ref = (
+            str(receipt.get("engine_session_ref"))
+            if isinstance(receipt.get("engine_session_ref"), str)
+            else ""
+        )
+        for index, entry in enumerate(entries, start=1):
+            if not isinstance(entry, Mapping):
+                entry_errors.append("transaction_entries must contain objects")
+                invalid_transaction_count += 1
+                continue
+            transaction_id = entry.get("transaction_id")
+            if isinstance(transaction_id, str):
+                if transaction_id in seen_transaction_ids:
+                    duplicate_transaction_ids.append(transaction_id)
+                seen_transaction_ids.add(transaction_id)
+                ordered_transaction_ids.append(transaction_id)
+            try:
+                self._validate_engine_transaction_entry(
+                    entry,
+                    expected_index=index,
+                    engine_session_ref=engine_session_ref,
+                    source_artifact_digests=expected_digests,
+                )
+            except ValueError as exc:
+                entry_errors.append(str(exc))
+                invalid_transaction_count += 1
+                continue
+            normalized_entry_digests.append(str(entry["entry_digest"]))
+            source_artifact_digests_ordered.append(str(entry["source_artifact_digest"]))
+            state_transition_pairs.append(
+                {
+                    "transaction_id": entry["transaction_id"],
+                    "operation": entry["operation"],
+                    "engine_state_before_digest": entry["engine_state_before_digest"],
+                    "engine_state_after_digest": entry["engine_state_after_digest"],
+                }
+            )
+            if entry["operation"] in required:
+                covered_operations.append(str(entry["operation"]))
+
+        errors.extend(f"transaction_entries.{error}" for error in entry_errors)
+        missing_operations = [
+            operation for operation in required if operation not in covered_operations
+        ]
+        entry_order_bound = [
+            entry.get("transaction_index")
+            for entry in entries
+            if isinstance(entry, Mapping)
+        ] == list(range(1, len(entries) + 1))
+        redaction_complete = all(
+            isinstance(entry, Mapping)
+            and entry.get("payload_redacted") is True
+            and entry.get("raw_payload_stored") is False
+            for entry in entries
+        )
+        source_artifacts_bound = (
+            not missing_operations
+            and not entry_errors
+            and all(
+                not expected_digests
+                or not isinstance(entry, Mapping)
+                or entry.get("operation") not in expected_digests
+                or entry.get("source_artifact_digest")
+                == expected_digests[str(entry.get("operation"))]
+                for entry in entries
+            )
+        )
+        if receipt.get("covered_operations") != covered_operations:
+            errors.append("covered_operations must follow transaction entry order")
+        if receipt.get("missing_operations") != missing_operations:
+            errors.append("missing_operations must reflect required minus covered operations")
+        if receipt.get("duplicate_transaction_ids") != _dedupe_preserve_order(duplicate_transaction_ids):
+            errors.append("duplicate_transaction_ids must reflect duplicate entry ids")
+        if receipt.get("invalid_transaction_count") != invalid_transaction_count:
+            errors.append("invalid_transaction_count must reflect invalid entries")
+        if receipt.get("transaction_entry_count") != len(entries):
+            errors.append("transaction_entry_count must equal transaction_entries length")
+        if receipt.get("ordered_transaction_ids") != ordered_transaction_ids:
+            errors.append("ordered_transaction_ids must follow transaction order")
+        if receipt.get("ordered_entry_digests") != normalized_entry_digests:
+            errors.append("ordered_entry_digests must follow transaction order")
+        if receipt.get("transaction_set_digest") != sha256_text(canonical_json(normalized_entry_digests)):
+            errors.append("transaction_set_digest must bind ordered_entry_digests")
+        if receipt.get("source_artifact_digest_set_digest") != sha256_text(
+            canonical_json(source_artifact_digests_ordered)
+        ):
+            errors.append("source_artifact_digest_set_digest must bind source artifacts")
+        if receipt.get("engine_state_transition_digest") != sha256_text(
+            canonical_json(state_transition_pairs)
+        ):
+            errors.append("engine_state_transition_digest must bind state transition pairs")
+        if receipt.get("entry_order_bound") is not entry_order_bound:
+            errors.append("entry_order_bound must reflect transaction indices")
+        if receipt.get("source_artifacts_bound") is not source_artifacts_bound:
+            errors.append("source_artifacts_bound must reflect source digest checks")
+        if receipt.get("redaction_complete") is not redaction_complete:
+            errors.append("redaction_complete must reflect transaction redaction flags")
+        if receipt.get("state_transition_bound") is not bool(entries):
+            errors.append("state_transition_bound must reflect transaction presence")
+        complete = (
+            bool(entries)
+            and not missing_operations
+            and invalid_transaction_count == 0
+            and not duplicate_transaction_ids
+            and entry_order_bound
+            and source_artifacts_bound
+            and redaction_complete
+        )
+        expected_status = "complete" if complete else "incomplete"
+        if receipt.get("engine_binding_status") != expected_status:
+            errors.append("engine_binding_status must reflect transaction completeness")
+        expected_digest = sha256_text(canonical_json(_engine_transaction_log_digest_payload(receipt)))
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match engine transaction log payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "engine_binding_complete": complete,
+            "entry_order_bound": entry_order_bound,
+            "source_artifacts_bound": source_artifacts_bound,
+            "redaction_complete": redaction_complete,
+            "state_transition_bound": bool(entries),
+            "digest_bound": digest_bound,
+            "missing_operations": missing_operations,
+        }
+
+    @staticmethod
+    def _normalize_engine_required_operations(
+        required_operations: Sequence[str] | None,
+    ) -> List[str]:
+        if required_operations is None:
+            return [
+                "time_rate_escape_evidence",
+                "approval_collection_bound",
+                "approval_fanout_bound",
+                "physics_rules_apply",
+                "physics_rules_revert",
+            ]
+        required = _dedupe_preserve_order([str(item) for item in required_operations])
+        for operation in required:
+            if operation not in WMS_ENGINE_TRANSACTION_OPERATIONS:
+                raise ValueError("required_operations contains an unsupported operation")
+        return required
+
+    def _validate_engine_transaction_entry(
+        self,
+        entry: Mapping[str, Any],
+        *,
+        expected_index: int,
+        engine_session_ref: str,
+        source_artifact_digests: Mapping[str, str],
+    ) -> None:
+        if entry.get("kind") != "wms_engine_transaction_entry":
+            raise ValueError("kind must equal wms_engine_transaction_entry")
+        if entry.get("schema_version") != WMS_SCHEMA_VERSION:
+            raise ValueError(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if entry.get("entry_digest_profile") != WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE:
+            raise ValueError("entry_digest_profile mismatch")
+        if entry.get("transaction_index") != expected_index:
+            raise ValueError("transaction_index must follow transaction order")
+        for field_name in (
+            "transaction_id",
+            "operation",
+            "source_artifact_kind",
+            "source_artifact_ref",
+            "engine_session_ref",
+            "transaction_status",
+            "committed_at",
+        ):
+            self._normalize_non_empty_string(str(entry.get(field_name) or ""), field_name)
+        operation = str(entry["operation"])
+        if operation not in WMS_ENGINE_TRANSACTION_OPERATIONS:
+            raise ValueError("operation is not allowed")
+        if entry.get("engine_session_ref") != engine_session_ref:
+            raise ValueError("engine_session_ref must match transaction log")
+        if entry.get("transaction_status") != "committed":
+            raise ValueError("transaction_status must be committed")
+        if entry.get("payload_redacted") is not True:
+            raise ValueError("payload_redacted must be true")
+        if entry.get("raw_payload_stored") is not False:
+            raise ValueError("raw_payload_stored must be false")
+        participants = entry.get("participant_ids")
+        if not isinstance(participants, list) or not participants:
+            raise ValueError("participant_ids must be a non-empty list")
+        for participant in participants:
+            self._normalize_non_empty_string(str(participant), "participant_id")
+        for field_name in (
+            "source_artifact_digest",
+            "engine_state_before_digest",
+            "engine_state_after_digest",
+            "entry_digest",
+        ):
+            self._normalize_digest(entry.get(field_name), field_name)
+        if operation in source_artifact_digests:
+            expected_digest = source_artifact_digests[operation]
+            if entry.get("source_artifact_digest") != expected_digest:
+                raise ValueError("source_artifact_digest must match expected source artifact")
+        expected_entry_digest = sha256_text(
+            canonical_json(_engine_transaction_entry_digest_payload(entry))
+        )
+        if entry.get("entry_digest") != expected_entry_digest:
+            raise ValueError("entry_digest must bind transaction entry payload")
 
     def validate_state(self, state: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []

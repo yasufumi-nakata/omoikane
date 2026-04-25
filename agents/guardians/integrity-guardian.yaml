@@ -14,6 +14,7 @@ capabilities:
   - wms.time-rate-attestation-transport.attest
   - wms.distributed-approval-fanout.attest
   - wms.distributed-approval-fanout-retry.attest
+  - wms.engine-transaction-log.attest
   - wms.approval-collection-scaling.attest
   - wms.participant-approval-transport.attest
   - wms.physics-rules-revert.attest
@@ -35,6 +36,7 @@ when_to_invoke: |
   - WMS shared reality の requested time_rate deviation が participant subjective-time IMC attestation receipt set に束縛されていることを検証する時
   - WMS shared reality の complete approval collection が Federation distributed transport fan-out receipt に束縛されていることを検証する時
   - WMS shared reality の distributed approval fan-out partial outage が bounded retry receipt で recovered になっていることを検証する時
+  - WMS shared reality の source artifacts が external engine adapter の ordered committed transaction log receipt に raw payload 無しで束縛されていることを検証する時
   - WMS shared reality の participant approval collection が ordered digest set と bounded batch digest に束縛されていることを検証する時
   - WMS shared reality の physics_rules change 前に participant approval が IMC transport receipt に束縛されていることを検証する時
   - WMS shared reality の physics_rules change / revert receipt が unanimous approval と rollback token に束縛されていることを検証する時
