@@ -15,6 +15,7 @@ required:
   - quorum_profile
   - digest_profile
   - required_quorum_count
+  - required_jurisdiction_count
   - accepted_probe_count
   - accepted_authority_count
   - accepted_jurisdiction_count
@@ -28,8 +29,20 @@ required:
   - accepted_jurisdiction_set_digest
   - route_refs
   - route_ref_set_digest
+  - jurisdiction_policy_registry_refs
   - jurisdiction_policy_registry_digests
   - jurisdiction_policy_registry_set_digest
+  - threshold_policy_id
+  - threshold_profile
+  - threshold_digest_profile
+  - threshold_signature_digest_profile
+  - threshold_policy_ref
+  - threshold_policy_receipt
+  - threshold_policy_digest
+  - threshold_policy_signature_digest
+  - threshold_policy_source_bound
+  - threshold_policy_signature_bound
+  - raw_threshold_policy_payload_stored
   - authority_slo_snapshot_digests
   - authority_slo_snapshot_set_digest
   - network_response_digests
@@ -62,6 +75,9 @@ properties:
     type: string
     const: authority-slo-probe-quorum-digest-v1
   required_quorum_count:
+    type: integer
+    minimum: 2
+  required_jurisdiction_count:
     type: integer
     minimum: 2
   accepted_probe_count:
@@ -115,6 +131,13 @@ properties:
       minLength: 1
   route_ref_set_digest:
     $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
   jurisdiction_policy_registry_digests:
     type: array
     minItems: 2
@@ -122,6 +145,36 @@ properties:
       $ref: "#/$defs/sha256"
   jurisdiction_policy_registry_set_digest:
     $ref: "#/$defs/sha256"
+  threshold_policy_id:
+    type: string
+    const: signed-authority-slo-quorum-threshold-policy-v1
+  threshold_profile:
+    type: string
+    const: jurisdiction-policy-registry-slo-quorum-threshold-v1
+  threshold_digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-policy-digest-v1
+  threshold_signature_digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-policy-signature-digest-v1
+  threshold_policy_ref:
+    type: string
+    minLength: 1
+  threshold_policy_receipt:
+    $ref: "wms_authority_slo_quorum_threshold_policy_receipt.schema"
+  threshold_policy_digest:
+    $ref: "#/$defs/sha256"
+  threshold_policy_signature_digest:
+    $ref: "#/$defs/sha256"
+  threshold_policy_source_bound:
+    type: boolean
+    const: true
+  threshold_policy_signature_bound:
+    type: boolean
+    const: true
+  raw_threshold_policy_payload_stored:
+    type: boolean
+    const: false
   authority_slo_snapshot_digests:
     type: array
     minItems: 2

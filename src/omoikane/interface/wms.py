@@ -76,6 +76,18 @@ WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE = (
     "authority-slo-probe-quorum-digest-v1"
 )
 WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES = 2
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID = (
+    "signed-authority-slo-quorum-threshold-policy-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE = (
+    "jurisdiction-policy-registry-slo-quorum-threshold-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE = (
+    "authority-slo-quorum-threshold-policy-digest-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE = (
+    "authority-slo-quorum-threshold-policy-signature-digest-v1"
+)
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
     "registry-slo-derived-retry-schedule-v1"
 )
@@ -195,6 +207,12 @@ def _remote_authority_slo_probe_receipt_digest_payload(
 
 
 def _remote_authority_slo_probe_quorum_receipt_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _remote_authority_slo_quorum_threshold_policy_receipt_digest_payload(
     receipt: Mapping[str, Any],
 ) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
@@ -341,6 +359,10 @@ class WorldModelSync:
                 "remote_authority_slo_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE,
                 "remote_authority_slo_quorum_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE,
                 "remote_authority_slo_quorum_min_authorities": WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
+                "remote_authority_slo_quorum_threshold_policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+                "remote_authority_slo_quorum_threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+                "remote_authority_slo_quorum_threshold_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE,
+                "remote_authority_slo_quorum_threshold_signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
                 "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
@@ -1253,12 +1275,255 @@ class WorldModelSync:
             "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
         }
 
+    def build_authority_slo_quorum_threshold_policy_receipt(
+        self,
+        *,
+        policy_ref: str,
+        jurisdiction_policy_registry_refs: Sequence[str],
+        jurisdiction_policy_registry_digests: Sequence[str],
+        remote_jurisdictions: Sequence[str],
+        signer_key_ref: str,
+        required_authority_count: int = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
+        required_jurisdiction_count: int = 2,
+        effective_at: str | None = None,
+    ) -> Dict[str, Any]:
+        """Bind WMS SLO quorum thresholds to a signed registry policy digest."""
+
+        registry_refs = self._normalize_string_list(
+            jurisdiction_policy_registry_refs,
+            "jurisdiction_policy_registry_refs",
+        )
+        registry_digests = [
+            self._normalize_digest(digest, "jurisdiction_policy_registry_digests")
+            for digest in jurisdiction_policy_registry_digests
+        ]
+        if len(registry_refs) != len(registry_digests):
+            raise ValueError(
+                "jurisdiction_policy_registry_refs and digests must have equal length"
+            )
+        jurisdictions = self._normalize_string_list(
+            remote_jurisdictions,
+            "remote_jurisdictions",
+        )
+        required_authorities = int(required_authority_count)
+        required_jurisdictions = int(required_jurisdiction_count)
+        if required_authorities < WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES:
+            raise ValueError("required_authority_count must require at least two authorities")
+        if required_jurisdictions < 2:
+            raise ValueError("required_jurisdiction_count must require at least two jurisdictions")
+        if required_jurisdictions > len(jurisdictions):
+            raise ValueError(
+                "required_jurisdiction_count cannot exceed covered jurisdictions"
+            )
+        normalized_policy_ref = self._normalize_non_empty_string(
+            policy_ref,
+            "policy_ref",
+        )
+        normalized_signer_key_ref = self._normalize_non_empty_string(
+            signer_key_ref,
+            "signer_key_ref",
+        )
+        normalized_effective_at = effective_at or utc_now_iso()
+        registry_set_digest = sha256_text(canonical_json(registry_digests))
+        policy_body = {
+            "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+            "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+            "policy_ref": normalized_policy_ref,
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": registry_set_digest,
+            "remote_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+        }
+        policy_body_digest = sha256_text(canonical_json(policy_body))
+        signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+                    "signer_key_ref": normalized_signer_key_ref,
+                    "policy_body_digest": policy_body_digest,
+                }
+            )
+        )
+        receipt = {
+            "kind": "wms_authority_slo_quorum_threshold_policy_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "receipt_id": new_id("wms-slo-quorum-policy"),
+            "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+            "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+            "digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE,
+            "signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+            "policy_ref": normalized_policy_ref,
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": registry_set_digest,
+            "remote_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+            "signer_key_ref": normalized_signer_key_ref,
+            "policy_body_digest": policy_body_digest,
+            "policy_signature_digest": signature_digest,
+            "threshold_source_bound": True,
+            "signature_bound": True,
+            "raw_threshold_policy_payload_stored": False,
+            "effective_at": normalized_effective_at,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                _remote_authority_slo_quorum_threshold_policy_receipt_digest_payload(
+                    receipt
+                )
+            )
+        )
+        return receipt
+
+    def validate_authority_slo_quorum_threshold_policy_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_authority_slo_quorum_threshold_policy_receipt":
+            errors.append(
+                "kind must equal wms_authority_slo_quorum_threshold_policy_receipt"
+            )
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID:
+            errors.append("policy_id mismatch")
+        if receipt.get("threshold_profile") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE:
+            errors.append("threshold_profile mismatch")
+        if receipt.get("digest_profile") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if (
+            receipt.get("signature_digest_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+        ):
+            errors.append("signature_digest_profile mismatch")
+        for field_name in (
+            "receipt_id",
+            "policy_ref",
+            "signer_key_ref",
+            "effective_at",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        for field_name in (
+            "jurisdiction_policy_registry_set_digest",
+            "policy_body_digest",
+            "policy_signature_digest",
+            "digest",
+        ):
+            self._check_digest(receipt.get(field_name), field_name, errors)
+        registry_refs = receipt.get("jurisdiction_policy_registry_refs")
+        if not isinstance(registry_refs, list) or not registry_refs:
+            errors.append("jurisdiction_policy_registry_refs must be a non-empty list")
+            registry_refs = []
+        elif len(set(registry_refs)) != len(registry_refs):
+            errors.append("jurisdiction_policy_registry_refs must be unique")
+        registry_digests = receipt.get("jurisdiction_policy_registry_digests")
+        if not isinstance(registry_digests, list) or not registry_digests:
+            errors.append("jurisdiction_policy_registry_digests must be a non-empty list")
+            registry_digests = []
+        for digest in registry_digests:
+            self._check_digest(digest, "jurisdiction_policy_registry_digests", errors)
+        if len(registry_refs) != len(registry_digests):
+            errors.append(
+                "jurisdiction_policy_registry_refs and digests must have equal length"
+            )
+        jurisdictions = receipt.get("remote_jurisdictions")
+        if not isinstance(jurisdictions, list) or len(jurisdictions) < 2:
+            errors.append("remote_jurisdictions must contain at least two values")
+            jurisdictions = []
+        elif len(set(jurisdictions)) != len(jurisdictions):
+            errors.append("remote_jurisdictions must be unique")
+        required_authorities = receipt.get("required_authority_count")
+        if (
+            not isinstance(required_authorities, int)
+            or required_authorities < WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES
+        ):
+            errors.append("required_authority_count must require at least two authorities")
+            required_authorities = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES
+        required_jurisdictions = receipt.get("required_jurisdiction_count")
+        if not isinstance(required_jurisdictions, int) or required_jurisdictions < 2:
+            errors.append("required_jurisdiction_count must require at least two jurisdictions")
+            required_jurisdictions = 2
+        if isinstance(jurisdictions, list) and required_jurisdictions > len(jurisdictions):
+            errors.append(
+                "required_jurisdiction_count cannot exceed covered jurisdictions"
+            )
+
+        expected_registry_set_digest = sha256_text(canonical_json(registry_digests))
+        if receipt.get("jurisdiction_policy_registry_set_digest") != expected_registry_set_digest:
+            errors.append("jurisdiction_policy_registry_set_digest mismatch")
+        policy_body = {
+            "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+            "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+            "policy_ref": str(receipt.get("policy_ref", "")),
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": expected_registry_set_digest,
+            "remote_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+        }
+        expected_policy_body_digest = sha256_text(canonical_json(policy_body))
+        policy_body_bound = receipt.get("policy_body_digest") == expected_policy_body_digest
+        if not policy_body_bound:
+            errors.append("policy_body_digest must bind threshold policy fields")
+        expected_signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+                    "signer_key_ref": str(receipt.get("signer_key_ref", "")),
+                    "policy_body_digest": expected_policy_body_digest,
+                }
+            )
+        )
+        signature_bound = (
+            receipt.get("policy_signature_digest") == expected_signature_digest
+            and receipt.get("signature_bound") is True
+        )
+        if not signature_bound:
+            errors.append("policy_signature_digest must bind signer key and policy body")
+        threshold_source_bound = bool(
+            policy_body_bound
+            and signature_bound
+            and receipt.get("threshold_source_bound") is True
+            and receipt.get("raw_threshold_policy_payload_stored") is False
+        )
+        if not threshold_source_bound:
+            errors.append("threshold_source_bound must reflect signed registry policy")
+        if receipt.get("raw_threshold_policy_payload_stored") is not False:
+            errors.append("raw_threshold_policy_payload_stored must be false")
+        expected_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_quorum_threshold_policy_receipt_digest_payload(
+                    receipt
+                )
+            )
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match authority SLO quorum threshold policy")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "threshold_source_bound": threshold_source_bound,
+            "signature_bound": signature_bound,
+            "policy_body_bound": policy_body_bound,
+            "digest_bound": digest_bound,
+            "raw_policy_redacted": receipt.get("raw_threshold_policy_payload_stored") is False,
+        }
+
     def build_authority_slo_probe_quorum_receipt(
         self,
         authority_slo_probe_receipts: Sequence[Mapping[str, Any]],
         *,
         primary_probe_digest: str | None = None,
         required_quorum_count: int = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
+        threshold_policy_receipt: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         """Bind multiple live authority SLO probes into one digest-only quorum."""
 
@@ -1301,6 +1566,9 @@ class WorldModelSync:
         route_refs = _dedupe_preserve_order(
             [str(probe["route_ref"]) for probe in accepted_probes]
         )
+        jurisdiction_policy_registry_refs = _dedupe_preserve_order(
+            [str(probe["jurisdiction_policy_registry_ref"]) for probe in accepted_probes]
+        )
         jurisdiction_policy_registry_digests = [
             str(probe["jurisdiction_policy_registry_digest"]) for probe in accepted_probes
         ]
@@ -1310,8 +1578,55 @@ class WorldModelSync:
         network_response_digests = [
             str(probe["network_response_digest"]) for probe in accepted_probes
         ]
+        if threshold_policy_receipt is None:
+            threshold_policy = self.build_authority_slo_quorum_threshold_policy_receipt(
+                policy_ref="policy://wms-authority-slo-quorum/default-threshold/v1",
+                jurisdiction_policy_registry_refs=jurisdiction_policy_registry_refs,
+                jurisdiction_policy_registry_digests=jurisdiction_policy_registry_digests,
+                remote_jurisdictions=accepted_remote_jurisdictions,
+                signer_key_ref="key://reference-wms/slo-quorum-threshold-policy",
+                required_authority_count=normalized_required_count,
+                required_jurisdiction_count=2,
+            )
+        elif isinstance(threshold_policy_receipt, Mapping):
+            threshold_policy = deepcopy(threshold_policy_receipt)
+        else:
+            raise ValueError("threshold_policy_receipt must be a mapping")
+        threshold_policy_validation = (
+            self.validate_authority_slo_quorum_threshold_policy_receipt(
+                threshold_policy
+            )
+        )
+        if not threshold_policy_validation["ok"]:
+            raise ValueError("threshold_policy_receipt must validate")
+        threshold_required_authorities = int(
+            threshold_policy["required_authority_count"]
+        )
+        threshold_required_jurisdictions = int(
+            threshold_policy["required_jurisdiction_count"]
+        )
+        if threshold_required_authorities != normalized_required_count:
+            raise ValueError(
+                "required_quorum_count must match threshold policy authorities"
+            )
+        threshold_registry_refs = list(
+            threshold_policy["jurisdiction_policy_registry_refs"]
+        )
+        threshold_registry_digests = list(
+            threshold_policy["jurisdiction_policy_registry_digests"]
+        )
+        threshold_source_bound = bool(
+            threshold_policy_validation["threshold_source_bound"]
+            and threshold_policy_validation["signature_bound"]
+            and threshold_registry_refs == jurisdiction_policy_registry_refs
+            and threshold_registry_digests == jurisdiction_policy_registry_digests
+            and list(threshold_policy["remote_jurisdictions"])
+            == accepted_remote_jurisdictions
+        )
         multi_authority_bound = len(set(accepted_authority_refs)) >= normalized_required_count
-        multi_jurisdiction_bound = len(set(accepted_remote_jurisdictions)) >= 2
+        multi_jurisdiction_bound = (
+            len(set(accepted_remote_jurisdictions)) >= threshold_required_jurisdictions
+        )
         all_probes_live_bound = all(
             probe.get("network_probe_bound") is True
             and probe.get("raw_slo_payload_stored") is False
@@ -1323,6 +1638,7 @@ class WorldModelSync:
             and primary_probe_covered
             and multi_authority_bound
             and multi_jurisdiction_bound
+            and threshold_source_bound
         )
         receipt = {
             "kind": "wms_authority_slo_probe_quorum_receipt",
@@ -1332,6 +1648,7 @@ class WorldModelSync:
             "quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE,
             "digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE,
             "required_quorum_count": normalized_required_count,
+            "required_jurisdiction_count": threshold_required_jurisdictions,
             "accepted_probe_count": len(accepted_probes),
             "accepted_authority_count": len(set(accepted_authority_refs)),
             "accepted_jurisdiction_count": len(set(accepted_remote_jurisdictions)),
@@ -1351,10 +1668,26 @@ class WorldModelSync:
             ),
             "route_refs": route_refs,
             "route_ref_set_digest": sha256_text(canonical_json(route_refs)),
+            "jurisdiction_policy_registry_refs": jurisdiction_policy_registry_refs,
             "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
             "jurisdiction_policy_registry_set_digest": sha256_text(
                 canonical_json(jurisdiction_policy_registry_digests)
             ),
+            "threshold_policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+            "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+            "threshold_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE,
+            "threshold_signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+            "threshold_policy_ref": threshold_policy["policy_ref"],
+            "threshold_policy_receipt": threshold_policy,
+            "threshold_policy_digest": threshold_policy["digest"],
+            "threshold_policy_signature_digest": threshold_policy[
+                "policy_signature_digest"
+            ],
+            "threshold_policy_source_bound": threshold_source_bound,
+            "threshold_policy_signature_bound": threshold_policy_validation[
+                "signature_bound"
+            ],
+            "raw_threshold_policy_payload_stored": False,
             "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
             "authority_slo_snapshot_set_digest": sha256_text(
                 canonical_json(authority_slo_snapshot_digests)
@@ -1404,6 +1737,13 @@ class WorldModelSync:
         ):
             errors.append("required_quorum_count must require at least two authorities")
             required_quorum_count = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES
+        required_jurisdiction_count = receipt.get("required_jurisdiction_count")
+        if (
+            not isinstance(required_jurisdiction_count, int)
+            or required_jurisdiction_count < 2
+        ):
+            errors.append("required_jurisdiction_count must require at least two jurisdictions")
+            required_jurisdiction_count = 2
 
         probe_receipts = receipt.get("authority_slo_probe_receipts")
         if not isinstance(probe_receipts, list):
@@ -1413,6 +1753,7 @@ class WorldModelSync:
         accepted_authority_refs: List[str] = []
         accepted_remote_jurisdictions: List[str] = []
         route_refs: List[str] = []
+        jurisdiction_policy_registry_refs: List[str] = []
         jurisdiction_policy_registry_digests: List[str] = []
         authority_slo_snapshot_digests: List[str] = []
         network_response_digests: List[str] = []
@@ -1437,6 +1778,10 @@ class WorldModelSync:
                 accepted_remote_jurisdictions.append(str(probe["remote_jurisdiction"]))
             if isinstance(probe.get("route_ref"), str):
                 route_refs.append(str(probe["route_ref"]))
+            if isinstance(probe.get("jurisdiction_policy_registry_ref"), str):
+                jurisdiction_policy_registry_refs.append(
+                    str(probe["jurisdiction_policy_registry_ref"])
+                )
             if isinstance(probe.get("jurisdiction_policy_registry_digest"), str):
                 jurisdiction_policy_registry_digests.append(
                     str(probe["jurisdiction_policy_registry_digest"])
@@ -1452,6 +1797,7 @@ class WorldModelSync:
             probe_receipts_valid = False
         deduped_jurisdictions = _dedupe_preserve_order(accepted_remote_jurisdictions)
         deduped_routes = _dedupe_preserve_order(route_refs)
+        deduped_registry_refs = _dedupe_preserve_order(jurisdiction_policy_registry_refs)
         expected_probe_set_digest = sha256_text(canonical_json(accepted_probe_digests))
         expected_authority_set_digest = sha256_text(canonical_json(accepted_authority_refs))
         expected_jurisdiction_set_digest = sha256_text(canonical_json(deduped_jurisdictions))
@@ -1477,6 +1823,7 @@ class WorldModelSync:
             "accepted_jurisdiction_set_digest": expected_jurisdiction_set_digest,
             "route_refs": deduped_routes,
             "route_ref_set_digest": expected_route_set_digest,
+            "jurisdiction_policy_registry_refs": deduped_registry_refs,
             "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
             "jurisdiction_policy_registry_set_digest": expected_registry_set_digest,
             "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
@@ -1487,6 +1834,57 @@ class WorldModelSync:
         for field_name, expected_value in expected_values.items():
             if receipt.get(field_name) != expected_value:
                 errors.append(f"{field_name} must match live SLO probe quorum inputs")
+
+        threshold_policy = receipt.get("threshold_policy_receipt")
+        threshold_policy_validation = {
+            "ok": False,
+            "threshold_source_bound": False,
+            "signature_bound": False,
+        }
+        if not isinstance(threshold_policy, Mapping):
+            errors.append("threshold_policy_receipt must be an object")
+            threshold_policy = {}
+        else:
+            threshold_policy_validation = (
+                self.validate_authority_slo_quorum_threshold_policy_receipt(
+                    threshold_policy
+                )
+            )
+            if not threshold_policy_validation["ok"]:
+                errors.append("threshold_policy_receipt must validate")
+        threshold_expected_values = {
+            "threshold_policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
+            "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
+            "threshold_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE,
+            "threshold_signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+            "threshold_policy_ref": threshold_policy.get("policy_ref"),
+            "threshold_policy_digest": threshold_policy.get("digest"),
+            "threshold_policy_signature_digest": threshold_policy.get(
+                "policy_signature_digest"
+            ),
+        }
+        for field_name, expected_value in threshold_expected_values.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must match threshold policy receipt")
+        threshold_source_bound = bool(
+            threshold_policy_validation["threshold_source_bound"]
+            and threshold_policy_validation["signature_bound"]
+            and threshold_policy.get("required_authority_count") == required_quorum_count
+            and threshold_policy.get("required_jurisdiction_count")
+            == required_jurisdiction_count
+            and threshold_policy.get("jurisdiction_policy_registry_refs")
+            == deduped_registry_refs
+            and threshold_policy.get("jurisdiction_policy_registry_digests")
+            == jurisdiction_policy_registry_digests
+            and threshold_policy.get("remote_jurisdictions") == deduped_jurisdictions
+        )
+        threshold_signature_bound = bool(threshold_policy_validation["signature_bound"])
+        if receipt.get("threshold_policy_source_bound") is not threshold_source_bound:
+            errors.append("threshold_policy_source_bound must reflect signed threshold policy")
+        if receipt.get("threshold_policy_signature_bound") is not threshold_signature_bound:
+            errors.append("threshold_policy_signature_bound must reflect threshold signature")
+        if receipt.get("raw_threshold_policy_payload_stored") is not False:
+            errors.append("raw_threshold_policy_payload_stored must be false")
 
         all_probes_live_bound = bool(
             probe_receipts_valid
@@ -1501,7 +1899,9 @@ class WorldModelSync:
         multi_authority_bound = (
             len(set(accepted_authority_refs)) >= required_quorum_count
         )
-        multi_jurisdiction_bound = len(set(deduped_jurisdictions)) >= 2
+        multi_jurisdiction_bound = (
+            len(set(deduped_jurisdictions)) >= required_jurisdiction_count
+        )
         primary_probe_digest = receipt.get("primary_probe_digest")
         if not isinstance(primary_probe_digest, str) or len(primary_probe_digest) != 64:
             errors.append("primary_probe_digest must be a sha256 hex digest")
@@ -1513,12 +1913,15 @@ class WorldModelSync:
             and multi_authority_bound
             and multi_jurisdiction_bound
             and primary_probe_covered
+            and threshold_source_bound
         )
         bool_expectations = {
             "all_probes_live_bound": all_probes_live_bound,
             "multi_authority_bound": multi_authority_bound,
             "multi_jurisdiction_bound": multi_jurisdiction_bound,
             "primary_probe_covered": primary_probe_covered,
+            "threshold_policy_source_bound": threshold_source_bound,
+            "threshold_policy_signature_bound": threshold_signature_bound,
             "quorum_bound": quorum_bound,
         }
         for field_name, expected_value in bool_expectations.items():
@@ -1544,6 +1947,8 @@ class WorldModelSync:
             "multi_authority_bound": multi_authority_bound,
             "multi_jurisdiction_bound": multi_jurisdiction_bound,
             "primary_probe_covered": primary_probe_covered,
+            "threshold_policy_source_bound": threshold_source_bound,
+            "threshold_policy_signature_bound": threshold_signature_bound,
             "digest_bound": digest_bound,
             "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
         }

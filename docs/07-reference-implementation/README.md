@@ -912,6 +912,7 @@ remote authority route-health observation と
 authority SLO snapshot digest、`registry-slo-derived-retry-schedule-v1` の
 schedule derivation、`live-authority-slo-snapshot-probe-v1` の live HTTP SLO probe receipt、
 `multi-authority-slo-probe-quorum-v1` の 2 authority / 2 jurisdiction quorum receipt、
+`signed-authority-slo-quorum-threshold-policy-v1` の signed threshold policy receipt、
 `fixed-exponential-backoff-with-health-cap-v1` schedule entry へ束ね、
 engine transaction log の `approval_fanout_bound` entry と同じ fan-out digest を共有し、
 raw remote authority transcript を保存しないことを確認する。

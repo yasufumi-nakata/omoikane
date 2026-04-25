@@ -101,6 +101,9 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   その probe evidence はさらに `multi-authority-slo-probe-quorum-v1` により
   2 authority / 2 remote jurisdiction の live-bound quorum receipt へ束ね、
   primary retry SLO probe が quorum に含まれることを raw SLO payload 無しで検証する。
+  quorum threshold は `signed-authority-slo-quorum-threshold-policy-v1` の
+  signed jurisdiction policy registry receipt から取り込み、
+  reviewer 側の固定値だけでは `quorum_status=complete` にしない。
   さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、
@@ -116,7 +119,7 @@ wms.collect_distributed_approval_fanout(session_id, collection, transport_result
 wms.bind_engine_transaction_log(session_id, entries, engine_adapter_key_ref) → EngineTransactionLogReceipt
 wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
 wms.probe_remote_authority_slo_snapshot_endpoint(endpoint, route_health) → WMSAuthoritySLOProbeReceipt
-wms.build_authority_slo_probe_quorum(slo_probes, primary_probe_digest) → WMSAuthoritySLOProbeQuorumReceipt
+wms.build_authority_slo_probe_quorum(slo_probes, primary_probe_digest, threshold_policy_receipt) → WMSAuthoritySLOProbeQuorumReceipt
 wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health, slo_probes) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
@@ -143,6 +146,7 @@ wms.observe_violation(session_id) → ViolationReport
   `wms_engine_route_binding_receipt.schema` /
   `wms_engine_capture_binding_receipt.schema` /
   `wms_authority_slo_probe_quorum_receipt.schema` /
+  `wms_authority_slo_quorum_threshold_policy_receipt.schema` /
   `wms_remote_authority_retry_budget_receipt.schema` /
   `wms_time_rate_attestation_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
@@ -153,7 +157,8 @@ wms.observe_violation(session_id) → ViolationReport
   partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → engine transaction log →
   engine route binding → engine packet capture binding →
-  multi-authority SLO probe quorum → signed jurisdiction-aware remote authority retry budget →
+  signed threshold policy-bound multi-authority SLO probe quorum →
+  signed jurisdiction-aware remote authority retry budget →
   malicious veto → mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_time_rate_deviation_escape.yaml` /
@@ -180,7 +185,7 @@ wms.observe_violation(session_id) → ViolationReport
 - `evals/interface/wms_remote_authority_retry_budget.yaml` で recovered fan-out retry が
   signed jurisdiction-specific rate limit digest、authority signature digest、
   jurisdiction policy registry digest、authority SLO snapshot digest、
-  route-health observation、live SLO probe quorum、registry/SLO-derived fixed exponential
+  route-health observation、signed threshold policy-bound live SLO probe quorum、registry/SLO-derived fixed exponential
   backoff schedule、engine transaction log digest に束縛され、raw remote authority transcript を
   保存しないことを保証
 

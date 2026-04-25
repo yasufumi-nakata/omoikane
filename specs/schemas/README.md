@@ -153,6 +153,7 @@
 - `wms_approval_collection_receipt.schema`
 - `wms_authority_slo_probe_receipt.schema`
 - `wms_authority_slo_probe_quorum_receipt.schema`
+- `wms_authority_slo_quorum_threshold_policy_receipt.schema`
 - `wms_distributed_approval_fanout_receipt.schema`
 - `wms_engine_capture_binding_receipt.schema`
 - `wms_engine_transaction_log.schema`

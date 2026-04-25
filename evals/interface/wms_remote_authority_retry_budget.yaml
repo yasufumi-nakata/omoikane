@@ -44,6 +44,9 @@ expected:
   authority_slo_probe_count: 1
   authority_slo_probe_quorum_bound: true
   authority_slo_probe_quorum_count: 2
+  authority_slo_quorum_threshold_policy_bound: true
+  authority_slo_quorum_threshold_policy_id: signed-authority-slo-quorum-threshold-policy-v1
+  authority_slo_quorum_threshold_signature_bound: true
   registry_slo_schedule_bound: true
   authority_signature_bound: true
   signed_jurisdiction_retry_budget_bound: true

@@ -72,7 +72,8 @@ approval_fanout_bound entry に束縛し、raw remote transcript を保存しな
 
 ### WMS Authority SLO Probe Quorum
 primary retry SLO probe と backup authority / remote jurisdiction の live probe を
-multi-authority quorum receipt に束ね、raw SLO payload 無しで quorum を検証する。
+multi-authority quorum receipt に束ね、signed jurisdiction policy registry 由来の
+threshold policy receipt と raw SLO payload 無しで quorum を検証する。
 
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、

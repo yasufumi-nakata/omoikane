@@ -1024,11 +1024,40 @@ class WorldModelSyncTests(unittest.TestCase):
                 ],
                 request_timeout_ms=500,
             )
+        slo_quorum_threshold_policy = (
+            sync.build_authority_slo_quorum_threshold_policy_receipt(
+                policy_ref="policy://test/wms-authority-slo-quorum-threshold",
+                jurisdiction_policy_registry_refs=[
+                    route_health_observation["jurisdiction_policy_registry_ref"],
+                    backup_route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                ],
+                jurisdiction_policy_registry_digests=[
+                    jurisdiction_policy_registry_digest,
+                    backup_registry_digest,
+                ],
+                remote_jurisdictions=[
+                    route_health_observation["remote_jurisdiction"],
+                    backup_route_health_observation["remote_jurisdiction"],
+                ],
+                signer_key_ref="key://test/wms-slo-quorum-threshold-signer",
+                required_authority_count=2,
+                required_jurisdiction_count=2,
+                effective_at="2026-04-26T00:20:06Z",
+            )
+        )
         slo_quorum = sync.build_authority_slo_probe_quorum_receipt(
             [slo_probe, backup_slo_probe],
             primary_probe_digest=slo_probe["digest"],
+            threshold_policy_receipt=slo_quorum_threshold_policy,
         )
         slo_probe_validation = sync.validate_authority_slo_probe_receipt(slo_probe)
+        slo_quorum_threshold_policy_validation = (
+            sync.validate_authority_slo_quorum_threshold_policy_receipt(
+                slo_quorum_threshold_policy
+            )
+        )
         slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
             slo_quorum
         )
@@ -1089,6 +1118,13 @@ class WorldModelSyncTests(unittest.TestCase):
         tampered_slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
             tampered_slo_quorum
         )
+        tampered_threshold_policy = dict(slo_quorum_threshold_policy)
+        tampered_threshold_policy["required_authority_count"] = 3
+        tampered_threshold_policy_validation = (
+            sync.validate_authority_slo_quorum_threshold_policy_receipt(
+                tampered_threshold_policy
+            )
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["fanout_complete"])
@@ -1114,14 +1150,35 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(slo_probe["slo_endpoint_ref"].startswith("http://"))
         self.assertEqual(64, len(slo_probe["network_response_digest"]))
         self.assertFalse(slo_probe["raw_slo_payload_stored"])
+        self.assertTrue(slo_quorum_threshold_policy_validation["ok"])
+        self.assertTrue(
+            slo_quorum_threshold_policy_validation["threshold_source_bound"]
+        )
+        self.assertTrue(slo_quorum_threshold_policy_validation["signature_bound"])
+        self.assertEqual(2, slo_quorum_threshold_policy["required_authority_count"])
+        self.assertEqual(2, slo_quorum_threshold_policy["required_jurisdiction_count"])
+        self.assertFalse(
+            slo_quorum_threshold_policy["raw_threshold_policy_payload_stored"]
+        )
         self.assertTrue(slo_quorum_validation["ok"])
         self.assertTrue(slo_quorum_validation["quorum_bound"])
         self.assertTrue(slo_quorum_validation["multi_authority_bound"])
         self.assertTrue(slo_quorum_validation["multi_jurisdiction_bound"])
+        self.assertTrue(slo_quorum_validation["threshold_policy_source_bound"])
+        self.assertTrue(slo_quorum_validation["threshold_policy_signature_bound"])
         self.assertEqual(2, slo_quorum["accepted_probe_count"])
         self.assertEqual(2, slo_quorum["accepted_authority_count"])
         self.assertEqual(2, slo_quorum["accepted_jurisdiction_count"])
+        self.assertEqual(2, slo_quorum["required_jurisdiction_count"])
         self.assertEqual(slo_probe["digest"], slo_quorum["primary_probe_digest"])
+        self.assertEqual(
+            slo_quorum_threshold_policy["digest"],
+            slo_quorum["threshold_policy_digest"],
+        )
+        self.assertEqual(
+            slo_quorum_threshold_policy["policy_signature_digest"],
+            slo_quorum["threshold_policy_signature_digest"],
+        )
         self.assertEqual(
             [slo_probe["digest"], backup_slo_probe["digest"]],
             slo_quorum["accepted_probe_digests"],
@@ -1174,6 +1231,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_slo_probe_validation["authority_slo_live_probe_bound"])
         self.assertFalse(tampered_slo_quorum_validation["ok"])
         self.assertFalse(tampered_slo_quorum_validation["multi_jurisdiction_bound"])
+        self.assertFalse(tampered_threshold_policy_validation["ok"])
+        self.assertFalse(tampered_threshold_policy_validation["policy_body_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

@@ -9377,6 +9377,44 @@ json.dump(response, sys.stdout)
                     request_timeout_ms=500,
                 )
             )
+        remote_authority_slo_quorum_threshold_policy = (
+            self.wms.build_authority_slo_quorum_threshold_policy_receipt(
+                policy_ref="policy://wms-authority-slo-quorum/live-registry-threshold/v1",
+                jurisdiction_policy_registry_refs=[
+                    route_health_observation["jurisdiction_policy_registry_ref"],
+                    backup_route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                ],
+                jurisdiction_policy_registry_digests=[
+                    jurisdiction_policy_registry_digest,
+                    backup_jurisdiction_policy_registry_digest,
+                ],
+                remote_jurisdictions=[
+                    route_health_observation["remote_jurisdiction"],
+                    backup_route_health_observation["remote_jurisdiction"],
+                ],
+                signer_key_ref="key://wms-authority-slo-quorum/threshold-policy-signer",
+                required_authority_count=2,
+                required_jurisdiction_count=2,
+                effective_at="2026-04-26T00:10:06Z",
+            )
+        )
+        remote_authority_slo_quorum_threshold_policy_validation = (
+            self.wms.validate_authority_slo_quorum_threshold_policy_receipt(
+                remote_authority_slo_quorum_threshold_policy
+            )
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.remote_authority_slo_quorum_threshold_policy.bound",
+            payload=remote_authority_slo_quorum_threshold_policy,
+            actor="WorldModelSync",
+            category="interface-wms-approval",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
         remote_authority_slo_probe_quorum_receipt = (
             self.wms.build_authority_slo_probe_quorum_receipt(
                 [
@@ -9384,6 +9422,9 @@ json.dump(response, sys.stdout)
                     backup_authority_slo_probe_receipt,
                 ],
                 primary_probe_digest=remote_authority_slo_probe_receipt["digest"],
+                threshold_policy_receipt=(
+                    remote_authority_slo_quorum_threshold_policy
+                ),
             )
         )
         remote_authority_slo_probe_quorum_validation = (
@@ -9510,6 +9551,9 @@ json.dump(response, sys.stdout)
                 ),
                 "remote_authority_slo_probe_quorum_receipt": (
                     remote_authority_slo_probe_quorum_receipt
+                ),
+                "remote_authority_slo_quorum_threshold_policy": (
+                    remote_authority_slo_quorum_threshold_policy
                 ),
                 "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
@@ -9661,9 +9705,41 @@ json.dump(response, sys.stdout)
                         "raw_slo_payload_stored"
                     ]
                     is False
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "threshold_policy_digest"
+                    ]
+                    == remote_authority_slo_quorum_threshold_policy["digest"]
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "threshold_policy_source_bound"
+                    ]
+                    is True
+                ),
+                "remote_authority_slo_quorum_threshold_policy_bound": (
+                    remote_authority_slo_quorum_threshold_policy_validation["ok"]
+                    and remote_authority_slo_quorum_threshold_policy_validation[
+                        "threshold_source_bound"
+                    ]
+                    and remote_authority_slo_quorum_threshold_policy_validation[
+                        "signature_bound"
+                    ]
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "required_authority_count"
+                    ]
+                    == 2
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "required_jurisdiction_count"
+                    ]
+                    == 2
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "raw_threshold_policy_payload_stored"
+                    ]
+                    is False
                 ),
                 "remote_authority_slo_probe_quorum": (
                     remote_authority_slo_probe_quorum_validation
+                ),
+                "remote_authority_slo_quorum_threshold_policy": (
+                    remote_authority_slo_quorum_threshold_policy_validation
                 ),
                 "remote_authority_retry_budget_bound": (
                     remote_authority_retry_budget_validation["ok"]

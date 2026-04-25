@@ -132,6 +132,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/wms_authority_slo_probe_quorum_receipt.schema",
             result["scenarios"]["remote_authority_slo_probe_quorum_receipt"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema",
+            result["scenarios"]["remote_authority_slo_quorum_threshold_policy"],
+        )
         self.assertTrue(result["validation"]["physics_change_reversible"])
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
         self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
@@ -169,6 +173,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertTrue(result["validation"]["remote_authority_slo_probe_quorum_bound"])
+        self.assertTrue(
+            result["validation"][
+                "remote_authority_slo_quorum_threshold_policy_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 

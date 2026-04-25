@@ -1,0 +1,109 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema"
+title: WMSAuthoritySLOQuorumThresholdPolicyReceipt
+description: >
+  Digest-only receipt proving that a WMS authority SLO probe quorum threshold
+  came from a signed jurisdiction policy registry policy rather than from a
+  hard-coded reviewer-side constant.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - policy_id
+  - threshold_profile
+  - digest_profile
+  - signature_digest_profile
+  - policy_ref
+  - jurisdiction_policy_registry_refs
+  - jurisdiction_policy_registry_digests
+  - jurisdiction_policy_registry_set_digest
+  - remote_jurisdictions
+  - required_authority_count
+  - required_jurisdiction_count
+  - signer_key_ref
+  - policy_body_digest
+  - policy_signature_digest
+  - threshold_source_bound
+  - signature_bound
+  - raw_threshold_policy_payload_stored
+  - effective_at
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_authority_slo_quorum_threshold_policy_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^wms-slo-quorum-policy-[a-f0-9]{12}$"
+  policy_id:
+    type: string
+    const: signed-authority-slo-quorum-threshold-policy-v1
+  threshold_profile:
+    type: string
+    const: jurisdiction-policy-registry-slo-quorum-threshold-v1
+  digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-policy-digest-v1
+  signature_digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-policy-signature-digest-v1
+  policy_ref:
+    type: string
+    minLength: 1
+  jurisdiction_policy_registry_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  jurisdiction_policy_registry_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_set_digest:
+    $ref: "#/$defs/sha256"
+  remote_jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 2
+  required_authority_count:
+    type: integer
+    minimum: 2
+  required_jurisdiction_count:
+    type: integer
+    minimum: 2
+  signer_key_ref:
+    type: string
+    minLength: 1
+  policy_body_digest:
+    $ref: "#/$defs/sha256"
+  policy_signature_digest:
+    $ref: "#/$defs/sha256"
+  threshold_source_bound:
+    type: boolean
+    const: true
+  signature_bound:
+    type: boolean
+    const: true
+  raw_threshold_policy_payload_stored:
+    type: boolean
+    const: false
+  effective_at:
+    type: string
+    minLength: 1
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

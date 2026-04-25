@@ -924,6 +924,7 @@ entries:
     file: specs/schemas/wms_authority_slo_probe_quorum_receipt.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema
       - evals/interface/wms_authority_slo_probe_quorum.yaml
       - evals/interface/wms_remote_authority_retry_budget.yaml
       - docs/02-subsystems/interface/wms-spec.md
@@ -931,6 +932,18 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
     rationale: Required to bind WMS live authority SLO probes into a multi-authority and multi-jurisdiction digest-only quorum before reviewers accept the primary retry SLO probe as durable evidence.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_authority_slo_probe_quorum_receipt.schema
+      - evals/interface/wms_authority_slo_probe_quorum.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind WMS authority SLO quorum thresholds to signed jurisdiction policy registry evidence instead of hard-coded reviewer constants.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_remote_authority_retry_budget_receipt.schema

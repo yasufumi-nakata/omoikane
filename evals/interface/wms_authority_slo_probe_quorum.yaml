@@ -14,10 +14,17 @@ expected:
   policy_id: multi-authority-slo-probe-quorum-v1
   quorum_profile: multi-jurisdiction-authority-slo-quorum-v1
   digest_profile: authority-slo-probe-quorum-digest-v1
+  threshold_policy_id: signed-authority-slo-quorum-threshold-policy-v1
+  threshold_profile: jurisdiction-policy-registry-slo-quorum-threshold-v1
+  threshold_digest_profile: authority-slo-quorum-threshold-policy-digest-v1
+  threshold_signature_digest_profile: authority-slo-quorum-threshold-policy-signature-digest-v1
   required_quorum_count: 2
+  required_jurisdiction_count: 2
   accepted_probe_count: 2
   accepted_authority_count: 2
   accepted_jurisdiction_count: 2
+  threshold_policy_source_bound: true
+  threshold_policy_signature_bound: true
   multi_authority_bound: true
   multi_jurisdiction_bound: true
   all_probes_live_bound: true

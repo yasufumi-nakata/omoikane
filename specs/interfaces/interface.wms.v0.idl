@@ -16,6 +16,7 @@ imports:
   wms_engine_capture_binding_receipt: ../schemas/wms_engine_capture_binding_receipt.schema
   wms_authority_slo_probe_receipt: ../schemas/wms_authority_slo_probe_receipt.schema
   wms_authority_slo_probe_quorum_receipt: ../schemas/wms_authority_slo_probe_quorum_receipt.schema
+  wms_authority_slo_quorum_threshold_policy_receipt: ../schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema
   wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
@@ -343,12 +344,15 @@ operations:
             type: integer
             minimum: 2
             default: 2
+          threshold_policy_receipt:
+            schema_ref: wms_authority_slo_quorum_threshold_policy_receipt
     output:
       schema_ref: wms_authority_slo_probe_quorum_receipt
     guarantees:
       - quorum can complete only when at least two live-bound SLO probe receipts are accepted
       - accepted probes must cover at least two authority refs and two remote jurisdictions
       - primary_probe_digest must be one of the accepted live probe digests
+      - required_quorum_count and required_jurisdiction_count must be sourced from signed-authority-slo-quorum-threshold-policy-v1 registry policy evidence
       - quorum receipt must bind accepted probe, authority, jurisdiction, route, SLO snapshot, registry, and network response digest sets without storing raw SLO payloads
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.
