@@ -79,7 +79,7 @@ entries:
       - reference-runtime
       - docs/02-subsystems/kernel/identity-lifecycle.md
       - evals/identity-fidelity/identity_confirmation_profile.yaml
-    rationale: Required to serialize the multidimensional Ascending to Active identity confirmation profile with self-report and third-party witness quorum binding.
+    rationale: Required to serialize the multidimensional Ascending to Active identity confirmation profile with self-report, third-party witness quorum, and self-report/witness consistency binding.
   - priority: P1
     kind: schema
     file: specs/schemas/ethics_event.schema

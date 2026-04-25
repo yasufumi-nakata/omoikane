@@ -20,6 +20,7 @@ required:
   - self_report
   - third_party_witness_receipts
   - witness_quorum
+  - self_report_witness_consistency
   - result
   - active_transition_allowed
   - failure_action
@@ -208,6 +209,93 @@ properties:
       status:
         type: string
         enum: [met, missing]
+  self_report_witness_consistency:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - consistency_profile
+      - continuity_subject_ref
+      - continuity_subject_digest
+      - self_report_ref
+      - self_report_evidence_digest
+      - accepted_witness_evidence_digest_set
+      - accepted_witness_roles
+      - required_witness_roles
+      - self_report_score
+      - accepted_witness_mean_score
+      - max_score_delta
+      - observed_score_delta
+      - score_consistency_status
+      - role_binding_status
+      - status
+      - consistency_digest
+    properties:
+      policy_id:
+        type: string
+        const: identity-self-report-witness-consistency-v1
+      consistency_profile:
+        type: string
+        const: score-delta-and-role-bound-v1
+      continuity_subject_ref:
+        type: string
+        pattern: "^identity://.+/ascending-to-active$"
+      continuity_subject_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      self_report_ref:
+        type: string
+        minLength: 1
+      self_report_evidence_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      accepted_witness_evidence_digest_set:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      accepted_witness_roles:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      required_witness_roles:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          enum: [clinician, guardian]
+      self_report_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      accepted_witness_mean_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      max_score_delta:
+        type: number
+        const: 0.12
+      observed_score_delta:
+        type: number
+        minimum: 0
+        maximum: 1
+      score_consistency_status:
+        type: string
+        enum: [consistent, divergent]
+      role_binding_status:
+        type: string
+        enum: [bound, missing]
+      status:
+        type: string
+        enum: [bound, unbound]
+      consistency_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
   result:
     type: string
     enum: [passed, failed]
@@ -224,6 +312,7 @@ properties:
         - dimension-threshold-not-met
         - subjective-self-report-not-bound
         - third-party-witness-quorum-not-met
+        - self-report-witness-consistency-not-bound
         - aggregate-threshold-not-met
   confirmation_digest:
     type: string
@@ -297,6 +386,26 @@ examples:
       required_roles: [clinician, guardian]
       accepted_roles: [clinician, guardian]
       status: met
+    self_report_witness_consistency:
+      policy_id: identity-self-report-witness-consistency-v1
+      consistency_profile: score-delta-and-role-bound-v1
+      continuity_subject_ref: identity://id-0001/ascending-to-active
+      continuity_subject_digest: "9999999999999999999999999999999999999999999999999999999999999999"
+      self_report_ref: self-report://identity-confirmation-demo/v1
+      self_report_evidence_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      accepted_witness_evidence_digest_set:
+        - "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        - "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      accepted_witness_roles: [clinician, guardian]
+      required_witness_roles: [clinician, guardian]
+      self_report_score: 0.92
+      accepted_witness_mean_score: 0.89
+      max_score_delta: 0.12
+      observed_score_delta: 0.03
+      score_consistency_status: consistent
+      role_binding_status: bound
+      status: bound
+      consistency_digest: "9999999999999999999999999999999999999999999999999999999999999999"
     result: passed
     active_transition_allowed: true
     failure_action: none

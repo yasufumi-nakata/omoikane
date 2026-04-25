@@ -9,9 +9,11 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
 IDENTITY_CONFIRMATION_POLICY_ID = "multidimensional-identity-confirmation-v1"
+IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = "identity-self-report-witness-consistency-v1"
 IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD = 0.85
 IDENTITY_CONFIRMATION_WITNESS_QUORUM = 2
 IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES = ("clinician", "guardian")
+IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA = 0.12
 IDENTITY_CONFIRMATION_DIMENSION_THRESHOLDS = {
     "episodic_recall": 0.85,
     "self_model_alignment": 0.80,
@@ -310,10 +312,24 @@ class IdentityRegistry:
             normalized_self_report["status"] == "pass"
             and dimensions[2].evidence_digest == normalized_self_report["evidence_digest"]
         )
+        self_report_witness_consistency = self._build_self_report_witness_consistency(
+            identity_id=record.identity_id,
+            lineage_id=record.lineage_id,
+            consent_ref=normalized_consent_ref,
+            scheduler_stage_ref=normalized_scheduler_ref,
+            self_report=normalized_self_report,
+            accepted_witnesses=accepted_witnesses,
+            witness_quorum_met=witness_quorum_met,
+            third_party_score=third_party_score,
+        )
+        self_report_witness_consistency_bound = (
+            self_report_witness_consistency["status"] == "bound"
+        )
         active_transition_allowed = (
             all_dimensions_pass
             and subjective_self_report_bound
             and witness_quorum_met
+            and self_report_witness_consistency_bound
             and aggregate_score >= IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD
         )
         result = "passed" if active_transition_allowed else "failed"
@@ -324,6 +340,8 @@ class IdentityRegistry:
             failure_reasons.append("subjective-self-report-not-bound")
         if not witness_quorum_met:
             failure_reasons.append("third-party-witness-quorum-not-met")
+        if not self_report_witness_consistency_bound:
+            failure_reasons.append("self-report-witness-consistency-not-bound")
         if aggregate_score < IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD:
             failure_reasons.append("aggregate-threshold-not-met")
 
@@ -349,6 +367,7 @@ class IdentityRegistry:
                 "accepted_roles": accepted_roles,
                 "status": "met" if witness_quorum_met else "missing",
             },
+            "self_report_witness_consistency": self_report_witness_consistency,
             "result": result,
             "active_transition_allowed": active_transition_allowed,
             "failure_action": (
@@ -397,6 +416,8 @@ class IdentityRegistry:
         dimensions = profile.get("dimensions", [])
         witness_quorum = profile.get("witness_quorum", {})
         self_report = profile.get("self_report", {})
+        consistency = profile.get("self_report_witness_consistency", {})
+        witness_receipts = profile.get("third_party_witness_receipts", [])
         dimension_map = {
             item.get("dimension_id"): item
             for item in dimensions
@@ -414,6 +435,85 @@ class IdentityRegistry:
             and self_report.get("status") == "pass"
         )
         third_party_witness_quorum_met = witness_quorum.get("status") == "met"
+        accepted_witnesses = [
+            receipt
+            for receipt in witness_receipts
+            if isinstance(receipt, dict) and receipt.get("status") == "pass"
+        ]
+        accepted_witness_digests = sorted(
+            receipt.get("evidence_digest")
+            for receipt in accepted_witnesses
+            if isinstance(receipt.get("evidence_digest"), str)
+        )
+        accepted_witness_roles = sorted(
+            {
+                receipt.get("witness_role")
+                for receipt in accepted_witnesses
+                if isinstance(receipt.get("witness_role"), str)
+            }
+        )
+        accepted_witness_scores = [
+            float(receipt.get("alignment_score"))
+            for receipt in accepted_witnesses
+            if isinstance(receipt.get("alignment_score"), (int, float))
+            and not isinstance(receipt.get("alignment_score"), bool)
+        ]
+        accepted_witness_mean_score = (
+            round(sum(accepted_witness_scores) / len(accepted_witness_scores), 3)
+            if accepted_witness_scores
+            else 0.0
+        )
+        self_report_score = self_report.get("continuity_score")
+        if not isinstance(self_report_score, (int, float)) or isinstance(self_report_score, bool):
+            self_report_score = 0.0
+        else:
+            self_report_score = round(float(self_report_score), 3)
+        observed_score_delta = round(
+            abs(self_report_score - accepted_witness_mean_score),
+            3,
+        )
+        score_consistency_status = (
+            "consistent"
+            if observed_score_delta <= IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA
+            else "divergent"
+        )
+        role_binding_status = (
+            "bound" if third_party_witness_quorum_met else "missing"
+        )
+        consistency_core = (
+            {
+                key: value
+                for key, value in consistency.items()
+                if key != "consistency_digest"
+            }
+            if isinstance(consistency, dict)
+            else {}
+        )
+        consistency_digest_bound = (
+            isinstance(consistency, dict)
+            and consistency.get("consistency_digest")
+            == sha256_text(canonical_json(consistency_core))
+        )
+        self_report_witness_consistency_bound = (
+            isinstance(consistency, dict)
+            and consistency.get("policy_id") == IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID
+            and consistency.get("self_report_evidence_digest")
+            == self_report.get("evidence_digest")
+            and consistency.get("accepted_witness_evidence_digest_set")
+            == accepted_witness_digests
+            and consistency.get("accepted_witness_roles") == accepted_witness_roles
+            and consistency.get("required_witness_roles")
+            == list(IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES)
+            and consistency.get("self_report_score") == self_report_score
+            and consistency.get("accepted_witness_mean_score") == accepted_witness_mean_score
+            and consistency.get("max_score_delta")
+            == IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA
+            and consistency.get("observed_score_delta") == observed_score_delta
+            and consistency.get("score_consistency_status") == score_consistency_status
+            and consistency.get("role_binding_status") == role_binding_status
+            and consistency.get("status") == "bound"
+            and consistency_digest_bound
+        )
         aggregate_threshold_met = (
             profile.get("aggregate_score", 0)
             >= IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD
@@ -423,6 +523,7 @@ class IdentityRegistry:
             and all_required_dimensions_pass
             and subjective_self_report_bound
             and third_party_witness_quorum_met
+            and self_report_witness_consistency_bound
             and aggregate_threshold_met
             and profile.get("result") == "passed"
             and profile.get("active_transition_allowed") is True
@@ -443,6 +544,8 @@ class IdentityRegistry:
             "all_required_dimensions_pass": all_required_dimensions_pass,
             "subjective_self_report_bound": subjective_self_report_bound,
             "third_party_witness_quorum_met": third_party_witness_quorum_met,
+            "self_report_witness_consistency_bound": self_report_witness_consistency_bound,
+            "consistency_digest_bound": consistency_digest_bound,
             "aggregate_threshold_met": aggregate_threshold_met,
             "active_transition_allowed": active_transition_allowed,
             "confirmation_digest_bound": confirmation_digest_bound,
@@ -540,6 +643,76 @@ class IdentityRegistry:
             status="pass" if alignment_score >= threshold else "fail",
             evidence_digest=evidence_digest,
         )
+
+    @classmethod
+    def _build_self_report_witness_consistency(
+        cls,
+        *,
+        identity_id: str,
+        lineage_id: str,
+        consent_ref: str,
+        scheduler_stage_ref: str,
+        self_report: Dict[str, Any],
+        accepted_witnesses: List[IdentityWitnessReceipt],
+        witness_quorum_met: bool,
+        third_party_score: float,
+    ) -> Dict[str, Any]:
+        accepted_witness_digest_set = sorted(
+            receipt.evidence_digest for receipt in accepted_witnesses
+        )
+        accepted_witness_roles = sorted(
+            {receipt.witness_role for receipt in accepted_witnesses}
+        )
+        observed_score_delta = round(
+            abs(self_report["continuity_score"] - third_party_score),
+            3,
+        )
+        score_consistency_status = (
+            "consistent"
+            if observed_score_delta <= IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA
+            else "divergent"
+        )
+        role_binding_status = "bound" if witness_quorum_met else "missing"
+        status = (
+            "bound"
+            if self_report["status"] == "pass"
+            and witness_quorum_met
+            and score_consistency_status == "consistent"
+            else "unbound"
+        )
+        continuity_subject_ref = f"identity://{identity_id}/ascending-to-active"
+        consistency_core = {
+            "policy_id": IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID,
+            "consistency_profile": "score-delta-and-role-bound-v1",
+            "continuity_subject_ref": continuity_subject_ref,
+            "continuity_subject_digest": sha256_text(
+                canonical_json(
+                    {
+                        "identity_id": identity_id,
+                        "lineage_id": lineage_id,
+                        "transition": "ascending-to-active",
+                        "consent_ref": consent_ref,
+                        "scheduler_stage_ref": scheduler_stage_ref,
+                    }
+                )
+            ),
+            "self_report_ref": self_report["report_ref"],
+            "self_report_evidence_digest": self_report["evidence_digest"],
+            "accepted_witness_evidence_digest_set": accepted_witness_digest_set,
+            "accepted_witness_roles": accepted_witness_roles,
+            "required_witness_roles": list(IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES),
+            "self_report_score": self_report["continuity_score"],
+            "accepted_witness_mean_score": third_party_score,
+            "max_score_delta": IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA,
+            "observed_score_delta": observed_score_delta,
+            "score_consistency_status": score_consistency_status,
+            "role_binding_status": role_binding_status,
+            "status": status,
+        }
+        return {
+            **consistency_core,
+            "consistency_digest": sha256_text(canonical_json(consistency_core)),
+        }
 
     @classmethod
     def _build_confirmation_dimension(

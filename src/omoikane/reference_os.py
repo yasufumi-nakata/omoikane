@@ -14311,6 +14311,12 @@ json.dump(response, sys.stdout)
                 "active_transition_allowed": profile["active_transition_allowed"],
                 "aggregate_score": profile["aggregate_score"],
                 "witness_quorum_status": profile["witness_quorum"]["status"],
+                "self_report_witness_consistency_status": profile[
+                    "self_report_witness_consistency"
+                ]["status"],
+                "self_report_witness_consistency_digest": profile[
+                    "self_report_witness_consistency"
+                ]["consistency_digest"],
             },
             actor="IdentityRegistry",
             category="identity-fidelity",
@@ -14354,6 +14360,9 @@ json.dump(response, sys.stdout)
                 "required_dimensions": profile["required_dimensions"],
                 "aggregate_threshold": profile["aggregate_threshold"],
                 "witness_quorum": profile["witness_quorum"],
+                "self_report_witness_consistency_policy": profile[
+                    "self_report_witness_consistency"
+                ]["policy_id"],
                 "failure_action": "failed-ascension-or-repeat-ascending",
             },
             "confirmation_profile": profile,
@@ -14373,6 +14382,8 @@ json.dump(response, sys.stdout)
                 "ledger_event_bound": (
                     ledger_event.payload["confirmation_digest"]
                     == profile["confirmation_digest"]
+                    and ledger_event.payload["self_report_witness_consistency_digest"]
+                    == profile["self_report_witness_consistency"]["consistency_digest"]
                 ),
             },
             "ledger_profile": self.ledger.profile(),

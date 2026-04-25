@@ -17,6 +17,7 @@ when_to_invoke: |
   - Fork / Terminate 提案時
   - Identity Confirmation Test 失敗時
   - Active 遷移前の identity_confirmation_profile witness quorum 確認時
+  - Active 遷移前の self-report / accepted witness consistency digest が同一 continuity subject に束縛されているか確認する時
   - cognitive audit follow-up が JP-13 / US-CA など複数法域 reviewer quorum を満たすか確認する時
   - cognitive audit follow-up の reviewer verifier-network receipt が authenticated non-loopback authority route trace に束縛されているか確認する時
 when_not_to_invoke: |

@@ -580,7 +580,21 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["subjective_self_report_bound"])
         self.assertTrue(validation["third_party_witness_quorum_met"])
+        self.assertTrue(validation["self_report_witness_consistency_bound"])
+        self.assertTrue(validation["consistency_digest_bound"])
         self.assertTrue(validation["confirmation_digest_bound"])
+        self.assertEqual(
+            "identity-self-report-witness-consistency-v1",
+            profile["self_report_witness_consistency"]["policy_id"],
+        )
+        self.assertEqual(
+            "bound",
+            profile["self_report_witness_consistency"]["status"],
+        )
+        self.assertLessEqual(
+            profile["self_report_witness_consistency"]["observed_score_delta"],
+            profile["self_report_witness_consistency"]["max_score_delta"],
+        )
 
         blocked = registry.confirm_identity(
             identity.identity_id,
@@ -613,6 +627,60 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(blocked_validation["confirmation_digest_bound"])
         self.assertIn("subjective-self-report-not-bound", blocked["failure_reasons"])
         self.assertIn("third-party-witness-quorum-not-met", blocked["failure_reasons"])
+        self.assertIn(
+            "self-report-witness-consistency-not-bound",
+            blocked["failure_reasons"],
+        )
+
+    def test_identity_confirmation_blocks_divergent_self_report_witness_consistency(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-confirmation-consistency")
+
+        profile = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-consistency",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-consistency",
+            episodic_recall_ref="episodic://identity-confirmation-consistency/recall",
+            self_model_ref="self-model://identity-confirmation-consistency/stable",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-consistency/high",
+                "statement": "I strongly confirm continuity with the pre-upload self.",
+                "continuity_score": 0.99,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation-consistency/clinician",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation-consistency/recall",
+                    "alignment_score": 0.8,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation-consistency/guardian",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation-consistency/self-model",
+                    "alignment_score": 0.8,
+                },
+            ],
+        )
+
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+
+        self.assertEqual("failed", profile["result"])
+        self.assertFalse(profile["active_transition_allowed"])
+        self.assertTrue(validation["all_required_dimensions_pass"])
+        self.assertTrue(validation["subjective_self_report_bound"])
+        self.assertTrue(validation["third_party_witness_quorum_met"])
+        self.assertFalse(validation["self_report_witness_consistency_bound"])
+        self.assertEqual(
+            "divergent",
+            profile["self_report_witness_consistency"]["score_consistency_status"],
+        )
+        self.assertIn(
+            "self-report-witness-consistency-not-bound",
+            profile["failure_reasons"],
+        )
 
     def test_termination_gate_completes_and_releases_allocation(self) -> None:
         registry = IdentityRegistry()

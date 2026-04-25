@@ -93,6 +93,9 @@ operations:
       schema_ref: identity_record
   confirm_active_transition:
     summary: Evaluate the Ascending to Active identity confirmation profile before activation.
+    policy_refs:
+      - multidimensional-identity-confirmation-v1
+      - identity-self-report-witness-consistency-v1
     input:
       inline_schema:
         type: object
@@ -195,3 +198,4 @@ compatibility:
     - council-initiated pause requires council_resolution_ref, while resume requires explicit self_proof.
     - pause_state preserves the most recent pause/resume cycle as machine-readable audit metadata.
     - confirm_active_transition uses a fixed multidimensional profile with episodic recall, self-model alignment, subjective self-report, and third-party witness quorum.
+    - active transition also requires identity-self-report-witness-consistency-v1, which binds the self-report evidence digest, accepted witness digest set, required roles, and bounded score delta to the same continuity subject.

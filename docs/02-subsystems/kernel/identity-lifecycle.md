@@ -57,7 +57,9 @@
   third-party witness alignment を同一 profile へ束ねる
 - Active 遷移は 4 dimension 全 pass、aggregate score `>=0.85`、
   subjective self-report digest binding、clinician + guardian の witness quorum
-  が揃った場合のみ許可する
+  に加えて、`identity-self-report-witness-consistency-v1` が同じ continuity subject 上で
+  self-report evidence digest、accepted witness digest set、required roles、
+  score delta `<=0.12` を束縛した場合のみ許可する
 - 失敗時は `active_transition_allowed=false` と
   `failure_action=failed-ascension-or-repeat-ascending` を返し、Active へ進めない
 
@@ -75,7 +77,8 @@ Ascending → Active への遷移時に必ず実施：
 reference runtime ではこの確認を `identity_confirmation_profile.schema` で
 machine-readable に固定する。生の主観報告文や第三者観察本文は保持せず、
 `self_report.statement_digest`、各 dimension の `evidence_digest`、
-`confirmation_digest` を ContinuityLedger の `identity-fidelity` event へ束縛する。
+`self_report_witness_consistency.consistency_digest`、`confirmation_digest` を
+ContinuityLedger の `identity-fidelity` event へ束縛する。
 
 ## Fork（複製）の特殊性
 

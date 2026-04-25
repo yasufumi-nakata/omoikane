@@ -4,7 +4,7 @@ level: L1
 description: >
   Ascending から Active へ進める前に、episodic recall、SelfModel alignment、
   subjective self-report、third-party witness alignment を同じ digest-bound
-  profile に束ね、全 dimension と witness quorum が pass した場合だけ
+  profile に束ね、全 dimension、witness quorum、self-report / witness consistency が pass した場合だけ
   active_transition_allowed=true になること。
 fixtures:
   - scenario: multidimensional_profile_passes
@@ -18,6 +18,7 @@ fixtures:
         - subjective_self_report
         - third_party_witness_alignment
       witness_quorum_status: met
+      self_report_witness_consistency_status: bound
   - scenario: low_self_report_and_missing_witness_fail_closed
     expected:
       result: failed
@@ -25,10 +26,20 @@ fixtures:
       failure_reasons:
         - subjective-self-report-not-bound
         - third-party-witness-quorum-not-met
+        - self-report-witness-consistency-not-bound
+  - scenario: divergent_self_report_and_witness_scores_fail_closed
+    profile_id: identity-self-report-witness-consistency-v1
+    expected:
+      result: failed
+      active_transition_allowed: false
+      score_consistency_status: divergent
+      failure_reasons:
+        - self-report-witness-consistency-not-bound
 assertions:
   - Every confirmation profile must include exactly the four required dimensions.
   - Subjective self-report must be digest-bound to the subjective_self_report dimension.
   - Third-party witness alignment must meet a clinician + guardian quorum of two accepted receipts.
+  - Self-report / witness consistency must bind the same self-report evidence digest, accepted witness digest set, required roles, and score delta <= 0.12 to the continuity subject.
   - The confirmation_digest must cover the profile core excluding only confirmation_id, confirmed_at, and confirmation_digest.
   - Failed profiles must return failed-ascension-or-repeat-ascending instead of allowing Active transition.
 metric: exact-match

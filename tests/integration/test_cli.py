@@ -1066,6 +1066,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["subjective_self_report_bound"])
         self.assertTrue(result["validation"]["third_party_witness_quorum_met"])
+        self.assertTrue(result["validation"]["self_report_witness_consistency_bound"])
+        self.assertTrue(result["validation"]["consistency_digest_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
         self.assertEqual(
             "multidimensional-identity-confirmation-v1",
@@ -1073,6 +1075,10 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("passed", result["confirmation_profile"]["result"])
         self.assertEqual("met", result["confirmation_profile"]["witness_quorum"]["status"])
+        self.assertEqual(
+            "identity-self-report-witness-consistency-v1",
+            result["confirmation_profile"]["self_report_witness_consistency"]["policy_id"],
+        )
         self.assertEqual("failed", result["blocked_profile"]["result"])
 
     def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:

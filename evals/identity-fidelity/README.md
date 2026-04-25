@@ -19,7 +19,9 @@ self pause roundtrip と対応し、最新 pause cycle の audit metadata が
 `identity_confirmation_profile.yaml` は `identity-confirmation-demo` の
 multidimensional confirmation profile と対応し、episodic recall / SelfModel /
 subjective self-report / third-party witness quorum が揃った時だけ
-Active 遷移を許可することを保護する。
+Active 遷移を許可することに加えて、self-report と accepted witness set が
+`identity-self-report-witness-consistency-v1` の score delta / role binding に
+収まることを保護する。
 
 ## 評価項目（暫定）
 
