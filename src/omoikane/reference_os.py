@@ -8999,6 +8999,147 @@ json.dump(response, sys.stdout)
                 )
             )
 
+        backup_route_health_observation = {
+            "observation_ref": (
+                "route-health://heritage/wms-approval/"
+                f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
+            ),
+            "authority_ref": "authority://heritage/wms-approval",
+            "route_ref": (
+                "route://heritage/wms-approval/observer/"
+                f"{approval_subject['digest'][:12]}"
+            ),
+            "participant_id": observer.identity_id,
+            "outage_kind": "timeout",
+            "route_status": "recovered",
+            "remote_jurisdiction": "US-CA",
+            "jurisdiction_policy_registry_ref": (
+                "policy-registry://us-ca/wms-authority-retry/v1"
+            ),
+            "jurisdiction_rate_limit_ref": (
+                "rate-limit://us-ca/wms-approval-retry-budget/v1"
+            ),
+            "jurisdiction_retry_limit_ms": 750,
+            "authority_slo_snapshot_ref": (
+                "authority-slo://heritage/wms-approval/observer-timeout/v1"
+            ),
+            "authority_slo_retry_limit_ms": 750,
+            "signer_key_ref": "key://heritage/us-ca/wms-retry-signer",
+            "observed_latency_ms": 420,
+            "success_ratio": 0.91,
+            "consecutive_failures": 0,
+        }
+        backup_jurisdiction_policy_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_policy_id": "registry-bound-authority-retry-slo-v1",
+                    "registry_profile": "jurisdiction-policy-registry-bound-retry-v1",
+                    "jurisdiction_policy_registry_ref": (
+                        backup_route_health_observation[
+                            "jurisdiction_policy_registry_ref"
+                        ]
+                    ),
+                    "remote_jurisdiction": backup_route_health_observation[
+                        "remote_jurisdiction"
+                    ],
+                    "jurisdiction_rate_limit_ref": backup_route_health_observation[
+                        "jurisdiction_rate_limit_ref"
+                    ],
+                    "jurisdiction_retry_limit_ms": backup_route_health_observation[
+                        "jurisdiction_retry_limit_ms"
+                    ],
+                    "signer_key_ref": backup_route_health_observation["signer_key_ref"],
+                }
+            )
+        )
+        backup_live_slo_payload = {
+            "checked_at": "2026-04-26T00:10:05Z",
+            "authority_ref": backup_route_health_observation["authority_ref"],
+            "route_ref": backup_route_health_observation["route_ref"],
+            "route_status": backup_route_health_observation["route_status"],
+            "remote_jurisdiction": backup_route_health_observation[
+                "remote_jurisdiction"
+            ],
+            "jurisdiction_policy_registry_ref": backup_route_health_observation[
+                "jurisdiction_policy_registry_ref"
+            ],
+            "jurisdiction_policy_registry_digest": (
+                backup_jurisdiction_policy_registry_digest
+            ),
+            "authority_slo_snapshot_profile": "authority-slo-snapshot-retry-window-v1",
+            "authority_slo_snapshot_ref": backup_route_health_observation[
+                "authority_slo_snapshot_ref"
+            ],
+            "authority_slo_retry_limit_ms": backup_route_health_observation[
+                "authority_slo_retry_limit_ms"
+            ],
+            "observed_latency_ms": backup_route_health_observation[
+                "observed_latency_ms"
+            ],
+            "success_ratio": backup_route_health_observation["success_ratio"],
+            "consecutive_failures": backup_route_health_observation[
+                "consecutive_failures"
+            ],
+        }
+        with live_authority_slo_bridge(
+            backup_live_slo_payload
+        ) as backup_authority_slo_endpoint:
+            backup_authority_slo_probe_receipt = (
+                self.wms.probe_remote_authority_slo_snapshot_endpoint(
+                    slo_endpoint=backup_authority_slo_endpoint,
+                    authority_ref=backup_route_health_observation["authority_ref"],
+                    route_ref=backup_route_health_observation["route_ref"],
+                    route_status=backup_route_health_observation["route_status"],
+                    remote_jurisdiction=backup_route_health_observation[
+                        "remote_jurisdiction"
+                    ],
+                    jurisdiction_policy_registry_ref=backup_route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                    jurisdiction_policy_registry_digest=(
+                        backup_jurisdiction_policy_registry_digest
+                    ),
+                    authority_slo_snapshot_ref=backup_route_health_observation[
+                        "authority_slo_snapshot_ref"
+                    ],
+                    authority_slo_retry_limit_ms=backup_route_health_observation[
+                        "authority_slo_retry_limit_ms"
+                    ],
+                    observed_latency_ms=backup_route_health_observation[
+                        "observed_latency_ms"
+                    ],
+                    success_ratio=backup_route_health_observation["success_ratio"],
+                    consecutive_failures=backup_route_health_observation[
+                        "consecutive_failures"
+                    ],
+                    request_timeout_ms=500,
+                )
+            )
+        remote_authority_slo_probe_quorum_receipt = (
+            self.wms.build_authority_slo_probe_quorum_receipt(
+                [
+                    remote_authority_slo_probe_receipt,
+                    backup_authority_slo_probe_receipt,
+                ],
+                primary_probe_digest=remote_authority_slo_probe_receipt["digest"],
+            )
+        )
+        remote_authority_slo_probe_quorum_validation = (
+            self.wms.validate_authority_slo_probe_quorum_receipt(
+                remote_authority_slo_probe_quorum_receipt
+            )
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.remote_authority_slo_probe_quorum.bound",
+            payload=remote_authority_slo_probe_quorum_receipt,
+            actor="WorldModelSync",
+            category="interface-wms-approval",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         remote_authority_retry_budget = self.wms.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref=(
@@ -9102,6 +9243,12 @@ json.dump(response, sys.stdout)
                 "engine_privileged_capture_acquisition": engine_privileged_capture_acquisition,
                 "engine_capture_binding": engine_capture_binding,
                 "remote_authority_slo_probe_receipt": remote_authority_slo_probe_receipt,
+                "remote_authority_slo_backup_probe_receipt": (
+                    backup_authority_slo_probe_receipt
+                ),
+                "remote_authority_slo_probe_quorum_receipt": (
+                    remote_authority_slo_probe_quorum_receipt
+                ),
                 "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
@@ -9231,6 +9378,31 @@ json.dump(response, sys.stdout)
                     and engine_capture_binding["raw_packet_body_stored"] is False
                 ),
                 "engine_capture_binding": engine_capture_binding_validation,
+                "remote_authority_slo_probe_quorum_bound": (
+                    remote_authority_slo_probe_quorum_validation["ok"]
+                    and remote_authority_slo_probe_quorum_validation["quorum_bound"]
+                    and remote_authority_slo_probe_quorum_validation[
+                        "multi_authority_bound"
+                    ]
+                    and remote_authority_slo_probe_quorum_validation[
+                        "multi_jurisdiction_bound"
+                    ]
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "primary_probe_digest"
+                    ]
+                    == remote_authority_slo_probe_receipt["digest"]
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "accepted_probe_count"
+                    ]
+                    == 2
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "raw_slo_payload_stored"
+                    ]
+                    is False
+                ),
+                "remote_authority_slo_probe_quorum": (
+                    remote_authority_slo_probe_quorum_validation
+                ),
                 "remote_authority_retry_budget_bound": (
                     remote_authority_retry_budget_validation["ok"]
                     and remote_authority_retry_budget_validation[

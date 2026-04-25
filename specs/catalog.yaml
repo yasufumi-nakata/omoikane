@@ -921,6 +921,18 @@ entries:
     rationale: Required to bind WMS remote authority retry SLO windows to live HTTP endpoint probes and digest-only SLO snapshot receipts before retry scheduling accepts recovered fan-out outages.
   - priority: P1
     kind: schema
+    file: specs/schemas/wms_authority_slo_probe_quorum_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_authority_slo_probe_quorum.yaml
+      - evals/interface/wms_remote_authority_retry_budget.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind WMS live authority SLO probes into a multi-authority and multi-jurisdiction digest-only quorum before reviewers accept the primary retry SLO probe as durable evidence.
+  - priority: P1
+    kind: schema
     file: specs/schemas/wms_remote_authority_retry_budget_receipt.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl
@@ -1352,6 +1364,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects signed jurisdiction-aware remote authority retry budget receipts for recovered WMS fan-out outages with fixed exponential backoff and no raw remote transcript retention.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_authority_slo_probe_quorum.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects WMS authority SLO evidence by requiring the primary live SLO probe to be covered by a multi-authority and multi-jurisdiction digest-only quorum receipt.
   - priority: P1
     kind: eval
     file: evals/interface/wms_participant_approval_transport.yaml

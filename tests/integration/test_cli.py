@@ -225,6 +225,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
         self.assertTrue(result["validation"]["engine_route_binding_bound"])
         self.assertTrue(result["validation"]["engine_capture_binding_bound"])
+        self.assertTrue(result["validation"]["remote_authority_slo_probe_quorum_bound"])
         self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
@@ -285,6 +286,24 @@ class CliIntegrationTests(unittest.TestCase):
             result["scenarios"]["remote_authority_slo_probe_receipt"][
                 "network_probe_bound"
             ]
+        )
+        self.assertEqual(
+            "complete",
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "quorum_status"
+            ],
+        )
+        self.assertEqual(
+            2,
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "accepted_authority_count"
+            ],
+        )
+        self.assertEqual(
+            result["scenarios"]["remote_authority_slo_probe_receipt"]["digest"],
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "primary_probe_digest"
+            ],
         )
         self.assertFalse(
             result["scenarios"]["remote_authority_retry_budget"]["raw_remote_transcript_stored"]

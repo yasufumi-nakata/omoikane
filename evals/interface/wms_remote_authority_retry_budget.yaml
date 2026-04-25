@@ -42,6 +42,8 @@ expected:
   authority_slo_snapshot_bound: true
   authority_slo_live_probe_bound: true
   authority_slo_probe_count: 1
+  authority_slo_probe_quorum_bound: true
+  authority_slo_probe_quorum_count: 2
   registry_slo_schedule_bound: true
   authority_signature_bound: true
   signed_jurisdiction_retry_budget_bound: true

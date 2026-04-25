@@ -70,6 +70,10 @@ recovered fan-out retry を remote authority route-health observation、
 live authority SLO snapshot probe、fixed exponential backoff schedule、engine transaction log の
 approval_fanout_bound entry に束縛し、raw remote transcript を保存しないことを確認する。
 
+### WMS Authority SLO Probe Quorum
+primary retry SLO probe と backup authority / remote jurisdiction の live probe を
+multi-authority quorum receipt に束ね、raw SLO payload 無しで quorum を検証する。
+
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
@@ -83,6 +87,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `sensory_loopback_guard.yaml`
 - `sensory_loopback_multi_self_arbitration.yaml`
 - `wms_approval_collection_scaling.yaml`
+- `wms_authority_slo_probe_quorum.yaml`
 - `wms_distributed_approval_fanout.yaml`
 - `wms_distributed_approval_fanout_retry.yaml`
 - `wms_engine_capture_binding.yaml`

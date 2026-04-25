@@ -68,6 +68,14 @@ WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE = (
     "live-http-json-authority-slo-snapshot-v1"
 )
 WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS = 250.0
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID = "multi-authority-slo-probe-quorum-v1"
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE = (
+    "multi-jurisdiction-authority-slo-quorum-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE = (
+    "authority-slo-probe-quorum-digest-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES = 2
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
     "registry-slo-derived-retry-schedule-v1"
 )
@@ -181,6 +189,12 @@ def _remote_authority_retry_budget_digest_payload(
 
 
 def _remote_authority_slo_probe_receipt_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _remote_authority_slo_probe_quorum_receipt_digest_payload(
     receipt: Mapping[str, Any],
 ) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
@@ -323,6 +337,10 @@ class WorldModelSync:
                 "remote_authority_slo_probe_policy_id": WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID,
                 "remote_authority_slo_probe_digest_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE,
                 "remote_authority_slo_probe_transport_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE,
+                "remote_authority_slo_quorum_policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID,
+                "remote_authority_slo_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE,
+                "remote_authority_slo_quorum_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE,
+                "remote_authority_slo_quorum_min_authorities": WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
                 "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
@@ -1231,6 +1249,301 @@ class WorldModelSync:
             "authority_slo_live_probe_bound": authority_slo_live_probe_bound,
             "network_probe_bound": network_probe_bound,
             "slo_snapshot_bound": slo_snapshot_bound,
+            "digest_bound": digest_bound,
+            "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
+        }
+
+    def build_authority_slo_probe_quorum_receipt(
+        self,
+        authority_slo_probe_receipts: Sequence[Mapping[str, Any]],
+        *,
+        primary_probe_digest: str | None = None,
+        required_quorum_count: int = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
+    ) -> Dict[str, Any]:
+        """Bind multiple live authority SLO probes into one digest-only quorum."""
+
+        normalized_required_count = int(required_quorum_count)
+        if normalized_required_count < WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES:
+            raise ValueError("required_quorum_count must require at least two authorities")
+        accepted_probes: List[Dict[str, Any]] = []
+        seen_authorities: set[str] = set()
+        for probe in authority_slo_probe_receipts:
+            if not isinstance(probe, Mapping):
+                raise ValueError("authority_slo_probe_receipts must contain mappings")
+            probe_copy = deepcopy(probe)
+            probe_validation = self.validate_authority_slo_probe_receipt(probe_copy)
+            if not (
+                probe_validation["ok"]
+                and probe_validation["authority_slo_live_probe_bound"]
+            ):
+                raise ValueError("authority_slo_probe_receipts must be live-bound")
+            authority_ref = str(probe_copy.get("authority_ref", ""))
+            if authority_ref in seen_authorities:
+                raise ValueError("authority_slo_probe_receipts must use unique authorities")
+            seen_authorities.add(authority_ref)
+            accepted_probes.append(probe_copy)
+        if len(accepted_probes) < normalized_required_count:
+            raise ValueError("authority_slo_probe_receipts do not satisfy quorum")
+
+        accepted_probe_digests = [str(probe["digest"]) for probe in accepted_probes]
+        normalized_primary_digest = (
+            self._normalize_digest(primary_probe_digest, "primary_probe_digest")
+            if primary_probe_digest is not None
+            else accepted_probe_digests[0]
+        )
+        if normalized_primary_digest not in accepted_probe_digests:
+            raise ValueError("primary_probe_digest must be covered by the quorum")
+
+        accepted_authority_refs = [str(probe["authority_ref"]) for probe in accepted_probes]
+        accepted_remote_jurisdictions = _dedupe_preserve_order(
+            [str(probe["remote_jurisdiction"]) for probe in accepted_probes]
+        )
+        route_refs = _dedupe_preserve_order(
+            [str(probe["route_ref"]) for probe in accepted_probes]
+        )
+        jurisdiction_policy_registry_digests = [
+            str(probe["jurisdiction_policy_registry_digest"]) for probe in accepted_probes
+        ]
+        authority_slo_snapshot_digests = [
+            str(probe["authority_slo_snapshot_digest"]) for probe in accepted_probes
+        ]
+        network_response_digests = [
+            str(probe["network_response_digest"]) for probe in accepted_probes
+        ]
+        multi_authority_bound = len(set(accepted_authority_refs)) >= normalized_required_count
+        multi_jurisdiction_bound = len(set(accepted_remote_jurisdictions)) >= 2
+        all_probes_live_bound = all(
+            probe.get("network_probe_bound") is True
+            and probe.get("raw_slo_payload_stored") is False
+            for probe in accepted_probes
+        )
+        primary_probe_covered = normalized_primary_digest in accepted_probe_digests
+        quorum_bound = bool(
+            all_probes_live_bound
+            and primary_probe_covered
+            and multi_authority_bound
+            and multi_jurisdiction_bound
+        )
+        receipt = {
+            "kind": "wms_authority_slo_probe_quorum_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "receipt_id": new_id("wms-slo-quorum"),
+            "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID,
+            "quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE,
+            "digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE,
+            "required_quorum_count": normalized_required_count,
+            "accepted_probe_count": len(accepted_probes),
+            "accepted_authority_count": len(set(accepted_authority_refs)),
+            "accepted_jurisdiction_count": len(set(accepted_remote_jurisdictions)),
+            "primary_probe_digest": normalized_primary_digest,
+            "authority_slo_probe_receipts": accepted_probes,
+            "accepted_probe_digests": accepted_probe_digests,
+            "accepted_probe_set_digest": sha256_text(
+                canonical_json(accepted_probe_digests)
+            ),
+            "accepted_authority_refs": accepted_authority_refs,
+            "accepted_authority_set_digest": sha256_text(
+                canonical_json(accepted_authority_refs)
+            ),
+            "accepted_remote_jurisdictions": accepted_remote_jurisdictions,
+            "accepted_jurisdiction_set_digest": sha256_text(
+                canonical_json(accepted_remote_jurisdictions)
+            ),
+            "route_refs": route_refs,
+            "route_ref_set_digest": sha256_text(canonical_json(route_refs)),
+            "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
+            "jurisdiction_policy_registry_set_digest": sha256_text(
+                canonical_json(jurisdiction_policy_registry_digests)
+            ),
+            "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
+            "authority_slo_snapshot_set_digest": sha256_text(
+                canonical_json(authority_slo_snapshot_digests)
+            ),
+            "network_response_digests": network_response_digests,
+            "network_response_set_digest": sha256_text(
+                canonical_json(network_response_digests)
+            ),
+            "all_probes_live_bound": all_probes_live_bound,
+            "multi_authority_bound": multi_authority_bound,
+            "multi_jurisdiction_bound": multi_jurisdiction_bound,
+            "primary_probe_covered": primary_probe_covered,
+            "quorum_bound": quorum_bound,
+            "quorum_status": "complete" if quorum_bound else "incomplete",
+            "raw_slo_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                _remote_authority_slo_probe_quorum_receipt_digest_payload(receipt)
+            )
+        )
+        return receipt
+
+    def validate_authority_slo_probe_quorum_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_authority_slo_probe_quorum_receipt":
+            errors.append("kind must equal wms_authority_slo_probe_quorum_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID:
+            errors.append("policy_id mismatch")
+        if receipt.get("quorum_profile") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_PROFILE:
+            errors.append("quorum_profile mismatch")
+        if receipt.get("digest_profile") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        self._check_non_empty_string(receipt.get("receipt_id"), "receipt_id", errors)
+        self._check_digest(receipt.get("digest"), "digest", errors)
+        required_quorum_count = receipt.get("required_quorum_count")
+        if (
+            not isinstance(required_quorum_count, int)
+            or required_quorum_count < WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES
+        ):
+            errors.append("required_quorum_count must require at least two authorities")
+            required_quorum_count = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES
+
+        probe_receipts = receipt.get("authority_slo_probe_receipts")
+        if not isinstance(probe_receipts, list):
+            errors.append("authority_slo_probe_receipts must be a list")
+            probe_receipts = []
+        accepted_probe_digests: List[str] = []
+        accepted_authority_refs: List[str] = []
+        accepted_remote_jurisdictions: List[str] = []
+        route_refs: List[str] = []
+        jurisdiction_policy_registry_digests: List[str] = []
+        authority_slo_snapshot_digests: List[str] = []
+        network_response_digests: List[str] = []
+        probe_receipts_valid = True
+        for probe in probe_receipts:
+            if not isinstance(probe, Mapping):
+                errors.append("authority_slo_probe_receipts must contain objects")
+                probe_receipts_valid = False
+                continue
+            probe_validation = self.validate_authority_slo_probe_receipt(probe)
+            if not (
+                probe_validation["ok"]
+                and probe_validation["authority_slo_live_probe_bound"]
+            ):
+                errors.append("authority SLO quorum probe must validate and be live-bound")
+                probe_receipts_valid = False
+            if isinstance(probe.get("digest"), str):
+                accepted_probe_digests.append(str(probe["digest"]))
+            if isinstance(probe.get("authority_ref"), str):
+                accepted_authority_refs.append(str(probe["authority_ref"]))
+            if isinstance(probe.get("remote_jurisdiction"), str):
+                accepted_remote_jurisdictions.append(str(probe["remote_jurisdiction"]))
+            if isinstance(probe.get("route_ref"), str):
+                route_refs.append(str(probe["route_ref"]))
+            if isinstance(probe.get("jurisdiction_policy_registry_digest"), str):
+                jurisdiction_policy_registry_digests.append(
+                    str(probe["jurisdiction_policy_registry_digest"])
+                )
+            if isinstance(probe.get("authority_slo_snapshot_digest"), str):
+                authority_slo_snapshot_digests.append(
+                    str(probe["authority_slo_snapshot_digest"])
+                )
+            if isinstance(probe.get("network_response_digest"), str):
+                network_response_digests.append(str(probe["network_response_digest"]))
+        if len(set(accepted_authority_refs)) != len(accepted_authority_refs):
+            errors.append("authority SLO quorum probes must use unique authorities")
+            probe_receipts_valid = False
+        deduped_jurisdictions = _dedupe_preserve_order(accepted_remote_jurisdictions)
+        deduped_routes = _dedupe_preserve_order(route_refs)
+        expected_probe_set_digest = sha256_text(canonical_json(accepted_probe_digests))
+        expected_authority_set_digest = sha256_text(canonical_json(accepted_authority_refs))
+        expected_jurisdiction_set_digest = sha256_text(canonical_json(deduped_jurisdictions))
+        expected_route_set_digest = sha256_text(canonical_json(deduped_routes))
+        expected_registry_set_digest = sha256_text(
+            canonical_json(jurisdiction_policy_registry_digests)
+        )
+        expected_slo_snapshot_set_digest = sha256_text(
+            canonical_json(authority_slo_snapshot_digests)
+        )
+        expected_network_response_set_digest = sha256_text(
+            canonical_json(network_response_digests)
+        )
+        expected_values = {
+            "accepted_probe_count": len(accepted_probe_digests),
+            "accepted_authority_count": len(set(accepted_authority_refs)),
+            "accepted_jurisdiction_count": len(set(deduped_jurisdictions)),
+            "accepted_probe_digests": accepted_probe_digests,
+            "accepted_probe_set_digest": expected_probe_set_digest,
+            "accepted_authority_refs": accepted_authority_refs,
+            "accepted_authority_set_digest": expected_authority_set_digest,
+            "accepted_remote_jurisdictions": deduped_jurisdictions,
+            "accepted_jurisdiction_set_digest": expected_jurisdiction_set_digest,
+            "route_refs": deduped_routes,
+            "route_ref_set_digest": expected_route_set_digest,
+            "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
+            "jurisdiction_policy_registry_set_digest": expected_registry_set_digest,
+            "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
+            "authority_slo_snapshot_set_digest": expected_slo_snapshot_set_digest,
+            "network_response_digests": network_response_digests,
+            "network_response_set_digest": expected_network_response_set_digest,
+        }
+        for field_name, expected_value in expected_values.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must match live SLO probe quorum inputs")
+
+        all_probes_live_bound = bool(
+            probe_receipts_valid
+            and accepted_probe_digests
+            and all(
+                isinstance(probe, Mapping)
+                and probe.get("network_probe_bound") is True
+                and probe.get("raw_slo_payload_stored") is False
+                for probe in probe_receipts
+            )
+        )
+        multi_authority_bound = (
+            len(set(accepted_authority_refs)) >= required_quorum_count
+        )
+        multi_jurisdiction_bound = len(set(deduped_jurisdictions)) >= 2
+        primary_probe_digest = receipt.get("primary_probe_digest")
+        if not isinstance(primary_probe_digest, str) or len(primary_probe_digest) != 64:
+            errors.append("primary_probe_digest must be a sha256 hex digest")
+            primary_probe_covered = False
+        else:
+            primary_probe_covered = primary_probe_digest in accepted_probe_digests
+        quorum_bound = bool(
+            all_probes_live_bound
+            and multi_authority_bound
+            and multi_jurisdiction_bound
+            and primary_probe_covered
+        )
+        bool_expectations = {
+            "all_probes_live_bound": all_probes_live_bound,
+            "multi_authority_bound": multi_authority_bound,
+            "multi_jurisdiction_bound": multi_jurisdiction_bound,
+            "primary_probe_covered": primary_probe_covered,
+            "quorum_bound": quorum_bound,
+        }
+        for field_name, expected_value in bool_expectations.items():
+            if receipt.get(field_name) is not expected_value:
+                errors.append(f"{field_name} must reflect authority SLO quorum binding")
+        if receipt.get("quorum_status") != ("complete" if quorum_bound else "incomplete"):
+            errors.append("quorum_status must reflect quorum_bound")
+        if receipt.get("raw_slo_payload_stored") is not False:
+            errors.append("raw_slo_payload_stored must be false")
+        expected_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_probe_quorum_receipt_digest_payload(receipt)
+            )
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match authority SLO quorum receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "quorum_bound": quorum_bound,
+            "all_probes_live_bound": all_probes_live_bound,
+            "multi_authority_bound": multi_authority_bound,
+            "multi_jurisdiction_bound": multi_jurisdiction_bound,
+            "primary_probe_covered": primary_probe_covered,
             "digest_bound": digest_bound,
             "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
         }

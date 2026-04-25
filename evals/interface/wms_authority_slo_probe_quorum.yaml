@@ -1,0 +1,29 @@
+eval_id: wms_authority_slo_probe_quorum
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の live authority SLO probe evidence が、primary retry probe
+  だけでなく backup authority / remote jurisdiction も含む digest-only quorum
+  receipt に束縛され、raw SLO payload を保存しないことを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  authority_slo_probe_quorum_bound: true
+  policy_id: multi-authority-slo-probe-quorum-v1
+  quorum_profile: multi-jurisdiction-authority-slo-quorum-v1
+  digest_profile: authority-slo-probe-quorum-digest-v1
+  required_quorum_count: 2
+  accepted_probe_count: 2
+  accepted_authority_count: 2
+  accepted_jurisdiction_count: 2
+  multi_authority_bound: true
+  multi_jurisdiction_bound: true
+  all_probes_live_bound: true
+  primary_probe_covered: true
+  quorum_status: complete
+  raw_slo_payload_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

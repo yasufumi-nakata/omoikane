@@ -15,6 +15,7 @@ imports:
   wms_engine_route_binding_receipt: ../schemas/wms_engine_route_binding_receipt.schema
   wms_engine_capture_binding_receipt: ../schemas/wms_engine_capture_binding_receipt.schema
   wms_authority_slo_probe_receipt: ../schemas/wms_authority_slo_probe_receipt.schema
+  wms_authority_slo_probe_quorum_receipt: ../schemas/wms_authority_slo_probe_quorum_receipt.schema
   wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
@@ -321,6 +322,34 @@ operations:
       - endpoint must return JSON matching the expected authority, route, jurisdiction registry, SLO snapshot ref, SLO retry limit, latency, success ratio, and failure-count fields
       - network_response_digest must bind the endpoint JSON without storing the raw SLO payload
       - receipt can be live-bound only when HTTP status is 200 and observed probe latency fits the fixed SLO probe latency budget
+  build_authority_slo_probe_quorum:
+    summary: Bind multiple live authority SLO endpoint probes into one digest-only multi-authority quorum receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - authority_slo_probe_receipts
+          - primary_probe_digest
+        properties:
+          authority_slo_probe_receipts:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: wms_authority_slo_probe_receipt
+          primary_probe_digest:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          required_quorum_count:
+            type: integer
+            minimum: 2
+            default: 2
+    output:
+      schema_ref: wms_authority_slo_probe_quorum_receipt
+    guarantees:
+      - quorum can complete only when at least two live-bound SLO probe receipts are accepted
+      - accepted probes must cover at least two authority refs and two remote jurisdictions
+      - primary_probe_digest must be one of the accepted live probe digests
+      - quorum receipt must bind accepted probe, authority, jurisdiction, route, SLO snapshot, registry, and network response digest sets without storing raw SLO payloads
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.
     input:

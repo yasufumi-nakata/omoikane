@@ -1,0 +1,166 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_authority_slo_probe_quorum_receipt.schema"
+title: WMSAuthoritySLOProbeQuorumReceipt
+description: >
+  Digest-only receipt proving that WMS remote authority SLO evidence came from
+  a multi-authority, multi-jurisdiction live probe quorum before reviewer-facing
+  retry evidence accepts the primary SLO probe.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - policy_id
+  - quorum_profile
+  - digest_profile
+  - required_quorum_count
+  - accepted_probe_count
+  - accepted_authority_count
+  - accepted_jurisdiction_count
+  - primary_probe_digest
+  - authority_slo_probe_receipts
+  - accepted_probe_digests
+  - accepted_probe_set_digest
+  - accepted_authority_refs
+  - accepted_authority_set_digest
+  - accepted_remote_jurisdictions
+  - accepted_jurisdiction_set_digest
+  - route_refs
+  - route_ref_set_digest
+  - jurisdiction_policy_registry_digests
+  - jurisdiction_policy_registry_set_digest
+  - authority_slo_snapshot_digests
+  - authority_slo_snapshot_set_digest
+  - network_response_digests
+  - network_response_set_digest
+  - all_probes_live_bound
+  - multi_authority_bound
+  - multi_jurisdiction_bound
+  - primary_probe_covered
+  - quorum_bound
+  - quorum_status
+  - raw_slo_payload_stored
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_authority_slo_probe_quorum_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^wms-slo-quorum-[a-f0-9]{12}$"
+  policy_id:
+    type: string
+    const: multi-authority-slo-probe-quorum-v1
+  quorum_profile:
+    type: string
+    const: multi-jurisdiction-authority-slo-quorum-v1
+  digest_profile:
+    type: string
+    const: authority-slo-probe-quorum-digest-v1
+  required_quorum_count:
+    type: integer
+    minimum: 2
+  accepted_probe_count:
+    type: integer
+    minimum: 2
+  accepted_authority_count:
+    type: integer
+    minimum: 2
+  accepted_jurisdiction_count:
+    type: integer
+    minimum: 2
+  primary_probe_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_probe_receipts:
+    type: array
+    minItems: 2
+    items:
+      $ref: "wms_authority_slo_probe_receipt.schema"
+  accepted_probe_digests:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  accepted_probe_set_digest:
+    $ref: "#/$defs/sha256"
+  accepted_authority_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  accepted_authority_set_digest:
+    $ref: "#/$defs/sha256"
+  accepted_remote_jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 2
+  accepted_jurisdiction_set_digest:
+    $ref: "#/$defs/sha256"
+  route_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  route_ref_set_digest:
+    $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_set_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_snapshot_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  authority_slo_snapshot_set_digest:
+    $ref: "#/$defs/sha256"
+  network_response_digests:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  network_response_set_digest:
+    $ref: "#/$defs/sha256"
+  all_probes_live_bound:
+    type: boolean
+    const: true
+  multi_authority_bound:
+    type: boolean
+    const: true
+  multi_jurisdiction_bound:
+    type: boolean
+    const: true
+  primary_probe_covered:
+    type: boolean
+    const: true
+  quorum_bound:
+    type: boolean
+    const: true
+  quorum_status:
+    type: string
+    const: complete
+  raw_slo_payload_stored:
+    type: boolean
+    const: false
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

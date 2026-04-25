@@ -925,7 +925,113 @@ class WorldModelSyncTests(unittest.TestCase):
                 consecutive_failures=route_health_observation["consecutive_failures"],
                 request_timeout_ms=500,
             )
+        backup_route_health_observation = {
+            "authority_ref": "authority://test/heritage",
+            "route_ref": "route://test/heritage/observer",
+            "participant_id": session["current_state"]["participants"][-1],
+            "outage_kind": "timeout",
+            "route_status": "recovered",
+            "remote_jurisdiction": "US-CA",
+            "jurisdiction_policy_registry_ref": (
+                "policy-registry://us-ca/test-wms-authority-retry"
+            ),
+            "jurisdiction_rate_limit_ref": "rate-limit://us-ca/test-wms-retry",
+            "jurisdiction_retry_limit_ms": 750,
+            "authority_slo_snapshot_ref": (
+                "authority-slo://test/heritage/observer-timeout"
+            ),
+            "authority_slo_retry_limit_ms": 750,
+            "signer_key_ref": "key://test/us-ca/wms-retry-signer",
+            "observed_latency_ms": 410,
+            "success_ratio": 0.91,
+            "consecutive_failures": 0,
+        }
+        backup_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_policy_id": "registry-bound-authority-retry-slo-v1",
+                    "registry_profile": "jurisdiction-policy-registry-bound-retry-v1",
+                    "jurisdiction_policy_registry_ref": backup_route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                    "remote_jurisdiction": backup_route_health_observation[
+                        "remote_jurisdiction"
+                    ],
+                    "jurisdiction_rate_limit_ref": backup_route_health_observation[
+                        "jurisdiction_rate_limit_ref"
+                    ],
+                    "jurisdiction_retry_limit_ms": backup_route_health_observation[
+                        "jurisdiction_retry_limit_ms"
+                    ],
+                    "signer_key_ref": backup_route_health_observation[
+                        "signer_key_ref"
+                    ],
+                }
+            )
+        )
+        backup_slo_payload = {
+            "checked_at": "2026-04-26T00:20:05Z",
+            "authority_ref": backup_route_health_observation["authority_ref"],
+            "route_ref": backup_route_health_observation["route_ref"],
+            "route_status": backup_route_health_observation["route_status"],
+            "remote_jurisdiction": backup_route_health_observation[
+                "remote_jurisdiction"
+            ],
+            "jurisdiction_policy_registry_ref": backup_route_health_observation[
+                "jurisdiction_policy_registry_ref"
+            ],
+            "jurisdiction_policy_registry_digest": backup_registry_digest,
+            "authority_slo_snapshot_profile": "authority-slo-snapshot-retry-window-v1",
+            "authority_slo_snapshot_ref": backup_route_health_observation[
+                "authority_slo_snapshot_ref"
+            ],
+            "authority_slo_retry_limit_ms": backup_route_health_observation[
+                "authority_slo_retry_limit_ms"
+            ],
+            "observed_latency_ms": backup_route_health_observation[
+                "observed_latency_ms"
+            ],
+            "success_ratio": backup_route_health_observation["success_ratio"],
+            "consecutive_failures": backup_route_health_observation[
+                "consecutive_failures"
+            ],
+        }
+        with live_slo_endpoint(backup_slo_payload) as backup_endpoint:
+            backup_slo_probe = sync.probe_remote_authority_slo_snapshot_endpoint(
+                slo_endpoint=backup_endpoint,
+                authority_ref=backup_route_health_observation["authority_ref"],
+                route_ref=backup_route_health_observation["route_ref"],
+                route_status=backup_route_health_observation["route_status"],
+                remote_jurisdiction=backup_route_health_observation[
+                    "remote_jurisdiction"
+                ],
+                jurisdiction_policy_registry_ref=backup_route_health_observation[
+                    "jurisdiction_policy_registry_ref"
+                ],
+                jurisdiction_policy_registry_digest=backup_registry_digest,
+                authority_slo_snapshot_ref=backup_route_health_observation[
+                    "authority_slo_snapshot_ref"
+                ],
+                authority_slo_retry_limit_ms=backup_route_health_observation[
+                    "authority_slo_retry_limit_ms"
+                ],
+                observed_latency_ms=backup_route_health_observation[
+                    "observed_latency_ms"
+                ],
+                success_ratio=backup_route_health_observation["success_ratio"],
+                consecutive_failures=backup_route_health_observation[
+                    "consecutive_failures"
+                ],
+                request_timeout_ms=500,
+            )
+        slo_quorum = sync.build_authority_slo_probe_quorum_receipt(
+            [slo_probe, backup_slo_probe],
+            primary_probe_digest=slo_probe["digest"],
+        )
         slo_probe_validation = sync.validate_authority_slo_probe_receipt(slo_probe)
+        slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
+            slo_quorum
+        )
         retry_budget = sync.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref="authority-profile://test/wms-approval-retry",
@@ -978,6 +1084,11 @@ class WorldModelSyncTests(unittest.TestCase):
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
         )
+        tampered_slo_quorum = dict(slo_quorum)
+        tampered_slo_quorum["authority_slo_probe_receipts"] = [slo_probe]
+        tampered_slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
+            tampered_slo_quorum
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["fanout_complete"])
@@ -1003,6 +1114,19 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(slo_probe["slo_endpoint_ref"].startswith("http://"))
         self.assertEqual(64, len(slo_probe["network_response_digest"]))
         self.assertFalse(slo_probe["raw_slo_payload_stored"])
+        self.assertTrue(slo_quorum_validation["ok"])
+        self.assertTrue(slo_quorum_validation["quorum_bound"])
+        self.assertTrue(slo_quorum_validation["multi_authority_bound"])
+        self.assertTrue(slo_quorum_validation["multi_jurisdiction_bound"])
+        self.assertEqual(2, slo_quorum["accepted_probe_count"])
+        self.assertEqual(2, slo_quorum["accepted_authority_count"])
+        self.assertEqual(2, slo_quorum["accepted_jurisdiction_count"])
+        self.assertEqual(slo_probe["digest"], slo_quorum["primary_probe_digest"])
+        self.assertEqual(
+            [slo_probe["digest"], backup_slo_probe["digest"]],
+            slo_quorum["accepted_probe_digests"],
+        )
+        self.assertFalse(slo_quorum["raw_slo_payload_stored"])
         self.assertTrue(retry_budget_validation["ok"])
         self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
@@ -1048,6 +1172,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_registry_validation["jurisdiction_policy_registry_bound"])
         self.assertFalse(tampered_slo_probe_validation["ok"])
         self.assertFalse(tampered_slo_probe_validation["authority_slo_live_probe_bound"])
+        self.assertFalse(tampered_slo_quorum_validation["ok"])
+        self.assertFalse(tampered_slo_quorum_validation["multi_jurisdiction_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()
