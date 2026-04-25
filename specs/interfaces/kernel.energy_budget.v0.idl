@@ -6,6 +6,7 @@ summary: AP-1 protected L1 contract for preserving ethics-coupled energy budget 
 imports:
   energy_budget_floor_receipt: ../schemas/energy_budget_floor_receipt.schema
   energy_budget_pool_receipt: ../schemas/energy_budget_pool_receipt.schema
+  energy_budget_voluntary_subsidy_receipt: ../schemas/energy_budget_voluntary_subsidy_receipt.schema
   energy_floor: ../schemas/energy_floor.schema
 operations:
   evaluate_floor:
@@ -195,6 +196,109 @@ operations:
     guarantees:
       - digest must match the pool receipt payload under energy-budget-pool-floor-digest-v1
       - member receipt digests and totals must agree with member_receipts
+  evaluate_voluntary_subsidy:
+    summary: >
+      Evaluate a post-floor voluntary energy-budget subsidy after a validated
+      multi-identity pool floor receipt proves that each member's floor was
+      already preserved without cross-identity offsets.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - pool_receipt
+          - subsidy_offers
+        additionalProperties: false
+        properties:
+          pool_receipt:
+            schema_ref: energy_budget_pool_receipt
+          subsidy_offers:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+                - donor_identity_id
+                - recipient_identity_id
+                - offered_jps
+                - consent_ref
+              additionalProperties: false
+              properties:
+                donor_identity_id:
+                  type: string
+                  minLength: 1
+                recipient_identity_id:
+                  type: string
+                  minLength: 1
+                offered_jps:
+                  type: integer
+                  minimum: 1
+                consent_ref:
+                  type: string
+                  minLength: 1
+                consent_digest:
+                  type: string
+                  minLength: 64
+                  maxLength: 64
+                max_duration_ms:
+                  type: integer
+                  minimum: 1
+                revocation_ref:
+                  type: string
+                  minLength: 1
+          external_funding_policy_ref:
+            type: string
+            minLength: 1
+          funding_policy_signature_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: energy_budget_voluntary_subsidy_receipt
+    guarantees:
+      - pool receipt must satisfy energy_budget_pool_receipt before subsidy evaluation starts
+      - voluntary subsidy must use post-floor-voluntary-consent mode
+      - donor surplus must be consumed only after the donor's own floor remains preserved
+      - recipient shortfall must not be exceeded by accepted offers
+      - consent_digest must bind donor, recipient, amount, duration, revocation ref, and funding policy digest
+      - cross_identity_offset_used must remain false; surplus must not affect pool floor validation
+      - raw funding policy payloads must remain outside the receipt
+  validate_voluntary_subsidy_receipt:
+    summary: Validate one EnergyBudgetVoluntarySubsidyReceipt against consent, floor, and digest constraints.
+    input:
+      schema_ref: energy_budget_voluntary_subsidy_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - voluntary_subsidy_allowed
+          - floor_protection_preserved
+          - donor_floor_preserved
+          - all_consent_digests_valid
+          - raw_payload_redacted
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          voluntary_subsidy_allowed:
+            type: boolean
+          floor_protection_preserved:
+            type: boolean
+          donor_floor_preserved:
+            type: boolean
+          all_consent_digests_valid:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+    guarantees:
+      - digest must match the receipt payload under energy-budget-voluntary-subsidy-digest-v1
+      - accepted offers must carry valid consent digests and no rejection reasons
+      - donor accepted_jps must not exceed donor surplus after floor preservation
+      - raw_funding_payload_stored must remain false
 events:
   energy_budget.floor_protected:
     summary: ContinuityLedger event emitted after an AP-1 protected floor receipt is accepted.
@@ -206,6 +310,13 @@ events:
   energy_budget.pool_floor_protected:
     summary: ContinuityLedger event emitted after a multi-identity pool floor receipt is accepted.
     payload_schema: energy_budget_pool_receipt
+    category: energy-budget
+    required_roles:
+      - self
+      - guardian
+  energy_budget.voluntary_subsidy_accepted:
+    summary: ContinuityLedger event emitted after a post-floor voluntary subsidy receipt is accepted.
+    payload_schema: energy_budget_voluntary_subsidy_receipt
     category: energy-budget
     required_roles:
       - self

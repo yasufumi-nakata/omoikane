@@ -1111,6 +1111,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, len(receipt["receipt_member_digests"]))
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["energy-budget"])
 
+    def test_energy_budget_subsidy_demo_accepts_only_consent_bound_surplus(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_energy_budget_subsidy_demo()
+        receipt = result["energy_budget_subsidy"]["receipt"]
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["pool_floor_preserved"])
+        self.assertTrue(result["validation"]["voluntary_subsidy_allowed"])
+        self.assertTrue(result["validation"]["floor_protection_preserved"])
+        self.assertTrue(result["validation"]["donor_floor_preserved"])
+        self.assertTrue(result["validation"]["all_consent_digests_valid"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertEqual("accepted", receipt["subsidy_status"])
+        self.assertFalse(receipt["cross_identity_offset_used"])
+        self.assertFalse(receipt["raw_funding_payload_stored"])
+        self.assertEqual(8, receipt["total_accepted_jps"])
+        self.assertEqual(2, result["ledger_verification"]["category_counts"]["energy-budget"])
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
 

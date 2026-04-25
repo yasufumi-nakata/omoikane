@@ -118,6 +118,22 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(2, result["energy_budget_pool"]["receipt"]["member_count"])
 
+    def test_energy_budget_subsidy_demo_emits_consent_bound_subsidy(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "energy-budget-subsidy-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        receipt = result["energy_budget_subsidy"]["receipt"]
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("accepted", result["validation"]["subsidy_status"])
+        self.assertTrue(receipt["voluntary_subsidy_allowed"])
+        self.assertTrue(receipt["floor_protection_preserved"])
+        self.assertTrue(receipt["all_consent_digests_valid"])
+        self.assertFalse(receipt["cross_identity_offset_used"])
+        self.assertFalse(receipt["raw_funding_payload_stored"])
+
     def test_imc_demo_emits_disclosure_safe_json(self) -> None:
         stdout = io.StringIO()
 

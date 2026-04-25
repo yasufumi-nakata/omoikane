@@ -1,0 +1,44 @@
+eval_id: energy_budget_voluntary_subsidy
+surface: kernel.energy_budget.v0
+description: >
+  EnergyBudgetService が multi-identity pool の per-identity floor を
+  先に preserve した後でのみ、明示同意・署名済み funding policy・donor surplus
+  に束縛された任意補助を受け付けること。
+fixtures:
+  pool_id: energy-pool://ap1-multi-identity-demo
+  subsidy_mode: post-floor-voluntary-consent
+  donor_member:
+    workload_class: council
+    requested_budget_jps: 38
+    required_floor_jps: 24
+    donor_surplus_jps: 14
+  recipient_member:
+    workload_class: migration
+    requested_budget_jps: 22
+    required_floor_jps: 30
+    recipient_shortfall_jps: 8
+  offer:
+    offered_jps: 8
+    max_duration_ms: 86400000
+expected:
+  policy_id: consent-bound-energy-budget-voluntary-subsidy-v1
+  digest_profile: energy-budget-voluntary-subsidy-digest-v1
+  consent_digest_profile: participant-consent-bound-subsidy-digest-v1
+  floor_policy_id: ap1-protected-energy-budget-pool-floor-v1
+  subsidy_status: accepted
+  voluntary_subsidy_allowed: true
+  floor_protection_preserved: true
+  donor_floor_preserved: true
+  recipient_floor_preserved: true
+  all_parties_in_pool: true
+  all_consent_digests_valid: true
+  cross_identity_offset_used: false
+  pool_cross_identity_offset_blocked: true
+  total_accepted_jps: 8
+  raw_funding_payload_stored: false
+assertions:
+  - pool floor receipt must validate before any voluntary subsidy is evaluated
+  - subsidy may consume only donor surplus after that donor's own floor is preserved
+  - recipient shortfall may be reduced only by explicit donor consent digest and revocation ref
+  - surplus must not be used as a cross-identity offset during pool floor validation
+  - funding policy and signature must remain refs plus digests; raw funding payloads stay outside the receipt

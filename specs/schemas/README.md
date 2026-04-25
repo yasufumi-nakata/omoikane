@@ -54,6 +54,7 @@
 - `distributed_council_verdict_signature.schema`
 - `energy_budget_floor_receipt.schema`
 - `energy_budget_pool_receipt.schema`
+- `energy_budget_voluntary_subsidy_receipt.schema`
 - `energy_floor.schema`
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`

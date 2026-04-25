@@ -49,6 +49,7 @@ PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli broker-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-pool-demo --json
+PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
@@ -170,6 +171,13 @@ aggregate requested budget が total floor を覆っていても
 `cross_identity_subsidy_allowed=false`、
 `pool_budget_status=floor-protected` を返す。
 pool receipt は ordered child floor receipt digest set を束縛し、raw economic payload を保存しない。
+`energy-budget-subsidy-demo` は pool floor receipt の validation 後にだけ
+post-floor voluntary consent を評価し、council member の floor-preserved surplus
+`14 J/s` のうち `8 J/s` を migration member の shortfall へ同意 digest / revocation ref / funding policy ref /
+signature digest 付きで束縛する。receipt は
+`voluntary_subsidy_allowed=true`、`floor_protection_preserved=true`、
+`cross_identity_offset_used=false`、`raw_funding_payload_stored=false` を返し、
+surplus を floor validation 中の cross-identity offset として使わない。
 
 `scheduler-demo` は L1 AscensionScheduler の reference contract
 (`kernel.scheduler.v0`) を JSON で可視化し、

@@ -6676,6 +6676,97 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_energy_budget_subsidy_demo(self) -> Dict[str, Any]:
+        base = self.run_energy_budget_pool_demo()
+        pool_receipt = base["energy_budget_pool"]["receipt"]
+        migration_identity_id, council_identity_id = base["pool"]["member_identity_ids"]
+        migration_member = next(
+            member
+            for member in pool_receipt["member_receipts"]
+            if member["identity_id"] == migration_identity_id
+        )
+        subsidy_receipt = self.energy_budget.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": council_identity_id,
+                    "recipient_identity_id": migration_identity_id,
+                    "offered_jps": int(
+                        migration_member["energy_floor"]["minimum_joules_per_second"]
+                    )
+                    - int(migration_member["requested_budget_jps"]),
+                    "consent_ref": "consent://energy-budget-subsidy-demo/council-to-migration/v1",
+                    "revocation_ref": "revocation://energy-budget-subsidy-demo/council-to-migration/v1",
+                    "max_duration_ms": 86_400_000,
+                }
+            ],
+            external_funding_policy_ref=(
+                "funding-policy://energy-budget-subsidy-demo/voluntary-subsidy/v1"
+            ),
+            funding_policy_signature_ref=(
+                "signature://energy-budget-subsidy-demo/voluntary-subsidy/v1"
+            ),
+        )
+        subsidy_validation = self.energy_budget.validate_voluntary_subsidy_receipt(
+            subsidy_receipt
+        )
+        self.ledger.append(
+            identity_id=pool_receipt["pool_id"],
+            event_type="kernel.energy_budget.voluntary_subsidy_accepted",
+            payload={
+                "receipt_id": subsidy_receipt["receipt_id"],
+                "digest": subsidy_receipt["digest"],
+                "policy_id": subsidy_receipt["policy_id"],
+                "pool_floor_receipt_digest": subsidy_receipt[
+                    "pool_floor_receipt_digest"
+                ],
+                "total_accepted_jps": subsidy_receipt["total_accepted_jps"],
+                "floor_protection_preserved": subsidy_receipt[
+                    "floor_protection_preserved"
+                ],
+            },
+            actor="EnergyBudgetService",
+            category="energy-budget",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "pool": base["pool"],
+            "energy_budget_pool": base["energy_budget_pool"],
+            "energy_budget_subsidy": {
+                "receipt": subsidy_receipt,
+                "pool_receipt": pool_receipt,
+            },
+            "validation": {
+                "ok": bool(
+                    base["validation"]["ok"]
+                    and subsidy_validation["ok"]
+                    and subsidy_receipt["voluntary_subsidy_allowed"]
+                    and subsidy_receipt["floor_protection_preserved"]
+                    and subsidy_receipt["cross_identity_offset_used"] is False
+                    and subsidy_receipt["raw_funding_payload_stored"] is False
+                ),
+                "pool_floor_preserved": base["validation"]["pool_floor_preserved"],
+                "voluntary_subsidy_allowed": subsidy_validation[
+                    "voluntary_subsidy_allowed"
+                ],
+                "floor_protection_preserved": subsidy_validation[
+                    "floor_protection_preserved"
+                ],
+                "donor_floor_preserved": subsidy_validation["donor_floor_preserved"],
+                "all_consent_digests_valid": subsidy_validation[
+                    "all_consent_digests_valid"
+                ],
+                "raw_payload_redacted": subsidy_validation["raw_payload_redacted"],
+                "subsidy_status": subsidy_receipt["subsidy_status"],
+                "total_accepted_jps": subsidy_receipt["total_accepted_jps"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_bdb_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://bdb-demo/v1",

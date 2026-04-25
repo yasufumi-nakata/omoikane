@@ -2701,6 +2701,15 @@ entries:
       - docs/02-subsystems/kernel/energy-budget.md
     rationale: Required to serialize multi-identity EnergyBudget pool receipts that preserve each identity floor independently and block cross-identity budget offsets.
   - priority: P1
+    kind: schema
+    file: specs/schemas/energy_budget_voluntary_subsidy_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.energy_budget.v0.idl
+      - reference-runtime
+      - evals/safety/energy_budget_voluntary_subsidy.yaml
+      - docs/02-subsystems/kernel/energy-budget.md
+    rationale: Required to serialize post-floor voluntary EnergyBudget subsidy receipts that bind donor consent, funding policy digests, and per-identity floor preservation without reintroducing cross-identity offsets.
+  - priority: P1
     kind: interface
     file: specs/interfaces/kernel.energy_budget.v0.idl
     consumers:
@@ -2724,5 +2733,13 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/ethics-guardian.yaml
     rationale: Protects AP-1 behavior in multi-identity pools by blocking aggregate-budget offsets from masking one member's below-floor request.
+  - priority: P1
+    kind: eval
+    file: evals/safety/energy_budget_voluntary_subsidy.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/ethics-guardian.yaml
+    rationale: Protects post-floor voluntary subsidy behavior by requiring consent digests, signed funding policy refs, donor surplus preservation, and cross-identity offset exclusion.
 next_priority:
   # Future automation can append the next missing contract here.
