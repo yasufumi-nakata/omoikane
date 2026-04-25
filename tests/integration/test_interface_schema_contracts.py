@@ -104,6 +104,18 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/wms_engine_route_binding_receipt.schema",
             result["scenarios"]["engine_route_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/distributed_transport_packet_capture_export.schema",
+            result["scenarios"]["engine_packet_capture_export"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/distributed_transport_privileged_capture_acquisition.schema",
+            result["scenarios"]["engine_privileged_capture_acquisition"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/wms_engine_capture_binding_receipt.schema",
+            result["scenarios"]["engine_capture_binding"],
+        )
         self.assertTrue(result["validation"]["physics_change_reversible"])
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
         self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
@@ -111,12 +123,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
         self.assertTrue(result["validation"]["engine_route_binding_bound"])
+        self.assertTrue(result["validation"]["engine_capture_binding_bound"])
         self.assertTrue(result["validation"]["physics_change"]["digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_transport_digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_change"]["approval_fanout_complete"])
         self.assertTrue(result["validation"]["engine_transaction_log"]["digest_bound"])
         self.assertTrue(result["validation"]["engine_route_binding"]["digest_bound"])
+        self.assertTrue(result["validation"]["engine_capture_binding"]["digest_bound"])
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 

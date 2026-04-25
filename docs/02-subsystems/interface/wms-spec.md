@@ -121,6 +121,7 @@ wms.observe_violation(session_id) → ViolationReport
   `wms_distributed_approval_fanout_receipt.schema` /
   `wms_engine_transaction_log.schema` /
   `wms_engine_route_binding_receipt.schema` /
+  `wms_engine_capture_binding_receipt.schema` /
   `wms_remote_authority_retry_budget_receipt.schema` /
   `wms_time_rate_attestation_receipt.schema` /
   `wms_physics_rules_change_receipt.schema` /
@@ -130,7 +131,8 @@ wms.observe_violation(session_id) → ViolationReport
   3 participant の IMC transport-bound approval collection →
   partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → engine transaction log →
-  engine route binding → remote authority retry budget → malicious veto → mode 切替を実行
+  engine route binding → engine packet capture binding →
+  remote authority retry budget → malicious veto → mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_time_rate_deviation_escape.yaml` /
   `evals/interface/wms_time_rate_attestation_transport.yaml` /
@@ -149,6 +151,10 @@ wms.observe_violation(session_id) → ViolationReport
 - `evals/interface/wms_engine_route_binding.yaml` で completed engine transaction log が
   authenticated cross-host distributed transport authority-route trace、OS observer digest、
   route binding ref set と raw payload 無しで束縛されることを保証
+- `evals/interface/wms_engine_capture_binding.yaml` で completed engine route binding が
+  verified packet-capture export、delegated privileged capture acquisition、route ref set、
+  readback / artifact digest、broker lease / filter digest と raw packet body 無しで
+  束縛されることを保証
 - `evals/interface/wms_remote_authority_retry_budget.yaml` で recovered fan-out retry が
   route-health observation、fixed exponential backoff schedule、engine transaction log
   digest に束縛され、raw remote authority transcript を保存しないことを保証

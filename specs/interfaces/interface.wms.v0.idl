@@ -13,6 +13,7 @@ imports:
   wms_distributed_approval_fanout_receipt: ../schemas/wms_distributed_approval_fanout_receipt.schema
   wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
   wms_engine_route_binding_receipt: ../schemas/wms_engine_route_binding_receipt.schema
+  wms_engine_capture_binding_receipt: ../schemas/wms_engine_capture_binding_receipt.schema
   wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
@@ -216,6 +217,34 @@ operations:
       - route binding refs, remote host refs, OS observer tuple digests, and host-binding digests must be copied as digest-only evidence
       - raw engine payloads, raw route payloads, and packet bodies must not be stored in the binding receipt
       - engine_route_binding_status can become complete only when the engine log and route trace are both digest-bound
+  bind_engine_capture_evidence:
+    summary: Bind a completed WMS engine route binding to packet-capture export and delegated privileged capture acquisition evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - engine_route_binding_receipt
+          - packet_capture_export
+          - privileged_capture_acquisition
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          engine_route_binding_receipt:
+            schema_ref: wms_engine_route_binding_receipt
+          packet_capture_export:
+            type: object
+          privileged_capture_acquisition:
+            type: object
+    output:
+      schema_ref: wms_engine_capture_binding_receipt
+    guarantees:
+      - engine_route_binding_digest, authority_route_trace_digest, and route_binding_refs must match the supplied completed route binding receipt
+      - packet_capture_export must be verified, pcap-formatted, readback-bound, and route-ref aligned with the route binding receipt
+      - privileged_capture_acquisition must be delegated-broker granted and bind the same trace, packet capture digest, capture filter, lease, broker attestation, and route refs
+      - raw engine payloads, raw route payloads, and raw packet bodies must not be stored in the capture binding receipt
+      - engine_capture_binding_status can become complete only when route binding, packet capture, privileged acquisition, and route-ref set binding all validate
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a deterministic adaptive retry budget and engine transaction evidence.
     input:

@@ -1,0 +1,209 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_engine_capture_binding_receipt.schema"
+title: WMSEngineCaptureBindingReceipt
+description: >
+  Digest-only receipt proving that a WMS engine route binding is further bound
+  to a verified packet-capture export and delegated privileged live-capture
+  acquisition without storing raw engine payloads, route payloads, or packet bodies.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - capture_binding_policy_id
+  - digest_profile
+  - session_id
+  - engine_route_binding_policy_id
+  - engine_route_binding_digest
+  - engine_transaction_log_digest
+  - authority_route_trace_ref
+  - authority_route_trace_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - council_tier
+  - transport_profile
+  - route_count
+  - route_binding_refs
+  - route_binding_digest_set_digest
+  - packet_capture_ref
+  - packet_capture_digest
+  - packet_capture_profile
+  - packet_capture_artifact_format
+  - packet_capture_artifact_digest
+  - packet_capture_readback_digest
+  - packet_count
+  - packet_capture_export_status
+  - packet_capture_route_binding_refs
+  - packet_capture_route_binding_set_digest
+  - os_native_readback_available
+  - os_native_readback_ok
+  - privileged_capture_ref
+  - privileged_capture_digest
+  - privileged_capture_profile
+  - privilege_mode
+  - broker_profile
+  - broker_attestation_ref
+  - lease_ref
+  - interface_name
+  - local_ips
+  - capture_filter_digest
+  - capture_command_digest
+  - acquisition_route_binding_refs
+  - acquisition_route_binding_set_digest
+  - engine_route_binding_bound
+  - packet_capture_bound
+  - privileged_capture_bound
+  - route_binding_set_bound
+  - raw_engine_payload_stored
+  - raw_route_payload_stored
+  - raw_packet_body_stored
+  - engine_capture_binding_status
+  - digest
+properties:
+  kind:
+    const: wms_engine_capture_binding_receipt
+  schema_version:
+    const: "1.0"
+  capture_binding_policy_id:
+    const: packet-capture-bound-wms-engine-route-v1
+  digest_profile:
+    const: wms-engine-capture-binding-digest-v1
+  session_id:
+    type: string
+    minLength: 8
+  engine_route_binding_policy_id:
+    const: distributed-transport-bound-wms-engine-adapter-route-v1
+  engine_route_binding_digest:
+    $ref: "#/$defs/sha256"
+  engine_transaction_log_digest:
+    $ref: "#/$defs/sha256"
+  authority_route_trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  authority_route_trace_digest:
+    $ref: "#/$defs/sha256"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    $ref: "#/$defs/sha256"
+  council_tier:
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  route_count:
+    type: integer
+    minimum: 2
+  route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  route_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_ref:
+    type: string
+    pattern: "^authority-packet-capture://"
+  packet_capture_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_profile:
+    const: trace-bound-pcap-export-v1
+  packet_capture_artifact_format:
+    const: pcap
+  packet_capture_artifact_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_readback_digest:
+    $ref: "#/$defs/sha256"
+  packet_count:
+    type: integer
+    minimum: 4
+  packet_capture_export_status:
+    const: verified
+  packet_capture_route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  packet_capture_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  os_native_readback_available:
+    type: boolean
+  os_native_readback_ok:
+    type: boolean
+  privileged_capture_ref:
+    type: string
+    pattern: "^authority-live-capture://"
+  privileged_capture_digest:
+    $ref: "#/$defs/sha256"
+  privileged_capture_profile:
+    const: bounded-live-interface-capture-acquisition-v1
+  privilege_mode:
+    const: delegated-broker
+  broker_profile:
+    type: string
+    minLength: 1
+  broker_attestation_ref:
+    type: string
+    pattern: "^broker://"
+  lease_ref:
+    type: string
+    pattern: "^capture-lease://"
+  interface_name:
+    type: string
+    minLength: 1
+  local_ips:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  capture_filter_digest:
+    $ref: "#/$defs/sha256"
+  capture_command_digest:
+    $ref: "#/$defs/sha256"
+  acquisition_route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  acquisition_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  engine_route_binding_bound:
+    type: boolean
+    const: true
+  packet_capture_bound:
+    type: boolean
+    const: true
+  privileged_capture_bound:
+    type: boolean
+    const: true
+  route_binding_set_bound:
+    type: boolean
+    const: true
+  raw_engine_payload_stored:
+    type: boolean
+    const: false
+  raw_route_payload_stored:
+    type: boolean
+    const: false
+  raw_packet_body_stored:
+    type: boolean
+    const: false
+  engine_capture_binding_status:
+    const: complete
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

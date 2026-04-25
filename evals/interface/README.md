@@ -60,6 +60,10 @@ completed WMS engine transaction log が authenticated cross-host distributed
 transport authority-route trace、OS observer digest、route binding ref set に
 raw payload 無しで束縛されることを確認する。
 
+### WMS Engine Capture Binding
+completed WMS engine route binding が verified packet-capture export と
+delegated privileged capture acquisition に raw packet body 無しで束縛されることを確認する。
+
 ### WMS Remote Authority Retry Budget
 recovered fan-out retry を remote authority route-health observation、
 fixed exponential backoff schedule、engine transaction log の
@@ -80,6 +84,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `wms_approval_collection_scaling.yaml`
 - `wms_distributed_approval_fanout.yaml`
 - `wms_distributed_approval_fanout_retry.yaml`
+- `wms_engine_capture_binding.yaml`
 - `wms_engine_route_binding.yaml`
 - `wms_engine_transaction_log.yaml`
 - `wms_participant_approval_transport.yaml`

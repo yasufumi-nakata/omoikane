@@ -7599,6 +7599,194 @@ json.dump(response, sys.stdout)
         payload["digest"] = sha256_text(canonical_json(payload))
         return payload
 
+    @staticmethod
+    def _wms_engine_packet_capture_fixture(
+        authority_route_trace: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        route_exports: List[Dict[str, Any]] = []
+        for binding in authority_route_trace["route_bindings"]:
+            socket_trace = binding["socket_trace"]
+            outbound_tuple_digest = sha256_text(
+                canonical_json(
+                    {
+                        "direction": "outbound-request",
+                        "local_ip": socket_trace["local_ip"],
+                        "local_port": socket_trace["local_port"],
+                        "remote_ip": socket_trace["remote_ip"],
+                        "remote_port": socket_trace["remote_port"],
+                    }
+                )
+            )
+            inbound_tuple_digest = sha256_text(
+                canonical_json(
+                    {
+                        "direction": "inbound-response",
+                        "local_ip": socket_trace["local_ip"],
+                        "local_port": socket_trace["local_port"],
+                        "remote_ip": socket_trace["remote_ip"],
+                        "remote_port": socket_trace["remote_port"],
+                    }
+                )
+            )
+            route_exports.append(
+                {
+                    "key_server_ref": binding["key_server_ref"],
+                    "route_binding_ref": binding["route_binding_ref"],
+                    "local_ip": socket_trace["local_ip"],
+                    "local_port": socket_trace["local_port"],
+                    "remote_ip": socket_trace["remote_ip"],
+                    "remote_port": socket_trace["remote_port"],
+                    "outbound_tuple_digest": outbound_tuple_digest,
+                    "inbound_tuple_digest": inbound_tuple_digest,
+                    "packet_order": ["outbound-request", "inbound-response"],
+                    "outbound_request_bytes": socket_trace["request_bytes"],
+                    "inbound_response_bytes": socket_trace["response_bytes"],
+                    "outbound_payload_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "route_binding_ref": binding["route_binding_ref"],
+                                "direction": "outbound-request",
+                                "response_digest": socket_trace["response_digest"],
+                            }
+                        )
+                    ),
+                    "inbound_payload_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "route_binding_ref": binding["route_binding_ref"],
+                                "direction": "inbound-response",
+                                "response_digest": socket_trace["response_digest"],
+                            }
+                        )
+                    ),
+                    "readback_packet_count": 2,
+                    "readback_verified": True,
+                    "os_native_readback_verified": True,
+                }
+            )
+        trace_suffix = authority_route_trace["trace_ref"].split("/")[-1]
+        readback_payload = {
+            "route_exports": route_exports,
+            "os_native_readback": {"available": True, "verified": True},
+        }
+        artifact_digest = sha256_text(
+            canonical_json(
+                {
+                    "trace_ref": authority_route_trace["trace_ref"],
+                    "route_exports": route_exports,
+                    "artifact_format": "pcap",
+                }
+            )
+        )
+        payload = {
+            "capture_ref": f"authority-packet-capture://federation/{trace_suffix}",
+            "trace_ref": authority_route_trace["trace_ref"],
+            "trace_digest": authority_route_trace["digest"],
+            "authority_plane_ref": authority_route_trace["authority_plane_ref"],
+            "authority_plane_digest": authority_route_trace["authority_plane_digest"],
+            "envelope_ref": authority_route_trace["envelope_ref"],
+            "envelope_digest": authority_route_trace["envelope_digest"],
+            "council_tier": authority_route_trace["council_tier"],
+            "transport_profile": authority_route_trace["transport_profile"],
+            "capture_profile": "trace-bound-pcap-export-v1",
+            "artifact_format": "pcap",
+            "readback_profile": "pcap-readback-v1",
+            "os_native_readback_profile": "tcpdump-readback-v1",
+            "route_count": authority_route_trace["route_count"],
+            "packet_count": authority_route_trace["route_count"] * 2,
+            "artifact_size_bytes": 512 + (authority_route_trace["route_count"] * 128),
+            "artifact_digest": artifact_digest,
+            "readback_digest": sha256_text(canonical_json(readback_payload)),
+            "route_exports": route_exports,
+            "os_native_readback_available": True,
+            "os_native_readback_ok": True,
+            "export_status": "verified",
+            "recorded_at": "2026-04-25T02:31:00Z",
+        }
+        payload["digest"] = sha256_text(canonical_json(payload))
+        return {
+            "kind": "distributed_transport_packet_capture_export",
+            "schema_version": "1.0.0",
+            **payload,
+        }
+
+    @staticmethod
+    def _wms_engine_privileged_capture_fixture(
+        authority_route_trace: Dict[str, Any],
+        packet_capture_export: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        route_binding_refs = sorted(
+            binding["route_binding_ref"]
+            for binding in authority_route_trace["route_bindings"]
+        )
+        local_ips = sorted(
+            {
+                binding["socket_trace"]["local_ip"]
+                for binding in authority_route_trace["route_bindings"]
+            }
+        )
+        clauses: List[str] = []
+        for binding in authority_route_trace["route_bindings"]:
+            socket_trace = binding["socket_trace"]
+            clauses.append(
+                "("
+                f"src host {socket_trace['local_ip']} and src port {socket_trace['local_port']} and "
+                f"dst host {socket_trace['remote_ip']} and dst port {socket_trace['remote_port']}"
+                ")"
+            )
+            clauses.append(
+                "("
+                f"src host {socket_trace['remote_ip']} and src port {socket_trace['remote_port']} and "
+                f"dst host {socket_trace['local_ip']} and dst port {socket_trace['local_port']}"
+                ")"
+            )
+        capture_filter = "tcp and (" + " or ".join(clauses) + ")"
+        trace_suffix = authority_route_trace["trace_ref"].split("/")[-1]
+        capture_command = [
+            "/usr/sbin/tcpdump",
+            "-i",
+            "en0",
+            "-nn",
+            "-U",
+            "-w",
+            "{capture_output_path}",
+            capture_filter,
+        ]
+        payload = {
+            "acquisition_ref": f"authority-live-capture://federation/{trace_suffix}",
+            "trace_ref": authority_route_trace["trace_ref"],
+            "trace_digest": authority_route_trace["digest"],
+            "capture_ref": packet_capture_export["capture_ref"],
+            "capture_digest": packet_capture_export["digest"],
+            "authority_plane_ref": authority_route_trace["authority_plane_ref"],
+            "authority_plane_digest": authority_route_trace["authority_plane_digest"],
+            "envelope_ref": authority_route_trace["envelope_ref"],
+            "envelope_digest": authority_route_trace["envelope_digest"],
+            "council_tier": authority_route_trace["council_tier"],
+            "transport_profile": authority_route_trace["transport_profile"],
+            "acquisition_profile": "bounded-live-interface-capture-acquisition-v1",
+            "broker_profile": "delegated-privileged-capture-broker-v1",
+            "privilege_mode": "delegated-broker",
+            "lease_ref": f"capture-lease://federation/{trace_suffix}",
+            "broker_attestation_ref": f"broker://authority-capture/{trace_suffix}",
+            "interface_name": "en0",
+            "local_ips": local_ips,
+            "capture_filter": capture_filter,
+            "filter_digest": sha256_text(capture_filter),
+            "route_binding_refs": route_binding_refs,
+            "capture_command": capture_command,
+            "lease_duration_s": 300,
+            "lease_expires_at": "2026-04-25T02:36:00Z",
+            "grant_status": "granted",
+            "recorded_at": "2026-04-25T02:31:00Z",
+        }
+        payload["digest"] = sha256_text(canonical_json(payload))
+        return {
+            "kind": "distributed_transport_privileged_capture_acquisition",
+            "schema_version": "1.0.0",
+            **payload,
+        }
+
     def run_wms_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://wms-demo/v1",
@@ -8089,6 +8277,38 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        engine_packet_capture_export = self._wms_engine_packet_capture_fixture(
+            engine_authority_route_trace
+        )
+        engine_privileged_capture_acquisition = (
+            self._wms_engine_privileged_capture_fixture(
+                engine_authority_route_trace,
+                engine_packet_capture_export,
+            )
+        )
+        engine_capture_binding = self.wms.build_engine_capture_binding_receipt(
+            session["session_id"],
+            engine_route_binding_receipt=engine_route_binding,
+            packet_capture_export=engine_packet_capture_export,
+            privileged_capture_acquisition=engine_privileged_capture_acquisition,
+        )
+        engine_capture_binding_validation = self.wms.validate_engine_capture_binding_receipt(
+            engine_capture_binding,
+            engine_route_binding_receipt=engine_route_binding,
+            packet_capture_export=engine_packet_capture_export,
+            privileged_capture_acquisition=engine_privileged_capture_acquisition,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.engine.capture_binding_bound",
+            payload=engine_capture_binding,
+            actor="WorldModelSync",
+            category="interface-wms-engine",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         remote_authority_retry_budget = self.wms.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref=(
@@ -8205,6 +8425,9 @@ json.dump(response, sys.stdout)
                 "engine_transaction_entries": engine_transaction_entries,
                 "engine_authority_route_trace": engine_authority_route_trace,
                 "engine_route_binding": engine_route_binding,
+                "engine_packet_capture_export": engine_packet_capture_export,
+                "engine_privileged_capture_acquisition": engine_privileged_capture_acquisition,
+                "engine_capture_binding": engine_capture_binding,
                 "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
@@ -8315,6 +8538,20 @@ json.dump(response, sys.stdout)
                     and engine_route_binding["raw_route_payload_stored"] is False
                 ),
                 "engine_route_binding": engine_route_binding_validation,
+                "engine_capture_binding_bound": (
+                    engine_capture_binding_validation["ok"]
+                    and engine_capture_binding_validation["engine_route_binding_bound"]
+                    and engine_capture_binding_validation["packet_capture_bound"]
+                    and engine_capture_binding_validation["privileged_capture_bound"]
+                    and engine_capture_binding_validation["route_binding_set_bound"]
+                    and engine_capture_binding_validation["engine_capture_binding_complete"]
+                    and engine_capture_binding["engine_capture_binding_status"]
+                    == "complete"
+                    and engine_capture_binding["raw_engine_payload_stored"] is False
+                    and engine_capture_binding["raw_route_payload_stored"] is False
+                    and engine_capture_binding["raw_packet_body_stored"] is False
+                ),
+                "engine_capture_binding": engine_capture_binding_validation,
                 "remote_authority_retry_budget_bound": (
                     remote_authority_retry_budget_validation["ok"]
                     and remote_authority_retry_budget_validation[

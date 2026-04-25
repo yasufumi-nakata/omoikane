@@ -65,6 +65,12 @@ WMS_ENGINE_ROUTE_SOCKET_PROFILE = "mtls-socket-trace-v1"
 WMS_ENGINE_ROUTE_OS_OBSERVER_PROFILE = "os-native-tcp-observer-v1"
 WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE = "attested-cross-host-authority-binding-v1"
 WMS_ENGINE_ROUTE_TARGET_DISCOVERY_PROFILE = "bounded-authority-route-target-discovery-v1"
+WMS_ENGINE_CAPTURE_BINDING_POLICY_ID = "packet-capture-bound-wms-engine-route-v1"
+WMS_ENGINE_CAPTURE_BINDING_DIGEST_PROFILE = "wms-engine-capture-binding-digest-v1"
+WMS_ENGINE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
+WMS_ENGINE_PACKET_CAPTURE_FORMAT = "pcap"
+WMS_ENGINE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
+WMS_ENGINE_PRIVILEGED_CAPTURE_MODE = "delegated-broker"
 WMS_ENGINE_TRANSACTION_OPERATIONS = {
     "time_rate_escape_evidence",
     "approval_collection_bound",
@@ -154,6 +160,18 @@ def _engine_route_binding_digest_payload(receipt: Mapping[str, Any]) -> Dict[str
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _engine_capture_binding_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _transport_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        key: deepcopy(value)
+        for key, value in receipt.items()
+        if key not in {"kind", "schema_version", "digest"}
+    }
+
+
 def _route_trace_digest_payload(trace: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in trace.items() if key != "digest"}
 
@@ -213,6 +231,10 @@ class WorldModelSync:
                 "engine_route_binding_digest_profile": WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE,
                 "engine_route_trace_profile": WMS_ENGINE_ROUTE_TRACE_PROFILE,
                 "engine_route_cross_host_profile": WMS_ENGINE_ROUTE_CROSS_HOST_PROFILE,
+                "engine_capture_binding_policy_id": WMS_ENGINE_CAPTURE_BINDING_POLICY_ID,
+                "engine_capture_binding_digest_profile": WMS_ENGINE_CAPTURE_BINDING_DIGEST_PROFILE,
+                "engine_packet_capture_profile": WMS_ENGINE_PACKET_CAPTURE_PROFILE,
+                "engine_privileged_capture_profile": WMS_ENGINE_PRIVILEGED_CAPTURE_PROFILE,
             },
             "consensus_policy": {
                 "minor_diff": "consensus_round",
@@ -1303,6 +1325,144 @@ class WorldModelSync:
         }
         receipt["digest"] = sha256_text(
             canonical_json(_engine_route_binding_digest_payload(receipt))
+        )
+        return receipt
+
+    def build_engine_capture_binding_receipt(
+        self,
+        session_id: str,
+        *,
+        engine_route_binding_receipt: Mapping[str, Any],
+        packet_capture_export: Mapping[str, Any],
+        privileged_capture_acquisition: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        self._require_session(session_id)
+        if not isinstance(engine_route_binding_receipt, Mapping):
+            raise ValueError("engine_route_binding_receipt must be a mapping")
+        if not isinstance(packet_capture_export, Mapping):
+            raise ValueError("packet_capture_export must be a mapping")
+        if not isinstance(privileged_capture_acquisition, Mapping):
+            raise ValueError("privileged_capture_acquisition must be a mapping")
+        route_binding = deepcopy(engine_route_binding_receipt)
+        capture = deepcopy(packet_capture_export)
+        acquisition = deepcopy(privileged_capture_acquisition)
+        route_binding_digest = self._normalize_digest(
+            route_binding.get("digest"),
+            "engine_route_binding_digest",
+        )
+        packet_capture_digest = self._normalize_digest(
+            capture.get("digest"),
+            "packet_capture_digest",
+        )
+        privileged_capture_digest = self._normalize_digest(
+            acquisition.get("digest"),
+            "privileged_capture_digest",
+        )
+        route_validation = self.validate_engine_route_binding_receipt(route_binding)
+        capture_validation = self._validate_engine_packet_capture_export(
+            capture,
+            engine_route_binding_receipt=route_binding,
+        )
+        acquisition_validation = self._validate_engine_privileged_capture_acquisition(
+            acquisition,
+            engine_route_binding_receipt=route_binding,
+            packet_capture_export=capture,
+        )
+        route_binding_refs = [
+            str(route_ref)
+            for route_ref in route_binding.get("route_binding_refs", [])
+            if isinstance(route_ref, str)
+        ]
+        route_binding_set_digest = sha256_text(canonical_json(route_binding_refs))
+        capture_route_binding_refs = [
+            str(route_export.get("route_binding_ref"))
+            for route_export in capture.get("route_exports", [])
+            if isinstance(route_export, Mapping)
+            and isinstance(route_export.get("route_binding_ref"), str)
+        ]
+        capture_route_binding_set_digest = sha256_text(
+            canonical_json(capture_route_binding_refs)
+        )
+        acquisition_route_binding_refs = [
+            str(route_ref)
+            for route_ref in acquisition.get("route_binding_refs", [])
+            if isinstance(route_ref, str)
+        ]
+        acquisition_route_binding_set_digest = sha256_text(
+            canonical_json(sorted(acquisition_route_binding_refs))
+        )
+        route_binding_set_bound = (
+            route_binding_set_digest == capture_route_binding_set_digest
+            and sorted(route_binding_refs) == sorted(acquisition_route_binding_refs)
+        )
+        raw_payloads_redacted = (
+            route_binding.get("raw_engine_payload_stored") is False
+            and route_binding.get("raw_route_payload_stored") is False
+            and capture.get("artifact_format") == WMS_ENGINE_PACKET_CAPTURE_FORMAT
+        )
+        complete = (
+            route_validation["ok"]
+            and capture_validation["ok"]
+            and acquisition_validation["ok"]
+            and route_binding_set_bound
+            and raw_payloads_redacted
+        )
+        receipt = {
+            "kind": "wms_engine_capture_binding_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "capture_binding_policy_id": WMS_ENGINE_CAPTURE_BINDING_POLICY_ID,
+            "digest_profile": WMS_ENGINE_CAPTURE_BINDING_DIGEST_PROFILE,
+            "session_id": session_id,
+            "engine_route_binding_policy_id": WMS_ENGINE_ROUTE_BINDING_POLICY_ID,
+            "engine_route_binding_digest": route_binding_digest,
+            "engine_transaction_log_digest": route_binding["engine_transaction_log_digest"],
+            "authority_route_trace_ref": route_binding["authority_route_trace_ref"],
+            "authority_route_trace_digest": route_binding["authority_route_trace_digest"],
+            "authority_plane_ref": route_binding["authority_plane_ref"],
+            "authority_plane_digest": route_binding["authority_plane_digest"],
+            "council_tier": route_binding["council_tier"],
+            "transport_profile": route_binding["transport_profile"],
+            "route_count": int(route_binding["route_count"]),
+            "route_binding_refs": route_binding_refs,
+            "route_binding_digest_set_digest": route_binding_set_digest,
+            "packet_capture_ref": capture["capture_ref"],
+            "packet_capture_digest": packet_capture_digest,
+            "packet_capture_profile": capture["capture_profile"],
+            "packet_capture_artifact_format": capture["artifact_format"],
+            "packet_capture_artifact_digest": capture["artifact_digest"],
+            "packet_capture_readback_digest": capture["readback_digest"],
+            "packet_count": int(capture["packet_count"]),
+            "packet_capture_export_status": capture["export_status"],
+            "packet_capture_route_binding_refs": capture_route_binding_refs,
+            "packet_capture_route_binding_set_digest": capture_route_binding_set_digest,
+            "os_native_readback_available": bool(capture["os_native_readback_available"]),
+            "os_native_readback_ok": bool(capture["os_native_readback_ok"]),
+            "privileged_capture_ref": acquisition["acquisition_ref"],
+            "privileged_capture_digest": privileged_capture_digest,
+            "privileged_capture_profile": acquisition["acquisition_profile"],
+            "privilege_mode": acquisition["privilege_mode"],
+            "broker_profile": acquisition["broker_profile"],
+            "broker_attestation_ref": acquisition["broker_attestation_ref"],
+            "lease_ref": acquisition["lease_ref"],
+            "interface_name": acquisition["interface_name"],
+            "local_ips": list(acquisition["local_ips"]),
+            "capture_filter_digest": acquisition["filter_digest"],
+            "capture_command_digest": sha256_text(
+                canonical_json(acquisition["capture_command"])
+            ),
+            "acquisition_route_binding_refs": acquisition_route_binding_refs,
+            "acquisition_route_binding_set_digest": acquisition_route_binding_set_digest,
+            "engine_route_binding_bound": route_validation["ok"],
+            "packet_capture_bound": capture_validation["ok"],
+            "privileged_capture_bound": acquisition_validation["ok"],
+            "route_binding_set_bound": route_binding_set_bound,
+            "raw_engine_payload_stored": False,
+            "raw_route_payload_stored": False,
+            "raw_packet_body_stored": False,
+            "engine_capture_binding_status": "complete" if complete else "incomplete",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_engine_capture_binding_digest_payload(receipt))
         )
         return receipt
 
@@ -3486,6 +3646,482 @@ class WorldModelSync:
             "cross_host_route_bound": cross_host_route_bound,
             "redaction_complete": raw_flags_clear,
             "engine_route_binding_complete": complete,
+            "digest_bound": digest_bound,
+        }
+
+    def validate_engine_capture_binding_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        engine_route_binding_receipt: Mapping[str, Any] | None = None,
+        packet_capture_export: Mapping[str, Any] | None = None,
+        privileged_capture_acquisition: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_engine_capture_binding_receipt":
+            errors.append("kind must equal wms_engine_capture_binding_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("capture_binding_policy_id") != WMS_ENGINE_CAPTURE_BINDING_POLICY_ID:
+            errors.append("capture_binding_policy_id mismatch")
+        if receipt.get("digest_profile") != WMS_ENGINE_CAPTURE_BINDING_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if receipt.get("engine_route_binding_policy_id") != WMS_ENGINE_ROUTE_BINDING_POLICY_ID:
+            errors.append("engine_route_binding_policy_id mismatch")
+        for field_name in (
+            "session_id",
+            "authority_route_trace_ref",
+            "authority_plane_ref",
+            "council_tier",
+            "transport_profile",
+            "packet_capture_ref",
+            "packet_capture_profile",
+            "packet_capture_artifact_format",
+            "packet_capture_export_status",
+            "privileged_capture_ref",
+            "privileged_capture_profile",
+            "privilege_mode",
+            "broker_profile",
+            "broker_attestation_ref",
+            "lease_ref",
+            "interface_name",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        for field_name in (
+            "engine_route_binding_digest",
+            "engine_transaction_log_digest",
+            "authority_route_trace_digest",
+            "authority_plane_digest",
+            "route_binding_digest_set_digest",
+            "packet_capture_digest",
+            "packet_capture_artifact_digest",
+            "packet_capture_readback_digest",
+            "packet_capture_route_binding_set_digest",
+            "privileged_capture_digest",
+            "capture_filter_digest",
+            "capture_command_digest",
+            "acquisition_route_binding_set_digest",
+        ):
+            self._check_digest(receipt.get(field_name), field_name, errors)
+        if receipt.get("packet_capture_profile") != WMS_ENGINE_PACKET_CAPTURE_PROFILE:
+            errors.append("packet_capture_profile mismatch")
+        if receipt.get("packet_capture_artifact_format") != WMS_ENGINE_PACKET_CAPTURE_FORMAT:
+            errors.append("packet_capture_artifact_format mismatch")
+        if receipt.get("privileged_capture_profile") != WMS_ENGINE_PRIVILEGED_CAPTURE_PROFILE:
+            errors.append("privileged_capture_profile mismatch")
+        if receipt.get("privilege_mode") != WMS_ENGINE_PRIVILEGED_CAPTURE_MODE:
+            errors.append("privilege_mode mismatch")
+
+        route_binding_refs = receipt.get("route_binding_refs")
+        if not isinstance(route_binding_refs, list) or not route_binding_refs:
+            errors.append("route_binding_refs must be a non-empty list")
+            route_binding_refs = []
+        else:
+            for route_ref in route_binding_refs:
+                self._check_non_empty_string(route_ref, "route_binding_ref", errors)
+        if receipt.get("route_binding_digest_set_digest") != sha256_text(
+            canonical_json(route_binding_refs)
+        ):
+            errors.append("route_binding_digest_set_digest must bind route refs")
+        for list_field in (
+            "packet_capture_route_binding_refs",
+            "acquisition_route_binding_refs",
+        ):
+            value = receipt.get(list_field)
+            if not isinstance(value, list) or not value:
+                errors.append(f"{list_field} must be a non-empty list")
+            else:
+                for route_ref in value:
+                    self._check_non_empty_string(route_ref, list_field[:-1], errors)
+        local_ips = receipt.get("local_ips")
+        if not isinstance(local_ips, list) or not local_ips:
+            errors.append("local_ips must be a non-empty list")
+        else:
+            for local_ip in local_ips:
+                self._check_non_empty_string(local_ip, "local_ip", errors)
+
+        route_validation = {"ok": receipt.get("engine_route_binding_bound") is True}
+        if engine_route_binding_receipt is not None:
+            route_validation = self.validate_engine_route_binding_receipt(
+                engine_route_binding_receipt
+            )
+            route_bound = (
+                route_validation["ok"]
+                and receipt.get("engine_route_binding_digest")
+                == engine_route_binding_receipt.get("digest")
+                and receipt.get("engine_transaction_log_digest")
+                == engine_route_binding_receipt.get("engine_transaction_log_digest")
+                and receipt.get("authority_route_trace_ref")
+                == engine_route_binding_receipt.get("authority_route_trace_ref")
+                and receipt.get("authority_route_trace_digest")
+                == engine_route_binding_receipt.get("authority_route_trace_digest")
+                and receipt.get("authority_plane_ref")
+                == engine_route_binding_receipt.get("authority_plane_ref")
+                and receipt.get("authority_plane_digest")
+                == engine_route_binding_receipt.get("authority_plane_digest")
+                and receipt.get("council_tier") == engine_route_binding_receipt.get("council_tier")
+                and receipt.get("transport_profile")
+                == engine_route_binding_receipt.get("transport_profile")
+                and route_binding_refs
+                == list(engine_route_binding_receipt.get("route_binding_refs", []))
+                and receipt.get("route_count")
+                == engine_route_binding_receipt.get("route_count")
+            )
+            route_validation = {**route_validation, "route_bound": route_bound}
+            if not route_bound:
+                errors.append("engine capture binding must bind the supplied route binding receipt")
+        if receipt.get("engine_route_binding_bound") is not route_validation.get("ok", False):
+            errors.append("engine_route_binding_bound must reflect route binding validity")
+
+        capture_validation = {"ok": receipt.get("packet_capture_bound") is True}
+        if packet_capture_export is not None:
+            capture_validation = self._validate_engine_packet_capture_export(
+                packet_capture_export,
+                engine_route_binding_receipt=engine_route_binding_receipt,
+            )
+            capture_bound = (
+                capture_validation["ok"]
+                and receipt.get("packet_capture_ref") == packet_capture_export.get("capture_ref")
+                and receipt.get("packet_capture_digest") == packet_capture_export.get("digest")
+                and receipt.get("packet_capture_artifact_digest")
+                == packet_capture_export.get("artifact_digest")
+                and receipt.get("packet_capture_readback_digest")
+                == packet_capture_export.get("readback_digest")
+                and receipt.get("packet_count") == packet_capture_export.get("packet_count")
+                and receipt.get("packet_capture_export_status")
+                == packet_capture_export.get("export_status")
+            )
+            capture_validation = {**capture_validation, "capture_bound": capture_bound}
+            if not capture_bound:
+                errors.append("engine capture binding must bind the supplied packet capture export")
+        if receipt.get("packet_capture_bound") is not capture_validation.get("ok", False):
+            errors.append("packet_capture_bound must reflect packet capture export validity")
+
+        acquisition_validation = {"ok": receipt.get("privileged_capture_bound") is True}
+        if privileged_capture_acquisition is not None:
+            acquisition_validation = self._validate_engine_privileged_capture_acquisition(
+                privileged_capture_acquisition,
+                engine_route_binding_receipt=engine_route_binding_receipt,
+                packet_capture_export=packet_capture_export,
+            )
+            acquisition_bound = (
+                acquisition_validation["ok"]
+                and receipt.get("privileged_capture_ref")
+                == privileged_capture_acquisition.get("acquisition_ref")
+                and receipt.get("privileged_capture_digest")
+                == privileged_capture_acquisition.get("digest")
+                and receipt.get("broker_attestation_ref")
+                == privileged_capture_acquisition.get("broker_attestation_ref")
+                and receipt.get("lease_ref") == privileged_capture_acquisition.get("lease_ref")
+                and receipt.get("capture_filter_digest")
+                == privileged_capture_acquisition.get("filter_digest")
+                and receipt.get("capture_command_digest")
+                == sha256_text(
+                    canonical_json(
+                        privileged_capture_acquisition.get("capture_command", [])
+                    )
+                )
+            )
+            acquisition_validation = {
+                **acquisition_validation,
+                "acquisition_bound": acquisition_bound,
+            }
+            if not acquisition_bound:
+                errors.append("engine capture binding must bind the supplied privileged capture acquisition")
+        if receipt.get("privileged_capture_bound") is not acquisition_validation.get("ok", False):
+            errors.append("privileged_capture_bound must reflect capture acquisition validity")
+
+        route_binding_set_bound = (
+            receipt.get("route_binding_set_bound") is True
+            and receipt.get("packet_capture_route_binding_set_digest")
+            == sha256_text(canonical_json(receipt.get("packet_capture_route_binding_refs", [])))
+            and receipt.get("acquisition_route_binding_set_digest")
+            == sha256_text(
+                canonical_json(sorted(receipt.get("acquisition_route_binding_refs", [])))
+            )
+            and receipt.get("route_binding_digest_set_digest")
+            == receipt.get("packet_capture_route_binding_set_digest")
+            and sorted(route_binding_refs)
+            == sorted(receipt.get("packet_capture_route_binding_refs", []))
+            == sorted(receipt.get("acquisition_route_binding_refs", []))
+        )
+        if receipt.get("route_binding_set_bound") is not route_binding_set_bound:
+            errors.append("route_binding_set_bound must reflect capture/acquisition route refs")
+        raw_flags_clear = (
+            receipt.get("raw_engine_payload_stored") is False
+            and receipt.get("raw_route_payload_stored") is False
+            and receipt.get("raw_packet_body_stored") is False
+        )
+        if not raw_flags_clear:
+            errors.append("raw payload flags must be false")
+        complete = (
+            route_validation.get("ok", False)
+            and capture_validation.get("ok", False)
+            and acquisition_validation.get("ok", False)
+            and route_binding_set_bound
+            and raw_flags_clear
+        )
+        expected_status = "complete" if complete else "incomplete"
+        if receipt.get("engine_capture_binding_status") != expected_status:
+            errors.append("engine_capture_binding_status must reflect binding completeness")
+        expected_digest = sha256_text(
+            canonical_json(_engine_capture_binding_digest_payload(receipt))
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match engine capture binding receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "engine_route_binding_bound": route_validation.get("ok", False),
+            "packet_capture_bound": capture_validation.get("ok", False),
+            "privileged_capture_bound": acquisition_validation.get("ok", False),
+            "route_binding_set_bound": route_binding_set_bound,
+            "raw_payloads_redacted": raw_flags_clear,
+            "engine_capture_binding_complete": complete,
+            "digest_bound": digest_bound,
+        }
+
+    def _validate_engine_packet_capture_export(
+        self,
+        packet_capture_export: Mapping[str, Any],
+        *,
+        engine_route_binding_receipt: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(packet_capture_export, Mapping):
+            raise ValueError("packet_capture_export must be a mapping")
+        if packet_capture_export.get("kind") != "distributed_transport_packet_capture_export":
+            errors.append("packet capture export kind mismatch")
+        if packet_capture_export.get("schema_version") != "1.0.0":
+            errors.append("packet capture export schema_version mismatch")
+        for field_name in (
+            "capture_ref",
+            "trace_ref",
+            "authority_plane_ref",
+            "envelope_ref",
+            "council_tier",
+            "transport_profile",
+            "capture_profile",
+            "artifact_format",
+            "readback_profile",
+            "os_native_readback_profile",
+            "export_status",
+        ):
+            self._check_non_empty_string(packet_capture_export.get(field_name), field_name, errors)
+        for field_name in (
+            "trace_digest",
+            "authority_plane_digest",
+            "envelope_digest",
+            "artifact_digest",
+            "readback_digest",
+            "digest",
+        ):
+            self._check_digest(packet_capture_export.get(field_name), field_name, errors)
+        if packet_capture_export.get("capture_profile") != WMS_ENGINE_PACKET_CAPTURE_PROFILE:
+            errors.append("packet capture profile mismatch")
+        if packet_capture_export.get("artifact_format") != WMS_ENGINE_PACKET_CAPTURE_FORMAT:
+            errors.append("packet capture artifact format mismatch")
+        if packet_capture_export.get("export_status") != "verified":
+            errors.append("packet capture export_status must be verified")
+        route_exports = packet_capture_export.get("route_exports")
+        if not isinstance(route_exports, list) or not route_exports:
+            errors.append("route_exports must be a non-empty list")
+            route_exports = []
+        route_binding_refs: List[str] = []
+        route_export_errors = 0
+        for route_export in route_exports:
+            if not isinstance(route_export, Mapping):
+                errors.append("route_exports must contain objects")
+                route_export_errors += 1
+                continue
+            for field_name in (
+                "route_binding_ref",
+                "local_ip",
+                "remote_ip",
+                "outbound_tuple_digest",
+                "inbound_tuple_digest",
+                "outbound_payload_digest",
+                "inbound_payload_digest",
+            ):
+                value = route_export.get(field_name)
+                if field_name.endswith("digest"):
+                    self._check_digest(value, field_name, errors)
+                else:
+                    self._check_non_empty_string(value, field_name, errors)
+            route_binding_ref = route_export.get("route_binding_ref")
+            if isinstance(route_binding_ref, str):
+                route_binding_refs.append(route_binding_ref)
+            if route_export.get("readback_verified") is not True:
+                errors.append("packet capture route export must be readback_verified")
+                route_export_errors += 1
+            if route_export.get("readback_packet_count") != 2:
+                errors.append("packet capture route export must have two readback packets")
+                route_export_errors += 1
+            if (
+                packet_capture_export.get("os_native_readback_available") is True
+                and route_export.get("os_native_readback_verified") is not True
+            ):
+                errors.append("os native readback must verify each route export when available")
+                route_export_errors += 1
+        route_count = packet_capture_export.get("route_count")
+        packet_count = packet_capture_export.get("packet_count")
+        if not isinstance(route_count, int) or route_count != len(route_exports):
+            errors.append("packet capture route_count must equal route_exports length")
+            route_count = len(route_exports)
+        if not isinstance(packet_count, int) or packet_count != route_count * 2:
+            errors.append("packet capture packet_count must equal two packets per route")
+        if (
+            packet_capture_export.get("os_native_readback_available") is True
+            and packet_capture_export.get("os_native_readback_ok") is not True
+        ):
+            errors.append("os native readback must be ok when available")
+        if engine_route_binding_receipt is not None:
+            expected_route_refs = list(engine_route_binding_receipt.get("route_binding_refs", []))
+            if packet_capture_export.get("trace_ref") != engine_route_binding_receipt.get(
+                "authority_route_trace_ref"
+            ):
+                errors.append("packet capture trace_ref must match engine route binding")
+            if packet_capture_export.get("trace_digest") != engine_route_binding_receipt.get(
+                "authority_route_trace_digest"
+            ):
+                errors.append("packet capture trace_digest must match engine route binding")
+            if route_binding_refs != expected_route_refs:
+                errors.append("packet capture route refs must match engine route binding")
+            if route_count != engine_route_binding_receipt.get("route_count"):
+                errors.append("packet capture route_count must match engine route binding")
+        expected_digest = sha256_text(
+            canonical_json(_transport_receipt_digest_payload(packet_capture_export))
+        )
+        digest_bound = packet_capture_export.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("packet capture digest must bind payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "digest_bound": digest_bound,
+            "route_binding_refs": route_binding_refs,
+            "packet_capture_complete": route_export_errors == 0 and not errors,
+        }
+
+    def _validate_engine_privileged_capture_acquisition(
+        self,
+        privileged_capture_acquisition: Mapping[str, Any],
+        *,
+        engine_route_binding_receipt: Mapping[str, Any] | None = None,
+        packet_capture_export: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(privileged_capture_acquisition, Mapping):
+            raise ValueError("privileged_capture_acquisition must be a mapping")
+        if (
+            privileged_capture_acquisition.get("kind")
+            != "distributed_transport_privileged_capture_acquisition"
+        ):
+            errors.append("privileged capture acquisition kind mismatch")
+        if privileged_capture_acquisition.get("schema_version") != "1.0.0":
+            errors.append("privileged capture acquisition schema_version mismatch")
+        for field_name in (
+            "acquisition_ref",
+            "trace_ref",
+            "capture_ref",
+            "authority_plane_ref",
+            "envelope_ref",
+            "council_tier",
+            "transport_profile",
+            "acquisition_profile",
+            "broker_profile",
+            "privilege_mode",
+            "lease_ref",
+            "broker_attestation_ref",
+            "interface_name",
+            "capture_filter",
+            "grant_status",
+        ):
+            self._check_non_empty_string(
+                privileged_capture_acquisition.get(field_name),
+                field_name,
+                errors,
+            )
+        for field_name in (
+            "trace_digest",
+            "capture_digest",
+            "authority_plane_digest",
+            "envelope_digest",
+            "filter_digest",
+            "digest",
+        ):
+            self._check_digest(privileged_capture_acquisition.get(field_name), field_name, errors)
+        if (
+            privileged_capture_acquisition.get("acquisition_profile")
+            != WMS_ENGINE_PRIVILEGED_CAPTURE_PROFILE
+        ):
+            errors.append("privileged capture acquisition profile mismatch")
+        if privileged_capture_acquisition.get("privilege_mode") != WMS_ENGINE_PRIVILEGED_CAPTURE_MODE:
+            errors.append("privileged capture mode mismatch")
+        if privileged_capture_acquisition.get("grant_status") != "granted":
+            errors.append("privileged capture grant_status must be granted")
+        local_ips = privileged_capture_acquisition.get("local_ips")
+        if not isinstance(local_ips, list) or not local_ips:
+            errors.append("privileged capture local_ips must be non-empty")
+        route_binding_refs = privileged_capture_acquisition.get("route_binding_refs")
+        if not isinstance(route_binding_refs, list) or not route_binding_refs:
+            errors.append("privileged capture route_binding_refs must be non-empty")
+            route_binding_refs = []
+        else:
+            for route_ref in route_binding_refs:
+                self._check_non_empty_string(route_ref, "route_binding_ref", errors)
+        capture_command = privileged_capture_acquisition.get("capture_command")
+        if not isinstance(capture_command, list) or not capture_command:
+            errors.append("capture_command must be a non-empty list")
+            capture_command = []
+        else:
+            for command_part in capture_command:
+                self._check_non_empty_string(command_part, "capture_command", errors)
+            if not str(capture_command[0]).endswith("tcpdump"):
+                errors.append("capture_command must start with tcpdump")
+            if privileged_capture_acquisition.get("interface_name") not in capture_command:
+                errors.append("capture_command must bind interface_name")
+            if privileged_capture_acquisition.get("capture_filter") not in capture_command:
+                errors.append("capture_command must bind capture_filter")
+        expected_filter_digest = sha256_text(
+            str(privileged_capture_acquisition.get("capture_filter", ""))
+        )
+        if privileged_capture_acquisition.get("filter_digest") != expected_filter_digest:
+            errors.append("filter_digest must bind capture_filter")
+        if engine_route_binding_receipt is not None:
+            if privileged_capture_acquisition.get("trace_ref") != engine_route_binding_receipt.get(
+                "authority_route_trace_ref"
+            ):
+                errors.append("privileged capture trace_ref must match route binding")
+            if privileged_capture_acquisition.get("trace_digest") != engine_route_binding_receipt.get(
+                "authority_route_trace_digest"
+            ):
+                errors.append("privileged capture trace_digest must match route binding")
+            if sorted(route_binding_refs) != sorted(
+                engine_route_binding_receipt.get("route_binding_refs", [])
+            ):
+                errors.append("privileged capture route refs must match route binding")
+        if packet_capture_export is not None:
+            if privileged_capture_acquisition.get("capture_ref") != packet_capture_export.get(
+                "capture_ref"
+            ):
+                errors.append("privileged capture capture_ref must match packet capture")
+            if privileged_capture_acquisition.get("capture_digest") != packet_capture_export.get(
+                "digest"
+            ):
+                errors.append("privileged capture capture_digest must match packet capture")
+        expected_digest = sha256_text(
+            canonical_json(_transport_receipt_digest_payload(privileged_capture_acquisition))
+        )
+        digest_bound = privileged_capture_acquisition.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("privileged capture digest must bind payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
             "digest_bound": digest_bound,
         }
 

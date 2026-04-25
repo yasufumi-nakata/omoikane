@@ -830,6 +830,12 @@ authenticated cross-host authority-route trace digest、route binding refs、
 remote host refs、OS observer tuple / host-binding digests を
 `wms_engine_route_binding_receipt.schema` に従って raw engine payload / raw route
 payload 無しで共有することを確認する。
+さらに completed engine route binding を
+`packet-capture-bound-wms-engine-route-v1` の capture binding receipt へ束ね、
+verified packet-capture export、delegated privileged capture acquisition、
+route binding ref set、PCAP artifact / readback digest、broker lease / filter digest を
+`wms_engine_capture_binding_receipt.schema` に従って raw packet body 無しで
+共有することを確認する。
 さらに recovered fan-out retry を
 `bounded-remote-authority-adaptive-retry-budget-v1` の
 remote authority route-health observation と

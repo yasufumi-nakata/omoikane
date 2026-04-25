@@ -145,6 +145,7 @@
 - `volition_shift.schema`
 - `wms_approval_collection_receipt.schema`
 - `wms_distributed_approval_fanout_receipt.schema`
+- `wms_engine_capture_binding_receipt.schema`
 - `wms_engine_transaction_log.schema`
 - `wms_engine_route_binding_receipt.schema`
 - `wms_participant_approval_transport_receipt.schema`

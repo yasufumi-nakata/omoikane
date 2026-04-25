@@ -895,6 +895,20 @@ entries:
     rationale: Required to bind completed WMS engine transaction logs to authenticated cross-host distributed transport authority-route traces without storing raw engine payloads, route payloads, or packet bodies.
   - priority: P1
     kind: schema
+    file: specs/schemas/wms_engine_capture_binding_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_engine_capture_binding.yaml
+      - specs/schemas/wms_engine_route_binding_receipt.schema
+      - specs/schemas/distributed_transport_packet_capture_export.schema
+      - specs/schemas/distributed_transport_privileged_capture_acquisition.schema
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind completed WMS engine route bindings to verified packet-capture export and delegated privileged capture acquisition evidence without storing raw packet bodies.
+  - priority: P1
+    kind: schema
     file: specs/schemas/wms_remote_authority_retry_budget_receipt.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl
@@ -1310,6 +1324,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects completed WMS engine transaction logs bound to authenticated cross-host authority-route trace evidence without raw engine or route payload retention.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_engine_capture_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects completed WMS engine route bindings bound to verified packet-capture export and delegated privileged capture acquisition receipts without raw packet body retention.
   - priority: P1
     kind: eval
     file: evals/interface/wms_remote_authority_retry_budget.yaml

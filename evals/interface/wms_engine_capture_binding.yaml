@@ -1,0 +1,30 @@
+eval_id: wms_engine_capture_binding
+target: interface.wms
+level: L6
+description: >
+  Completed WMS engine route binding が verified packet-capture export と
+  delegated privileged capture acquisition に digest-only で束縛され、
+  raw engine payload、raw route payload、raw packet body を保存しないことを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  engine_capture_binding_bound: true
+  capture_binding_policy_id: packet-capture-bound-wms-engine-route-v1
+  digest_profile: wms-engine-capture-binding-digest-v1
+  packet_capture_profile: trace-bound-pcap-export-v1
+  privileged_capture_profile: bounded-live-interface-capture-acquisition-v1
+  route_count: 2
+  packet_count: 4
+  engine_route_binding_bound: true
+  packet_capture_bound: true
+  privileged_capture_bound: true
+  route_binding_set_bound: true
+  raw_engine_payload_stored: false
+  raw_route_payload_stored: false
+  raw_packet_body_stored: false
+  engine_capture_binding_status: complete
+metric: boolean
+threshold: 1.0
+ethics_check: true

@@ -139,6 +139,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["distributed_approval_fanout_bound"])
         self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
+        self.assertTrue(result["validation"]["engine_route_binding_bound"])
+        self.assertTrue(result["validation"]["engine_capture_binding_bound"])
         self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
@@ -147,6 +149,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("complete", result["scenarios"]["approval_fanout_receipt"]["fanout_status"])
         self.assertEqual("recovered", result["scenarios"]["approval_fanout_receipt"]["partial_outage_status"])
         self.assertEqual("complete", result["scenarios"]["engine_transaction_log"]["engine_binding_status"])
+        self.assertEqual("complete", result["scenarios"]["engine_route_binding"]["engine_route_binding_status"])
+        self.assertEqual("complete", result["scenarios"]["engine_capture_binding"]["engine_capture_binding_status"])
+        self.assertFalse(result["scenarios"]["engine_capture_binding"]["raw_packet_body_stored"])
         self.assertEqual("complete", result["scenarios"]["remote_authority_retry_budget"]["budget_status"])
         self.assertFalse(
             result["scenarios"]["remote_authority_retry_budget"]["raw_remote_transcript_stored"]

@@ -271,6 +271,146 @@ class WorldModelSyncTests(unittest.TestCase):
         trace["digest"] = sha256_text(canonical_json(trace))
         return trace
 
+    def _packet_capture_export(self, route_trace: dict) -> dict:
+        route_exports = []
+        for binding in route_trace["route_bindings"]:
+            socket_trace = binding["socket_trace"]
+            route_exports.append(
+                {
+                    "key_server_ref": binding["key_server_ref"],
+                    "route_binding_ref": binding["route_binding_ref"],
+                    "local_ip": socket_trace["local_ip"],
+                    "local_port": socket_trace["local_port"],
+                    "remote_ip": socket_trace["remote_ip"],
+                    "remote_port": socket_trace["remote_port"],
+                    "outbound_tuple_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "direction": "outbound-request",
+                                "local_ip": socket_trace["local_ip"],
+                                "local_port": socket_trace["local_port"],
+                                "remote_ip": socket_trace["remote_ip"],
+                                "remote_port": socket_trace["remote_port"],
+                            }
+                        )
+                    ),
+                    "inbound_tuple_digest": sha256_text(
+                        canonical_json(
+                            {
+                                "direction": "inbound-response",
+                                "local_ip": socket_trace["local_ip"],
+                                "local_port": socket_trace["local_port"],
+                                "remote_ip": socket_trace["remote_ip"],
+                                "remote_port": socket_trace["remote_port"],
+                            }
+                        )
+                    ),
+                    "packet_order": ["outbound-request", "inbound-response"],
+                    "outbound_request_bytes": socket_trace["request_bytes"],
+                    "inbound_response_bytes": socket_trace["response_bytes"],
+                    "outbound_payload_digest": sha256_text(
+                        f"{binding['route_binding_ref']}:outbound"
+                    ),
+                    "inbound_payload_digest": sha256_text(
+                        f"{binding['route_binding_ref']}:inbound"
+                    ),
+                    "readback_packet_count": 2,
+                    "readback_verified": True,
+                    "os_native_readback_verified": True,
+                }
+            )
+        payload = {
+            "capture_ref": "authority-packet-capture://federation/test",
+            "trace_ref": route_trace["trace_ref"],
+            "trace_digest": route_trace["digest"],
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "envelope_ref": route_trace["envelope_ref"],
+            "envelope_digest": route_trace["envelope_digest"],
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "capture_profile": "trace-bound-pcap-export-v1",
+            "artifact_format": "pcap",
+            "readback_profile": "pcap-readback-v1",
+            "os_native_readback_profile": "tcpdump-readback-v1",
+            "route_count": route_trace["route_count"],
+            "packet_count": route_trace["route_count"] * 2,
+            "artifact_size_bytes": 768,
+            "artifact_digest": sha256_text(canonical_json(route_exports)),
+            "readback_digest": sha256_text(canonical_json({"route_exports": route_exports})),
+            "route_exports": route_exports,
+            "os_native_readback_available": True,
+            "os_native_readback_ok": True,
+            "export_status": "verified",
+            "recorded_at": "2026-04-25T02:31:00Z",
+        }
+        payload["digest"] = sha256_text(canonical_json(payload))
+        return {
+            "kind": "distributed_transport_packet_capture_export",
+            "schema_version": "1.0.0",
+            **payload,
+        }
+
+    def _privileged_capture_acquisition(self, route_trace: dict, capture_export: dict) -> dict:
+        route_binding_refs = [
+            binding["route_binding_ref"] for binding in route_trace["route_bindings"]
+        ]
+        capture_filter = (
+            "tcp and ("
+            + " or ".join(
+                [
+                    (
+                        f"host {binding['socket_trace']['remote_ip']} and "
+                        f"port {binding['socket_trace']['remote_port']}"
+                    )
+                    for binding in route_trace["route_bindings"]
+                ]
+            )
+            + ")"
+        )
+        capture_command = [
+            "/usr/sbin/tcpdump",
+            "-i",
+            "en0",
+            "-w",
+            "{capture_output_path}",
+            capture_filter,
+        ]
+        payload = {
+            "acquisition_ref": "authority-live-capture://federation/test",
+            "trace_ref": route_trace["trace_ref"],
+            "trace_digest": route_trace["digest"],
+            "capture_ref": capture_export["capture_ref"],
+            "capture_digest": capture_export["digest"],
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "envelope_ref": route_trace["envelope_ref"],
+            "envelope_digest": route_trace["envelope_digest"],
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "acquisition_profile": "bounded-live-interface-capture-acquisition-v1",
+            "broker_profile": "delegated-privileged-capture-broker-v1",
+            "privilege_mode": "delegated-broker",
+            "lease_ref": "capture-lease://federation/test",
+            "broker_attestation_ref": "broker://authority-capture/test",
+            "interface_name": "en0",
+            "local_ips": ["203.0.113.5"],
+            "capture_filter": capture_filter,
+            "filter_digest": sha256_text(capture_filter),
+            "route_binding_refs": route_binding_refs,
+            "capture_command": capture_command,
+            "lease_duration_s": 300,
+            "lease_expires_at": "2026-04-25T02:36:00Z",
+            "grant_status": "granted",
+            "recorded_at": "2026-04-25T02:31:00Z",
+        }
+        payload["digest"] = sha256_text(canonical_json(payload))
+        return {
+            "kind": "distributed_transport_privileged_capture_acquisition",
+            "schema_version": "1.0.0",
+            **payload,
+        }
+
     def test_minor_diff_reconciles_via_consensus_round(self) -> None:
         sync = WorldModelSync()
         session = sync.create_session(
@@ -856,6 +996,83 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertEqual(engine_log["digest"], receipt["engine_transaction_log_digest"])
         self.assertFalse(tampered_validation["ok"])
         self.assertFalse(tampered_validation["authority_route_trace_bound"])
+
+    def test_engine_capture_binding_binds_route_to_capture_evidence(self) -> None:
+        sync = WorldModelSync()
+        session = sync.create_session(
+            ["identity://primary", "identity://peer"],
+            objects=["atrium", "council-table"],
+        )
+        state_digest = sha256_text(canonical_json(sync.snapshot(session["session_id"])))
+        engine_session_ref = f"engine-session://test/{session['session_id']}"
+        source_digest = sha256_text("approval-fanout")
+        entry = sync.build_engine_transaction_entry(
+            transaction_id="engine-txn://test/capture-binding/001",
+            transaction_index=1,
+            operation="approval_fanout_bound",
+            source_artifact_kind="wms_distributed_approval_fanout_receipt",
+            source_artifact_ref="artifact://approval-fanout",
+            source_artifact_digest=source_digest,
+            engine_session_ref=engine_session_ref,
+            engine_state_before_digest=state_digest,
+            engine_state_after_digest=state_digest,
+            participant_ids=session["current_state"]["participants"],
+        )
+        engine_log = sync.build_engine_transaction_log_receipt(
+            session["session_id"],
+            engine_adapter_ref="engine-adapter://test/reference",
+            engine_session_ref=engine_session_ref,
+            transaction_log_ref=f"engine-log://test/{session['session_id']}",
+            transaction_entries=[entry],
+            required_operations=["approval_fanout_bound"],
+            source_artifact_digests={"approval_fanout_bound": source_digest},
+        )
+        route_trace = self._authority_route_trace()
+        route_binding = sync.build_engine_route_binding_receipt(
+            session["session_id"],
+            engine_transaction_log_receipt=engine_log,
+            authority_route_trace=route_trace,
+        )
+        packet_capture = self._packet_capture_export(route_trace)
+        acquisition = self._privileged_capture_acquisition(route_trace, packet_capture)
+
+        receipt = sync.build_engine_capture_binding_receipt(
+            session["session_id"],
+            engine_route_binding_receipt=route_binding,
+            packet_capture_export=packet_capture,
+            privileged_capture_acquisition=acquisition,
+        )
+        validation = sync.validate_engine_capture_binding_receipt(
+            receipt,
+            engine_route_binding_receipt=route_binding,
+            packet_capture_export=packet_capture,
+            privileged_capture_acquisition=acquisition,
+        )
+        tampered_acquisition = dict(acquisition)
+        tampered_acquisition["filter_digest"] = sha256_text("tampered-filter")
+        tampered_validation = sync.validate_engine_capture_binding_receipt(
+            receipt,
+            engine_route_binding_receipt=route_binding,
+            packet_capture_export=packet_capture,
+            privileged_capture_acquisition=tampered_acquisition,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["engine_route_binding_bound"])
+        self.assertTrue(validation["packet_capture_bound"])
+        self.assertTrue(validation["privileged_capture_bound"])
+        self.assertTrue(validation["route_binding_set_bound"])
+        self.assertTrue(validation["engine_capture_binding_complete"])
+        self.assertEqual("complete", receipt["engine_capture_binding_status"])
+        self.assertEqual(route_binding["digest"], receipt["engine_route_binding_digest"])
+        self.assertEqual(packet_capture["digest"], receipt["packet_capture_digest"])
+        self.assertEqual(acquisition["digest"], receipt["privileged_capture_digest"])
+        self.assertEqual(4, receipt["packet_count"])
+        self.assertFalse(receipt["raw_engine_payload_stored"])
+        self.assertFalse(receipt["raw_route_payload_stored"])
+        self.assertFalse(receipt["raw_packet_body_stored"])
+        self.assertFalse(tampered_validation["ok"])
+        self.assertFalse(tampered_validation["privileged_capture_bound"])
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
         sync = WorldModelSync()
