@@ -5,8 +5,9 @@ description: >
   Digest-bound receipt proving that WMS distributed approval fan-out retry
   attempts were admitted through a bounded external remote-authority retry
   budget. The receipt binds route-health observations, fixed exponential
-  backoff schedule entries, the final fan-out digest, and the WMS engine
-  transaction log digest without storing raw remote transport transcripts.
+  backoff schedule entries, signed jurisdiction-specific retry rate limits,
+  the final fan-out digest, and the WMS engine transaction log digest without
+  storing raw remote transport transcripts.
 type: object
 additionalProperties: false
 required:
@@ -14,6 +15,9 @@ required:
   - schema_version
   - retry_budget_policy_id
   - digest_profile
+  - signature_policy_id
+  - jurisdiction_rate_limit_profile
+  - signature_digest_profile
   - schedule_profile
   - session_id
   - authority_profile_ref
@@ -29,6 +33,11 @@ required:
   - route_health_observations
   - route_health_observation_digests
   - route_health_set_digest
+  - remote_jurisdictions
+  - jurisdiction_rate_limit_digests
+  - jurisdiction_rate_limit_set_digest
+  - authority_signature_digests
+  - authority_signature_set_digest
   - outage_participants
   - schedule_entries
   - schedule_entry_digests
@@ -41,6 +50,9 @@ required:
   - max_scheduled_delay_ms
   - all_outages_budgeted
   - adaptive_retry_budget_bound
+  - jurisdiction_rate_limit_bound
+  - authority_signature_bound
+  - signed_jurisdiction_retry_budget_bound
   - budget_status
   - raw_remote_transcript_stored
   - digest
@@ -57,6 +69,15 @@ properties:
   digest_profile:
     type: string
     const: authority-route-health-retry-budget-digest-v1
+  signature_policy_id:
+    type: string
+    const: signed-jurisdiction-rate-limit-retry-budget-v1
+  jurisdiction_rate_limit_profile:
+    type: string
+    const: jurisdiction-aware-authority-retry-rate-limit-v1
+  signature_digest_profile:
+    type: string
+    const: authority-retry-budget-signature-digest-v1
   schedule_profile:
     type: string
     const: fixed-exponential-backoff-with-health-cap-v1
@@ -107,6 +128,12 @@ properties:
         - participant_id
         - outage_kind
         - route_status
+        - remote_jurisdiction
+        - jurisdiction_rate_limit_ref
+        - jurisdiction_retry_limit_ms
+        - jurisdiction_rate_limit_digest
+        - signer_key_ref
+        - authority_signature_digest
         - observed_latency_ms
         - success_ratio
         - consecutive_failures
@@ -134,6 +161,23 @@ properties:
             - degraded
             - partial-outage
             - recovered
+        remote_jurisdiction:
+          type: string
+          minLength: 2
+        jurisdiction_rate_limit_ref:
+          type: string
+          minLength: 1
+        jurisdiction_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
+        jurisdiction_rate_limit_digest:
+          $ref: "#/$defs/sha256"
+        signer_key_ref:
+          type: string
+          minLength: 1
+        authority_signature_digest:
+          $ref: "#/$defs/sha256"
         observed_latency_ms:
           type: integer
           minimum: 0
@@ -156,6 +200,29 @@ properties:
       $ref: "#/$defs/sha256"
   route_health_set_digest:
     $ref: "#/$defs/sha256"
+  remote_jurisdictions:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 2
+  jurisdiction_rate_limit_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  jurisdiction_rate_limit_set_digest:
+    $ref: "#/$defs/sha256"
+  authority_signature_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  authority_signature_set_digest:
+    $ref: "#/$defs/sha256"
   outage_participants:
     type: array
     uniqueItems: true
@@ -177,9 +244,15 @@ properties:
         - computed_backoff_ms
         - remaining_budget_ms
         - route_health_observation_digest
+        - remote_jurisdiction
+        - jurisdiction_rate_limit_ref
+        - jurisdiction_retry_limit_ms
+        - jurisdiction_rate_limit_digest
+        - authority_signature_digest
         - recovery_result_digest
         - recovery_transport_receipt_digest
         - route_health_eligible
+        - jurisdiction_rate_limit_ok
         - within_budget
         - budget_decision
         - schedule_entry_digest
@@ -214,11 +287,28 @@ properties:
           maximum: 1500
         route_health_observation_digest:
           $ref: "#/$defs/sha256"
+        remote_jurisdiction:
+          type: string
+          minLength: 2
+        jurisdiction_rate_limit_ref:
+          type: string
+          minLength: 1
+        jurisdiction_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
+        jurisdiction_rate_limit_digest:
+          $ref: "#/$defs/sha256"
+        authority_signature_digest:
+          $ref: "#/$defs/sha256"
         recovery_result_digest:
           $ref: "#/$defs/sha256"
         recovery_transport_receipt_digest:
           $ref: "#/$defs/sha256"
         route_health_eligible:
+          type: boolean
+          const: true
+        jurisdiction_rate_limit_ok:
           type: boolean
           const: true
         within_budget:
@@ -260,6 +350,15 @@ properties:
     type: boolean
     const: true
   adaptive_retry_budget_bound:
+    type: boolean
+    const: true
+  jurisdiction_rate_limit_bound:
+    type: boolean
+    const: true
+  authority_signature_bound:
+    type: boolean
+    const: true
+  signed_jurisdiction_retry_budget_bound:
     type: boolean
     const: true
   budget_status:

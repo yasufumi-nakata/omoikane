@@ -868,6 +868,7 @@ route binding ref set、PCAP artifact / readback digest、broker lease / filter 
 共有することを確認する。
 さらに recovered fan-out retry を
 `bounded-remote-authority-adaptive-retry-budget-v1` の
+signed jurisdiction-specific rate limit digest、authority signature digest、
 remote authority route-health observation と
 `fixed-exponential-backoff-with-health-cap-v1` schedule entry へ束ね、
 engine transaction log の `approval_fanout_bound` entry と同じ fan-out digest を共有し、

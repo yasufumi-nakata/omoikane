@@ -246,7 +246,7 @@ operations:
       - raw engine payloads, raw route payloads, and raw packet bodies must not be stored in the capture binding receipt
       - engine_capture_binding_status can become complete only when route binding, packet capture, privileged acquisition, and route-ref set binding all validate
   bind_remote_authority_retry_budget:
-    summary: Bind recovered remote authority partial-outage retries to a deterministic adaptive retry budget and engine transaction evidence.
+    summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.
     input:
       inline_schema:
         type: object
@@ -277,6 +277,8 @@ operations:
       - recovered fan-out retry attempts must be admitted through bounded-remote-authority-adaptive-retry-budget-v1 before external authority retries are considered complete
       - retry schedule entries must use fixed-exponential-backoff-with-health-cap-v1 with base_retry_after_ms=250, exponential_multiplier=2, max_retry_attempts=2, and total_retry_budget_ms=1500
       - every outage participant must have a route-health observation digest and a schedule entry that binds the same recovery result digest and recovery transport receipt digest
+      - every route-health observation must carry remote_jurisdiction, jurisdiction_rate_limit_ref, jurisdiction_retry_limit_ms, signer_key_ref, jurisdiction_rate_limit_digest, and authority_signature_digest
+      - every schedule entry must copy the signed jurisdiction rate-limit evidence and stay within both fixed exponential backoff and jurisdiction_retry_limit_ms
       - the engine transaction log must contain approval_fanout_bound with the same approval_fanout_digest
       - raw remote authority transcripts must not be stored in the retry budget receipt
   switch_mode:

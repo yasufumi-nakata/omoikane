@@ -197,6 +197,19 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("complete", result["scenarios"]["engine_capture_binding"]["engine_capture_binding_status"])
         self.assertFalse(result["scenarios"]["engine_capture_binding"]["raw_packet_body_stored"])
         self.assertEqual("complete", result["scenarios"]["remote_authority_retry_budget"]["budget_status"])
+        self.assertEqual(
+            "signed-jurisdiction-rate-limit-retry-budget-v1",
+            result["scenarios"]["remote_authority_retry_budget"]["signature_policy_id"],
+        )
+        self.assertEqual(
+            ["JP-13"],
+            result["scenarios"]["remote_authority_retry_budget"]["remote_jurisdictions"],
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "signed_jurisdiction_retry_budget_bound"
+            ]
+        )
         self.assertFalse(
             result["scenarios"]["remote_authority_retry_budget"]["raw_remote_transcript_stored"]
         )

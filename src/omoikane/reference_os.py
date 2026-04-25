@@ -8639,6 +8639,12 @@ json.dump(response, sys.stdout)
                     "participant_id": observer.identity_id,
                     "outage_kind": "timeout",
                     "route_status": "partial-outage",
+                    "remote_jurisdiction": "JP-13",
+                    "jurisdiction_rate_limit_ref": (
+                        "rate-limit://jp-13/wms-approval-retry-budget/v1"
+                    ),
+                    "jurisdiction_retry_limit_ms": 500,
+                    "signer_key_ref": "key://federation/jp-13/wms-retry-signer",
                     "observed_latency_ms": 860,
                     "success_ratio": 0.667,
                     "consecutive_failures": 1,
@@ -8870,9 +8876,20 @@ json.dump(response, sys.stdout)
                         "engine_log_fanout_bound"
                     ]
                     and remote_authority_retry_budget_validation["route_health_bound"]
+                    and remote_authority_retry_budget_validation[
+                        "jurisdiction_rate_limit_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "authority_signature_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "signed_jurisdiction_retry_budget_bound"
+                    ]
                     and remote_authority_retry_budget_validation["schedule_bound"]
                     and remote_authority_retry_budget["budget_status"] == "complete"
                     and remote_authority_retry_budget["total_scheduled_delay_ms"] == 250
+                    and remote_authority_retry_budget["remote_jurisdictions"]
+                    == ["JP-13"]
                     and remote_authority_retry_budget["raw_remote_transcript_stored"]
                     is False
                 ),

@@ -818,6 +818,10 @@ class WorldModelSyncTests(unittest.TestCase):
                     "participant_id": session["current_state"]["participants"][-1],
                     "outage_kind": "timeout",
                     "route_status": "partial-outage",
+                    "remote_jurisdiction": "JP-13",
+                    "jurisdiction_rate_limit_ref": "rate-limit://jp-13/test-wms-retry",
+                    "jurisdiction_retry_limit_ms": 500,
+                    "signer_key_ref": "key://test/jp-13/wms-retry-signer",
                     "observed_latency_ms": 830,
                     "success_ratio": 0.667,
                     "consecutive_failures": 1,
@@ -834,6 +838,16 @@ class WorldModelSyncTests(unittest.TestCase):
         tampered_budget["engine_log_fanout_bound"] = False
         tampered_budget_validation = sync.validate_remote_authority_retry_budget_receipt(
             tampered_budget,
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            required_participants=session["current_state"]["participants"],
+        )
+        tampered_signature_budget = dict(retry_budget)
+        tampered_signature_budget["authority_signature_digests"] = [
+            sha256_text("tampered-signature")
+        ]
+        tampered_signature_validation = sync.validate_remote_authority_retry_budget_receipt(
+            tampered_signature_budget,
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
@@ -862,12 +876,20 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
         self.assertTrue(retry_budget_validation["route_health_bound"])
+        self.assertTrue(retry_budget_validation["jurisdiction_rate_limit_bound"])
+        self.assertTrue(retry_budget_validation["authority_signature_bound"])
+        self.assertTrue(retry_budget_validation["signed_jurisdiction_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["schedule_bound"])
         self.assertEqual("complete", retry_budget["budget_status"])
         self.assertEqual(250, retry_budget["total_scheduled_delay_ms"])
+        self.assertEqual(["JP-13"], retry_budget["remote_jurisdictions"])
+        self.assertTrue(retry_budget["jurisdiction_rate_limit_bound"])
+        self.assertTrue(retry_budget["authority_signature_bound"])
         self.assertFalse(retry_budget["raw_remote_transcript_stored"])
         self.assertFalse(tampered_budget_validation["ok"])
         self.assertFalse(tampered_budget_validation["digest_bound"])
+        self.assertFalse(tampered_signature_validation["ok"])
+        self.assertFalse(tampered_signature_validation["authority_signature_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

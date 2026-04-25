@@ -131,6 +131,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "complete",
             result["scenarios"]["remote_authority_retry_budget"]["budget_status"],
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "signed_jurisdiction_retry_budget_bound"
+            ]
+        )
+        self.assertEqual(
+            ["JP-13"],
+            result["scenarios"]["remote_authority_retry_budget"]["remote_jurisdictions"],
+        )
         self.assertEqual(
             result["scenarios"]["approval_fanout_receipt"]["digest"],
             result["scenarios"]["remote_authority_retry_budget"]["approval_fanout_digest"],

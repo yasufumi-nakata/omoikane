@@ -116,6 +116,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/wms_engine_capture_binding_receipt.schema",
             result["scenarios"]["engine_capture_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/wms_remote_authority_retry_budget_receipt.schema",
+            result["scenarios"]["remote_authority_retry_budget"],
+        )
         self.assertTrue(result["validation"]["physics_change_reversible"])
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
         self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
@@ -124,6 +128,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
         self.assertTrue(result["validation"]["engine_route_binding_bound"])
         self.assertTrue(result["validation"]["engine_capture_binding_bound"])
+        self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["physics_change"]["digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_transport_digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
@@ -131,6 +136,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["engine_transaction_log"]["digest_bound"])
         self.assertTrue(result["validation"]["engine_route_binding"]["digest_bound"])
         self.assertTrue(result["validation"]["engine_capture_binding"]["digest_bound"])
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "signed_jurisdiction_retry_budget_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 

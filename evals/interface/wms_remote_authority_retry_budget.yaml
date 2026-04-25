@@ -3,7 +3,8 @@ target: interface.wms
 level: L6
 description: >
   World Model Sync の recovered distributed approval fan-out retry が、
-  remote authority route-health observation、fixed exponential backoff schedule、
+  signed jurisdiction-aware remote authority route-health observation、
+  fixed exponential backoff schedule、
   external engine transaction log の approval_fanout_bound entry に束縛され、
   raw remote authority transcript を保存しないことを確認する。
 inputs:
@@ -14,7 +15,12 @@ expected:
   remote_authority_retry_budget_bound: true
   retry_budget_policy_id: bounded-remote-authority-adaptive-retry-budget-v1
   digest_profile: authority-route-health-retry-budget-digest-v1
+  signature_policy_id: signed-jurisdiction-rate-limit-retry-budget-v1
+  jurisdiction_rate_limit_profile: jurisdiction-aware-authority-retry-rate-limit-v1
+  signature_digest_profile: authority-retry-budget-signature-digest-v1
   schedule_profile: fixed-exponential-backoff-with-health-cap-v1
+  remote_jurisdictions:
+    - JP-13
   base_retry_after_ms: 250
   exponential_multiplier: 2
   max_retry_attempts: 2
@@ -23,6 +29,9 @@ expected:
   budget_status: complete
   engine_log_fanout_bound: true
   route_health_bound: true
+  jurisdiction_rate_limit_bound: true
+  authority_signature_bound: true
+  signed_jurisdiction_retry_budget_bound: true
   schedule_bound: true
   raw_remote_transcript_stored: false
 metric: boolean

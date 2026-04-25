@@ -39,6 +39,15 @@ WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID = (
 WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE = (
     "authority-route-health-retry-budget-digest-v1"
 )
+WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID = (
+    "signed-jurisdiction-rate-limit-retry-budget-v1"
+)
+WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE = (
+    "jurisdiction-aware-authority-retry-rate-limit-v1"
+)
+WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE = (
+    "authority-retry-budget-signature-digest-v1"
+)
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE = (
     "fixed-exponential-backoff-with-health-cap-v1"
 )
@@ -215,6 +224,9 @@ class WorldModelSync:
                 "approval_fanout_retry_window_ms": WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS,
                 "remote_authority_retry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID,
                 "remote_authority_retry_digest_profile": WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE,
+                "remote_authority_retry_signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
+                "remote_authority_jurisdiction_rate_limit_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE,
+                "remote_authority_signature_digest_profile": WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
                 "remote_authority_retry_multiplier": WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
@@ -881,6 +893,8 @@ class WorldModelSync:
             )
             within_budget = (
                 retry_after_ms <= computed_backoff_ms
+                and observation is not None
+                and retry_after_ms <= observation["jurisdiction_retry_limit_ms"]
                 and cumulative_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             )
             schedule_entry = {
@@ -901,11 +915,38 @@ class WorldModelSync:
                 "route_health_observation_digest": (
                     observation["observation_digest"] if observation is not None else ""
                 ),
+                "remote_jurisdiction": (
+                    observation["remote_jurisdiction"] if observation is not None else ""
+                ),
+                "jurisdiction_rate_limit_ref": (
+                    observation["jurisdiction_rate_limit_ref"]
+                    if observation is not None
+                    else ""
+                ),
+                "jurisdiction_retry_limit_ms": (
+                    observation["jurisdiction_retry_limit_ms"]
+                    if observation is not None
+                    else 0
+                ),
+                "jurisdiction_rate_limit_digest": (
+                    observation["jurisdiction_rate_limit_digest"]
+                    if observation is not None
+                    else ""
+                ),
+                "authority_signature_digest": (
+                    observation["authority_signature_digest"]
+                    if observation is not None
+                    else ""
+                ),
                 "recovery_result_digest": attempt["recovery_result_digest"],
                 "recovery_transport_receipt_digest": attempt[
                     "recovery_transport_receipt_digest"
                 ],
                 "route_health_eligible": route_health_eligible,
+                "jurisdiction_rate_limit_ok": (
+                    observation is not None
+                    and retry_after_ms <= observation["jurisdiction_retry_limit_ms"]
+                ),
                 "within_budget": within_budget,
                 "budget_decision": (
                     "retry" if route_health_eligible and within_budget else "blocked"
@@ -923,6 +964,16 @@ class WorldModelSync:
         route_observation_digests = [
             observation["observation_digest"] for observation in observations
         ]
+        jurisdiction_rate_limit_digests = [
+            observation["jurisdiction_rate_limit_digest"]
+            for observation in observations
+        ]
+        authority_signature_digests = [
+            observation["authority_signature_digest"] for observation in observations
+        ]
+        remote_jurisdictions = sorted(
+            {observation["remote_jurisdiction"] for observation in observations}
+        )
         schedule_entry_digests = [
             entry["schedule_entry_digest"] for entry in schedule_entries
         ]
@@ -946,6 +997,8 @@ class WorldModelSync:
             and engine_log_validation["ok"]
             and engine_log_fanout_bound
             and all_outages_budgeted
+            and bool(jurisdiction_rate_limit_digests)
+            and bool(authority_signature_digests)
             and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             and fanout_receipt.get("partial_outage_status") in {"not-required", "recovered"}
         )
@@ -954,6 +1007,9 @@ class WorldModelSync:
             "schema_version": WMS_SCHEMA_VERSION,
             "retry_budget_policy_id": WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID,
             "digest_profile": WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE,
+            "signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
+            "jurisdiction_rate_limit_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE,
+            "signature_digest_profile": WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE,
             "schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
             "session_id": session_id,
             "authority_profile_ref": authority_ref,
@@ -975,6 +1031,15 @@ class WorldModelSync:
             "route_health_set_digest": sha256_text(
                 canonical_json(route_observation_digests)
             ),
+            "remote_jurisdictions": remote_jurisdictions,
+            "jurisdiction_rate_limit_digests": jurisdiction_rate_limit_digests,
+            "jurisdiction_rate_limit_set_digest": sha256_text(
+                canonical_json(jurisdiction_rate_limit_digests)
+            ),
+            "authority_signature_digests": authority_signature_digests,
+            "authority_signature_set_digest": sha256_text(
+                canonical_json(authority_signature_digests)
+            ),
             "outage_participants": outage_participants,
             "schedule_entries": schedule_entries,
             "schedule_entry_digests": schedule_entry_digests,
@@ -991,6 +1056,9 @@ class WorldModelSync:
             ),
             "all_outages_budgeted": all_outages_budgeted,
             "adaptive_retry_budget_bound": adaptive_budget_bound,
+            "jurisdiction_rate_limit_bound": bool(jurisdiction_rate_limit_digests),
+            "authority_signature_bound": bool(authority_signature_digests),
+            "signed_jurisdiction_retry_budget_bound": adaptive_budget_bound,
             "budget_status": "complete" if adaptive_budget_bound else "incomplete",
             "raw_remote_transcript_stored": False,
         }
@@ -2859,6 +2927,29 @@ class WorldModelSync:
                 str(raw_observation.get("route_ref") or ""),
                 "route_ref",
             )
+            remote_jurisdiction = self._normalize_non_empty_string(
+                str(raw_observation.get("remote_jurisdiction") or ""),
+                "remote_jurisdiction",
+            )
+            jurisdiction_rate_limit_ref = self._normalize_non_empty_string(
+                str(raw_observation.get("jurisdiction_rate_limit_ref") or ""),
+                "jurisdiction_rate_limit_ref",
+            )
+            signer_key_ref = self._normalize_non_empty_string(
+                str(raw_observation.get("signer_key_ref") or ""),
+                "signer_key_ref",
+            )
+            jurisdiction_retry_limit_ms = raw_observation.get(
+                "jurisdiction_retry_limit_ms"
+            )
+            if (
+                not isinstance(jurisdiction_retry_limit_ms, int)
+                or jurisdiction_retry_limit_ms < 1
+                or jurisdiction_retry_limit_ms > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            ):
+                raise ValueError(
+                    "jurisdiction_retry_limit_ms must be a positive integer within total retry budget"
+                )
             key = (participant, outage_kind, route_ref)
             if key in seen:
                 raise ValueError("route health observations must be unique per route")
@@ -2886,6 +2977,32 @@ class WorldModelSync:
                 and success_ratio >= 0.5
                 and consecutive_failures <= WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
             )
+            jurisdiction_rate_limit_payload = {
+                "authority_ref": authority_ref,
+                "route_ref": route_ref,
+                "remote_jurisdiction": remote_jurisdiction,
+                "jurisdiction_rate_limit_ref": jurisdiction_rate_limit_ref,
+                "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "outage_kind": outage_kind,
+                "signer_key_ref": signer_key_ref,
+            }
+            jurisdiction_rate_limit_digest = sha256_text(
+                canonical_json(jurisdiction_rate_limit_payload)
+            )
+            authority_signature_digest = sha256_text(
+                canonical_json(
+                    {
+                        "signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
+                        "authority_ref": authority_ref,
+                        "route_ref": route_ref,
+                        "participant_id": participant,
+                        "outage_kind": outage_kind,
+                        "remote_jurisdiction": remote_jurisdiction,
+                        "jurisdiction_rate_limit_digest": jurisdiction_rate_limit_digest,
+                        "signer_key_ref": signer_key_ref,
+                    }
+                )
+            )
             observation = {
                 "observation_ref": self._normalize_non_empty_string(
                     str(
@@ -2899,6 +3016,12 @@ class WorldModelSync:
                 "participant_id": participant,
                 "outage_kind": outage_kind,
                 "route_status": route_status,
+                "remote_jurisdiction": remote_jurisdiction,
+                "jurisdiction_rate_limit_ref": jurisdiction_rate_limit_ref,
+                "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "jurisdiction_rate_limit_digest": jurisdiction_rate_limit_digest,
+                "signer_key_ref": signer_key_ref,
+                "authority_signature_digest": authority_signature_digest,
                 "observed_latency_ms": observed_latency_ms,
                 "success_ratio": success_ratio,
                 "consecutive_failures": consecutive_failures,
@@ -2941,6 +3064,15 @@ class WorldModelSync:
             errors.append("retry_budget_policy_id mismatch")
         if receipt.get("digest_profile") != WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE:
             errors.append("digest_profile mismatch")
+        if receipt.get("signature_policy_id") != WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID:
+            errors.append("signature_policy_id mismatch")
+        if (
+            receipt.get("jurisdiction_rate_limit_profile")
+            != WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE
+        ):
+            errors.append("jurisdiction_rate_limit_profile mismatch")
+        if receipt.get("signature_digest_profile") != WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE:
+            errors.append("signature_digest_profile mismatch")
         if receipt.get("schedule_profile") != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE:
             errors.append("schedule_profile mismatch")
         if receipt.get("approval_fanout_policy_id") != WMS_APPROVAL_FANOUT_POLICY_ID:
@@ -3022,6 +3154,8 @@ class WorldModelSync:
             errors.append("route_health_observations must be a list")
             observations = []
         expected_observation_digests: List[str] = []
+        expected_rate_limit_digests: List[str] = []
+        expected_signature_digests: List[str] = []
         observation_by_key: Dict[tuple[str, str], Mapping[str, Any]] = {}
         route_health_bound = True
         for observation in observations:
@@ -3029,7 +3163,17 @@ class WorldModelSync:
                 errors.append("route_health_observations must contain objects")
                 route_health_bound = False
                 continue
-            for field_name in ("observation_ref", "authority_ref", "route_ref", "participant_id", "outage_kind", "route_status"):
+            for field_name in (
+                "observation_ref",
+                "authority_ref",
+                "route_ref",
+                "participant_id",
+                "outage_kind",
+                "route_status",
+                "remote_jurisdiction",
+                "jurisdiction_rate_limit_ref",
+                "signer_key_ref",
+            ):
                 self._check_non_empty_string(observation.get(field_name), field_name, errors)
             if observation.get("participant_id") not in expected_participants:
                 errors.append("route health participant_id must belong to required participants")
@@ -3055,6 +3199,49 @@ class WorldModelSync:
             if not isinstance(consecutive_failures, int) or consecutive_failures < 0:
                 errors.append("consecutive_failures must be a non-negative integer")
                 route_health_bound = False
+            jurisdiction_retry_limit_ms = observation.get("jurisdiction_retry_limit_ms")
+            if (
+                not isinstance(jurisdiction_retry_limit_ms, int)
+                or jurisdiction_retry_limit_ms < 1
+                or jurisdiction_retry_limit_ms > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            ):
+                errors.append("jurisdiction_retry_limit_ms must fit total retry budget")
+                route_health_bound = False
+                jurisdiction_retry_limit_ms = 0
+            rate_limit_payload = {
+                "authority_ref": observation.get("authority_ref"),
+                "route_ref": observation.get("route_ref"),
+                "remote_jurisdiction": observation.get("remote_jurisdiction"),
+                "jurisdiction_rate_limit_ref": observation.get(
+                    "jurisdiction_rate_limit_ref"
+                ),
+                "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "outage_kind": observation.get("outage_kind"),
+                "signer_key_ref": observation.get("signer_key_ref"),
+            }
+            expected_rate_limit_digest = sha256_text(
+                canonical_json(rate_limit_payload)
+            )
+            if observation.get("jurisdiction_rate_limit_digest") != expected_rate_limit_digest:
+                errors.append("jurisdiction_rate_limit_digest must bind signed rate limit payload")
+                route_health_bound = False
+            expected_signature_digest = sha256_text(
+                canonical_json(
+                    {
+                        "signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
+                        "authority_ref": observation.get("authority_ref"),
+                        "route_ref": observation.get("route_ref"),
+                        "participant_id": observation.get("participant_id"),
+                        "outage_kind": observation.get("outage_kind"),
+                        "remote_jurisdiction": observation.get("remote_jurisdiction"),
+                        "jurisdiction_rate_limit_digest": expected_rate_limit_digest,
+                        "signer_key_ref": observation.get("signer_key_ref"),
+                    }
+                )
+            )
+            if observation.get("authority_signature_digest") != expected_signature_digest:
+                errors.append("authority_signature_digest must bind jurisdiction rate limit digest")
+                route_health_bound = False
             expected_digest = sha256_text(
                 canonical_json(
                     _remote_authority_route_observation_digest_payload(observation)
@@ -3065,6 +3252,14 @@ class WorldModelSync:
                 route_health_bound = False
             if isinstance(observation.get("observation_digest"), str):
                 expected_observation_digests.append(str(observation["observation_digest"]))
+            if isinstance(observation.get("jurisdiction_rate_limit_digest"), str):
+                expected_rate_limit_digests.append(
+                    str(observation["jurisdiction_rate_limit_digest"])
+                )
+            if isinstance(observation.get("authority_signature_digest"), str):
+                expected_signature_digests.append(
+                    str(observation["authority_signature_digest"])
+                )
             if isinstance(observation.get("participant_id"), str) and isinstance(
                 observation.get("outage_kind"),
                 str,
@@ -3080,6 +3275,41 @@ class WorldModelSync:
         ):
             errors.append("route_health_set_digest must bind observation digests")
             route_health_bound = False
+
+        remote_jurisdictions = receipt.get("remote_jurisdictions")
+        expected_remote_jurisdictions = sorted(
+            {
+                str(observation.get("remote_jurisdiction"))
+                for observation in observations
+                if isinstance(observation, Mapping)
+                and isinstance(observation.get("remote_jurisdiction"), str)
+            }
+        )
+        jurisdiction_rate_limit_bound = route_health_bound and bool(
+            expected_rate_limit_digests
+        )
+        authority_signature_bound = route_health_bound and bool(
+            expected_signature_digests
+        )
+        if remote_jurisdictions != expected_remote_jurisdictions:
+            errors.append("remote_jurisdictions must reflect observed jurisdictions")
+            jurisdiction_rate_limit_bound = False
+        if receipt.get("jurisdiction_rate_limit_digests") != expected_rate_limit_digests:
+            errors.append("jurisdiction_rate_limit_digests must follow observation order")
+            jurisdiction_rate_limit_bound = False
+        if receipt.get("jurisdiction_rate_limit_set_digest") != sha256_text(
+            canonical_json(expected_rate_limit_digests)
+        ):
+            errors.append("jurisdiction_rate_limit_set_digest must bind rate limit digests")
+            jurisdiction_rate_limit_bound = False
+        if receipt.get("authority_signature_digests") != expected_signature_digests:
+            errors.append("authority_signature_digests must follow observation order")
+            authority_signature_bound = False
+        if receipt.get("authority_signature_set_digest") != sha256_text(
+            canonical_json(expected_signature_digests)
+        ):
+            errors.append("authority_signature_set_digest must bind signature digests")
+            authority_signature_bound = False
 
         schedule_entries = receipt.get("schedule_entries")
         if not isinstance(schedule_entries, list):
@@ -3097,7 +3327,14 @@ class WorldModelSync:
                 errors.append("schedule_entries must contain objects")
                 schedule_bound = False
                 continue
-            for field_name in ("schedule_entry_ref", "retry_attempt_ref", "participant_id", "outage_kind"):
+            for field_name in (
+                "schedule_entry_ref",
+                "retry_attempt_ref",
+                "participant_id",
+                "outage_kind",
+                "remote_jurisdiction",
+                "jurisdiction_rate_limit_ref",
+            ):
                 self._check_non_empty_string(entry.get(field_name), field_name, errors)
             attempt_index = entry.get("attempt_index")
             if (
@@ -3125,6 +3362,11 @@ class WorldModelSync:
             observation = observation_by_key.get(
                 (str(entry.get("participant_id")), str(entry.get("outage_kind")))
             )
+            jurisdiction_retry_limit_ms = entry.get("jurisdiction_retry_limit_ms")
+            if not isinstance(jurisdiction_retry_limit_ms, int) or jurisdiction_retry_limit_ms < 1:
+                errors.append("schedule jurisdiction_retry_limit_ms must be positive")
+                schedule_bound = False
+                jurisdiction_retry_limit_ms = 0
             if observation is None:
                 errors.append("schedule entry must bind a route health observation")
                 schedule_bound = False
@@ -3132,6 +3374,19 @@ class WorldModelSync:
                 "observation_digest"
             ):
                 errors.append("route_health_observation_digest must match observation")
+                schedule_bound = False
+            elif (
+                entry.get("remote_jurisdiction") != observation.get("remote_jurisdiction")
+                or entry.get("jurisdiction_rate_limit_ref")
+                != observation.get("jurisdiction_rate_limit_ref")
+                or entry.get("jurisdiction_retry_limit_ms")
+                != observation.get("jurisdiction_retry_limit_ms")
+                or entry.get("jurisdiction_rate_limit_digest")
+                != observation.get("jurisdiction_rate_limit_digest")
+                or entry.get("authority_signature_digest")
+                != observation.get("authority_signature_digest")
+            ):
+                errors.append("schedule entry must copy jurisdiction rate limit and signature evidence")
                 schedule_bound = False
             attempt = attempt_by_key.get((str(entry.get("participant_id")), attempt_index))
             if attempt is not None:
@@ -3149,8 +3404,18 @@ class WorldModelSync:
             if entry.get("route_health_eligible") is not True:
                 errors.append("route_health_eligible must be true")
                 schedule_bound = False
-            if entry.get("within_budget") is not (retry_after_ms <= computed_backoff_ms):
-                errors.append("within_budget must reflect retry_after_ms and backoff")
+            jurisdiction_rate_limit_ok = (
+                jurisdiction_retry_limit_ms > 0
+                and retry_after_ms <= jurisdiction_retry_limit_ms
+            )
+            if entry.get("jurisdiction_rate_limit_ok") is not jurisdiction_rate_limit_ok:
+                errors.append("jurisdiction_rate_limit_ok must reflect signed jurisdiction limit")
+                schedule_bound = False
+            if entry.get("within_budget") is not (
+                retry_after_ms <= computed_backoff_ms
+                and jurisdiction_rate_limit_ok
+            ):
+                errors.append("within_budget must reflect retry_after_ms, backoff, and jurisdiction limit")
                 schedule_bound = False
             if entry.get("budget_decision") != "retry":
                 errors.append("budget_decision must be retry")
@@ -3208,11 +3473,22 @@ class WorldModelSync:
             (fanout_validation["ok"] if approval_fanout_receipt is not None else True)
             and engine_log_fanout_bound
             and route_health_bound
+            and jurisdiction_rate_limit_bound
+            and authority_signature_bound
             and schedule_bound
             and all_outages_budgeted
             and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             and receipt.get("raw_remote_transcript_stored") is False
         )
+        if receipt.get("jurisdiction_rate_limit_bound") is not jurisdiction_rate_limit_bound:
+            errors.append("jurisdiction_rate_limit_bound must reflect signed rate limit digest binding")
+        if receipt.get("authority_signature_bound") is not authority_signature_bound:
+            errors.append("authority_signature_bound must reflect signature digest binding")
+        if (
+            receipt.get("signed_jurisdiction_retry_budget_bound")
+            is not adaptive_retry_budget_bound
+        ):
+            errors.append("signed_jurisdiction_retry_budget_bound must reflect complete signed budget binding")
         if receipt.get("adaptive_retry_budget_bound") is not adaptive_retry_budget_bound:
             errors.append("adaptive_retry_budget_bound must reflect fanout, engine, route, and schedule binding")
         if receipt.get("budget_status") not in {"complete", "incomplete"}:
@@ -3238,6 +3514,9 @@ class WorldModelSync:
             "schedule_bound": schedule_bound,
             "all_outages_budgeted": all_outages_budgeted,
             "digest_bound": digest_bound,
+            "jurisdiction_rate_limit_bound": jurisdiction_rate_limit_bound,
+            "authority_signature_bound": authority_signature_bound,
+            "signed_jurisdiction_retry_budget_bound": adaptive_retry_budget_bound,
         }
 
     def validate_engine_transaction_log_receipt(

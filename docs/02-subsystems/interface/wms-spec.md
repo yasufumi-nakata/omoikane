@@ -83,7 +83,10 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   raw engine payload / raw route payload / packet body は保存しない
 - real remote authority に近い partial outage recovery は
   `bounded-remote-authority-adaptive-retry-budget-v1` receipt で固定する。
-  route-health observation digest、`base_retry_after_ms=250` /
+  `signed-jurisdiction-rate-limit-retry-budget-v1` により
+  remote jurisdiction、jurisdiction-specific rate limit ref、signer key ref、
+  rate-limit digest、authority signature digest を route-health observation と
+  schedule entry の両方へ複写する。さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、
   raw remote authority transcript は保存しない
@@ -132,7 +135,7 @@ wms.observe_violation(session_id) → ViolationReport
   partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → engine transaction log →
   engine route binding → engine packet capture binding →
-  remote authority retry budget → malicious veto → mode 切替を実行
+  signed jurisdiction-aware remote authority retry budget → malicious veto → mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
   `evals/interface/wms_time_rate_deviation_escape.yaml` /
   `evals/interface/wms_time_rate_attestation_transport.yaml` /
@@ -156,6 +159,7 @@ wms.observe_violation(session_id) → ViolationReport
   readback / artifact digest、broker lease / filter digest と raw packet body 無しで
   束縛されることを保証
 - `evals/interface/wms_remote_authority_retry_budget.yaml` で recovered fan-out retry が
+  signed jurisdiction-specific rate limit digest、authority signature digest、
   route-health observation、fixed exponential backoff schedule、engine transaction log
   digest に束縛され、raw remote authority transcript を保存しないことを保証
 
