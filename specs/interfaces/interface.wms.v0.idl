@@ -283,7 +283,8 @@ operations:
       - retry schedule entries must use fixed-exponential-backoff-with-health-cap-v1 with base_retry_after_ms=250, exponential_multiplier=2, max_retry_attempts=2, and total_retry_budget_ms=1500
       - every outage participant must have a route-health observation digest and a schedule entry that binds the same recovery result digest and recovery transport receipt digest
       - every route-health observation must carry remote_jurisdiction, jurisdiction_rate_limit_ref, jurisdiction_retry_limit_ms, signer_key_ref, jurisdiction_rate_limit_digest, and authority_signature_digest
-      - every schedule entry must copy the signed jurisdiction rate-limit evidence and stay within both fixed exponential backoff and jurisdiction_retry_limit_ms
+      - every route-health observation must bind jurisdiction_policy_registry_ref/digest and authority_slo_snapshot_ref/digest under registry-bound-authority-retry-slo-v1
+      - every schedule entry must copy the signed jurisdiction rate-limit evidence, registry digest, SLO snapshot digest, and stay within fixed exponential backoff, jurisdiction_retry_limit_ms, and registry_slo_retry_limit_ms
       - the engine transaction log must contain approval_fanout_bound with the same approval_fanout_digest
       - raw remote authority transcripts must not be stored in the retry budget receipt
   switch_mode:

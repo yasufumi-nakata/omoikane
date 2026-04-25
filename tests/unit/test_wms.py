@@ -819,8 +819,15 @@ class WorldModelSyncTests(unittest.TestCase):
                     "outage_kind": "timeout",
                     "route_status": "partial-outage",
                     "remote_jurisdiction": "JP-13",
+                    "jurisdiction_policy_registry_ref": (
+                        "policy-registry://jp-13/test-wms-authority-retry"
+                    ),
                     "jurisdiction_rate_limit_ref": "rate-limit://jp-13/test-wms-retry",
                     "jurisdiction_retry_limit_ms": 500,
+                    "authority_slo_snapshot_ref": (
+                        "authority-slo://test/federation/observer-timeout"
+                    ),
+                    "authority_slo_retry_limit_ms": 500,
                     "signer_key_ref": "key://test/jp-13/wms-retry-signer",
                     "observed_latency_ms": 830,
                     "success_ratio": 0.667,
@@ -852,6 +859,16 @@ class WorldModelSyncTests(unittest.TestCase):
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
         )
+        tampered_registry_budget = dict(retry_budget)
+        tampered_registry_budget["jurisdiction_policy_registry_digests"] = [
+            sha256_text("tampered-registry")
+        ]
+        tampered_registry_validation = sync.validate_remote_authority_retry_budget_receipt(
+            tampered_registry_budget,
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            required_participants=session["current_state"]["participants"],
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["fanout_complete"])
@@ -877,19 +894,41 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
         self.assertTrue(retry_budget_validation["route_health_bound"])
         self.assertTrue(retry_budget_validation["jurisdiction_rate_limit_bound"])
+        self.assertTrue(retry_budget_validation["jurisdiction_policy_registry_bound"])
+        self.assertTrue(retry_budget_validation["authority_slo_snapshot_bound"])
+        self.assertTrue(retry_budget_validation["registry_slo_schedule_bound"])
         self.assertTrue(retry_budget_validation["authority_signature_bound"])
         self.assertTrue(retry_budget_validation["signed_jurisdiction_retry_budget_bound"])
+        self.assertTrue(retry_budget_validation["registry_bound_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["schedule_bound"])
         self.assertEqual("complete", retry_budget["budget_status"])
         self.assertEqual(250, retry_budget["total_scheduled_delay_ms"])
         self.assertEqual(["JP-13"], retry_budget["remote_jurisdictions"])
         self.assertTrue(retry_budget["jurisdiction_rate_limit_bound"])
+        self.assertTrue(retry_budget["jurisdiction_policy_registry_bound"])
+        self.assertTrue(retry_budget["authority_slo_snapshot_bound"])
+        self.assertTrue(retry_budget["registry_slo_schedule_bound"])
+        self.assertTrue(retry_budget["registry_bound_retry_budget_bound"])
         self.assertTrue(retry_budget["authority_signature_bound"])
+        self.assertEqual(
+            ["policy-registry://jp-13/test-wms-authority-retry"],
+            retry_budget["jurisdiction_policy_registry_refs"],
+        )
+        self.assertEqual(
+            ["authority-slo://test/federation/observer-timeout"],
+            retry_budget["authority_slo_snapshot_refs"],
+        )
+        self.assertEqual(
+            500,
+            retry_budget["schedule_entries"][0]["registry_slo_retry_limit_ms"],
+        )
         self.assertFalse(retry_budget["raw_remote_transcript_stored"])
         self.assertFalse(tampered_budget_validation["ok"])
         self.assertFalse(tampered_budget_validation["digest_bound"])
         self.assertFalse(tampered_signature_validation["ok"])
         self.assertFalse(tampered_signature_validation["authority_signature_bound"])
+        self.assertFalse(tampered_registry_validation["ok"])
+        self.assertFalse(tampered_registry_validation["jurisdiction_policy_registry_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

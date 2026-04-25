@@ -48,6 +48,18 @@ WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE = (
 WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE = (
     "authority-retry-budget-signature-digest-v1"
 )
+WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID = (
+    "registry-bound-authority-retry-slo-v1"
+)
+WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE = (
+    "jurisdiction-policy-registry-bound-retry-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE = (
+    "authority-slo-snapshot-retry-window-v1"
+)
+WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
+    "registry-slo-derived-retry-schedule-v1"
+)
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE = (
     "fixed-exponential-backoff-with-health-cap-v1"
 )
@@ -260,6 +272,10 @@ class WorldModelSync:
                 "remote_authority_retry_signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
                 "remote_authority_jurisdiction_rate_limit_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE,
                 "remote_authority_signature_digest_profile": WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE,
+                "remote_authority_retry_registry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID,
+                "remote_authority_jurisdiction_policy_registry_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE,
+                "remote_authority_slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+                "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
                 "remote_authority_retry_multiplier": WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
@@ -930,6 +946,7 @@ class WorldModelSync:
                 retry_after_ms <= computed_backoff_ms
                 and observation is not None
                 and retry_after_ms <= observation["jurisdiction_retry_limit_ms"]
+                and retry_after_ms <= observation["registry_slo_retry_limit_ms"]
                 and cumulative_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             )
             schedule_entry = {
@@ -968,6 +985,36 @@ class WorldModelSync:
                     if observation is not None
                     else ""
                 ),
+                "jurisdiction_policy_registry_ref": (
+                    observation["jurisdiction_policy_registry_ref"]
+                    if observation is not None
+                    else ""
+                ),
+                "jurisdiction_policy_registry_digest": (
+                    observation["jurisdiction_policy_registry_digest"]
+                    if observation is not None
+                    else ""
+                ),
+                "authority_slo_snapshot_ref": (
+                    observation["authority_slo_snapshot_ref"]
+                    if observation is not None
+                    else ""
+                ),
+                "authority_slo_snapshot_digest": (
+                    observation["authority_slo_snapshot_digest"]
+                    if observation is not None
+                    else ""
+                ),
+                "authority_slo_retry_limit_ms": (
+                    observation["authority_slo_retry_limit_ms"]
+                    if observation is not None
+                    else 0
+                ),
+                "registry_slo_retry_limit_ms": (
+                    observation["registry_slo_retry_limit_ms"]
+                    if observation is not None
+                    else 0
+                ),
                 "authority_signature_digest": (
                     observation["authority_signature_digest"]
                     if observation is not None
@@ -981,6 +1028,10 @@ class WorldModelSync:
                 "jurisdiction_rate_limit_ok": (
                     observation is not None
                     and retry_after_ms <= observation["jurisdiction_retry_limit_ms"]
+                ),
+                "registry_slo_limit_ok": (
+                    observation is not None
+                    and retry_after_ms <= observation["registry_slo_retry_limit_ms"]
                 ),
                 "within_budget": within_budget,
                 "budget_decision": (
@@ -1001,6 +1052,22 @@ class WorldModelSync:
         ]
         jurisdiction_rate_limit_digests = [
             observation["jurisdiction_rate_limit_digest"]
+            for observation in observations
+        ]
+        jurisdiction_policy_registry_refs = [
+            observation["jurisdiction_policy_registry_ref"]
+            for observation in observations
+        ]
+        jurisdiction_policy_registry_digests = [
+            observation["jurisdiction_policy_registry_digest"]
+            for observation in observations
+        ]
+        authority_slo_snapshot_refs = [
+            observation["authority_slo_snapshot_ref"]
+            for observation in observations
+        ]
+        authority_slo_snapshot_digests = [
+            observation["authority_slo_snapshot_digest"]
             for observation in observations
         ]
         authority_signature_digests = [
@@ -1033,6 +1100,8 @@ class WorldModelSync:
             and engine_log_fanout_bound
             and all_outages_budgeted
             and bool(jurisdiction_rate_limit_digests)
+            and bool(jurisdiction_policy_registry_digests)
+            and bool(authority_slo_snapshot_digests)
             and bool(authority_signature_digests)
             and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             and fanout_receipt.get("partial_outage_status") in {"not-required", "recovered"}
@@ -1045,6 +1114,10 @@ class WorldModelSync:
             "signature_policy_id": WMS_REMOTE_AUTHORITY_RETRY_SIGNATURE_POLICY_ID,
             "jurisdiction_rate_limit_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_RATE_LIMIT_PROFILE,
             "signature_digest_profile": WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE,
+            "registry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID,
+            "jurisdiction_policy_registry_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE,
+            "authority_slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+            "schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
             "schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
             "session_id": session_id,
             "authority_profile_ref": authority_ref,
@@ -1071,6 +1144,16 @@ class WorldModelSync:
             "jurisdiction_rate_limit_set_digest": sha256_text(
                 canonical_json(jurisdiction_rate_limit_digests)
             ),
+            "jurisdiction_policy_registry_refs": jurisdiction_policy_registry_refs,
+            "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
+            "jurisdiction_policy_registry_set_digest": sha256_text(
+                canonical_json(jurisdiction_policy_registry_digests)
+            ),
+            "authority_slo_snapshot_refs": authority_slo_snapshot_refs,
+            "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
+            "authority_slo_snapshot_set_digest": sha256_text(
+                canonical_json(authority_slo_snapshot_digests)
+            ),
             "authority_signature_digests": authority_signature_digests,
             "authority_signature_set_digest": sha256_text(
                 canonical_json(authority_signature_digests)
@@ -1092,8 +1175,14 @@ class WorldModelSync:
             "all_outages_budgeted": all_outages_budgeted,
             "adaptive_retry_budget_bound": adaptive_budget_bound,
             "jurisdiction_rate_limit_bound": bool(jurisdiction_rate_limit_digests),
+            "jurisdiction_policy_registry_bound": bool(
+                jurisdiction_policy_registry_digests
+            ),
+            "authority_slo_snapshot_bound": bool(authority_slo_snapshot_digests),
+            "registry_slo_schedule_bound": adaptive_budget_bound,
             "authority_signature_bound": bool(authority_signature_digests),
             "signed_jurisdiction_retry_budget_bound": adaptive_budget_bound,
+            "registry_bound_retry_budget_bound": adaptive_budget_bound,
             "budget_status": "complete" if adaptive_budget_bound else "incomplete",
             "raw_remote_transcript_stored": False,
         }
@@ -3008,6 +3097,13 @@ class WorldModelSync:
                 str(raw_observation.get("signer_key_ref") or ""),
                 "signer_key_ref",
             )
+            jurisdiction_policy_registry_ref = self._normalize_non_empty_string(
+                str(
+                    raw_observation.get("jurisdiction_policy_registry_ref")
+                    or f"policy-registry://{remote_jurisdiction}/wms-authority-retry/v1"
+                ),
+                "jurisdiction_policy_registry_ref",
+            )
             jurisdiction_retry_limit_ms = raw_observation.get(
                 "jurisdiction_retry_limit_ms"
             )
@@ -3032,6 +3128,30 @@ class WorldModelSync:
             observed_latency_ms = raw_observation.get("observed_latency_ms")
             if not isinstance(observed_latency_ms, int) or observed_latency_ms < 0:
                 raise ValueError("observed_latency_ms must be a non-negative integer")
+            authority_slo_snapshot_ref = self._normalize_non_empty_string(
+                str(
+                    raw_observation.get("authority_slo_snapshot_ref")
+                    or f"authority-slo://{sha256_text(authority_ref)[:12]}/{sha256_text(route_ref)[:12]}"
+                ),
+                "authority_slo_snapshot_ref",
+            )
+            authority_slo_retry_limit_ms = raw_observation.get(
+                "authority_slo_retry_limit_ms",
+                min(
+                    jurisdiction_retry_limit_ms,
+                    WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS
+                    * WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
+                ),
+            )
+            if (
+                not isinstance(authority_slo_retry_limit_ms, int)
+                or authority_slo_retry_limit_ms < 1
+                or authority_slo_retry_limit_ms
+                > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            ):
+                raise ValueError(
+                    "authority_slo_retry_limit_ms must be a positive integer within total retry budget"
+                )
             success_ratio = raw_observation.get("success_ratio")
             if not isinstance(success_ratio, (int, float)):
                 raise ValueError("success_ratio must be a number")
@@ -3046,12 +3166,48 @@ class WorldModelSync:
                 and success_ratio >= 0.5
                 and consecutive_failures <= WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
             )
+            jurisdiction_policy_registry_payload = {
+                "registry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID,
+                "registry_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE,
+                "jurisdiction_policy_registry_ref": jurisdiction_policy_registry_ref,
+                "remote_jurisdiction": remote_jurisdiction,
+                "jurisdiction_rate_limit_ref": jurisdiction_rate_limit_ref,
+                "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "signer_key_ref": signer_key_ref,
+            }
+            jurisdiction_policy_registry_digest = sha256_text(
+                canonical_json(jurisdiction_policy_registry_payload)
+            )
+            authority_slo_snapshot_payload = {
+                "slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+                "authority_slo_snapshot_ref": authority_slo_snapshot_ref,
+                "authority_ref": authority_ref,
+                "route_ref": route_ref,
+                "route_status": route_status,
+                "observed_latency_ms": observed_latency_ms,
+                "success_ratio": success_ratio,
+                "consecutive_failures": consecutive_failures,
+                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+            }
+            authority_slo_snapshot_digest = sha256_text(
+                canonical_json(authority_slo_snapshot_payload)
+            )
+            registry_slo_retry_limit_ms = min(
+                jurisdiction_retry_limit_ms,
+                authority_slo_retry_limit_ms,
+            )
             jurisdiction_rate_limit_payload = {
                 "authority_ref": authority_ref,
                 "route_ref": route_ref,
                 "remote_jurisdiction": remote_jurisdiction,
                 "jurisdiction_rate_limit_ref": jurisdiction_rate_limit_ref,
                 "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "jurisdiction_policy_registry_ref": jurisdiction_policy_registry_ref,
+                "jurisdiction_policy_registry_digest": jurisdiction_policy_registry_digest,
+                "authority_slo_snapshot_ref": authority_slo_snapshot_ref,
+                "authority_slo_snapshot_digest": authority_slo_snapshot_digest,
+                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+                "registry_slo_retry_limit_ms": registry_slo_retry_limit_ms,
                 "outage_kind": outage_kind,
                 "signer_key_ref": signer_key_ref,
             }
@@ -3068,6 +3224,9 @@ class WorldModelSync:
                         "outage_kind": outage_kind,
                         "remote_jurisdiction": remote_jurisdiction,
                         "jurisdiction_rate_limit_digest": jurisdiction_rate_limit_digest,
+                        "jurisdiction_policy_registry_digest": jurisdiction_policy_registry_digest,
+                        "authority_slo_snapshot_digest": authority_slo_snapshot_digest,
+                        "registry_slo_retry_limit_ms": registry_slo_retry_limit_ms,
                         "signer_key_ref": signer_key_ref,
                     }
                 )
@@ -3089,6 +3248,12 @@ class WorldModelSync:
                 "jurisdiction_rate_limit_ref": jurisdiction_rate_limit_ref,
                 "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
                 "jurisdiction_rate_limit_digest": jurisdiction_rate_limit_digest,
+                "jurisdiction_policy_registry_ref": jurisdiction_policy_registry_ref,
+                "jurisdiction_policy_registry_digest": jurisdiction_policy_registry_digest,
+                "authority_slo_snapshot_ref": authority_slo_snapshot_ref,
+                "authority_slo_snapshot_digest": authority_slo_snapshot_digest,
+                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+                "registry_slo_retry_limit_ms": registry_slo_retry_limit_ms,
                 "signer_key_ref": signer_key_ref,
                 "authority_signature_digest": authority_signature_digest,
                 "observed_latency_ms": observed_latency_ms,
@@ -3142,6 +3307,20 @@ class WorldModelSync:
             errors.append("jurisdiction_rate_limit_profile mismatch")
         if receipt.get("signature_digest_profile") != WMS_REMOTE_AUTHORITY_SIGNATURE_DIGEST_PROFILE:
             errors.append("signature_digest_profile mismatch")
+        if receipt.get("registry_policy_id") != WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID:
+            errors.append("registry_policy_id mismatch")
+        if (
+            receipt.get("jurisdiction_policy_registry_profile")
+            != WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE
+        ):
+            errors.append("jurisdiction_policy_registry_profile mismatch")
+        if receipt.get("authority_slo_snapshot_profile") != WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE:
+            errors.append("authority_slo_snapshot_profile mismatch")
+        if (
+            receipt.get("schedule_derivation_profile")
+            != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE
+        ):
+            errors.append("schedule_derivation_profile mismatch")
         if receipt.get("schedule_profile") != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE:
             errors.append("schedule_profile mismatch")
         if receipt.get("approval_fanout_policy_id") != WMS_APPROVAL_FANOUT_POLICY_ID:
@@ -3224,6 +3403,10 @@ class WorldModelSync:
             observations = []
         expected_observation_digests: List[str] = []
         expected_rate_limit_digests: List[str] = []
+        expected_policy_registry_refs: List[str] = []
+        expected_policy_registry_digests: List[str] = []
+        expected_slo_snapshot_refs: List[str] = []
+        expected_slo_snapshot_digests: List[str] = []
         expected_signature_digests: List[str] = []
         observation_by_key: Dict[tuple[str, str], Mapping[str, Any]] = {}
         route_health_bound = True
@@ -3241,6 +3424,8 @@ class WorldModelSync:
                 "route_status",
                 "remote_jurisdiction",
                 "jurisdiction_rate_limit_ref",
+                "jurisdiction_policy_registry_ref",
+                "authority_slo_snapshot_ref",
                 "signer_key_ref",
             ):
                 self._check_non_empty_string(observation.get(field_name), field_name, errors)
@@ -3277,6 +3462,68 @@ class WorldModelSync:
                 errors.append("jurisdiction_retry_limit_ms must fit total retry budget")
                 route_health_bound = False
                 jurisdiction_retry_limit_ms = 0
+            authority_slo_retry_limit_ms = observation.get("authority_slo_retry_limit_ms")
+            if (
+                not isinstance(authority_slo_retry_limit_ms, int)
+                or authority_slo_retry_limit_ms < 1
+                or authority_slo_retry_limit_ms
+                > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            ):
+                errors.append("authority_slo_retry_limit_ms must fit total retry budget")
+                route_health_bound = False
+                authority_slo_retry_limit_ms = 0
+            registry_slo_retry_limit_ms = observation.get("registry_slo_retry_limit_ms")
+            expected_registry_slo_limit = min(
+                jurisdiction_retry_limit_ms,
+                authority_slo_retry_limit_ms,
+            )
+            if registry_slo_retry_limit_ms != expected_registry_slo_limit:
+                errors.append("registry_slo_retry_limit_ms must derive from jurisdiction and SLO limits")
+                route_health_bound = False
+                registry_slo_retry_limit_ms = expected_registry_slo_limit
+            policy_registry_payload = {
+                "registry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID,
+                "registry_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE,
+                "jurisdiction_policy_registry_ref": observation.get(
+                    "jurisdiction_policy_registry_ref"
+                ),
+                "remote_jurisdiction": observation.get("remote_jurisdiction"),
+                "jurisdiction_rate_limit_ref": observation.get(
+                    "jurisdiction_rate_limit_ref"
+                ),
+                "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "signer_key_ref": observation.get("signer_key_ref"),
+            }
+            expected_policy_registry_digest = sha256_text(
+                canonical_json(policy_registry_payload)
+            )
+            if (
+                observation.get("jurisdiction_policy_registry_digest")
+                != expected_policy_registry_digest
+            ):
+                errors.append("jurisdiction_policy_registry_digest must bind registry payload")
+                route_health_bound = False
+            slo_snapshot_payload = {
+                "slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+                "authority_slo_snapshot_ref": observation.get(
+                    "authority_slo_snapshot_ref"
+                ),
+                "authority_ref": observation.get("authority_ref"),
+                "route_ref": observation.get("route_ref"),
+                "route_status": observation.get("route_status"),
+                "observed_latency_ms": observed_latency_ms,
+                "success_ratio": round(float(success_ratio), 3)
+                if isinstance(success_ratio, (int, float))
+                else success_ratio,
+                "consecutive_failures": consecutive_failures,
+                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+            }
+            expected_slo_snapshot_digest = sha256_text(
+                canonical_json(slo_snapshot_payload)
+            )
+            if observation.get("authority_slo_snapshot_digest") != expected_slo_snapshot_digest:
+                errors.append("authority_slo_snapshot_digest must bind authority SLO payload")
+                route_health_bound = False
             rate_limit_payload = {
                 "authority_ref": observation.get("authority_ref"),
                 "route_ref": observation.get("route_ref"),
@@ -3285,6 +3532,16 @@ class WorldModelSync:
                     "jurisdiction_rate_limit_ref"
                 ),
                 "jurisdiction_retry_limit_ms": jurisdiction_retry_limit_ms,
+                "jurisdiction_policy_registry_ref": observation.get(
+                    "jurisdiction_policy_registry_ref"
+                ),
+                "jurisdiction_policy_registry_digest": expected_policy_registry_digest,
+                "authority_slo_snapshot_ref": observation.get(
+                    "authority_slo_snapshot_ref"
+                ),
+                "authority_slo_snapshot_digest": expected_slo_snapshot_digest,
+                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+                "registry_slo_retry_limit_ms": registry_slo_retry_limit_ms,
                 "outage_kind": observation.get("outage_kind"),
                 "signer_key_ref": observation.get("signer_key_ref"),
             }
@@ -3304,6 +3561,9 @@ class WorldModelSync:
                         "outage_kind": observation.get("outage_kind"),
                         "remote_jurisdiction": observation.get("remote_jurisdiction"),
                         "jurisdiction_rate_limit_digest": expected_rate_limit_digest,
+                        "jurisdiction_policy_registry_digest": expected_policy_registry_digest,
+                        "authority_slo_snapshot_digest": expected_slo_snapshot_digest,
+                        "registry_slo_retry_limit_ms": registry_slo_retry_limit_ms,
                         "signer_key_ref": observation.get("signer_key_ref"),
                     }
                 )
@@ -3324,6 +3584,22 @@ class WorldModelSync:
             if isinstance(observation.get("jurisdiction_rate_limit_digest"), str):
                 expected_rate_limit_digests.append(
                     str(observation["jurisdiction_rate_limit_digest"])
+                )
+            if isinstance(observation.get("jurisdiction_policy_registry_ref"), str):
+                expected_policy_registry_refs.append(
+                    str(observation["jurisdiction_policy_registry_ref"])
+                )
+            if isinstance(observation.get("jurisdiction_policy_registry_digest"), str):
+                expected_policy_registry_digests.append(
+                    str(observation["jurisdiction_policy_registry_digest"])
+                )
+            if isinstance(observation.get("authority_slo_snapshot_ref"), str):
+                expected_slo_snapshot_refs.append(
+                    str(observation["authority_slo_snapshot_ref"])
+                )
+            if isinstance(observation.get("authority_slo_snapshot_digest"), str):
+                expected_slo_snapshot_digests.append(
+                    str(observation["authority_slo_snapshot_digest"])
                 )
             if isinstance(observation.get("authority_signature_digest"), str):
                 expected_signature_digests.append(
@@ -3357,6 +3633,12 @@ class WorldModelSync:
         jurisdiction_rate_limit_bound = route_health_bound and bool(
             expected_rate_limit_digests
         )
+        jurisdiction_policy_registry_bound = route_health_bound and bool(
+            expected_policy_registry_digests
+        )
+        authority_slo_snapshot_bound = route_health_bound and bool(
+            expected_slo_snapshot_digests
+        )
         authority_signature_bound = route_health_bound and bool(
             expected_signature_digests
         )
@@ -3371,6 +3653,31 @@ class WorldModelSync:
         ):
             errors.append("jurisdiction_rate_limit_set_digest must bind rate limit digests")
             jurisdiction_rate_limit_bound = False
+        if receipt.get("jurisdiction_policy_registry_refs") != expected_policy_registry_refs:
+            errors.append("jurisdiction_policy_registry_refs must follow observation order")
+            jurisdiction_policy_registry_bound = False
+        if (
+            receipt.get("jurisdiction_policy_registry_digests")
+            != expected_policy_registry_digests
+        ):
+            errors.append("jurisdiction_policy_registry_digests must follow observation order")
+            jurisdiction_policy_registry_bound = False
+        if receipt.get("jurisdiction_policy_registry_set_digest") != sha256_text(
+            canonical_json(expected_policy_registry_digests)
+        ):
+            errors.append("jurisdiction_policy_registry_set_digest must bind registry digests")
+            jurisdiction_policy_registry_bound = False
+        if receipt.get("authority_slo_snapshot_refs") != expected_slo_snapshot_refs:
+            errors.append("authority_slo_snapshot_refs must follow observation order")
+            authority_slo_snapshot_bound = False
+        if receipt.get("authority_slo_snapshot_digests") != expected_slo_snapshot_digests:
+            errors.append("authority_slo_snapshot_digests must follow observation order")
+            authority_slo_snapshot_bound = False
+        if receipt.get("authority_slo_snapshot_set_digest") != sha256_text(
+            canonical_json(expected_slo_snapshot_digests)
+        ):
+            errors.append("authority_slo_snapshot_set_digest must bind SLO snapshot digests")
+            authority_slo_snapshot_bound = False
         if receipt.get("authority_signature_digests") != expected_signature_digests:
             errors.append("authority_signature_digests must follow observation order")
             authority_signature_bound = False
@@ -3403,6 +3710,8 @@ class WorldModelSync:
                 "outage_kind",
                 "remote_jurisdiction",
                 "jurisdiction_rate_limit_ref",
+                "jurisdiction_policy_registry_ref",
+                "authority_slo_snapshot_ref",
             ):
                 self._check_non_empty_string(entry.get(field_name), field_name, errors)
             attempt_index = entry.get("attempt_index")
@@ -3436,6 +3745,22 @@ class WorldModelSync:
                 errors.append("schedule jurisdiction_retry_limit_ms must be positive")
                 schedule_bound = False
                 jurisdiction_retry_limit_ms = 0
+            authority_slo_retry_limit_ms = entry.get("authority_slo_retry_limit_ms")
+            if (
+                not isinstance(authority_slo_retry_limit_ms, int)
+                or authority_slo_retry_limit_ms < 1
+            ):
+                errors.append("schedule authority_slo_retry_limit_ms must be positive")
+                schedule_bound = False
+                authority_slo_retry_limit_ms = 0
+            registry_slo_retry_limit_ms = entry.get("registry_slo_retry_limit_ms")
+            if registry_slo_retry_limit_ms != min(
+                jurisdiction_retry_limit_ms,
+                authority_slo_retry_limit_ms,
+            ):
+                errors.append("schedule registry_slo_retry_limit_ms must derive from jurisdiction and SLO limits")
+                schedule_bound = False
+                registry_slo_retry_limit_ms = 0
             if observation is None:
                 errors.append("schedule entry must bind a route health observation")
                 schedule_bound = False
@@ -3452,10 +3777,22 @@ class WorldModelSync:
                 != observation.get("jurisdiction_retry_limit_ms")
                 or entry.get("jurisdiction_rate_limit_digest")
                 != observation.get("jurisdiction_rate_limit_digest")
+                or entry.get("jurisdiction_policy_registry_ref")
+                != observation.get("jurisdiction_policy_registry_ref")
+                or entry.get("jurisdiction_policy_registry_digest")
+                != observation.get("jurisdiction_policy_registry_digest")
+                or entry.get("authority_slo_snapshot_ref")
+                != observation.get("authority_slo_snapshot_ref")
+                or entry.get("authority_slo_snapshot_digest")
+                != observation.get("authority_slo_snapshot_digest")
+                or entry.get("authority_slo_retry_limit_ms")
+                != observation.get("authority_slo_retry_limit_ms")
+                or entry.get("registry_slo_retry_limit_ms")
+                != observation.get("registry_slo_retry_limit_ms")
                 or entry.get("authority_signature_digest")
                 != observation.get("authority_signature_digest")
             ):
-                errors.append("schedule entry must copy jurisdiction rate limit and signature evidence")
+                errors.append("schedule entry must copy registry, SLO, jurisdiction rate limit, and signature evidence")
                 schedule_bound = False
             attempt = attempt_by_key.get((str(entry.get("participant_id")), attempt_index))
             if attempt is not None:
@@ -3480,11 +3817,19 @@ class WorldModelSync:
             if entry.get("jurisdiction_rate_limit_ok") is not jurisdiction_rate_limit_ok:
                 errors.append("jurisdiction_rate_limit_ok must reflect signed jurisdiction limit")
                 schedule_bound = False
+            registry_slo_limit_ok = (
+                registry_slo_retry_limit_ms > 0
+                and retry_after_ms <= registry_slo_retry_limit_ms
+            )
+            if entry.get("registry_slo_limit_ok") is not registry_slo_limit_ok:
+                errors.append("registry_slo_limit_ok must reflect registry/SLO derived limit")
+                schedule_bound = False
             if entry.get("within_budget") is not (
                 retry_after_ms <= computed_backoff_ms
                 and jurisdiction_rate_limit_ok
+                and registry_slo_limit_ok
             ):
-                errors.append("within_budget must reflect retry_after_ms, backoff, and jurisdiction limit")
+                errors.append("within_budget must reflect retry_after_ms, backoff, jurisdiction limit, and registry/SLO limit")
                 schedule_bound = False
             if entry.get("budget_decision") != "retry":
                 errors.append("budget_decision must be retry")
@@ -3543,6 +3888,8 @@ class WorldModelSync:
             and engine_log_fanout_bound
             and route_health_bound
             and jurisdiction_rate_limit_bound
+            and jurisdiction_policy_registry_bound
+            and authority_slo_snapshot_bound
             and authority_signature_bound
             and schedule_bound
             and all_outages_budgeted
@@ -3551,6 +3898,16 @@ class WorldModelSync:
         )
         if receipt.get("jurisdiction_rate_limit_bound") is not jurisdiction_rate_limit_bound:
             errors.append("jurisdiction_rate_limit_bound must reflect signed rate limit digest binding")
+        if (
+            receipt.get("jurisdiction_policy_registry_bound")
+            is not jurisdiction_policy_registry_bound
+        ):
+            errors.append("jurisdiction_policy_registry_bound must reflect registry digest binding")
+        if receipt.get("authority_slo_snapshot_bound") is not authority_slo_snapshot_bound:
+            errors.append("authority_slo_snapshot_bound must reflect SLO snapshot digest binding")
+        registry_slo_schedule_bound = schedule_bound and jurisdiction_policy_registry_bound and authority_slo_snapshot_bound
+        if receipt.get("registry_slo_schedule_bound") is not registry_slo_schedule_bound:
+            errors.append("registry_slo_schedule_bound must reflect registry/SLO schedule binding")
         if receipt.get("authority_signature_bound") is not authority_signature_bound:
             errors.append("authority_signature_bound must reflect signature digest binding")
         if (
@@ -3558,6 +3915,11 @@ class WorldModelSync:
             is not adaptive_retry_budget_bound
         ):
             errors.append("signed_jurisdiction_retry_budget_bound must reflect complete signed budget binding")
+        if (
+            receipt.get("registry_bound_retry_budget_bound")
+            is not adaptive_retry_budget_bound
+        ):
+            errors.append("registry_bound_retry_budget_bound must reflect registry/SLO-derived budget binding")
         if receipt.get("adaptive_retry_budget_bound") is not adaptive_retry_budget_bound:
             errors.append("adaptive_retry_budget_bound must reflect fanout, engine, route, and schedule binding")
         if receipt.get("budget_status") not in {"complete", "incomplete"}:
@@ -3584,8 +3946,12 @@ class WorldModelSync:
             "all_outages_budgeted": all_outages_budgeted,
             "digest_bound": digest_bound,
             "jurisdiction_rate_limit_bound": jurisdiction_rate_limit_bound,
+            "jurisdiction_policy_registry_bound": jurisdiction_policy_registry_bound,
+            "authority_slo_snapshot_bound": authority_slo_snapshot_bound,
+            "registry_slo_schedule_bound": registry_slo_schedule_bound,
             "authority_signature_bound": authority_signature_bound,
             "signed_jurisdiction_retry_budget_bound": adaptive_retry_budget_bound,
+            "registry_bound_retry_budget_bound": adaptive_retry_budget_bound,
         }
 
     def validate_engine_transaction_log_receipt(

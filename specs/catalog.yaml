@@ -917,7 +917,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to bind recovered WMS remote authority retry attempts to signed jurisdiction-specific rate limits, route-health observations, fixed exponential schedule entries, and the engine transaction log fan-out entry without storing raw remote transcripts.
+    rationale: Required to bind recovered WMS remote authority retry attempts to signed jurisdiction-specific rate limits, jurisdiction policy registry digests, authority SLO snapshots, registry/SLO-derived fixed exponential schedule entries, and the engine transaction log fan-out entry without storing raw remote transcripts.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_participant_approval_transport_receipt.schema

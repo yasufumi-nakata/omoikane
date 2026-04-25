@@ -90,7 +90,12 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   `signed-jurisdiction-rate-limit-retry-budget-v1` により
   remote jurisdiction、jurisdiction-specific rate limit ref、signer key ref、
   rate-limit digest、authority signature digest を route-health observation と
-  schedule entry の両方へ複写する。さらに `base_retry_after_ms=250` /
+  schedule entry の両方へ複写する。さらに
+  `registry-bound-authority-retry-slo-v1` により jurisdiction policy registry
+  digest と authority SLO snapshot digest を束縛し、schedule は
+  `registry-slo-derived-retry-schedule-v1` として fixed backoff、jurisdiction
+  limit、registry/SLO 由来 limit の全てを満たす場合だけ `retry` になる。
+  さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、
   raw remote authority transcript は保存しない
@@ -164,7 +169,8 @@ wms.observe_violation(session_id) → ViolationReport
   束縛されることを保証
 - `evals/interface/wms_remote_authority_retry_budget.yaml` で recovered fan-out retry が
   signed jurisdiction-specific rate limit digest、authority signature digest、
-  route-health observation、fixed exponential backoff schedule、engine transaction log
+  jurisdiction policy registry digest、authority SLO snapshot digest、
+  route-health observation、registry/SLO-derived fixed exponential backoff schedule、engine transaction log
   digest に束縛され、raw remote authority transcript を保存しないことを保証
 
 ## 未解決

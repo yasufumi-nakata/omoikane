@@ -151,9 +151,29 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "signed_jurisdiction_retry_budget_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "registry_bound_retry_budget_bound"
+            ]
+        )
         self.assertEqual(
             ["JP-13"],
             result["scenarios"]["remote_authority_retry_budget"]["remote_jurisdictions"],
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "jurisdiction_policy_registry_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "authority_slo_snapshot_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "registry_slo_schedule_bound"
+            ]
         )
         self.assertEqual(
             result["scenarios"]["approval_fanout_receipt"]["digest"],

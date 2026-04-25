@@ -6,6 +6,7 @@ description: >
   attempts were admitted through a bounded external remote-authority retry
   budget. The receipt binds route-health observations, fixed exponential
   backoff schedule entries, signed jurisdiction-specific retry rate limits,
+  registry-bound policy digests, authority SLO snapshots,
   the final fan-out digest, and the WMS engine transaction log digest without
   storing raw remote transport transcripts.
 type: object
@@ -18,6 +19,10 @@ required:
   - signature_policy_id
   - jurisdiction_rate_limit_profile
   - signature_digest_profile
+  - registry_policy_id
+  - jurisdiction_policy_registry_profile
+  - authority_slo_snapshot_profile
+  - schedule_derivation_profile
   - schedule_profile
   - session_id
   - authority_profile_ref
@@ -36,6 +41,12 @@ required:
   - remote_jurisdictions
   - jurisdiction_rate_limit_digests
   - jurisdiction_rate_limit_set_digest
+  - jurisdiction_policy_registry_refs
+  - jurisdiction_policy_registry_digests
+  - jurisdiction_policy_registry_set_digest
+  - authority_slo_snapshot_refs
+  - authority_slo_snapshot_digests
+  - authority_slo_snapshot_set_digest
   - authority_signature_digests
   - authority_signature_set_digest
   - outage_participants
@@ -51,8 +62,12 @@ required:
   - all_outages_budgeted
   - adaptive_retry_budget_bound
   - jurisdiction_rate_limit_bound
+  - jurisdiction_policy_registry_bound
+  - authority_slo_snapshot_bound
+  - registry_slo_schedule_bound
   - authority_signature_bound
   - signed_jurisdiction_retry_budget_bound
+  - registry_bound_retry_budget_bound
   - budget_status
   - raw_remote_transcript_stored
   - digest
@@ -78,6 +93,18 @@ properties:
   signature_digest_profile:
     type: string
     const: authority-retry-budget-signature-digest-v1
+  registry_policy_id:
+    type: string
+    const: registry-bound-authority-retry-slo-v1
+  jurisdiction_policy_registry_profile:
+    type: string
+    const: jurisdiction-policy-registry-bound-retry-v1
+  authority_slo_snapshot_profile:
+    type: string
+    const: authority-slo-snapshot-retry-window-v1
+  schedule_derivation_profile:
+    type: string
+    const: registry-slo-derived-retry-schedule-v1
   schedule_profile:
     type: string
     const: fixed-exponential-backoff-with-health-cap-v1
@@ -132,6 +159,12 @@ properties:
         - jurisdiction_rate_limit_ref
         - jurisdiction_retry_limit_ms
         - jurisdiction_rate_limit_digest
+        - jurisdiction_policy_registry_ref
+        - jurisdiction_policy_registry_digest
+        - authority_slo_snapshot_ref
+        - authority_slo_snapshot_digest
+        - authority_slo_retry_limit_ms
+        - registry_slo_retry_limit_ms
         - signer_key_ref
         - authority_signature_digest
         - observed_latency_ms
@@ -173,6 +206,24 @@ properties:
           maximum: 1500
         jurisdiction_rate_limit_digest:
           $ref: "#/$defs/sha256"
+        jurisdiction_policy_registry_ref:
+          type: string
+          minLength: 1
+        jurisdiction_policy_registry_digest:
+          $ref: "#/$defs/sha256"
+        authority_slo_snapshot_ref:
+          type: string
+          minLength: 1
+        authority_slo_snapshot_digest:
+          $ref: "#/$defs/sha256"
+        authority_slo_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
+        registry_slo_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
         signer_key_ref:
           type: string
           minLength: 1
@@ -215,6 +266,32 @@ properties:
       $ref: "#/$defs/sha256"
   jurisdiction_rate_limit_set_digest:
     $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  jurisdiction_policy_registry_digests:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/sha256"
+  jurisdiction_policy_registry_set_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_snapshot_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  authority_slo_snapshot_digests:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/sha256"
+  authority_slo_snapshot_set_digest:
+    $ref: "#/$defs/sha256"
   authority_signature_digests:
     type: array
     minItems: 1
@@ -248,11 +325,18 @@ properties:
         - jurisdiction_rate_limit_ref
         - jurisdiction_retry_limit_ms
         - jurisdiction_rate_limit_digest
+        - jurisdiction_policy_registry_ref
+        - jurisdiction_policy_registry_digest
+        - authority_slo_snapshot_ref
+        - authority_slo_snapshot_digest
+        - authority_slo_retry_limit_ms
+        - registry_slo_retry_limit_ms
         - authority_signature_digest
         - recovery_result_digest
         - recovery_transport_receipt_digest
         - route_health_eligible
         - jurisdiction_rate_limit_ok
+        - registry_slo_limit_ok
         - within_budget
         - budget_decision
         - schedule_entry_digest
@@ -299,6 +383,24 @@ properties:
           maximum: 1500
         jurisdiction_rate_limit_digest:
           $ref: "#/$defs/sha256"
+        jurisdiction_policy_registry_ref:
+          type: string
+          minLength: 1
+        jurisdiction_policy_registry_digest:
+          $ref: "#/$defs/sha256"
+        authority_slo_snapshot_ref:
+          type: string
+          minLength: 1
+        authority_slo_snapshot_digest:
+          $ref: "#/$defs/sha256"
+        authority_slo_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
+        registry_slo_retry_limit_ms:
+          type: integer
+          minimum: 1
+          maximum: 1500
         authority_signature_digest:
           $ref: "#/$defs/sha256"
         recovery_result_digest:
@@ -309,6 +411,9 @@ properties:
           type: boolean
           const: true
         jurisdiction_rate_limit_ok:
+          type: boolean
+          const: true
+        registry_slo_limit_ok:
           type: boolean
           const: true
         within_budget:
@@ -355,10 +460,22 @@ properties:
   jurisdiction_rate_limit_bound:
     type: boolean
     const: true
+  jurisdiction_policy_registry_bound:
+    type: boolean
+    const: true
+  authority_slo_snapshot_bound:
+    type: boolean
+    const: true
+  registry_slo_schedule_bound:
+    type: boolean
+    const: true
   authority_signature_bound:
     type: boolean
     const: true
   signed_jurisdiction_retry_budget_bound:
+    type: boolean
+    const: true
+  registry_bound_retry_budget_bound:
     type: boolean
     const: true
   budget_status:

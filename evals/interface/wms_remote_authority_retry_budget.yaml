@@ -4,6 +4,7 @@ level: L6
 description: >
   World Model Sync の recovered distributed approval fan-out retry が、
   signed jurisdiction-aware remote authority route-health observation、
+  jurisdiction policy registry / authority SLO snapshot 由来の schedule derivation、
   fixed exponential backoff schedule、
   external engine transaction log の approval_fanout_bound entry に束縛され、
   raw remote authority transcript を保存しないことを確認する。
@@ -18,6 +19,10 @@ expected:
   signature_policy_id: signed-jurisdiction-rate-limit-retry-budget-v1
   jurisdiction_rate_limit_profile: jurisdiction-aware-authority-retry-rate-limit-v1
   signature_digest_profile: authority-retry-budget-signature-digest-v1
+  registry_policy_id: registry-bound-authority-retry-slo-v1
+  jurisdiction_policy_registry_profile: jurisdiction-policy-registry-bound-retry-v1
+  authority_slo_snapshot_profile: authority-slo-snapshot-retry-window-v1
+  schedule_derivation_profile: registry-slo-derived-retry-schedule-v1
   schedule_profile: fixed-exponential-backoff-with-health-cap-v1
   remote_jurisdictions:
     - JP-13
@@ -30,8 +35,12 @@ expected:
   engine_log_fanout_bound: true
   route_health_bound: true
   jurisdiction_rate_limit_bound: true
+  jurisdiction_policy_registry_bound: true
+  authority_slo_snapshot_bound: true
+  registry_slo_schedule_bound: true
   authority_signature_bound: true
   signed_jurisdiction_retry_budget_bound: true
+  registry_bound_retry_budget_bound: true
   schedule_bound: true
   raw_remote_transcript_stored: false
 metric: boolean

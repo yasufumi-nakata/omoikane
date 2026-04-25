@@ -8643,10 +8643,17 @@ json.dump(response, sys.stdout)
                     "outage_kind": "timeout",
                     "route_status": "partial-outage",
                     "remote_jurisdiction": "JP-13",
+                    "jurisdiction_policy_registry_ref": (
+                        "policy-registry://jp-13/wms-authority-retry/v1"
+                    ),
                     "jurisdiction_rate_limit_ref": (
                         "rate-limit://jp-13/wms-approval-retry-budget/v1"
                     ),
                     "jurisdiction_retry_limit_ms": 500,
+                    "authority_slo_snapshot_ref": (
+                        "authority-slo://federation/wms-approval/observer-timeout/v1"
+                    ),
+                    "authority_slo_retry_limit_ms": 500,
                     "signer_key_ref": "key://federation/jp-13/wms-retry-signer",
                     "observed_latency_ms": 860,
                     "success_ratio": 0.667,
@@ -8888,10 +8895,22 @@ json.dump(response, sys.stdout)
                         "jurisdiction_rate_limit_bound"
                     ]
                     and remote_authority_retry_budget_validation[
+                        "jurisdiction_policy_registry_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "authority_slo_snapshot_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "registry_slo_schedule_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
                         "authority_signature_bound"
                     ]
                     and remote_authority_retry_budget_validation[
                         "signed_jurisdiction_retry_budget_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "registry_bound_retry_budget_bound"
                     ]
                     and remote_authority_retry_budget_validation["schedule_bound"]
                     and remote_authority_retry_budget["budget_status"] == "complete"

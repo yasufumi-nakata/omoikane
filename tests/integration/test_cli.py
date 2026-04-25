@@ -220,6 +220,16 @@ class CliIntegrationTests(unittest.TestCase):
                 "signed_jurisdiction_retry_budget_bound"
             ]
         )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "registry_bound_retry_budget_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "registry_slo_schedule_bound"
+            ]
+        )
         self.assertFalse(
             result["scenarios"]["remote_authority_retry_budget"]["raw_remote_transcript_stored"]
         )

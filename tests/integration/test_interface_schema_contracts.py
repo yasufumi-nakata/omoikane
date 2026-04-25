@@ -146,6 +146,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 "signed_jurisdiction_retry_budget_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "registry_bound_retry_budget_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 
