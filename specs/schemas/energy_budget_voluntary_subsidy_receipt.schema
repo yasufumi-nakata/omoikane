@@ -6,8 +6,8 @@ description: >
   voluntary cross-identity subsidy only after each member's AP-1 floor has
   already been preserved, with explicit donor consent and without using surplus
   as an offset during floor validation. The authority chain also embeds a
-  digest-only signer-roster verifier receipt and a multi-jurisdiction verifier
-  quorum receipt.
+  digest-only signer-roster verifier receipt with a signed response envelope and
+  a multi-jurisdiction verifier quorum receipt.
 type: object
 additionalProperties: false
 required:

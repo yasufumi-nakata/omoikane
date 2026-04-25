@@ -4,7 +4,8 @@ title: EnergyBudgetSubsidyVerifierQuorumReceipt
 description: >
   Digest-only quorum receipt proving that a voluntary EnergyBudget subsidy
   signer roster was checked by multiple live verifier authorities across
-  multiple verifier jurisdictions without storing raw verifier payloads.
+  multiple verifier jurisdictions, and that each accepted live response carries
+  a digest-bound signed response envelope without storing raw verifier payloads.
 type: object
 additionalProperties: false
 required:
@@ -23,6 +24,7 @@ required:
   - accepted_verifier_jurisdictions
   - accepted_verifier_route_refs
   - accepted_verifier_response_digests
+  - accepted_verifier_response_signature_digests
   - primary_verifier_receipt_digest
   - primary_verifier_digest_included
   - signer_roster_ref
@@ -34,6 +36,7 @@ required:
   - common_evidence_bound
   - all_verifier_receipts_verified
   - live_network_probe_quorum_bound
+  - signed_response_envelope_quorum_bound
   - quorum_status
   - raw_verifier_payload_stored
   - checked_at
@@ -100,6 +103,13 @@ properties:
       type: string
       minLength: 64
       maxLength: 64
+  accepted_verifier_response_signature_digests:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 64
+      maxLength: 64
   primary_verifier_receipt_digest:
     type: string
     minLength: 64
@@ -132,6 +142,8 @@ properties:
   all_verifier_receipts_verified:
     const: true
   live_network_probe_quorum_bound:
+    const: true
+  signed_response_envelope_quorum_bound:
     const: true
   quorum_status:
     const: complete

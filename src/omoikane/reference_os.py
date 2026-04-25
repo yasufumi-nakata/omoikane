@@ -6725,6 +6725,55 @@ json.dump(response, sys.stdout)
                 server.server_close()
                 thread.join(timeout=1.0)
 
+        def attach_signed_response_envelope(
+            verifier_payload: Dict[str, Any],
+            verifier_endpoint: str,
+        ) -> None:
+            preview_receipt = self.energy_budget.build_subsidy_signer_roster_verifier_receipt(
+                signer_roster_ref=str(verifier_payload["signer_roster_ref"]),
+                signer_roster_digest=str(verifier_payload["signer_roster_digest"]),
+                signer_key_ref=str(verifier_payload["signer_key_ref"]),
+                signer_jurisdiction=str(verifier_payload["signer_jurisdiction"]),
+                external_funding_policy_digest=str(
+                    verifier_payload["external_funding_policy_digest"]
+                ),
+                funding_policy_signature_digest=str(
+                    verifier_payload["funding_policy_signature_digest"]
+                ),
+                verifier_ref=str(verifier_payload["verifier_ref"]),
+                challenge_ref=str(verifier_payload["challenge_ref"]),
+                verifier_endpoint_ref=verifier_endpoint,
+                verifier_authority_ref=str(
+                    verifier_payload["verifier_authority_ref"]
+                ),
+                verifier_jurisdiction=str(verifier_payload["verifier_jurisdiction"]),
+                verifier_route_ref=str(verifier_payload["verifier_route_ref"]),
+                authority_chain_ref=str(verifier_payload["authority_chain_ref"]),
+                trust_root_ref=str(verifier_payload["trust_root_ref"]),
+                trust_root_digest=str(verifier_payload["trust_root_digest"]),
+                verifier_transport_profile=(
+                    "live-http-json-energy-subsidy-signer-roster-verifier-v1"
+                ),
+                request_timeout_ms=500,
+                network_response_digest="0" * 64,
+                network_probe_status="reachable",
+                checked_at=str(verifier_payload["checked_at"]),
+            )
+            verifier_payload.update(
+                {
+                    "response_envelope_profile": preview_receipt[
+                        "response_envelope_profile"
+                    ],
+                    "response_signing_key_ref": preview_receipt[
+                        "response_signing_key_ref"
+                    ],
+                    "response_signature_digest": preview_receipt[
+                        "response_signature_digest"
+                    ],
+                    "raw_response_signature_payload_stored": False,
+                }
+            )
+
         base = self.run_energy_budget_pool_demo()
         pool_receipt = base["energy_budget_pool"]["receipt"]
         migration_identity_id, council_identity_id = base["pool"]["member_identity_ids"]
@@ -6828,6 +6877,7 @@ json.dump(response, sys.stdout)
             "trust_root_digest": backup_trust_root_digest,
         }
         with live_subsidy_verifier_bridge(live_verifier_payload) as verifier_endpoint:
+            attach_signed_response_envelope(live_verifier_payload, verifier_endpoint)
             live_verifier_receipt = (
                 self.energy_budget.probe_subsidy_signer_roster_verifier_endpoint(
                     verifier_endpoint=verifier_endpoint,
@@ -6861,6 +6911,7 @@ json.dump(response, sys.stdout)
                 )
             )
         with live_subsidy_verifier_bridge(backup_verifier_payload) as verifier_endpoint:
+            attach_signed_response_envelope(backup_verifier_payload, verifier_endpoint)
             backup_live_verifier_receipt = (
                 self.energy_budget.probe_subsidy_signer_roster_verifier_endpoint(
                     verifier_endpoint=verifier_endpoint,
@@ -6942,6 +6993,9 @@ json.dump(response, sys.stdout)
                 "signer_roster_verifier_quorum_receipt_digest": subsidy_receipt[
                     "signer_roster_verifier_quorum_receipt_digest"
                 ],
+                "signer_roster_verifier_response_signature_digest": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["response_signature_digest"],
             },
             actor="EnergyBudgetService",
             category="energy-budget",
@@ -6971,6 +7025,12 @@ json.dump(response, sys.stdout)
                     and subsidy_receipt["authority_binding_status"] == "verified"
                     and subsidy_receipt["signer_roster_verifier_receipt"][
                         "network_probe_bound"
+                    ]
+                    and subsidy_receipt["signer_roster_verifier_receipt"][
+                        "signed_response_envelope_bound"
+                    ]
+                    and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
+                        "signed_response_envelope_quorum_bound"
                     ]
                     and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
                         "quorum_status"
@@ -7009,6 +7069,18 @@ json.dump(response, sys.stdout)
                 "signer_roster_verifier_network_response_digest": subsidy_receipt[
                     "signer_roster_verifier_receipt"
                 ]["network_response_digest"],
+                "signer_roster_verifier_response_envelope_profile": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["response_envelope_profile"],
+                "signer_roster_verifier_response_signing_key_ref": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["response_signing_key_ref"],
+                "signer_roster_verifier_response_signature_digest": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["response_signature_digest"],
+                "signer_roster_verifier_signed_response_envelope_bound": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["signed_response_envelope_bound"],
                 "signer_roster_verifier_quorum_bound": subsidy_validation[
                     "signer_roster_verifier_quorum_bound"
                 ],
@@ -7023,9 +7095,16 @@ json.dump(response, sys.stdout)
                 "signer_roster_verifier_quorum_jurisdictions": subsidy_receipt[
                     "signer_roster_verifier_quorum_receipt"
                 ]["accepted_verifier_jurisdictions"],
+                "signer_roster_verifier_quorum_signed_response_envelope_bound": subsidy_receipt[
+                    "signer_roster_verifier_quorum_receipt"
+                ]["signed_response_envelope_quorum_bound"],
                 "raw_verifier_payload_redacted": subsidy_receipt[
                     "signer_roster_verifier_receipt"
                 ]["raw_verifier_payload_stored"]
+                is False,
+                "raw_response_signature_payload_redacted": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["raw_response_signature_payload_stored"]
                 is False,
                 "revocation_registry_bound": subsidy_validation[
                     "revocation_registry_bound"

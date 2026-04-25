@@ -13,13 +13,16 @@ expected:
   verifier_policy_id: energy-subsidy-signer-roster-live-verifier-v1
   verifier_digest_profile: energy-subsidy-signer-roster-verifier-digest-v1
   verifier_transport_profile: live-http-json-energy-subsidy-signer-roster-verifier-v1
+  response_envelope_profile: signed-energy-subsidy-verifier-response-envelope-v1
   quorum_policy_id: multi-jurisdiction-energy-subsidy-verifier-quorum-v1
   quorum_digest_profile: energy-subsidy-signer-roster-verifier-quorum-digest-v1
   authority_binding_status: verified
   signer_roster_verifier_bound: true
   signer_roster_verifier_quorum_bound: true
   network_probe_bound: true
+  signed_response_envelope_bound: true
   live_network_probe_quorum_bound: true
+  signed_response_envelope_quorum_bound: true
   accepted_probe_count: 2
   verifier_jurisdictions: [JP-13, SG-01]
   quorum_status: complete
@@ -29,6 +32,7 @@ expected:
   audit_authority_bound: true
   jurisdiction_authority_bound: true
   raw_verifier_payload_stored: false
+  raw_response_signature_payload_stored: false
   raw_authority_payload_stored: false
 metric: boolean
 threshold: true
@@ -37,9 +41,12 @@ guards:
   - signer roster verifier receipt digest must equal the nested verifier receipt digest
   - challenge digest must bind signer roster digest, signer key ref, funding policy digest, and signature digest
   - response digest must bind verifier endpoint, authority chain, trust root, and signer roster evidence
+  - response signature digest must bind the response digest, challenge digest, verifier authority, route, response signing key, and trust root digest
   - network_response_digest must bind the live endpoint JSON response without storing the raw payload
+  - signed response envelope must be mirrored by the verifier receipt and by the quorum receipt
   - verifier quorum must include the primary verifier receipt digest and at least two verifier authorities across two verifier jurisdictions
   - accepted verifier response digests must mirror the nested live HTTP verifier receipts
+  - accepted verifier response signature digests must mirror the nested signed response envelopes
   - voluntary_subsidy_allowed requires signer_roster_verifier_bound=true
   - voluntary_subsidy_allowed requires signer_roster_verifier_quorum_bound=true
-  - raw verifier payloads must not be stored in the subsidy receipt
+  - raw verifier payloads and raw response signature payloads must not be stored in the subsidy receipt

@@ -5,7 +5,7 @@ description: >
   Digest-only loopback or live-HTTP verifier receipt proving that a voluntary EnergyBudget
   subsidy signer roster, signer key, funding policy digest, and policy signature
   digest were checked by a bounded live verifier bridge without storing raw
-  verifier payloads.
+  verifier payloads or raw response-signature payloads.
 type: object
 additionalProperties: false
 required:
@@ -38,6 +38,11 @@ required:
   - network_response_digest
   - network_probe_status
   - network_probe_bound
+  - response_envelope_profile
+  - response_signing_key_ref
+  - response_signature_digest
+  - signed_response_envelope_bound
+  - raw_response_signature_payload_stored
   - response_digest
   - verifier_receipt_status
   - raw_verifier_payload_stored
@@ -136,6 +141,19 @@ properties:
       - reachable
   network_probe_bound:
     type: boolean
+  response_envelope_profile:
+    const: signed-energy-subsidy-verifier-response-envelope-v1
+  response_signing_key_ref:
+    type: string
+    pattern: "^verifier-key://"
+  response_signature_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  signed_response_envelope_bound:
+    const: true
+  raw_response_signature_payload_stored:
+    const: false
   response_digest:
     type: string
     minLength: 64

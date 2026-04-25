@@ -2751,7 +2751,7 @@ entries:
       - reference-runtime
       - evals/safety/energy_budget_subsidy_verifier.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to serialize digest-only signer roster verifier receipts that bind voluntary subsidy authority evidence to a bounded loopback or live HTTP verifier bridge and expose authority/jurisdiction/route refs for quorum coverage without storing raw verifier payloads.
+    rationale: Required to serialize digest-only signer roster verifier receipts that bind voluntary subsidy authority evidence to a bounded loopback or live HTTP verifier bridge, expose authority/jurisdiction/route refs for quorum coverage, and require a signed response envelope without storing raw verifier or raw signature payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_subsidy_verifier_quorum_receipt.schema
@@ -2761,7 +2761,7 @@ entries:
       - reference-runtime
       - evals/safety/energy_budget_subsidy_verifier.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to serialize multi-authority, multi-jurisdiction live verifier quorum receipts before voluntary subsidy authority binding can become verified.
+    rationale: Required to serialize multi-authority, multi-jurisdiction live verifier quorum receipts, including accepted response signature digest coverage, before voluntary subsidy authority binding can become verified.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema

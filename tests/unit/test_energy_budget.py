@@ -40,6 +40,43 @@ def live_verifier_endpoint(payload: dict[str, object]):
         thread.join(timeout=1.0)
 
 
+def attach_signed_response_envelope(
+    service: EnergyBudgetService,
+    payload: dict[str, object],
+    endpoint: str,
+) -> None:
+    preview_receipt = service.build_subsidy_signer_roster_verifier_receipt(
+        signer_roster_ref=str(payload["signer_roster_ref"]),
+        signer_roster_digest=str(payload["signer_roster_digest"]),
+        signer_key_ref=str(payload["signer_key_ref"]),
+        signer_jurisdiction=str(payload["signer_jurisdiction"]),
+        external_funding_policy_digest=str(payload["external_funding_policy_digest"]),
+        funding_policy_signature_digest=str(payload["funding_policy_signature_digest"]),
+        verifier_ref=str(payload["verifier_ref"]),
+        challenge_ref=str(payload["challenge_ref"]),
+        verifier_endpoint_ref=endpoint,
+        verifier_authority_ref=str(payload["verifier_authority_ref"]),
+        verifier_jurisdiction=str(payload["verifier_jurisdiction"]),
+        verifier_route_ref=str(payload["verifier_route_ref"]),
+        authority_chain_ref=str(payload["authority_chain_ref"]),
+        trust_root_ref=str(payload["trust_root_ref"]),
+        trust_root_digest=str(payload["trust_root_digest"]),
+        verifier_transport_profile="live-http-json-energy-subsidy-signer-roster-verifier-v1",
+        request_timeout_ms=500,
+        network_response_digest="0" * 64,
+        network_probe_status="reachable",
+        checked_at=str(payload["checked_at"]),
+    )
+    payload.update(
+        {
+            "response_envelope_profile": preview_receipt["response_envelope_profile"],
+            "response_signing_key_ref": preview_receipt["response_signing_key_ref"],
+            "response_signature_digest": preview_receipt["response_signature_digest"],
+            "raw_response_signature_payload_stored": False,
+        }
+    )
+
+
 def build_live_subsidy_verifier_quorum(
     service: EnergyBudgetService,
     draft_receipt: dict[str, object],
@@ -96,6 +133,7 @@ def build_live_subsidy_verifier_quorum(
         **common_payload,
     }
     with live_verifier_endpoint(primary_payload) as endpoint:
+        attach_signed_response_envelope(service, primary_payload, endpoint)
         primary_receipt = service.probe_subsidy_signer_roster_verifier_endpoint(
             verifier_endpoint=endpoint,
             signer_roster_ref=str(common_payload["signer_roster_ref"]),
@@ -119,6 +157,7 @@ def build_live_subsidy_verifier_quorum(
             request_timeout_ms=500,
         )
     with live_verifier_endpoint(backup_payload) as endpoint:
+        attach_signed_response_envelope(service, backup_payload, endpoint)
         backup_receipt = service.probe_subsidy_signer_roster_verifier_endpoint(
             verifier_endpoint=endpoint,
             signer_roster_ref=str(common_payload["signer_roster_ref"]),
@@ -430,9 +469,24 @@ class EnergyBudgetTests(unittest.TestCase):
         )
         self.assertTrue(verifier_validation["ok"])
         self.assertTrue(verifier_validation["network_probe_bound"])
+        self.assertTrue(verifier_validation["signed_response_envelope_bound"])
         self.assertEqual(
             "live-http-json-energy-subsidy-signer-roster-verifier-v1",
             live_verifier_receipt["verifier_transport_profile"],
+        )
+        self.assertEqual(
+            "signed-energy-subsidy-verifier-response-envelope-v1",
+            live_verifier_receipt["response_envelope_profile"],
+        )
+        self.assertTrue(
+            live_verifier_receipt["response_signing_key_ref"].startswith(
+                "verifier-key://"
+            )
+        )
+        self.assertEqual(64, len(live_verifier_receipt["response_signature_digest"]))
+        self.assertTrue(live_verifier_receipt["signed_response_envelope_bound"])
+        self.assertFalse(
+            live_verifier_receipt["raw_response_signature_payload_stored"]
         )
         self.assertTrue(live_verifier_receipt["verifier_endpoint_ref"].startswith("http://"))
         self.assertEqual(64, len(live_verifier_receipt["network_response_digest"]))
@@ -450,6 +504,20 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(receipt["signer_roster_verifier_bound"])
         self.assertTrue(receipt["signer_roster_verifier_quorum_bound"])
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "signed_response_envelope_quorum_bound"
+            ]
+        )
+        self.assertEqual(
+            [
+                live_verifier_receipt["response_signature_digest"],
+                verifier_quorum["verifier_receipts"][1]["response_signature_digest"],
+            ],
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "accepted_verifier_response_signature_digests"
+            ],
+        )
         self.assertEqual(
             "complete",
             receipt["signer_roster_verifier_quorum_receipt"]["quorum_status"],
@@ -600,6 +668,72 @@ class EnergyBudgetTests(unittest.TestCase):
             validation["errors"],
         )
         self.assertIn("authority_binding_status mismatch", validation["errors"])
+
+    def test_voluntary_subsidy_validation_rejects_tampered_response_signature(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://subsidy-signature-tamper",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/subsidy-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 22,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/subsidy-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 38,
+                    "observed_capacity_jps": 32,
+                },
+            ],
+        )
+        draft_receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+        )
+        primary_verifier, _backup_verifier, verifier_quorum = (
+            build_live_subsidy_verifier_quorum(service, draft_receipt)
+        )
+        receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+            signer_roster_verifier_receipt=primary_verifier,
+            signer_roster_verifier_quorum_receipt=verifier_quorum,
+        )
+        receipt["signer_roster_verifier_receipt"]["response_signature_digest"] = (
+            "0" * 64
+        )
+
+        validation = service.validate_voluntary_subsidy_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["signer_roster_verifier_bound"])
+        self.assertIn("signer_roster_verifier_bound mismatch", validation["errors"])
+        self.assertIn(
+            "signer_roster_verifier_receipt: response_signature_digest mismatch",
+            validation["errors"],
+        )
+        self.assertIn(
+            "signer_roster_verifier_receipt: signed_response_envelope_bound mismatch",
+            validation["errors"],
+        )
 
     def test_shared_fabric_capacity_derives_member_shortfalls(self) -> None:
         service = EnergyBudgetService()
