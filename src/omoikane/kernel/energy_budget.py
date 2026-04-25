@@ -22,6 +22,15 @@ ENERGY_BUDGET_VOLUNTARY_SUBSIDY_DIGEST_PROFILE = (
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_CONSENT_DIGEST_PROFILE = (
     "participant-consent-bound-subsidy-digest-v1"
 )
+ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID = (
+    "ap1-shared-fabric-capacity-allocation-v1"
+)
+ENERGY_BUDGET_SHARED_FABRIC_DIGEST_PROFILE = (
+    "energy-budget-shared-fabric-allocation-digest-v1"
+)
+ENERGY_BUDGET_SHARED_FABRIC_OBSERVATION_DIGEST_PROFILE = (
+    "shared-fabric-observation-digest-v1"
+)
 ENERGY_BUDGET_SCHEMA_VERSION = "1.0.0"
 ENERGY_BUDGET_FLOOR_SOURCE_REF = (
     "python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE"
@@ -825,6 +834,354 @@ class EnergyBudgetService:
             "raw_payload_redacted": receipt.get("raw_funding_payload_stored") is False,
         }
 
+    def allocate_shared_fabric_capacity(
+        self,
+        *,
+        pool_receipt: Mapping[str, Any],
+        fabric_id: str,
+        observed_shared_capacity_jps: int,
+        shared_fabric_observation_ref: str = (
+            "fabric-observation://not-imported/shared-capacity-v1"
+        ),
+        member_broker_signals: Optional[Sequence[Mapping[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Derive per-member floor shortfalls from one shared fabric capacity reading."""
+
+        pool_validation = self.validate_pool_receipt(pool_receipt)
+        if not pool_validation["ok"]:
+            raise ValueError(
+                "pool_receipt must satisfy energy_budget_pool_receipt validation"
+            )
+        normalized_fabric_id = self._normalize_non_empty_string(
+            fabric_id,
+            "fabric_id",
+        )
+        normalized_observation_ref = self._normalize_non_empty_string(
+            shared_fabric_observation_ref,
+            "shared_fabric_observation_ref",
+        )
+        observed_capacity = int(observed_shared_capacity_jps)
+        if observed_capacity < 0:
+            raise ValueError("observed_shared_capacity_jps must be non-negative")
+
+        member_summaries = [
+            self._member_floor_summary(member_receipt)
+            for member_receipt in pool_receipt["member_receipts"]
+        ]
+        capacity_by_identity = _shared_fabric_floor_allocations(
+            member_summaries,
+            observed_capacity,
+        )
+        signals_by_identity = {
+            str(signal.get("identity_id")): dict(signal)
+            for signal in (member_broker_signals or [])
+            if isinstance(signal, Mapping)
+        }
+        observation_digest = _shared_fabric_observation_digest(
+            fabric_id=normalized_fabric_id,
+            observation_ref=normalized_observation_ref,
+            observed_shared_capacity_jps=observed_capacity,
+            pool_id=str(pool_receipt["pool_id"]),
+            pool_floor_receipt_digest=str(pool_receipt["digest"]),
+        )
+
+        member_allocations = []
+        for summary in member_summaries:
+            identity_id = str(summary["identity_id"])
+            required_floor = int(summary["required_floor_jps"])
+            allocated_capacity = int(capacity_by_identity[identity_id])
+            shortfall = max(0, required_floor - allocated_capacity)
+            scheduler_signal_required = shortfall > 0
+            broker_signal = signals_by_identity.get(identity_id)
+            broker_signal_digest = (
+                sha256_text(canonical_json(dict(broker_signal)))
+                if broker_signal
+                else None
+            )
+            broker_recommended_action = (
+                str(broker_signal.get("recommended_action"))
+                if broker_signal
+                else None
+            )
+            broker_signal_bound = bool(
+                not scheduler_signal_required
+                or (
+                    broker_signal
+                    and broker_signal.get("identity_id") == identity_id
+                    and int(broker_signal.get("minimum_joules_per_second", 0))
+                    == required_floor
+                    and int(broker_signal.get("current_joules_per_second", -1))
+                    == allocated_capacity
+                    and broker_signal.get("severity") == "critical"
+                    and broker_signal.get("recommended_action") == "migrate-standby"
+                )
+            )
+            member_allocations.append(
+                {
+                    "identity_id": identity_id,
+                    "workload_class": str(summary["workload_class"]),
+                    "required_floor_jps": required_floor,
+                    "granted_budget_jps": int(summary["granted_budget_jps"]),
+                    "allocated_capacity_jps": allocated_capacity,
+                    "capacity_shortfall_jps": shortfall,
+                    "member_floor_preserved": allocated_capacity >= required_floor,
+                    "scheduler_signal_required": scheduler_signal_required,
+                    "floor_receipt_digest": str(summary["floor_receipt_digest"]),
+                    "broker_signal_ref": (
+                        str(broker_signal.get("signal_id")) if broker_signal else None
+                    ),
+                    "broker_signal_digest": broker_signal_digest,
+                    "broker_recommended_action": broker_recommended_action,
+                    "broker_signal_bound": broker_signal_bound,
+                }
+            )
+
+        total_required = sum(
+            int(allocation["required_floor_jps"]) for allocation in member_allocations
+        )
+        total_allocated = sum(
+            int(allocation["allocated_capacity_jps"]) for allocation in member_allocations
+        )
+        fabric_capacity_deficit = max(0, total_required - observed_capacity)
+        scheduler_signal_required = any(
+            bool(allocation["scheduler_signal_required"])
+            for allocation in member_allocations
+        )
+        all_member_floors_preserved = all(
+            bool(allocation["member_floor_preserved"])
+            for allocation in member_allocations
+        )
+        broker_signal_bound = all(
+            bool(allocation["broker_signal_bound"])
+            for allocation in member_allocations
+        )
+        blocking_reasons = []
+        if fabric_capacity_deficit:
+            blocking_reasons.extend(
+                [
+                    "shared-fabric-capacity-below-total-floor",
+                    "per-member-shortfall-derived-from-shared-fabric",
+                ]
+            )
+
+        receipt = {
+            "kind": "energy_budget_shared_fabric_allocation_receipt",
+            "schema_version": ENERGY_BUDGET_SCHEMA_VERSION,
+            "receipt_id": new_id("energy-budget-fabric"),
+            "fabric_id": normalized_fabric_id,
+            "pool_id": str(pool_receipt["pool_id"]),
+            "pool_floor_receipt_ref": str(pool_receipt["receipt_id"]),
+            "pool_floor_receipt_digest": str(pool_receipt["digest"]),
+            "pool_member_digest_set": str(pool_receipt["receipt_member_digest_set"]),
+            "policy_id": ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID,
+            "digest_profile": ENERGY_BUDGET_SHARED_FABRIC_DIGEST_PROFILE,
+            "observation_digest_profile": (
+                ENERGY_BUDGET_SHARED_FABRIC_OBSERVATION_DIGEST_PROFILE
+            ),
+            "floor_policy_id": ENERGY_BUDGET_POOL_POLICY_ID,
+            "floor_source_ref": ENERGY_BUDGET_FLOOR_SOURCE_REF,
+            "ethics_policy_refs": list(ENERGY_BUDGET_ETHICS_POLICY_REFS),
+            "allocation_strategy": "floor-ratio-deficit-first-v1",
+            "shared_fabric_capacity_only": True,
+            "shared_fabric_observation_ref": normalized_observation_ref,
+            "shared_fabric_observation_digest": observation_digest,
+            "observed_shared_capacity_jps": observed_capacity,
+            "total_required_floor_jps": total_required,
+            "total_allocated_floor_capacity_jps": total_allocated,
+            "fabric_capacity_deficit_jps": fabric_capacity_deficit,
+            "unallocated_fabric_surplus_jps": max(0, observed_capacity - total_required),
+            "member_count": len(member_allocations),
+            "member_allocations": member_allocations,
+            "impacted_member_count": sum(
+                1
+                for allocation in member_allocations
+                if allocation["capacity_shortfall_jps"]
+            ),
+            "per_identity_floor_preserved_before_fabric": bool(
+                pool_receipt.get("per_identity_floor_preserved")
+            ),
+            "shared_capacity_floor_preserved": observed_capacity >= total_required,
+            "all_member_floors_preserved": all_member_floors_preserved,
+            "scheduler_signal_required": scheduler_signal_required,
+            "broker_signal_bound": broker_signal_bound,
+            "budget_status": (
+                "fabric-capacity-deficit-protected"
+                if fabric_capacity_deficit
+                else "accepted"
+            ),
+            "degradation_allowed": not scheduler_signal_required,
+            "raw_capacity_payload_stored": False,
+            "blocking_reasons": blocking_reasons,
+            "evaluated_at": utc_now_iso(),
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_shared_fabric_receipt_digest_payload(receipt))
+        )
+        return receipt
+
+    def validate_shared_fabric_allocation_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors = []
+        if receipt.get("kind") != "energy_budget_shared_fabric_allocation_receipt":
+            errors.append("kind must equal energy_budget_shared_fabric_allocation_receipt")
+        if receipt.get("schema_version") != ENERGY_BUDGET_SCHEMA_VERSION:
+            errors.append(f"schema_version must equal {ENERGY_BUDGET_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID:
+            errors.append("policy_id mismatch")
+        if receipt.get("digest_profile") != ENERGY_BUDGET_SHARED_FABRIC_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if (
+            receipt.get("observation_digest_profile")
+            != ENERGY_BUDGET_SHARED_FABRIC_OBSERVATION_DIGEST_PROFILE
+        ):
+            errors.append("observation_digest_profile mismatch")
+        if receipt.get("floor_policy_id") != ENERGY_BUDGET_POOL_POLICY_ID:
+            errors.append("floor_policy_id must reference the pool floor policy")
+        if receipt.get("floor_source_ref") != ENERGY_BUDGET_FLOOR_SOURCE_REF:
+            errors.append("floor_source_ref mismatch")
+        if receipt.get("allocation_strategy") != "floor-ratio-deficit-first-v1":
+            errors.append("allocation_strategy mismatch")
+        if receipt.get("shared_fabric_capacity_only") is not True:
+            errors.append("shared_fabric_capacity_only must be true")
+        if receipt.get("raw_capacity_payload_stored") is not False:
+            errors.append("raw_capacity_payload_stored must be false")
+
+        observed_capacity = int(receipt.get("observed_shared_capacity_jps", 0))
+        expected_observation_digest = _shared_fabric_observation_digest(
+            fabric_id=str(receipt.get("fabric_id", "")),
+            observation_ref=str(receipt.get("shared_fabric_observation_ref", "")),
+            observed_shared_capacity_jps=observed_capacity,
+            pool_id=str(receipt.get("pool_id", "")),
+            pool_floor_receipt_digest=str(receipt.get("pool_floor_receipt_digest", "")),
+        )
+        if receipt.get("shared_fabric_observation_digest") != expected_observation_digest:
+            errors.append("shared_fabric_observation_digest mismatch")
+
+        allocations = receipt.get("member_allocations")
+        if not isinstance(allocations, list) or not allocations:
+            errors.append("member_allocations must be a non-empty array")
+            allocations = []
+        normalized_allocations = [
+            allocation for allocation in allocations if isinstance(allocation, Mapping)
+        ]
+        if len(normalized_allocations) != len(allocations):
+            errors.append("member_allocations must contain objects")
+
+        expected_capacity_by_identity = _shared_fabric_floor_allocations(
+            normalized_allocations,
+            observed_capacity,
+        )
+        total_required = 0
+        total_allocated = 0
+        impacted_member_count = 0
+        broker_bound_flags = []
+        scheduler_flags = []
+        member_floor_flags = []
+        for allocation in normalized_allocations:
+            identity_id = str(allocation.get("identity_id", ""))
+            required_floor = int(allocation.get("required_floor_jps", 0))
+            allocated_capacity = int(allocation.get("allocated_capacity_jps", 0))
+            shortfall = max(0, required_floor - allocated_capacity)
+            total_required += required_floor
+            total_allocated += allocated_capacity
+            if shortfall:
+                impacted_member_count += 1
+            expected_allocated = expected_capacity_by_identity.get(identity_id)
+            if allocated_capacity != expected_allocated:
+                errors.append("allocated_capacity_jps must match allocation strategy")
+            if allocation.get("capacity_shortfall_jps") != shortfall:
+                errors.append("capacity_shortfall_jps mismatch")
+            member_floor_preserved = allocated_capacity >= required_floor
+            member_floor_flags.append(member_floor_preserved)
+            if allocation.get("member_floor_preserved") is not member_floor_preserved:
+                errors.append("member_floor_preserved mismatch")
+            scheduler_signal_required = shortfall > 0
+            scheduler_flags.append(scheduler_signal_required)
+            if allocation.get("scheduler_signal_required") is not scheduler_signal_required:
+                errors.append("scheduler_signal_required mismatch")
+            broker_signal_bound = bool(allocation.get("broker_signal_bound"))
+            broker_bound_flags.append(broker_signal_bound)
+            if scheduler_signal_required:
+                if allocation.get("broker_recommended_action") != "migrate-standby":
+                    errors.append("impacted member must bind migrate-standby broker action")
+                if broker_signal_bound is not True:
+                    errors.append("impacted member must bind a broker signal")
+            else:
+                if broker_signal_bound is not True:
+                    errors.append("unimpacted member broker binding must be true")
+            if allocation.get("floor_receipt_digest") in {"", None}:
+                errors.append("floor_receipt_digest must be present")
+
+        fabric_capacity_deficit = max(0, total_required - observed_capacity)
+        all_member_floors_preserved = bool(member_floor_flags) and all(
+            member_floor_flags
+        )
+        shared_capacity_floor_preserved = observed_capacity >= total_required
+        scheduler_signal_required = any(scheduler_flags)
+        broker_signal_bound = bool(broker_bound_flags) and all(broker_bound_flags)
+
+        if receipt.get("member_count") != len(allocations):
+            errors.append("member_count must match member_allocations length")
+        if receipt.get("total_required_floor_jps") != total_required:
+            errors.append("total_required_floor_jps mismatch")
+        if receipt.get("total_allocated_floor_capacity_jps") != total_allocated:
+            errors.append("total_allocated_floor_capacity_jps mismatch")
+        if receipt.get("fabric_capacity_deficit_jps") != fabric_capacity_deficit:
+            errors.append("fabric_capacity_deficit_jps mismatch")
+        if receipt.get("unallocated_fabric_surplus_jps") != max(
+            0,
+            observed_capacity - total_required,
+        ):
+            errors.append("unallocated_fabric_surplus_jps mismatch")
+        if receipt.get("impacted_member_count") != impacted_member_count:
+            errors.append("impacted_member_count mismatch")
+        if (
+            receipt.get("shared_capacity_floor_preserved")
+            is not shared_capacity_floor_preserved
+        ):
+            errors.append("shared_capacity_floor_preserved mismatch")
+        if receipt.get("all_member_floors_preserved") is not all_member_floors_preserved:
+            errors.append("all_member_floors_preserved mismatch")
+        if receipt.get("scheduler_signal_required") is not scheduler_signal_required:
+            errors.append("scheduler_signal_required mismatch")
+        if receipt.get("broker_signal_bound") is not broker_signal_bound:
+            errors.append("broker_signal_bound mismatch")
+        expected_budget_status = (
+            "fabric-capacity-deficit-protected"
+            if fabric_capacity_deficit
+            else "accepted"
+        )
+        if receipt.get("budget_status") != expected_budget_status:
+            errors.append("budget_status mismatch")
+        expected_degradation_allowed = not scheduler_signal_required
+        if receipt.get("degradation_allowed") is not expected_degradation_allowed:
+            errors.append("degradation_allowed mismatch")
+        if fabric_capacity_deficit and receipt.get("degradation_allowed") is not False:
+            errors.append("fabric deficit must not allow degradation")
+
+        expected_digest = sha256_text(
+            canonical_json(_shared_fabric_receipt_digest_payload(receipt))
+        )
+        if receipt.get("digest") != expected_digest:
+            errors.append("digest must match shared fabric allocation receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "shared_capacity_floor_preserved": shared_capacity_floor_preserved,
+            "fabric_capacity_deficit_blocked": bool(
+                fabric_capacity_deficit
+                and receipt.get("degradation_allowed") is False
+                and scheduler_signal_required
+            ),
+            "all_member_floors_preserved": all_member_floors_preserved,
+            "impacted_member_count": impacted_member_count,
+            "broker_signal_bound": broker_signal_bound,
+            "raw_payload_redacted": receipt.get("raw_capacity_payload_stored") is False,
+        }
+
     @staticmethod
     def _resolve_energy_floor(
         *,
@@ -969,6 +1326,63 @@ def _pool_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
 
 def _subsidy_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _shared_fabric_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _shared_fabric_floor_allocations(
+    member_summaries: Sequence[Mapping[str, Any]],
+    observed_shared_capacity_jps: int,
+) -> Dict[str, int]:
+    if not member_summaries:
+        return {}
+    required_by_identity = {
+        str(summary["identity_id"]): int(summary["required_floor_jps"])
+        for summary in member_summaries
+    }
+    total_required = sum(required_by_identity.values())
+    if total_required <= 0:
+        return {identity_id: 0 for identity_id in required_by_identity}
+    effective_capacity = min(int(observed_shared_capacity_jps), total_required)
+    allocations: Dict[str, int] = {}
+    remainders = []
+    for identity_id, required_floor in required_by_identity.items():
+        product = effective_capacity * required_floor
+        allocations[identity_id] = product // total_required
+        remainders.append((product % total_required, identity_id))
+    remainder_capacity = effective_capacity - sum(allocations.values())
+    for _remainder, identity_id in sorted(remainders, key=lambda item: (-item[0], item[1])):
+        if remainder_capacity <= 0:
+            break
+        allocations[identity_id] += 1
+        remainder_capacity -= 1
+    return allocations
+
+
+def _shared_fabric_observation_digest(
+    *,
+    fabric_id: str,
+    observation_ref: str,
+    observed_shared_capacity_jps: int,
+    pool_id: str,
+    pool_floor_receipt_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "fabric_id": fabric_id,
+                "observation_ref": observation_ref,
+                "observed_shared_capacity_jps": observed_shared_capacity_jps,
+                "pool_id": pool_id,
+                "pool_floor_receipt_digest": pool_floor_receipt_digest,
+                "observation_digest_profile": (
+                    ENERGY_BUDGET_SHARED_FABRIC_OBSERVATION_DIGEST_PROFILE
+                ),
+            }
+        )
+    )
 
 
 def _voluntary_subsidy_policy_digest(

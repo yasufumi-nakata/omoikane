@@ -245,6 +245,127 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertIn("all_consent_digests_valid mismatch", validation["errors"])
         self.assertIn("digest must match voluntary subsidy receipt payload", validation["errors"])
 
+    def test_shared_fabric_capacity_derives_member_shortfalls(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://fabric",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/fabric-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 30,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/fabric-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 24,
+                    "observed_capacity_jps": 24,
+                },
+            ],
+        )
+        draft_receipt = service.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://unit",
+            observed_shared_capacity_jps=50,
+        )
+        signals = [
+            {
+                "signal_id": f"broker-signal-{allocation['identity_id'].rsplit('/', 1)[-1]}",
+                "identity_id": allocation["identity_id"],
+                "minimum_joules_per_second": allocation["required_floor_jps"],
+                "current_joules_per_second": allocation["allocated_capacity_jps"],
+                "severity": "critical",
+                "recommended_action": "migrate-standby",
+            }
+            for allocation in draft_receipt["member_allocations"]
+        ]
+
+        receipt = service.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://unit",
+            observed_shared_capacity_jps=50,
+            shared_fabric_observation_ref="fabric-observation://unit/shared/v1",
+            member_broker_signals=signals,
+        )
+        validation = service.validate_shared_fabric_allocation_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertFalse(receipt["shared_capacity_floor_preserved"])
+        self.assertFalse(receipt["all_member_floors_preserved"])
+        self.assertEqual(4, receipt["fabric_capacity_deficit_jps"])
+        self.assertEqual(2, receipt["impacted_member_count"])
+        self.assertEqual("fabric-capacity-deficit-protected", receipt["budget_status"])
+        self.assertFalse(receipt["degradation_allowed"])
+        self.assertTrue(receipt["broker_signal_bound"])
+        self.assertFalse(receipt["raw_capacity_payload_stored"])
+        self.assertEqual(
+            {
+                "identity://energy-budget/fabric-a": 28,
+                "identity://energy-budget/fabric-b": 22,
+            },
+            {
+                allocation["identity_id"]: allocation["allocated_capacity_jps"]
+                for allocation in receipt["member_allocations"]
+            },
+        )
+
+    def test_shared_fabric_validation_rejects_tampered_allocation(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://fabric-tamper",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/fabric-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 30,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/fabric-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 24,
+                    "observed_capacity_jps": 24,
+                },
+            ],
+        )
+        draft_receipt = service.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://tamper",
+            observed_shared_capacity_jps=50,
+        )
+        signals = [
+            {
+                "signal_id": f"broker-signal-{allocation['identity_id'].rsplit('/', 1)[-1]}",
+                "identity_id": allocation["identity_id"],
+                "minimum_joules_per_second": allocation["required_floor_jps"],
+                "current_joules_per_second": allocation["allocated_capacity_jps"],
+                "severity": "critical",
+                "recommended_action": "migrate-standby",
+            }
+            for allocation in draft_receipt["member_allocations"]
+        ]
+        receipt = service.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://tamper",
+            observed_shared_capacity_jps=50,
+            member_broker_signals=signals,
+        )
+        receipt["member_allocations"][0]["allocated_capacity_jps"] = 29
+
+        validation = service.validate_shared_fabric_allocation_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "allocated_capacity_jps must match allocation strategy",
+            validation["errors"],
+        )
+        self.assertIn("capacity_shortfall_jps mismatch", validation["errors"])
+        self.assertIn(
+            "digest must match shared fabric allocation receipt payload",
+            validation["errors"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -134,6 +134,26 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(receipt["cross_identity_offset_used"])
         self.assertFalse(receipt["raw_funding_payload_stored"])
 
+    def test_energy_budget_fabric_demo_emits_shared_capacity_shortfalls(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "energy-budget-fabric-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        receipt = result["energy_budget_fabric"]["receipt"]
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            "fabric-capacity-deficit-protected",
+            result["validation"]["budget_status"],
+        )
+        self.assertFalse(receipt["shared_capacity_floor_preserved"])
+        self.assertEqual(4, receipt["fabric_capacity_deficit_jps"])
+        self.assertEqual(2, receipt["impacted_member_count"])
+        self.assertTrue(receipt["broker_signal_bound"])
+        self.assertFalse(receipt["degradation_allowed"])
+        self.assertFalse(receipt["raw_capacity_payload_stored"])
+
     def test_imc_demo_emits_disclosure_safe_json(self) -> None:
         stdout = io.StringIO()
 

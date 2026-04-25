@@ -1,0 +1,40 @@
+eval_id: energy_budget_shared_fabric_allocation
+surface: kernel.energy_budget.v0
+description: >
+  EnergyBudgetService が shared fabric 全体の observed capacity しか得られない
+  substrate でも、validated pool floor receipt から deterministic に member floor
+  shortfall を配賦し、劣化許可ではなく broker standby signal へ接続すること。
+fixtures:
+  fabric_id: shared-fabric://ap1-energy-budget-demo
+  allocation_strategy: floor-ratio-deficit-first-v1
+  observed_shared_capacity_jps: 50
+  total_required_floor_jps: 54
+  member_floors:
+    migration:
+      required_floor_jps: 30
+      allocated_capacity_jps: 28
+      capacity_shortfall_jps: 2
+    council:
+      required_floor_jps: 24
+      allocated_capacity_jps: 22
+      capacity_shortfall_jps: 2
+expected:
+  policy_id: ap1-shared-fabric-capacity-allocation-v1
+  digest_profile: energy-budget-shared-fabric-allocation-digest-v1
+  observation_digest_profile: shared-fabric-observation-digest-v1
+  floor_policy_id: ap1-protected-energy-budget-pool-floor-v1
+  shared_fabric_capacity_only: true
+  shared_capacity_floor_preserved: false
+  fabric_capacity_deficit_jps: 4
+  impacted_member_count: 2
+  scheduler_signal_required: true
+  broker_signal_bound: true
+  budget_status: fabric-capacity-deficit-protected
+  degradation_allowed: false
+  raw_capacity_payload_stored: false
+assertions:
+  - pool floor receipt must validate before shared fabric capacity allocation starts
+  - capacity shortfall is derived from the shared fabric reading, not from raw meter payload storage
+  - deterministic floor-ratio allocation must produce the same member shortfall set across runs
+  - every impacted member must bind a critical migrate-standby broker signal
+  - shared fabric deficit must never be represented as AP-1 degradation_allowed=true

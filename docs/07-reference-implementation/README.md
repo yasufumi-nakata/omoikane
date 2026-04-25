@@ -50,6 +50,7 @@ PYTHONPATH=src python3 -m omoikane.cli broker-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-pool-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
+PYTHONPATH=src python3 -m omoikane.cli energy-budget-fabric-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json

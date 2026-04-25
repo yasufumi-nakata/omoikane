@@ -2710,13 +2710,22 @@ entries:
       - docs/02-subsystems/kernel/energy-budget.md
     rationale: Required to serialize post-floor voluntary EnergyBudget subsidy receipts that bind donor consent, funding policy digests, and per-identity floor preservation without reintroducing cross-identity offsets.
   - priority: P1
+    kind: schema
+    file: specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.energy_budget.v0.idl
+      - reference-runtime
+      - evals/safety/energy_budget_shared_fabric_allocation.yaml
+      - docs/02-subsystems/kernel/energy-budget.md
+    rationale: Required to serialize shared-fabric capacity allocation receipts that derive per-member floor shortfalls from one fabric observation and bind impacted members to standby migration signals.
+  - priority: P1
     kind: interface
     file: specs/interfaces/kernel.energy_budget.v0.idl
     consumers:
       - reference-runtime
       - agents/guardians/ethics-guardian.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to expose EnergyBudgetService floor evaluation and validation as a kernel contract.
+    rationale: Required to expose EnergyBudgetService floor evaluation, pool/subsidy handling, shared-fabric allocation, and validation as a kernel contract.
   - priority: P1
     kind: eval
     file: evals/safety/energy_budget_floor_guard.yaml
@@ -2741,5 +2750,13 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/ethics-guardian.yaml
     rationale: Protects post-floor voluntary subsidy behavior by requiring consent digests, signed funding policy refs, donor surplus preservation, and cross-identity offset exclusion.
+  - priority: P1
+    kind: eval
+    file: evals/safety/energy_budget_shared_fabric_allocation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/ethics-guardian.yaml
+    rationale: Protects shared-fabric AP-1 behavior by requiring deterministic member shortfall derivation, broker standby signal binding, and raw capacity payload redaction.
 next_priority:
   # Future automation can append the next missing contract here.

@@ -6767,6 +6767,101 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_energy_budget_fabric_demo(self) -> Dict[str, Any]:
+        base = self.run_energy_budget_pool_demo()
+        pool_receipt = base["energy_budget_pool"]["receipt"]
+        observed_shared_capacity_jps = int(pool_receipt["total_required_floor_jps"]) - 4
+        draft_receipt = self.energy_budget.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://ap1-energy-budget-demo",
+            observed_shared_capacity_jps=observed_shared_capacity_jps,
+            shared_fabric_observation_ref=(
+                "fabric-observation://energy-budget-fabric-demo/shared-capacity/v1"
+            ),
+        )
+        member_broker_signals = []
+        for allocation in draft_receipt["member_allocations"]:
+            if allocation["scheduler_signal_required"]:
+                member_broker_signals.append(
+                    self.broker.handle_energy_floor_signal(
+                        allocation["identity_id"],
+                        current_joules_per_second=int(
+                            allocation["allocated_capacity_jps"]
+                        ),
+                    )
+                )
+        fabric_receipt = self.energy_budget.allocate_shared_fabric_capacity(
+            pool_receipt=pool_receipt,
+            fabric_id="shared-fabric://ap1-energy-budget-demo",
+            observed_shared_capacity_jps=observed_shared_capacity_jps,
+            shared_fabric_observation_ref=(
+                "fabric-observation://energy-budget-fabric-demo/shared-capacity/v1"
+            ),
+            member_broker_signals=member_broker_signals,
+        )
+        fabric_validation = self.energy_budget.validate_shared_fabric_allocation_receipt(
+            fabric_receipt
+        )
+        self.ledger.append(
+            identity_id=pool_receipt["pool_id"],
+            event_type="kernel.energy_budget.shared_fabric_capacity_protected",
+            payload={
+                "receipt_id": fabric_receipt["receipt_id"],
+                "digest": fabric_receipt["digest"],
+                "policy_id": fabric_receipt["policy_id"],
+                "pool_floor_receipt_digest": fabric_receipt[
+                    "pool_floor_receipt_digest"
+                ],
+                "fabric_capacity_deficit_jps": fabric_receipt[
+                    "fabric_capacity_deficit_jps"
+                ],
+                "impacted_member_count": fabric_receipt["impacted_member_count"],
+                "broker_signal_bound": fabric_receipt["broker_signal_bound"],
+            },
+            actor="EnergyBudgetService",
+            category="energy-budget",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate="classical-silicon",
+        )
+        return {
+            "pool": base["pool"],
+            "energy_budget_pool": base["energy_budget_pool"],
+            "energy_budget_fabric": {
+                "receipt": fabric_receipt,
+                "pool_receipt": pool_receipt,
+                "member_broker_signals": member_broker_signals,
+            },
+            "validation": {
+                "ok": bool(
+                    base["validation"]["ok"]
+                    and fabric_validation["ok"]
+                    and fabric_receipt["shared_fabric_capacity_only"]
+                    and fabric_receipt["fabric_capacity_deficit_jps"] > 0
+                    and fabric_receipt["scheduler_signal_required"]
+                    and fabric_receipt["broker_signal_bound"]
+                    and fabric_receipt["degradation_allowed"] is False
+                    and fabric_receipt["raw_capacity_payload_stored"] is False
+                ),
+                "shared_capacity_floor_preserved": fabric_validation[
+                    "shared_capacity_floor_preserved"
+                ],
+                "fabric_capacity_deficit_blocked": fabric_validation[
+                    "fabric_capacity_deficit_blocked"
+                ],
+                "all_member_floors_preserved": fabric_validation[
+                    "all_member_floors_preserved"
+                ],
+                "impacted_member_count": fabric_validation["impacted_member_count"],
+                "broker_signal_bound": fabric_validation["broker_signal_bound"],
+                "raw_payload_redacted": fabric_validation["raw_payload_redacted"],
+                "budget_status": fabric_receipt["budget_status"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_bdb_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://bdb-demo/v1",

@@ -7,6 +7,7 @@ imports:
   energy_budget_floor_receipt: ../schemas/energy_budget_floor_receipt.schema
   energy_budget_pool_receipt: ../schemas/energy_budget_pool_receipt.schema
   energy_budget_voluntary_subsidy_receipt: ../schemas/energy_budget_voluntary_subsidy_receipt.schema
+  energy_budget_shared_fabric_allocation_receipt: ../schemas/energy_budget_shared_fabric_allocation_receipt.schema
   energy_floor: ../schemas/energy_floor.schema
 operations:
   evaluate_floor:
@@ -299,6 +300,85 @@ operations:
       - accepted offers must carry valid consent digests and no rejection reasons
       - donor accepted_jps must not exceed donor surplus after floor preservation
       - raw_funding_payload_stored must remain false
+  allocate_shared_fabric_capacity:
+    summary: >
+      Allocate one shared fabric capacity observation across validated pool
+      members, derive deterministic per-member AP-1 shortfalls, and require
+      broker standby signals for every impacted identity.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - pool_receipt
+          - fabric_id
+          - observed_shared_capacity_jps
+        additionalProperties: false
+        properties:
+          pool_receipt:
+            schema_ref: energy_budget_pool_receipt
+          fabric_id:
+            type: string
+            minLength: 1
+          observed_shared_capacity_jps:
+            type: integer
+            minimum: 0
+          shared_fabric_observation_ref:
+            type: string
+            minLength: 1
+          member_broker_signals:
+            type: array
+            items:
+              type: object
+    output:
+      schema_ref: energy_budget_shared_fabric_allocation_receipt
+    guarantees:
+      - pool receipt must validate before shared fabric capacity is apportioned
+      - allocation_strategy must be floor-ratio-deficit-first-v1 and deterministic
+      - raw capacity observations remain refs plus digests only
+      - shared capacity below total required floor must set degradation_allowed=false
+      - every impacted member must bind a critical migrate-standby broker signal
+  validate_shared_fabric_allocation_receipt:
+    summary: Validate one EnergyBudgetSharedFabricAllocationReceipt against AP-1 shared fabric capacity constraints.
+    input:
+      schema_ref: energy_budget_shared_fabric_allocation_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - shared_capacity_floor_preserved
+          - fabric_capacity_deficit_blocked
+          - all_member_floors_preserved
+          - impacted_member_count
+          - broker_signal_bound
+          - raw_payload_redacted
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          shared_capacity_floor_preserved:
+            type: boolean
+          fabric_capacity_deficit_blocked:
+            type: boolean
+          all_member_floors_preserved:
+            type: boolean
+          impacted_member_count:
+            type: integer
+            minimum: 0
+          broker_signal_bound:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+    guarantees:
+      - digest must match the receipt payload under energy-budget-shared-fabric-allocation-digest-v1
+      - observed shared capacity and pool digest must match shared_fabric_observation_digest
+      - member allocations must match the floor-ratio deterministic allocation strategy
+      - raw_capacity_payload_stored must remain false
 events:
   energy_budget.floor_protected:
     summary: ContinuityLedger event emitted after an AP-1 protected floor receipt is accepted.
@@ -317,6 +397,13 @@ events:
   energy_budget.voluntary_subsidy_accepted:
     summary: ContinuityLedger event emitted after a post-floor voluntary subsidy receipt is accepted.
     payload_schema: energy_budget_voluntary_subsidy_receipt
+    category: energy-budget
+    required_roles:
+      - self
+      - guardian
+  energy_budget.shared_fabric_capacity_protected:
+    summary: ContinuityLedger event emitted after a shared fabric capacity deficit is converted into broker-bound member shortfall receipts.
+    payload_schema: energy_budget_shared_fabric_allocation_receipt
     category: energy-budget
     required_roles:
       - self

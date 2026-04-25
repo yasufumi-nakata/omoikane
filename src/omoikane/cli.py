@@ -281,6 +281,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Emit JSON only",
     )
 
+    energy_budget_fabric_parser = subparsers.add_parser(
+        "energy-budget-fabric-demo",
+        help="Run the L1 shared-fabric AP-1 energy capacity allocation scenario",
+    )
+    energy_budget_fabric_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON only",
+    )
+
     continuity_parser = subparsers.add_parser(
         "continuity-demo",
         help="Run the L1 continuity ledger profile and signature policy scenario",
@@ -620,6 +630,10 @@ def main() -> None:
 
     if args.command == "energy-budget-subsidy-demo":
         _print_result(runtime.run_energy_budget_subsidy_demo(), args.json)
+        return
+
+    if args.command == "energy-budget-fabric-demo":
+        _print_result(runtime.run_energy_budget_fabric_demo(), args.json)
         return
 
     if args.command == "continuity-demo":

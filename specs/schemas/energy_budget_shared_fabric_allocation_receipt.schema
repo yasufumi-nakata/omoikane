@@ -1,0 +1,227 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema"
+title: EnergyBudgetSharedFabricAllocationReceipt
+description: >
+  Digest-bound L1 receipt deriving per-identity AP-1 floor shortfalls from one
+  shared fabric capacity observation, without storing raw metering payloads or
+  silently degrading a member below its floor.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - fabric_id
+  - pool_id
+  - pool_floor_receipt_ref
+  - pool_floor_receipt_digest
+  - pool_member_digest_set
+  - policy_id
+  - digest_profile
+  - observation_digest_profile
+  - floor_policy_id
+  - floor_source_ref
+  - ethics_policy_refs
+  - allocation_strategy
+  - shared_fabric_capacity_only
+  - shared_fabric_observation_ref
+  - shared_fabric_observation_digest
+  - observed_shared_capacity_jps
+  - total_required_floor_jps
+  - total_allocated_floor_capacity_jps
+  - fabric_capacity_deficit_jps
+  - unallocated_fabric_surplus_jps
+  - member_count
+  - member_allocations
+  - impacted_member_count
+  - per_identity_floor_preserved_before_fabric
+  - shared_capacity_floor_preserved
+  - all_member_floors_preserved
+  - scheduler_signal_required
+  - broker_signal_bound
+  - budget_status
+  - degradation_allowed
+  - raw_capacity_payload_stored
+  - blocking_reasons
+  - evaluated_at
+  - digest
+properties:
+  kind:
+    const: energy_budget_shared_fabric_allocation_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^energy-budget-fabric-"
+  fabric_id:
+    type: string
+    minLength: 1
+  pool_id:
+    type: string
+    minLength: 1
+  pool_floor_receipt_ref:
+    type: string
+    pattern: "^energy-budget-pool-"
+  pool_floor_receipt_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  pool_member_digest_set:
+    type: string
+    minLength: 64
+    maxLength: 64
+  policy_id:
+    const: ap1-shared-fabric-capacity-allocation-v1
+  digest_profile:
+    const: energy-budget-shared-fabric-allocation-digest-v1
+  observation_digest_profile:
+    const: shared-fabric-observation-digest-v1
+  floor_policy_id:
+    const: ap1-protected-energy-budget-pool-floor-v1
+  floor_source_ref:
+    const: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+  ethics_policy_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+    contains:
+      const: docs/02-subsystems/kernel/anti-patterns.md#ap-1
+  allocation_strategy:
+    const: floor-ratio-deficit-first-v1
+  shared_fabric_capacity_only:
+    const: true
+  shared_fabric_observation_ref:
+    type: string
+    minLength: 1
+  shared_fabric_observation_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  observed_shared_capacity_jps:
+    type: integer
+    minimum: 0
+  total_required_floor_jps:
+    type: integer
+    minimum: 1
+  total_allocated_floor_capacity_jps:
+    type: integer
+    minimum: 0
+  fabric_capacity_deficit_jps:
+    type: integer
+    minimum: 0
+  unallocated_fabric_surplus_jps:
+    type: integer
+    minimum: 0
+  member_count:
+    type: integer
+    minimum: 1
+  member_allocations:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - identity_id
+        - workload_class
+        - required_floor_jps
+        - granted_budget_jps
+        - allocated_capacity_jps
+        - capacity_shortfall_jps
+        - member_floor_preserved
+        - scheduler_signal_required
+        - floor_receipt_digest
+        - broker_signal_ref
+        - broker_signal_digest
+        - broker_recommended_action
+        - broker_signal_bound
+      properties:
+        identity_id:
+          type: string
+          minLength: 1
+        workload_class:
+          type: string
+          enum:
+            - baseline
+            - sandbox
+            - council
+            - migration
+        required_floor_jps:
+          type: integer
+          minimum: 1
+        granted_budget_jps:
+          type: integer
+          minimum: 1
+        allocated_capacity_jps:
+          type: integer
+          minimum: 0
+        capacity_shortfall_jps:
+          type: integer
+          minimum: 0
+        member_floor_preserved:
+          type: boolean
+        scheduler_signal_required:
+          type: boolean
+        floor_receipt_digest:
+          type: string
+          minLength: 64
+          maxLength: 64
+        broker_signal_ref:
+          type:
+            - string
+            - "null"
+        broker_signal_digest:
+          type:
+            - string
+            - "null"
+          minLength: 64
+          maxLength: 64
+        broker_recommended_action:
+          type:
+            - string
+            - "null"
+          enum:
+            - migrate-standby
+            - pause-and-review
+            - null
+        broker_signal_bound:
+          type: boolean
+  impacted_member_count:
+    type: integer
+    minimum: 0
+  per_identity_floor_preserved_before_fabric:
+    type: boolean
+  shared_capacity_floor_preserved:
+    type: boolean
+  all_member_floors_preserved:
+    type: boolean
+  scheduler_signal_required:
+    type: boolean
+  broker_signal_bound:
+    type: boolean
+  budget_status:
+    type: string
+    enum:
+      - fabric-capacity-deficit-protected
+      - accepted
+  degradation_allowed:
+    type: boolean
+  raw_capacity_payload_stored:
+    const: false
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      enum:
+        - shared-fabric-capacity-below-total-floor
+        - per-member-shortfall-derived-from-shared-fabric
+    uniqueItems: true
+  evaluated_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    minLength: 64
+    maxLength: 64

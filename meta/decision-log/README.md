@@ -98,5 +98,6 @@ status: decided | superseded
 - [2026-04-25_wms-approval-collection-scaling.md](2026-04-25_wms-approval-collection-scaling.md)
 - [2026-04-25_wms-registry-slo-retry-budget.md](2026-04-25_wms-registry-slo-retry-budget.md)
 - [2026-04-25_energy-budget-floor-guard.md](2026-04-25_energy-budget-floor-guard.md)
+- [2026-04-25_energy-budget-shared-fabric-allocation.md](2026-04-25_energy-budget-shared-fabric-allocation.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)
