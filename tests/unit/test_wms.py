@@ -1,11 +1,45 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
 import unittest
 
 from omoikane.agentic.distributed_transport import DistributedTransportService
 from omoikane.common import canonical_json, sha256_text
 from omoikane.interface.imc import InterMindChannel
 from omoikane.interface.wms import WorldModelSync
+
+
+@contextmanager
+def live_slo_endpoint(payload: dict[str, object]):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self) -> None:  # noqa: N802
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+            self.close_connection = True
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/authority-slo"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1.0)
 
 
 class WorldModelSyncTests(unittest.TestCase):
@@ -806,34 +840,99 @@ class WorldModelSyncTests(unittest.TestCase):
             required_operations=["approval_fanout_bound"],
             source_artifact_digests={"approval_fanout_bound": fanout["digest"]},
         )
+        route_health_observation = {
+            "authority_ref": "authority://test/federation",
+            "route_ref": "route://test/federation/observer",
+            "participant_id": session["current_state"]["participants"][-1],
+            "outage_kind": "timeout",
+            "route_status": "partial-outage",
+            "remote_jurisdiction": "JP-13",
+            "jurisdiction_policy_registry_ref": (
+                "policy-registry://jp-13/test-wms-authority-retry"
+            ),
+            "jurisdiction_rate_limit_ref": "rate-limit://jp-13/test-wms-retry",
+            "jurisdiction_retry_limit_ms": 500,
+            "authority_slo_snapshot_ref": (
+                "authority-slo://test/federation/observer-timeout"
+            ),
+            "authority_slo_retry_limit_ms": 500,
+            "signer_key_ref": "key://test/jp-13/wms-retry-signer",
+            "observed_latency_ms": 830,
+            "success_ratio": 0.667,
+            "consecutive_failures": 1,
+        }
+        jurisdiction_policy_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_policy_id": "registry-bound-authority-retry-slo-v1",
+                    "registry_profile": "jurisdiction-policy-registry-bound-retry-v1",
+                    "jurisdiction_policy_registry_ref": route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                    "remote_jurisdiction": route_health_observation[
+                        "remote_jurisdiction"
+                    ],
+                    "jurisdiction_rate_limit_ref": route_health_observation[
+                        "jurisdiction_rate_limit_ref"
+                    ],
+                    "jurisdiction_retry_limit_ms": route_health_observation[
+                        "jurisdiction_retry_limit_ms"
+                    ],
+                    "signer_key_ref": route_health_observation["signer_key_ref"],
+                }
+            )
+        )
+        slo_payload = {
+            "checked_at": "2026-04-26T00:20:00Z",
+            "authority_ref": route_health_observation["authority_ref"],
+            "route_ref": route_health_observation["route_ref"],
+            "route_status": route_health_observation["route_status"],
+            "remote_jurisdiction": route_health_observation["remote_jurisdiction"],
+            "jurisdiction_policy_registry_ref": route_health_observation[
+                "jurisdiction_policy_registry_ref"
+            ],
+            "jurisdiction_policy_registry_digest": jurisdiction_policy_registry_digest,
+            "authority_slo_snapshot_profile": "authority-slo-snapshot-retry-window-v1",
+            "authority_slo_snapshot_ref": route_health_observation[
+                "authority_slo_snapshot_ref"
+            ],
+            "authority_slo_retry_limit_ms": route_health_observation[
+                "authority_slo_retry_limit_ms"
+            ],
+            "observed_latency_ms": route_health_observation["observed_latency_ms"],
+            "success_ratio": route_health_observation["success_ratio"],
+            "consecutive_failures": route_health_observation["consecutive_failures"],
+        }
+        with live_slo_endpoint(slo_payload) as endpoint:
+            slo_probe = sync.probe_remote_authority_slo_snapshot_endpoint(
+                slo_endpoint=endpoint,
+                authority_ref=route_health_observation["authority_ref"],
+                route_ref=route_health_observation["route_ref"],
+                route_status=route_health_observation["route_status"],
+                remote_jurisdiction=route_health_observation["remote_jurisdiction"],
+                jurisdiction_policy_registry_ref=route_health_observation[
+                    "jurisdiction_policy_registry_ref"
+                ],
+                jurisdiction_policy_registry_digest=jurisdiction_policy_registry_digest,
+                authority_slo_snapshot_ref=route_health_observation[
+                    "authority_slo_snapshot_ref"
+                ],
+                authority_slo_retry_limit_ms=route_health_observation[
+                    "authority_slo_retry_limit_ms"
+                ],
+                observed_latency_ms=route_health_observation["observed_latency_ms"],
+                success_ratio=route_health_observation["success_ratio"],
+                consecutive_failures=route_health_observation["consecutive_failures"],
+                request_timeout_ms=500,
+            )
+        slo_probe_validation = sync.validate_authority_slo_probe_receipt(slo_probe)
         retry_budget = sync.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref="authority-profile://test/wms-approval-retry",
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
-            route_health_observations=[
-                {
-                    "authority_ref": "authority://test/federation",
-                    "route_ref": "route://test/federation/observer",
-                    "participant_id": session["current_state"]["participants"][-1],
-                    "outage_kind": "timeout",
-                    "route_status": "partial-outage",
-                    "remote_jurisdiction": "JP-13",
-                    "jurisdiction_policy_registry_ref": (
-                        "policy-registry://jp-13/test-wms-authority-retry"
-                    ),
-                    "jurisdiction_rate_limit_ref": "rate-limit://jp-13/test-wms-retry",
-                    "jurisdiction_retry_limit_ms": 500,
-                    "authority_slo_snapshot_ref": (
-                        "authority-slo://test/federation/observer-timeout"
-                    ),
-                    "authority_slo_retry_limit_ms": 500,
-                    "signer_key_ref": "key://test/jp-13/wms-retry-signer",
-                    "observed_latency_ms": 830,
-                    "success_ratio": 0.667,
-                    "consecutive_failures": 1,
-                }
-            ],
+            route_health_observations=[route_health_observation],
+            authority_slo_probe_receipts=[slo_probe],
         )
         retry_budget_validation = sync.validate_remote_authority_retry_budget_receipt(
             retry_budget,
@@ -869,6 +968,16 @@ class WorldModelSyncTests(unittest.TestCase):
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
         )
+        tampered_slo_probe_budget = dict(retry_budget)
+        tampered_slo_probe_budget["authority_slo_probe_digests"] = [
+            sha256_text("tampered-slo-probe")
+        ]
+        tampered_slo_probe_validation = sync.validate_remote_authority_retry_budget_receipt(
+            tampered_slo_probe_budget,
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            required_participants=session["current_state"]["participants"],
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["fanout_complete"])
@@ -889,6 +998,11 @@ class WorldModelSyncTests(unittest.TestCase):
             fanout["outage_participants"],
         )
         self.assertEqual(3, fanout["result_count"])
+        self.assertTrue(slo_probe_validation["ok"])
+        self.assertTrue(slo_probe_validation["authority_slo_live_probe_bound"])
+        self.assertTrue(slo_probe["slo_endpoint_ref"].startswith("http://"))
+        self.assertEqual(64, len(slo_probe["network_response_digest"]))
+        self.assertFalse(slo_probe["raw_slo_payload_stored"])
         self.assertTrue(retry_budget_validation["ok"])
         self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
@@ -896,6 +1010,7 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget_validation["jurisdiction_rate_limit_bound"])
         self.assertTrue(retry_budget_validation["jurisdiction_policy_registry_bound"])
         self.assertTrue(retry_budget_validation["authority_slo_snapshot_bound"])
+        self.assertTrue(retry_budget_validation["authority_slo_live_probe_bound"])
         self.assertTrue(retry_budget_validation["registry_slo_schedule_bound"])
         self.assertTrue(retry_budget_validation["authority_signature_bound"])
         self.assertTrue(retry_budget_validation["signed_jurisdiction_retry_budget_bound"])
@@ -907,6 +1022,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget["jurisdiction_rate_limit_bound"])
         self.assertTrue(retry_budget["jurisdiction_policy_registry_bound"])
         self.assertTrue(retry_budget["authority_slo_snapshot_bound"])
+        self.assertTrue(retry_budget["authority_slo_live_probe_bound"])
+        self.assertEqual([slo_probe["digest"]], retry_budget["authority_slo_probe_digests"])
         self.assertTrue(retry_budget["registry_slo_schedule_bound"])
         self.assertTrue(retry_budget["registry_bound_retry_budget_bound"])
         self.assertTrue(retry_budget["authority_signature_bound"])
@@ -929,6 +1046,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_signature_validation["authority_signature_bound"])
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["jurisdiction_policy_registry_bound"])
+        self.assertFalse(tampered_slo_probe_validation["ok"])
+        self.assertFalse(tampered_slo_probe_validation["authority_slo_live_probe_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

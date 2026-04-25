@@ -172,8 +172,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["scenarios"]["remote_authority_retry_budget"][
+                "authority_slo_live_probe_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"][
                 "registry_slo_schedule_bound"
             ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_slo_probe_receipt"][
+                "network_probe_bound"
+            ]
+        )
+        self.assertEqual(
+            [result["scenarios"]["remote_authority_slo_probe_receipt"]["digest"]],
+            result["scenarios"]["remote_authority_retry_budget"][
+                "authority_slo_probe_digests"
+            ],
         )
         self.assertEqual(
             result["scenarios"]["approval_fanout_receipt"]["digest"],

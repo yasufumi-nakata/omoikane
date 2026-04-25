@@ -67,7 +67,7 @@ delegated privileged capture acquisition に raw packet body 無しで束縛さ�
 
 ### WMS Remote Authority Retry Budget
 recovered fan-out retry を remote authority route-health observation、
-fixed exponential backoff schedule、engine transaction log の
+live authority SLO snapshot probe、fixed exponential backoff schedule、engine transaction log の
 approval_fanout_bound entry に束縛し、raw remote transcript を保存しないことを確認する。
 
 ### Sensory Loopback Guard

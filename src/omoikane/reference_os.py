@@ -8870,6 +8870,135 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        @contextmanager
+        def live_authority_slo_bridge(slo_payload: Dict[str, Any]):
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    body = json.dumps(slo_payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            endpoint = f"http://127.0.0.1:{server.server_address[1]}/authority-slo"
+            try:
+                yield endpoint
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
+
+        route_health_observation = {
+            "observation_ref": (
+                "route-health://federation/wms-approval/"
+                f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
+            ),
+            "authority_ref": "authority://federation/wms-approval",
+            "route_ref": (
+                "route://federation/wms-approval/observer/"
+                f"{approval_subject['digest'][:12]}"
+            ),
+            "participant_id": observer.identity_id,
+            "outage_kind": "timeout",
+            "route_status": "partial-outage",
+            "remote_jurisdiction": "JP-13",
+            "jurisdiction_policy_registry_ref": (
+                "policy-registry://jp-13/wms-authority-retry/v1"
+            ),
+            "jurisdiction_rate_limit_ref": (
+                "rate-limit://jp-13/wms-approval-retry-budget/v1"
+            ),
+            "jurisdiction_retry_limit_ms": 500,
+            "authority_slo_snapshot_ref": (
+                "authority-slo://federation/wms-approval/observer-timeout/v1"
+            ),
+            "authority_slo_retry_limit_ms": 500,
+            "signer_key_ref": "key://federation/jp-13/wms-retry-signer",
+            "observed_latency_ms": 860,
+            "success_ratio": 0.667,
+            "consecutive_failures": 1,
+        }
+        jurisdiction_policy_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_policy_id": "registry-bound-authority-retry-slo-v1",
+                    "registry_profile": "jurisdiction-policy-registry-bound-retry-v1",
+                    "jurisdiction_policy_registry_ref": route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                    "remote_jurisdiction": route_health_observation[
+                        "remote_jurisdiction"
+                    ],
+                    "jurisdiction_rate_limit_ref": route_health_observation[
+                        "jurisdiction_rate_limit_ref"
+                    ],
+                    "jurisdiction_retry_limit_ms": route_health_observation[
+                        "jurisdiction_retry_limit_ms"
+                    ],
+                    "signer_key_ref": route_health_observation["signer_key_ref"],
+                }
+            )
+        )
+        live_slo_payload = {
+            "checked_at": "2026-04-26T00:10:00Z",
+            "authority_ref": route_health_observation["authority_ref"],
+            "route_ref": route_health_observation["route_ref"],
+            "route_status": route_health_observation["route_status"],
+            "remote_jurisdiction": route_health_observation["remote_jurisdiction"],
+            "jurisdiction_policy_registry_ref": route_health_observation[
+                "jurisdiction_policy_registry_ref"
+            ],
+            "jurisdiction_policy_registry_digest": jurisdiction_policy_registry_digest,
+            "authority_slo_snapshot_profile": "authority-slo-snapshot-retry-window-v1",
+            "authority_slo_snapshot_ref": route_health_observation[
+                "authority_slo_snapshot_ref"
+            ],
+            "authority_slo_retry_limit_ms": route_health_observation[
+                "authority_slo_retry_limit_ms"
+            ],
+            "observed_latency_ms": route_health_observation["observed_latency_ms"],
+            "success_ratio": route_health_observation["success_ratio"],
+            "consecutive_failures": route_health_observation["consecutive_failures"],
+        }
+        with live_authority_slo_bridge(live_slo_payload) as authority_slo_endpoint:
+            remote_authority_slo_probe_receipt = (
+                self.wms.probe_remote_authority_slo_snapshot_endpoint(
+                    slo_endpoint=authority_slo_endpoint,
+                    authority_ref=route_health_observation["authority_ref"],
+                    route_ref=route_health_observation["route_ref"],
+                    route_status=route_health_observation["route_status"],
+                    remote_jurisdiction=route_health_observation["remote_jurisdiction"],
+                    jurisdiction_policy_registry_ref=route_health_observation[
+                        "jurisdiction_policy_registry_ref"
+                    ],
+                    jurisdiction_policy_registry_digest=jurisdiction_policy_registry_digest,
+                    authority_slo_snapshot_ref=route_health_observation[
+                        "authority_slo_snapshot_ref"
+                    ],
+                    authority_slo_retry_limit_ms=route_health_observation[
+                        "authority_slo_retry_limit_ms"
+                    ],
+                    observed_latency_ms=route_health_observation["observed_latency_ms"],
+                    success_ratio=route_health_observation["success_ratio"],
+                    consecutive_failures=route_health_observation[
+                        "consecutive_failures"
+                    ],
+                    request_timeout_ms=500,
+                )
+            )
+
         remote_authority_retry_budget = self.wms.build_remote_authority_retry_budget_receipt(
             session["session_id"],
             authority_profile_ref=(
@@ -8877,38 +9006,8 @@ json.dump(response, sys.stdout)
             ),
             approval_fanout_receipt=approval_fanout_retry_receipt,
             engine_transaction_log_receipt=engine_transaction_log,
-            route_health_observations=[
-                {
-                    "observation_ref": (
-                        "route-health://federation/wms-approval/"
-                        f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
-                    ),
-                    "authority_ref": "authority://federation/wms-approval",
-                    "route_ref": (
-                        "route://federation/wms-approval/observer/"
-                        f"{approval_subject['digest'][:12]}"
-                    ),
-                    "participant_id": observer.identity_id,
-                    "outage_kind": "timeout",
-                    "route_status": "partial-outage",
-                    "remote_jurisdiction": "JP-13",
-                    "jurisdiction_policy_registry_ref": (
-                        "policy-registry://jp-13/wms-authority-retry/v1"
-                    ),
-                    "jurisdiction_rate_limit_ref": (
-                        "rate-limit://jp-13/wms-approval-retry-budget/v1"
-                    ),
-                    "jurisdiction_retry_limit_ms": 500,
-                    "authority_slo_snapshot_ref": (
-                        "authority-slo://federation/wms-approval/observer-timeout/v1"
-                    ),
-                    "authority_slo_retry_limit_ms": 500,
-                    "signer_key_ref": "key://federation/jp-13/wms-retry-signer",
-                    "observed_latency_ms": 860,
-                    "success_ratio": 0.667,
-                    "consecutive_failures": 1,
-                }
-            ],
+            route_health_observations=[route_health_observation],
+            authority_slo_probe_receipts=[remote_authority_slo_probe_receipt],
         )
         remote_authority_retry_budget_validation = (
             self.wms.validate_remote_authority_retry_budget_receipt(
@@ -9002,6 +9101,7 @@ json.dump(response, sys.stdout)
                 "engine_packet_capture_export": engine_packet_capture_export,
                 "engine_privileged_capture_acquisition": engine_privileged_capture_acquisition,
                 "engine_capture_binding": engine_capture_binding,
+                "remote_authority_slo_probe_receipt": remote_authority_slo_probe_receipt,
                 "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
@@ -9150,6 +9250,9 @@ json.dump(response, sys.stdout)
                         "authority_slo_snapshot_bound"
                     ]
                     and remote_authority_retry_budget_validation[
+                        "authority_slo_live_probe_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
                         "registry_slo_schedule_bound"
                     ]
                     and remote_authority_retry_budget_validation[
@@ -9163,6 +9266,9 @@ json.dump(response, sys.stdout)
                     ]
                     and remote_authority_retry_budget_validation["schedule_bound"]
                     and remote_authority_retry_budget["budget_status"] == "complete"
+                    and remote_authority_retry_budget[
+                        "authority_slo_live_probe_bound"
+                    ]
                     and remote_authority_retry_budget["total_scheduled_delay_ms"] == 250
                     and remote_authority_retry_budget["remote_jurisdictions"]
                     == ["JP-13"]

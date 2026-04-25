@@ -909,6 +909,18 @@ entries:
     rationale: Required to bind completed WMS engine route bindings to verified packet-capture export and delegated privileged capture acquisition evidence without storing raw packet bodies.
   - priority: P1
     kind: schema
+    file: specs/schemas/wms_authority_slo_probe_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - specs/schemas/wms_remote_authority_retry_budget_receipt.schema
+      - evals/interface/wms_remote_authority_retry_budget.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind WMS remote authority retry SLO windows to live HTTP endpoint probes and digest-only SLO snapshot receipts before retry scheduling accepts recovered fan-out outages.
+  - priority: P1
+    kind: schema
     file: specs/schemas/wms_remote_authority_retry_budget_receipt.schema
     consumers:
       - specs/interfaces/interface.wms.v0.idl
@@ -917,7 +929,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to bind recovered WMS remote authority retry attempts to signed jurisdiction-specific rate limits, jurisdiction policy registry digests, authority SLO snapshots, registry/SLO-derived fixed exponential schedule entries, and the engine transaction log fan-out entry without storing raw remote transcripts.
+    rationale: Required to bind recovered WMS remote authority retry attempts to signed jurisdiction-specific rate limits, jurisdiction policy registry digests, live-probed authority SLO snapshots, registry/SLO-derived fixed exponential schedule entries, and the engine transaction log fan-out entry without storing raw remote transcripts.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_participant_approval_transport_receipt.schema

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
+import time
 from typing import Any, Dict, List, Mapping, Sequence
+from urllib import error, request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -57,6 +60,14 @@ WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE = (
 WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE = (
     "authority-slo-snapshot-retry-window-v1"
 )
+WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID = "live-authority-slo-snapshot-probe-v1"
+WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE = (
+    "authority-slo-snapshot-live-probe-digest-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE = (
+    "live-http-json-authority-slo-snapshot-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS = 250.0
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
     "registry-slo-derived-retry-schedule-v1"
 )
@@ -169,6 +180,40 @@ def _remote_authority_retry_budget_digest_payload(
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _remote_authority_slo_probe_receipt_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _remote_authority_slo_snapshot_payload(
+    *,
+    authority_slo_snapshot_ref: str,
+    authority_ref: str,
+    route_ref: str,
+    route_status: str,
+    observed_latency_ms: int,
+    success_ratio: float,
+    consecutive_failures: int,
+    authority_slo_retry_limit_ms: int,
+) -> Dict[str, Any]:
+    return {
+        "slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+        "authority_slo_snapshot_ref": authority_slo_snapshot_ref,
+        "authority_ref": authority_ref,
+        "route_ref": route_ref,
+        "route_status": route_status,
+        "observed_latency_ms": observed_latency_ms,
+        "success_ratio": success_ratio,
+        "consecutive_failures": consecutive_failures,
+        "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
+    }
+
+
+def _is_live_http_endpoint(endpoint_ref: str) -> bool:
+    return endpoint_ref.startswith("http://") or endpoint_ref.startswith("https://")
+
+
 def _time_rate_attestation_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
@@ -275,6 +320,9 @@ class WorldModelSync:
                 "remote_authority_retry_registry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_REGISTRY_POLICY_ID,
                 "remote_authority_jurisdiction_policy_registry_profile": WMS_REMOTE_AUTHORITY_JURISDICTION_POLICY_REGISTRY_PROFILE,
                 "remote_authority_slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+                "remote_authority_slo_probe_policy_id": WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID,
+                "remote_authority_slo_probe_digest_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE,
+                "remote_authority_slo_probe_transport_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE,
                 "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
@@ -869,6 +917,324 @@ class WorldModelSync:
         receipt["digest"] = sha256_text(canonical_json(_approval_fanout_digest_payload(receipt)))
         return receipt
 
+    def probe_remote_authority_slo_snapshot_endpoint(
+        self,
+        *,
+        slo_endpoint: str,
+        authority_ref: str,
+        route_ref: str,
+        route_status: str,
+        remote_jurisdiction: str,
+        jurisdiction_policy_registry_ref: str,
+        jurisdiction_policy_registry_digest: str,
+        authority_slo_snapshot_ref: str,
+        authority_slo_retry_limit_ms: int,
+        observed_latency_ms: int,
+        success_ratio: float,
+        consecutive_failures: int,
+        request_timeout_ms: int = 1_000,
+    ) -> Dict[str, Any]:
+        """Probe one live SLO endpoint and return a digest-only WMS receipt."""
+
+        normalized_endpoint = self._normalize_non_empty_string(
+            slo_endpoint,
+            "slo_endpoint",
+        )
+        if not _is_live_http_endpoint(normalized_endpoint):
+            raise ValueError("slo_endpoint must be http:// or https://")
+        normalized_timeout_ms = int(request_timeout_ms)
+        if normalized_timeout_ms <= 0:
+            raise ValueError("request_timeout_ms must be positive")
+        normalized_authority_ref = self._normalize_non_empty_string(
+            authority_ref,
+            "authority_ref",
+        )
+        normalized_route_ref = self._normalize_non_empty_string(route_ref, "route_ref")
+        normalized_route_status = self._normalize_non_empty_string(
+            route_status,
+            "route_status",
+        )
+        if normalized_route_status not in WMS_REMOTE_AUTHORITY_ROUTE_STATUSES:
+            raise ValueError("route_status is not allowed")
+        normalized_remote_jurisdiction = self._normalize_non_empty_string(
+            remote_jurisdiction,
+            "remote_jurisdiction",
+        )
+        normalized_registry_ref = self._normalize_non_empty_string(
+            jurisdiction_policy_registry_ref,
+            "jurisdiction_policy_registry_ref",
+        )
+        normalized_registry_digest = self._normalize_digest(
+            jurisdiction_policy_registry_digest,
+            "jurisdiction_policy_registry_digest",
+        )
+        normalized_slo_ref = self._normalize_non_empty_string(
+            authority_slo_snapshot_ref,
+            "authority_slo_snapshot_ref",
+        )
+        normalized_slo_retry_limit_ms = int(authority_slo_retry_limit_ms)
+        if (
+            normalized_slo_retry_limit_ms < 1
+            or normalized_slo_retry_limit_ms > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+        ):
+            raise ValueError("authority_slo_retry_limit_ms must fit total retry budget")
+        normalized_route_latency_ms = int(observed_latency_ms)
+        if normalized_route_latency_ms < 0:
+            raise ValueError("observed_latency_ms must be non-negative")
+        normalized_success_ratio = self._normalize_ratio(success_ratio, "success_ratio")
+        normalized_consecutive_failures = int(consecutive_failures)
+        if normalized_consecutive_failures < 0:
+            raise ValueError("consecutive_failures must be non-negative")
+
+        request_started = time.monotonic()
+        try:
+            with request.urlopen(
+                normalized_endpoint,
+                timeout=normalized_timeout_ms / 1000.0,
+            ) as response:
+                http_status = int(getattr(response, "status", 200))
+                payload_text = response.read().decode("utf-8")
+        except error.URLError as exc:
+            raise ValueError(
+                f"WMS authority SLO endpoint unreachable: {normalized_endpoint}"
+            ) from exc
+        observed_probe_latency_ms = round(
+            (time.monotonic() - request_started) * 1000.0,
+            3,
+        )
+        if http_status != 200:
+            raise ValueError(
+                f"WMS authority SLO endpoint returned unexpected status {http_status}"
+            )
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("WMS authority SLO endpoint must return JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("WMS authority SLO endpoint payload must be a mapping")
+
+        expected_values = {
+            "authority_ref": normalized_authority_ref,
+            "route_ref": normalized_route_ref,
+            "route_status": normalized_route_status,
+            "remote_jurisdiction": normalized_remote_jurisdiction,
+            "jurisdiction_policy_registry_ref": normalized_registry_ref,
+            "jurisdiction_policy_registry_digest": normalized_registry_digest,
+            "authority_slo_snapshot_ref": normalized_slo_ref,
+            "authority_slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+            "authority_slo_retry_limit_ms": normalized_slo_retry_limit_ms,
+            "observed_latency_ms": normalized_route_latency_ms,
+            "success_ratio": normalized_success_ratio,
+            "consecutive_failures": normalized_consecutive_failures,
+        }
+        for field_name, expected_value in expected_values.items():
+            observed_value = payload.get(field_name)
+            if field_name == "success_ratio":
+                if not isinstance(observed_value, (int, float)) or round(float(observed_value), 3) != expected_value:
+                    raise ValueError(
+                        f"WMS authority SLO endpoint field mismatch: {field_name}"
+                    )
+            elif observed_value != expected_value:
+                raise ValueError(
+                    f"WMS authority SLO endpoint field mismatch: {field_name}"
+                )
+        checked_at = self._normalize_non_empty_string(
+            str(payload.get("checked_at") or ""),
+            "authority_slo_payload.checked_at",
+        )
+
+        slo_snapshot_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_snapshot_payload(
+                    authority_slo_snapshot_ref=normalized_slo_ref,
+                    authority_ref=normalized_authority_ref,
+                    route_ref=normalized_route_ref,
+                    route_status=normalized_route_status,
+                    observed_latency_ms=normalized_route_latency_ms,
+                    success_ratio=normalized_success_ratio,
+                    consecutive_failures=normalized_consecutive_failures,
+                    authority_slo_retry_limit_ms=normalized_slo_retry_limit_ms,
+                )
+            )
+        )
+        network_response_digest = sha256_text(canonical_json(payload))
+        network_probe_bound = (
+            _is_live_http_endpoint(normalized_endpoint)
+            and http_status == 200
+            and observed_probe_latency_ms <= WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS
+            and len(network_response_digest) == 64
+        )
+        receipt = {
+            "kind": "wms_authority_slo_probe_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "receipt_id": new_id("wms-slo-probe"),
+            "policy_id": WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID,
+            "digest_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE,
+            "transport_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE,
+            "slo_endpoint_ref": normalized_endpoint,
+            "authority_ref": normalized_authority_ref,
+            "route_ref": normalized_route_ref,
+            "route_status": normalized_route_status,
+            "remote_jurisdiction": normalized_remote_jurisdiction,
+            "jurisdiction_policy_registry_ref": normalized_registry_ref,
+            "jurisdiction_policy_registry_digest": normalized_registry_digest,
+            "authority_slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
+            "authority_slo_snapshot_ref": normalized_slo_ref,
+            "authority_slo_snapshot_digest": slo_snapshot_digest,
+            "authority_slo_retry_limit_ms": normalized_slo_retry_limit_ms,
+            "observed_route_latency_ms": normalized_route_latency_ms,
+            "success_ratio": normalized_success_ratio,
+            "consecutive_failures": normalized_consecutive_failures,
+            "http_status": http_status,
+            "request_timeout_ms": normalized_timeout_ms,
+            "observed_probe_latency_ms": observed_probe_latency_ms,
+            "latency_budget_ms": WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS,
+            "network_response_digest": network_response_digest,
+            "network_probe_status": "reachable",
+            "network_probe_bound": network_probe_bound,
+            "raw_slo_payload_stored": False,
+            "checked_at": checked_at,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_remote_authority_slo_probe_receipt_digest_payload(receipt))
+        )
+        return receipt
+
+    def validate_authority_slo_probe_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_authority_slo_probe_receipt":
+            errors.append("kind must equal wms_authority_slo_probe_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID:
+            errors.append("policy_id mismatch")
+        if receipt.get("digest_profile") != WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if receipt.get("transport_profile") != WMS_REMOTE_AUTHORITY_SLO_PROBE_TRANSPORT_PROFILE:
+            errors.append("transport_profile mismatch")
+        if receipt.get("authority_slo_snapshot_profile") != WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE:
+            errors.append("authority_slo_snapshot_profile mismatch")
+        if receipt.get("raw_slo_payload_stored") is not False:
+            errors.append("raw_slo_payload_stored must be false")
+        for field_name in (
+            "receipt_id",
+            "slo_endpoint_ref",
+            "authority_ref",
+            "route_ref",
+            "route_status",
+            "remote_jurisdiction",
+            "jurisdiction_policy_registry_ref",
+            "authority_slo_snapshot_ref",
+            "checked_at",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        for field_name in (
+            "jurisdiction_policy_registry_digest",
+            "authority_slo_snapshot_digest",
+            "network_response_digest",
+            "digest",
+        ):
+            self._check_digest(receipt.get(field_name), field_name, errors)
+        endpoint_bound = _is_live_http_endpoint(str(receipt.get("slo_endpoint_ref", "")))
+        if not endpoint_bound:
+            errors.append("slo_endpoint_ref must be a live http(s) endpoint")
+        if receipt.get("route_status") not in WMS_REMOTE_AUTHORITY_ROUTE_STATUSES:
+            errors.append("route_status is not allowed")
+        retry_limit = receipt.get("authority_slo_retry_limit_ms")
+        if (
+            not isinstance(retry_limit, int)
+            or retry_limit < 1
+            or retry_limit > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+        ):
+            errors.append("authority_slo_retry_limit_ms must fit total retry budget")
+            retry_limit = 0
+        observed_route_latency_ms = receipt.get("observed_route_latency_ms")
+        if (
+            not isinstance(observed_route_latency_ms, int)
+            or observed_route_latency_ms < 0
+        ):
+            errors.append("observed_route_latency_ms must be non-negative")
+            observed_route_latency_ms = 0
+        success_ratio = receipt.get("success_ratio")
+        if not isinstance(success_ratio, (int, float)) or not 0 <= float(success_ratio) <= 1:
+            errors.append("success_ratio must be between 0 and 1")
+            success_ratio = 0.0
+        normalized_success_ratio = round(float(success_ratio), 3)
+        consecutive_failures = receipt.get("consecutive_failures")
+        if not isinstance(consecutive_failures, int) or consecutive_failures < 0:
+            errors.append("consecutive_failures must be non-negative")
+            consecutive_failures = 0
+        expected_slo_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_snapshot_payload(
+                    authority_slo_snapshot_ref=str(
+                        receipt.get("authority_slo_snapshot_ref", "")
+                    ),
+                    authority_ref=str(receipt.get("authority_ref", "")),
+                    route_ref=str(receipt.get("route_ref", "")),
+                    route_status=str(receipt.get("route_status", "")),
+                    observed_latency_ms=observed_route_latency_ms,
+                    success_ratio=normalized_success_ratio,
+                    consecutive_failures=consecutive_failures,
+                    authority_slo_retry_limit_ms=retry_limit,
+                )
+            )
+        )
+        slo_snapshot_bound = receipt.get("authority_slo_snapshot_digest") == expected_slo_digest
+        if not slo_snapshot_bound:
+            errors.append("authority_slo_snapshot_digest must bind authority SLO payload")
+        request_timeout_ms = receipt.get("request_timeout_ms")
+        if not isinstance(request_timeout_ms, int) or request_timeout_ms <= 0:
+            errors.append("request_timeout_ms must be positive")
+        http_status = receipt.get("http_status")
+        if http_status != 200:
+            errors.append("http_status must be 200")
+        observed_probe_latency_ms = receipt.get("observed_probe_latency_ms")
+        if not isinstance(observed_probe_latency_ms, (int, float)) or float(observed_probe_latency_ms) < 0:
+            errors.append("observed_probe_latency_ms must be non-negative")
+            observed_probe_latency_ms = WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS + 1.0
+        if receipt.get("latency_budget_ms") != WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS:
+            errors.append("latency_budget_ms mismatch")
+        network_probe_bound = bool(
+            endpoint_bound
+            and http_status == 200
+            and isinstance(request_timeout_ms, int)
+            and request_timeout_ms > 0
+            and float(observed_probe_latency_ms)
+            <= WMS_REMOTE_AUTHORITY_SLO_PROBE_LATENCY_BUDGET_MS
+            and isinstance(receipt.get("network_response_digest"), str)
+            and len(str(receipt.get("network_response_digest"))) == 64
+            and receipt.get("network_probe_status") == "reachable"
+        )
+        if receipt.get("network_probe_bound") is not network_probe_bound:
+            errors.append("network_probe_bound mismatch")
+        expected_digest = sha256_text(
+            canonical_json(_remote_authority_slo_probe_receipt_digest_payload(receipt))
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match authority SLO probe receipt payload")
+        authority_slo_live_probe_bound = bool(
+            network_probe_bound
+            and slo_snapshot_bound
+            and digest_bound
+            and receipt.get("raw_slo_payload_stored") is False
+        )
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "authority_slo_live_probe_bound": authority_slo_live_probe_bound,
+            "network_probe_bound": network_probe_bound,
+            "slo_snapshot_bound": slo_snapshot_bound,
+            "digest_bound": digest_bound,
+            "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
+        }
+
     def build_remote_authority_retry_budget_receipt(
         self,
         session_id: str,
@@ -877,6 +1243,7 @@ class WorldModelSync:
         approval_fanout_receipt: Mapping[str, Any],
         engine_transaction_log_receipt: Mapping[str, Any],
         route_health_observations: Sequence[Mapping[str, Any]],
+        authority_slo_probe_receipts: Sequence[Mapping[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         authority_ref = self._normalize_non_empty_string(
@@ -1070,6 +1437,54 @@ class WorldModelSync:
             observation["authority_slo_snapshot_digest"]
             for observation in observations
         ]
+        raw_slo_probe_receipts = [
+            deepcopy(probe)
+            for probe in (authority_slo_probe_receipts or [])
+            if isinstance(probe, Mapping)
+        ]
+        slo_probe_by_key: Dict[tuple[str, str, str], Mapping[str, Any]] = {}
+        for probe in raw_slo_probe_receipts:
+            probe_validation = self.validate_authority_slo_probe_receipt(probe)
+            if not (
+                probe_validation["ok"]
+                and probe_validation["authority_slo_live_probe_bound"]
+            ):
+                continue
+            key = (
+                str(probe.get("authority_ref", "")),
+                str(probe.get("route_ref", "")),
+                str(probe.get("authority_slo_snapshot_ref", "")),
+            )
+            slo_probe_by_key[key] = probe
+        ordered_slo_probe_receipts: List[Dict[str, Any]] = []
+        for observation in observations:
+            probe = slo_probe_by_key.get(
+                (
+                    observation["authority_ref"],
+                    observation["route_ref"],
+                    observation["authority_slo_snapshot_ref"],
+                )
+            )
+            if (
+                probe is not None
+                and probe.get("remote_jurisdiction")
+                == observation["remote_jurisdiction"]
+                and probe.get("jurisdiction_policy_registry_ref")
+                == observation["jurisdiction_policy_registry_ref"]
+                and probe.get("jurisdiction_policy_registry_digest")
+                == observation["jurisdiction_policy_registry_digest"]
+                and probe.get("authority_slo_snapshot_digest")
+                == observation["authority_slo_snapshot_digest"]
+                and probe.get("authority_slo_retry_limit_ms")
+                == observation["authority_slo_retry_limit_ms"]
+            ):
+                ordered_slo_probe_receipts.append(dict(probe))
+        authority_slo_probe_digests = [
+            str(probe["digest"]) for probe in ordered_slo_probe_receipts
+        ]
+        authority_slo_live_probe_bound = bool(observations) and len(
+            ordered_slo_probe_receipts
+        ) == len(observations)
         authority_signature_digests = [
             observation["authority_signature_digest"] for observation in observations
         ]
@@ -1102,6 +1517,7 @@ class WorldModelSync:
             and bool(jurisdiction_rate_limit_digests)
             and bool(jurisdiction_policy_registry_digests)
             and bool(authority_slo_snapshot_digests)
+            and authority_slo_live_probe_bound
             and bool(authority_signature_digests)
             and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             and fanout_receipt.get("partial_outage_status") in {"not-required", "recovered"}
@@ -1154,6 +1570,13 @@ class WorldModelSync:
             "authority_slo_snapshot_set_digest": sha256_text(
                 canonical_json(authority_slo_snapshot_digests)
             ),
+            "slo_probe_policy_id": WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID,
+            "slo_probe_digest_profile": WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE,
+            "authority_slo_probe_receipts": ordered_slo_probe_receipts,
+            "authority_slo_probe_digests": authority_slo_probe_digests,
+            "authority_slo_probe_set_digest": sha256_text(
+                canonical_json(authority_slo_probe_digests)
+            ),
             "authority_signature_digests": authority_signature_digests,
             "authority_signature_set_digest": sha256_text(
                 canonical_json(authority_signature_digests)
@@ -1179,6 +1602,7 @@ class WorldModelSync:
                 jurisdiction_policy_registry_digests
             ),
             "authority_slo_snapshot_bound": bool(authority_slo_snapshot_digests),
+            "authority_slo_live_probe_bound": authority_slo_live_probe_bound,
             "registry_slo_schedule_bound": adaptive_budget_bound,
             "authority_signature_bound": bool(authority_signature_digests),
             "signed_jurisdiction_retry_budget_bound": adaptive_budget_bound,
@@ -3178,17 +3602,16 @@ class WorldModelSync:
             jurisdiction_policy_registry_digest = sha256_text(
                 canonical_json(jurisdiction_policy_registry_payload)
             )
-            authority_slo_snapshot_payload = {
-                "slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
-                "authority_slo_snapshot_ref": authority_slo_snapshot_ref,
-                "authority_ref": authority_ref,
-                "route_ref": route_ref,
-                "route_status": route_status,
-                "observed_latency_ms": observed_latency_ms,
-                "success_ratio": success_ratio,
-                "consecutive_failures": consecutive_failures,
-                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
-            }
+            authority_slo_snapshot_payload = _remote_authority_slo_snapshot_payload(
+                authority_slo_snapshot_ref=authority_slo_snapshot_ref,
+                authority_ref=authority_ref,
+                route_ref=route_ref,
+                route_status=route_status,
+                observed_latency_ms=observed_latency_ms,
+                success_ratio=success_ratio,
+                consecutive_failures=consecutive_failures,
+                authority_slo_retry_limit_ms=authority_slo_retry_limit_ms,
+            )
             authority_slo_snapshot_digest = sha256_text(
                 canonical_json(authority_slo_snapshot_payload)
             )
@@ -3316,6 +3739,10 @@ class WorldModelSync:
             errors.append("jurisdiction_policy_registry_profile mismatch")
         if receipt.get("authority_slo_snapshot_profile") != WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE:
             errors.append("authority_slo_snapshot_profile mismatch")
+        if receipt.get("slo_probe_policy_id") != WMS_REMOTE_AUTHORITY_SLO_PROBE_POLICY_ID:
+            errors.append("slo_probe_policy_id mismatch")
+        if receipt.get("slo_probe_digest_profile") != WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE:
+            errors.append("slo_probe_digest_profile mismatch")
         if (
             receipt.get("schedule_derivation_profile")
             != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE
@@ -3503,21 +3930,24 @@ class WorldModelSync:
             ):
                 errors.append("jurisdiction_policy_registry_digest must bind registry payload")
                 route_health_bound = False
-            slo_snapshot_payload = {
-                "slo_snapshot_profile": WMS_REMOTE_AUTHORITY_SLO_SNAPSHOT_PROFILE,
-                "authority_slo_snapshot_ref": observation.get(
-                    "authority_slo_snapshot_ref"
+            slo_snapshot_payload = _remote_authority_slo_snapshot_payload(
+                authority_slo_snapshot_ref=str(
+                    observation.get("authority_slo_snapshot_ref", "")
                 ),
-                "authority_ref": observation.get("authority_ref"),
-                "route_ref": observation.get("route_ref"),
-                "route_status": observation.get("route_status"),
-                "observed_latency_ms": observed_latency_ms,
-                "success_ratio": round(float(success_ratio), 3)
+                authority_ref=str(observation.get("authority_ref", "")),
+                route_ref=str(observation.get("route_ref", "")),
+                route_status=str(observation.get("route_status", "")),
+                observed_latency_ms=observed_latency_ms
+                if isinstance(observed_latency_ms, int)
+                else 0,
+                success_ratio=round(float(success_ratio), 3)
                 if isinstance(success_ratio, (int, float))
-                else success_ratio,
-                "consecutive_failures": consecutive_failures,
-                "authority_slo_retry_limit_ms": authority_slo_retry_limit_ms,
-            }
+                else 0.0,
+                consecutive_failures=consecutive_failures
+                if isinstance(consecutive_failures, int)
+                else 0,
+                authority_slo_retry_limit_ms=authority_slo_retry_limit_ms,
+            )
             expected_slo_snapshot_digest = sha256_text(
                 canonical_json(slo_snapshot_payload)
             )
@@ -3678,6 +4108,81 @@ class WorldModelSync:
         ):
             errors.append("authority_slo_snapshot_set_digest must bind SLO snapshot digests")
             authority_slo_snapshot_bound = False
+        probe_receipts = receipt.get("authority_slo_probe_receipts")
+        if not isinstance(probe_receipts, list):
+            errors.append("authority_slo_probe_receipts must be a list")
+            probe_receipts = []
+        probe_by_key: Dict[tuple[str, str, str], Mapping[str, Any]] = {}
+        probe_receipts_valid = True
+        for probe in probe_receipts:
+            if not isinstance(probe, Mapping):
+                errors.append("authority_slo_probe_receipts must contain objects")
+                probe_receipts_valid = False
+                continue
+            probe_validation = self.validate_authority_slo_probe_receipt(probe)
+            if not (
+                probe_validation["ok"]
+                and probe_validation["authority_slo_live_probe_bound"]
+            ):
+                errors.append("authority SLO probe receipt must validate and be live-bound")
+                probe_receipts_valid = False
+            probe_key = (
+                str(probe.get("authority_ref", "")),
+                str(probe.get("route_ref", "")),
+                str(probe.get("authority_slo_snapshot_ref", "")),
+            )
+            if probe_key in probe_by_key:
+                errors.append("authority SLO probe receipts must be unique per route SLO")
+                probe_receipts_valid = False
+            probe_by_key[probe_key] = probe
+        expected_probe_digests: List[str] = []
+        for observation in observations:
+            if not isinstance(observation, Mapping):
+                probe_receipts_valid = False
+                continue
+            probe = probe_by_key.get(
+                (
+                    str(observation.get("authority_ref", "")),
+                    str(observation.get("route_ref", "")),
+                    str(observation.get("authority_slo_snapshot_ref", "")),
+                )
+            )
+            if probe is None:
+                errors.append("authority SLO probe receipt must cover every route observation")
+                probe_receipts_valid = False
+                continue
+            for field_name in (
+                "remote_jurisdiction",
+                "jurisdiction_policy_registry_ref",
+                "jurisdiction_policy_registry_digest",
+                "authority_slo_snapshot_digest",
+                "authority_slo_retry_limit_ms",
+            ):
+                if probe.get(field_name) != observation.get(field_name):
+                    errors.append(
+                        "authority SLO probe receipt must match route observation fields"
+                    )
+                    probe_receipts_valid = False
+                    break
+            if isinstance(probe.get("digest"), str):
+                expected_probe_digests.append(str(probe["digest"]))
+        if receipt.get("authority_slo_probe_digests") != expected_probe_digests:
+            errors.append("authority_slo_probe_digests must follow observation order")
+            probe_receipts_valid = False
+        if receipt.get("authority_slo_probe_set_digest") != sha256_text(
+            canonical_json(expected_probe_digests)
+        ):
+            errors.append("authority_slo_probe_set_digest must bind SLO probe digests")
+            probe_receipts_valid = False
+        authority_slo_live_probe_bound = bool(
+            route_health_bound
+            and authority_slo_snapshot_bound
+            and probe_receipts_valid
+            and observations
+            and len(probe_receipts) == len(observations)
+        )
+        if receipt.get("authority_slo_live_probe_bound") is not authority_slo_live_probe_bound:
+            errors.append("authority_slo_live_probe_bound must reflect live SLO probe coverage")
         if receipt.get("authority_signature_digests") != expected_signature_digests:
             errors.append("authority_signature_digests must follow observation order")
             authority_signature_bound = False
@@ -3890,6 +4395,7 @@ class WorldModelSync:
             and jurisdiction_rate_limit_bound
             and jurisdiction_policy_registry_bound
             and authority_slo_snapshot_bound
+            and authority_slo_live_probe_bound
             and authority_signature_bound
             and schedule_bound
             and all_outages_budgeted
@@ -3905,6 +4411,8 @@ class WorldModelSync:
             errors.append("jurisdiction_policy_registry_bound must reflect registry digest binding")
         if receipt.get("authority_slo_snapshot_bound") is not authority_slo_snapshot_bound:
             errors.append("authority_slo_snapshot_bound must reflect SLO snapshot digest binding")
+        if receipt.get("authority_slo_live_probe_bound") is not authority_slo_live_probe_bound:
+            errors.append("authority_slo_live_probe_bound must reflect live SLO probe binding")
         registry_slo_schedule_bound = schedule_bound and jurisdiction_policy_registry_bound and authority_slo_snapshot_bound
         if receipt.get("registry_slo_schedule_bound") is not registry_slo_schedule_bound:
             errors.append("registry_slo_schedule_bound must reflect registry/SLO schedule binding")
@@ -3948,6 +4456,7 @@ class WorldModelSync:
             "jurisdiction_rate_limit_bound": jurisdiction_rate_limit_bound,
             "jurisdiction_policy_registry_bound": jurisdiction_policy_registry_bound,
             "authority_slo_snapshot_bound": authority_slo_snapshot_bound,
+            "authority_slo_live_probe_bound": authority_slo_live_probe_bound,
             "registry_slo_schedule_bound": registry_slo_schedule_bound,
             "authority_signature_bound": authority_signature_bound,
             "signed_jurisdiction_retry_budget_bound": adaptive_retry_budget_bound,

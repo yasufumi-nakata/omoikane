@@ -95,6 +95,9 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   digest と authority SLO snapshot digest を束縛し、schedule は
   `registry-slo-derived-retry-schedule-v1` として fixed backoff、jurisdiction
   limit、registry/SLO 由来 limit の全てを満たす場合だけ `retry` になる。
+  authority SLO snapshot は `live-authority-slo-snapshot-probe-v1` の
+  live HTTP JSON probe receipt で endpoint response digest と SLO snapshot digest を
+  raw SLO payload 無しで束縛してから retry budget に取り込む。
   さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、
@@ -109,7 +112,8 @@ wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollec
 wms.collect_distributed_approval_fanout(session_id, collection, transport_results, retry_attempts) → DistributedApprovalFanoutReceipt
 wms.bind_engine_transaction_log(session_id, entries, engine_adapter_key_ref) → EngineTransactionLogReceipt
 wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
-wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health) → RemoteAuthorityRetryBudgetReceipt
+wms.probe_remote_authority_slo_snapshot_endpoint(endpoint, route_health) → WMSAuthoritySLOProbeReceipt
+wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health, slo_probes) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
 wms.revert_physics_rules_change(session_id, change_id) → PhysicsRulesChangeReceipt

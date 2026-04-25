@@ -120,6 +120,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/wms_remote_authority_retry_budget_receipt.schema",
             result["scenarios"]["remote_authority_retry_budget"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/wms_authority_slo_probe_receipt.schema",
+            result["scenarios"]["remote_authority_slo_probe_receipt"],
+        )
         self.assertTrue(result["validation"]["physics_change_reversible"])
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
         self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
@@ -149,6 +153,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["remote_authority_retry_budget"][
                 "registry_bound_retry_budget_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "authority_slo_live_probe_bound"
             ]
         )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])

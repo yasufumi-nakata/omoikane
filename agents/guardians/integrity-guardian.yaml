@@ -20,6 +20,7 @@ capabilities:
   - wms.engine-capture-binding.attest
   - wms.remote-authority-retry-budget.attest
   - wms.remote-authority-registry-slo-retry.attest
+  - wms.remote-authority-slo-live-probe.attest
   - wms.approval-collection-scaling.attest
   - wms.participant-approval-transport.attest
   - wms.physics-rules-revert.attest
@@ -47,6 +48,7 @@ when_to_invoke: |
   - WMS shared reality の completed engine route binding が packet capture export と delegated privileged capture acquisition に raw packet body 無しで束縛されていることを検証する時
   - WMS shared reality の remote authority retry budget が signed jurisdiction-specific rate limit、authority signature digest、route-health observation、fixed exponential schedule、engine transaction log の fan-out entry に束縛されていることを検証する時
   - WMS shared reality の remote authority retry schedule が jurisdiction policy registry digest と authority SLO snapshot digest から導出され、registry/SLO limit を超えていないことを検証する時
+  - WMS shared reality の authority SLO snapshot が live HTTP probe receipt の endpoint response digest に raw SLO payload 無しで束縛されていることを検証する時
   - WMS shared reality の participant approval collection が ordered digest set と bounded batch digest に束縛されていることを検証する時
   - WMS shared reality の physics_rules change 前に participant approval が IMC transport receipt に束縛されていることを検証する時
   - WMS shared reality の physics_rules change / revert receipt が unanimous approval と rollback token に束縛されていることを検証する時

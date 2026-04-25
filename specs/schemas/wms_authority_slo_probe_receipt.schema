@@ -1,0 +1,138 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_authority_slo_probe_receipt.schema"
+title: WMSAuthoritySLOProbeReceipt
+description: >
+  Digest-only live HTTP receipt proving that a WMS remote authority SLO
+  snapshot was fetched from a bounded endpoint before remote retry scheduling
+  used the SLO retry window.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - policy_id
+  - digest_profile
+  - transport_profile
+  - slo_endpoint_ref
+  - authority_ref
+  - route_ref
+  - route_status
+  - remote_jurisdiction
+  - jurisdiction_policy_registry_ref
+  - jurisdiction_policy_registry_digest
+  - authority_slo_snapshot_profile
+  - authority_slo_snapshot_ref
+  - authority_slo_snapshot_digest
+  - authority_slo_retry_limit_ms
+  - observed_route_latency_ms
+  - success_ratio
+  - consecutive_failures
+  - http_status
+  - request_timeout_ms
+  - observed_probe_latency_ms
+  - latency_budget_ms
+  - network_response_digest
+  - network_probe_status
+  - network_probe_bound
+  - raw_slo_payload_stored
+  - checked_at
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_authority_slo_probe_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^wms-slo-probe-[a-f0-9]{12}$"
+  policy_id:
+    type: string
+    const: live-authority-slo-snapshot-probe-v1
+  digest_profile:
+    type: string
+    const: authority-slo-snapshot-live-probe-digest-v1
+  transport_profile:
+    type: string
+    const: live-http-json-authority-slo-snapshot-v1
+  slo_endpoint_ref:
+    type: string
+    pattern: "^https?://"
+  authority_ref:
+    type: string
+    minLength: 1
+  route_ref:
+    type: string
+    minLength: 1
+  route_status:
+    type: string
+    enum:
+      - healthy
+      - degraded
+      - partial-outage
+      - recovered
+  remote_jurisdiction:
+    type: string
+    minLength: 2
+  jurisdiction_policy_registry_ref:
+    type: string
+    minLength: 1
+  jurisdiction_policy_registry_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_snapshot_profile:
+    type: string
+    const: authority-slo-snapshot-retry-window-v1
+  authority_slo_snapshot_ref:
+    type: string
+    minLength: 1
+  authority_slo_snapshot_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_retry_limit_ms:
+    type: integer
+    minimum: 1
+    maximum: 1500
+  observed_route_latency_ms:
+    type: integer
+    minimum: 0
+  success_ratio:
+    type: number
+    minimum: 0
+    maximum: 1
+  consecutive_failures:
+    type: integer
+    minimum: 0
+  http_status:
+    type: integer
+    const: 200
+  request_timeout_ms:
+    type: integer
+    minimum: 1
+  observed_probe_latency_ms:
+    type: number
+    minimum: 0
+    maximum: 250.0
+  latency_budget_ms:
+    type: number
+    const: 250.0
+  network_response_digest:
+    $ref: "#/$defs/sha256"
+  network_probe_status:
+    type: string
+    const: reachable
+  network_probe_bound:
+    type: boolean
+    const: true
+  raw_slo_payload_stored:
+    type: boolean
+    const: false
+  checked_at:
+    type: string
+    minLength: 1
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

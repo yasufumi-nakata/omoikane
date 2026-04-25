@@ -14,6 +14,7 @@ imports:
   wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
   wms_engine_route_binding_receipt: ../schemas/wms_engine_route_binding_receipt.schema
   wms_engine_capture_binding_receipt: ../schemas/wms_engine_capture_binding_receipt.schema
+  wms_authority_slo_probe_receipt: ../schemas/wms_authority_slo_probe_receipt.schema
   wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
@@ -250,6 +251,76 @@ operations:
       - privileged_capture_acquisition must be delegated-broker granted and bind the same trace, packet capture digest, capture filter, lease, broker attestation, and route refs
       - raw engine payloads, raw route payloads, and raw packet bodies must not be stored in the capture binding receipt
       - engine_capture_binding_status can become complete only when route binding, packet capture, privileged acquisition, and route-ref set binding all validate
+  probe_remote_authority_slo_snapshot_endpoint:
+    summary: Probe one live remote-authority SLO endpoint and convert it to a digest-only retry SLO receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - slo_endpoint
+          - authority_ref
+          - route_ref
+          - route_status
+          - remote_jurisdiction
+          - jurisdiction_policy_registry_ref
+          - jurisdiction_policy_registry_digest
+          - authority_slo_snapshot_ref
+          - authority_slo_retry_limit_ms
+          - observed_latency_ms
+          - success_ratio
+          - consecutive_failures
+        properties:
+          slo_endpoint:
+            type: string
+            pattern: "^https?://"
+          authority_ref:
+            type: string
+            minLength: 1
+          route_ref:
+            type: string
+            minLength: 1
+          route_status:
+            type: string
+            enum:
+              - healthy
+              - degraded
+              - partial-outage
+              - recovered
+          remote_jurisdiction:
+            type: string
+            minLength: 2
+          jurisdiction_policy_registry_ref:
+            type: string
+            minLength: 1
+          jurisdiction_policy_registry_digest:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          authority_slo_snapshot_ref:
+            type: string
+            minLength: 1
+          authority_slo_retry_limit_ms:
+            type: integer
+            minimum: 1
+            maximum: 1500
+          observed_latency_ms:
+            type: integer
+            minimum: 0
+          success_ratio:
+            type: number
+            minimum: 0
+            maximum: 1
+          consecutive_failures:
+            type: integer
+            minimum: 0
+          request_timeout_ms:
+            type: integer
+            minimum: 1
+    output:
+      schema_ref: wms_authority_slo_probe_receipt
+    guarantees:
+      - endpoint must return JSON matching the expected authority, route, jurisdiction registry, SLO snapshot ref, SLO retry limit, latency, success ratio, and failure-count fields
+      - network_response_digest must bind the endpoint JSON without storing the raw SLO payload
+      - receipt can be live-bound only when HTTP status is 200 and observed probe latency fits the fixed SLO probe latency budget
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.
     input:
@@ -261,6 +332,7 @@ operations:
           - approval_fanout_receipt
           - engine_transaction_log_receipt
           - route_health_observations
+          - authority_slo_probe_receipts
         properties:
           session_id:
             type: string
@@ -276,6 +348,10 @@ operations:
             type: array
             items:
               type: object
+          authority_slo_probe_receipts:
+            type: array
+            items:
+              schema_ref: wms_authority_slo_probe_receipt
     output:
       schema_ref: wms_remote_authority_retry_budget_receipt
     guarantees:
@@ -284,6 +360,7 @@ operations:
       - every outage participant must have a route-health observation digest and a schedule entry that binds the same recovery result digest and recovery transport receipt digest
       - every route-health observation must carry remote_jurisdiction, jurisdiction_rate_limit_ref, jurisdiction_retry_limit_ms, signer_key_ref, jurisdiction_rate_limit_digest, and authority_signature_digest
       - every route-health observation must bind jurisdiction_policy_registry_ref/digest and authority_slo_snapshot_ref/digest under registry-bound-authority-retry-slo-v1
+      - every authority_slo_snapshot_digest must be covered by a live-authority-slo-snapshot-probe-v1 receipt fetched from a bounded HTTP JSON endpoint
       - every schedule entry must copy the signed jurisdiction rate-limit evidence, registry digest, SLO snapshot digest, and stay within fixed exponential backoff, jurisdiction_retry_limit_ms, and registry_slo_retry_limit_ms
       - the engine transaction log must contain approval_fanout_bound with the same approval_fanout_digest
       - raw remote authority transcripts must not be stored in the retry budget receipt
