@@ -103,6 +103,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["energy_budget"]["receipt"]["floor_preserved"])
         self.assertFalse(result["energy_budget"]["receipt"]["raw_economic_payload_stored"])
 
+    def test_energy_budget_pool_demo_emits_cross_identity_offset_guard(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "energy-budget-pool-demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual("floor-protected", result["validation"]["pool_budget_status"])
+        self.assertTrue(result["validation"]["cross_identity_floor_offset_blocked"])
+        self.assertFalse(
+            result["energy_budget_pool"]["receipt"]["cross_identity_subsidy_allowed"]
+        )
+        self.assertEqual(2, result["energy_budget_pool"]["receipt"]["member_count"])
+
     def test_imc_demo_emits_disclosure_safe_json(self) -> None:
         stdout = io.StringIO()
 

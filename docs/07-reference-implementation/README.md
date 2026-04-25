@@ -48,6 +48,7 @@ PYTHONPATH=src python3 -m omoikane.cli termination-demo --json
 PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json
 PYTHONPATH=src python3 -m omoikane.cli broker-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-demo --json
+PYTHONPATH=src python3 -m omoikane.cli energy-budget-pool-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
@@ -162,6 +163,13 @@ selected standby がそのまま migration destination に束縛されること�
 `observed_capacity_jps=28` の below-floor capacity を
 SubstrateBroker の `critical + migrate-standby` signal に束縛する。
 receipt は raw economic payload を保存せず、外部 context ref と digest だけを残す。
+`energy-budget-pool-demo` は multi-identity pool 上で
+migration member の below-floor request と council member の surplus request を同時に評価し、
+aggregate requested budget が total floor を覆っていても
+`cross_identity_floor_offset_blocked=true`、
+`cross_identity_subsidy_allowed=false`、
+`pool_budget_status=floor-protected` を返す。
+pool receipt は ordered child floor receipt digest set を束縛し、raw economic payload を保存しない。
 
 `scheduler-demo` は L1 AscensionScheduler の reference contract
 (`kernel.scheduler.v0`) を JSON で可視化し、

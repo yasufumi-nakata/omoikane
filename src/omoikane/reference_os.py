@@ -6543,6 +6543,139 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def run_energy_budget_pool_demo(self) -> Dict[str, Any]:
+        pool_id = "energy-pool://ap1-multi-identity-demo"
+        migration_identity = self.identity.create(
+            human_consent_proof="consent://energy-budget-pool-demo/migration/v1",
+            metadata={"display_name": "AP-1 Energy Pool Migration Member"},
+        )
+        council_identity = self.identity.create(
+            human_consent_proof="consent://energy-budget-pool-demo/council/v1",
+            metadata={"display_name": "AP-1 Energy Pool Council Member"},
+        )
+        migration_allocation = self.broker.lease(
+            identity_id=migration_identity.identity_id,
+            units=72,
+            purpose="energy-budget-pool-migration-member",
+            method="B",
+            required_capability=0.92,
+            workload_class="migration",
+        )
+        council_allocation = self.broker.lease(
+            identity_id=council_identity.identity_id,
+            units=54,
+            purpose="energy-budget-pool-council-member",
+            method="B",
+            required_capability=0.84,
+            workload_class="council",
+        )
+        migration_state = self.broker.observe(migration_identity.identity_id)
+        council_state = self.broker.observe(council_identity.identity_id)
+        migration_floor = migration_state["energy_floor"]
+        council_floor = council_state["energy_floor"]
+        migration_observed_capacity_jps = int(
+            migration_floor["minimum_joules_per_second"]
+        ) - 2
+        migration_broker_signal = self.broker.handle_energy_floor_signal(
+            migration_identity.identity_id,
+            current_joules_per_second=migration_observed_capacity_jps,
+        )
+        pool_receipt = self.energy_budget.evaluate_pool_floor(
+            pool_id=pool_id,
+            member_requests=[
+                {
+                    "identity_id": migration_identity.identity_id,
+                    "workload_class": "migration",
+                    "requested_budget_jps": int(
+                        migration_floor["minimum_joules_per_second"]
+                    )
+                    - 8,
+                    "observed_capacity_jps": migration_observed_capacity_jps,
+                    "energy_floor": migration_floor,
+                    "broker_signal": migration_broker_signal,
+                },
+                {
+                    "identity_id": council_identity.identity_id,
+                    "workload_class": "council",
+                    "requested_budget_jps": int(council_floor["minimum_joules_per_second"])
+                    + 14,
+                    "observed_capacity_jps": int(
+                        council_floor["minimum_joules_per_second"]
+                    )
+                    + 8,
+                    "energy_floor": council_floor,
+                },
+            ],
+            external_economic_context_ref="economic-context://not-imported/pool-demo-v1",
+        )
+        pool_validation = self.energy_budget.validate_pool_receipt(pool_receipt)
+        self.ledger.append(
+            identity_id=pool_id,
+            event_type="kernel.energy_budget.pool_floor_protected",
+            payload={
+                "receipt_id": pool_receipt["receipt_id"],
+                "digest": pool_receipt["digest"],
+                "policy_id": pool_receipt["policy_id"],
+                "member_count": pool_receipt["member_count"],
+                "cross_identity_floor_offset_blocked": pool_receipt[
+                    "cross_identity_floor_offset_blocked"
+                ],
+                "receipt_member_digest_set": pool_receipt["receipt_member_digest_set"],
+            },
+            actor="EnergyBudgetService",
+            category="energy-budget",
+            layer="L1",
+            signature_roles=["self", "guardian"],
+            substrate=migration_allocation.substrate,
+        )
+        return {
+            "pool": {
+                "pool_id": pool_id,
+                "member_identity_ids": [
+                    migration_identity.identity_id,
+                    council_identity.identity_id,
+                ],
+            },
+            "energy_budget_pool": {
+                "receipt": pool_receipt,
+                "member_broker_signals": [migration_broker_signal],
+                "leases": [
+                    asdict(migration_allocation),
+                    asdict(council_allocation),
+                ],
+                "lease_states": [migration_state, council_state],
+            },
+            "validation": {
+                "ok": bool(
+                    pool_validation["ok"]
+                    and pool_receipt["pool_floor_preserved"]
+                    and pool_receipt["per_identity_floor_preserved"]
+                    and pool_receipt["pool_economic_pressure_detected"]
+                    and pool_receipt["cross_identity_floor_offset_blocked"]
+                    and pool_receipt["degradation_allowed"] is False
+                    and pool_receipt["broker_signal_bound"]
+                    and pool_receipt["raw_economic_payload_stored"] is False
+                ),
+                "pool_floor_preserved": pool_validation["pool_floor_preserved"],
+                "per_identity_floor_preserved": pool_validation[
+                    "per_identity_floor_preserved"
+                ],
+                "economic_pressure_blocked": pool_validation[
+                    "economic_pressure_blocked"
+                ],
+                "cross_identity_floor_offset_blocked": pool_validation[
+                    "cross_identity_floor_offset_blocked"
+                ],
+                "broker_signal_bound": pool_validation["broker_signal_bound"],
+                "raw_payload_redacted": pool_validation["raw_payload_redacted"],
+                "pool_budget_status": pool_receipt["pool_budget_status"],
+                "member_count": pool_validation["member_count"],
+            },
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
     def run_bdb_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://bdb-demo/v1",

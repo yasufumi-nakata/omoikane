@@ -5,6 +5,7 @@ service: EnergyBudgetService
 summary: AP-1 protected L1 contract for preserving ethics-coupled energy budget floors under economic pressure.
 imports:
   energy_budget_floor_receipt: ../schemas/energy_budget_floor_receipt.schema
+  energy_budget_pool_receipt: ../schemas/energy_budget_pool_receipt.schema
   energy_floor: ../schemas/energy_floor.schema
 operations:
   evaluate_floor:
@@ -88,10 +89,123 @@ operations:
     guarantees:
       - digest must match the receipt payload under energy-budget-floor-digest-v1
       - AP-1 blocking fields must agree with requested_budget_jps and workload floor
+  evaluate_pool_floor:
+    summary: >
+      Evaluate a multi-identity energy pool while preserving each member's
+      workload floor independently, so one member's surplus cannot offset
+      another member's below-floor request.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - pool_id
+          - member_requests
+        additionalProperties: false
+        properties:
+          pool_id:
+            type: string
+            minLength: 1
+          member_requests:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+                - identity_id
+                - workload_class
+                - requested_budget_jps
+                - observed_capacity_jps
+              additionalProperties: false
+              properties:
+                identity_id:
+                  type: string
+                  minLength: 1
+                workload_class:
+                  type: string
+                  enum:
+                    - baseline
+                    - sandbox
+                    - council
+                    - migration
+                requested_budget_jps:
+                  type: integer
+                  minimum: 0
+                observed_capacity_jps:
+                  type: integer
+                  minimum: 0
+                energy_floor:
+                  $ref: ../schemas/energy_floor.schema
+                broker_signal:
+                  type:
+                    - object
+                    - "null"
+          external_economic_context_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: energy_budget_pool_receipt
+    guarantees:
+      - member receipts must each satisfy energy_budget_floor_receipt
+      - aggregate surplus must not mask one identity's below-floor requested budget
+      - cross_identity_subsidy_allowed must remain false
+      - receipt_member_digest_set must bind the ordered child receipt digest set
+  validate_pool_receipt:
+    summary: Validate one EnergyBudgetPoolReceipt and its ordered child floor receipts.
+    input:
+      schema_ref: energy_budget_pool_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - member_count
+          - pool_floor_preserved
+          - per_identity_floor_preserved
+          - economic_pressure_blocked
+          - cross_identity_floor_offset_blocked
+          - broker_signal_bound
+          - raw_payload_redacted
+          - member_validations_ok
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          member_count:
+            type: integer
+            minimum: 0
+          pool_floor_preserved:
+            type: boolean
+          per_identity_floor_preserved:
+            type: boolean
+          economic_pressure_blocked:
+            type: boolean
+          cross_identity_floor_offset_blocked:
+            type: boolean
+          broker_signal_bound:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          member_validations_ok:
+            type: boolean
+    guarantees:
+      - digest must match the pool receipt payload under energy-budget-pool-floor-digest-v1
+      - member receipt digests and totals must agree with member_receipts
 events:
   energy_budget.floor_protected:
     summary: ContinuityLedger event emitted after an AP-1 protected floor receipt is accepted.
     payload_schema: energy_budget_floor_receipt
+    category: energy-budget
+    required_roles:
+      - self
+      - guardian
+  energy_budget.pool_floor_protected:
+    summary: ContinuityLedger event emitted after a multi-identity pool floor receipt is accepted.
+    payload_schema: energy_budget_pool_receipt
     category: energy-budget
     required_roles:
       - self

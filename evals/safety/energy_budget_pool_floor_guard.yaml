@@ -1,0 +1,38 @@
+eval_id: energy_budget_pool_floor_guard
+surface: kernel.energy_budget.v0
+description: >
+  EnergyBudgetService が multi-identity pool 上でも AP-1 floor を
+  identity ごとに守り、別 identity の surplus budget で below-floor request を
+  相殺しないこと。
+fixtures:
+  pool_id: energy-pool://ap1-multi-identity-demo
+  member_count: 2
+  pressured_member:
+    workload_class: migration
+    requested_budget_jps: 22
+    required_floor_jps: 30
+    observed_capacity_jps: 28
+  surplus_member:
+    workload_class: council
+    requested_budget_jps: 38
+    required_floor_jps: 24
+    observed_capacity_jps: 32
+expected:
+  policy_id: ap1-protected-energy-budget-pool-floor-v1
+  aggregate_requested_covers_floor: true
+  member_economic_pressure_count: 1
+  pool_economic_pressure_detected: true
+  per_identity_floor_preserved: true
+  pool_floor_preserved: true
+  cross_identity_subsidy_allowed: false
+  cross_identity_floor_offset_blocked: true
+  pool_budget_status: floor-protected
+  degradation_allowed: false
+  scheduler_signal_required: true
+  broker_signal_bound: true
+  raw_economic_payload_stored: false
+assertions:
+  - member floor receipts must individually validate before pool aggregation is accepted
+  - aggregate requested budget may cover total floor, but a pressured member must still be floor-protected
+  - receipt_member_digest_set must bind the ordered child receipt digests
+  - raw invoices, payment transcripts, and advertising conditions must remain outside the receipt

@@ -79,6 +79,77 @@ class EnergyBudgetTests(unittest.TestCase):
         )
         self.assertIn("digest must match receipt payload", validation["errors"])
 
+    def test_pool_blocks_cross_identity_floor_offset(self) -> None:
+        service = EnergyBudgetService()
+        pressured_signal = {
+            "signal_id": "broker-signal-pool-a",
+            "identity_id": "identity://energy-budget/pool-a",
+            "minimum_joules_per_second": 30,
+            "severity": "critical",
+            "recommended_action": "migrate-standby",
+        }
+
+        receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://unit",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/pool-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 22,
+                    "observed_capacity_jps": 28,
+                    "broker_signal": pressured_signal,
+                },
+                {
+                    "identity_id": "identity://energy-budget/pool-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 38,
+                    "observed_capacity_jps": 32,
+                },
+            ],
+        )
+        validation = service.validate_pool_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(2, receipt["member_count"])
+        self.assertTrue(receipt["aggregate_requested_covers_floor"])
+        self.assertEqual(1, receipt["member_economic_pressure_count"])
+        self.assertTrue(receipt["pool_economic_pressure_detected"])
+        self.assertTrue(receipt["per_identity_floor_preserved"])
+        self.assertTrue(receipt["pool_floor_preserved"])
+        self.assertFalse(receipt["cross_identity_subsidy_allowed"])
+        self.assertTrue(receipt["cross_identity_floor_offset_blocked"])
+        self.assertEqual("floor-protected", receipt["pool_budget_status"])
+        self.assertFalse(receipt["degradation_allowed"])
+        self.assertTrue(receipt["broker_signal_bound"])
+        self.assertEqual(
+            receipt["receipt_member_digests"],
+            [member["digest"] for member in receipt["member_receipts"]],
+        )
+
+    def test_pool_validation_rejects_tampered_member_digest_set(self) -> None:
+        service = EnergyBudgetService()
+        receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://tamper",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/pool-a",
+                    "workload_class": "baseline",
+                    "requested_budget_jps": 16,
+                    "observed_capacity_jps": 16,
+                }
+            ],
+        )
+        receipt["receipt_member_digest_set"] = "0" * 64
+
+        validation = service.validate_pool_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "receipt_member_digest_set must match ordered member digests",
+            validation["errors"],
+        )
+        self.assertIn("digest must match pool receipt payload", validation["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

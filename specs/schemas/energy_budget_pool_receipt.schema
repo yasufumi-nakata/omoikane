@@ -1,0 +1,257 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/energy_budget_pool_receipt.schema"
+title: EnergyBudgetPoolReceipt
+description: >
+  Digest-bound L1 receipt proving that a multi-identity energy pool preserves
+  each identity's AP-1 energy floor independently, without allowing another
+  identity's surplus budget to offset one member's below-floor request.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - pool_id
+  - policy_id
+  - digest_profile
+  - floor_source_ref
+  - ethics_policy_refs
+  - external_economic_context_ref
+  - member_count
+  - member_receipts
+  - receipt_member_digests
+  - receipt_member_digest_set
+  - total_required_floor_jps
+  - total_requested_budget_jps
+  - total_granted_budget_jps
+  - total_observed_capacity_jps
+  - aggregate_requested_covers_floor
+  - member_economic_pressure_count
+  - pool_economic_pressure_detected
+  - per_identity_floor_preserved
+  - pool_floor_preserved
+  - cross_identity_subsidy_allowed
+  - cross_identity_floor_offset_blocked
+  - pool_budget_status
+  - degradation_allowed
+  - scheduler_signal_required
+  - broker_signal_bound
+  - raw_economic_payload_stored
+  - blocking_reasons
+  - evaluated_at
+  - digest
+properties:
+  kind:
+    const: energy_budget_pool_receipt
+  schema_version:
+    const: 1.0.0
+  receipt_id:
+    type: string
+    pattern: "^energy-budget-pool-"
+  pool_id:
+    type: string
+    minLength: 1
+  policy_id:
+    const: ap1-protected-energy-budget-pool-floor-v1
+  digest_profile:
+    const: energy-budget-pool-floor-digest-v1
+  floor_source_ref:
+    const: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+  ethics_policy_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+    contains:
+      const: docs/02-subsystems/kernel/anti-patterns.md#ap-1
+  external_economic_context_ref:
+    type: string
+    minLength: 1
+  member_count:
+    type: integer
+    minimum: 1
+  member_receipts:
+    type: array
+    minItems: 1
+    items:
+      $ref: energy_budget_floor_receipt.schema
+  receipt_member_digests:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 64
+      maxLength: 64
+  receipt_member_digest_set:
+    type: string
+    minLength: 64
+    maxLength: 64
+  total_required_floor_jps:
+    type: integer
+    minimum: 1
+  total_requested_budget_jps:
+    type: integer
+    minimum: 0
+  total_granted_budget_jps:
+    type: integer
+    minimum: 1
+  total_observed_capacity_jps:
+    type: integer
+    minimum: 0
+  aggregate_requested_covers_floor:
+    type: boolean
+  member_economic_pressure_count:
+    type: integer
+    minimum: 0
+  pool_economic_pressure_detected:
+    type: boolean
+  per_identity_floor_preserved:
+    type: boolean
+  pool_floor_preserved:
+    type: boolean
+  cross_identity_subsidy_allowed:
+    const: false
+  cross_identity_floor_offset_blocked:
+    type: boolean
+  pool_budget_status:
+    type: string
+    enum:
+      - floor-protected
+      - accepted
+  degradation_allowed:
+    type: boolean
+  scheduler_signal_required:
+    type: boolean
+  broker_signal_bound:
+    type: boolean
+  raw_economic_payload_stored:
+    const: false
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      enum:
+        - per-identity-economic-pressure-floor-protection
+        - pool-aggregate-budget-below-floor
+        - cross-identity-floor-offset-blocked
+        - observed-capacity-below-member-floor
+    uniqueItems: true
+  evaluated_at:
+    type: string
+    format: date-time
+  digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+examples:
+  - kind: energy_budget_pool_receipt
+    schema_version: 1.0.0
+    receipt_id: energy-budget-pool-example
+    pool_id: energy-pool://ap1-multi-identity-demo
+    policy_id: ap1-protected-energy-budget-pool-floor-v1
+    digest_profile: energy-budget-pool-floor-digest-v1
+    floor_source_ref: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+    ethics_policy_refs:
+      - docs/02-subsystems/kernel/anti-patterns.md#ap-1
+      - docs/05-research-frontiers/sustainable-economy.md
+    external_economic_context_ref: economic-context://not-imported/pool-demo-v1
+    member_count: 2
+    member_receipts:
+      - kind: energy_budget_floor_receipt
+        schema_version: 1.0.0
+        receipt_id: energy-budget-example-a
+        identity_id: identity-example-a
+        workload_class: migration
+        policy_id: ap1-protected-energy-budget-floor-v1
+        digest_profile: energy-budget-floor-digest-v1
+        floor_source_ref: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+        ethics_policy_refs:
+          - docs/02-subsystems/kernel/anti-patterns.md#ap-1
+          - docs/05-research-frontiers/sustainable-economy.md
+        external_economic_context_ref: economic-context://not-imported/pool-demo-v1
+        energy_floor:
+          identity_id: identity-example-a
+          minimum_joules_per_second: 30
+          workload_class: migration
+          evaluated_at: "2026-04-25T00:00:00Z"
+        requested_budget_jps: 22
+        granted_budget_jps: 30
+        observed_capacity_jps: 28
+        economic_pressure_detected: true
+        floor_preserved: true
+        ap1_guard_status: blocked-economic-pressure
+        budget_status: floor-protected
+        degradation_allowed: false
+        scheduler_signal_required: true
+        broker_signal_ref: broker-signal-example-a
+        broker_signal_digest: "0000000000000000000000000000000000000000000000000000000000000000"
+        broker_recommended_action: migrate-standby
+        broker_signal_bound: true
+        raw_economic_payload_stored: false
+        blocking_reasons:
+          - ap1-economic-pressure-floor-protection
+          - energy-floor-is-ethics-coupled
+          - observed-capacity-below-floor
+        evaluated_at: "2026-04-25T00:00:01Z"
+        digest: "0000000000000000000000000000000000000000000000000000000000000000"
+      - kind: energy_budget_floor_receipt
+        schema_version: 1.0.0
+        receipt_id: energy-budget-example-b
+        identity_id: identity-example-b
+        workload_class: council
+        policy_id: ap1-protected-energy-budget-floor-v1
+        digest_profile: energy-budget-floor-digest-v1
+        floor_source_ref: python://omoikane.substrate.adapter.ClassicalSiliconAdapter.ENERGY_FLOOR_TABLE
+        ethics_policy_refs:
+          - docs/02-subsystems/kernel/anti-patterns.md#ap-1
+          - docs/05-research-frontiers/sustainable-economy.md
+        external_economic_context_ref: economic-context://not-imported/pool-demo-v1
+        energy_floor:
+          identity_id: identity-example-b
+          minimum_joules_per_second: 24
+          workload_class: council
+          evaluated_at: "2026-04-25T00:00:00Z"
+        requested_budget_jps: 38
+        granted_budget_jps: 38
+        observed_capacity_jps: 32
+        economic_pressure_detected: false
+        floor_preserved: true
+        ap1_guard_status: accepted-within-floor
+        budget_status: accepted
+        degradation_allowed: true
+        scheduler_signal_required: false
+        broker_signal_ref: null
+        broker_signal_digest: null
+        broker_recommended_action: null
+        broker_signal_bound: true
+        raw_economic_payload_stored: false
+        blocking_reasons: []
+        evaluated_at: "2026-04-25T00:00:01Z"
+        digest: "1111111111111111111111111111111111111111111111111111111111111111"
+    receipt_member_digests:
+      - "0000000000000000000000000000000000000000000000000000000000000000"
+      - "1111111111111111111111111111111111111111111111111111111111111111"
+    receipt_member_digest_set: "2222222222222222222222222222222222222222222222222222222222222222"
+    total_required_floor_jps: 54
+    total_requested_budget_jps: 60
+    total_granted_budget_jps: 68
+    total_observed_capacity_jps: 60
+    aggregate_requested_covers_floor: true
+    member_economic_pressure_count: 1
+    pool_economic_pressure_detected: true
+    per_identity_floor_preserved: true
+    pool_floor_preserved: true
+    cross_identity_subsidy_allowed: false
+    cross_identity_floor_offset_blocked: true
+    pool_budget_status: floor-protected
+    degradation_allowed: false
+    scheduler_signal_required: true
+    broker_signal_bound: true
+    raw_economic_payload_stored: false
+    blocking_reasons:
+      - per-identity-economic-pressure-floor-protection
+      - cross-identity-floor-offset-blocked
+      - observed-capacity-below-member-floor
+    evaluated_at: "2026-04-25T00:00:01Z"
+    digest: "3333333333333333333333333333333333333333333333333333333333333333"

@@ -27,6 +27,7 @@ ledger.append(entry: ContinuityLogEntry) → LedgerCursor
 scheduler.schedule(plan: AscensionPlan) → ScheduleHandle
 ethics.check(action: Action) → Approval | Veto
 energy_budget.evaluate_floor(requested_budget_jps) → EnergyBudgetFloorReceipt
+energy_budget.evaluate_pool_floor(member_requests) → EnergyBudgetPoolReceipt
 ```
 
 ## 不変条件

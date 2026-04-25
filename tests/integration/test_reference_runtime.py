@@ -1091,6 +1091,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("migrate-standby", receipt["broker_recommended_action"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["energy-budget"])
 
+    def test_energy_budget_pool_demo_blocks_cross_identity_offset(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_energy_budget_pool_demo()
+        receipt = result["energy_budget_pool"]["receipt"]
+
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["pool_floor_preserved"])
+        self.assertTrue(result["validation"]["per_identity_floor_preserved"])
+        self.assertTrue(result["validation"]["economic_pressure_blocked"])
+        self.assertTrue(result["validation"]["cross_identity_floor_offset_blocked"])
+        self.assertTrue(result["validation"]["broker_signal_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertEqual("floor-protected", receipt["pool_budget_status"])
+        self.assertFalse(receipt["cross_identity_subsidy_allowed"])
+        self.assertEqual(2, receipt["member_count"])
+        self.assertEqual(2, len(receipt["receipt_member_digests"]))
+        self.assertEqual(1, result["ledger_verification"]["category_counts"]["energy-budget"])
+
     def test_continuity_demo_emits_profile_and_snapshot(self) -> None:
         runtime = OmoikaneReferenceOS()
 
