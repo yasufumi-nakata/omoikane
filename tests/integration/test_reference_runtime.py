@@ -97,6 +97,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["distributed_approval_fanout_bound"])
         self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
+        self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertTrue(result["validation"]["physics_change"]["revert_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_transport_quorum_met"])
@@ -113,6 +114,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "complete",
             result["scenarios"]["engine_transaction_log"]["engine_binding_status"],
+        )
+        self.assertEqual(
+            "complete",
+            result["scenarios"]["remote_authority_retry_budget"]["budget_status"],
+        )
+        self.assertEqual(
+            result["scenarios"]["approval_fanout_receipt"]["digest"],
+            result["scenarios"]["remote_authority_retry_budget"]["approval_fanout_digest"],
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_retry_budget"]["engine_log_fanout_bound"]
         )
         self.assertEqual(5, result["scenarios"]["engine_transaction_log"]["transaction_entry_count"])
         self.assertEqual("major_diff", result["scenarios"]["time_rate_deviation"]["classification"])

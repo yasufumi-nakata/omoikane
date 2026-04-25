@@ -139,6 +139,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["distributed_approval_fanout_bound"])
         self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["engine_transaction_log_bound"])
+        self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
         self.assertEqual(3, len(result["scenarios"]["approval_transport_receipts"]))
@@ -146,6 +147,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("complete", result["scenarios"]["approval_fanout_receipt"]["fanout_status"])
         self.assertEqual("recovered", result["scenarios"]["approval_fanout_receipt"]["partial_outage_status"])
         self.assertEqual("complete", result["scenarios"]["engine_transaction_log"]["engine_binding_status"])
+        self.assertEqual("complete", result["scenarios"]["remote_authority_retry_budget"]["budget_status"])
+        self.assertFalse(
+            result["scenarios"]["remote_authority_retry_budget"]["raw_remote_transcript_stored"]
+        )
         self.assertEqual("offer-private-reality", result["scenarios"]["time_rate_deviation"]["decision"])
         self.assertTrue(result["scenarios"]["time_rate_deviation"]["time_rate_deviation_detected"])
         self.assertEqual("reverted", result["scenarios"]["physics_revert"]["decision"])

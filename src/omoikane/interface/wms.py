@@ -33,6 +33,24 @@ WMS_APPROVAL_FANOUT_OUTAGE_KINDS = {
     "transport-unavailable",
     "authority-quorum-pending",
 }
+WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID = (
+    "bounded-remote-authority-adaptive-retry-budget-v1"
+)
+WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE = (
+    "authority-route-health-retry-budget-digest-v1"
+)
+WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE = (
+    "fixed-exponential-backoff-with-health-cap-v1"
+)
+WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS = 250
+WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER = 2
+WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS = WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS
+WMS_REMOTE_AUTHORITY_ROUTE_STATUSES = {
+    "healthy",
+    "degraded",
+    "partial-outage",
+    "recovered",
+}
 WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE = 2
 WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
@@ -87,6 +105,32 @@ def _fanout_retry_attempt_digest_payload(attempt: Mapping[str, Any]) -> Dict[str
     }
 
 
+def _remote_authority_route_observation_digest_payload(
+    observation: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        key: deepcopy(value)
+        for key, value in observation.items()
+        if key != "observation_digest"
+    }
+
+
+def _remote_authority_retry_schedule_entry_digest_payload(
+    entry: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        key: deepcopy(value)
+        for key, value in entry.items()
+        if key != "schedule_entry_digest"
+    }
+
+
+def _remote_authority_retry_budget_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
 def _time_rate_attestation_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
@@ -136,6 +180,12 @@ class WorldModelSync:
                 "approval_fanout_retry_digest_profile": WMS_APPROVAL_FANOUT_RETRY_DIGEST_PROFILE,
                 "approval_fanout_max_retry_attempts": WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS,
                 "approval_fanout_retry_window_ms": WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS,
+                "remote_authority_retry_policy_id": WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID,
+                "remote_authority_retry_digest_profile": WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE,
+                "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
+                "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
+                "remote_authority_retry_multiplier": WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
+                "remote_authority_retry_total_budget_ms": WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS,
                 "approval_collection_max_batch_size": WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
                 "approval_transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
                 "guardian_attestation_required": True,
@@ -713,6 +763,199 @@ class WorldModelSync:
             "participant_order_bound": covered_participants == required_participants,
         }
         receipt["digest"] = sha256_text(canonical_json(_approval_fanout_digest_payload(receipt)))
+        return receipt
+
+    def build_remote_authority_retry_budget_receipt(
+        self,
+        session_id: str,
+        *,
+        authority_profile_ref: str,
+        approval_fanout_receipt: Mapping[str, Any],
+        engine_transaction_log_receipt: Mapping[str, Any],
+        route_health_observations: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        authority_ref = self._normalize_non_empty_string(
+            authority_profile_ref,
+            "authority_profile_ref",
+        )
+        if not isinstance(approval_fanout_receipt, Mapping):
+            raise ValueError("approval_fanout_receipt must be a mapping")
+        if not isinstance(engine_transaction_log_receipt, Mapping):
+            raise ValueError("engine_transaction_log_receipt must be a mapping")
+        fanout_receipt = deepcopy(approval_fanout_receipt)
+        engine_log = deepcopy(engine_transaction_log_receipt)
+        required_participants = list(session["current_state"]["participants"])
+        fanout_digest = self._normalize_digest(
+            fanout_receipt.get("digest"),
+            "approval_fanout_digest",
+        )
+        engine_log_digest = self._normalize_digest(
+            engine_log.get("digest"),
+            "engine_transaction_log_digest",
+        )
+        fanout_validation = self.validate_distributed_approval_fanout_receipt(
+            fanout_receipt,
+            required_participants=required_participants,
+            approval_subject_digest=fanout_receipt.get("approval_subject_digest"),
+            approval_collection_digest=fanout_receipt.get("approval_collection_digest"),
+        )
+        engine_log_validation = self.validate_engine_transaction_log_receipt(engine_log)
+        engine_log_fanout_bound = any(
+            entry.get("operation") == "approval_fanout_bound"
+            and entry.get("source_artifact_digest") == fanout_digest
+            for entry in engine_log.get("transaction_entries", [])
+            if isinstance(entry, Mapping)
+        )
+        observations = self._build_remote_authority_route_observations(
+            route_health_observations,
+            required_participants=required_participants,
+        )
+        observations_by_key = {
+            (observation["participant_id"], observation["outage_kind"]): observation
+            for observation in observations
+        }
+        retry_attempts = [
+            deepcopy(attempt)
+            for attempt in fanout_receipt.get("retry_attempts", [])
+            if isinstance(attempt, Mapping)
+        ]
+        schedule_entries: List[Dict[str, Any]] = []
+        cumulative_delay_ms = 0
+        for attempt in retry_attempts:
+            participant = str(attempt["participant_id"])
+            outage_kind = str(attempt["outage_kind"])
+            attempt_index = int(attempt["attempt_index"])
+            observation = observations_by_key.get((participant, outage_kind))
+            retry_after_ms = int(attempt["retry_after_ms"])
+            computed_backoff_ms = min(
+                WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS
+                * (WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER ** (attempt_index - 1)),
+                WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS,
+            )
+            cumulative_delay_ms += retry_after_ms
+            route_health_eligible = (
+                observation is not None
+                and observation["retry_budget_eligible"] is True
+            )
+            within_budget = (
+                retry_after_ms <= computed_backoff_ms
+                and cumulative_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            )
+            schedule_entry = {
+                "schedule_entry_ref": (
+                    "retry-schedule://wms-authority/"
+                    f"{sha256_text(participant)[:12]}/{attempt_index}"
+                ),
+                "retry_attempt_ref": attempt["retry_attempt_ref"],
+                "participant_id": participant,
+                "attempt_index": attempt_index,
+                "outage_kind": outage_kind,
+                "retry_after_ms": retry_after_ms,
+                "computed_backoff_ms": computed_backoff_ms,
+                "remaining_budget_ms": max(
+                    0,
+                    WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS - cumulative_delay_ms,
+                ),
+                "route_health_observation_digest": (
+                    observation["observation_digest"] if observation is not None else ""
+                ),
+                "recovery_result_digest": attempt["recovery_result_digest"],
+                "recovery_transport_receipt_digest": attempt[
+                    "recovery_transport_receipt_digest"
+                ],
+                "route_health_eligible": route_health_eligible,
+                "within_budget": within_budget,
+                "budget_decision": (
+                    "retry" if route_health_eligible and within_budget else "blocked"
+                ),
+            }
+            schedule_entry["schedule_entry_digest"] = sha256_text(
+                canonical_json(
+                    _remote_authority_retry_schedule_entry_digest_payload(
+                        schedule_entry
+                    )
+                )
+            )
+            schedule_entries.append(schedule_entry)
+
+        route_observation_digests = [
+            observation["observation_digest"] for observation in observations
+        ]
+        schedule_entry_digests = [
+            entry["schedule_entry_digest"] for entry in schedule_entries
+        ]
+        outage_participants = list(fanout_receipt.get("outage_participants", []))
+        all_outages_budgeted = (
+            len(schedule_entries) == len(retry_attempts)
+            and all(entry["budget_decision"] == "retry" for entry in schedule_entries)
+            and all(
+                any(
+                    observation["participant_id"] == participant
+                    for observation in observations
+                )
+                for participant in outage_participants
+            )
+        )
+        total_scheduled_delay_ms = sum(
+            entry["retry_after_ms"] for entry in schedule_entries
+        )
+        adaptive_budget_bound = (
+            fanout_validation["ok"]
+            and engine_log_validation["ok"]
+            and engine_log_fanout_bound
+            and all_outages_budgeted
+            and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            and fanout_receipt.get("partial_outage_status") in {"not-required", "recovered"}
+        )
+        receipt = {
+            "kind": "wms_remote_authority_retry_budget_receipt",
+            "schema_version": WMS_SCHEMA_VERSION,
+            "retry_budget_policy_id": WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID,
+            "digest_profile": WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE,
+            "schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
+            "session_id": session_id,
+            "authority_profile_ref": authority_ref,
+            "approval_fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
+            "approval_fanout_digest": fanout_digest,
+            "fanout_retry_policy_id": WMS_APPROVAL_FANOUT_RETRY_POLICY_ID,
+            "fanout_retry_attempt_count": len(retry_attempts),
+            "fanout_retry_attempt_digests": [
+                attempt["attempt_digest"] for attempt in retry_attempts
+            ],
+            "fanout_partial_outage_status": fanout_receipt.get(
+                "partial_outage_status"
+            ),
+            "engine_transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
+            "engine_transaction_log_digest": engine_log_digest,
+            "engine_log_fanout_bound": engine_log_fanout_bound,
+            "route_health_observations": observations,
+            "route_health_observation_digests": route_observation_digests,
+            "route_health_set_digest": sha256_text(
+                canonical_json(route_observation_digests)
+            ),
+            "outage_participants": outage_participants,
+            "schedule_entries": schedule_entries,
+            "schedule_entry_digests": schedule_entry_digests,
+            "schedule_set_digest": sha256_text(
+                canonical_json(schedule_entry_digests)
+            ),
+            "base_retry_after_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
+            "exponential_multiplier": WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
+            "max_retry_attempts": WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS,
+            "total_retry_budget_ms": WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS,
+            "total_scheduled_delay_ms": total_scheduled_delay_ms,
+            "max_scheduled_delay_ms": max(
+                [entry["retry_after_ms"] for entry in schedule_entries] or [0]
+            ),
+            "all_outages_budgeted": all_outages_budgeted,
+            "adaptive_retry_budget_bound": adaptive_budget_bound,
+            "budget_status": "complete" if adaptive_budget_bound else "incomplete",
+            "raw_remote_transcript_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_remote_authority_retry_budget_digest_payload(receipt))
+        )
         return receipt
 
     def build_engine_transaction_entry(
@@ -2283,6 +2526,418 @@ class WorldModelSync:
             errors.append("retry attempts exceed bounded retry policy")
             retry_policy_bound = False
         return retry_policy_bound
+
+    def _build_remote_authority_route_observations(
+        self,
+        route_health_observations: Sequence[Mapping[str, Any]],
+        *,
+        required_participants: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        observations: List[Dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for index, raw_observation in enumerate(route_health_observations, start=1):
+            if not isinstance(raw_observation, Mapping):
+                raise ValueError("route_health_observations must contain mappings")
+            participant = self._normalize_non_empty_string(
+                str(raw_observation.get("participant_id") or ""),
+                "participant_id",
+            )
+            if participant not in required_participants:
+                raise ValueError("route health participant_id must belong to the WMS session")
+            outage_kind = self._normalize_non_empty_string(
+                str(raw_observation.get("outage_kind") or ""),
+                "outage_kind",
+            )
+            if outage_kind not in WMS_APPROVAL_FANOUT_OUTAGE_KINDS:
+                raise ValueError("route health outage_kind is not allowed")
+            authority_ref = self._normalize_non_empty_string(
+                str(raw_observation.get("authority_ref") or ""),
+                "authority_ref",
+            )
+            route_ref = self._normalize_non_empty_string(
+                str(raw_observation.get("route_ref") or ""),
+                "route_ref",
+            )
+            key = (participant, outage_kind, route_ref)
+            if key in seen:
+                raise ValueError("route health observations must be unique per route")
+            seen.add(key)
+            route_status = self._normalize_non_empty_string(
+                str(raw_observation.get("route_status") or ""),
+                "route_status",
+            )
+            if route_status not in WMS_REMOTE_AUTHORITY_ROUTE_STATUSES:
+                raise ValueError("route_status is not allowed")
+            observed_latency_ms = raw_observation.get("observed_latency_ms")
+            if not isinstance(observed_latency_ms, int) or observed_latency_ms < 0:
+                raise ValueError("observed_latency_ms must be a non-negative integer")
+            success_ratio = raw_observation.get("success_ratio")
+            if not isinstance(success_ratio, (int, float)):
+                raise ValueError("success_ratio must be a number")
+            success_ratio = round(float(success_ratio), 3)
+            if success_ratio < 0.0 or success_ratio > 1.0:
+                raise ValueError("success_ratio must be between 0 and 1")
+            consecutive_failures = raw_observation.get("consecutive_failures", 0)
+            if not isinstance(consecutive_failures, int) or consecutive_failures < 0:
+                raise ValueError("consecutive_failures must be a non-negative integer")
+            retry_budget_eligible = (
+                route_status in {"healthy", "degraded", "partial-outage", "recovered"}
+                and success_ratio >= 0.5
+                and consecutive_failures <= WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
+            )
+            observation = {
+                "observation_ref": self._normalize_non_empty_string(
+                    str(
+                        raw_observation.get("observation_ref")
+                        or f"route-health://wms-authority/{index:02d}"
+                    ),
+                    "observation_ref",
+                ),
+                "authority_ref": authority_ref,
+                "route_ref": route_ref,
+                "participant_id": participant,
+                "outage_kind": outage_kind,
+                "route_status": route_status,
+                "observed_latency_ms": observed_latency_ms,
+                "success_ratio": success_ratio,
+                "consecutive_failures": consecutive_failures,
+                "retry_budget_eligible": retry_budget_eligible,
+            }
+            observation["observation_digest"] = sha256_text(
+                canonical_json(
+                    _remote_authority_route_observation_digest_payload(observation)
+                )
+            )
+            observations.append(observation)
+        participant_rank = {
+            participant: index for index, participant in enumerate(required_participants)
+        }
+        observations.sort(
+            key=lambda observation: (
+                participant_rank.get(observation["participant_id"], len(participant_rank)),
+                observation["outage_kind"],
+                observation["route_ref"],
+            )
+        )
+        return observations
+
+    def validate_remote_authority_retry_budget_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        approval_fanout_receipt: Mapping[str, Any] | None = None,
+        engine_transaction_log_receipt: Mapping[str, Any] | None = None,
+        required_participants: Sequence[str] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if receipt.get("kind") != "wms_remote_authority_retry_budget_receipt":
+            errors.append("kind must equal wms_remote_authority_retry_budget_receipt")
+        if receipt.get("schema_version") != WMS_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {WMS_SCHEMA_VERSION}")
+        if receipt.get("retry_budget_policy_id") != WMS_REMOTE_AUTHORITY_RETRY_POLICY_ID:
+            errors.append("retry_budget_policy_id mismatch")
+        if receipt.get("digest_profile") != WMS_REMOTE_AUTHORITY_RETRY_DIGEST_PROFILE:
+            errors.append("digest_profile mismatch")
+        if receipt.get("schedule_profile") != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE:
+            errors.append("schedule_profile mismatch")
+        if receipt.get("approval_fanout_policy_id") != WMS_APPROVAL_FANOUT_POLICY_ID:
+            errors.append("approval_fanout_policy_id mismatch")
+        if receipt.get("fanout_retry_policy_id") != WMS_APPROVAL_FANOUT_RETRY_POLICY_ID:
+            errors.append("fanout_retry_policy_id mismatch")
+        if receipt.get("engine_transaction_log_policy_id") != WMS_ENGINE_TRANSACTION_LOG_POLICY_ID:
+            errors.append("engine_transaction_log_policy_id mismatch")
+        if receipt.get("base_retry_after_ms") != WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS:
+            errors.append("base_retry_after_ms mismatch")
+        if receipt.get("exponential_multiplier") != WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER:
+            errors.append("exponential_multiplier mismatch")
+        if receipt.get("max_retry_attempts") != WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS:
+            errors.append("max_retry_attempts mismatch")
+        if receipt.get("total_retry_budget_ms") != WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS:
+            errors.append("total_retry_budget_ms mismatch")
+        for field_name in ("session_id", "authority_profile_ref"):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        fanout_digest = receipt.get("approval_fanout_digest")
+        if not isinstance(fanout_digest, str) or len(fanout_digest) != 64:
+            errors.append("approval_fanout_digest must be a sha256 hex digest")
+            fanout_digest = ""
+        engine_log_digest = receipt.get("engine_transaction_log_digest")
+        if not isinstance(engine_log_digest, str) or len(engine_log_digest) != 64:
+            errors.append("engine_transaction_log_digest must be a sha256 hex digest")
+            engine_log_digest = ""
+
+        expected_participants = list(required_participants or [])
+        fanout_validation = {"ok": False}
+        fanout_retry_attempts: List[Mapping[str, Any]] = []
+        engine_log_fanout_bound = receipt.get("engine_log_fanout_bound") is True
+        if approval_fanout_receipt is not None:
+            if approval_fanout_receipt.get("digest") != fanout_digest:
+                errors.append("approval_fanout_digest must match approval_fanout_receipt")
+            expected_participants = expected_participants or list(
+                approval_fanout_receipt.get("required_participants", [])
+            )
+            fanout_validation = self.validate_distributed_approval_fanout_receipt(
+                approval_fanout_receipt,
+                required_participants=expected_participants,
+                approval_subject_digest=approval_fanout_receipt.get(
+                    "approval_subject_digest"
+                ),
+                approval_collection_digest=approval_fanout_receipt.get(
+                    "approval_collection_digest"
+                ),
+            )
+            errors.extend(
+                f"approval_fanout_receipt.{error}"
+                for error in fanout_validation["errors"]
+            )
+            raw_attempts = approval_fanout_receipt.get("retry_attempts", [])
+            if isinstance(raw_attempts, list):
+                fanout_retry_attempts = [
+                    attempt for attempt in raw_attempts if isinstance(attempt, Mapping)
+                ]
+        if engine_transaction_log_receipt is not None:
+            if engine_transaction_log_receipt.get("digest") != engine_log_digest:
+                errors.append("engine_transaction_log_digest must match engine log receipt")
+            engine_validation = self.validate_engine_transaction_log_receipt(
+                engine_transaction_log_receipt
+            )
+            errors.extend(
+                f"engine_transaction_log_receipt.{error}"
+                for error in engine_validation["errors"]
+            )
+            engine_log_fanout_bound = any(
+                entry.get("operation") == "approval_fanout_bound"
+                and entry.get("source_artifact_digest") == fanout_digest
+                for entry in engine_transaction_log_receipt.get("transaction_entries", [])
+                if isinstance(entry, Mapping)
+            )
+        if receipt.get("engine_log_fanout_bound") is not engine_log_fanout_bound:
+            errors.append("engine_log_fanout_bound must reflect engine log source artifact binding")
+
+        observations = receipt.get("route_health_observations")
+        if not isinstance(observations, list):
+            errors.append("route_health_observations must be a list")
+            observations = []
+        expected_observation_digests: List[str] = []
+        observation_by_key: Dict[tuple[str, str], Mapping[str, Any]] = {}
+        route_health_bound = True
+        for observation in observations:
+            if not isinstance(observation, Mapping):
+                errors.append("route_health_observations must contain objects")
+                route_health_bound = False
+                continue
+            for field_name in ("observation_ref", "authority_ref", "route_ref", "participant_id", "outage_kind", "route_status"):
+                self._check_non_empty_string(observation.get(field_name), field_name, errors)
+            if observation.get("participant_id") not in expected_participants:
+                errors.append("route health participant_id must belong to required participants")
+                route_health_bound = False
+            if observation.get("outage_kind") not in WMS_APPROVAL_FANOUT_OUTAGE_KINDS:
+                errors.append("route health outage_kind is not allowed")
+                route_health_bound = False
+            if observation.get("route_status") not in WMS_REMOTE_AUTHORITY_ROUTE_STATUSES:
+                errors.append("route_status is not allowed")
+                route_health_bound = False
+            if observation.get("retry_budget_eligible") is not True:
+                errors.append("route health observation must be retry-budget eligible")
+                route_health_bound = False
+            observed_latency_ms = observation.get("observed_latency_ms")
+            if not isinstance(observed_latency_ms, int) or observed_latency_ms < 0:
+                errors.append("observed_latency_ms must be a non-negative integer")
+                route_health_bound = False
+            success_ratio = observation.get("success_ratio")
+            if not isinstance(success_ratio, (int, float)) or not 0.0 <= float(success_ratio) <= 1.0:
+                errors.append("success_ratio must be between 0 and 1")
+                route_health_bound = False
+            consecutive_failures = observation.get("consecutive_failures")
+            if not isinstance(consecutive_failures, int) or consecutive_failures < 0:
+                errors.append("consecutive_failures must be a non-negative integer")
+                route_health_bound = False
+            expected_digest = sha256_text(
+                canonical_json(
+                    _remote_authority_route_observation_digest_payload(observation)
+                )
+            )
+            if observation.get("observation_digest") != expected_digest:
+                errors.append("observation_digest must bind route health payload")
+                route_health_bound = False
+            if isinstance(observation.get("observation_digest"), str):
+                expected_observation_digests.append(str(observation["observation_digest"]))
+            if isinstance(observation.get("participant_id"), str) and isinstance(
+                observation.get("outage_kind"),
+                str,
+            ):
+                observation_by_key[
+                    (str(observation["participant_id"]), str(observation["outage_kind"]))
+                ] = observation
+        if receipt.get("route_health_observation_digests") != expected_observation_digests:
+            errors.append("route_health_observation_digests must follow observation order")
+            route_health_bound = False
+        if receipt.get("route_health_set_digest") != sha256_text(
+            canonical_json(expected_observation_digests)
+        ):
+            errors.append("route_health_set_digest must bind observation digests")
+            route_health_bound = False
+
+        schedule_entries = receipt.get("schedule_entries")
+        if not isinstance(schedule_entries, list):
+            errors.append("schedule_entries must be a list")
+            schedule_entries = []
+        expected_schedule_digests: List[str] = []
+        schedule_bound = True
+        total_scheduled_delay_ms = 0
+        attempt_by_key = {
+            (str(attempt.get("participant_id")), int(attempt.get("attempt_index", -1))): attempt
+            for attempt in fanout_retry_attempts
+        }
+        for entry in schedule_entries:
+            if not isinstance(entry, Mapping):
+                errors.append("schedule_entries must contain objects")
+                schedule_bound = False
+                continue
+            for field_name in ("schedule_entry_ref", "retry_attempt_ref", "participant_id", "outage_kind"):
+                self._check_non_empty_string(entry.get(field_name), field_name, errors)
+            attempt_index = entry.get("attempt_index")
+            if (
+                not isinstance(attempt_index, int)
+                or attempt_index < 1
+                or attempt_index > WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
+            ):
+                errors.append("schedule attempt_index must fit max_retry_attempts")
+                schedule_bound = False
+                attempt_index = -1
+            retry_after_ms = entry.get("retry_after_ms")
+            if not isinstance(retry_after_ms, int) or retry_after_ms < 0:
+                errors.append("schedule retry_after_ms must be non-negative")
+                schedule_bound = False
+                retry_after_ms = 0
+            computed_backoff_ms = min(
+                WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS
+                * (WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER ** (attempt_index - 1)),
+                WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS,
+            )
+            if entry.get("computed_backoff_ms") != computed_backoff_ms:
+                errors.append("computed_backoff_ms must follow fixed exponential backoff")
+                schedule_bound = False
+            total_scheduled_delay_ms += retry_after_ms
+            observation = observation_by_key.get(
+                (str(entry.get("participant_id")), str(entry.get("outage_kind")))
+            )
+            if observation is None:
+                errors.append("schedule entry must bind a route health observation")
+                schedule_bound = False
+            elif entry.get("route_health_observation_digest") != observation.get(
+                "observation_digest"
+            ):
+                errors.append("route_health_observation_digest must match observation")
+                schedule_bound = False
+            attempt = attempt_by_key.get((str(entry.get("participant_id")), attempt_index))
+            if attempt is not None:
+                if entry.get("retry_attempt_ref") != attempt.get("retry_attempt_ref"):
+                    errors.append("schedule retry_attempt_ref must match fanout retry attempt")
+                    schedule_bound = False
+                if entry.get("recovery_result_digest") != attempt.get("recovery_result_digest"):
+                    errors.append("schedule recovery_result_digest must match retry attempt")
+                    schedule_bound = False
+                if entry.get("recovery_transport_receipt_digest") != attempt.get(
+                    "recovery_transport_receipt_digest"
+                ):
+                    errors.append("schedule recovery transport digest must match retry attempt")
+                    schedule_bound = False
+            if entry.get("route_health_eligible") is not True:
+                errors.append("route_health_eligible must be true")
+                schedule_bound = False
+            if entry.get("within_budget") is not (retry_after_ms <= computed_backoff_ms):
+                errors.append("within_budget must reflect retry_after_ms and backoff")
+                schedule_bound = False
+            if entry.get("budget_decision") != "retry":
+                errors.append("budget_decision must be retry")
+                schedule_bound = False
+            expected_entry_digest = sha256_text(
+                canonical_json(
+                    _remote_authority_retry_schedule_entry_digest_payload(entry)
+                )
+            )
+            if entry.get("schedule_entry_digest") != expected_entry_digest:
+                errors.append("schedule_entry_digest must bind schedule payload")
+                schedule_bound = False
+            if isinstance(entry.get("schedule_entry_digest"), str):
+                expected_schedule_digests.append(str(entry["schedule_entry_digest"]))
+        if receipt.get("schedule_entry_digests") != expected_schedule_digests:
+            errors.append("schedule_entry_digests must follow schedule entry order")
+            schedule_bound = False
+        if receipt.get("schedule_set_digest") != sha256_text(
+            canonical_json(expected_schedule_digests)
+        ):
+            errors.append("schedule_set_digest must bind schedule entry digests")
+            schedule_bound = False
+        if receipt.get("total_scheduled_delay_ms") != total_scheduled_delay_ms:
+            errors.append("total_scheduled_delay_ms must equal schedule delay sum")
+            schedule_bound = False
+        if total_scheduled_delay_ms > WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS:
+            errors.append("total_scheduled_delay_ms exceeds total retry budget")
+            schedule_bound = False
+        if receipt.get("max_scheduled_delay_ms") != max(
+            [entry.get("retry_after_ms", 0) for entry in schedule_entries if isinstance(entry, Mapping)]
+            or [0]
+        ):
+            errors.append("max_scheduled_delay_ms must reflect schedule entries")
+            schedule_bound = False
+
+        outage_participants = receipt.get("outage_participants")
+        if not isinstance(outage_participants, list):
+            errors.append("outage_participants must be a list")
+            outage_participants = []
+        all_outages_budgeted = (
+            schedule_bound
+            and route_health_bound
+            and all(
+                any(
+                    entry.get("participant_id") == participant
+                    for entry in schedule_entries
+                    if isinstance(entry, Mapping)
+                )
+                for participant in outage_participants
+            )
+        )
+        if receipt.get("all_outages_budgeted") is not all_outages_budgeted:
+            errors.append("all_outages_budgeted must reflect schedule coverage")
+        adaptive_retry_budget_bound = (
+            (fanout_validation["ok"] if approval_fanout_receipt is not None else True)
+            and engine_log_fanout_bound
+            and route_health_bound
+            and schedule_bound
+            and all_outages_budgeted
+            and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
+            and receipt.get("raw_remote_transcript_stored") is False
+        )
+        if receipt.get("adaptive_retry_budget_bound") is not adaptive_retry_budget_bound:
+            errors.append("adaptive_retry_budget_bound must reflect fanout, engine, route, and schedule binding")
+        if receipt.get("budget_status") not in {"complete", "incomplete"}:
+            errors.append("budget_status must be complete or incomplete")
+        elif receipt.get("budget_status") == "complete" and not adaptive_retry_budget_bound:
+            errors.append("complete budget_status requires adaptive_retry_budget_bound")
+        if receipt.get("raw_remote_transcript_stored") is not False:
+            errors.append("raw_remote_transcript_stored must be false")
+        expected_digest = sha256_text(
+            canonical_json(_remote_authority_retry_budget_digest_payload(receipt))
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match remote authority retry budget receipt payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "adaptive_retry_budget_bound": adaptive_retry_budget_bound,
+            "budget_complete": receipt.get("budget_status") == "complete"
+            and adaptive_retry_budget_bound,
+            "engine_log_fanout_bound": engine_log_fanout_bound,
+            "route_health_bound": route_health_bound,
+            "schedule_bound": schedule_bound,
+            "all_outages_budgeted": all_outages_budgeted,
+            "digest_bound": digest_bound,
+        }
 
     def validate_engine_transaction_log_receipt(
         self,

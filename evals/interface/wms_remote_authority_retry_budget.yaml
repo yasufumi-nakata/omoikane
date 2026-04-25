@@ -1,0 +1,30 @@
+eval_id: wms_remote_authority_retry_budget
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の recovered distributed approval fan-out retry が、
+  remote authority route-health observation、fixed exponential backoff schedule、
+  external engine transaction log の approval_fanout_bound entry に束縛され、
+  raw remote authority transcript を保存しないことを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  remote_authority_retry_budget_bound: true
+  retry_budget_policy_id: bounded-remote-authority-adaptive-retry-budget-v1
+  digest_profile: authority-route-health-retry-budget-digest-v1
+  schedule_profile: fixed-exponential-backoff-with-health-cap-v1
+  base_retry_after_ms: 250
+  exponential_multiplier: 2
+  max_retry_attempts: 2
+  total_retry_budget_ms: 1500
+  total_scheduled_delay_ms: 250
+  budget_status: complete
+  engine_log_fanout_bound: true
+  route_health_bound: true
+  schedule_bound: true
+  raw_remote_transcript_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

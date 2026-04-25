@@ -824,6 +824,12 @@ time_rate escape evidence、approval collection、distributed fan-out、
 physics_rules apply、physics_rules revert の 5 committed transaction entry が
 `wms_engine_transaction_log.schema` に従って ordered entry digest set、
 source artifact digest set、state transition digest、redaction flags を共有することを確認する。
+さらに recovered fan-out retry を
+`bounded-remote-authority-adaptive-retry-budget-v1` の
+remote authority route-health observation と
+`fixed-exponential-backoff-with-health-cap-v1` schedule entry へ束ね、
+engine transaction log の `approval_fanout_bound` entry と同じ fan-out digest を共有し、
+raw remote authority transcript を保存しないことを確認する。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

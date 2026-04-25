@@ -55,6 +55,11 @@ reference WMS decisions を external engine adapter の ordered committed
 transaction log receipt へ digest-only で束縛し、raw payload を保存せずに
 source artifact set と state transition digest を検証できることを確認する。
 
+### WMS Remote Authority Retry Budget
+recovered fan-out retry を remote authority route-health observation、
+fixed exponential backoff schedule、engine transaction log の
+approval_fanout_bound entry に束縛し、raw remote transcript を保存しないことを確認する。
+
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
@@ -74,5 +79,6 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `wms_participant_approval_transport.yaml`
 - `wms_physics_rules_revert.yaml`
 - `wms_private_reality_escape.yaml`
+- `wms_remote_authority_retry_budget.yaml`
 - `wms_time_rate_attestation_transport.yaml`
 - `wms_time_rate_deviation_escape.yaml`

@@ -505,6 +505,61 @@ class WorldModelSyncTests(unittest.TestCase):
             approval_fanout_receipt=fanout,
         )
         physics_validation = sync.validate_physics_rules_change(physics_change)
+        state_digest = sha256_text(canonical_json(sync.snapshot(session["session_id"])))
+        engine_session_ref = f"engine-session://test/{session['session_id']}"
+        engine_entry = sync.build_engine_transaction_entry(
+            transaction_id=f"engine-txn://test/{session['session_id']}/fanout",
+            transaction_index=1,
+            operation="approval_fanout_bound",
+            source_artifact_kind="wms_distributed_approval_fanout_receipt",
+            source_artifact_ref=f"wms-approval-fanout://{fanout['digest'][:16]}",
+            source_artifact_digest=fanout["digest"],
+            engine_session_ref=engine_session_ref,
+            engine_state_before_digest=state_digest,
+            engine_state_after_digest=state_digest,
+            participant_ids=session["current_state"]["participants"],
+        )
+        engine_log = sync.build_engine_transaction_log_receipt(
+            session["session_id"],
+            engine_adapter_ref="engine-adapter://test/wms",
+            engine_session_ref=engine_session_ref,
+            transaction_log_ref=f"engine-log://test/{session['session_id']}",
+            transaction_entries=[engine_entry],
+            required_operations=["approval_fanout_bound"],
+            source_artifact_digests={"approval_fanout_bound": fanout["digest"]},
+        )
+        retry_budget = sync.build_remote_authority_retry_budget_receipt(
+            session["session_id"],
+            authority_profile_ref="authority-profile://test/wms-approval-retry",
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            route_health_observations=[
+                {
+                    "authority_ref": "authority://test/federation",
+                    "route_ref": "route://test/federation/observer",
+                    "participant_id": session["current_state"]["participants"][-1],
+                    "outage_kind": "timeout",
+                    "route_status": "partial-outage",
+                    "observed_latency_ms": 830,
+                    "success_ratio": 0.667,
+                    "consecutive_failures": 1,
+                }
+            ],
+        )
+        retry_budget_validation = sync.validate_remote_authority_retry_budget_receipt(
+            retry_budget,
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            required_participants=session["current_state"]["participants"],
+        )
+        tampered_budget = dict(retry_budget)
+        tampered_budget["engine_log_fanout_bound"] = False
+        tampered_budget_validation = sync.validate_remote_authority_retry_budget_receipt(
+            tampered_budget,
+            approval_fanout_receipt=fanout,
+            engine_transaction_log_receipt=engine_log,
+            required_participants=session["current_state"]["participants"],
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["fanout_complete"])
@@ -525,6 +580,16 @@ class WorldModelSyncTests(unittest.TestCase):
             fanout["outage_participants"],
         )
         self.assertEqual(3, fanout["result_count"])
+        self.assertTrue(retry_budget_validation["ok"])
+        self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
+        self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
+        self.assertTrue(retry_budget_validation["route_health_bound"])
+        self.assertTrue(retry_budget_validation["schedule_bound"])
+        self.assertEqual("complete", retry_budget["budget_status"])
+        self.assertEqual(250, retry_budget["total_scheduled_delay_ms"])
+        self.assertFalse(retry_budget["raw_remote_transcript_stored"])
+        self.assertFalse(tampered_budget_validation["ok"])
+        self.assertFalse(tampered_budget_validation["digest_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

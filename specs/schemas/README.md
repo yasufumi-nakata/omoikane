@@ -148,6 +148,7 @@
 - `wms_engine_transaction_log.schema`
 - `wms_participant_approval_transport_receipt.schema`
 - `wms_physics_rules_change_receipt.schema`
+- `wms_remote_authority_retry_budget_receipt.schema`
 - `wms_time_rate_attestation_receipt.schema`
 - `wms_reconcile.schema`
 - `world_state.schema`

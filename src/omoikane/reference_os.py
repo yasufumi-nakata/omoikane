@@ -7891,6 +7891,52 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
 
+        remote_authority_retry_budget = self.wms.build_remote_authority_retry_budget_receipt(
+            session["session_id"],
+            authority_profile_ref=(
+                "authority-profile://federation/wms-approval-retry-budget/v1"
+            ),
+            approval_fanout_receipt=approval_fanout_retry_receipt,
+            engine_transaction_log_receipt=engine_transaction_log,
+            route_health_observations=[
+                {
+                    "observation_ref": (
+                        "route-health://federation/wms-approval/"
+                        f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
+                    ),
+                    "authority_ref": "authority://federation/wms-approval",
+                    "route_ref": (
+                        "route://federation/wms-approval/observer/"
+                        f"{approval_subject['digest'][:12]}"
+                    ),
+                    "participant_id": observer.identity_id,
+                    "outage_kind": "timeout",
+                    "route_status": "partial-outage",
+                    "observed_latency_ms": 860,
+                    "success_ratio": 0.667,
+                    "consecutive_failures": 1,
+                }
+            ],
+        )
+        remote_authority_retry_budget_validation = (
+            self.wms.validate_remote_authority_retry_budget_receipt(
+                remote_authority_retry_budget,
+                approval_fanout_receipt=approval_fanout_retry_receipt,
+                engine_transaction_log_receipt=engine_transaction_log,
+                required_participants=session["current_state"]["participants"],
+            )
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="wms.remote_authority_retry_budget.bound",
+            payload=remote_authority_retry_budget,
+            actor="WorldModelSync",
+            category="interface-wms-approval",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
+
         transportless_static_approval_rejection = self.wms.propose_physics_rules_change(
             session["session_id"],
             requested_by=identity.identity_id,
@@ -7959,6 +8005,7 @@ json.dump(response, sys.stdout)
                 "physics_revert": physics_revert,
                 "engine_transaction_log": engine_transaction_log,
                 "engine_transaction_entries": engine_transaction_entries,
+                "remote_authority_retry_budget": remote_authority_retry_budget,
                 "transportless_static_approval_rejection": transportless_static_approval_rejection,
                 "malicious_diff": malicious_diff,
                 "malicious_violation": malicious_violation,
@@ -8055,6 +8102,22 @@ json.dump(response, sys.stdout)
                     and engine_transaction_log["engine_binding_status"] == "complete"
                 ),
                 "engine_transaction_log": engine_transaction_log_validation,
+                "remote_authority_retry_budget_bound": (
+                    remote_authority_retry_budget_validation["ok"]
+                    and remote_authority_retry_budget_validation[
+                        "adaptive_retry_budget_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "engine_log_fanout_bound"
+                    ]
+                    and remote_authority_retry_budget_validation["route_health_bound"]
+                    and remote_authority_retry_budget_validation["schedule_bound"]
+                    and remote_authority_retry_budget["budget_status"] == "complete"
+                    and remote_authority_retry_budget["total_scheduled_delay_ms"] == 250
+                    and remote_authority_retry_budget["raw_remote_transcript_stored"]
+                    is False
+                ),
+                "remote_authority_retry_budget": remote_authority_retry_budget_validation,
                 "static_approval_without_transport_rejected": (
                     transportless_static_approval_rejection["decision"] == "rejected"
                     and transportless_static_approval_rejection["approval_quorum_met"]

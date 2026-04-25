@@ -875,11 +875,23 @@ entries:
     consumers:
       - specs/interfaces/interface.wms.v0.idl
       - evals/interface/wms_engine_transaction_log.yaml
+      - specs/schemas/wms_remote_authority_retry_budget_receipt.schema
       - docs/02-subsystems/interface/wms-spec.md
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
     rationale: Required to bind reference WMS source artifacts to ordered committed external engine adapter transaction entries without storing raw world-state or engine payloads.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/wms_remote_authority_retry_budget_receipt.schema
+    consumers:
+      - specs/interfaces/interface.wms.v0.idl
+      - evals/interface/wms_remote_authority_retry_budget.yaml
+      - docs/02-subsystems/interface/wms-spec.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+      - reference-runtime
+    rationale: Required to bind recovered WMS remote authority retry attempts to route-health observations, fixed exponential schedule entries, and the engine transaction log fan-out entry without storing raw remote transcripts.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_participant_approval_transport_receipt.schema
@@ -1278,6 +1290,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects digest-only external WMS engine adapter transaction logs that bind time_rate escape, approval collection, fan-out, apply, and revert source artifacts without raw payload retention.
+  - priority: P1
+    kind: eval
+    file: evals/interface/wms_remote_authority_retry_budget.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects route-health-bound remote authority retry budget receipts for recovered WMS fan-out outages with fixed exponential backoff and no raw remote transcript retention.
   - priority: P1
     kind: eval
     file: evals/interface/wms_participant_approval_transport.yaml

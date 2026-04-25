@@ -12,6 +12,7 @@ imports:
   wms_approval_collection_receipt: ../schemas/wms_approval_collection_receipt.schema
   wms_distributed_approval_fanout_receipt: ../schemas/wms_distributed_approval_fanout_receipt.schema
   wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
+  wms_remote_authority_retry_budget_receipt: ../schemas/wms_remote_authority_retry_budget_receipt.schema
 operations:
   snapshot:
     summary: Read the current world state for one WMS session.
@@ -189,6 +190,40 @@ operations:
       - source artifact digests must match the WMS reconcile, approval collection, fan-out, apply, and revert receipts supplied by the reference runtime
       - raw engine payloads and raw world-state bodies must not be stored in the transaction log receipt
       - engine_binding_status can become complete only when all required operations are covered and digest-bound
+  bind_remote_authority_retry_budget:
+    summary: Bind recovered remote authority partial-outage retries to a deterministic adaptive retry budget and engine transaction evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - authority_profile_ref
+          - approval_fanout_receipt
+          - engine_transaction_log_receipt
+          - route_health_observations
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          authority_profile_ref:
+            type: string
+            minLength: 1
+          approval_fanout_receipt:
+            schema_ref: wms_distributed_approval_fanout_receipt
+          engine_transaction_log_receipt:
+            schema_ref: wms_engine_transaction_log
+          route_health_observations:
+            type: array
+            items:
+              type: object
+    output:
+      schema_ref: wms_remote_authority_retry_budget_receipt
+    guarantees:
+      - recovered fan-out retry attempts must be admitted through bounded-remote-authority-adaptive-retry-budget-v1 before external authority retries are considered complete
+      - retry schedule entries must use fixed-exponential-backoff-with-health-cap-v1 with base_retry_after_ms=250, exponential_multiplier=2, max_retry_attempts=2, and total_retry_budget_ms=1500
+      - every outage participant must have a route-health observation digest and a schedule entry that binds the same recovery result digest and recovery transport receipt digest
+      - the engine transaction log must contain approval_fanout_bound with the same approval_fanout_digest
+      - raw remote authority transcripts must not be stored in the retry budget receipt
   switch_mode:
     summary: Change a session between shared, private, and mixed world-model modes.
     input:

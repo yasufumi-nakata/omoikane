@@ -1,0 +1,282 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/wms_remote_authority_retry_budget_receipt.schema"
+title: WMSRemoteAuthorityRetryBudgetReceipt
+description: >
+  Digest-bound receipt proving that WMS distributed approval fan-out retry
+  attempts were admitted through a bounded external remote-authority retry
+  budget. The receipt binds route-health observations, fixed exponential
+  backoff schedule entries, the final fan-out digest, and the WMS engine
+  transaction log digest without storing raw remote transport transcripts.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - retry_budget_policy_id
+  - digest_profile
+  - schedule_profile
+  - session_id
+  - authority_profile_ref
+  - approval_fanout_policy_id
+  - approval_fanout_digest
+  - fanout_retry_policy_id
+  - fanout_retry_attempt_count
+  - fanout_retry_attempt_digests
+  - fanout_partial_outage_status
+  - engine_transaction_log_policy_id
+  - engine_transaction_log_digest
+  - engine_log_fanout_bound
+  - route_health_observations
+  - route_health_observation_digests
+  - route_health_set_digest
+  - outage_participants
+  - schedule_entries
+  - schedule_entry_digests
+  - schedule_set_digest
+  - base_retry_after_ms
+  - exponential_multiplier
+  - max_retry_attempts
+  - total_retry_budget_ms
+  - total_scheduled_delay_ms
+  - max_scheduled_delay_ms
+  - all_outages_budgeted
+  - adaptive_retry_budget_bound
+  - budget_status
+  - raw_remote_transcript_stored
+  - digest
+properties:
+  kind:
+    type: string
+    const: wms_remote_authority_retry_budget_receipt
+  schema_version:
+    type: string
+    const: "1.0"
+  retry_budget_policy_id:
+    type: string
+    const: bounded-remote-authority-adaptive-retry-budget-v1
+  digest_profile:
+    type: string
+    const: authority-route-health-retry-budget-digest-v1
+  schedule_profile:
+    type: string
+    const: fixed-exponential-backoff-with-health-cap-v1
+  session_id:
+    type: string
+    minLength: 8
+  authority_profile_ref:
+    type: string
+    minLength: 1
+  approval_fanout_policy_id:
+    type: string
+    const: distributed-council-approval-fanout-v1
+  approval_fanout_digest:
+    $ref: "#/$defs/sha256"
+  fanout_retry_policy_id:
+    type: string
+    const: bounded-distributed-approval-fanout-retry-v1
+  fanout_retry_attempt_count:
+    type: integer
+    minimum: 0
+  fanout_retry_attempt_digests:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  fanout_partial_outage_status:
+    type: string
+    enum:
+      - not-required
+      - recovered
+  engine_transaction_log_policy_id:
+    type: string
+    const: digest-bound-wms-engine-transaction-log-v1
+  engine_transaction_log_digest:
+    $ref: "#/$defs/sha256"
+  engine_log_fanout_bound:
+    type: boolean
+    const: true
+  route_health_observations:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - observation_ref
+        - authority_ref
+        - route_ref
+        - participant_id
+        - outage_kind
+        - route_status
+        - observed_latency_ms
+        - success_ratio
+        - consecutive_failures
+        - retry_budget_eligible
+        - observation_digest
+      properties:
+        observation_ref:
+          type: string
+          minLength: 1
+        authority_ref:
+          type: string
+          minLength: 1
+        route_ref:
+          type: string
+          minLength: 1
+        participant_id:
+          type: string
+          minLength: 1
+        outage_kind:
+          $ref: "#/$defs/outage_kind"
+        route_status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - partial-outage
+            - recovered
+        observed_latency_ms:
+          type: integer
+          minimum: 0
+        success_ratio:
+          type: number
+          minimum: 0
+          maximum: 1
+        consecutive_failures:
+          type: integer
+          minimum: 0
+        retry_budget_eligible:
+          type: boolean
+          const: true
+        observation_digest:
+          $ref: "#/$defs/sha256"
+  route_health_observation_digests:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  route_health_set_digest:
+    $ref: "#/$defs/sha256"
+  outage_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  schedule_entries:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - schedule_entry_ref
+        - retry_attempt_ref
+        - participant_id
+        - attempt_index
+        - outage_kind
+        - retry_after_ms
+        - computed_backoff_ms
+        - remaining_budget_ms
+        - route_health_observation_digest
+        - recovery_result_digest
+        - recovery_transport_receipt_digest
+        - route_health_eligible
+        - within_budget
+        - budget_decision
+        - schedule_entry_digest
+      properties:
+        schedule_entry_ref:
+          type: string
+          minLength: 1
+        retry_attempt_ref:
+          type: string
+          minLength: 1
+        participant_id:
+          type: string
+          minLength: 1
+        attempt_index:
+          type: integer
+          minimum: 1
+          maximum: 2
+        outage_kind:
+          $ref: "#/$defs/outage_kind"
+        retry_after_ms:
+          type: integer
+          minimum: 0
+          maximum: 1500
+        computed_backoff_ms:
+          type: integer
+          enum:
+            - 250
+            - 500
+        remaining_budget_ms:
+          type: integer
+          minimum: 0
+          maximum: 1500
+        route_health_observation_digest:
+          $ref: "#/$defs/sha256"
+        recovery_result_digest:
+          $ref: "#/$defs/sha256"
+        recovery_transport_receipt_digest:
+          $ref: "#/$defs/sha256"
+        route_health_eligible:
+          type: boolean
+          const: true
+        within_budget:
+          type: boolean
+          const: true
+        budget_decision:
+          type: string
+          const: retry
+        schedule_entry_digest:
+          $ref: "#/$defs/sha256"
+  schedule_entry_digests:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  schedule_set_digest:
+    $ref: "#/$defs/sha256"
+  base_retry_after_ms:
+    type: integer
+    const: 250
+  exponential_multiplier:
+    type: integer
+    const: 2
+  max_retry_attempts:
+    type: integer
+    const: 2
+  total_retry_budget_ms:
+    type: integer
+    const: 1500
+  total_scheduled_delay_ms:
+    type: integer
+    minimum: 0
+    maximum: 1500
+  max_scheduled_delay_ms:
+    type: integer
+    minimum: 0
+    maximum: 1500
+  all_outages_budgeted:
+    type: boolean
+    const: true
+  adaptive_retry_budget_bound:
+    type: boolean
+    const: true
+  budget_status:
+    type: string
+    const: complete
+  raw_remote_transcript_stored:
+    type: boolean
+    const: false
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  outage_kind:
+    type: string
+    enum:
+      - timeout
+      - transport-unavailable
+      - authority-quorum-pending
