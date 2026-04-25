@@ -134,6 +134,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_change"]["approval_fanout_complete"])
         self.assertTrue(result["validation"]["engine_transaction_log"]["digest_bound"])
+        self.assertTrue(
+            result["validation"]["engine_transaction_log"][
+                "engine_adapter_signature_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["engine_route_binding"]["digest_bound"])
         self.assertTrue(result["validation"]["engine_capture_binding"]["digest_bound"])
         self.assertTrue(

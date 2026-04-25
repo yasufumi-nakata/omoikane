@@ -881,7 +881,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to bind reference WMS source artifacts to ordered committed external engine adapter transaction entries without storing raw world-state or engine payloads.
+    rationale: Required to bind reference WMS source artifacts to ordered committed and adapter-signed external engine transaction entries without storing raw world-state, engine payloads, or raw adapter signature material.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_engine_route_binding_receipt.schema
@@ -1315,7 +1315,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects digest-only external WMS engine adapter transaction logs that bind time_rate escape, approval collection, fan-out, apply, and revert source artifacts without raw payload retention.
+    rationale: Protects digest-only external WMS engine adapter transaction logs that bind time_rate escape, approval collection, fan-out, apply, revert, and adapter signature digest evidence without raw payload or raw signature retention.
   - priority: P1
     kind: eval
     file: evals/interface/wms_engine_route_binding.yaml

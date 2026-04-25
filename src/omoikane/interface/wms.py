@@ -65,6 +65,10 @@ WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
 WMS_ENGINE_TRANSACTION_LOG_POLICY_ID = "digest-bound-wms-engine-transaction-log-v1"
 WMS_ENGINE_ADAPTER_PROFILE = "reference-wms-engine-adapter-v1"
+WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE = "signed-wms-engine-adapter-log-v1"
+WMS_ENGINE_ADAPTER_SIGNATURE_DIGEST_PROFILE = (
+    "wms-engine-adapter-signature-digest-v1"
+)
 WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE = "wms-engine-transaction-entry-digest-v1"
 WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE = "wms-engine-transaction-log-digest-v1"
 WMS_ENGINE_ROUTE_BINDING_POLICY_ID = "distributed-transport-bound-wms-engine-adapter-route-v1"
@@ -165,6 +169,35 @@ def _engine_transaction_log_digest_payload(receipt: Mapping[str, Any]) -> Dict[s
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
 
+def _engine_adapter_signature_digest_payload(
+    *,
+    engine_adapter_signature_profile: str,
+    engine_adapter_key_ref: str,
+    engine_adapter_ref: str,
+    engine_session_ref: str,
+    transaction_log_ref: str,
+    required_operations: Sequence[str],
+    covered_operations: Sequence[str],
+    transaction_set_digest: str,
+    source_artifact_digest_set_digest: str,
+    engine_state_transition_digest: str,
+    current_wms_state_digest: str,
+) -> Dict[str, Any]:
+    return {
+        "engine_adapter_signature_profile": engine_adapter_signature_profile,
+        "engine_adapter_key_ref": engine_adapter_key_ref,
+        "engine_adapter_ref": engine_adapter_ref,
+        "engine_session_ref": engine_session_ref,
+        "transaction_log_ref": transaction_log_ref,
+        "required_operations": list(required_operations),
+        "covered_operations": list(covered_operations),
+        "transaction_set_digest": transaction_set_digest,
+        "source_artifact_digest_set_digest": source_artifact_digest_set_digest,
+        "engine_state_transition_digest": engine_state_transition_digest,
+        "current_wms_state_digest": current_wms_state_digest,
+    }
+
+
 def _engine_route_binding_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
 
@@ -238,6 +271,8 @@ class WorldModelSync:
                 "revert_operation_required": True,
                 "engine_transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
                 "engine_adapter_profile": WMS_ENGINE_ADAPTER_PROFILE,
+                "engine_adapter_signature_profile": WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE,
+                "engine_adapter_signature_digest_profile": WMS_ENGINE_ADAPTER_SIGNATURE_DIGEST_PROFILE,
                 "engine_transaction_operations": sorted(WMS_ENGINE_TRANSACTION_OPERATIONS),
                 "engine_route_binding_policy_id": WMS_ENGINE_ROUTE_BINDING_POLICY_ID,
                 "engine_route_binding_digest_profile": WMS_ENGINE_ROUTE_BINDING_DIGEST_PROFILE,
@@ -1143,6 +1178,7 @@ class WorldModelSync:
         engine_session_ref: str,
         transaction_log_ref: str,
         transaction_entries: Sequence[Mapping[str, Any]],
+        engine_adapter_key_ref: str | None = None,
         required_operations: Sequence[str] | None = None,
         source_artifact_digests: Mapping[str, str] | None = None,
     ) -> Dict[str, Any]:
@@ -1150,6 +1186,11 @@ class WorldModelSync:
         adapter_ref = self._normalize_non_empty_string(
             engine_adapter_ref,
             "engine_adapter_ref",
+        )
+        adapter_key_ref = self._normalize_non_empty_string(
+            engine_adapter_key_ref
+            or f"engine-key://reference-wms/{sha256_text(adapter_ref)[:16]}",
+            "engine_adapter_key_ref",
         )
         engine_session = self._normalize_non_empty_string(
             engine_session_ref,
@@ -1222,7 +1263,15 @@ class WorldModelSync:
             or entry["source_artifact_digest"] == expected_digests[entry["operation"]]
             for entry in normalized_entries
         )
-        complete = (
+        transaction_set_digest = sha256_text(canonical_json(ordered_entry_digests))
+        source_artifact_digest_set_digest = sha256_text(
+            canonical_json(source_artifact_digests_ordered)
+        )
+        engine_state_transition_digest = sha256_text(
+            canonical_json(state_transition_pairs)
+        )
+        current_wms_state_digest = sha256_text(canonical_json(session["current_state"]))
+        complete_without_signature = (
             bool(normalized_entries)
             and not missing_operations
             and invalid_transaction_count == 0
@@ -1231,11 +1280,32 @@ class WorldModelSync:
             and redaction_complete
             and source_artifacts_bound
         )
+        engine_adapter_signature_digest = sha256_text(
+            canonical_json(
+                _engine_adapter_signature_digest_payload(
+                    engine_adapter_signature_profile=WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE,
+                    engine_adapter_key_ref=adapter_key_ref,
+                    engine_adapter_ref=adapter_ref,
+                    engine_session_ref=engine_session,
+                    transaction_log_ref=log_ref,
+                    required_operations=required,
+                    covered_operations=covered_operations,
+                    transaction_set_digest=transaction_set_digest,
+                    source_artifact_digest_set_digest=source_artifact_digest_set_digest,
+                    engine_state_transition_digest=engine_state_transition_digest,
+                    current_wms_state_digest=current_wms_state_digest,
+                )
+            )
+        )
+        engine_adapter_signature_bound = complete_without_signature
         receipt = {
             "kind": "wms_engine_transaction_log",
             "schema_version": WMS_SCHEMA_VERSION,
             "transaction_log_policy_id": WMS_ENGINE_TRANSACTION_LOG_POLICY_ID,
             "engine_adapter_profile": WMS_ENGINE_ADAPTER_PROFILE,
+            "engine_adapter_signature_profile": WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE,
+            "engine_adapter_signature_digest_profile": WMS_ENGINE_ADAPTER_SIGNATURE_DIGEST_PROFILE,
+            "engine_adapter_key_ref": adapter_key_ref,
             "entry_digest_profile": WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE,
             "digest_profile": WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE,
             "session_id": session_id,
@@ -1253,21 +1323,20 @@ class WorldModelSync:
                 entry["transaction_id"] for entry in normalized_entries
             ],
             "ordered_entry_digests": ordered_entry_digests,
-            "transaction_set_digest": sha256_text(canonical_json(ordered_entry_digests)),
-            "source_artifact_digest_set_digest": sha256_text(
-                canonical_json(source_artifact_digests_ordered)
-            ),
-            "engine_state_transition_digest": sha256_text(
-                canonical_json(state_transition_pairs)
-            ),
-            "current_wms_state_digest": sha256_text(
-                canonical_json(session["current_state"])
-            ),
+            "transaction_set_digest": transaction_set_digest,
+            "source_artifact_digest_set_digest": source_artifact_digest_set_digest,
+            "engine_state_transition_digest": engine_state_transition_digest,
+            "current_wms_state_digest": current_wms_state_digest,
+            "engine_adapter_signature_digest": engine_adapter_signature_digest,
             "entry_order_bound": entry_order_bound,
             "source_artifacts_bound": source_artifacts_bound,
             "redaction_complete": redaction_complete,
             "state_transition_bound": bool(normalized_entries),
-            "engine_binding_status": "complete" if complete else "incomplete",
+            "engine_adapter_signature_bound": engine_adapter_signature_bound,
+            "raw_adapter_signature_stored": False,
+            "engine_binding_status": (
+                "complete" if engine_adapter_signature_bound else "incomplete"
+            ),
         }
         receipt["digest"] = sha256_text(
             canonical_json(_engine_transaction_log_digest_payload(receipt))
@@ -3537,12 +3606,30 @@ class WorldModelSync:
             errors.append("transaction_log_policy_id mismatch")
         if receipt.get("engine_adapter_profile") != WMS_ENGINE_ADAPTER_PROFILE:
             errors.append("engine_adapter_profile mismatch")
+        if receipt.get("engine_adapter_signature_profile") != WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE:
+            errors.append("engine_adapter_signature_profile mismatch")
+        if (
+            receipt.get("engine_adapter_signature_digest_profile")
+            != WMS_ENGINE_ADAPTER_SIGNATURE_DIGEST_PROFILE
+        ):
+            errors.append("engine_adapter_signature_digest_profile mismatch")
         if receipt.get("entry_digest_profile") != WMS_ENGINE_TRANSACTION_ENTRY_DIGEST_PROFILE:
             errors.append("entry_digest_profile mismatch")
         if receipt.get("digest_profile") != WMS_ENGINE_TRANSACTION_LOG_DIGEST_PROFILE:
             errors.append("digest_profile mismatch")
-        for field_name in ("session_id", "engine_adapter_ref", "engine_session_ref", "transaction_log_ref"):
+        for field_name in (
+            "session_id",
+            "engine_adapter_ref",
+            "engine_adapter_key_ref",
+            "engine_session_ref",
+            "transaction_log_ref",
+        ):
             self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+        self._check_digest(
+            receipt.get("engine_adapter_signature_digest"),
+            "engine_adapter_signature_digest",
+            errors,
+        )
 
         required = self._normalize_engine_required_operations(
             required_operations or receipt.get("required_operations")
@@ -3646,17 +3733,18 @@ class WorldModelSync:
             errors.append("transaction_entry_count must equal transaction_entries length")
         if receipt.get("ordered_transaction_ids") != ordered_transaction_ids:
             errors.append("ordered_transaction_ids must follow transaction order")
+        transaction_set_digest = sha256_text(canonical_json(normalized_entry_digests))
+        source_artifact_digest_set_digest = sha256_text(
+            canonical_json(source_artifact_digests_ordered)
+        )
+        engine_state_transition_digest = sha256_text(canonical_json(state_transition_pairs))
         if receipt.get("ordered_entry_digests") != normalized_entry_digests:
             errors.append("ordered_entry_digests must follow transaction order")
-        if receipt.get("transaction_set_digest") != sha256_text(canonical_json(normalized_entry_digests)):
+        if receipt.get("transaction_set_digest") != transaction_set_digest:
             errors.append("transaction_set_digest must bind ordered_entry_digests")
-        if receipt.get("source_artifact_digest_set_digest") != sha256_text(
-            canonical_json(source_artifact_digests_ordered)
-        ):
+        if receipt.get("source_artifact_digest_set_digest") != source_artifact_digest_set_digest:
             errors.append("source_artifact_digest_set_digest must bind source artifacts")
-        if receipt.get("engine_state_transition_digest") != sha256_text(
-            canonical_json(state_transition_pairs)
-        ):
+        if receipt.get("engine_state_transition_digest") != engine_state_transition_digest:
             errors.append("engine_state_transition_digest must bind state transition pairs")
         if receipt.get("entry_order_bound") is not entry_order_bound:
             errors.append("entry_order_bound must reflect transaction indices")
@@ -3666,7 +3754,7 @@ class WorldModelSync:
             errors.append("redaction_complete must reflect transaction redaction flags")
         if receipt.get("state_transition_bound") is not bool(entries):
             errors.append("state_transition_bound must reflect transaction presence")
-        complete = (
+        complete_without_signature = (
             bool(entries)
             and not missing_operations
             and invalid_transaction_count == 0
@@ -3675,6 +3763,43 @@ class WorldModelSync:
             and source_artifacts_bound
             and redaction_complete
         )
+        current_wms_state_digest = receipt.get("current_wms_state_digest")
+        if not isinstance(current_wms_state_digest, str) or len(current_wms_state_digest) != 64:
+            errors.append("current_wms_state_digest must be a sha256 hex digest")
+            current_wms_state_digest = ""
+        expected_signature_digest = sha256_text(
+            canonical_json(
+                _engine_adapter_signature_digest_payload(
+                    engine_adapter_signature_profile=WMS_ENGINE_ADAPTER_SIGNATURE_PROFILE,
+                    engine_adapter_key_ref=str(receipt.get("engine_adapter_key_ref") or ""),
+                    engine_adapter_ref=str(receipt.get("engine_adapter_ref") or ""),
+                    engine_session_ref=str(receipt.get("engine_session_ref") or ""),
+                    transaction_log_ref=str(receipt.get("transaction_log_ref") or ""),
+                    required_operations=required,
+                    covered_operations=covered_operations,
+                    transaction_set_digest=transaction_set_digest,
+                    source_artifact_digest_set_digest=source_artifact_digest_set_digest,
+                    engine_state_transition_digest=engine_state_transition_digest,
+                    current_wms_state_digest=current_wms_state_digest,
+                )
+            )
+        )
+        signature_digest_bound = (
+            receipt.get("engine_adapter_signature_digest") == expected_signature_digest
+        )
+        raw_adapter_signature_excluded = receipt.get("raw_adapter_signature_stored") is False
+        engine_adapter_signature_bound = (
+            complete_without_signature
+            and signature_digest_bound
+            and raw_adapter_signature_excluded
+        )
+        if not signature_digest_bound:
+            errors.append("engine_adapter_signature_digest must bind adapter key and log digest set")
+        if receipt.get("engine_adapter_signature_bound") is not engine_adapter_signature_bound:
+            errors.append("engine_adapter_signature_bound must reflect adapter signature digest binding")
+        if not raw_adapter_signature_excluded:
+            errors.append("raw_adapter_signature_stored must be false")
+        complete = complete_without_signature and engine_adapter_signature_bound
         expected_status = "complete" if complete else "incomplete"
         if receipt.get("engine_binding_status") != expected_status:
             errors.append("engine_binding_status must reflect transaction completeness")
@@ -3690,6 +3815,9 @@ class WorldModelSync:
             "source_artifacts_bound": source_artifacts_bound,
             "redaction_complete": redaction_complete,
             "state_transition_bound": bool(entries),
+            "engine_adapter_signature_bound": engine_adapter_signature_bound,
+            "signature_digest_bound": signature_digest_bound,
+            "raw_adapter_signature_excluded": raw_adapter_signature_excluded,
             "digest_bound": digest_bound,
             "missing_operations": missing_operations,
         }

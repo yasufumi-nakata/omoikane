@@ -53,7 +53,8 @@ recovered retry の result digest と transport receipt digest が最終 fan-out
 ### WMS Engine Transaction Log
 reference WMS decisions を external engine adapter の ordered committed
 transaction log receipt へ digest-only で束縛し、raw payload を保存せずに
-source artifact set と state transition digest を検証できることを確認する。
+source artifact set、state transition digest、adapter signature digest を検証でき、
+raw adapter signature material も保存しないことを確認する。
 
 ### WMS Engine Route Binding
 completed WMS engine transaction log が authenticated cross-host distributed

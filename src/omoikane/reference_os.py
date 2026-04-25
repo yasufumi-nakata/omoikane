@@ -8542,6 +8542,9 @@ json.dump(response, sys.stdout)
         engine_transaction_log = self.wms.build_engine_transaction_log_receipt(
             session["session_id"],
             engine_adapter_ref="engine-adapter://reference-wms/multi-user-transaction-log",
+            engine_adapter_key_ref=(
+                "engine-key://reference-wms/multi-user-transaction-log/signer-2026-04"
+            ),
             engine_session_ref=engine_session_ref,
             transaction_log_ref=engine_transaction_log_ref,
             transaction_entries=engine_transaction_entries,
@@ -8835,8 +8838,13 @@ json.dump(response, sys.stdout)
                     and engine_transaction_log_validation["entry_order_bound"]
                     and engine_transaction_log_validation["source_artifacts_bound"]
                     and engine_transaction_log_validation["redaction_complete"]
+                    and engine_transaction_log_validation[
+                        "engine_adapter_signature_bound"
+                    ]
                     and engine_transaction_log["covered_operations"]
                     == engine_transaction_log["required_operations"]
+                    and engine_transaction_log["engine_adapter_signature_bound"]
+                    and engine_transaction_log["raw_adapter_signature_stored"] is False
                     and engine_transaction_log["engine_binding_status"] == "complete"
                 ),
                 "engine_transaction_log": engine_transaction_log_validation,

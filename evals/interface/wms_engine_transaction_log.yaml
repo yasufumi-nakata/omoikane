@@ -16,12 +16,16 @@ expected:
   engine_adapter_profile: reference-wms-engine-adapter-v1
   entry_digest_profile: wms-engine-transaction-entry-digest-v1
   digest_profile: wms-engine-transaction-log-digest-v1
+  engine_adapter_signature_profile: signed-wms-engine-adapter-log-v1
+  engine_adapter_signature_digest_profile: wms-engine-adapter-signature-digest-v1
   required_operation_count: 5
   transaction_entry_count: 5
   entry_order_bound: true
   source_artifacts_bound: true
   redaction_complete: true
   state_transition_bound: true
+  engine_adapter_signature_bound: true
+  raw_adapter_signature_stored: false
   engine_binding_status: complete
 metric: boolean
 threshold: 1.0

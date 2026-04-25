@@ -74,7 +74,11 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   `digest-bound-wms-engine-transaction-log-v1` receipt で固定する。
   time_rate escape evidence、approval collection、distributed fan-out、
   physics_rules apply、revert の各 source artifact digest を ordered committed
-  transaction entry に束縛し、raw engine payload / raw world-state body は保存しない
+  transaction entry に束縛する。さらに adapter signer key ref と
+  `signed-wms-engine-adapter-log-v1` signature digest が transaction digest set、
+  source artifact digest set、state-transition digest、current WMS state digest を
+  署名対象として束縛し、raw engine payload / raw world-state body /
+  raw adapter signature material は保存しない
 - same adapter の route 境界は
   `distributed-transport-bound-wms-engine-adapter-route-v1` receipt で固定する。
   completed engine transaction log digest、ordered transaction entry digest set、
@@ -98,7 +102,7 @@ wms.snapshot(session_id) → WorldState
 wms.propose_diff(session_id, diff, time_rate_attestation_receipts) → ReconcileOutcome
 wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
 wms.collect_distributed_approval_fanout(session_id, collection, transport_results, retry_attempts) → DistributedApprovalFanoutReceipt
-wms.bind_engine_transaction_log(session_id, entries) → EngineTransactionLogReceipt
+wms.bind_engine_transaction_log(session_id, entries, engine_adapter_key_ref) → EngineTransactionLogReceipt
 wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
 wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
@@ -150,7 +154,7 @@ wms.observe_violation(session_id) → ViolationReport
   partial outage retry recovery を保証
 - `evals/interface/wms_engine_transaction_log.yaml` で external WMS engine adapter
   transaction log が ordered committed entry、source artifact digest set、
-  state transition digest、payload redaction flag を持つことを保証
+  state transition digest、adapter signature digest、payload redaction flag を持つことを保証
 - `evals/interface/wms_engine_route_binding.yaml` で completed engine transaction log が
   authenticated cross-host distributed transport authority-route trace、OS observer digest、
   route binding ref set と raw payload 無しで束縛されることを保証

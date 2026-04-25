@@ -929,6 +929,7 @@ class WorldModelSyncTests(unittest.TestCase):
         receipt = sync.build_engine_transaction_log_receipt(
             session["session_id"],
             engine_adapter_ref="engine-adapter://test/reference",
+            engine_adapter_key_ref="engine-key://test/reference/signer",
             engine_session_ref=engine_session_ref,
             transaction_log_ref=f"engine-log://test/{session['session_id']}",
             transaction_entries=entries,
@@ -945,16 +946,46 @@ class WorldModelSyncTests(unittest.TestCase):
             tampered,
             source_artifact_digests=source_digests,
         )
+        tampered_signature = dict(receipt)
+        tampered_signature["engine_adapter_signature_digest"] = sha256_text(
+            "tampered-adapter-signature"
+        )
+        tampered_signature_validation = sync.validate_engine_transaction_log_receipt(
+            tampered_signature,
+            source_artifact_digests=source_digests,
+        )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["engine_binding_complete"])
         self.assertTrue(validation["entry_order_bound"])
         self.assertTrue(validation["source_artifacts_bound"])
         self.assertTrue(validation["redaction_complete"])
+        self.assertTrue(validation["engine_adapter_signature_bound"])
+        self.assertTrue(validation["signature_digest_bound"])
+        self.assertTrue(validation["raw_adapter_signature_excluded"])
         self.assertEqual("complete", receipt["engine_binding_status"])
+        self.assertEqual(
+            "signed-wms-engine-adapter-log-v1",
+            receipt["engine_adapter_signature_profile"],
+        )
+        self.assertEqual(
+            "wms-engine-adapter-signature-digest-v1",
+            receipt["engine_adapter_signature_digest_profile"],
+        )
+        self.assertEqual(
+            "engine-key://test/reference/signer",
+            receipt["engine_adapter_key_ref"],
+        )
+        self.assertTrue(receipt["engine_adapter_signature_bound"])
+        self.assertFalse(receipt["raw_adapter_signature_stored"])
         self.assertEqual(receipt["required_operations"], receipt["covered_operations"])
         self.assertFalse(tampered_validation["ok"])
         self.assertFalse(tampered_validation["source_artifacts_bound"])
+        self.assertFalse(tampered_signature_validation["ok"])
+        self.assertFalse(tampered_signature_validation["signature_digest_bound"])
+        self.assertFalse(
+            tampered_signature_validation["engine_adapter_signature_bound"]
+        )
 
     def test_engine_route_binding_binds_transaction_log_to_authority_trace(self) -> None:
         sync = WorldModelSync()

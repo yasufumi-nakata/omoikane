@@ -193,6 +193,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("complete", result["scenarios"]["approval_fanout_receipt"]["fanout_status"])
         self.assertEqual("recovered", result["scenarios"]["approval_fanout_receipt"]["partial_outage_status"])
         self.assertEqual("complete", result["scenarios"]["engine_transaction_log"]["engine_binding_status"])
+        self.assertTrue(
+            result["scenarios"]["engine_transaction_log"][
+                "engine_adapter_signature_bound"
+            ]
+        )
+        self.assertFalse(
+            result["scenarios"]["engine_transaction_log"][
+                "raw_adapter_signature_stored"
+            ]
+        )
         self.assertEqual("complete", result["scenarios"]["engine_route_binding"]["engine_route_binding_status"])
         self.assertEqual("complete", result["scenarios"]["engine_capture_binding"]["engine_capture_binding_status"])
         self.assertFalse(result["scenarios"]["engine_capture_binding"]["raw_packet_body_stored"])

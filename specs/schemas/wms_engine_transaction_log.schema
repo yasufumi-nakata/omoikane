@@ -5,7 +5,8 @@ description: >
   Digest-bound receipt proving that a bounded external WMS engine adapter
   materialized the reference WMS decisions as ordered committed transactions.
   The receipt binds source artifact digests and state-transition digests while
-  explicitly excluding raw world-state or engine payload storage.
+  binding adapter signature digest evidence and explicitly excluding raw
+  world-state, engine payload, or adapter signature storage.
 type: object
 additionalProperties: false
 required:
@@ -13,6 +14,9 @@ required:
   - schema_version
   - transaction_log_policy_id
   - engine_adapter_profile
+  - engine_adapter_signature_profile
+  - engine_adapter_signature_digest_profile
+  - engine_adapter_key_ref
   - entry_digest_profile
   - digest_profile
   - session_id
@@ -32,10 +36,13 @@ required:
   - source_artifact_digest_set_digest
   - engine_state_transition_digest
   - current_wms_state_digest
+  - engine_adapter_signature_digest
   - entry_order_bound
   - source_artifacts_bound
   - redaction_complete
   - state_transition_bound
+  - engine_adapter_signature_bound
+  - raw_adapter_signature_stored
   - engine_binding_status
   - digest
 properties:
@@ -51,6 +58,15 @@ properties:
   engine_adapter_profile:
     type: string
     const: reference-wms-engine-adapter-v1
+  engine_adapter_signature_profile:
+    type: string
+    const: signed-wms-engine-adapter-log-v1
+  engine_adapter_signature_digest_profile:
+    type: string
+    const: wms-engine-adapter-signature-digest-v1
+  engine_adapter_key_ref:
+    type: string
+    minLength: 1
   entry_digest_profile:
     type: string
     const: wms-engine-transaction-entry-digest-v1
@@ -201,6 +217,8 @@ properties:
     $ref: "#/$defs/sha256"
   current_wms_state_digest:
     $ref: "#/$defs/sha256"
+  engine_adapter_signature_digest:
+    $ref: "#/$defs/sha256"
   entry_order_bound:
     type: boolean
     const: true
@@ -213,6 +231,12 @@ properties:
   state_transition_bound:
     type: boolean
     const: true
+  engine_adapter_signature_bound:
+    type: boolean
+    const: true
+  raw_adapter_signature_stored:
+    type: boolean
+    const: false
   engine_binding_status:
     type: string
     const: complete

@@ -106,6 +106,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_change"]["approval_fanout_complete"])
         self.assertTrue(result["validation"]["engine_transaction_log"]["engine_binding_complete"])
+        self.assertTrue(
+            result["validation"]["engine_transaction_log"][
+                "engine_adapter_signature_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["engine_route_binding"]["engine_route_binding_complete"])
         self.assertTrue(result["validation"]["engine_capture_binding"]["engine_capture_binding_complete"])
         self.assertTrue(result["validation"]["physics_revert"]["revert_bound"])
@@ -118,6 +123,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "complete",
             result["scenarios"]["engine_transaction_log"]["engine_binding_status"],
+        )
+        self.assertTrue(
+            result["scenarios"]["engine_transaction_log"][
+                "engine_adapter_signature_bound"
+            ]
+        )
+        self.assertFalse(
+            result["scenarios"]["engine_transaction_log"][
+                "raw_adapter_signature_stored"
+            ]
         )
         self.assertEqual(
             "complete",

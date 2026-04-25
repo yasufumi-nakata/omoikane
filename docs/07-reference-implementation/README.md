@@ -853,7 +853,9 @@ recovery result digest と recovery transport receipt digest が最終 fan-out r
 time_rate escape evidence、approval collection、distributed fan-out、
 physics_rules apply、physics_rules revert の 5 committed transaction entry が
 `wms_engine_transaction_log.schema` に従って ordered entry digest set、
-source artifact digest set、state transition digest、redaction flags を共有することを確認する。
+source artifact digest set、state transition digest、adapter signer key ref、
+`signed-wms-engine-adapter-log-v1` signature digest、redaction flags を共有し、
+raw adapter signature material を保存しないことを確認する。
 さらに completed engine transaction log を
 `distributed-transport-bound-wms-engine-adapter-route-v1` の route binding receipt へ束ね、
 authenticated cross-host authority-route trace digest、route binding refs、

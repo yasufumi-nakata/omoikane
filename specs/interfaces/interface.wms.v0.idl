@@ -162,6 +162,9 @@ operations:
           engine_adapter_ref:
             type: string
             minLength: 1
+          engine_adapter_key_ref:
+            type: string
+            minLength: 1
           engine_session_ref:
             type: string
             minLength: 1
@@ -190,7 +193,9 @@ operations:
     guarantees:
       - transaction entries must be ordered, committed, payload-redacted, and bound to the same engine_session_ref
       - source artifact digests must match the WMS reconcile, approval collection, fan-out, apply, and revert receipts supplied by the reference runtime
+      - engine_adapter_signature_digest must bind engine_adapter_key_ref, the ordered transaction digest set, source artifact digest set, state-transition digest, and current WMS state digest
       - raw engine payloads and raw world-state bodies must not be stored in the transaction log receipt
+      - raw adapter signature material must not be stored; only digest and key ref evidence may be retained
       - engine_binding_status can become complete only when all required operations are covered and digest-bound
   bind_engine_route_trace:
     summary: Bind a completed WMS engine transaction log to authenticated cross-host distributed transport route evidence.
