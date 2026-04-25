@@ -1445,6 +1445,14 @@ entries:
     rationale: Required to serialize one PLC / firmware adapter receipt proving live armed stop-signal bus readiness before EWA authorization.
   - priority: P1
     kind: schema
+    file: specs/schemas/ewa_production_connector_attestation.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - docs/02-subsystems/interface/ewa-safety.md
+      - reference-runtime
+    rationale: Required to serialize one digest-only vendor API connector certificate and safety PLC installation proof binding before EWA authorization.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ewa_legal_execution.schema
     consumers:
       - specs/interfaces/interface.ewa.v0.idl
@@ -1531,6 +1539,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
     rationale: Protects PLC / firmware adapter readiness, transcript digest binding, and authorization/emergency-stop binding for EWA stop-signal paths.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_production_connector_attestation.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+    rationale: Protects vendor API certificate, safety PLC installation proof, adapter receipt binding, and raw payload redaction before EWA authorization.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_motor_semantics_legal_execution.yaml

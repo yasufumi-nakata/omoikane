@@ -9,6 +9,7 @@ imports:
   ewa_motor_plan: ../schemas/ewa_motor_plan.schema
   ewa_stop_signal_path: ../schemas/ewa_stop_signal_path.schema
   ewa_stop_signal_adapter_receipt: ../schemas/ewa_stop_signal_adapter_receipt.schema
+  ewa_production_connector_attestation: ../schemas/ewa_production_connector_attestation.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
   ewa_guardian_oversight_gate: ../schemas/ewa_guardian_oversight_gate.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
@@ -324,6 +325,116 @@ operations:
             items:
               type: string
               minLength: 1
+  attest_production_connector:
+    summary: Bind one vendor API connector certificate and safety PLC installation proof to a live stop-signal adapter receipt before authorization.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - stop_signal_adapter_receipt
+          - vendor_api_ref
+          - vendor_api_certificate_ref
+          - vendor_api_certificate_digest
+          - production_connector_ref
+          - installation_site_ref
+          - installation_proof_ref
+          - installation_proof_digest
+          - installer_authority_ref
+          - safety_plc_ref
+          - maintenance_window_ref
+        properties:
+          stop_signal_adapter_receipt:
+            schema_ref: ewa_stop_signal_adapter_receipt
+          vendor_api_ref:
+            type: string
+            minLength: 1
+          vendor_api_certificate_ref:
+            type: string
+            minLength: 1
+          vendor_api_certificate_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          production_connector_ref:
+            type: string
+            minLength: 1
+          installation_site_ref:
+            type: string
+            minLength: 1
+          installation_proof_ref:
+            type: string
+            minLength: 1
+          installation_proof_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          installer_authority_ref:
+            type: string
+            minLength: 1
+          safety_plc_ref:
+            type: string
+            minLength: 1
+          maintenance_window_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: ewa_production_connector_attestation
+    guarantees:
+      - attestation must bind the stop_signal_adapter_receipt_id/digest and adapter profile
+      - vendor API certificate and installation proof digests must be sha256 refs
+      - raw vendor API and installation payloads must not be stored
+  validate_production_connector_attestation:
+    summary: Validate one production connector attestation against its live stop-signal adapter receipt.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - attestation
+          - stop_signal_adapter_receipt
+        properties:
+          attestation:
+            schema_ref: ewa_production_connector_attestation
+          stop_signal_adapter_receipt:
+            schema_ref: ewa_stop_signal_adapter_receipt
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - attestation_ready
+          - adapter_receipt_bound
+          - vendor_certificate_verified
+          - installation_proof_verified
+          - connector_auth_verified
+          - installation_verified
+          - evidence_digest_set_complete
+          - raw_payload_redacted
+          - errors
+        properties:
+          ok:
+            type: boolean
+          attestation_ready:
+            type: boolean
+          adapter_receipt_bound:
+            type: boolean
+          vendor_certificate_verified:
+            type: boolean
+          installation_proof_verified:
+            type: boolean
+          connector_auth_verified:
+            type: boolean
+          installation_verified:
+            type: boolean
+          evidence_digest_set_complete:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   execute_legal_preflight:
     summary: Execute one jurisdiction-bound legal preflight before EWA actuation authorization is issued.
     input:
@@ -526,6 +637,7 @@ operations:
           - motor_plan
           - stop_signal_path
           - stop_signal_adapter_receipt
+          - production_connector_attestation
           - legal_execution
           - guardian_oversight_gate
         properties:
@@ -537,6 +649,8 @@ operations:
             schema_ref: ewa_stop_signal_path
           stop_signal_adapter_receipt:
             schema_ref: ewa_stop_signal_adapter_receipt
+          production_connector_attestation:
+            schema_ref: ewa_production_connector_attestation
           legal_execution:
             schema_ref: ewa_legal_execution
           guardian_oversight_gate:
@@ -550,7 +664,7 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, stop_signal_adapter_receipt_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, stop_signal_adapter_receipt_id/digest, production_connector_attestation_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
       - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
@@ -561,7 +675,7 @@ operations:
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
       - non-read-only commands require one active authorization_id whose digests match the command payload
-      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, one legal_execution receipt, and one guardian oversight-gated authorization artifact
+      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, one stop_signal_adapter receipt, one production connector attestation, one legal_execution receipt, and one guardian oversight-gated authorization artifact
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
@@ -594,10 +708,12 @@ operations:
           - motor_plan_ready
           - stop_signal_path_ready
           - stop_signal_adapter_receipt_ready
+          - production_connector_attestation_ready
           - legal_execution_ready
           - motor_plan_bound
           - stop_signal_path_bound
           - stop_signal_adapter_receipt_bound
+          - production_connector_attestation_bound
           - legal_execution_bound
           - window_open
           - status_authorized
@@ -622,6 +738,8 @@ operations:
             type: boolean
           stop_signal_adapter_receipt_ready:
             type: boolean
+          production_connector_attestation_ready:
+            type: boolean
           legal_execution_ready:
             type: boolean
           motor_plan_bound:
@@ -629,6 +747,8 @@ operations:
           stop_signal_path_bound:
             type: boolean
           stop_signal_adapter_receipt_bound:
+            type: boolean
+          production_connector_attestation_bound:
             type: boolean
           legal_execution_bound:
             type: boolean
@@ -840,6 +960,9 @@ events:
   ewa.stop_signal_path_prepared:
     payload:
       schema_ref: ewa_stop_signal_path
+  ewa.production_connector_attested:
+    payload:
+      schema_ref: ewa_production_connector_attestation
   ewa.legal_execution_prepared:
     payload:
       schema_ref: ewa_legal_execution
@@ -858,5 +981,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
-    - Raw regulator APIs and site-specific firmware adapters stay outside this reference runtime; only digest-bound stop-signal bus arming is modeled here.
+    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, production connector attestation, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - Raw regulator APIs, vendor API transcripts, installation documents, and site-specific firmware payloads stay outside this reference runtime; only digest-bound connector and stop-signal evidence is modeled here.

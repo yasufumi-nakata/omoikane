@@ -3,8 +3,8 @@ target: mind.procedural_actuation
 summary: >
   Passed procedural skill enactment が external actuation へ移る時に、
   EWA authorization artifact、approved command digest、stop-signal adapter receipt、
-  legal execution、guardian oversight gate、rollback token を同一 bridge receipt に束縛し、
-  raw instruction text を保持しないこと。
+  production connector attestation、legal execution、guardian oversight gate、
+  rollback token を同一 bridge receipt に束縛し、raw instruction text を保持しないこと。
 checks:
   - name: procedural actuation bridge demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli procedural-actuation-demo --json
@@ -15,6 +15,7 @@ expect:
   authorization_validation_bound: true
   command_bound_to_authorization: true
   stop_signal_adapter_receipt_bound: true
+  production_connector_attestation_bound: true
   legal_execution_bound: true
   guardian_oversight_gate_bound: true
   no_raw_instruction_text: true

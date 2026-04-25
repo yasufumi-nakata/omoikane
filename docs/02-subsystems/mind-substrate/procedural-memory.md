@@ -76,20 +76,22 @@ procedural actuation bridge schema:
   `procedural_skill_enactment_session` を EWA の
   `external_actuation_authorization` と approved command audit に
   digest-bound で接続し、raw instruction text を保持せずに
-  PLC / firmware stop-signal adapter receipt / legal execution /
-  Guardian oversight gate / rollback token を確認する
+  PLC / firmware stop-signal adapter receipt / production connector attestation /
+  legal execution / Guardian oversight gate / rollback token を確認する
 - ledger には `procedural-preview` category で source manifest / connectome digest と target path 一覧を残す
 - ledger には `procedural-writeback` category で output connectome digest、human reviewer quorum、rollback token を残す
 - ledger には `procedural-execution` category で executed skill label、sandbox session、rollback token を残す
 - ledger には `procedural-enactment` category で materialized skill count、command receipt、cleanup status、rollback token を残す
 - ledger には `procedural-actuation-bridge` category で source enactment digest、
-  EWA authorization digest、command id、delivery scope、rollback token を残す
+  EWA authorization digest、command id、production connector attestation digest、
+  delivery scope、rollback token を残す
 - `weight-application` は reference runtime で bounded writeback まで固定し、
   `skill-execution` と `skill-enactment` も sandbox-only / no external actuation の範囲で固定する
 - external actuation へ接続する場合は `mind.procedural_actuation.v0` の
   bridge receipt を介し、`interface.ewa.v0` の
   `external_actuation_authorization` artifact、guardian-reviewed jurisdiction evidence、
-  stop-signal adapter receipt binding、command digest binding、raw instruction redaction を満たす必要がある
+  stop-signal adapter receipt binding、production connector attestation binding、
+  command digest binding、raw instruction redaction を満たす必要がある
 
 ## 不変条件
 
@@ -101,7 +103,7 @@ procedural actuation bridge schema:
 6. skill execution は guardian witness 付き sandbox-only rehearsal に限り、external actuation を禁止する
 7. skill enactment は temp workspace cleanup と actual command receipt を必須とし、external actuation を禁止する
    かつ command receipt の `eval_ref` は session の `eval_refs` に列挙される
-8. procedural actuation bridge は passed enactment と EWA authorization / approved command / stop-signal adapter receipt の digest が一致する場合だけ成立する
+8. procedural actuation bridge は passed enactment と EWA authorization / approved command / stop-signal adapter receipt / production connector attestation の digest が一致する場合だけ成立する
 
 ## 関連
 

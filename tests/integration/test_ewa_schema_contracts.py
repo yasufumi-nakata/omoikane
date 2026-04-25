@@ -52,6 +52,10 @@ class EWASchemaContractTests(unittest.TestCase):
             result["stop_signal_adapter_receipt"],
         )
         self._assert_schema_valid(
+            "specs/schemas/ewa_production_connector_attestation.schema",
+            result["production_connector_attestation"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/external_actuation_authorization.schema",
             result["authorization"],
         )

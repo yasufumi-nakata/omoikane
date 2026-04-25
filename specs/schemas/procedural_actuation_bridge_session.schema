@@ -120,6 +120,8 @@ properties:
       - stop_signal_path_digest
       - stop_signal_adapter_receipt_id
       - stop_signal_adapter_receipt_digest
+      - production_connector_attestation_id
+      - production_connector_attestation_digest
       - legal_execution_id
       - legal_execution_digest
       - guardian_oversight_gate_id
@@ -173,6 +175,12 @@ properties:
       stop_signal_adapter_receipt_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+      production_connector_attestation_id:
+        type: string
+        pattern: "^ewa-connector-[a-f0-9]{12}$"
+      production_connector_attestation_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
       legal_execution_id:
         type: string
         minLength: 8
@@ -214,6 +222,7 @@ properties:
       - motor_plan_bound
       - stop_signal_path_bound
       - stop_signal_adapter_receipt_bound
+      - production_connector_attestation_bound
       - legal_execution_bound
       - guardian_oversight_gate_bound
       - reviewer_network_attested
@@ -231,6 +240,8 @@ properties:
       stop_signal_path_bound:
         const: true
       stop_signal_adapter_receipt_bound:
+        const: true
+      production_connector_attestation_bound:
         const: true
       legal_execution_bound:
         const: true
@@ -256,8 +267,8 @@ properties:
       minLength: 1
   preserved_invariants:
     type: array
-    minItems: 7
-    maxItems: 7
+    minItems: 8
+    maxItems: 8
     prefixItems:
       - const: source-enactment-passed
       - const: ewa-authorization-required
@@ -265,6 +276,7 @@ properties:
       - const: raw-instruction-redacted
       - const: rollback-token-retained
       - const: plc-firmware-stop-signal-adapter-bound
+      - const: production-connector-attestation-bound
       - const: guardian-oversight-gate-bound
   status:
     const: bridged
@@ -280,6 +292,7 @@ properties:
       - authorization_validation_bound
       - command_bound_to_authorization
       - stop_signal_adapter_receipt_bound
+      - production_connector_attestation_bound
       - legal_execution_bound
       - guardian_oversight_gate_bound
       - no_raw_instruction_text
@@ -297,6 +310,8 @@ properties:
       command_bound_to_authorization:
         const: true
       stop_signal_adapter_receipt_bound:
+        const: true
+      production_connector_attestation_bound:
         const: true
       legal_execution_bound:
         const: true
@@ -356,6 +371,8 @@ examples:
       stop_signal_path_digest: 2222222222222222222222222222222222222222222222222222222222222222
       stop_signal_adapter_receipt_id: ewa-stop-adapter-0123456789ab
       stop_signal_adapter_receipt_digest: 9999999999999999999999999999999999999999999999999999999999999999
+      production_connector_attestation_id: ewa-connector-0123456789ab
+      production_connector_attestation_digest: 8888888888888888888888888888888888888888888888888888888888888888
       legal_execution_id: ewa-legal-0123456789ab
       legal_execution_digest: 3333333333333333333333333333333333333333333333333333333333333333
       guardian_oversight_gate_id: ewa-oversight-gate-0123456789ab
@@ -374,6 +391,7 @@ examples:
       motor_plan_bound: true
       stop_signal_path_bound: true
       stop_signal_adapter_receipt_bound: true
+      production_connector_attestation_bound: true
       legal_execution_bound: true
       guardian_oversight_gate_bound: true
       reviewer_network_attested: true
@@ -391,6 +409,7 @@ examples:
       - raw-instruction-redacted
       - rollback-token-retained
       - plc-firmware-stop-signal-adapter-bound
+      - production-connector-attestation-bound
       - guardian-oversight-gate-bound
     status: bridged
     bridged_at: "2026-04-24T00:00:00+00:00"
@@ -400,6 +419,7 @@ examples:
       authorization_validation_bound: true
       command_bound_to_authorization: true
       stop_signal_adapter_receipt_bound: true
+      production_connector_attestation_bound: true
       legal_execution_bound: true
       guardian_oversight_gate_bound: true
       no_raw_instruction_text: true

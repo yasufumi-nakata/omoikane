@@ -1,0 +1,21 @@
+eval_id: ewa_production_connector_attestation
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が vendor API connector certificate と
+  safety PLC installation proof を live stop-signal adapter receipt に束縛し、
+  authorization / approved command / emergency stop が同じ attestation digest を
+  raw vendor payload なしで参照できること。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  production_connector_attestation_ok: true
+  production_connector_attestation_bound: true
+  authorization_production_connector_attestation_ready: true
+  approved_command_production_connector_attestation_bound: true
+  emergency_stop_bound_to_production_connector_attestation: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

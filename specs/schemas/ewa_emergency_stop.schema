@@ -27,6 +27,11 @@ required:
   - stop_signal_adapter_receipt_id
   - stop_signal_adapter_receipt_digest
   - stop_signal_adapter_profile_id
+  - production_connector_attestation_id
+  - production_connector_attestation_digest
+  - production_connector_profile_id
+  - vendor_api_ref
+  - installation_site_ref
   - kill_switch_wiring_ref
   - activated_binding_id
   - activated_channel_ref
@@ -101,6 +106,21 @@ properties:
   stop_signal_adapter_profile_id:
     type: string
     const: plc-firmware-stop-signal-adapter-v1
+  production_connector_attestation_id:
+    type: string
+    pattern: "^ewa-connector-[a-f0-9]{12}$"
+  production_connector_attestation_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  production_connector_profile_id:
+    type: string
+    const: vendor-api-safety-plc-installation-attestation-v1
+  vendor_api_ref:
+    type: string
+    minLength: 1
+  installation_site_ref:
+    type: string
+    minLength: 1
   kill_switch_wiring_ref:
     type: string
     minLength: 1

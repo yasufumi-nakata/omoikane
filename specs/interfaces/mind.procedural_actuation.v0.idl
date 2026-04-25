@@ -47,7 +47,7 @@ operations:
     guarantees:
       - source procedural enactment must already be passed, cleaned up, and rollback-token preserving
       - EWA authorization must be authorized, digest-bound, reviewer-network attested, and delivery_scope=physical-device-actuation
-      - approved command must bind the same authorization_id, instruction_digest, motor plan, stop-signal path, stop-signal adapter receipt, and legal execution receipts
+      - approved command must bind the same authorization_id, instruction_digest, motor plan, stop-signal path, stop-signal adapter receipt, production connector attestation, and legal execution receipts
       - bridge receipt must expose only digests and refs, never raw actuation instruction text
   validate_bridge:
     summary: Validate one procedural/EWA bridge receipt against source enactment and authorization evidence.
@@ -83,6 +83,7 @@ operations:
           - authorization_validation_bound
           - command_bound_to_authorization
           - stop_signal_adapter_receipt_bound
+          - production_connector_attestation_bound
           - legal_execution_bound
           - guardian_oversight_gate_bound
           - no_raw_instruction_text
@@ -101,6 +102,8 @@ operations:
           command_bound_to_authorization:
             type: boolean
           stop_signal_adapter_receipt_bound:
+            type: boolean
+          production_connector_attestation_bound:
             type: boolean
           legal_execution_bound:
             type: boolean

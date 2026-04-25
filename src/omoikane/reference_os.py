@@ -7720,6 +7720,23 @@ json.dump(response, sys.stdout)
             stop_signal_adapter_receipt,
             stop_signal_path=stop_signal_path,
         )
+        production_connector_attestation = self.ewa.attest_production_connector(
+            stop_signal_adapter_receipt["receipt_id"],
+            vendor_api_ref="vendor-api://lab-drone-arm-01/safety-plc/v1",
+            vendor_api_certificate_ref="vendor-cert://lab-drone-arm-01/safety-plc/prod-connector",
+            vendor_api_certificate_digest=f"sha256:{'c' * 64}",
+            production_connector_ref="connector://lab-drone-arm-01/safety-plc/production-v1",
+            installation_site_ref="site://tokyo-lab/ewa-cell-a",
+            installation_proof_ref="install-proof://lab-drone-arm-01/safety-plc/2026-04-26",
+            installation_proof_digest=f"sha256:{'d' * 64}",
+            installer_authority_ref="authority://jp-13/lab-safety-plc-installers",
+            safety_plc_ref="plc://lab-drone-arm-01/safety-plc",
+            maintenance_window_ref="maintenance://lab-drone-arm-01/safety-plc/2026q2",
+        )
+        production_connector_validation = self.ewa.validate_production_connector_attestation(
+            production_connector_attestation,
+            stop_signal_adapter_receipt=stop_signal_adapter_receipt,
+        )
         reviewer_alpha = self.oversight.register_reviewer(
             reviewer_id="human-reviewer-ewa-001",
             display_name="EWA Reviewer Alpha",
@@ -7830,6 +7847,9 @@ json.dump(response, sys.stdout)
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
             stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
+            production_connector_attestation_id=production_connector_attestation[
+                "attestation_id"
+            ],
             legal_execution_id=legal_execution["execution_id"],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
@@ -7841,6 +7861,7 @@ json.dump(response, sys.stdout)
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
             stop_signal_adapter_receipt=stop_signal_adapter_receipt,
+            production_connector_attestation=production_connector_attestation,
             legal_execution=legal_execution,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
@@ -7911,6 +7932,7 @@ json.dump(response, sys.stdout)
             "motor_plan_ok": motor_plan_validation["ok"],
             "stop_signal_path_ok": stop_signal_path_validation["ok"],
             "stop_signal_adapter_receipt_ok": stop_signal_adapter_validation["ok"],
+            "production_connector_attestation_ok": production_connector_validation["ok"],
             "motor_plan_bound": handle_validation["motor_plan_bound"]
             and authorization_validation["motor_plan_bound"],
             "stop_signal_path_bound": handle_validation["stop_signal_path_bound"]
@@ -7919,6 +7941,10 @@ json.dump(response, sys.stdout)
                 "stop_signal_adapter_receipt_bound"
             ]
             and authorization_validation["stop_signal_adapter_receipt_bound"],
+            "production_connector_attestation_bound": handle_validation[
+                "production_connector_attestation_bound"
+            ]
+            and authorization_validation["production_connector_attestation_bound"],
             "legal_execution_ok": legal_execution_validation["ok"],
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
@@ -7941,6 +7967,12 @@ json.dump(response, sys.stdout)
                 and approved_command["stop_signal_adapter_receipt_digest"]
                 == stop_signal_adapter_receipt["receipt_digest"]
             ),
+            "approved_command_production_connector_attestation_bound": (
+                approved_command["production_connector_attestation_id"]
+                == production_connector_attestation["attestation_id"]
+                and approved_command["production_connector_attestation_digest"]
+                == production_connector_attestation["attestation_digest"]
+            ),
             "approved_command_legal_execution_bound": (
                 approved_command["legal_execution_id"] == legal_execution["execution_id"]
                 and approved_command["legal_execution_digest"] == legal_execution["digest"]
@@ -7961,6 +7993,9 @@ json.dump(response, sys.stdout)
             ],
             "authorization_stop_signal_adapter_receipt_ready": authorization_validation[
                 "stop_signal_adapter_receipt_ready"
+            ],
+            "authorization_production_connector_attestation_ready": authorization_validation[
+                "production_connector_attestation_ready"
             ],
             "authorization_guardian_oversight_gate_ready": authorization_validation[
                 "guardian_oversight_gate_ready"
@@ -7997,12 +8032,20 @@ json.dump(response, sys.stdout)
             == stop_signal_adapter_receipt["receipt_id"]
             and emergency_stop["stop_signal_adapter_receipt_digest"]
             == stop_signal_adapter_receipt["receipt_digest"],
+            "emergency_stop_bound_to_production_connector_attestation": emergency_stop_validation[
+                "production_connector_attestation_bound"
+            ]
+            and emergency_stop["production_connector_attestation_id"]
+            == production_connector_attestation["attestation_id"]
+            and emergency_stop["production_connector_attestation_digest"]
+            == production_connector_attestation["attestation_digest"],
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]
             and motor_plan_validation["ok"]
             and stop_signal_path_validation["ok"]
             and stop_signal_adapter_validation["ok"]
+            and production_connector_validation["ok"]
             and legal_execution_validation["ok"]
             and guardian_oversight_gate_validation["ok"]
             and authorization_validation["ok"]
@@ -8047,6 +8090,16 @@ json.dump(response, sys.stdout)
             category="interface-ewa-stop-signal-adapter",
             layer="L6",
             signature_roles=["guardian"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.production_connector.attested",
+            payload=production_connector_attestation,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-production-connector",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
             substrate="robotic-actuator",
         )
         self.ledger.append(
@@ -8164,6 +8217,8 @@ json.dump(response, sys.stdout)
             "stop_signal_path_validation": stop_signal_path_validation,
             "stop_signal_adapter_receipt": stop_signal_adapter_receipt,
             "stop_signal_adapter_validation": stop_signal_adapter_validation,
+            "production_connector_attestation": production_connector_attestation,
+            "production_connector_validation": production_connector_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "reviewers": {
@@ -11118,6 +11173,19 @@ json.dump(response, sys.stdout)
             plc_program_ref="plc-program://lab-drone-arm-03/emergency-latch/v3",
             plc_program_digest=f"sha256:{'d' * 64}",
         )
+        production_connector_attestation = self.ewa.attest_production_connector(
+            stop_signal_adapter_receipt["receipt_id"],
+            vendor_api_ref="vendor-api://lab-drone-arm-03/safety-plc/v1",
+            vendor_api_certificate_ref="vendor-cert://lab-drone-arm-03/safety-plc/prod-connector",
+            vendor_api_certificate_digest=f"sha256:{'e' * 64}",
+            production_connector_ref="connector://lab-drone-arm-03/safety-plc/production-v1",
+            installation_site_ref="site://tokyo-lab/procedural-actuation-cell-a",
+            installation_proof_ref="install-proof://lab-drone-arm-03/safety-plc/2026-04-26",
+            installation_proof_digest=f"sha256:{'f' * 64}",
+            installer_authority_ref="authority://jp-13/lab-safety-plc-installers",
+            safety_plc_ref="plc://lab-drone-arm-03/safety-plc",
+            maintenance_window_ref="maintenance://lab-drone-arm-03/safety-plc/2026q2",
+        )
         reviewer_alpha = self.oversight.register_reviewer(
             reviewer_id="human-reviewer-procedural-actuation-001",
             display_name="Procedural Actuation Reviewer Alpha",
@@ -11213,6 +11281,9 @@ json.dump(response, sys.stdout)
             motor_plan_id=motor_plan["plan_id"],
             stop_signal_path_id=stop_signal_path["path_id"],
             stop_signal_adapter_receipt_id=stop_signal_adapter_receipt["receipt_id"],
+            production_connector_attestation_id=production_connector_attestation[
+                "attestation_id"
+            ],
             legal_execution_id=legal_execution["execution_id"],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
@@ -11224,6 +11295,7 @@ json.dump(response, sys.stdout)
             motor_plan=motor_plan,
             stop_signal_path=stop_signal_path,
             stop_signal_adapter_receipt=stop_signal_adapter_receipt,
+            production_connector_attestation=production_connector_attestation,
             legal_execution=legal_execution,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
@@ -11302,6 +11374,16 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity_id,
+            event_type="ewa.production_connector.attested",
+            payload=production_connector_attestation,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-production-connector",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
             event_type="ewa.legal_execution.prepared",
             payload=legal_execution,
             actor="ExternalWorldAgentController",
@@ -11360,6 +11442,12 @@ json.dump(response, sys.stdout)
                 "stop_signal_adapter_receipt_digest": bridge_session["command_binding"][
                     "stop_signal_adapter_receipt_digest"
                 ],
+                "production_connector_attestation_id": bridge_session[
+                    "command_binding"
+                ]["production_connector_attestation_id"],
+                "production_connector_attestation_digest": bridge_session[
+                    "command_binding"
+                ]["production_connector_attestation_digest"],
                 "rollback_token": bridge_session["rollback_token"],
                 "delivery_scope": bridge_session["command_binding"]["delivery_scope"],
             },
@@ -11393,6 +11481,7 @@ json.dump(response, sys.stdout)
                 "motor_plan": motor_plan,
                 "stop_signal_path": stop_signal_path,
                 "stop_signal_adapter_receipt": stop_signal_adapter_receipt,
+                "production_connector_attestation": production_connector_attestation,
                 "reviewers": {
                     "alpha": reviewer_alpha,
                     "beta": reviewer_beta,

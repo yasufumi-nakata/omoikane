@@ -24,6 +24,8 @@ required:
   - stop_signal_path_digest
   - stop_signal_adapter_receipt_id
   - stop_signal_adapter_receipt_digest
+  - production_connector_attestation_id
+  - production_connector_attestation_digest
   - legal_execution_id
   - legal_execution_digest
   - audit_event_ref
@@ -141,6 +143,11 @@ properties:
   stop_signal_adapter_receipt_id:
     type: string
   stop_signal_adapter_receipt_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  production_connector_attestation_id:
+    type: string
+  production_connector_attestation_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   legal_execution_id:

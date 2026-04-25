@@ -71,6 +71,7 @@
 - `ewa_guardian_oversight_gate.schema`
 - `ewa_legal_execution.schema`
 - `ewa_motor_plan.schema`
+- `ewa_production_connector_attestation.schema`
 - `ewa_stop_signal_adapter_receipt.schema`
 - `ewa_stop_signal_path.schema`
 - `external_actuation_authorization.schema`

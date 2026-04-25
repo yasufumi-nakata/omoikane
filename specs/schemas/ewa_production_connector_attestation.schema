@@ -1,0 +1,141 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_production_connector_attestation.schema"
+title: EWAProductionConnectorAttestation
+description: >
+  Digest-only production connector attestation proving that a vendor API
+  connector, safety PLC installation proof, and the live stop-signal adapter
+  receipt are bound before external actuation authorization.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - attestation_id
+  - profile_id
+  - connector_auth_profile_id
+  - stop_signal_adapter_receipt_id
+  - stop_signal_adapter_receipt_digest
+  - stop_signal_adapter_profile_id
+  - path_id
+  - path_digest
+  - handle_id
+  - device_id
+  - command_id
+  - adapter_endpoint_ref
+  - vendor_api_ref
+  - vendor_api_certificate_ref
+  - vendor_api_certificate_digest
+  - production_connector_ref
+  - installation_site_ref
+  - installation_proof_ref
+  - installation_proof_digest
+  - installer_authority_ref
+  - safety_plc_ref
+  - firmware_digest
+  - plc_program_digest
+  - maintenance_window_ref
+  - connector_auth_status
+  - installation_status
+  - safety_plc_installation_status
+  - evidence_digest_set
+  - raw_vendor_payload_stored
+  - raw_installation_payload_stored
+  - attested_at
+  - attestation_digest
+properties:
+  kind:
+    const: ewa_production_connector_attestation
+  schema_version:
+    const: "1.0"
+  attestation_id:
+    type: string
+    pattern: "^ewa-connector-[a-f0-9]{12}$"
+  profile_id:
+    const: vendor-api-safety-plc-installation-attestation-v1
+  connector_auth_profile_id:
+    const: bounded-vendor-api-connector-auth-v1
+  stop_signal_adapter_receipt_id:
+    type: string
+    pattern: "^ewa-stop-adapter-[a-f0-9]{12}$"
+  stop_signal_adapter_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  stop_signal_adapter_profile_id:
+    const: plc-firmware-stop-signal-adapter-v1
+  path_id:
+    type: string
+    pattern: "^ewa-stop-path-[a-f0-9]{12}$"
+  path_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  adapter_endpoint_ref:
+    type: string
+    minLength: 1
+  vendor_api_ref:
+    type: string
+    minLength: 1
+  vendor_api_certificate_ref:
+    type: string
+    minLength: 1
+  vendor_api_certificate_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  production_connector_ref:
+    type: string
+    minLength: 1
+  installation_site_ref:
+    type: string
+    minLength: 1
+  installation_proof_ref:
+    type: string
+    minLength: 1
+  installation_proof_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  installer_authority_ref:
+    type: string
+    minLength: 1
+  safety_plc_ref:
+    type: string
+    minLength: 1
+  firmware_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  plc_program_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  maintenance_window_ref:
+    type: string
+    minLength: 1
+  connector_auth_status:
+    const: verified
+  installation_status:
+    const: verified
+  safety_plc_installation_status:
+    const: verified
+  evidence_digest_set:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  raw_vendor_payload_stored:
+    const: false
+  raw_installation_payload_stored:
+    const: false
+  attested_at:
+    type: string
+    format: date-time
+  attestation_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

@@ -40,6 +40,8 @@ EWA_STOP_SIGNAL_PATH_POLICY_ID = "guardian-latched-stop-signal-bus-v1"
 EWA_STOP_SIGNAL_BUS_PROFILE_ID = "bounded-hardware-kill-switch-bus-v1"
 EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID = "plc-firmware-stop-signal-adapter-v1"
 EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID = "loopback-plc-firmware-probe-v1"
+EWA_PRODUCTION_CONNECTOR_PROFILE_ID = "vendor-api-safety-plc-installation-attestation-v1"
+EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID = "bounded-vendor-api-connector-auth-v1"
 EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID = "guardian-network-attested-ewa-authorization-gate-v1"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE = "integrity"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY = "attest"
@@ -122,6 +124,10 @@ def _stop_signal_adapter_digest_payload(record: Dict[str, Any]) -> Dict[str, Any
     return {key: value for key, value in record.items() if key != "receipt_digest"}
 
 
+def _production_connector_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "attestation_digest"}
+
+
 def _oversight_gate_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "gate_digest"}
 
@@ -137,6 +143,7 @@ class ExternalWorldAgentController:
         self.legal_executions: Dict[str, Dict[str, Any]] = {}
         self.stop_signal_paths: Dict[str, Dict[str, Any]] = {}
         self.stop_signal_adapter_receipts: Dict[str, Dict[str, Any]] = {}
+        self.production_connector_attestations: Dict[str, Dict[str, Any]] = {}
         self.guardian_oversight_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
@@ -216,6 +223,8 @@ class ExternalWorldAgentController:
                 "safe_stop_policy_id": EWA_EMERGENCY_STOP_POLICY_ID,
                 "live_adapter_profile_id": EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID,
                 "live_adapter_transport_profile_id": EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID,
+                "production_connector_profile_id": EWA_PRODUCTION_CONNECTOR_PROFILE_ID,
+                "production_connector_auth_profile_id": EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID,
                 "required_trigger_sources": sorted(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
                 "redundant_channel_count": len(EWA_ALLOWED_EMERGENCY_STOP_SOURCES),
                 "binding_roles": {
@@ -224,6 +233,9 @@ class ExternalWorldAgentController:
                 },
                 "requires_armed_bindings": True,
                 "requires_live_plc_firmware_adapter_receipt": True,
+                "requires_production_connector_attestation": True,
+                "requires_installation_proof_digest": True,
+                "requires_vendor_api_certificate_digest": True,
                 "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
             },
             "emergency_stop_policy": {
@@ -263,6 +275,8 @@ class ExternalWorldAgentController:
             "last_stop_signal_path_digest": "",
             "last_stop_signal_adapter_receipt_id": "",
             "last_stop_signal_adapter_receipt_digest": "",
+            "last_production_connector_attestation_id": "",
+            "last_production_connector_attestation_digest": "",
             "last_emergency_stop_id": "",
             "emergency_stop_active": False,
             "audit_log": [],
@@ -967,6 +981,297 @@ class ExternalWorldAgentController:
                 and trigger_coverage_confirmed
                 and transcript_digest_matches
                 and receipt_digest_matches
+            ),
+        }
+
+    def attest_production_connector(
+        self,
+        stop_signal_adapter_receipt_id: str,
+        *,
+        vendor_api_ref: str,
+        vendor_api_certificate_ref: str,
+        vendor_api_certificate_digest: str,
+        production_connector_ref: str,
+        installation_site_ref: str,
+        installation_proof_ref: str,
+        installation_proof_digest: str,
+        installer_authority_ref: str,
+        safety_plc_ref: str,
+        maintenance_window_ref: str,
+    ) -> Dict[str, Any]:
+        adapter_receipt = self._require_stop_signal_adapter_receipt(
+            stop_signal_adapter_receipt_id
+        )
+        adapter_validation = self.validate_stop_signal_adapter_receipt(adapter_receipt)
+        if not adapter_validation["ok"]:
+            raise ValueError(adapter_validation["errors"][0])
+
+        normalized_vendor_api_ref = self._normalize_non_empty_string(
+            vendor_api_ref,
+            "vendor_api_ref",
+        )
+        normalized_certificate_ref = self._normalize_non_empty_string(
+            vendor_api_certificate_ref,
+            "vendor_api_certificate_ref",
+        )
+        normalized_certificate_digest = self._normalize_sha256_ref(
+            vendor_api_certificate_digest,
+            "vendor_api_certificate_digest",
+        )
+        normalized_connector_ref = self._normalize_non_empty_string(
+            production_connector_ref,
+            "production_connector_ref",
+        )
+        normalized_site_ref = self._normalize_non_empty_string(
+            installation_site_ref,
+            "installation_site_ref",
+        )
+        normalized_proof_ref = self._normalize_non_empty_string(
+            installation_proof_ref,
+            "installation_proof_ref",
+        )
+        normalized_proof_digest = self._normalize_sha256_ref(
+            installation_proof_digest,
+            "installation_proof_digest",
+        )
+        normalized_installer_ref = self._normalize_non_empty_string(
+            installer_authority_ref,
+            "installer_authority_ref",
+        )
+        normalized_safety_plc_ref = self._normalize_non_empty_string(
+            safety_plc_ref,
+            "safety_plc_ref",
+        )
+        normalized_maintenance_ref = self._normalize_non_empty_string(
+            maintenance_window_ref,
+            "maintenance_window_ref",
+        )
+
+        vendor_auth_digest = sha256_text(
+            canonical_json(
+                {
+                    "vendor_api_ref": normalized_vendor_api_ref,
+                    "vendor_api_certificate_ref": normalized_certificate_ref,
+                    "vendor_api_certificate_digest": normalized_certificate_digest,
+                    "production_connector_ref": normalized_connector_ref,
+                }
+            )
+        )
+        installation_digest = sha256_text(
+            canonical_json(
+                {
+                    "installation_site_ref": normalized_site_ref,
+                    "installation_proof_ref": normalized_proof_ref,
+                    "installation_proof_digest": normalized_proof_digest,
+                    "installer_authority_ref": normalized_installer_ref,
+                }
+            )
+        )
+        safety_plc_digest = sha256_text(
+            canonical_json(
+                {
+                    "safety_plc_ref": normalized_safety_plc_ref,
+                    "firmware_digest": adapter_receipt["firmware_digest"],
+                    "plc_program_digest": adapter_receipt["plc_program_digest"],
+                    "maintenance_window_ref": normalized_maintenance_ref,
+                }
+            )
+        )
+
+        attestation = {
+            "kind": "ewa_production_connector_attestation",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "attestation_id": new_id("ewa-connector"),
+            "profile_id": EWA_PRODUCTION_CONNECTOR_PROFILE_ID,
+            "connector_auth_profile_id": EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID,
+            "stop_signal_adapter_receipt_id": adapter_receipt["receipt_id"],
+            "stop_signal_adapter_receipt_digest": adapter_receipt["receipt_digest"],
+            "stop_signal_adapter_profile_id": adapter_receipt["profile_id"],
+            "path_id": adapter_receipt["path_id"],
+            "path_digest": adapter_receipt["path_digest"],
+            "handle_id": adapter_receipt["handle_id"],
+            "device_id": adapter_receipt["device_id"],
+            "command_id": adapter_receipt["command_id"],
+            "adapter_endpoint_ref": adapter_receipt["adapter_endpoint_ref"],
+            "vendor_api_ref": normalized_vendor_api_ref,
+            "vendor_api_certificate_ref": normalized_certificate_ref,
+            "vendor_api_certificate_digest": normalized_certificate_digest,
+            "production_connector_ref": normalized_connector_ref,
+            "installation_site_ref": normalized_site_ref,
+            "installation_proof_ref": normalized_proof_ref,
+            "installation_proof_digest": normalized_proof_digest,
+            "installer_authority_ref": normalized_installer_ref,
+            "safety_plc_ref": normalized_safety_plc_ref,
+            "firmware_digest": adapter_receipt["firmware_digest"],
+            "plc_program_digest": adapter_receipt["plc_program_digest"],
+            "maintenance_window_ref": normalized_maintenance_ref,
+            "connector_auth_status": "verified",
+            "installation_status": "verified",
+            "safety_plc_installation_status": "verified",
+            "evidence_digest_set": [
+                vendor_auth_digest,
+                installation_digest,
+                safety_plc_digest,
+            ],
+            "raw_vendor_payload_stored": False,
+            "raw_installation_payload_stored": False,
+            "attested_at": utc_now_iso(),
+        }
+        attestation["attestation_digest"] = sha256_text(
+            canonical_json(_production_connector_digest_payload(attestation))
+        )
+        self.production_connector_attestations[attestation["attestation_id"]] = attestation
+        return deepcopy(attestation)
+
+    def validate_production_connector_attestation(
+        self,
+        attestation: Mapping[str, Any],
+        *,
+        stop_signal_adapter_receipt: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(attestation, Mapping):
+            raise ValueError("attestation must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "attestation_id",
+            "stop_signal_adapter_receipt_id",
+            "stop_signal_adapter_receipt_digest",
+            "stop_signal_adapter_profile_id",
+            "path_id",
+            "path_digest",
+            "handle_id",
+            "device_id",
+            "command_id",
+            "adapter_endpoint_ref",
+            "vendor_api_ref",
+            "vendor_api_certificate_ref",
+            "vendor_api_certificate_digest",
+            "production_connector_ref",
+            "installation_site_ref",
+            "installation_proof_ref",
+            "installation_proof_digest",
+            "installer_authority_ref",
+            "safety_plc_ref",
+            "firmware_digest",
+            "plc_program_digest",
+            "maintenance_window_ref",
+            "attestation_digest",
+        ):
+            self._check_non_empty_string(attestation.get(field_name), field_name, errors)
+
+        if attestation.get("kind") != "ewa_production_connector_attestation":
+            errors.append("kind must be ewa_production_connector_attestation")
+        if attestation.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if attestation.get("profile_id") != EWA_PRODUCTION_CONNECTOR_PROFILE_ID:
+            errors.append(f"profile_id must be {EWA_PRODUCTION_CONNECTOR_PROFILE_ID}")
+        if attestation.get("connector_auth_profile_id") != EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID:
+            errors.append(
+                f"connector_auth_profile_id must be {EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID}"
+            )
+
+        vendor_certificate_verified = self._is_sha256_ref(
+            attestation.get("vendor_api_certificate_digest")
+        )
+        if not vendor_certificate_verified:
+            errors.append("vendor_api_certificate_digest must be a sha256 ref")
+        installation_proof_verified = self._is_sha256_ref(
+            attestation.get("installation_proof_digest")
+        )
+        if not installation_proof_verified:
+            errors.append("installation_proof_digest must be a sha256 ref")
+
+        connector_auth_verified = attestation.get("connector_auth_status") == "verified"
+        if not connector_auth_verified:
+            errors.append("connector_auth_status must be verified")
+        installation_verified = (
+            attestation.get("installation_status") == "verified"
+            and attestation.get("safety_plc_installation_status") == "verified"
+        )
+        if not installation_verified:
+            errors.append("installation_status and safety_plc_installation_status must be verified")
+        raw_payload_redacted = (
+            attestation.get("raw_vendor_payload_stored") is False
+            and attestation.get("raw_installation_payload_stored") is False
+        )
+        if not raw_payload_redacted:
+            errors.append("production connector attestation must not store raw vendor or installation payloads")
+
+        adapter_receipt_bound = True
+        try:
+            bound_adapter_receipt = (
+                dict(stop_signal_adapter_receipt)
+                if stop_signal_adapter_receipt is not None
+                else self._require_stop_signal_adapter_receipt(
+                    str(attestation.get("stop_signal_adapter_receipt_id", ""))
+                )
+            )
+        except (KeyError, ValueError):
+            adapter_receipt_bound = False
+            errors.append("production connector attestation must reference a known stop signal adapter receipt")
+            bound_adapter_receipt = {}
+        if bound_adapter_receipt:
+            for attestation_field, adapter_field in (
+                ("stop_signal_adapter_receipt_id", "receipt_id"),
+                ("stop_signal_adapter_receipt_digest", "receipt_digest"),
+                ("stop_signal_adapter_profile_id", "profile_id"),
+                ("path_id", "path_id"),
+                ("path_digest", "path_digest"),
+                ("handle_id", "handle_id"),
+                ("device_id", "device_id"),
+                ("command_id", "command_id"),
+                ("adapter_endpoint_ref", "adapter_endpoint_ref"),
+                ("firmware_digest", "firmware_digest"),
+                ("plc_program_digest", "plc_program_digest"),
+            ):
+                if attestation.get(attestation_field) != bound_adapter_receipt.get(adapter_field):
+                    adapter_receipt_bound = False
+                    errors.append(
+                        f"production connector {attestation_field} must match the adapter receipt"
+                    )
+            adapter_validation = self.validate_stop_signal_adapter_receipt(bound_adapter_receipt)
+            if not adapter_validation["ok"]:
+                adapter_receipt_bound = False
+                errors.extend(adapter_validation["errors"])
+
+        evidence_digest_set = attestation.get("evidence_digest_set")
+        evidence_digest_set_complete = True
+        if not isinstance(evidence_digest_set, list) or len(evidence_digest_set) != 3:
+            evidence_digest_set_complete = False
+            errors.append("evidence_digest_set must contain three ordered sha256 digests")
+            evidence_digest_set = []
+        for digest in evidence_digest_set:
+            if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+                evidence_digest_set_complete = False
+                errors.append("evidence_digest_set entries must be sha256 digests")
+
+        self._parse_datetime(attestation.get("attested_at"), "attested_at", errors)
+        digest_matches = attestation.get("attestation_digest") == sha256_text(
+            canonical_json(_production_connector_digest_payload(dict(attestation)))
+        )
+        if not digest_matches:
+            errors.append("attestation_digest must match the canonical production connector payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "adapter_receipt_bound": adapter_receipt_bound,
+            "vendor_certificate_verified": vendor_certificate_verified,
+            "installation_proof_verified": installation_proof_verified,
+            "connector_auth_verified": connector_auth_verified,
+            "installation_verified": installation_verified,
+            "evidence_digest_set_complete": evidence_digest_set_complete,
+            "raw_payload_redacted": raw_payload_redacted,
+            "attestation_ready": (
+                adapter_receipt_bound
+                and vendor_certificate_verified
+                and installation_proof_verified
+                and connector_auth_verified
+                and installation_verified
+                and evidence_digest_set_complete
+                and raw_payload_redacted
+                and digest_matches
             ),
         }
 
@@ -1774,6 +2079,7 @@ class ExternalWorldAgentController:
         motor_plan_id: str,
         stop_signal_path_id: str,
         stop_signal_adapter_receipt_id: str,
+        production_connector_attestation_id: str,
         legal_execution_id: str,
         guardian_oversight_gate_id: str,
         council_attestation_id: str = "",
@@ -1808,6 +2114,10 @@ class ExternalWorldAgentController:
         normalized_stop_signal_adapter_receipt_id = self._normalize_non_empty_string(
             stop_signal_adapter_receipt_id,
             "stop_signal_adapter_receipt_id",
+        )
+        normalized_production_connector_attestation_id = self._normalize_non_empty_string(
+            production_connector_attestation_id,
+            "production_connector_attestation_id",
         )
         normalized_legal_execution_id = self._normalize_non_empty_string(
             legal_execution_id,
@@ -1896,6 +2206,16 @@ class ExternalWorldAgentController:
         if not stop_signal_adapter_validation["ok"]:
             raise ValueError(stop_signal_adapter_validation["errors"][0])
 
+        production_connector_attestation = self._require_production_connector_attestation(
+            normalized_production_connector_attestation_id
+        )
+        production_connector_validation = self.validate_production_connector_attestation(
+            production_connector_attestation,
+            stop_signal_adapter_receipt=stop_signal_adapter_receipt,
+        )
+        if not production_connector_validation["ok"]:
+            raise ValueError(production_connector_validation["errors"][0])
+
         legal_execution = self._require_legal_execution(normalized_legal_execution_id)
         legal_execution_validation = self.validate_legal_execution(
             legal_execution,
@@ -1974,6 +2294,26 @@ class ExternalWorldAgentController:
                 "receipt_digest"
             ],
             "stop_signal_adapter_profile_id": stop_signal_adapter_receipt["profile_id"],
+            "production_connector_attestation_id": production_connector_attestation[
+                "attestation_id"
+            ],
+            "production_connector_attestation_digest": production_connector_attestation[
+                "attestation_digest"
+            ],
+            "production_connector_profile_id": production_connector_attestation["profile_id"],
+            "vendor_api_ref": production_connector_attestation["vendor_api_ref"],
+            "vendor_api_certificate_digest": production_connector_attestation[
+                "vendor_api_certificate_digest"
+            ],
+            "production_connector_ref": production_connector_attestation[
+                "production_connector_ref"
+            ],
+            "installation_site_ref": production_connector_attestation[
+                "installation_site_ref"
+            ],
+            "installation_proof_digest": production_connector_attestation[
+                "installation_proof_digest"
+            ],
             "legal_execution_id": legal_execution["execution_id"],
             "legal_execution_digest": legal_execution["digest"],
             "legal_execution_profile_id": legal_execution["execution_profile_id"],
@@ -2194,6 +2534,12 @@ class ExternalWorldAgentController:
             stop_signal_adapter_receipt_digest = authorization[
                 "stop_signal_adapter_receipt_digest"
             ]
+            production_connector_attestation_id = authorization[
+                "production_connector_attestation_id"
+            ]
+            production_connector_attestation_digest = authorization[
+                "production_connector_attestation_digest"
+            ]
             legal_execution_id = authorization["legal_execution_id"]
             legal_execution_digest = authorization["legal_execution_digest"]
         else:
@@ -2203,6 +2549,8 @@ class ExternalWorldAgentController:
             stop_signal_path_digest = ""
             stop_signal_adapter_receipt_id = ""
             stop_signal_adapter_receipt_digest = ""
+            production_connector_attestation_id = ""
+            production_connector_attestation_digest = ""
             legal_execution_id = ""
             legal_execution_digest = ""
 
@@ -2234,6 +2582,8 @@ class ExternalWorldAgentController:
             stop_signal_path_digest=stop_signal_path_digest,
             stop_signal_adapter_receipt_id=stop_signal_adapter_receipt_id,
             stop_signal_adapter_receipt_digest=stop_signal_adapter_receipt_digest,
+            production_connector_attestation_id=production_connector_attestation_id,
+            production_connector_attestation_digest=production_connector_attestation_digest,
             legal_execution_id=legal_execution_id,
             legal_execution_digest=legal_execution_digest,
         )
@@ -2250,6 +2600,10 @@ class ExternalWorldAgentController:
         handle["last_stop_signal_path_digest"] = stop_signal_path_digest
         handle["last_stop_signal_adapter_receipt_id"] = stop_signal_adapter_receipt_id
         handle["last_stop_signal_adapter_receipt_digest"] = stop_signal_adapter_receipt_digest
+        handle["last_production_connector_attestation_id"] = production_connector_attestation_id
+        handle["last_production_connector_attestation_digest"] = (
+            production_connector_attestation_digest
+        )
         handle["last_legal_execution_id"] = legal_execution_id
         handle["last_legal_execution_digest"] = legal_execution_digest
         handle["last_emergency_stop_id"] = ""
@@ -2317,6 +2671,10 @@ class ExternalWorldAgentController:
             raise ValueError(
                 "emergency stop requires a live stop signal adapter receipt bound to the last command"
             )
+        if not handle.get("last_production_connector_attestation_id"):
+            raise ValueError(
+                "emergency stop requires a production connector attestation bound to the last command"
+            )
 
         normalized_trigger_source = self._normalize_emergency_stop_source(trigger_source)
         normalized_reason = self._normalize_non_empty_string(reason, "reason")
@@ -2325,6 +2683,9 @@ class ExternalWorldAgentController:
         stop_signal_path = self._require_stop_signal_path(str(handle["last_stop_signal_path_id"]))
         stop_signal_adapter_receipt = self._require_stop_signal_adapter_receipt(
             str(handle["last_stop_signal_adapter_receipt_id"])
+        )
+        production_connector_attestation = self._require_production_connector_attestation(
+            str(handle["last_production_connector_attestation_id"])
         )
         activated_binding = next(
             (
@@ -2385,6 +2746,15 @@ class ExternalWorldAgentController:
                 "receipt_digest"
             ],
             "stop_signal_adapter_profile_id": stop_signal_adapter_receipt["profile_id"],
+            "production_connector_attestation_id": production_connector_attestation[
+                "attestation_id"
+            ],
+            "production_connector_attestation_digest": production_connector_attestation[
+                "attestation_digest"
+            ],
+            "production_connector_profile_id": production_connector_attestation["profile_id"],
+            "vendor_api_ref": production_connector_attestation["vendor_api_ref"],
+            "installation_site_ref": production_connector_attestation["installation_site_ref"],
             "kill_switch_wiring_ref": stop_signal_path["kill_switch_wiring_ref"],
             "activated_binding_id": activated_binding["binding_id"],
             "activated_channel_ref": activated_binding["channel_ref"],
@@ -2453,6 +2823,9 @@ class ExternalWorldAgentController:
     def snapshot_stop_signal_adapter_receipt(self, receipt_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_stop_signal_adapter_receipt(receipt_id))
 
+    def snapshot_production_connector_attestation(self, attestation_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_production_connector_attestation(attestation_id))
+
     def snapshot_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_guardian_oversight_gate(gate_id))
 
@@ -2463,6 +2836,7 @@ class ExternalWorldAgentController:
         motor_plan: Mapping[str, Any] | None = None,
         stop_signal_path: Mapping[str, Any] | None = None,
         stop_signal_adapter_receipt: Mapping[str, Any] | None = None,
+        production_connector_attestation: Mapping[str, Any] | None = None,
         legal_execution: Mapping[str, Any] | None = None,
         guardian_oversight_gate: Mapping[str, Any] | None = None,
         handle_id: str | None = None,
@@ -2560,6 +2934,42 @@ class ExternalWorldAgentController:
             errors,
         )
         self._check_non_empty_string(
+            authorization.get("production_connector_attestation_id"),
+            "production_connector_attestation_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("production_connector_attestation_digest"),
+            "production_connector_attestation_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("production_connector_profile_id"),
+            "production_connector_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(authorization.get("vendor_api_ref"), "vendor_api_ref", errors)
+        self._check_non_empty_string(
+            authorization.get("vendor_api_certificate_digest"),
+            "vendor_api_certificate_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("production_connector_ref"),
+            "production_connector_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("installation_site_ref"),
+            "installation_site_ref",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("installation_proof_digest"),
+            "installation_proof_digest",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("legal_execution_id"),
             "legal_execution_id",
             errors,
@@ -2624,6 +3034,14 @@ class ExternalWorldAgentController:
                 "stop_signal_adapter_profile_id must be "
                 f"{EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID}"
             )
+        if authorization.get("production_connector_profile_id") != EWA_PRODUCTION_CONNECTOR_PROFILE_ID:
+            errors.append(
+                f"production_connector_profile_id must be {EWA_PRODUCTION_CONNECTOR_PROFILE_ID}"
+            )
+        if not self._is_sha256_ref(authorization.get("vendor_api_certificate_digest")):
+            errors.append("vendor_api_certificate_digest must be a sha256 ref")
+        if not self._is_sha256_ref(authorization.get("installation_proof_digest")):
+            errors.append("installation_proof_digest must be a sha256 ref")
         if authorization.get("legal_execution_profile_id") != EWA_LEGAL_EXECUTION_PROFILE_ID:
             errors.append(
                 f"legal_execution_profile_id must be {EWA_LEGAL_EXECUTION_PROFILE_ID}"
@@ -2855,6 +3273,82 @@ class ExternalWorldAgentController:
                 stop_signal_adapter_receipt_bound = False
                 errors.extend(stop_signal_adapter_validation["errors"])
 
+        production_connector_attestation_bound = True
+        production_connector_validation: Dict[str, Any] = {"attestation_ready": False}
+        try:
+            bound_production_connector_attestation = (
+                dict(production_connector_attestation)
+                if production_connector_attestation is not None
+                else self._require_production_connector_attestation(
+                    str(authorization.get("production_connector_attestation_id", ""))
+                )
+            )
+        except (KeyError, ValueError):
+            production_connector_attestation_bound = False
+            errors.append("authorization must reference a known production connector attestation")
+            bound_production_connector_attestation = {}
+        if bound_production_connector_attestation:
+            if bound_production_connector_attestation.get("attestation_id") != authorization.get(
+                "production_connector_attestation_id"
+            ):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "authorization production_connector_attestation_id must match the connector attestation"
+                )
+            if bound_production_connector_attestation.get("attestation_digest") != authorization.get(
+                "production_connector_attestation_digest"
+            ):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "authorization production_connector_attestation_digest must match the connector attestation"
+                )
+            if bound_production_connector_attestation.get("profile_id") != authorization.get(
+                "production_connector_profile_id"
+            ):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "authorization production_connector_profile_id must match the connector attestation"
+                )
+            for authorization_field in (
+                "vendor_api_ref",
+                "vendor_api_certificate_digest",
+                "production_connector_ref",
+                "installation_site_ref",
+                "installation_proof_digest",
+            ):
+                if bound_production_connector_attestation.get(
+                    authorization_field
+                ) != authorization.get(authorization_field):
+                    production_connector_attestation_bound = False
+                    errors.append(
+                        f"authorization {authorization_field} must match the connector attestation"
+                    )
+            if bound_production_connector_attestation.get(
+                "stop_signal_adapter_receipt_id"
+            ) != authorization.get("stop_signal_adapter_receipt_id"):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "authorization connector attestation must bind the adapter receipt id"
+                )
+            if bound_production_connector_attestation.get(
+                "stop_signal_adapter_receipt_digest"
+            ) != authorization.get("stop_signal_adapter_receipt_digest"):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "authorization connector attestation must bind the adapter receipt digest"
+                )
+            production_connector_validation = self.validate_production_connector_attestation(
+                bound_production_connector_attestation,
+                stop_signal_adapter_receipt=(
+                    bound_stop_signal_adapter_receipt
+                    if bound_stop_signal_adapter_receipt
+                    else None
+                ),
+            )
+            if not production_connector_validation["ok"]:
+                production_connector_attestation_bound = False
+                errors.extend(production_connector_validation["errors"])
+
         legal_execution_bound = True
         legal_execution_validation: Dict[str, Any] = {"execution_ready": False}
         try:
@@ -3054,6 +3548,10 @@ class ExternalWorldAgentController:
                 "receipt_ready",
                 False,
             ),
+            "production_connector_attestation_ready": production_connector_validation.get(
+                "attestation_ready",
+                False,
+            ),
             "legal_execution_ready": legal_execution_validation.get("execution_ready", False),
             "guardian_oversight_gate_ready": guardian_oversight_gate_validation.get(
                 "gate_ready",
@@ -3062,6 +3560,7 @@ class ExternalWorldAgentController:
             "motor_plan_bound": motor_plan_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
+            "production_connector_attestation_bound": production_connector_attestation_bound,
             "legal_execution_bound": legal_execution_bound,
             "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
             "reviewer_network_attested": guardian_oversight_gate_validation.get(
@@ -3079,11 +3578,13 @@ class ExternalWorldAgentController:
                 and plan_validation.get("plan_ready", False)
                 and stop_signal_path_validation.get("path_ready", False)
                 and stop_signal_adapter_validation.get("receipt_ready", False)
+                and production_connector_validation.get("attestation_ready", False)
                 and legal_execution_validation.get("execution_ready", False)
                 and guardian_oversight_gate_validation.get("gate_ready", False)
                 and motor_plan_bound
                 and stop_signal_path_bound
                 and stop_signal_adapter_receipt_bound
+                and production_connector_attestation_bound
                 and legal_execution_bound
                 and guardian_oversight_gate_bound
                 and window_open
@@ -3124,6 +3625,7 @@ class ExternalWorldAgentController:
         motor_plan_bound = True
         stop_signal_path_bound = True
         stop_signal_adapter_receipt_bound = True
+        production_connector_attestation_bound = True
         legal_execution_bound = True
         emergency_stop_release_sequence_valid = True
         emergency_stop_seen = False
@@ -3187,6 +3689,20 @@ class ExternalWorldAgentController:
                     stop_signal_adapter_receipt_digest,
                 ):
                     stop_signal_adapter_receipt_bound = False
+                if not isinstance(entry.get("production_connector_attestation_id"), str) or not entry.get(
+                    "production_connector_attestation_id",
+                    "",
+                ).strip():
+                    production_connector_attestation_bound = False
+                production_connector_attestation_digest = entry.get(
+                    "production_connector_attestation_digest",
+                    "",
+                )
+                if not isinstance(production_connector_attestation_digest, str) or not re.fullmatch(
+                    r"[a-f0-9]{64}",
+                    production_connector_attestation_digest,
+                ):
+                    production_connector_attestation_bound = False
                 if not isinstance(entry.get("legal_execution_id"), str) or not entry.get(
                     "legal_execution_id",
                     "",
@@ -3223,6 +3739,10 @@ class ExternalWorldAgentController:
             errors.append(
                 "non-read-only command execution requires a bound stop_signal_adapter receipt"
             )
+        if not production_connector_attestation_bound:
+            errors.append(
+                "non-read-only command execution requires a bound production connector attestation"
+            )
         if not legal_execution_bound:
             errors.append("non-read-only command execution requires a bound legal_execution receipt")
         if emergency_stop_seen and not release_after_stop_seen:
@@ -3242,6 +3762,7 @@ class ExternalWorldAgentController:
             "motor_plan_bound": motor_plan_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
+            "production_connector_attestation_bound": production_connector_attestation_bound,
             "legal_execution_bound": legal_execution_bound,
             "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
@@ -3286,6 +3807,27 @@ class ExternalWorldAgentController:
         self._check_non_empty_string(
             receipt.get("stop_signal_adapter_profile_id"),
             "stop_signal_adapter_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("production_connector_attestation_id"),
+            "production_connector_attestation_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("production_connector_attestation_digest"),
+            "production_connector_attestation_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("production_connector_profile_id"),
+            "production_connector_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(receipt.get("vendor_api_ref"), "vendor_api_ref", errors)
+        self._check_non_empty_string(
+            receipt.get("installation_site_ref"),
+            "installation_site_ref",
             errors,
         )
         self._check_non_empty_string(
@@ -3371,6 +3913,7 @@ class ExternalWorldAgentController:
 
         stop_signal_path_bound = True
         stop_signal_adapter_receipt_bound = True
+        production_connector_attestation_bound = True
         trigger_binding_matched = True
         try:
             stop_signal_path = self._require_stop_signal_path(str(receipt.get("stop_signal_path_id", "")))
@@ -3453,6 +3996,65 @@ class ExternalWorldAgentController:
                 stop_signal_adapter_receipt_bound = False
                 errors.extend(adapter_validation["errors"])
 
+        try:
+            production_connector_attestation = self._require_production_connector_attestation(
+                str(receipt.get("production_connector_attestation_id", ""))
+            )
+        except (KeyError, ValueError):
+            production_connector_attestation_bound = False
+            errors.append(
+                "emergency stop must reference a known production connector attestation"
+            )
+            production_connector_attestation = {}
+        if production_connector_attestation:
+            if production_connector_attestation.get("attestation_digest") != receipt.get(
+                "production_connector_attestation_digest"
+            ):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "production_connector_attestation_digest must match the connector attestation"
+                )
+            if production_connector_attestation.get("profile_id") != receipt.get(
+                "production_connector_profile_id"
+            ):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "production_connector_profile_id must match the connector attestation"
+                )
+            if production_connector_attestation.get("vendor_api_ref") != receipt.get(
+                "vendor_api_ref"
+            ):
+                production_connector_attestation_bound = False
+                errors.append("vendor_api_ref must match the connector attestation")
+            if production_connector_attestation.get("installation_site_ref") != receipt.get(
+                "installation_site_ref"
+            ):
+                production_connector_attestation_bound = False
+                errors.append("installation_site_ref must match the connector attestation")
+            if production_connector_attestation.get(
+                "stop_signal_adapter_receipt_id"
+            ) != receipt.get("stop_signal_adapter_receipt_id"):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "connector attestation must bind the emergency stop adapter receipt"
+                )
+            if production_connector_attestation.get(
+                "stop_signal_adapter_receipt_digest"
+            ) != receipt.get("stop_signal_adapter_receipt_digest"):
+                production_connector_attestation_bound = False
+                errors.append(
+                    "connector attestation must bind the emergency stop adapter digest"
+                )
+            connector_validation = self.validate_production_connector_attestation(
+                production_connector_attestation,
+                stop_signal_adapter_receipt=(
+                    stop_signal_adapter_receipt if stop_signal_adapter_receipt else None
+                ),
+            )
+            if not connector_validation["ok"]:
+                production_connector_attestation_bound = False
+                errors.extend(connector_validation["errors"])
+
         self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
 
         digest_matches = receipt.get("stop_digest") == sha256_text(
@@ -3470,6 +4072,7 @@ class ExternalWorldAgentController:
             "authorization_bound": authorization_bound,
             "stop_signal_path_bound": stop_signal_path_bound,
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
+            "production_connector_attestation_bound": production_connector_attestation_bound,
             "trigger_binding_matched": trigger_binding_matched,
             "release_required": release_required,
             "errors": errors,
@@ -3525,6 +4128,8 @@ class ExternalWorldAgentController:
         stop_signal_path_digest: str = "",
         stop_signal_adapter_receipt_id: str = "",
         stop_signal_adapter_receipt_digest: str = "",
+        production_connector_attestation_id: str = "",
+        production_connector_attestation_digest: str = "",
         legal_execution_id: str = "",
         legal_execution_digest: str = "",
     ) -> Dict[str, Any]:
@@ -3554,6 +4159,8 @@ class ExternalWorldAgentController:
             "stop_signal_path_digest": stop_signal_path_digest,
             "stop_signal_adapter_receipt_id": stop_signal_adapter_receipt_id,
             "stop_signal_adapter_receipt_digest": stop_signal_adapter_receipt_digest,
+            "production_connector_attestation_id": production_connector_attestation_id,
+            "production_connector_attestation_digest": production_connector_attestation_digest,
             "legal_execution_id": legal_execution_id,
             "legal_execution_digest": legal_execution_digest,
             "audit_event_ref": audit_event_ref,
@@ -3682,6 +4289,18 @@ class ExternalWorldAgentController:
             return self.stop_signal_adapter_receipts[normalized_receipt_id]
         except KeyError as exc:
             raise KeyError(f"unknown stop_signal_adapter_receipt_id: {normalized_receipt_id}") from exc
+
+    def _require_production_connector_attestation(self, attestation_id: str) -> Dict[str, Any]:
+        normalized_attestation_id = self._normalize_non_empty_string(
+            attestation_id,
+            "production_connector_attestation_id",
+        )
+        try:
+            return self.production_connector_attestations[normalized_attestation_id]
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown production_connector_attestation_id: {normalized_attestation_id}"
+            ) from exc
 
     def _require_legal_execution(self, execution_id: str) -> Dict[str, Any]:
         normalized_execution_id = self._normalize_non_empty_string(
