@@ -1,0 +1,26 @@
+eval_id: wms_distributed_approval_fanout_retry
+target: interface.wms
+level: L6
+description: >
+  World Model Sync の distributed approval fan-out が partial transport outage
+  を bounded retry receipt として縮約し、recovered retry の result digest と
+  transport receipt digest が最終 participant fan-out result に一致した時だけ
+  physics_rules change へ complete fan-out を渡すことを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
+expected:
+  validation_ok: true
+  distributed_approval_fanout_retry_bound: true
+  fanout_retry_policy_id: bounded-distributed-approval-fanout-retry-v1
+  retry_digest_profile: participant-retry-outage-digest-v1
+  max_retry_attempts: 2
+  retry_window_ms: 1500
+  partial_outage_status: recovered
+  retry_attempt_count: 1
+  all_retry_attempts_recovered: true
+  fanout_status: complete
+  approval_fanout_complete: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

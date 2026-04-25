@@ -66,6 +66,10 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   `distributed-council-approval-fanout-v1` receipt で complete collection digest、
   Federation envelope digest、authenticated receipt digest、participant ごとの
   approval result digest を ordered set として束縛する
+- partial outage は `bounded-distributed-approval-fanout-retry-v1` で
+  `max_retry_attempts=2` / `retry_window_ms=1500` に制限し、
+  retry の recovery result digest と transport receipt digest が
+  最終 fan-out result に一致した時だけ `fanout_status=complete` に戻す
 
 ## API
 
@@ -73,7 +77,7 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
 wms.snapshot(session_id) → WorldState
 wms.propose_diff(session_id, diff, time_rate_attestation_receipts) → ReconcileOutcome
 wms.collect_approval_transport_receipts(session_id, receipts) → ApprovalCollectionReceipt
-wms.collect_distributed_approval_fanout(session_id, collection, transport_results) → DistributedApprovalFanoutReceipt
+wms.collect_distributed_approval_fanout(session_id, collection, transport_results, retry_attempts) → DistributedApprovalFanoutReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
 wms.revert_physics_rules_change(session_id, change_id) → PhysicsRulesChangeReceipt
@@ -101,7 +105,7 @@ wms.observe_violation(session_id) → ViolationReport
 - `wms-demo` を CLI に追加し、minor reconcile → major escalation →
   participant subjective-time attested time_rate deviation の fixed-time-rate private escape →
   3 participant の IMC transport-bound approval collection →
-  distributed Council transport fan-out →
+  partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → malicious veto →
   mode 切替を実行
 - `evals/interface/wms_private_reality_escape.yaml` と
@@ -110,10 +114,12 @@ wms.observe_violation(session_id) → ViolationReport
   `evals/interface/wms_physics_rules_revert.yaml` /
   `evals/interface/wms_participant_approval_transport.yaml` /
   `evals/interface/wms_approval_collection_scaling.yaml` /
-  `evals/interface/wms_distributed_approval_fanout.yaml` で退避路、
+  `evals/interface/wms_distributed_approval_fanout.yaml` /
+  `evals/interface/wms_distributed_approval_fanout_retry.yaml` で退避路、
   time_rate deviation escape、participant subjective-time attestation の live transport binding、
   physics_rules 可逆性、participant approval の live transport binding、
-  ordered batch collection、distributed Council transport fan-out を保証
+  ordered batch collection、distributed Council transport fan-out、
+  partial outage retry recovery を保証
 
 ## 未解決
 

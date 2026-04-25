@@ -812,6 +812,12 @@ Federation distributed transport envelope / authenticated receipt / participant 
 result digest の ordered set へ fan-out され、
 `wms_distributed_approval_fanout_receipt.schema` と physics change receipt の
 `approval_fanout_digest` が同じ digest-only fan-out receipt を指すことも確認する。
+fan-out 中の partial outage は
+`bounded-distributed-approval-fanout-retry-v1` /
+`participant-retry-outage-digest-v1` により、observer participant の timeout を
+`max_retry_attempts=2` / `retry_window_ms=1500` の範囲で retry し、
+recovery result digest と recovery transport receipt digest が最終 fan-out result に
+一致した時だけ `partial_outage_status=recovered` として physics change へ渡す。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

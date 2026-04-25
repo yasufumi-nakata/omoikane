@@ -14,11 +14,13 @@ expected:
   distributed_approval_fanout_bound: true
   fanout_policy_id: distributed-council-approval-fanout-v1
   digest_profile: transport-result-bound-approval-fanout-v1
+  fanout_retry_policy_id: bounded-distributed-approval-fanout-retry-v1
   distributed_transport_profile: federation-mtls-quorum-v1
   council_tier: federation
   participant_count: 3
   result_count: 3
   fanout_status: complete
+  partial_outage_status: recovered
   approval_collection_complete: true
   transport_receipt_set_authenticated: true
   participant_order_bound: true

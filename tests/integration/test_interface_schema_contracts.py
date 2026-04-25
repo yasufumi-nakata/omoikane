@@ -100,10 +100,12 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["physics_approval_transport_bound"])
         self.assertTrue(result["validation"]["approval_collection_scaling_bound"])
         self.assertTrue(result["validation"]["distributed_approval_fanout_bound"])
+        self.assertTrue(result["validation"]["distributed_approval_fanout_retry_bound"])
         self.assertTrue(result["validation"]["physics_change"]["digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_transport_digest_bound"])
         self.assertTrue(result["validation"]["physics_change"]["approval_collection_complete"])
         self.assertTrue(result["validation"]["physics_change"]["approval_fanout_complete"])
+        self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 
 

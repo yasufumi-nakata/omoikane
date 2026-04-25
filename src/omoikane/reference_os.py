@@ -7705,10 +7705,42 @@ json.dump(response, sys.stdout)
             approval_subject_digest=approval_subject["digest"],
             approval_collection_digest=approval_collection_receipt["digest"],
         )
+        approval_fanout_retry_attempts = [
+            {
+                "retry_attempt_ref": (
+                    "retry://wms-approval-fanout/"
+                    f"{approval_subject['digest'][:12]}/observer-attempt-1"
+                ),
+                "participant_id": observer.identity_id,
+                "attempt_index": 1,
+                "outage_kind": "timeout",
+                "retry_after_ms": 250,
+                "retry_decision": "retry",
+                "recovery_result_digest": approval_fanout_results[-1][
+                    "approval_result_digest"
+                ],
+                "recovery_transport_receipt_digest": approval_fanout_results[-1][
+                    "transport_receipt"
+                ]["digest"],
+            }
+        ]
+        approval_fanout_retry_receipt = self.wms.build_distributed_approval_fanout_receipt(
+            session["session_id"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_collection_receipt=approval_collection_receipt,
+            participant_fanout_results=approval_fanout_results,
+            fanout_retry_attempts=approval_fanout_retry_attempts,
+        )
+        approval_fanout_retry_validation = self.wms.validate_distributed_approval_fanout_receipt(
+            approval_fanout_retry_receipt,
+            required_participants=session["current_state"]["participants"],
+            approval_subject_digest=approval_subject["digest"],
+            approval_collection_digest=approval_collection_receipt["digest"],
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="wms.approval_fanout.bound",
-            payload=approval_fanout_receipt,
+            payload=approval_fanout_retry_receipt,
             actor="WorldModelSync",
             category="interface-wms-approval",
             layer="L6",
@@ -7725,7 +7757,7 @@ json.dump(response, sys.stdout)
             guardian_attested=True,
             approval_transport_receipts=approval_transport_receipts,
             approval_collection_receipt=approval_collection_receipt,
-            approval_fanout_receipt=approval_fanout_receipt,
+            approval_fanout_receipt=approval_fanout_retry_receipt,
         )
         physics_change_validation = self.wms.validate_physics_rules_change(physics_change)
         self.ledger.append(
@@ -7817,7 +7849,9 @@ json.dump(response, sys.stdout)
                 "approval_imc_sessions": approval_imc_sessions,
                 "approval_messages": approval_messages,
                 "approval_collection_receipt": approval_collection_receipt,
-                "approval_fanout_receipt": approval_fanout_receipt,
+                "approval_fanout_receipt": approval_fanout_retry_receipt,
+                "approval_fanout_nominal_receipt": approval_fanout_receipt,
+                "approval_fanout_retry_attempts": approval_fanout_retry_attempts,
                 "approval_fanout_results": approval_fanout_results,
                 "approval_transport_receipts": approval_transport_receipts,
                 "physics_change": physics_change,
@@ -7874,7 +7908,8 @@ json.dump(response, sys.stdout)
                 "physics_change": physics_change_validation,
                 "physics_revert": physics_revert_validation,
                 "approval_collection": approval_collection_validation,
-                "approval_fanout": approval_fanout_validation,
+                "approval_fanout": approval_fanout_retry_validation,
+                "approval_fanout_nominal": approval_fanout_validation,
                 "physics_approval_transport_bound": physics_change_validation["approval_transport_quorum_met"]
                 and physics_change_validation["approval_transport_digest_bound"]
                 and all(
@@ -7893,11 +7928,19 @@ json.dump(response, sys.stdout)
                 and physics_change_validation["approval_collection_complete"]
                 and physics_change["approval_collection_digest"]
                 == approval_collection_receipt["digest"],
-                "distributed_approval_fanout_bound": approval_fanout_validation["ok"]
+                "distributed_approval_fanout_bound": approval_fanout_retry_validation["ok"]
                 and physics_change_validation["approval_fanout_complete"]
                 and physics_change_validation["approval_fanout_digest_bound"]
                 and physics_change["approval_fanout_digest"]
-                == approval_fanout_receipt["digest"],
+                == approval_fanout_retry_receipt["digest"],
+                "distributed_approval_fanout_retry_bound": (
+                    approval_fanout_retry_validation["retry_policy_bound"]
+                    and approval_fanout_retry_validation["partial_outage_recovered"]
+                    and approval_fanout_retry_receipt["partial_outage_status"] == "recovered"
+                    and approval_fanout_retry_receipt["retry_attempt_count"] == 1
+                    and approval_fanout_retry_receipt["outage_participants"]
+                    == [observer.identity_id]
+                ),
                 "static_approval_without_transport_rejected": (
                     transportless_static_approval_rejection["decision"] == "rejected"
                     and transportless_static_approval_rejection["approval_quorum_met"]

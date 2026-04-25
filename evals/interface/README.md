@@ -45,6 +45,11 @@ complete approval collection を Federation distributed transport envelope /
 authenticated receipt / participant approval result digest の ordered set へ
 fan-out し、physics_rules change が同じ fanout digest を参照することを確認する。
 
+### WMS Distributed Approval Fanout Retry
+partial transport outage を bounded retry attempt として receipt 化し、
+recovered retry の result digest と transport receipt digest が最終 fan-out result に
+一致した時だけ complete fan-out として扱うことを確認する。
+
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
@@ -59,6 +64,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `sensory_loopback_multi_self_arbitration.yaml`
 - `wms_approval_collection_scaling.yaml`
 - `wms_distributed_approval_fanout.yaml`
+- `wms_distributed_approval_fanout_retry.yaml`
 - `wms_participant_approval_transport.yaml`
 - `wms_physics_rules_revert.yaml`
 - `wms_private_reality_escape.yaml`

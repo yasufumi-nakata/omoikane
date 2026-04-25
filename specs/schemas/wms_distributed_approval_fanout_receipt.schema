@@ -6,7 +6,8 @@ description: >
   fanned out through authenticated Federation distributed transport receipts
   before the shared-reality change was applied. The receipt stores only
   envelope/receipt digests and bounded transport artifacts, not raw approval
-  conversations.
+  conversations. It also binds bounded retry evidence for partial outage
+  recovery before a complete fan-out can be accepted.
 type: object
 additionalProperties: false
 required:
@@ -14,6 +15,10 @@ required:
   - schema_version
   - fanout_policy_id
   - digest_profile
+  - fanout_retry_policy_id
+  - retry_digest_profile
+  - max_retry_attempts
+  - retry_window_ms
   - session_id
   - approval_subject_digest
   - approval_collection_policy_id
@@ -34,6 +39,14 @@ required:
   - transport_receipt_digests
   - transport_receipt_set_digest
   - participant_fanout_results
+  - retry_attempts
+  - retry_attempt_count
+  - retry_attempt_digests
+  - retry_attempt_set_digest
+  - outage_participants
+  - retry_recovered_participants
+  - partial_outage_status
+  - all_retry_attempts_recovered
   - fanout_status
   - transport_receipt_set_authenticated
   - participant_order_bound
@@ -51,6 +64,18 @@ properties:
   digest_profile:
     type: string
     const: transport-result-bound-approval-fanout-v1
+  fanout_retry_policy_id:
+    type: string
+    const: bounded-distributed-approval-fanout-retry-v1
+  retry_digest_profile:
+    type: string
+    const: participant-retry-outage-digest-v1
+  max_retry_attempts:
+    type: integer
+    const: 2
+  retry_window_ms:
+    type: integer
+    const: 1500
   session_id:
     type: string
     minLength: 8
@@ -185,6 +210,98 @@ properties:
         transport_profile:
           type: string
           const: federation-mtls-quorum-v1
+  retry_attempts:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - retry_attempt_ref
+        - participant_id
+        - attempt_index
+        - outage_kind
+        - outage_observation_digest
+        - retry_after_ms
+        - retry_window_ms
+        - retry_decision
+        - recovery_result_digest
+        - recovery_transport_receipt_digest
+        - recovered
+        - attempt_digest
+      properties:
+        retry_attempt_ref:
+          type: string
+          minLength: 1
+        participant_id:
+          type: string
+          minLength: 1
+        attempt_index:
+          type: integer
+          minimum: 1
+          maximum: 2
+        outage_kind:
+          type: string
+          enum:
+            - timeout
+            - transport-unavailable
+            - authority-quorum-pending
+        outage_observation_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        retry_after_ms:
+          type: integer
+          minimum: 0
+          maximum: 1500
+        retry_window_ms:
+          type: integer
+          const: 1500
+        retry_decision:
+          type: string
+          const: retry
+        recovery_result_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        recovery_transport_receipt_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        recovered:
+          type: boolean
+          const: true
+        attempt_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+  retry_attempt_count:
+    type: integer
+    minimum: 0
+  retry_attempt_digests:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retry_attempt_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  outage_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  retry_recovered_participants:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  partial_outage_status:
+    type: string
+    enum:
+      - not-required
+      - recovered
+  all_retry_attempts_recovered:
+    type: boolean
+    const: true
   fanout_status:
     type: string
     const: complete

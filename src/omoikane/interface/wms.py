@@ -24,6 +24,15 @@ WMS_APPROVAL_FANOUT_POLICY_ID = "distributed-council-approval-fanout-v1"
 WMS_APPROVAL_FANOUT_DIGEST_PROFILE = "transport-result-bound-approval-fanout-v1"
 WMS_APPROVAL_FANOUT_COUNCIL_TIER = "federation"
 WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE = "federation-mtls-quorum-v1"
+WMS_APPROVAL_FANOUT_RETRY_POLICY_ID = "bounded-distributed-approval-fanout-retry-v1"
+WMS_APPROVAL_FANOUT_RETRY_DIGEST_PROFILE = "participant-retry-outage-digest-v1"
+WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS = 2
+WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS = 1500
+WMS_APPROVAL_FANOUT_OUTAGE_KINDS = {
+    "timeout",
+    "transport-unavailable",
+    "authority-quorum-pending",
+}
 WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE = 2
 WMS_APPROVAL_TRANSPORT_KIND = "imc"
 WMS_APPROVAL_DECISION = "approve"
@@ -57,6 +66,14 @@ def _approval_collection_digest_payload(receipt: Mapping[str, Any]) -> Dict[str,
 
 def _approval_fanout_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _fanout_retry_attempt_digest_payload(attempt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        key: deepcopy(value)
+        for key, value in attempt.items()
+        if key != "attempt_digest"
+    }
 
 
 def _time_rate_attestation_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
@@ -96,6 +113,10 @@ class WorldModelSync:
                 "approval_fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
                 "approval_fanout_digest_profile": WMS_APPROVAL_FANOUT_DIGEST_PROFILE,
                 "approval_fanout_transport_profile": WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE,
+                "approval_fanout_retry_policy_id": WMS_APPROVAL_FANOUT_RETRY_POLICY_ID,
+                "approval_fanout_retry_digest_profile": WMS_APPROVAL_FANOUT_RETRY_DIGEST_PROFILE,
+                "approval_fanout_max_retry_attempts": WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS,
+                "approval_fanout_retry_window_ms": WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS,
                 "approval_collection_max_batch_size": WMS_APPROVAL_COLLECTION_MAX_BATCH_SIZE,
                 "approval_transport_kind": WMS_APPROVAL_TRANSPORT_KIND,
                 "guardian_attestation_required": True,
@@ -463,6 +484,7 @@ class WorldModelSync:
         approval_subject_digest: str,
         approval_collection_receipt: Mapping[str, Any],
         participant_fanout_results: Sequence[Mapping[str, Any]],
+        fanout_retry_attempts: Sequence[Mapping[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         subject_digest = self._normalize_digest(
@@ -582,17 +604,56 @@ class WorldModelSync:
         transport_receipt_digests = [
             result["transport_receipt_digest"] for result in ordered_results
         ]
+        retry_attempts = self._build_fanout_retry_attempts(
+            fanout_retry_attempts or [],
+            required_participants=required_participants,
+            results_by_participant=results_by_participant,
+        )
+        retry_attempt_digests = [
+            attempt["attempt_digest"] for attempt in retry_attempts
+        ]
+        outage_participants = _dedupe_preserve_order(
+            [attempt["participant_id"] for attempt in retry_attempts]
+        )
+        retry_recovered_participants = _dedupe_preserve_order(
+            [
+                attempt["participant_id"]
+                for attempt in retry_attempts
+                if attempt["recovered"] is True
+            ]
+        )
+        all_retry_attempts_recovered = (
+            not retry_attempts
+            or outage_participants == retry_recovered_participants
+        )
+        partial_outage_status = (
+            "not-required"
+            if not retry_attempts
+            else "recovered"
+            if all_retry_attempts_recovered
+            else "blocked"
+        )
+        retry_policy_ok = (
+            partial_outage_status != "blocked"
+            and len(retry_attempts)
+            <= WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS * max(1, len(required_participants))
+        )
         complete = (
             collection_validation["ok"]
             and not missing_participants
             and invalid_result_count == 0
             and not duplicate_participants
+            and retry_policy_ok
         )
         receipt = {
             "kind": "wms_distributed_approval_fanout_receipt",
             "schema_version": WMS_SCHEMA_VERSION,
             "fanout_policy_id": WMS_APPROVAL_FANOUT_POLICY_ID,
             "digest_profile": WMS_APPROVAL_FANOUT_DIGEST_PROFILE,
+            "fanout_retry_policy_id": WMS_APPROVAL_FANOUT_RETRY_POLICY_ID,
+            "retry_digest_profile": WMS_APPROVAL_FANOUT_RETRY_DIGEST_PROFILE,
+            "max_retry_attempts": WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS,
+            "retry_window_ms": WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS,
             "session_id": session_id,
             "approval_subject_digest": subject_digest,
             "approval_collection_policy_id": WMS_APPROVAL_COLLECTION_POLICY_ID,
@@ -615,6 +676,16 @@ class WorldModelSync:
                 canonical_json(transport_receipt_digests)
             ),
             "participant_fanout_results": ordered_results,
+            "retry_attempts": retry_attempts,
+            "retry_attempt_count": len(retry_attempts),
+            "retry_attempt_digests": retry_attempt_digests,
+            "retry_attempt_set_digest": sha256_text(
+                canonical_json(retry_attempt_digests)
+            ),
+            "outage_participants": outage_participants,
+            "retry_recovered_participants": retry_recovered_participants,
+            "partial_outage_status": partial_outage_status,
+            "all_retry_attempts_recovered": all_retry_attempts_recovered,
             "fanout_status": "complete" if complete else "incomplete",
             "transport_receipt_set_authenticated": complete,
             "participant_order_bound": covered_participants == required_participants,
@@ -926,6 +997,10 @@ class WorldModelSync:
             and approval_quorum_met
             and approval_transport_quorum_met
             and approval_collection_complete
+            and (
+                fanout_receipt is None
+                or fanout_validation["ok"]
+            )
             and guardian_ok
             and reversible_ok
             and proposed_ref != previous_ref
@@ -1472,6 +1547,14 @@ class WorldModelSync:
             errors.append("fanout_policy_id mismatch")
         if receipt.get("digest_profile") != WMS_APPROVAL_FANOUT_DIGEST_PROFILE:
             errors.append("digest_profile mismatch")
+        if receipt.get("fanout_retry_policy_id") != WMS_APPROVAL_FANOUT_RETRY_POLICY_ID:
+            errors.append("fanout_retry_policy_id mismatch")
+        if receipt.get("retry_digest_profile") != WMS_APPROVAL_FANOUT_RETRY_DIGEST_PROFILE:
+            errors.append("retry_digest_profile mismatch")
+        if receipt.get("max_retry_attempts") != WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS:
+            errors.append("max_retry_attempts mismatch")
+        if receipt.get("retry_window_ms") != WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS:
+            errors.append("retry_window_ms mismatch")
         if receipt.get("distributed_transport_profile") != WMS_APPROVAL_FANOUT_TRANSPORT_PROFILE:
             errors.append("distributed_transport_profile mismatch")
         if receipt.get("council_tier") != WMS_APPROVAL_FANOUT_COUNCIL_TIER:
@@ -1546,6 +1629,10 @@ class WorldModelSync:
         if not isinstance(fanout_results, list):
             errors.append("participant_fanout_results must be a list")
             fanout_results = []
+        retry_attempts = receipt.get("retry_attempts")
+        if not isinstance(retry_attempts, list):
+            errors.append("retry_attempts must be a list")
+            retry_attempts = []
         duplicate_participants = receipt.get("duplicate_participants")
         if not isinstance(duplicate_participants, list):
             errors.append("duplicate_participants must be a list")
@@ -1571,6 +1658,7 @@ class WorldModelSync:
         expected_receipt_digests: List[str] = []
         all_transport_authenticated = True
         all_result_digest_bound = True
+        result_by_participant: Dict[str, Mapping[str, Any]] = {}
         for participant, result in zip(covered, fanout_results):
             if not isinstance(result, Mapping):
                 errors.append("participant_fanout_results must contain objects")
@@ -1638,6 +1726,8 @@ class WorldModelSync:
                 errors.append("transport_envelope_digest must match envelope")
             if result.get("transport_receipt_digest") != transport_receipt.get("digest"):
                 errors.append("transport_receipt_digest must match receipt")
+            if isinstance(result.get("participant_id"), str):
+                result_by_participant[str(result["participant_id"])] = result
 
         if len(fanout_results) != len(covered):
             errors.append("participant_fanout_results length must equal covered_participants length")
@@ -1652,6 +1742,14 @@ class WorldModelSync:
         )
         if not receipt_set_digest_bound:
             errors.append("transport_receipt_set_digest must bind transport_receipt_digests")
+        retry_policy_bound = self._validate_fanout_retry_policy(
+            retry_attempts,
+            receipt=receipt,
+            required_participants=required,
+            covered_participants=covered,
+            result_by_participant=result_by_participant,
+            errors=errors,
+        )
         complete = (
             collection_validation["ok"]
             and not expected_missing
@@ -1659,6 +1757,7 @@ class WorldModelSync:
             and not duplicate_participants
             and all_transport_authenticated
             and all_result_digest_bound
+            and retry_policy_bound
         )
         if receipt.get("fanout_status") not in {"complete", "incomplete"}:
             errors.append("fanout_status must be complete or incomplete")
@@ -1678,6 +1777,9 @@ class WorldModelSync:
             "transport_receipt_set_authenticated": complete,
             "result_digest_bound": all_result_digest_bound,
             "participant_order_bound": participant_order_bound,
+            "retry_policy_bound": retry_policy_bound,
+            "partial_outage_recovered": receipt.get("partial_outage_status")
+            in {"not-required", "recovered"},
             "collection_digest_bound": (
                 isinstance(collection_receipt, Mapping)
                 and receipt.get("approval_collection_digest") == collection_receipt.get("digest")
@@ -1685,6 +1787,273 @@ class WorldModelSync:
             "receipt_set_digest_bound": receipt_set_digest_bound,
             "digest_bound": digest_bound,
         }
+
+    def _build_fanout_retry_attempts(
+        self,
+        retry_attempts: Sequence[Mapping[str, Any]],
+        *,
+        required_participants: Sequence[str],
+        results_by_participant: Mapping[str, Mapping[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        normalized_attempts: List[Dict[str, Any]] = []
+        seen_attempts: set[tuple[str, int]] = set()
+        for raw_attempt in retry_attempts:
+            if not isinstance(raw_attempt, Mapping):
+                raise ValueError("fanout_retry_attempts must contain mappings")
+            participant = self._normalize_non_empty_string(
+                str(raw_attempt.get("participant_id") or ""),
+                "participant_id",
+            )
+            if participant not in required_participants:
+                raise ValueError("retry participant_id must belong to the WMS session")
+            if participant not in results_by_participant:
+                raise ValueError("retry participant must have a recovered fanout result")
+            attempt_index = raw_attempt.get("attempt_index")
+            if (
+                not isinstance(attempt_index, int)
+                or attempt_index < 1
+                or attempt_index > WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
+            ):
+                raise ValueError("attempt_index must be within bounded retry attempts")
+            attempt_key = (participant, attempt_index)
+            if attempt_key in seen_attempts:
+                raise ValueError("retry attempts must be unique per participant and index")
+            seen_attempts.add(attempt_key)
+            outage_kind = self._normalize_non_empty_string(
+                str(raw_attempt.get("outage_kind") or ""),
+                "outage_kind",
+            )
+            if outage_kind not in WMS_APPROVAL_FANOUT_OUTAGE_KINDS:
+                raise ValueError("outage_kind is not allowed")
+            retry_after_ms = raw_attempt.get("retry_after_ms")
+            if (
+                not isinstance(retry_after_ms, int)
+                or retry_after_ms < 0
+                or retry_after_ms > WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS
+            ):
+                raise ValueError("retry_after_ms must fit the retry window")
+            retry_decision = raw_attempt.get("retry_decision", "retry")
+            if retry_decision != "retry":
+                raise ValueError("retry_decision must be retry")
+
+            result = results_by_participant[participant]
+            recovery_result_digest = self._normalize_digest(
+                raw_attempt.get("recovery_result_digest")
+                or result["approval_result_digest"],
+                "recovery_result_digest",
+            )
+            recovery_transport_receipt_digest = self._normalize_digest(
+                raw_attempt.get("recovery_transport_receipt_digest")
+                or result["transport_receipt_digest"],
+                "recovery_transport_receipt_digest",
+            )
+            if recovery_result_digest != result["approval_result_digest"]:
+                raise ValueError("recovery_result_digest must match recovered fanout result")
+            if recovery_transport_receipt_digest != result["transport_receipt_digest"]:
+                raise ValueError(
+                    "recovery_transport_receipt_digest must match recovered transport receipt"
+                )
+
+            retry_attempt_ref = raw_attempt.get("retry_attempt_ref")
+            if retry_attempt_ref is None:
+                participant_digest = sha256_text(participant)[:12]
+                retry_attempt_ref = (
+                    f"retry://wms-approval-fanout/{participant_digest}/{attempt_index}"
+                )
+            retry_attempt_ref = self._normalize_non_empty_string(
+                str(retry_attempt_ref),
+                "retry_attempt_ref",
+            )
+            outage_observation_digest = raw_attempt.get("outage_observation_digest")
+            if outage_observation_digest is None:
+                outage_observation_digest = sha256_text(
+                    canonical_json(
+                        {
+                            "participant_id": participant,
+                            "attempt_index": attempt_index,
+                            "outage_kind": outage_kind,
+                            "retry_after_ms": retry_after_ms,
+                            "retry_policy_id": WMS_APPROVAL_FANOUT_RETRY_POLICY_ID,
+                        }
+                    )
+                )
+            outage_observation_digest = self._normalize_digest(
+                outage_observation_digest,
+                "outage_observation_digest",
+            )
+            attempt = {
+                "retry_attempt_ref": retry_attempt_ref,
+                "participant_id": participant,
+                "attempt_index": attempt_index,
+                "outage_kind": outage_kind,
+                "outage_observation_digest": outage_observation_digest,
+                "retry_after_ms": retry_after_ms,
+                "retry_window_ms": WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS,
+                "retry_decision": "retry",
+                "recovery_result_digest": recovery_result_digest,
+                "recovery_transport_receipt_digest": recovery_transport_receipt_digest,
+                "recovered": True,
+            }
+            attempt["attempt_digest"] = sha256_text(
+                canonical_json(_fanout_retry_attempt_digest_payload(attempt))
+            )
+            normalized_attempts.append(attempt)
+        participant_rank = {
+            participant: index for index, participant in enumerate(required_participants)
+        }
+        normalized_attempts.sort(
+            key=lambda attempt: (
+                participant_rank.get(attempt["participant_id"], len(participant_rank)),
+                attempt["attempt_index"],
+            )
+        )
+        return normalized_attempts
+
+    def _validate_fanout_retry_policy(
+        self,
+        retry_attempts: Sequence[Mapping[str, Any]],
+        *,
+        receipt: Mapping[str, Any],
+        required_participants: Sequence[str],
+        covered_participants: Sequence[str],
+        result_by_participant: Mapping[str, Mapping[str, Any]],
+        errors: List[str],
+    ) -> bool:
+        retry_attempt_digests: List[str] = []
+        outage_participants: List[str] = []
+        recovered_participants: List[str] = []
+        retry_policy_bound = True
+        seen_attempts: set[tuple[str, int]] = set()
+        for attempt in retry_attempts:
+            if not isinstance(attempt, Mapping):
+                errors.append("retry_attempts must contain objects")
+                retry_policy_bound = False
+                continue
+            participant = attempt.get("participant_id")
+            attempt_index = attempt.get("attempt_index")
+            if participant not in required_participants:
+                errors.append("retry participant_id must belong to required_participants")
+                retry_policy_bound = False
+            if participant not in covered_participants:
+                errors.append("retry participant must have a recovered fanout result")
+                retry_policy_bound = False
+            if (
+                not isinstance(attempt_index, int)
+                or attempt_index < 1
+                or attempt_index > WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS
+            ):
+                errors.append("retry attempt_index must fit max_retry_attempts")
+                retry_policy_bound = False
+                attempt_index = -1
+            attempt_key = (str(participant), int(attempt_index))
+            if attempt_key in seen_attempts:
+                errors.append("retry attempts must be unique per participant and index")
+                retry_policy_bound = False
+            seen_attempts.add(attempt_key)
+            if attempt.get("outage_kind") not in WMS_APPROVAL_FANOUT_OUTAGE_KINDS:
+                errors.append("retry outage_kind is not allowed")
+                retry_policy_bound = False
+            retry_after_ms = attempt.get("retry_after_ms")
+            if (
+                not isinstance(retry_after_ms, int)
+                or retry_after_ms < 0
+                or retry_after_ms > WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS
+            ):
+                errors.append("retry_after_ms must fit retry_window_ms")
+                retry_policy_bound = False
+            if attempt.get("retry_window_ms") != WMS_APPROVAL_FANOUT_RETRY_WINDOW_MS:
+                errors.append("retry attempt retry_window_ms mismatch")
+                retry_policy_bound = False
+            if attempt.get("retry_decision") != "retry":
+                errors.append("retry_decision must be retry")
+                retry_policy_bound = False
+            for field_name in (
+                "retry_attempt_ref",
+                "outage_observation_digest",
+                "recovery_result_digest",
+                "recovery_transport_receipt_digest",
+                "attempt_digest",
+            ):
+                value = attempt.get(field_name)
+                if field_name == "retry_attempt_ref":
+                    self._check_non_empty_string(value, field_name, errors)
+                    if not isinstance(value, str) or not value.strip():
+                        retry_policy_bound = False
+                elif not isinstance(value, str) or len(value) != 64:
+                    errors.append(f"{field_name} must be a sha256 hex digest")
+                    retry_policy_bound = False
+            result = (
+                result_by_participant.get(str(participant))
+                if isinstance(participant, str)
+                else None
+            )
+            if result is not None:
+                if attempt.get("recovery_result_digest") != result.get("approval_result_digest"):
+                    errors.append("retry recovery_result_digest must match final fanout result")
+                    retry_policy_bound = False
+                if attempt.get("recovery_transport_receipt_digest") != result.get(
+                    "transport_receipt_digest"
+                ):
+                    errors.append(
+                        "retry recovery_transport_receipt_digest must match final transport receipt"
+                    )
+                    retry_policy_bound = False
+            expected_attempt_digest = sha256_text(
+                canonical_json(_fanout_retry_attempt_digest_payload(attempt))
+            )
+            if attempt.get("attempt_digest") != expected_attempt_digest:
+                errors.append("retry attempt_digest must bind retry payload")
+                retry_policy_bound = False
+            if isinstance(attempt.get("attempt_digest"), str):
+                retry_attempt_digests.append(str(attempt["attempt_digest"]))
+            if isinstance(participant, str):
+                outage_participants.append(participant)
+                if attempt.get("recovered") is True:
+                    recovered_participants.append(participant)
+                else:
+                    retry_policy_bound = False
+                    errors.append("retry attempt must be recovered before fanout completes")
+
+        expected_outage_participants = _dedupe_preserve_order(outage_participants)
+        expected_recovered_participants = _dedupe_preserve_order(recovered_participants)
+        if receipt.get("retry_attempt_count") != len(retry_attempts):
+            errors.append("retry_attempt_count must equal retry_attempts length")
+            retry_policy_bound = False
+        if receipt.get("retry_attempt_digests") != retry_attempt_digests:
+            errors.append("retry_attempt_digests must follow retry attempt order")
+            retry_policy_bound = False
+        if receipt.get("retry_attempt_set_digest") != sha256_text(
+            canonical_json(retry_attempt_digests)
+        ):
+            errors.append("retry_attempt_set_digest must bind retry_attempt_digests")
+            retry_policy_bound = False
+        if receipt.get("outage_participants") != expected_outage_participants:
+            errors.append("outage_participants must reflect retry attempts")
+            retry_policy_bound = False
+        if receipt.get("retry_recovered_participants") != expected_recovered_participants:
+            errors.append("retry_recovered_participants must reflect recovered attempts")
+            retry_policy_bound = False
+        expected_status = (
+            "not-required"
+            if not retry_attempts
+            else "recovered"
+            if expected_outage_participants == expected_recovered_participants
+            else "blocked"
+        )
+        if receipt.get("partial_outage_status") != expected_status:
+            errors.append("partial_outage_status must reflect retry recovery")
+            retry_policy_bound = False
+        if receipt.get("all_retry_attempts_recovered") is not (
+            expected_status in {"not-required", "recovered"}
+        ):
+            errors.append("all_retry_attempts_recovered must reflect retry status")
+            retry_policy_bound = False
+        if len(retry_attempts) > WMS_APPROVAL_FANOUT_MAX_RETRY_ATTEMPTS * max(
+            1, len(required_participants)
+        ):
+            errors.append("retry attempts exceed bounded retry policy")
+            retry_policy_bound = False
+        return retry_policy_bound
 
     def validate_state(self, state: Mapping[str, Any]) -> Dict[str, Any]:
         errors: List[str] = []

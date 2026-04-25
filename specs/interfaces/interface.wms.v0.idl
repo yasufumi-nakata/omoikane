@@ -126,12 +126,19 @@ operations:
             minItems: 1
             items:
               type: object
+          fanout_retry_attempts:
+            type: array
+            default: []
+            items:
+              type: object
     output:
       schema_ref: wms_distributed_approval_fanout_receipt
     guarantees:
       - required_participants must preserve current WMS session participant order
       - every participant fan-out result must bind the same approval_subject_digest and approval_collection_digest
       - every distributed transport receipt must be authenticated, channel-bound, quorum-attested, root-verified, and replay-accepted
+      - partial distributed transport outages must be represented as bounded-distributed-approval-fanout-retry-v1 retry attempts with max_retry_attempts=2 and retry_window_ms=1500
+      - recovered retry attempts must bind their recovery_result_digest and recovery_transport_receipt_digest to the final participant fan-out result before fanout_status becomes complete
       - fanout digest must bind ordered participant result digests, envelope digests, receipt digests, and the approval collection digest
   switch_mode:
     summary: Change a session between shared, private, and mixed world-model modes.

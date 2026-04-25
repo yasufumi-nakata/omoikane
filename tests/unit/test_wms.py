@@ -453,17 +453,44 @@ class WorldModelSyncTests(unittest.TestCase):
                 }
             )
 
+        retry_attempts = [
+            {
+                "participant_id": session["current_state"]["participants"][-1],
+                "attempt_index": 1,
+                "outage_kind": "timeout",
+                "retry_after_ms": 250,
+                "retry_decision": "retry",
+                "recovery_result_digest": fanout_results[-1]["approval_result_digest"],
+                "recovery_transport_receipt_digest": fanout_results[-1][
+                    "transport_receipt"
+                ]["digest"],
+            }
+        ]
         fanout = sync.build_distributed_approval_fanout_receipt(
             session["session_id"],
             approval_subject_digest=subject["digest"],
             approval_collection_receipt=collection,
             participant_fanout_results=fanout_results,
+            fanout_retry_attempts=retry_attempts,
         )
         validation = sync.validate_distributed_approval_fanout_receipt(
             fanout,
             required_participants=session["current_state"]["participants"],
             approval_subject_digest=subject["digest"],
             approval_collection_digest=collection["digest"],
+        )
+        tampered_fanout = dict(fanout)
+        tampered_fanout["partial_outage_status"] = "not-required"
+        rejected_with_tampered_fanout = sync.propose_physics_rules_change(
+            session["session_id"],
+            requested_by="identity://primary",
+            proposed_physics_rules_ref=proposed_ref,
+            rationale=rationale,
+            participant_approvals=session["current_state"]["participants"],
+            guardian_attested=True,
+            approval_transport_receipts=receipts,
+            approval_collection_receipt=collection,
+            approval_fanout_receipt=tampered_fanout,
         )
         physics_change = sync.propose_physics_rules_change(
             session["session_id"],
@@ -482,10 +509,20 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(validation["fanout_complete"])
         self.assertTrue(validation["transport_receipt_set_authenticated"])
         self.assertTrue(validation["result_digest_bound"])
+        self.assertTrue(validation["retry_policy_bound"])
+        self.assertTrue(validation["partial_outage_recovered"])
+        self.assertEqual("rejected", rejected_with_tampered_fanout["decision"])
+        self.assertFalse(rejected_with_tampered_fanout["approval_fanout_complete"])
         self.assertTrue(physics_validation["ok"])
         self.assertTrue(physics_validation["approval_fanout_complete"])
         self.assertTrue(physics_validation["approval_fanout_digest_bound"])
         self.assertEqual("complete", fanout["fanout_status"])
+        self.assertEqual("recovered", fanout["partial_outage_status"])
+        self.assertEqual(1, fanout["retry_attempt_count"])
+        self.assertEqual(
+            [session["current_state"]["participants"][-1]],
+            fanout["outage_participants"],
+        )
         self.assertEqual(3, fanout["result_count"])
 
     def test_physics_rules_change_rejects_missing_peer_approval(self) -> None:
