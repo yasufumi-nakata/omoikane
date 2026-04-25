@@ -6730,6 +6730,9 @@ json.dump(response, sys.stdout)
                 "authority_binding_digest": subsidy_receipt[
                     "authority_binding_digest"
                 ],
+                "signer_roster_verifier_receipt_digest": subsidy_receipt[
+                    "signer_roster_verifier_receipt_digest"
+                ],
             },
             actor="EnergyBudgetService",
             category="energy-budget",
@@ -6751,6 +6754,7 @@ json.dump(response, sys.stdout)
                     and subsidy_receipt["voluntary_subsidy_allowed"]
                     and subsidy_receipt["floor_protection_preserved"]
                     and subsidy_receipt["funding_policy_signature_bound"]
+                    and subsidy_receipt["signer_roster_verifier_bound"]
                     and subsidy_receipt["revocation_registry_bound"]
                     and subsidy_receipt["audit_authority_bound"]
                     and subsidy_receipt["jurisdiction_authority_bound"]
@@ -6773,6 +6777,16 @@ json.dump(response, sys.stdout)
                 "funding_policy_signature_bound": subsidy_validation[
                     "funding_policy_signature_bound"
                 ],
+                "signer_roster_verifier_bound": subsidy_validation[
+                    "signer_roster_verifier_bound"
+                ],
+                "signer_roster_verifier_status": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["verifier_receipt_status"],
+                "raw_verifier_payload_redacted": subsidy_receipt[
+                    "signer_roster_verifier_receipt"
+                ]["raw_verifier_payload_stored"]
+                is False,
                 "revocation_registry_bound": subsidy_validation[
                     "revocation_registry_bound"
                 ],

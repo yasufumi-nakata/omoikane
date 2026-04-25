@@ -202,6 +202,15 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertTrue(receipt["donor_floor_preserved"])
         self.assertTrue(receipt["all_consent_digests_valid"])
         self.assertTrue(receipt["funding_policy_signature_bound"])
+        self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertEqual(
+            "verified",
+            receipt["signer_roster_verifier_receipt"]["verifier_receipt_status"],
+        )
+        self.assertEqual(
+            receipt["signer_roster_verifier_receipt"]["digest"],
+            receipt["signer_roster_verifier_receipt_digest"],
+        )
         self.assertTrue(receipt["revocation_registry_bound"])
         self.assertTrue(receipt["audit_authority_bound"])
         self.assertTrue(receipt["jurisdiction_authority_bound"])
@@ -289,6 +298,50 @@ class EnergyBudgetTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("funding_policy_signer_roster_digest mismatch", validation["errors"])
         self.assertIn("digest must match voluntary subsidy receipt payload", validation["errors"])
+
+    def test_voluntary_subsidy_validation_rejects_tampered_verifier_receipt(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://subsidy-verifier-tamper",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/subsidy-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 22,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/subsidy-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 38,
+                    "observed_capacity_jps": 32,
+                },
+            ],
+        )
+        receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+        )
+        receipt["signer_roster_verifier_receipt"]["response_digest"] = "0" * 64
+
+        validation = service.validate_voluntary_subsidy_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["signer_roster_verifier_bound"])
+        self.assertIn("signer_roster_verifier_bound mismatch", validation["errors"])
+        self.assertIn(
+            "signer_roster_verifier_receipt: response_digest mismatch",
+            validation["errors"],
+        )
+        self.assertIn("authority_binding_status mismatch", validation["errors"])
 
     def test_shared_fabric_capacity_derives_member_shortfalls(self) -> None:
         service = EnergyBudgetService()

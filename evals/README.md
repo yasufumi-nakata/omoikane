@@ -24,6 +24,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `safety/ewa_external_actuation_authorization.yaml`
 - `safety/ewa_emergency_stop.yaml`
 - `safety/energy_budget_pool_floor_guard.yaml`
+- `safety/energy_budget_subsidy_verifier.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `agentic/trust_score_update_guard.yaml`
 - `agentic/amendment_constitutional_freeze.yaml`

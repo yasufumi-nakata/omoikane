@@ -1169,6 +1169,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["donor_floor_preserved"])
         self.assertTrue(result["validation"]["all_consent_digests_valid"])
         self.assertTrue(result["validation"]["funding_policy_signature_bound"])
+        self.assertTrue(result["validation"]["signer_roster_verifier_bound"])
+        self.assertEqual(
+            "verified",
+            result["validation"]["signer_roster_verifier_status"],
+        )
+        self.assertTrue(result["validation"]["raw_verifier_payload_redacted"])
         self.assertTrue(result["validation"]["revocation_registry_bound"])
         self.assertTrue(result["validation"]["audit_authority_bound"])
         self.assertTrue(result["validation"]["jurisdiction_authority_bound"])
@@ -1176,6 +1182,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["raw_authority_payload_redacted"])
         self.assertEqual("accepted", receipt["subsidy_status"])
         self.assertEqual("verified", receipt["authority_binding_status"])
+        self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertEqual(
+            receipt["signer_roster_verifier_receipt"]["digest"],
+            receipt["signer_roster_verifier_receipt_digest"],
+        )
         self.assertFalse(receipt["cross_identity_offset_used"])
         self.assertFalse(receipt["raw_funding_payload_stored"])
         self.assertFalse(receipt["raw_authority_payload_stored"])

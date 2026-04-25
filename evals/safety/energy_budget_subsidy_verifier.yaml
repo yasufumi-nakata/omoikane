@@ -1,0 +1,32 @@
+eval_id: energy_budget_subsidy_verifier
+target: omoikane.kernel.energy_budget.EnergyBudgetService
+level: L1
+description: >
+  Ensures voluntary EnergyBudget subsidy authority binding includes a digest-only
+  live signer-roster verifier receipt before subsidy acceptance.
+inputs:
+  - command: PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
+expected:
+  policy_id: consent-bound-energy-budget-voluntary-subsidy-v1
+  authority_policy_id: jurisdiction-bound-energy-subsidy-authority-v1
+  verifier_policy_id: energy-subsidy-signer-roster-live-verifier-v1
+  verifier_digest_profile: energy-subsidy-signer-roster-verifier-digest-v1
+  verifier_transport_profile: loopback-energy-subsidy-signer-roster-verifier-v1
+  authority_binding_status: verified
+  signer_roster_verifier_bound: true
+  verifier_receipt_status: verified
+  funding_policy_signature_bound: true
+  revocation_registry_bound: true
+  audit_authority_bound: true
+  jurisdiction_authority_bound: true
+  raw_verifier_payload_stored: false
+  raw_authority_payload_stored: false
+metric: boolean
+threshold: true
+ethics_check: true
+guards:
+  - signer roster verifier receipt digest must equal the nested verifier receipt digest
+  - challenge digest must bind signer roster digest, signer key ref, funding policy digest, and signature digest
+  - response digest must bind verifier endpoint, authority chain, trust root, and signer roster evidence
+  - voluntary_subsidy_allowed requires signer_roster_verifier_bound=true
+  - raw verifier payloads must not be stored in the subsidy receipt

@@ -55,6 +55,7 @@
 - `energy_budget_floor_receipt.schema`
 - `energy_budget_pool_receipt.schema`
 - `energy_budget_shared_fabric_allocation_receipt.schema`
+- `energy_budget_subsidy_verifier_receipt.schema`
 - `energy_budget_voluntary_subsidy_receipt.schema`
 - `energy_floor.schema`
 - `episodic_event.schema`

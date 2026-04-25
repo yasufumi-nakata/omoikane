@@ -37,6 +37,16 @@ ENERGY_BUDGET_VOLUNTARY_SUBSIDY_REVOCATION_REGISTRY_DIGEST_PROFILE = (
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUDIT_AUTHORITY_DIGEST_PROFILE = (
     "energy-subsidy-audit-authority-digest-v1"
 )
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_POLICY_ID = (
+    "energy-subsidy-signer-roster-live-verifier-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE = (
+    "energy-subsidy-signer-roster-verifier-digest-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE = (
+    "loopback-energy-subsidy-signer-roster-verifier-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS = 250.0
 ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID = (
     "ap1-shared-fabric-capacity-allocation-v1"
 )
@@ -484,6 +494,240 @@ class EnergyBudgetService:
             ),
         }
 
+    def build_subsidy_signer_roster_verifier_receipt(
+        self,
+        *,
+        signer_roster_ref: str,
+        signer_roster_digest: str,
+        signer_key_ref: str,
+        signer_jurisdiction: str,
+        external_funding_policy_digest: str,
+        funding_policy_signature_digest: str,
+        verifier_ref: str = "verifier://energy-budget.jp/signer-roster",
+        challenge_ref: str = "challenge://energy-budget-subsidy/signer-roster/v1",
+        verifier_endpoint_ref: Optional[str] = None,
+        authority_chain_ref: str = "authority://energy-budget.jp/subsidy-signer-roster",
+        trust_root_ref: str = "root://energy-budget.jp/subsidy-signer-roster-pki",
+        trust_root_digest: str = "sha256:energy-budget-jp-subsidy-signer-roster-pki-v1",
+        observed_latency_ms: float = 42.0,
+        http_status: int = 200,
+    ) -> Dict[str, Any]:
+        """Return a digest-only loopback verifier receipt for one subsidy signer roster."""
+
+        normalized_verifier_ref = self._normalize_non_empty_string(
+            verifier_ref,
+            "verifier_ref",
+        )
+        normalized_endpoint_ref = self._normalize_non_empty_string(
+            verifier_endpoint_ref or _verifier_endpoint_from_ref(normalized_verifier_ref),
+            "verifier_endpoint_ref",
+        )
+        normalized_challenge_ref = self._normalize_non_empty_string(
+            challenge_ref,
+            "challenge_ref",
+        )
+        normalized_authority_chain_ref = self._normalize_non_empty_string(
+            authority_chain_ref,
+            "authority_chain_ref",
+        )
+        normalized_trust_root_ref = self._normalize_non_empty_string(
+            trust_root_ref,
+            "trust_root_ref",
+        )
+        normalized_trust_root_digest = self._normalize_non_empty_string(
+            trust_root_digest,
+            "trust_root_digest",
+        )
+        normalized_signer_roster_ref = self._normalize_non_empty_string(
+            signer_roster_ref,
+            "signer_roster_ref",
+        )
+        normalized_signer_roster_digest = self._normalize_non_empty_string(
+            signer_roster_digest,
+            "signer_roster_digest",
+        )
+        normalized_signer_key_ref = self._normalize_non_empty_string(
+            signer_key_ref,
+            "signer_key_ref",
+        )
+        normalized_signer_jurisdiction = self._normalize_non_empty_string(
+            signer_jurisdiction,
+            "signer_jurisdiction",
+        )
+        normalized_policy_digest = self._normalize_non_empty_string(
+            external_funding_policy_digest,
+            "external_funding_policy_digest",
+        )
+        normalized_signature_digest = self._normalize_non_empty_string(
+            funding_policy_signature_digest,
+            "funding_policy_signature_digest",
+        )
+        normalized_latency_ms = round(float(observed_latency_ms), 3)
+        normalized_http_status = int(http_status)
+        challenge_digest = _subsidy_verifier_challenge_digest(
+            challenge_ref=normalized_challenge_ref,
+            signer_roster_digest=normalized_signer_roster_digest,
+            signer_key_ref=normalized_signer_key_ref,
+            external_funding_policy_digest=normalized_policy_digest,
+            funding_policy_signature_digest=normalized_signature_digest,
+        )
+        response_digest = _subsidy_verifier_response_digest(
+            verifier_ref=normalized_verifier_ref,
+            verifier_endpoint_ref=normalized_endpoint_ref,
+            challenge_digest=challenge_digest,
+            signer_roster_ref=normalized_signer_roster_ref,
+            signer_roster_digest=normalized_signer_roster_digest,
+            signer_key_ref=normalized_signer_key_ref,
+            signer_jurisdiction=normalized_signer_jurisdiction,
+            external_funding_policy_digest=normalized_policy_digest,
+            funding_policy_signature_digest=normalized_signature_digest,
+            authority_chain_ref=normalized_authority_chain_ref,
+            trust_root_ref=normalized_trust_root_ref,
+            trust_root_digest=normalized_trust_root_digest,
+        )
+        verifier_bound = bool(
+            normalized_verifier_ref.startswith("verifier://")
+            and normalized_endpoint_ref.startswith("verifier://")
+            and normalized_signer_roster_ref.startswith("signer-roster://")
+            and normalized_signer_key_ref.startswith("signer-key://")
+            and normalized_authority_chain_ref.startswith("authority://")
+            and normalized_trust_root_ref.startswith("root://")
+            and normalized_http_status == 200
+            and normalized_latency_ms
+            <= ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
+        )
+        receipt = {
+            "kind": "energy_budget_subsidy_verifier_receipt",
+            "schema_version": ENERGY_BUDGET_SCHEMA_VERSION,
+            "receipt_id": new_id("energy-subsidy-verifier"),
+            "verifier_policy_id": ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_POLICY_ID,
+            "verifier_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE
+            ),
+            "verifier_transport_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE
+            ),
+            "verifier_endpoint_ref": normalized_endpoint_ref,
+            "verifier_ref": normalized_verifier_ref,
+            "challenge_ref": normalized_challenge_ref,
+            "challenge_digest": challenge_digest,
+            "signer_roster_ref": normalized_signer_roster_ref,
+            "signer_roster_digest": normalized_signer_roster_digest,
+            "signer_key_ref": normalized_signer_key_ref,
+            "signer_jurisdiction": normalized_signer_jurisdiction,
+            "external_funding_policy_digest": normalized_policy_digest,
+            "funding_policy_signature_digest": normalized_signature_digest,
+            "authority_chain_ref": normalized_authority_chain_ref,
+            "trust_root_ref": normalized_trust_root_ref,
+            "trust_root_digest": normalized_trust_root_digest,
+            "observed_latency_ms": normalized_latency_ms,
+            "latency_budget_ms": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
+            ),
+            "http_status": normalized_http_status,
+            "response_digest": response_digest,
+            "verifier_receipt_status": "verified" if verifier_bound else "rejected",
+            "raw_verifier_payload_stored": False,
+            "checked_at": utc_now_iso(),
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_subsidy_verifier_receipt_digest_payload(receipt))
+        )
+        return receipt
+
+    def validate_subsidy_signer_roster_verifier_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors = []
+        if receipt.get("kind") != "energy_budget_subsidy_verifier_receipt":
+            errors.append("kind must equal energy_budget_subsidy_verifier_receipt")
+        if receipt.get("schema_version") != ENERGY_BUDGET_SCHEMA_VERSION:
+            errors.append(f"schema_version must equal {ENERGY_BUDGET_SCHEMA_VERSION}")
+        if receipt.get("verifier_policy_id") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_POLICY_ID
+        ):
+            errors.append("verifier_policy_id mismatch")
+        if receipt.get("verifier_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE
+        ):
+            errors.append("verifier_digest_profile mismatch")
+        if receipt.get("verifier_transport_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_TRANSPORT_PROFILE
+        ):
+            errors.append("verifier_transport_profile mismatch")
+        if receipt.get("raw_verifier_payload_stored") is not False:
+            errors.append("raw_verifier_payload_stored must be false")
+
+        expected_challenge_digest = _subsidy_verifier_challenge_digest(
+            challenge_ref=str(receipt.get("challenge_ref", "")),
+            signer_roster_digest=str(receipt.get("signer_roster_digest", "")),
+            signer_key_ref=str(receipt.get("signer_key_ref", "")),
+            external_funding_policy_digest=str(
+                receipt.get("external_funding_policy_digest", "")
+            ),
+            funding_policy_signature_digest=str(
+                receipt.get("funding_policy_signature_digest", "")
+            ),
+        )
+        if receipt.get("challenge_digest") != expected_challenge_digest:
+            errors.append("challenge_digest mismatch")
+        expected_response_digest = _subsidy_verifier_response_digest(
+            verifier_ref=str(receipt.get("verifier_ref", "")),
+            verifier_endpoint_ref=str(receipt.get("verifier_endpoint_ref", "")),
+            challenge_digest=expected_challenge_digest,
+            signer_roster_ref=str(receipt.get("signer_roster_ref", "")),
+            signer_roster_digest=str(receipt.get("signer_roster_digest", "")),
+            signer_key_ref=str(receipt.get("signer_key_ref", "")),
+            signer_jurisdiction=str(receipt.get("signer_jurisdiction", "")),
+            external_funding_policy_digest=str(
+                receipt.get("external_funding_policy_digest", "")
+            ),
+            funding_policy_signature_digest=str(
+                receipt.get("funding_policy_signature_digest", "")
+            ),
+            authority_chain_ref=str(receipt.get("authority_chain_ref", "")),
+            trust_root_ref=str(receipt.get("trust_root_ref", "")),
+            trust_root_digest=str(receipt.get("trust_root_digest", "")),
+        )
+        if receipt.get("response_digest") != expected_response_digest:
+            errors.append("response_digest mismatch")
+        expected_digest = sha256_text(
+            canonical_json(_subsidy_verifier_receipt_digest_payload(receipt))
+        )
+        if receipt.get("digest") != expected_digest:
+            errors.append("digest must match subsidy verifier receipt payload")
+
+        try:
+            observed_latency_ms = float(receipt.get("observed_latency_ms", 0.0))
+        except (TypeError, ValueError):
+            observed_latency_ms = ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS + 1.0
+            errors.append("observed_latency_ms must be numeric")
+        verifier_bound = bool(
+            str(receipt.get("verifier_ref", "")).startswith("verifier://")
+            and str(receipt.get("verifier_endpoint_ref", "")).startswith("verifier://")
+            and str(receipt.get("signer_roster_ref", "")).startswith("signer-roster://")
+            and str(receipt.get("signer_key_ref", "")).startswith("signer-key://")
+            and str(receipt.get("authority_chain_ref", "")).startswith("authority://")
+            and str(receipt.get("trust_root_ref", "")).startswith("root://")
+            and receipt.get("http_status") == 200
+            and observed_latency_ms
+            <= ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_LATENCY_BUDGET_MS
+            and receipt.get("challenge_digest") == expected_challenge_digest
+            and receipt.get("response_digest") == expected_response_digest
+            and receipt.get("raw_verifier_payload_stored") is False
+        )
+        expected_status = "verified" if verifier_bound else "rejected"
+        if receipt.get("verifier_receipt_status") != expected_status:
+            errors.append("verifier_receipt_status mismatch")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "signer_roster_verifier_bound": verifier_bound,
+            "verifier_receipt_status": expected_status,
+            "raw_payload_redacted": receipt.get("raw_verifier_payload_stored") is False,
+        }
+
     def evaluate_voluntary_subsidy(
         self,
         *,
@@ -509,6 +753,11 @@ class EnergyBudgetService:
             "audit-authority://energy-budget/voluntary-subsidy/jp-13/guardian-board-v1"
         ),
         audit_authority_jurisdiction: str = "JP-13",
+        signer_roster_verifier_ref: str = "verifier://energy-budget.jp/signer-roster",
+        signer_roster_verifier_challenge_ref: str = (
+            "challenge://energy-budget-subsidy/signer-roster/v1"
+        ),
+        signer_roster_verifier_endpoint_ref: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Return a post-floor voluntary subsidy receipt without changing floor guards."""
 
@@ -619,6 +868,33 @@ class EnergyBudgetService:
             signer_roster_digest=signer_roster_digest,
             policy_digest=external_funding_policy_digest,
         )
+        signer_roster_verifier_receipt = (
+            self.build_subsidy_signer_roster_verifier_receipt(
+                signer_roster_ref=signer_roster_ref,
+                signer_roster_digest=signer_roster_digest,
+                signer_key_ref=signer_key_ref,
+                signer_jurisdiction=signer_jurisdiction,
+                external_funding_policy_digest=external_funding_policy_digest,
+                funding_policy_signature_digest=funding_policy_signature_digest,
+                verifier_ref=signer_roster_verifier_ref,
+                challenge_ref=signer_roster_verifier_challenge_ref,
+                verifier_endpoint_ref=signer_roster_verifier_endpoint_ref,
+            )
+        )
+        signer_roster_verifier_validation = (
+            self.validate_subsidy_signer_roster_verifier_receipt(
+                signer_roster_verifier_receipt
+            )
+        )
+        signer_roster_verifier_bound = bool(
+            signer_roster_verifier_validation["ok"]
+            and signer_roster_verifier_validation["signer_roster_verifier_bound"]
+            and signer_roster_verifier_receipt["signer_roster_digest"]
+            == signer_roster_digest
+            and signer_roster_verifier_receipt["signer_key_ref"] == signer_key_ref
+            and signer_roster_verifier_receipt["signer_jurisdiction"]
+            == signer_jurisdiction
+        )
         authority_jurisdictions = sorted(
             {signer_jurisdiction, normalized_audit_jurisdiction}
         )
@@ -644,11 +920,16 @@ class EnergyBudgetService:
             revocation_registry_digest=revocation_registry_digest,
             audit_authority_digest=audit_authority_digest,
             signature_binding_digest=signature_binding_digest,
+            signer_roster_verifier_receipt_digest=signer_roster_verifier_receipt[
+                "digest"
+            ],
             authority_jurisdictions=authority_jurisdictions,
         )
         authority_rejection_reasons = []
         if not funding_policy_signature_bound:
             authority_rejection_reasons.append("funding-policy-signer-unbound")
+        if not signer_roster_verifier_bound:
+            authority_rejection_reasons.append("signer-roster-verifier-unbound")
         if not revocation_registry_bound:
             authority_rejection_reasons.append("revocation-registry-unbound")
         if not audit_authority_bound:
@@ -730,6 +1011,11 @@ class EnergyBudgetService:
             "funding_policy_signer_roster_digest": signer_roster_digest,
             "funding_policy_signer_key_ref": signer_key_ref,
             "funding_policy_signer_jurisdiction": signer_jurisdiction,
+            "signer_roster_verifier_receipt": signer_roster_verifier_receipt,
+            "signer_roster_verifier_receipt_digest": signer_roster_verifier_receipt[
+                "digest"
+            ],
+            "signer_roster_verifier_bound": signer_roster_verifier_bound,
             "funding_policy_signature_binding_digest": signature_binding_digest,
             "funding_policy_signature_bound": funding_policy_signature_bound,
             "revocation_registry_digest_profile": (
@@ -856,6 +1142,46 @@ class EnergyBudgetService:
         )
         if receipt.get("funding_policy_signer_roster_digest") != expected_signer_roster_digest:
             errors.append("funding_policy_signer_roster_digest mismatch")
+        verifier_receipt = receipt.get("signer_roster_verifier_receipt")
+        if not isinstance(verifier_receipt, Mapping):
+            errors.append("signer_roster_verifier_receipt must be an object")
+            verifier_receipt = {}
+            verifier_validation = {
+                "ok": False,
+                "signer_roster_verifier_bound": False,
+                "errors": ["missing verifier receipt"],
+            }
+        else:
+            verifier_validation = self.validate_subsidy_signer_roster_verifier_receipt(
+                verifier_receipt
+            )
+        if receipt.get("signer_roster_verifier_receipt_digest") != verifier_receipt.get(
+            "digest"
+        ):
+            errors.append("signer_roster_verifier_receipt_digest mismatch")
+        signer_roster_verifier_bound = bool(
+            verifier_validation["ok"]
+            and verifier_validation["signer_roster_verifier_bound"]
+            and verifier_receipt.get("signer_roster_ref")
+            == receipt.get("funding_policy_signer_roster_ref")
+            and verifier_receipt.get("signer_roster_digest")
+            == expected_signer_roster_digest
+            and verifier_receipt.get("signer_key_ref")
+            == receipt.get("funding_policy_signer_key_ref")
+            and verifier_receipt.get("signer_jurisdiction")
+            == receipt.get("funding_policy_signer_jurisdiction")
+            and verifier_receipt.get("external_funding_policy_digest")
+            == expected_policy_digest
+            and verifier_receipt.get("funding_policy_signature_digest")
+            == expected_signature_digest
+        )
+        if receipt.get("signer_roster_verifier_bound") is not signer_roster_verifier_bound:
+            errors.append("signer_roster_verifier_bound mismatch")
+        if not verifier_validation["ok"]:
+            errors.extend(
+                f"signer_roster_verifier_receipt: {error}"
+                for error in verifier_validation["errors"]
+            )
         expected_signature_binding_digest = _voluntary_subsidy_signature_binding_digest(
             signature_ref=str(receipt.get("funding_policy_signature_ref", "")),
             signature_digest=expected_signature_digest,
@@ -1014,6 +1340,9 @@ class EnergyBudgetService:
             revocation_registry_digest=expected_revocation_registry_digest,
             audit_authority_digest=expected_audit_authority_digest,
             signature_binding_digest=expected_signature_binding_digest,
+            signer_roster_verifier_receipt_digest=str(
+                receipt.get("signer_roster_verifier_receipt_digest", "")
+            ),
             authority_jurisdictions=authority_jurisdictions,
         )
         if receipt.get("authority_binding_digest") != expected_authority_binding_digest:
@@ -1066,6 +1395,7 @@ class EnergyBudgetService:
             "verified"
             if (
                 funding_policy_signature_bound
+                and signer_roster_verifier_bound
                 and revocation_registry_bound
                 and audit_authority_bound
                 and jurisdiction_authority_bound
@@ -1129,6 +1459,7 @@ class EnergyBudgetService:
             "donor_floor_preserved": donor_floor_preserved,
             "all_consent_digests_valid": all_consent_digests_valid,
             "funding_policy_signature_bound": funding_policy_signature_bound,
+            "signer_roster_verifier_bound": signer_roster_verifier_bound,
             "revocation_registry_bound": revocation_registry_bound,
             "audit_authority_bound": audit_authority_bound,
             "jurisdiction_authority_bound": jurisdiction_authority_bound,
@@ -1632,8 +1963,21 @@ def _subsidy_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any
     return {key: value for key, value in receipt.items() if key != "digest"}
 
 
+def _subsidy_verifier_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
+
+
 def _shared_fabric_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _verifier_endpoint_from_ref(verifier_ref: str) -> str:
+    if not verifier_ref.startswith("verifier://"):
+        return verifier_ref
+    parts = verifier_ref.split("/")
+    if len(parts) < 3 or not parts[2]:
+        return verifier_ref
+    return f"verifier://{parts[2]}"
 
 
 def _shared_fabric_floor_allocations(
@@ -1822,6 +2166,7 @@ def _voluntary_subsidy_authority_binding_digest(
     revocation_registry_digest: str,
     audit_authority_digest: str,
     signature_binding_digest: str,
+    signer_roster_verifier_receipt_digest: str,
     authority_jurisdictions: Sequence[str],
 ) -> str:
     return sha256_text(
@@ -1831,9 +2176,74 @@ def _voluntary_subsidy_authority_binding_digest(
                 "revocation_registry_digest": revocation_registry_digest,
                 "audit_authority_digest": audit_authority_digest,
                 "signature_binding_digest": signature_binding_digest,
+                "signer_roster_verifier_receipt_digest": (
+                    signer_roster_verifier_receipt_digest
+                ),
                 "authority_jurisdictions": list(authority_jurisdictions),
                 "authority_digest_profile": (
                     ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_DIGEST_PROFILE
+                ),
+            }
+        )
+    )
+
+
+def _subsidy_verifier_challenge_digest(
+    *,
+    challenge_ref: str,
+    signer_roster_digest: str,
+    signer_key_ref: str,
+    external_funding_policy_digest: str,
+    funding_policy_signature_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "challenge_ref": challenge_ref,
+                "signer_roster_digest": signer_roster_digest,
+                "signer_key_ref": signer_key_ref,
+                "external_funding_policy_digest": external_funding_policy_digest,
+                "funding_policy_signature_digest": funding_policy_signature_digest,
+                "verifier_policy_id": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_POLICY_ID
+                ),
+            }
+        )
+    )
+
+
+def _subsidy_verifier_response_digest(
+    *,
+    verifier_ref: str,
+    verifier_endpoint_ref: str,
+    challenge_digest: str,
+    signer_roster_ref: str,
+    signer_roster_digest: str,
+    signer_key_ref: str,
+    signer_jurisdiction: str,
+    external_funding_policy_digest: str,
+    funding_policy_signature_digest: str,
+    authority_chain_ref: str,
+    trust_root_ref: str,
+    trust_root_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "verifier_ref": verifier_ref,
+                "verifier_endpoint_ref": verifier_endpoint_ref,
+                "challenge_digest": challenge_digest,
+                "signer_roster_ref": signer_roster_ref,
+                "signer_roster_digest": signer_roster_digest,
+                "signer_key_ref": signer_key_ref,
+                "signer_jurisdiction": signer_jurisdiction,
+                "external_funding_policy_digest": external_funding_policy_digest,
+                "funding_policy_signature_digest": funding_policy_signature_digest,
+                "authority_chain_ref": authority_chain_ref,
+                "trust_root_ref": trust_root_ref,
+                "trust_root_digest": trust_root_digest,
+                "verifier_digest_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_DIGEST_PROFILE
                 ),
             }
         )

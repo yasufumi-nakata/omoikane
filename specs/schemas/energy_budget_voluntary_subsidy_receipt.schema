@@ -5,7 +5,8 @@ description: >
   Digest-bound L1 receipt proving that an energy-budget pool may accept a
   voluntary cross-identity subsidy only after each member's AP-1 floor has
   already been preserved, with explicit donor consent and without using surplus
-  as an offset during floor validation.
+  as an offset during floor validation. The authority chain also embeds a
+  digest-only signer-roster verifier receipt.
 type: object
 additionalProperties: false
 required:
@@ -33,6 +34,9 @@ required:
   - funding_policy_signer_roster_digest
   - funding_policy_signer_key_ref
   - funding_policy_signer_jurisdiction
+  - signer_roster_verifier_receipt
+  - signer_roster_verifier_receipt_digest
+  - signer_roster_verifier_bound
   - funding_policy_signature_binding_digest
   - funding_policy_signature_bound
   - revocation_registry_digest_profile
@@ -144,6 +148,14 @@ properties:
   funding_policy_signer_jurisdiction:
     type: string
     minLength: 1
+  signer_roster_verifier_receipt:
+    $ref: "energy_budget_subsidy_verifier_receipt.schema"
+  signer_roster_verifier_receipt_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  signer_roster_verifier_bound:
+    type: boolean
   funding_policy_signature_binding_digest:
     type: string
     minLength: 64
@@ -381,6 +393,7 @@ properties:
         - recipient-shortfall-absent
         - offer-exceeds-recipient-shortfall
         - funding-policy-signer-unbound
+        - signer-roster-verifier-unbound
         - revocation-registry-unbound
         - audit-authority-unbound
         - jurisdiction-mismatch

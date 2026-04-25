@@ -132,6 +132,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(receipt["floor_protection_preserved"])
         self.assertTrue(receipt["all_consent_digests_valid"])
         self.assertTrue(receipt["funding_policy_signature_bound"])
+        self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertEqual(
+            "verified",
+            receipt["signer_roster_verifier_receipt"]["verifier_receipt_status"],
+        )
         self.assertTrue(receipt["revocation_registry_bound"])
         self.assertTrue(receipt["audit_authority_bound"])
         self.assertTrue(receipt["jurisdiction_authority_bound"])

@@ -6,6 +6,7 @@ summary: AP-1 protected L1 contract for preserving ethics-coupled energy budget 
 imports:
   energy_budget_floor_receipt: ../schemas/energy_budget_floor_receipt.schema
   energy_budget_pool_receipt: ../schemas/energy_budget_pool_receipt.schema
+  energy_budget_subsidy_verifier_receipt: ../schemas/energy_budget_subsidy_verifier_receipt.schema
   energy_budget_voluntary_subsidy_receipt: ../schemas/energy_budget_voluntary_subsidy_receipt.schema
   energy_budget_shared_fabric_allocation_receipt: ../schemas/energy_budget_shared_fabric_allocation_receipt.schema
   energy_floor: ../schemas/energy_floor.schema
@@ -270,6 +271,15 @@ operations:
           audit_authority_jurisdiction:
             type: string
             minLength: 1
+          signer_roster_verifier_ref:
+            type: string
+            minLength: 1
+          signer_roster_verifier_challenge_ref:
+            type: string
+            minLength: 1
+          signer_roster_verifier_endpoint_ref:
+            type: string
+            minLength: 1
     output:
       schema_ref: energy_budget_voluntary_subsidy_receipt
     guarantees:
@@ -279,10 +289,43 @@ operations:
       - recipient shortfall must not be exceeded by accepted offers
       - consent_digest must bind donor, recipient, amount, duration, revocation ref, and funding policy digest
       - funding policy signature must bind to a jurisdiction-specific signer roster and signer key reference
+      - signer roster must bind to a digest-only live verifier receipt before authority_binding_status can become verified
       - revocation refs must bind to a revocation registry digest before subsidy acceptance
       - audit authority must share the signer jurisdiction and bind the signer roster plus revocation registry digests
       - cross_identity_offset_used must remain false; surplus must not affect pool floor validation
       - raw funding policy and authority payloads must remain outside the receipt
+  validate_subsidy_signer_roster_verifier_receipt:
+    summary: Validate one EnergyBudgetSubsidyVerifierReceipt against the live signer roster verifier bridge.
+    input:
+      schema_ref: energy_budget_subsidy_verifier_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - signer_roster_verifier_bound
+          - verifier_receipt_status
+          - raw_payload_redacted
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          signer_roster_verifier_bound:
+            type: boolean
+          verifier_receipt_status:
+            type: string
+          raw_payload_redacted:
+            type: boolean
+    guarantees:
+      - verifier receipt digest must match energy-subsidy-signer-roster-verifier-digest-v1 payload
+      - challenge and response digest must bind signer roster digest, signer key ref, funding policy digest, and signature digest
+      - verifier endpoint, authority chain, trust root, and latency budget must be bounded
+      - raw verifier payload must remain outside the receipt
   validate_voluntary_subsidy_receipt:
     summary: Validate one EnergyBudgetVoluntarySubsidyReceipt against consent, floor, and digest constraints.
     input:
@@ -298,6 +341,7 @@ operations:
           - donor_floor_preserved
           - all_consent_digests_valid
           - funding_policy_signature_bound
+          - signer_roster_verifier_bound
           - revocation_registry_bound
           - audit_authority_bound
           - jurisdiction_authority_bound
@@ -321,6 +365,8 @@ operations:
             type: boolean
           funding_policy_signature_bound:
             type: boolean
+          signer_roster_verifier_bound:
+            type: boolean
           revocation_registry_bound:
             type: boolean
           audit_authority_bound:
@@ -336,6 +382,7 @@ operations:
       - accepted offers must carry valid consent digests and no rejection reasons
       - donor accepted_jps must not exceed donor surplus after floor preservation
       - authority_binding_status must be verified before voluntary_subsidy_allowed can be true
+      - signer_roster_verifier_receipt must validate under energy_budget_subsidy_verifier_receipt and match the signer roster digest
       - signer roster, revocation registry, and audit authority digests must be recomputable from refs
       - raw_funding_payload_stored must remain false
       - raw_authority_payload_stored must remain false
