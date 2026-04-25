@@ -131,8 +131,14 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(receipt["voluntary_subsidy_allowed"])
         self.assertTrue(receipt["floor_protection_preserved"])
         self.assertTrue(receipt["all_consent_digests_valid"])
+        self.assertTrue(receipt["funding_policy_signature_bound"])
+        self.assertTrue(receipt["revocation_registry_bound"])
+        self.assertTrue(receipt["audit_authority_bound"])
+        self.assertTrue(receipt["jurisdiction_authority_bound"])
+        self.assertEqual("verified", receipt["authority_binding_status"])
         self.assertFalse(receipt["cross_identity_offset_used"])
         self.assertFalse(receipt["raw_funding_payload_stored"])
+        self.assertFalse(receipt["raw_authority_payload_stored"])
 
     def test_energy_budget_fabric_demo_emits_shared_capacity_shortfalls(self) -> None:
         stdout = io.StringIO()

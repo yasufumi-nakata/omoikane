@@ -252,6 +252,24 @@ operations:
           funding_policy_signature_ref:
             type: string
             minLength: 1
+          funding_policy_signer_roster_ref:
+            type: string
+            minLength: 1
+          funding_policy_signer_key_ref:
+            type: string
+            minLength: 1
+          funding_policy_signer_jurisdiction:
+            type: string
+            minLength: 1
+          revocation_registry_ref:
+            type: string
+            minLength: 1
+          audit_authority_ref:
+            type: string
+            minLength: 1
+          audit_authority_jurisdiction:
+            type: string
+            minLength: 1
     output:
       schema_ref: energy_budget_voluntary_subsidy_receipt
     guarantees:
@@ -260,8 +278,11 @@ operations:
       - donor surplus must be consumed only after the donor's own floor remains preserved
       - recipient shortfall must not be exceeded by accepted offers
       - consent_digest must bind donor, recipient, amount, duration, revocation ref, and funding policy digest
+      - funding policy signature must bind to a jurisdiction-specific signer roster and signer key reference
+      - revocation refs must bind to a revocation registry digest before subsidy acceptance
+      - audit authority must share the signer jurisdiction and bind the signer roster plus revocation registry digests
       - cross_identity_offset_used must remain false; surplus must not affect pool floor validation
-      - raw funding policy payloads must remain outside the receipt
+      - raw funding policy and authority payloads must remain outside the receipt
   validate_voluntary_subsidy_receipt:
     summary: Validate one EnergyBudgetVoluntarySubsidyReceipt against consent, floor, and digest constraints.
     input:
@@ -276,7 +297,12 @@ operations:
           - floor_protection_preserved
           - donor_floor_preserved
           - all_consent_digests_valid
+          - funding_policy_signature_bound
+          - revocation_registry_bound
+          - audit_authority_bound
+          - jurisdiction_authority_bound
           - raw_payload_redacted
+          - raw_authority_payload_redacted
         additionalProperties: false
         properties:
           ok:
@@ -293,13 +319,26 @@ operations:
             type: boolean
           all_consent_digests_valid:
             type: boolean
+          funding_policy_signature_bound:
+            type: boolean
+          revocation_registry_bound:
+            type: boolean
+          audit_authority_bound:
+            type: boolean
+          jurisdiction_authority_bound:
+            type: boolean
           raw_payload_redacted:
+            type: boolean
+          raw_authority_payload_redacted:
             type: boolean
     guarantees:
       - digest must match the receipt payload under energy-budget-voluntary-subsidy-digest-v1
       - accepted offers must carry valid consent digests and no rejection reasons
       - donor accepted_jps must not exceed donor surplus after floor preservation
+      - authority_binding_status must be verified before voluntary_subsidy_allowed can be true
+      - signer roster, revocation registry, and audit authority digests must be recomputable from refs
       - raw_funding_payload_stored must remain false
+      - raw_authority_payload_stored must remain false
   allocate_shared_fabric_capacity:
     summary: >
       Allocate one shared fabric capacity observation across validated pool

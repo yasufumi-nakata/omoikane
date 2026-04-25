@@ -182,6 +182,14 @@ signature digest 付きで束縛する。receipt は
 `voluntary_subsidy_allowed=true`、`floor_protection_preserved=true`、
 `cross_identity_offset_used=false`、`raw_funding_payload_stored=false` を返し、
 surplus を floor validation 中の cross-identity offset として使わない。
+同じ receipt は `jurisdiction-bound-energy-subsidy-authority-v1` により
+funding policy signature を `JP-13` の signer roster / signer key ref へ束縛し、
+offer revocation refs を revocation registry digest に束ね、
+audit authority digest が signer roster と revocation registry の両方を同じ法域で監査する。
+`authority_binding_status=verified`、`funding_policy_signature_bound=true`、
+`revocation_registry_bound=true`、`audit_authority_bound=true`、
+`jurisdiction_authority_bound=true`、`raw_authority_payload_stored=false` が
+`energy_budget_voluntary_subsidy_receipt.schema` と CLI smoke で検証される。
 
 `scheduler-demo` は L1 AscensionScheduler の reference contract
 (`kernel.scheduler.v0`) を JSON で可視化し、

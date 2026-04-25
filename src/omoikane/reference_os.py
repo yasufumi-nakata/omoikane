@@ -6724,6 +6724,12 @@ json.dump(response, sys.stdout)
                 "floor_protection_preserved": subsidy_receipt[
                     "floor_protection_preserved"
                 ],
+                "authority_binding_status": subsidy_receipt[
+                    "authority_binding_status"
+                ],
+                "authority_binding_digest": subsidy_receipt[
+                    "authority_binding_digest"
+                ],
             },
             actor="EnergyBudgetService",
             category="energy-budget",
@@ -6744,8 +6750,14 @@ json.dump(response, sys.stdout)
                     and subsidy_validation["ok"]
                     and subsidy_receipt["voluntary_subsidy_allowed"]
                     and subsidy_receipt["floor_protection_preserved"]
+                    and subsidy_receipt["funding_policy_signature_bound"]
+                    and subsidy_receipt["revocation_registry_bound"]
+                    and subsidy_receipt["audit_authority_bound"]
+                    and subsidy_receipt["jurisdiction_authority_bound"]
+                    and subsidy_receipt["authority_binding_status"] == "verified"
                     and subsidy_receipt["cross_identity_offset_used"] is False
                     and subsidy_receipt["raw_funding_payload_stored"] is False
+                    and subsidy_receipt["raw_authority_payload_stored"] is False
                 ),
                 "pool_floor_preserved": base["validation"]["pool_floor_preserved"],
                 "voluntary_subsidy_allowed": subsidy_validation[
@@ -6758,8 +6770,24 @@ json.dump(response, sys.stdout)
                 "all_consent_digests_valid": subsidy_validation[
                     "all_consent_digests_valid"
                 ],
+                "funding_policy_signature_bound": subsidy_validation[
+                    "funding_policy_signature_bound"
+                ],
+                "revocation_registry_bound": subsidy_validation[
+                    "revocation_registry_bound"
+                ],
+                "audit_authority_bound": subsidy_validation["audit_authority_bound"],
+                "jurisdiction_authority_bound": subsidy_validation[
+                    "jurisdiction_authority_bound"
+                ],
                 "raw_payload_redacted": subsidy_validation["raw_payload_redacted"],
+                "raw_authority_payload_redacted": subsidy_validation[
+                    "raw_authority_payload_redacted"
+                ],
                 "subsidy_status": subsidy_receipt["subsidy_status"],
+                "authority_binding_status": subsidy_receipt[
+                    "authority_binding_status"
+                ],
                 "total_accepted_jps": subsidy_receipt["total_accepted_jps"],
             },
             "ledger_profile": self.ledger.profile(),

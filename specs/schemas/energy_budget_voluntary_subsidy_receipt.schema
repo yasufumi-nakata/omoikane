@@ -26,6 +26,28 @@ required:
   - external_funding_policy_digest
   - funding_policy_signature_ref
   - funding_policy_signature_digest
+  - authority_policy_id
+  - authority_digest_profile
+  - signer_roster_digest_profile
+  - funding_policy_signer_roster_ref
+  - funding_policy_signer_roster_digest
+  - funding_policy_signer_key_ref
+  - funding_policy_signer_jurisdiction
+  - funding_policy_signature_binding_digest
+  - funding_policy_signature_bound
+  - revocation_registry_digest_profile
+  - revocation_registry_ref
+  - revocation_registry_digest
+  - revocation_registry_bound
+  - audit_authority_digest_profile
+  - audit_authority_ref
+  - audit_authority_jurisdiction
+  - audit_authority_digest
+  - audit_authority_bound
+  - authority_jurisdictions
+  - jurisdiction_authority_bound
+  - authority_binding_digest
+  - authority_binding_status
   - subsidy_mode
   - member_count
   - member_floor_summaries
@@ -45,6 +67,7 @@ required:
   - voluntary_subsidy_allowed
   - subsidy_status
   - raw_funding_payload_stored
+  - raw_authority_payload_stored
   - rejection_reasons
   - evaluated_at
   - digest
@@ -102,6 +125,74 @@ properties:
     type: string
     minLength: 64
     maxLength: 64
+  authority_policy_id:
+    const: jurisdiction-bound-energy-subsidy-authority-v1
+  authority_digest_profile:
+    const: energy-budget-voluntary-subsidy-authority-digest-v1
+  signer_roster_digest_profile:
+    const: energy-subsidy-signer-roster-digest-v1
+  funding_policy_signer_roster_ref:
+    type: string
+    pattern: "^signer-roster://"
+  funding_policy_signer_roster_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  funding_policy_signer_key_ref:
+    type: string
+    pattern: "^signer-key://"
+  funding_policy_signer_jurisdiction:
+    type: string
+    minLength: 1
+  funding_policy_signature_binding_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  funding_policy_signature_bound:
+    type: boolean
+  revocation_registry_digest_profile:
+    const: energy-subsidy-revocation-registry-digest-v1
+  revocation_registry_ref:
+    type: string
+    pattern: "^revocation-registry://"
+  revocation_registry_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  revocation_registry_bound:
+    type: boolean
+  audit_authority_digest_profile:
+    const: energy-subsidy-audit-authority-digest-v1
+  audit_authority_ref:
+    type: string
+    pattern: "^audit-authority://"
+  audit_authority_jurisdiction:
+    type: string
+    minLength: 1
+  audit_authority_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  audit_authority_bound:
+    type: boolean
+  authority_jurisdictions:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+    uniqueItems: true
+  jurisdiction_authority_bound:
+    type: boolean
+  authority_binding_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  authority_binding_status:
+    type: string
+    enum:
+      - verified
+      - rejected
   subsidy_mode:
     const: post-floor-voluntary-consent
   member_count:
@@ -277,6 +368,8 @@ properties:
       - rejected
   raw_funding_payload_stored:
     const: false
+  raw_authority_payload_stored:
+    const: false
   rejection_reasons:
     type: array
     items:
@@ -287,6 +380,10 @@ properties:
         - donor-surplus-insufficient
         - recipient-shortfall-absent
         - offer-exceeds-recipient-shortfall
+        - funding-policy-signer-unbound
+        - revocation-registry-unbound
+        - audit-authority-unbound
+        - jurisdiction-mismatch
     uniqueItems: true
   evaluated_at:
     type: string

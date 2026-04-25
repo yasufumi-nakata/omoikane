@@ -2708,7 +2708,7 @@ entries:
       - reference-runtime
       - evals/safety/energy_budget_voluntary_subsidy.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to serialize post-floor voluntary EnergyBudget subsidy receipts that bind donor consent, funding policy digests, and per-identity floor preservation without reintroducing cross-identity offsets.
+    rationale: Required to serialize post-floor voluntary EnergyBudget subsidy receipts that bind donor consent, funding policy digests, jurisdiction-specific signer roster, revocation registry, audit authority, and per-identity floor preservation without reintroducing cross-identity offsets.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema
@@ -2749,7 +2749,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/ethics-guardian.yaml
-    rationale: Protects post-floor voluntary subsidy behavior by requiring consent digests, signed funding policy refs, donor surplus preservation, and cross-identity offset exclusion.
+    rationale: Protects post-floor voluntary subsidy behavior by requiring consent digests, signed funding policy refs, jurisdiction-bound authority evidence, donor surplus preservation, and cross-identity offset exclusion.
   - priority: P1
     kind: eval
     file: evals/safety/energy_budget_shared_fabric_allocation.yaml

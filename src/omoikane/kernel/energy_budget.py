@@ -22,6 +22,21 @@ ENERGY_BUDGET_VOLUNTARY_SUBSIDY_DIGEST_PROFILE = (
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_CONSENT_DIGEST_PROFILE = (
     "participant-consent-bound-subsidy-digest-v1"
 )
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_POLICY_ID = (
+    "jurisdiction-bound-energy-subsidy-authority-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_DIGEST_PROFILE = (
+    "energy-budget-voluntary-subsidy-authority-digest-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_SIGNER_ROSTER_DIGEST_PROFILE = (
+    "energy-subsidy-signer-roster-digest-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_REVOCATION_REGISTRY_DIGEST_PROFILE = (
+    "energy-subsidy-revocation-registry-digest-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUDIT_AUTHORITY_DIGEST_PROFILE = (
+    "energy-subsidy-audit-authority-digest-v1"
+)
 ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID = (
     "ap1-shared-fabric-capacity-allocation-v1"
 )
@@ -480,6 +495,20 @@ class EnergyBudgetService:
         funding_policy_signature_ref: str = (
             "signature://not-imported/energy-budget-voluntary-subsidy-v1"
         ),
+        funding_policy_signer_roster_ref: str = (
+            "signer-roster://energy-budget/voluntary-subsidy/jp-13/v1"
+        ),
+        funding_policy_signer_key_ref: str = (
+            "signer-key://energy-budget/voluntary-subsidy/jp-13/key-001"
+        ),
+        funding_policy_signer_jurisdiction: str = "JP-13",
+        revocation_registry_ref: str = (
+            "revocation-registry://energy-budget/voluntary-subsidy/jp-13/v1"
+        ),
+        audit_authority_ref: str = (
+            "audit-authority://energy-budget/voluntary-subsidy/jp-13/guardian-board-v1"
+        ),
+        audit_authority_jurisdiction: str = "JP-13",
     ) -> Dict[str, Any]:
         """Return a post-floor voluntary subsidy receipt without changing floor guards."""
 
@@ -498,6 +527,30 @@ class EnergyBudgetService:
         signature_ref = self._normalize_non_empty_string(
             funding_policy_signature_ref,
             "funding_policy_signature_ref",
+        )
+        signer_roster_ref = self._normalize_non_empty_string(
+            funding_policy_signer_roster_ref,
+            "funding_policy_signer_roster_ref",
+        )
+        signer_key_ref = self._normalize_non_empty_string(
+            funding_policy_signer_key_ref,
+            "funding_policy_signer_key_ref",
+        )
+        signer_jurisdiction = self._normalize_non_empty_string(
+            funding_policy_signer_jurisdiction,
+            "funding_policy_signer_jurisdiction",
+        )
+        registry_ref = self._normalize_non_empty_string(
+            revocation_registry_ref,
+            "revocation_registry_ref",
+        )
+        normalized_audit_authority_ref = self._normalize_non_empty_string(
+            audit_authority_ref,
+            "audit_authority_ref",
+        )
+        normalized_audit_jurisdiction = self._normalize_non_empty_string(
+            audit_authority_jurisdiction,
+            "audit_authority_jurisdiction",
         )
         pool_digest = self._normalize_non_empty_string(
             pool_receipt.get("digest"),
@@ -527,6 +580,13 @@ class EnergyBudgetService:
             signature_ref=signature_ref,
             policy_digest=external_funding_policy_digest,
         )
+        signer_roster_digest = _voluntary_subsidy_signer_roster_digest(
+            signer_roster_ref=signer_roster_ref,
+            signer_key_ref=signer_key_ref,
+            signer_jurisdiction=signer_jurisdiction,
+            policy_ref=policy_ref,
+            policy_digest=external_funding_policy_digest,
+        )
 
         offers = []
         for raw_offer in subsidy_offers:
@@ -538,6 +598,63 @@ class EnergyBudgetService:
                 remaining_recipient_shortfall=remaining_recipient_shortfall,
             )
             offers.append(offer)
+
+        offer_revocation_refs = [str(offer["revocation_ref"]) for offer in offers]
+        revocation_registry_digest = _voluntary_subsidy_revocation_registry_digest(
+            registry_ref=registry_ref,
+            pool_id=str(pool_receipt["pool_id"]),
+            policy_digest=external_funding_policy_digest,
+            offer_revocation_refs=offer_revocation_refs,
+        )
+        audit_authority_digest = _voluntary_subsidy_audit_authority_digest(
+            audit_authority_ref=normalized_audit_authority_ref,
+            audit_authority_jurisdiction=normalized_audit_jurisdiction,
+            signer_roster_digest=signer_roster_digest,
+            revocation_registry_digest=revocation_registry_digest,
+        )
+        signature_binding_digest = _voluntary_subsidy_signature_binding_digest(
+            signature_ref=signature_ref,
+            signature_digest=funding_policy_signature_digest,
+            signer_key_ref=signer_key_ref,
+            signer_roster_digest=signer_roster_digest,
+            policy_digest=external_funding_policy_digest,
+        )
+        authority_jurisdictions = sorted(
+            {signer_jurisdiction, normalized_audit_jurisdiction}
+        )
+        jurisdiction_authority_bound = (
+            signer_jurisdiction == normalized_audit_jurisdiction
+        )
+        funding_policy_signature_bound = bool(
+            signature_ref.startswith("signature://")
+            and signer_key_ref.startswith("signer-key://")
+            and signer_roster_ref.startswith("signer-roster://")
+        )
+        revocation_registry_bound = bool(
+            registry_ref.startswith("revocation-registry://")
+            and offer_revocation_refs
+            and all(ref.startswith("revocation://") for ref in offer_revocation_refs)
+        )
+        audit_authority_bound = bool(
+            normalized_audit_authority_ref.startswith("audit-authority://")
+            and normalized_audit_jurisdiction == signer_jurisdiction
+        )
+        authority_binding_digest = _voluntary_subsidy_authority_binding_digest(
+            signer_roster_digest=signer_roster_digest,
+            revocation_registry_digest=revocation_registry_digest,
+            audit_authority_digest=audit_authority_digest,
+            signature_binding_digest=signature_binding_digest,
+            authority_jurisdictions=authority_jurisdictions,
+        )
+        authority_rejection_reasons = []
+        if not funding_policy_signature_bound:
+            authority_rejection_reasons.append("funding-policy-signer-unbound")
+        if not revocation_registry_bound:
+            authority_rejection_reasons.append("revocation-registry-unbound")
+        if not audit_authority_bound:
+            authority_rejection_reasons.append("audit-authority-unbound")
+        if not jurisdiction_authority_bound:
+            authority_rejection_reasons.append("jurisdiction-mismatch")
 
         accepted_offers = [offer for offer in offers if offer["offer_status"] == "accepted"]
         total_offered_jps = sum(int(offer["offered_jps"]) for offer in offers)
@@ -570,6 +687,7 @@ class EnergyBudgetService:
             and all_consent_digests_valid
             and all_parties_in_pool
             and floor_protection_preserved
+            and not authority_rejection_reasons
         )
 
         rejection_reasons = sorted(
@@ -577,7 +695,7 @@ class EnergyBudgetService:
                 reason
                 for offer in offers
                 for reason in offer["rejection_reasons"]
-            }
+            }.union(authority_rejection_reasons)
         )
         receipt = {
             "kind": "energy_budget_voluntary_subsidy_receipt",
@@ -599,6 +717,40 @@ class EnergyBudgetService:
             "external_funding_policy_digest": external_funding_policy_digest,
             "funding_policy_signature_ref": signature_ref,
             "funding_policy_signature_digest": funding_policy_signature_digest,
+            "authority_policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_POLICY_ID
+            ),
+            "authority_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_DIGEST_PROFILE
+            ),
+            "signer_roster_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_SIGNER_ROSTER_DIGEST_PROFILE
+            ),
+            "funding_policy_signer_roster_ref": signer_roster_ref,
+            "funding_policy_signer_roster_digest": signer_roster_digest,
+            "funding_policy_signer_key_ref": signer_key_ref,
+            "funding_policy_signer_jurisdiction": signer_jurisdiction,
+            "funding_policy_signature_binding_digest": signature_binding_digest,
+            "funding_policy_signature_bound": funding_policy_signature_bound,
+            "revocation_registry_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_REVOCATION_REGISTRY_DIGEST_PROFILE
+            ),
+            "revocation_registry_ref": registry_ref,
+            "revocation_registry_digest": revocation_registry_digest,
+            "revocation_registry_bound": revocation_registry_bound,
+            "audit_authority_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUDIT_AUTHORITY_DIGEST_PROFILE
+            ),
+            "audit_authority_ref": normalized_audit_authority_ref,
+            "audit_authority_jurisdiction": normalized_audit_jurisdiction,
+            "audit_authority_digest": audit_authority_digest,
+            "audit_authority_bound": audit_authority_bound,
+            "authority_jurisdictions": authority_jurisdictions,
+            "jurisdiction_authority_bound": jurisdiction_authority_bound,
+            "authority_binding_digest": authority_binding_digest,
+            "authority_binding_status": (
+                "verified" if not authority_rejection_reasons else "rejected"
+            ),
             "subsidy_mode": "post-floor-voluntary-consent",
             "member_count": len(member_summaries),
             "member_floor_summaries": member_summaries,
@@ -620,6 +772,7 @@ class EnergyBudgetService:
             "voluntary_subsidy_allowed": voluntary_subsidy_allowed,
             "subsidy_status": "accepted" if voluntary_subsidy_allowed else "rejected",
             "raw_funding_payload_stored": False,
+            "raw_authority_payload_stored": False,
             "rejection_reasons": rejection_reasons,
             "evaluated_at": utc_now_iso(),
         }
@@ -654,6 +807,28 @@ class EnergyBudgetService:
             errors.append("cross_identity_offset_used must be false")
         if receipt.get("raw_funding_payload_stored") is not False:
             errors.append("raw_funding_payload_stored must be false")
+        if receipt.get("authority_policy_id") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_POLICY_ID
+        ):
+            errors.append("authority_policy_id mismatch")
+        if receipt.get("authority_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_DIGEST_PROFILE
+        ):
+            errors.append("authority_digest_profile mismatch")
+        if receipt.get("signer_roster_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_SIGNER_ROSTER_DIGEST_PROFILE
+        ):
+            errors.append("signer_roster_digest_profile mismatch")
+        if receipt.get("revocation_registry_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_REVOCATION_REGISTRY_DIGEST_PROFILE
+        ):
+            errors.append("revocation_registry_digest_profile mismatch")
+        if receipt.get("audit_authority_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUDIT_AUTHORITY_DIGEST_PROFILE
+        ):
+            errors.append("audit_authority_digest_profile mismatch")
+        if receipt.get("raw_authority_payload_stored") is not False:
+            errors.append("raw_authority_payload_stored must be false")
 
         expected_policy_digest = _voluntary_subsidy_policy_digest(
             policy_ref=str(receipt.get("external_funding_policy_ref", "")),
@@ -668,6 +843,31 @@ class EnergyBudgetService:
         )
         if receipt.get("funding_policy_signature_digest") != expected_signature_digest:
             errors.append("funding_policy_signature_digest mismatch")
+        expected_signer_roster_digest = _voluntary_subsidy_signer_roster_digest(
+            signer_roster_ref=str(
+                receipt.get("funding_policy_signer_roster_ref", "")
+            ),
+            signer_key_ref=str(receipt.get("funding_policy_signer_key_ref", "")),
+            signer_jurisdiction=str(
+                receipt.get("funding_policy_signer_jurisdiction", "")
+            ),
+            policy_ref=str(receipt.get("external_funding_policy_ref", "")),
+            policy_digest=expected_policy_digest,
+        )
+        if receipt.get("funding_policy_signer_roster_digest") != expected_signer_roster_digest:
+            errors.append("funding_policy_signer_roster_digest mismatch")
+        expected_signature_binding_digest = _voluntary_subsidy_signature_binding_digest(
+            signature_ref=str(receipt.get("funding_policy_signature_ref", "")),
+            signature_digest=expected_signature_digest,
+            signer_key_ref=str(receipt.get("funding_policy_signer_key_ref", "")),
+            signer_roster_digest=expected_signer_roster_digest,
+            policy_digest=expected_policy_digest,
+        )
+        if (
+            receipt.get("funding_policy_signature_binding_digest")
+            != expected_signature_binding_digest
+        ):
+            errors.append("funding_policy_signature_binding_digest mismatch")
 
         member_summaries = receipt.get("member_floor_summaries")
         if not isinstance(member_summaries, list) or not member_summaries:
@@ -704,6 +904,7 @@ class EnergyBudgetService:
         accepted_by_recipient = {identity_id: 0 for identity_id in members_by_identity}
         consent_digests_valid = []
         all_parties_flags = []
+        offer_revocation_refs = []
         for offer in offers:
             if not isinstance(offer, Mapping):
                 errors.append("subsidy_offers must contain objects")
@@ -722,6 +923,7 @@ class EnergyBudgetService:
             all_parties_flags.append(all_parties)
             if offer.get("all_parties_in_pool") is not all_parties:
                 errors.append("offer all_parties_in_pool mismatch")
+            offer_revocation_refs.append(str(offer.get("revocation_ref", "")))
             expected_consent_digest = _voluntary_subsidy_consent_digest(
                 donor_identity_id=donor_id,
                 recipient_identity_id=recipient_id,
@@ -779,6 +981,100 @@ class EnergyBudgetService:
             and recipient_shortfall_not_exceeded
             and receipt.get("cross_identity_offset_used") is False
         )
+        expected_revocation_registry_digest = (
+            _voluntary_subsidy_revocation_registry_digest(
+                registry_ref=str(receipt.get("revocation_registry_ref", "")),
+                pool_id=str(receipt.get("pool_id", "")),
+                policy_digest=expected_policy_digest,
+                offer_revocation_refs=offer_revocation_refs,
+            )
+        )
+        if receipt.get("revocation_registry_digest") != expected_revocation_registry_digest:
+            errors.append("revocation_registry_digest mismatch")
+        expected_audit_authority_digest = _voluntary_subsidy_audit_authority_digest(
+            audit_authority_ref=str(receipt.get("audit_authority_ref", "")),
+            audit_authority_jurisdiction=str(
+                receipt.get("audit_authority_jurisdiction", "")
+            ),
+            signer_roster_digest=expected_signer_roster_digest,
+            revocation_registry_digest=expected_revocation_registry_digest,
+        )
+        if receipt.get("audit_authority_digest") != expected_audit_authority_digest:
+            errors.append("audit_authority_digest mismatch")
+        authority_jurisdictions = sorted(
+            {
+                str(receipt.get("funding_policy_signer_jurisdiction", "")),
+                str(receipt.get("audit_authority_jurisdiction", "")),
+            }
+        )
+        if receipt.get("authority_jurisdictions") != authority_jurisdictions:
+            errors.append("authority_jurisdictions mismatch")
+        expected_authority_binding_digest = _voluntary_subsidy_authority_binding_digest(
+            signer_roster_digest=expected_signer_roster_digest,
+            revocation_registry_digest=expected_revocation_registry_digest,
+            audit_authority_digest=expected_audit_authority_digest,
+            signature_binding_digest=expected_signature_binding_digest,
+            authority_jurisdictions=authority_jurisdictions,
+        )
+        if receipt.get("authority_binding_digest") != expected_authority_binding_digest:
+            errors.append("authority_binding_digest mismatch")
+
+        funding_policy_signature_bound = bool(
+            str(receipt.get("funding_policy_signature_ref", "")).startswith(
+                "signature://"
+            )
+            and str(receipt.get("funding_policy_signer_key_ref", "")).startswith(
+                "signer-key://"
+            )
+            and str(receipt.get("funding_policy_signer_roster_ref", "")).startswith(
+                "signer-roster://"
+            )
+            and receipt.get("funding_policy_signature_binding_digest")
+            == expected_signature_binding_digest
+        )
+        revocation_registry_bound = bool(
+            str(receipt.get("revocation_registry_ref", "")).startswith(
+                "revocation-registry://"
+            )
+            and offer_revocation_refs
+            and all(ref.startswith("revocation://") for ref in offer_revocation_refs)
+            and receipt.get("revocation_registry_digest")
+            == expected_revocation_registry_digest
+        )
+        audit_authority_bound = bool(
+            str(receipt.get("audit_authority_ref", "")).startswith(
+                "audit-authority://"
+            )
+            and str(receipt.get("audit_authority_jurisdiction", ""))
+            == str(receipt.get("funding_policy_signer_jurisdiction", ""))
+            and receipt.get("audit_authority_digest")
+            == expected_audit_authority_digest
+        )
+        jurisdiction_authority_bound = (
+            str(receipt.get("funding_policy_signer_jurisdiction", ""))
+            == str(receipt.get("audit_authority_jurisdiction", ""))
+        )
+        if receipt.get("funding_policy_signature_bound") is not funding_policy_signature_bound:
+            errors.append("funding_policy_signature_bound mismatch")
+        if receipt.get("revocation_registry_bound") is not revocation_registry_bound:
+            errors.append("revocation_registry_bound mismatch")
+        if receipt.get("audit_authority_bound") is not audit_authority_bound:
+            errors.append("audit_authority_bound mismatch")
+        if receipt.get("jurisdiction_authority_bound") is not jurisdiction_authority_bound:
+            errors.append("jurisdiction_authority_bound mismatch")
+        expected_authority_binding_status = (
+            "verified"
+            if (
+                funding_policy_signature_bound
+                and revocation_registry_bound
+                and audit_authority_bound
+                and jurisdiction_authority_bound
+            )
+            else "rejected"
+        )
+        if receipt.get("authority_binding_status") != expected_authority_binding_status:
+            errors.append("authority_binding_status mismatch")
+
         all_consent_digests_valid = bool(consent_digests_valid) and all(
             consent_digests_valid
         )
@@ -789,6 +1085,7 @@ class EnergyBudgetService:
             and all_consent_digests_valid
             and all_parties_in_pool
             and floor_protection_preserved
+            and expected_authority_binding_status == "verified"
             and all(
                 isinstance(offer, Mapping) and offer.get("offer_status") == "accepted"
                 for offer in offers
@@ -831,7 +1128,14 @@ class EnergyBudgetService:
             "floor_protection_preserved": floor_protection_preserved,
             "donor_floor_preserved": donor_floor_preserved,
             "all_consent_digests_valid": all_consent_digests_valid,
+            "funding_policy_signature_bound": funding_policy_signature_bound,
+            "revocation_registry_bound": revocation_registry_bound,
+            "audit_authority_bound": audit_authority_bound,
+            "jurisdiction_authority_bound": jurisdiction_authority_bound,
             "raw_payload_redacted": receipt.get("raw_funding_payload_stored") is False,
+            "raw_authority_payload_redacted": (
+                receipt.get("raw_authority_payload_stored") is False
+            ),
         }
 
     def allocate_shared_fabric_capacity(
@@ -1415,6 +1719,122 @@ def _voluntary_subsidy_signature_digest(
                 "signature_ref": signature_ref,
                 "policy_digest": policy_digest,
                 "policy_id": ENERGY_BUDGET_VOLUNTARY_SUBSIDY_POLICY_ID,
+            }
+        )
+    )
+
+
+def _voluntary_subsidy_signer_roster_digest(
+    *,
+    signer_roster_ref: str,
+    signer_key_ref: str,
+    signer_jurisdiction: str,
+    policy_ref: str,
+    policy_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "signer_roster_ref": signer_roster_ref,
+                "signer_key_ref": signer_key_ref,
+                "signer_jurisdiction": signer_jurisdiction,
+                "policy_ref": policy_ref,
+                "policy_digest": policy_digest,
+                "signer_roster_digest_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_SIGNER_ROSTER_DIGEST_PROFILE
+                ),
+            }
+        )
+    )
+
+
+def _voluntary_subsidy_revocation_registry_digest(
+    *,
+    registry_ref: str,
+    pool_id: str,
+    policy_digest: str,
+    offer_revocation_refs: Sequence[str],
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "registry_ref": registry_ref,
+                "pool_id": pool_id,
+                "policy_digest": policy_digest,
+                "offer_revocation_refs": list(offer_revocation_refs),
+                "revocation_registry_digest_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_REVOCATION_REGISTRY_DIGEST_PROFILE
+                ),
+            }
+        )
+    )
+
+
+def _voluntary_subsidy_audit_authority_digest(
+    *,
+    audit_authority_ref: str,
+    audit_authority_jurisdiction: str,
+    signer_roster_digest: str,
+    revocation_registry_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "audit_authority_ref": audit_authority_ref,
+                "audit_authority_jurisdiction": audit_authority_jurisdiction,
+                "signer_roster_digest": signer_roster_digest,
+                "revocation_registry_digest": revocation_registry_digest,
+                "audit_authority_digest_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUDIT_AUTHORITY_DIGEST_PROFILE
+                ),
+            }
+        )
+    )
+
+
+def _voluntary_subsidy_signature_binding_digest(
+    *,
+    signature_ref: str,
+    signature_digest: str,
+    signer_key_ref: str,
+    signer_roster_digest: str,
+    policy_digest: str,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "signature_ref": signature_ref,
+                "signature_digest": signature_digest,
+                "signer_key_ref": signer_key_ref,
+                "signer_roster_digest": signer_roster_digest,
+                "policy_digest": policy_digest,
+                "authority_policy_id": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_POLICY_ID
+                ),
+            }
+        )
+    )
+
+
+def _voluntary_subsidy_authority_binding_digest(
+    *,
+    signer_roster_digest: str,
+    revocation_registry_digest: str,
+    audit_authority_digest: str,
+    signature_binding_digest: str,
+    authority_jurisdictions: Sequence[str],
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "signer_roster_digest": signer_roster_digest,
+                "revocation_registry_digest": revocation_registry_digest,
+                "audit_authority_digest": audit_authority_digest,
+                "signature_binding_digest": signature_binding_digest,
+                "authority_jurisdictions": list(authority_jurisdictions),
+                "authority_digest_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_AUTHORITY_DIGEST_PROFILE
+                ),
             }
         )
     )

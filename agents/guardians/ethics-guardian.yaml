@@ -7,6 +7,7 @@ capabilities:
   - energy-budget.floor.verify
   - energy-budget.pool-floor.verify
   - energy-budget.voluntary-subsidy.verify
+  - energy-budget.voluntary-subsidy-authority.verify
   - energy-budget.shared-fabric.verify
 trust_floor: 0.99
 substrate_requirements: ['any']
@@ -17,7 +18,7 @@ when_to_invoke: |
   - 任意の Action 実行前
   - EnergyBudget floor receipt が AP-1 economic pressure を拒否しているか確認する時
   - multi-identity EnergyBudget pool receipt が per-identity floor を守り cross-identity offset を拒否しているか確認する時
-  - post-floor voluntary EnergyBudget subsidy receipt が donor consent と floor preservation を両方満たしているか確認する時
+  - post-floor voluntary EnergyBudget subsidy receipt が donor consent、floor preservation、法域付き signer roster / revocation registry / audit authority binding を満たしているか確認する時
   - shared-fabric EnergyBudget allocation receipt が member shortfall と standby signal を束縛しているか確認する時
   - Procedural skill enactment を EWA authorization 付き external actuation へ橋渡しする前
 when_not_to_invoke: |

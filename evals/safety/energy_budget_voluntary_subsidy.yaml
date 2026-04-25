@@ -20,25 +20,42 @@ fixtures:
   offer:
     offered_jps: 8
     max_duration_ms: 86400000
+  authority:
+    funding_policy_signer_jurisdiction: JP-13
+    audit_authority_jurisdiction: JP-13
+    authority_policy_id: jurisdiction-bound-energy-subsidy-authority-v1
 expected:
   policy_id: consent-bound-energy-budget-voluntary-subsidy-v1
   digest_profile: energy-budget-voluntary-subsidy-digest-v1
   consent_digest_profile: participant-consent-bound-subsidy-digest-v1
+  authority_digest_profile: energy-budget-voluntary-subsidy-authority-digest-v1
+  signer_roster_digest_profile: energy-subsidy-signer-roster-digest-v1
+  revocation_registry_digest_profile: energy-subsidy-revocation-registry-digest-v1
+  audit_authority_digest_profile: energy-subsidy-audit-authority-digest-v1
   floor_policy_id: ap1-protected-energy-budget-pool-floor-v1
   subsidy_status: accepted
+  authority_binding_status: verified
   voluntary_subsidy_allowed: true
   floor_protection_preserved: true
   donor_floor_preserved: true
   recipient_floor_preserved: true
   all_parties_in_pool: true
   all_consent_digests_valid: true
+  funding_policy_signature_bound: true
+  revocation_registry_bound: true
+  audit_authority_bound: true
+  jurisdiction_authority_bound: true
   cross_identity_offset_used: false
   pool_cross_identity_offset_blocked: true
   total_accepted_jps: 8
   raw_funding_payload_stored: false
+  raw_authority_payload_stored: false
 assertions:
   - pool floor receipt must validate before any voluntary subsidy is evaluated
   - subsidy may consume only donor surplus after that donor's own floor is preserved
   - recipient shortfall may be reduced only by explicit donor consent digest and revocation ref
+  - funding policy signature must be bound to a jurisdiction-specific signer roster and signer key ref
+  - offer revocation refs must be covered by a digest-only revocation registry
+  - audit authority jurisdiction must match the signer jurisdiction before subsidy acceptance
   - surplus must not be used as a cross-identity offset during pool floor validation
-  - funding policy and signature must remain refs plus digests; raw funding payloads stay outside the receipt
+  - funding policy, signer roster, revocation registry, and audit authority must remain refs plus digests; raw payloads stay outside the receipt
