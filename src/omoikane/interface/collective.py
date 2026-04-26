@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Sequence, Set
 
-from ..common import new_id, utc_now_iso
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 COLLECTIVE_SCHEMA_VERSION = "1.0"
 COLLECTIVE_MIN_MEMBERS = 2
@@ -14,6 +14,19 @@ COLLECTIVE_MAX_DURATION_SECONDS = 10.0
 COLLECTIVE_ALLOWED_STATUSES = {"active", "recovery", "dissolved"}
 COLLECTIVE_ALLOWED_MERGE_STATUSES = {"open", "completed", "recovery-required"}
 COLLECTIVE_ALLOWED_WMS_MODES = {"shared_reality", "private_reality", "mixed"}
+COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID = (
+    "collective-dissolution-identity-confirmation-binding-v1"
+)
+COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID = "multidimensional-identity-confirmation-v1"
+COLLECTIVE_IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = (
+    "identity-self-report-witness-consistency-v1"
+)
+COLLECTIVE_REQUIRED_IDENTITY_CONFIRMATION_DIMENSIONS = [
+    "episodic_recall",
+    "self_model_alignment",
+    "subjective_self_report",
+    "third_party_witness_alignment",
+]
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -56,6 +69,9 @@ class CollectiveIdentityService:
                 "member_quorum": "unanimous",
                 "active_merge_required": False,
                 "member_recovery_required": True,
+                "member_recovery_binding_profile": COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID,
+                "identity_confirmation_profile": COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID,
+                "raw_identity_confirmation_profiles_stored": False,
             },
         }
 
@@ -228,6 +244,7 @@ class CollectiveIdentityService:
         *,
         requested_by: str,
         member_confirmations: Mapping[str, bool],
+        identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
         reason: str,
     ) -> Dict[str, Any]:
         record = self._require_record(collective_id)
@@ -239,8 +256,26 @@ class CollectiveIdentityService:
         confirmations = self._normalize_confirmations(member_confirmations, record["member_ids"])
         if not all(confirmations.values()):
             raise PermissionError("dissolution requires unanimous member confirmation")
+        recovery_proofs = self._derive_member_recovery_proofs(
+            identity_confirmation_profiles,
+            record["member_ids"],
+        )
+        recovery_digest_set = [
+            proof["identity_confirmation_digest"] for proof in recovery_proofs.values()
+        ]
 
         dissolved_at = utc_now_iso()
+        recovery_binding_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID,
+                    "collective_id": record["collective_id"],
+                    "member_ids": record["member_ids"],
+                    "member_recovery_proofs": recovery_proofs,
+                    "member_recovery_confirmation_digest_set": recovery_digest_set,
+                }
+            )
+        )
         receipt = {
             "schema_version": COLLECTIVE_SCHEMA_VERSION,
             "collective_id": record["collective_id"],
@@ -250,6 +285,11 @@ class CollectiveIdentityService:
             "member_confirmations": confirmations,
             "reason": reason_text,
             "member_recovery_required": True,
+            "member_recovery_binding_profile": COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID,
+            "member_recovery_proofs": recovery_proofs,
+            "member_recovery_confirmation_digest_set": recovery_digest_set,
+            "member_recovery_binding_digest": recovery_binding_digest,
+            "raw_identity_confirmation_profiles_stored": False,
             "audit_event_ref": f"ledger://collective-dissolution/{new_id('collective-dissolution')}",
         }
         record["status"] = "dissolved"
@@ -387,17 +427,131 @@ class CollectiveIdentityService:
             errors.append("status must equal dissolved")
         if receipt.get("member_recovery_required") is not True:
             errors.append("member_recovery_required must be true")
+        if (
+            receipt.get("member_recovery_binding_profile")
+            != COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID
+        ):
+            errors.append(
+                "member_recovery_binding_profile must equal "
+                f"{COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID}"
+            )
+        if receipt.get("raw_identity_confirmation_profiles_stored") is not False:
+            errors.append("raw_identity_confirmation_profiles_stored must be false")
 
         confirmations = receipt.get("member_confirmations")
         if not isinstance(confirmations, Mapping):
             errors.append("member_confirmations must be an object")
             member_confirmation_complete = False
+            expected_member_ids: List[str] = []
         else:
+            expected_member_ids = list(confirmations)
             member_confirmation_complete = len(confirmations) >= COLLECTIVE_MIN_MEMBERS and all(
                 value is True for value in confirmations.values()
             )
             if not member_confirmation_complete:
                 errors.append("member_confirmations must include every member with true confirmation")
+
+        recovery_proofs = receipt.get("member_recovery_proofs")
+        if not isinstance(recovery_proofs, Mapping):
+            errors.append("member_recovery_proofs must be an object")
+            recovery_proofs_bound = False
+            recovery_digest_set_bound = False
+        else:
+            recovery_proofs_bound = set(recovery_proofs) == set(expected_member_ids)
+            if not recovery_proofs_bound:
+                errors.append("member_recovery_proofs must include exactly the confirmed members")
+            for member_id, proof in recovery_proofs.items():
+                if not isinstance(proof, Mapping):
+                    errors.append(f"member_recovery_proofs[{member_id}] must be an object")
+                    recovery_proofs_bound = False
+                    continue
+                if proof.get("member_id") != member_id:
+                    errors.append(f"member_recovery_proofs[{member_id}].member_id must match its key")
+                    recovery_proofs_bound = False
+                if (
+                    proof.get("identity_confirmation_profile_id")
+                    != COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID
+                ):
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].identity_confirmation_profile_id "
+                        f"must equal {COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID}"
+                    )
+                    recovery_proofs_bound = False
+                if proof.get("active_transition_allowed") is not True:
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].active_transition_allowed must be true"
+                    )
+                    recovery_proofs_bound = False
+                if proof.get("result") != "passed":
+                    errors.append(f"member_recovery_proofs[{member_id}].result must equal passed")
+                    recovery_proofs_bound = False
+                if proof.get("required_dimensions") != COLLECTIVE_REQUIRED_IDENTITY_CONFIRMATION_DIMENSIONS:
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].required_dimensions must match "
+                        "the four-dimensional identity confirmation profile"
+                    )
+                    recovery_proofs_bound = False
+                if proof.get("witness_quorum_status") != "met":
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].witness_quorum_status must equal met"
+                    )
+                    recovery_proofs_bound = False
+                if proof.get("self_report_witness_consistency_status") != "bound":
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].self_report_witness_consistency_status "
+                        "must equal bound"
+                    )
+                    recovery_proofs_bound = False
+                if proof.get("raw_profile_stored") is not False:
+                    errors.append(f"member_recovery_proofs[{member_id}].raw_profile_stored must be false")
+                    recovery_proofs_bound = False
+                if not self._looks_like_digest(proof.get("identity_confirmation_digest")):
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].identity_confirmation_digest must be sha256 hex"
+                    )
+                    recovery_proofs_bound = False
+                if not self._looks_like_digest(proof.get("self_report_witness_consistency_digest")):
+                    errors.append(
+                        f"member_recovery_proofs[{member_id}].self_report_witness_consistency_digest "
+                        "must be sha256 hex"
+                    )
+                    recovery_proofs_bound = False
+            recovery_digest_set = receipt.get("member_recovery_confirmation_digest_set")
+            expected_digest_set = [
+                recovery_proofs[member_id]["identity_confirmation_digest"]
+                for member_id in expected_member_ids
+                if isinstance(recovery_proofs.get(member_id), Mapping)
+                and self._looks_like_digest(
+                    recovery_proofs[member_id].get("identity_confirmation_digest")
+                )
+            ]
+            recovery_digest_set_bound = recovery_digest_set == expected_digest_set
+            if not recovery_digest_set_bound:
+                errors.append(
+                    "member_recovery_confirmation_digest_set must match member recovery proof order"
+                )
+
+        binding_digest = receipt.get("member_recovery_binding_digest")
+        expected_binding_digest = None
+        if isinstance(recovery_proofs, Mapping) and isinstance(receipt.get("member_recovery_confirmation_digest_set"), list):
+            expected_binding_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID,
+                        "collective_id": receipt.get("collective_id"),
+                        "member_ids": expected_member_ids,
+                        "member_recovery_proofs": recovery_proofs,
+                        "member_recovery_confirmation_digest_set": receipt.get(
+                            "member_recovery_confirmation_digest_set"
+                        ),
+                    }
+                )
+            )
+        recovery_binding_digest_bound = (
+            isinstance(expected_binding_digest, str) and binding_digest == expected_binding_digest
+        )
+        if not recovery_binding_digest_bound:
+            errors.append("member_recovery_binding_digest must match digest-only recovery proof bundle")
 
         return {
             "ok": not errors,
@@ -405,9 +559,92 @@ class CollectiveIdentityService:
             "schema_version_bound": receipt.get("schema_version") == COLLECTIVE_SCHEMA_VERSION,
             "member_confirmation_complete": member_confirmation_complete,
             "member_recovery_required": receipt.get("member_recovery_required") is True,
+            "member_recovery_proofs_bound": recovery_proofs_bound,
+            "member_recovery_digest_set_bound": recovery_digest_set_bound,
+            "member_recovery_binding_digest_bound": recovery_binding_digest_bound,
+            "raw_identity_confirmation_profiles_stored": receipt.get(
+                "raw_identity_confirmation_profiles_stored"
+            )
+            is True,
             "audit_bound": isinstance(receipt.get("audit_event_ref"), str)
             and bool(receipt.get("audit_event_ref")),
         }
+
+    def _derive_member_recovery_proofs(
+        self,
+        identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
+        required_member_ids: Sequence[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        if not isinstance(identity_confirmation_profiles, Mapping):
+            raise ValueError("identity_confirmation_profiles must be a mapping")
+        recovery_proofs: Dict[str, Dict[str, Any]] = {}
+        for member_id in required_member_ids:
+            profile = identity_confirmation_profiles.get(member_id)
+            if not isinstance(profile, Mapping):
+                raise ValueError(f"missing identity confirmation profile for {member_id}")
+            confirmation_id = self._normalize_non_empty_string(
+                profile.get("confirmation_id"),
+                f"identity_confirmation_profiles[{member_id}].confirmation_id",
+            )
+            confirmation_digest = self._normalize_digest(
+                profile.get("confirmation_digest"),
+                f"identity_confirmation_profiles[{member_id}].confirmation_digest",
+            )
+            consistency = profile.get("self_report_witness_consistency")
+            if not isinstance(consistency, Mapping):
+                raise ValueError(
+                    f"identity_confirmation_profiles[{member_id}].self_report_witness_consistency "
+                    "must be an object"
+                )
+            consistency_digest = self._normalize_digest(
+                consistency.get("consistency_digest"),
+                f"identity_confirmation_profiles[{member_id}].self_report_witness_consistency.consistency_digest",
+            )
+            required_dimensions = list(profile.get("required_dimensions", []))
+            if required_dimensions != COLLECTIVE_REQUIRED_IDENTITY_CONFIRMATION_DIMENSIONS:
+                raise ValueError(
+                    f"identity confirmation profile for {member_id} must carry the fixed "
+                    "four-dimensional recovery profile"
+                )
+            if profile.get("identity_id") != member_id:
+                raise ValueError(f"identity confirmation profile for {member_id} must match member_id")
+            if profile.get("profile_id") != COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID:
+                raise ValueError(
+                    f"identity confirmation profile for {member_id} must use "
+                    f"{COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID}"
+                )
+            if profile.get("result") != "passed" or profile.get("active_transition_allowed") is not True:
+                raise PermissionError(
+                    f"identity confirmation profile for {member_id} must pass before dissolution"
+                )
+            witness_quorum = profile.get("witness_quorum", {})
+            if not isinstance(witness_quorum, Mapping) or witness_quorum.get("status") != "met":
+                raise PermissionError(
+                    f"identity confirmation profile for {member_id} must have witness quorum"
+                )
+            if consistency.get("policy_id") != COLLECTIVE_IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID:
+                raise ValueError(
+                    f"identity confirmation profile for {member_id} must bind self-report witness consistency"
+                )
+            if consistency.get("status") != "bound":
+                raise PermissionError(
+                    f"identity confirmation profile for {member_id} must bind self-report witness consistency"
+                )
+            recovery_proofs[member_id] = {
+                "member_id": member_id,
+                "identity_confirmation_ref": f"identity-confirmation://{confirmation_id}",
+                "identity_confirmation_profile_id": COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID,
+                "identity_confirmation_digest": confirmation_digest,
+                "active_transition_allowed": True,
+                "result": "passed",
+                "required_dimensions": list(COLLECTIVE_REQUIRED_IDENTITY_CONFIRMATION_DIMENSIONS),
+                "witness_quorum_status": "met",
+                "self_report_witness_consistency_status": "bound",
+                "self_report_witness_consistency_digest": consistency_digest,
+                "recovery_status": "confirmed",
+                "raw_profile_stored": False,
+            }
+        return recovery_proofs
 
     def _require_record(self, collective_id: str) -> Dict[str, Any]:
         collective = self._normalize_non_empty_string(collective_id, "collective_id")
@@ -451,6 +688,18 @@ class CollectiveIdentityService:
         if normalized <= 0:
             raise ValueError(f"{field_name} must be > 0")
         return normalized
+
+    @staticmethod
+    def _looks_like_digest(value: Any) -> bool:
+        return isinstance(value, str) and len(value) == 64 and all(
+            char in "0123456789abcdef" for char in value
+        )
+
+    @classmethod
+    def _normalize_digest(cls, value: Any, field_name: str) -> str:
+        if not cls._looks_like_digest(value):
+            raise ValueError(f"{field_name} must be a sha256 hex digest")
+        return str(value)
 
     @staticmethod
     def _normalize_wms_mode(value: Any, field_name: str) -> str:

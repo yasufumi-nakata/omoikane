@@ -91,8 +91,17 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/collective_dissolution_receipt.schema",
             result["dissolution"],
         )
+        for profile in result["member_recovery"]["identity_confirmation_profiles"].values():
+            self._assert_schema_valid(
+                "specs/schemas/identity_confirmation_profile.schema",
+                profile,
+            )
         self.assertTrue(result["validation"]["dissolution_receipt_bound"])
         self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_proofs_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_digest_set_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_binding_digest_bound"])
+        self.assertFalse(result["validation"]["dissolution_raw_identity_confirmation_profiles_stored"])
 
     def test_imc_demo_matches_public_schemas(self) -> None:
         result = self.runtime.run_imc_demo()

@@ -15,6 +15,11 @@ required:
   - member_confirmations
   - reason
   - member_recovery_required
+  - member_recovery_binding_profile
+  - member_recovery_proofs
+  - member_recovery_confirmation_digest_set
+  - member_recovery_binding_digest
+  - raw_identity_confirmation_profiles_stored
   - audit_event_ref
 properties:
   schema_version:
@@ -43,6 +48,86 @@ properties:
   member_recovery_required:
     type: boolean
     const: true
+  member_recovery_binding_profile:
+    type: string
+    const: collective-dissolution-identity-confirmation-binding-v1
+  member_recovery_proofs:
+    type: object
+    minProperties: 2
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - member_id
+        - identity_confirmation_ref
+        - identity_confirmation_profile_id
+        - identity_confirmation_digest
+        - active_transition_allowed
+        - result
+        - required_dimensions
+        - witness_quorum_status
+        - self_report_witness_consistency_status
+        - self_report_witness_consistency_digest
+        - recovery_status
+        - raw_profile_stored
+      properties:
+        member_id:
+          type: string
+          minLength: 1
+        identity_confirmation_ref:
+          type: string
+          minLength: 1
+        identity_confirmation_profile_id:
+          type: string
+          const: multidimensional-identity-confirmation-v1
+        identity_confirmation_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        active_transition_allowed:
+          type: boolean
+          const: true
+        result:
+          type: string
+          const: passed
+        required_dimensions:
+          type: array
+          minItems: 4
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - episodic_recall
+              - self_model_alignment
+              - subjective_self_report
+              - third_party_witness_alignment
+        witness_quorum_status:
+          type: string
+          const: met
+        self_report_witness_consistency_status:
+          type: string
+          const: bound
+        self_report_witness_consistency_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        recovery_status:
+          type: string
+          const: confirmed
+        raw_profile_stored:
+          type: boolean
+          const: false
+  member_recovery_confirmation_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  member_recovery_binding_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  raw_identity_confirmation_profiles_stored:
+    type: boolean
+    const: false
   audit_event_ref:
     type: string
     minLength: 1
@@ -57,4 +142,45 @@ examples:
       identity://peer: true
     reason: bounded merge ended and both members recovered independent subjectivity
     member_recovery_required: true
+    member_recovery_binding_profile: collective-dissolution-identity-confirmation-binding-v1
+    member_recovery_proofs:
+      identity://origin:
+        member_id: identity://origin
+        identity_confirmation_ref: identity-confirmation://identity-confirmation-aaaaaaaaaaaa
+        identity_confirmation_profile_id: multidimensional-identity-confirmation-v1
+        identity_confirmation_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        active_transition_allowed: true
+        result: passed
+        required_dimensions:
+          - episodic_recall
+          - self_model_alignment
+          - subjective_self_report
+          - third_party_witness_alignment
+        witness_quorum_status: met
+        self_report_witness_consistency_status: bound
+        self_report_witness_consistency_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        recovery_status: confirmed
+        raw_profile_stored: false
+      identity://peer:
+        member_id: identity://peer
+        identity_confirmation_ref: identity-confirmation://identity-confirmation-cccccccccccc
+        identity_confirmation_profile_id: multidimensional-identity-confirmation-v1
+        identity_confirmation_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        active_transition_allowed: true
+        result: passed
+        required_dimensions:
+          - episodic_recall
+          - self_model_alignment
+          - subjective_self_report
+          - third_party_witness_alignment
+        witness_quorum_status: met
+        self_report_witness_consistency_status: bound
+        self_report_witness_consistency_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        recovery_status: confirmed
+        raw_profile_stored: false
+    member_recovery_confirmation_digest_set:
+      - "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      - "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    member_recovery_binding_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    raw_identity_confirmation_profiles_stored: false
     audit_event_ref: ledger://collective-dissolution/collective-dissolution-0123456789ab

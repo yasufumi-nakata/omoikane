@@ -69,6 +69,11 @@ collective_profile:
 - `collective_dissolution_receipt.schema` に合う
   first-class receipt を返し、`schema_version`、全 member confirmation、
   `member_recovery_required=true`、digest-only `audit_event_ref` を束縛する
+- `collective-dissolution-identity-confirmation-binding-v1` により、
+  各 member の `multidimensional-identity-confirmation-v1` profile から
+  confirmation digest、witness quorum status、
+  self-report/witness consistency digest だけを receipt へ縮約する
+- raw identity confirmation profile は dissolution receipt に保存しない
 
 ## reference runtime の扱い
 
@@ -78,11 +83,13 @@ collective_profile:
 - `collective_record.schema`、`collective_merge_session.schema`、
   `collective_dissolution_receipt.schema` を追加する
 - `collective-demo` は IMC `merge_thought`、WMS divergence、private escape、
-  identity confirmation、schema-bound dissolution receipt を 1 シナリオで smoke する
+  identity confirmation、schema-bound dissolution receipt、
+  member recovery proof binding を 1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
 - `evals/interface/collective_dissolution_receipt.yaml` は
-  dissolution receipt の public schema、全 member confirmation、digest-only audit ref を監査する
+  dissolution receipt の public schema、全 member confirmation、
+  IdentityConfirmation digest binding、digest-only audit ref を監査する
 
 ## 不変条件
 
@@ -90,7 +97,8 @@ collective_profile:
 2. **bounded merge** ── merge は 10 秒以内に cap する
 3. **escape freedom** ── divergence 後の private reality 退避を阻害しない
 4. **recovery first** ── dissolution 前に全 member の identity confirmation を必須化
-5. **no silent persistence** ── active merge 無しで Collective を存続させない
+5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
+6. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連
 

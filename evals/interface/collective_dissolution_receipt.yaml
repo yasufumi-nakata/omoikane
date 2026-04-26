@@ -14,5 +14,9 @@ assertions:
   - dissolution receipt carries schema_version 1.0
   - every member confirmation in the receipt is true
   - member_recovery_required remains true after dissolution
+  - member_recovery_binding_profile is collective-dissolution-identity-confirmation-binding-v1
+  - every member recovery proof binds a passed multidimensional-identity-confirmation-v1 digest
+  - recovery proof set binds witness quorum and self-report/witness consistency digests
+  - raw identity confirmation profiles are not stored in the dissolution receipt
   - audit_event_ref is retained as digest-only ledger reference metadata
   - ledger includes one interface-collective-dissolution event for the first-class receipt

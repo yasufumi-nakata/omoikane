@@ -85,10 +85,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dissolution_receipt_bound"])
         self.assertTrue(result["validation"]["dissolution_schema_version_bound"])
         self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_proofs_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_digest_set_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_recovery_binding_digest_bound"])
+        self.assertFalse(result["validation"]["dissolution_raw_identity_confirmation_profiles_stored"])
+        self.assertTrue(result["validation"]["member_recovery_identity_confirmation_profiles_ok"])
         self.assertTrue(result["validation"]["dissolution_audit_bound"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
+        self.assertEqual(
+            "collective-dissolution-identity-confirmation-binding-v1",
+            result["dissolution"]["member_recovery_binding_profile"],
+        )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
         self.assertEqual(
             1,

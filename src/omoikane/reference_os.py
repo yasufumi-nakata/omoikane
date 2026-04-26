@@ -7602,6 +7602,68 @@ json.dump(response, sys.stdout)
                 peer.identity_id: True,
             },
         )
+        member_recovery_profiles = {
+            identity.identity_id: self.identity.confirm_identity(
+                identity.identity_id,
+                consent_ref="consent://collective-dissolution/origin-recovery",
+                scheduler_stage_ref="scheduler://collective-dissolution/origin-recovery",
+                episodic_recall_ref="episodic://collective-dissolution/origin-recall",
+                self_model_ref="self-model://collective-dissolution/origin-stable",
+                episodic_recall_score=0.93,
+                self_model_alignment_score=0.9,
+                self_report={
+                    "report_ref": "self-report://collective-dissolution/origin",
+                    "statement": "I confirm independent continuity after the bounded collective session.",
+                    "continuity_score": 0.91,
+                },
+                witness_receipts=[
+                    {
+                        "witness_id": "witness://collective-dissolution/origin-clinician",
+                        "witness_role": "clinician",
+                        "observation_ref": "observation://collective-dissolution/origin-recall",
+                        "alignment_score": 0.89,
+                    },
+                    {
+                        "witness_id": "witness://collective-dissolution/origin-guardian",
+                        "witness_role": "guardian",
+                        "observation_ref": "observation://collective-dissolution/origin-self-model",
+                        "alignment_score": 0.9,
+                    },
+                ],
+            ),
+            peer.identity_id: self.identity.confirm_identity(
+                peer.identity_id,
+                consent_ref="consent://collective-dissolution/peer-recovery",
+                scheduler_stage_ref="scheduler://collective-dissolution/peer-recovery",
+                episodic_recall_ref="episodic://collective-dissolution/peer-recall",
+                self_model_ref="self-model://collective-dissolution/peer-stable",
+                episodic_recall_score=0.92,
+                self_model_alignment_score=0.89,
+                self_report={
+                    "report_ref": "self-report://collective-dissolution/peer",
+                    "statement": "I confirm independent continuity after the bounded collective session.",
+                    "continuity_score": 0.9,
+                },
+                witness_receipts=[
+                    {
+                        "witness_id": "witness://collective-dissolution/peer-clinician",
+                        "witness_role": "clinician",
+                        "observation_ref": "observation://collective-dissolution/peer-recall",
+                        "alignment_score": 0.88,
+                    },
+                    {
+                        "witness_id": "witness://collective-dissolution/peer-guardian",
+                        "witness_role": "guardian",
+                        "observation_ref": "observation://collective-dissolution/peer-self-model",
+                        "alignment_score": 0.89,
+                    },
+                ],
+            ),
+        }
+        member_recovery_validations = {
+            member_id: IdentityRegistry.validate_identity_confirmation(profile)
+            for member_id, profile in member_recovery_profiles.items()
+        }
         dissolution = self.collective.dissolve_collective(
             collective_record["collective_id"],
             requested_by=identity.identity_id,
@@ -7609,6 +7671,7 @@ json.dump(response, sys.stdout)
                 identity.identity_id: True,
                 peer.identity_id: True,
             },
+            identity_confirmation_profiles=member_recovery_profiles,
             reason="bounded merge session ended and both members recovered independent subjectivity",
         )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
@@ -7692,6 +7755,18 @@ json.dump(response, sys.stdout)
                 "status": dissolution["status"],
                 "member_confirmations": dissolution["member_confirmations"],
                 "member_recovery_required": dissolution["member_recovery_required"],
+                "member_recovery_binding_profile": dissolution[
+                    "member_recovery_binding_profile"
+                ],
+                "member_recovery_confirmation_digest_set": dissolution[
+                    "member_recovery_confirmation_digest_set"
+                ],
+                "member_recovery_binding_digest": dissolution[
+                    "member_recovery_binding_digest"
+                ],
+                "raw_identity_confirmation_profiles_stored": dissolution[
+                    "raw_identity_confirmation_profiles_stored"
+                ],
                 "audit_event_ref": dissolution["audit_event_ref"],
             },
             actor="CollectiveIdentityService",
@@ -7704,7 +7779,8 @@ json.dump(response, sys.stdout)
         validation = {
             "ok": collective_validation["ok"]
             and merge_validation["ok"]
-            and dissolution_validation["ok"],
+            and dissolution_validation["ok"]
+            and all(validation["ok"] for validation in member_recovery_validations.values()),
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
             "merge_window_bounded": merge_validation["merge_window_bounded"],
@@ -7717,6 +7793,21 @@ json.dump(response, sys.stdout)
             "dissolution_member_confirmations_bound": dissolution_validation[
                 "member_confirmation_complete"
             ],
+            "dissolution_member_recovery_proofs_bound": dissolution_validation[
+                "member_recovery_proofs_bound"
+            ],
+            "dissolution_member_recovery_digest_set_bound": dissolution_validation[
+                "member_recovery_digest_set_bound"
+            ],
+            "dissolution_member_recovery_binding_digest_bound": dissolution_validation[
+                "member_recovery_binding_digest_bound"
+            ],
+            "dissolution_raw_identity_confirmation_profiles_stored": dissolution_validation[
+                "raw_identity_confirmation_profiles_stored"
+            ],
+            "member_recovery_identity_confirmation_profiles_ok": all(
+                validation["ok"] for validation in member_recovery_validations.values()
+            ),
             "dissolution_audit_bound": dissolution_validation["audit_bound"],
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
@@ -7742,6 +7833,11 @@ json.dump(response, sys.stdout)
                 "state": wms_snapshot,
             },
             "dissolution": dissolution,
+            "member_recovery": {
+                "profile_id": "collective-dissolution-identity-confirmation-binding-v1",
+                "identity_confirmation_profiles": member_recovery_profiles,
+                "validations": member_recovery_validations,
+            },
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

@@ -806,7 +806,12 @@ WMS major divergence 後の `private_reality` escape、
 schema-bound collective dissolution receipt を 1 シナリオで確認する。
 同じ receipt は `schema_version=1.0`、全 member confirmation、
 `member_recovery_required=true`、digest-only `audit_event_ref` を保持し、
-`interface-collective-dissolution` ledger event として単独に検証できる。
+`collective-dissolution-identity-confirmation-binding-v1` として
+各 member の `multidimensional-identity-confirmation-v1` confirmation digest、
+witness quorum status、self-report/witness consistency digest を束縛し、
+raw identity confirmation profile を保存しない。
+`interface-collective-dissolution` ledger event は same binding digest と
+confirmation digest set を持つため、単独に検証できる。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、
