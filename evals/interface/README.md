@@ -35,8 +35,8 @@ member capture binding digest が揃い、raw packet body を保存しないこ�
 
 ### Collective External Registry Sync
 post-dissolution recovery capture export binding を external legal / governance
-registry の digest-only entry、submission、ack receipt に束縛し、raw dissolution /
-registry / packet payload を保存しないことを確認する。
+registry の digest-only entry、submission、ack receipt、2 jurisdiction ack quorum に
+束縛し、raw dissolution / registry / ack / packet payload を保存しないことを確認する。
 
 ### WMS Private Reality Escape
 minor diff の shared reconciliation、major diff での private reality escape 提示、

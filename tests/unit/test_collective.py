@@ -297,6 +297,20 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             packet_capture,
             privileged_capture,
         )
+        registry_sync = service.sync_dissolution_external_registry(capture_binding)
+        registry_validation = service.validate_collective_external_registry_sync(
+            registry_sync,
+            capture_binding,
+        )
+        tampered_registry_sync = dict(registry_sync)
+        tampered_registry_sync["ack_quorum_digest_set"] = [
+            registry_sync["ack_quorum_digest_set"][0],
+            "0" * 64,
+        ]
+        tampered_registry_validation = service.validate_collective_external_registry_sync(
+            tampered_registry_sync,
+            capture_binding,
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -355,6 +369,23 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             capture_binding["profile_id"],
         )
         self.assertEqual(2, capture_binding["member_capture_binding_count"])
+        self.assertTrue(registry_validation["ok"])
+        self.assertTrue(registry_validation["capture_export_bound"])
+        self.assertTrue(registry_validation["submission_ack_bound"])
+        self.assertTrue(registry_validation["ack_quorum_bound"])
+        self.assertFalse(registry_validation["raw_registry_payload_stored"])
+        self.assertFalse(registry_validation["raw_ack_payload_stored"])
+        self.assertEqual(
+            "collective-external-registry-ack-quorum-v1",
+            registry_sync["ack_quorum_profile_id"],
+        )
+        self.assertEqual(2, registry_sync["ack_quorum_required_authority_count"])
+        self.assertEqual(2, registry_sync["ack_quorum_required_jurisdiction_count"])
+        self.assertEqual(["JP-13", "FEDERATION"], registry_sync["ack_quorum_jurisdictions"])
+        self.assertEqual(2, len(registry_sync["ack_quorum_receipts"]))
+        self.assertEqual("complete", registry_sync["ack_quorum_status"])
+        self.assertFalse(tampered_registry_validation["ok"])
+        self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()

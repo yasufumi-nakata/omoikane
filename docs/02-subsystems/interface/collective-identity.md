@@ -92,7 +92,9 @@ collective_profile:
 - `collective-dissolution-external-registry-sync-v1` により、
   recovery capture export binding を external legal registry と governance registry の
   digest-only entry / submission / acknowledgement receipt へ同期する
-- raw dissolution payload、raw registry payload、raw packet body は保存しない
+- `collective-external-registry-ack-quorum-v1` により、legal / governance の
+  2 registry acknowledgement を 2 jurisdiction quorum として digest-only に束縛する
+- raw dissolution payload、raw registry payload、raw ack payload、raw packet body は保存しない
 
 ## reference runtime の扱い
 
@@ -128,8 +130,8 @@ collective_profile:
   route-ref alignment、member capture digest、raw packet body redaction を監査する
 - `evals/interface/collective_external_registry_sync.yaml` は
   capture export binding と external legal / governance registry digest、
-  registry entry、submission、acknowledgement receipt の束縛と
-  raw registry payload redaction を監査する
+  registry entry、submission、acknowledgement receipt、2 jurisdiction ack quorum の
+  束縛と raw registry / ack payload redaction を監査する
 
 ## 不変条件
 
@@ -140,7 +142,7 @@ collective_profile:
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
 6. **packet-body redaction** ── recovery capture binding は raw packet body を保存せず digest/readback/route ref だけを持つ
 7. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
-8. **external registry redaction** ── registry sync は legal/governance registry digest と acknowledgement digest だけを保持し、raw registry payload を保存しない
+8. **external registry redaction** ── registry sync は legal/governance registry digest と acknowledgement quorum digest だけを保持し、raw registry / ack payload を保存しない
 9. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連

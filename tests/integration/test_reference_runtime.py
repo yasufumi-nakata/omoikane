@@ -137,10 +137,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["external_registry_sync_governance_registry_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_registry_entry_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_submission_ack_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_ack_quorum_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_complete"])
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
+        self.assertFalse(result["validation"]["external_registry_sync_raw_ack_payload_stored"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])

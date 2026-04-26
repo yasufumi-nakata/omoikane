@@ -831,9 +831,9 @@ delegated-broker privileged capture acquisition、member ごとの capture bindi
 `collective-dissolution-external-registry-sync-v1` artifact が、
 recovery capture export binding digest を external legal registry digest、
 governance registry digest、registry entry digest、submission receipt digest、
-ack receipt digest に束縛する。
+ack receipt digest、2 jurisdiction ack quorum digest に束縛する。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
-raw packet body は保存しない。
+raw ack payload、raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

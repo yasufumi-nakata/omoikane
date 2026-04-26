@@ -45,6 +45,14 @@ COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID = (
     "collective-external-registry-submission-v1"
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID = "collective-external-registry-ack-v1"
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID = (
+    "collective-external-registry-ack-quorum-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-quorum-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_AUTHORITIES = 2
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_JURISDICTIONS = 2
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -118,6 +126,9 @@ class CollectiveIdentityService:
                 ),
                 "external_registry_sync_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID
+                ),
+                "external_registry_ack_quorum_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID
                 ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
@@ -831,6 +842,10 @@ class CollectiveIdentityService:
             raise ValueError(
                 "governance_registry_ref must start with governance-registry://"
             )
+        if legal_zone == governance_zone:
+            raise ValueError(
+                "legal_jurisdiction and governance_jurisdiction must be distinct for ack quorum"
+            )
 
         recorded_at = utc_now_iso()
         collective_id = str(recovery_capture_export_binding["collective_id"])
@@ -904,16 +919,62 @@ class CollectiveIdentityService:
             )
         )
         ack_receipt_ref = f"registry-ack://collective-dissolution/{collective_id}/{suffix}"
-        ack_receipt_digest = sha256_text(
-            canonical_json(
-                {
-                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
-                    "submission_receipt_ref": submission_receipt_ref,
-                    "submission_receipt_digest": submission_receipt_digest,
-                    "ack_status": "accepted",
-                    "registry_authority_digest": registry_authority_digest,
-                }
-            )
+        ack_receipt_digest = self._collective_external_registry_ack_digest(
+            submission_receipt_ref=submission_receipt_ref,
+            submission_receipt_digest=submission_receipt_digest,
+            registry_authority_digest=registry_authority_digest,
+            registry_authority_ref=legal_ref,
+            registry_jurisdiction=legal_zone,
+            registry_digest=legal_registry_digest,
+        )
+        governance_ack_receipt_ref = (
+            f"registry-ack://collective-dissolution/{collective_id}/{suffix}/governance"
+        )
+        governance_ack_receipt_digest = self._collective_external_registry_ack_digest(
+            submission_receipt_ref=submission_receipt_ref,
+            submission_receipt_digest=submission_receipt_digest,
+            registry_authority_digest=registry_authority_digest,
+            registry_authority_ref=governance_ref,
+            registry_jurisdiction=governance_zone,
+            registry_digest=governance_registry_digest,
+        )
+        ack_quorum_receipts = [
+            {
+                "ack_receipt_ref": ack_receipt_ref,
+                "ack_receipt_digest": ack_receipt_digest,
+                "ack_status": "accepted",
+                "registry_authority_ref": legal_ref,
+                "registry_jurisdiction": legal_zone,
+                "registry_digest": legal_registry_digest,
+                "submission_receipt_digest": submission_receipt_digest,
+                "raw_ack_payload_stored": False,
+            },
+            {
+                "ack_receipt_ref": governance_ack_receipt_ref,
+                "ack_receipt_digest": governance_ack_receipt_digest,
+                "ack_status": "accepted",
+                "registry_authority_ref": governance_ref,
+                "registry_jurisdiction": governance_zone,
+                "registry_digest": governance_registry_digest,
+                "submission_receipt_digest": submission_receipt_digest,
+                "raw_ack_payload_stored": False,
+            },
+        ]
+        ack_quorum_authority_refs = [legal_ref, governance_ref]
+        ack_quorum_jurisdictions = _dedupe_preserve_order([legal_zone, governance_zone])
+        ack_quorum_digest_set = [
+            ack_receipt_digest,
+            governance_ack_receipt_digest,
+        ]
+        ack_quorum_digest_set_digest = sha256_text(
+            canonical_json(ack_quorum_digest_set)
+        )
+        ack_quorum_digest = self._collective_external_registry_ack_quorum_digest(
+            collective_id=collective_id,
+            submission_receipt_digest=submission_receipt_digest,
+            ack_quorum_digest_set_digest=ack_quorum_digest_set_digest,
+            ack_quorum_authority_refs=ack_quorum_authority_refs,
+            ack_quorum_jurisdictions=ack_quorum_jurisdictions,
         )
         registry_digest_set = [
             legal_registry_digest,
@@ -921,6 +982,7 @@ class CollectiveIdentityService:
             registry_entry_digest,
             submission_receipt_digest,
             ack_receipt_digest,
+            ack_quorum_digest,
         ]
         registry_digest_set_digest = sha256_text(canonical_json(registry_digest_set))
         digest_payload = {
@@ -929,6 +991,7 @@ class CollectiveIdentityService:
             "recovery_capture_export_binding_digest": capture_binding_digest,
             "registry_entry_digest": registry_entry_digest,
             "ack_receipt_digest": ack_receipt_digest,
+            "ack_quorum_digest": ack_quorum_digest,
             "registry_digest_set_digest": registry_digest_set_digest,
         }
         receipt = {
@@ -972,6 +1035,23 @@ class CollectiveIdentityService:
             "ack_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
             "ack_receipt_ref": ack_receipt_ref,
             "ack_receipt_digest": ack_receipt_digest,
+            "ack_quorum_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID,
+            "ack_quorum_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_DIGEST_PROFILE_ID
+            ),
+            "ack_quorum_required_authority_count": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_AUTHORITIES
+            ),
+            "ack_quorum_required_jurisdiction_count": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_JURISDICTIONS
+            ),
+            "ack_quorum_authority_refs": ack_quorum_authority_refs,
+            "ack_quorum_jurisdictions": ack_quorum_jurisdictions,
+            "ack_quorum_receipts": ack_quorum_receipts,
+            "ack_quorum_digest_set": ack_quorum_digest_set,
+            "ack_quorum_digest_set_digest": ack_quorum_digest_set_digest,
+            "ack_quorum_digest": ack_quorum_digest,
+            "ack_quorum_status": "complete",
             "registry_digest_set": registry_digest_set,
             "registry_digest_set_digest": registry_digest_set_digest,
             "capture_export_bound": True,
@@ -979,9 +1059,11 @@ class CollectiveIdentityService:
             "governance_registry_bound": True,
             "registry_entry_bound": True,
             "submission_ack_bound": True,
+            "ack_quorum_bound": True,
             "external_registry_sync_complete": True,
             "raw_dissolution_payload_stored": False,
             "raw_registry_payload_stored": False,
+            "raw_ack_payload_stored": False,
             "raw_packet_body_stored": False,
             "digest": sha256_text(canonical_json(digest_payload)),
         }
@@ -2010,6 +2092,10 @@ class CollectiveIdentityService:
             "source_capture_export_profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
             "submission_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID,
             "ack_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+            "ack_quorum_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID,
+            "ack_quorum_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_DIGEST_PROFILE_ID
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -2097,6 +2183,8 @@ class CollectiveIdentityService:
             "registry_entry_digest",
             "submission_receipt_digest",
             "ack_receipt_digest",
+            "ack_quorum_digest_set_digest",
+            "ack_quorum_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -2204,20 +2292,13 @@ class CollectiveIdentityService:
                 }
             )
         )
-        expected_ack_digest = sha256_text(
-            canonical_json(
-                {
-                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
-                    "submission_receipt_ref": receipt.get("submission_receipt_ref"),
-                    "submission_receipt_digest": receipt.get(
-                        "submission_receipt_digest"
-                    ),
-                    "ack_status": "accepted",
-                    "registry_authority_digest": receipt.get(
-                        "registry_authority_digest"
-                    ),
-                }
-            )
+        expected_ack_digest = self._collective_external_registry_ack_digest(
+            submission_receipt_ref=str(receipt.get("submission_receipt_ref")),
+            submission_receipt_digest=str(receipt.get("submission_receipt_digest")),
+            registry_authority_digest=str(receipt.get("registry_authority_digest")),
+            registry_authority_ref=str(legal_ref),
+            registry_jurisdiction=str(legal_jurisdiction),
+            registry_digest=str(receipt.get("legal_registry_digest")),
         )
         submission_ack_bound = (
             receipt.get("submission_receipt_digest") == expected_submission_digest
@@ -2235,6 +2316,81 @@ class CollectiveIdentityService:
         if not submission_ack_bound:
             errors.append("submission and acknowledgement digests must be bound")
 
+        expected_governance_ack_digest = self._collective_external_registry_ack_digest(
+            submission_receipt_ref=str(receipt.get("submission_receipt_ref")),
+            submission_receipt_digest=str(receipt.get("submission_receipt_digest")),
+            registry_authority_digest=str(receipt.get("registry_authority_digest")),
+            registry_authority_ref=str(governance_ref),
+            registry_jurisdiction=str(governance_jurisdiction),
+            registry_digest=str(receipt.get("governance_registry_digest")),
+        )
+        expected_ack_quorum_receipts = [
+            {
+                "ack_receipt_ref": receipt.get("ack_receipt_ref"),
+                "ack_receipt_digest": receipt.get("ack_receipt_digest"),
+                "ack_status": "accepted",
+                "registry_authority_ref": legal_ref,
+                "registry_jurisdiction": legal_jurisdiction,
+                "registry_digest": receipt.get("legal_registry_digest"),
+                "submission_receipt_digest": receipt.get("submission_receipt_digest"),
+                "raw_ack_payload_stored": False,
+            },
+            {
+                "ack_receipt_ref": f"{receipt.get('ack_receipt_ref')}/governance",
+                "ack_receipt_digest": expected_governance_ack_digest,
+                "ack_status": "accepted",
+                "registry_authority_ref": governance_ref,
+                "registry_jurisdiction": governance_jurisdiction,
+                "registry_digest": receipt.get("governance_registry_digest"),
+                "submission_receipt_digest": receipt.get("submission_receipt_digest"),
+                "raw_ack_payload_stored": False,
+            },
+        ]
+        expected_ack_quorum_digest_set = [
+            receipt.get("ack_receipt_digest"),
+            expected_governance_ack_digest,
+        ]
+        expected_ack_quorum_jurisdictions = _dedupe_preserve_order(
+            [str(legal_jurisdiction), str(governance_jurisdiction)]
+        )
+        ack_quorum_authority_refs = receipt.get("ack_quorum_authority_refs")
+        ack_quorum_jurisdictions = receipt.get("ack_quorum_jurisdictions")
+        ack_quorum_receipts = receipt.get("ack_quorum_receipts")
+        ack_quorum_digest_set = receipt.get("ack_quorum_digest_set")
+        expected_ack_quorum_digest_set_digest = sha256_text(
+            canonical_json(expected_ack_quorum_digest_set)
+        )
+        expected_ack_quorum_digest = self._collective_external_registry_ack_quorum_digest(
+            collective_id=str(receipt.get("collective_id")),
+            submission_receipt_digest=str(receipt.get("submission_receipt_digest")),
+            ack_quorum_digest_set_digest=expected_ack_quorum_digest_set_digest,
+            ack_quorum_authority_refs=[str(legal_ref), str(governance_ref)],
+            ack_quorum_jurisdictions=expected_ack_quorum_jurisdictions,
+        )
+        raw_ack_payload_stored = receipt.get("raw_ack_payload_stored") is True
+        ack_quorum_bound = (
+            receipt.get("ack_quorum_required_authority_count")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_AUTHORITIES
+            and receipt.get("ack_quorum_required_jurisdiction_count")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_JURISDICTIONS
+            and ack_quorum_authority_refs == [legal_ref, governance_ref]
+            and ack_quorum_jurisdictions == expected_ack_quorum_jurisdictions
+            and len(expected_ack_quorum_jurisdictions)
+            >= COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_JURISDICTIONS
+            and ack_quorum_receipts == expected_ack_quorum_receipts
+            and ack_quorum_digest_set == expected_ack_quorum_digest_set
+            and receipt.get("ack_quorum_digest_set_digest")
+            == expected_ack_quorum_digest_set_digest
+            and receipt.get("ack_quorum_digest") == expected_ack_quorum_digest
+            and receipt.get("ack_quorum_status") == "complete"
+            and receipt.get("ack_quorum_bound") is True
+            and not raw_ack_payload_stored
+        )
+        if not ack_quorum_bound:
+            errors.append("ack quorum must bind legal/governance registry acknowledgements")
+        if raw_ack_payload_stored:
+            errors.append("raw_ack_payload_stored must be false")
+
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
             isinstance(registry_digest_set, list)
@@ -2245,6 +2401,7 @@ class CollectiveIdentityService:
                 receipt.get("registry_entry_digest"),
                 receipt.get("submission_receipt_digest"),
                 receipt.get("ack_receipt_digest"),
+                receipt.get("ack_quorum_digest"),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -2262,6 +2419,7 @@ class CollectiveIdentityService:
                     ),
                     "registry_entry_digest": receipt.get("registry_entry_digest"),
                     "ack_receipt_digest": receipt.get("ack_receipt_digest"),
+                    "ack_quorum_digest": receipt.get("ack_quorum_digest"),
                     "registry_digest_set_digest": receipt.get(
                         "registry_digest_set_digest"
                     ),
@@ -2290,10 +2448,12 @@ class CollectiveIdentityService:
             and governance_registry_bound
             and registry_entry_bound
             and submission_ack_bound
+            and ack_quorum_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
             and not raw_registry_payload_stored
+            and not raw_ack_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -2310,11 +2470,13 @@ class CollectiveIdentityService:
             "governance_registry_bound": governance_registry_bound,
             "registry_entry_bound": registry_entry_bound,
             "submission_ack_bound": submission_ack_bound,
+            "ack_quorum_bound": ack_quorum_bound,
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
             "raw_dissolution_payload_stored": raw_dissolution_payload_stored,
             "raw_registry_payload_stored": raw_registry_payload_stored,
+            "raw_ack_payload_stored": raw_ack_payload_stored,
             "raw_packet_body_stored": raw_packet_body_stored,
         }
 
@@ -2716,6 +2878,53 @@ class CollectiveIdentityService:
                     "member_capture_binding_digest_set_digest": (
                         member_capture_binding_digest_set_digest
                     ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_digest(
+        *,
+        submission_receipt_ref: str,
+        submission_receipt_digest: str,
+        registry_authority_digest: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+        registry_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+                    "submission_receipt_ref": submission_receipt_ref,
+                    "submission_receipt_digest": submission_receipt_digest,
+                    "ack_status": "accepted",
+                    "registry_authority_digest": registry_authority_digest,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "registry_digest": registry_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_quorum_digest(
+        *,
+        collective_id: str,
+        submission_receipt_digest: str,
+        ack_quorum_digest_set_digest: str,
+        ack_quorum_authority_refs: Sequence[str],
+        ack_quorum_jurisdictions: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID,
+                    "collective_id": collective_id,
+                    "submission_receipt_digest": submission_receipt_digest,
+                    "ack_quorum_digest_set_digest": ack_quorum_digest_set_digest,
+                    "ack_quorum_authority_refs": list(ack_quorum_authority_refs),
+                    "ack_quorum_jurisdictions": list(ack_quorum_jurisdictions),
                 }
             )
         )

@@ -7936,8 +7936,15 @@ json.dump(response, sys.stdout)
                     "registry_entry_digest"
                 ],
                 "ack_receipt_digest": external_registry_sync["ack_receipt_digest"],
+                "ack_quorum_digest": external_registry_sync["ack_quorum_digest"],
+                "ack_quorum_jurisdictions": external_registry_sync[
+                    "ack_quorum_jurisdictions"
+                ],
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
+                ],
+                "raw_ack_payload_stored": external_registry_sync[
+                    "raw_ack_payload_stored"
                 ],
             },
             actor="CollectiveIdentityService",
@@ -8093,11 +8100,17 @@ json.dump(response, sys.stdout)
             "external_registry_sync_submission_ack_bound": (
                 external_registry_sync_validation["submission_ack_bound"]
             ),
+            "external_registry_sync_ack_quorum_bound": (
+                external_registry_sync_validation["ack_quorum_bound"]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
             "external_registry_sync_raw_registry_payload_stored": (
                 external_registry_sync_validation["raw_registry_payload_stored"]
+            ),
+            "external_registry_sync_raw_ack_payload_stored": (
+                external_registry_sync_validation["raw_ack_payload_stored"]
             ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],

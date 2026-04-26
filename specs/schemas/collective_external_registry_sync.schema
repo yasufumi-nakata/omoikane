@@ -40,6 +40,17 @@ required:
   - ack_profile_id
   - ack_receipt_ref
   - ack_receipt_digest
+  - ack_quorum_profile_id
+  - ack_quorum_digest_profile
+  - ack_quorum_required_authority_count
+  - ack_quorum_required_jurisdiction_count
+  - ack_quorum_authority_refs
+  - ack_quorum_jurisdictions
+  - ack_quorum_receipts
+  - ack_quorum_digest_set
+  - ack_quorum_digest_set_digest
+  - ack_quorum_digest
+  - ack_quorum_status
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -47,9 +58,11 @@ required:
   - governance_registry_bound
   - registry_entry_bound
   - submission_ack_bound
+  - ack_quorum_bound
   - external_registry_sync_complete
   - raw_dissolution_payload_stored
   - raw_registry_payload_stored
+  - raw_ack_payload_stored
   - raw_packet_body_stored
   - digest
 properties:
@@ -126,10 +139,51 @@ properties:
     pattern: "^registry-ack://collective-dissolution/"
   ack_receipt_digest:
     $ref: "#/$defs/sha256"
+  ack_quorum_profile_id:
+    const: collective-external-registry-ack-quorum-v1
+  ack_quorum_digest_profile:
+    const: collective-external-registry-ack-quorum-digest-v1
+  ack_quorum_required_authority_count:
+    const: 2
+  ack_quorum_required_jurisdiction_count:
+    const: 2
+  ack_quorum_authority_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^(legal-registry|governance-registry)://"
+  ack_quorum_jurisdictions:
+    type: array
+    minItems: 2
+    maxItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 2
+  ack_quorum_receipts:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/ack_quorum_receipt"
+  ack_quorum_digest_set:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_quorum_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_quorum_digest:
+    $ref: "#/$defs/sha256"
+  ack_quorum_status:
+    const: complete
   registry_digest_set:
     type: array
-    minItems: 5
-    maxItems: 5
+    minItems: 6
+    maxItems: 6
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -144,17 +198,53 @@ properties:
     const: true
   submission_ack_bound:
     const: true
+  ack_quorum_bound:
+    const: true
   external_registry_sync_complete:
     const: true
   raw_dissolution_payload_stored:
     const: false
   raw_registry_payload_stored:
     const: false
+  raw_ack_payload_stored:
+    const: false
   raw_packet_body_stored:
     const: false
   digest:
     $ref: "#/$defs/sha256"
 $defs:
+  ack_quorum_receipt:
+    type: object
+    additionalProperties: false
+    required:
+      - ack_receipt_ref
+      - ack_receipt_digest
+      - ack_status
+      - registry_authority_ref
+      - registry_jurisdiction
+      - registry_digest
+      - submission_receipt_digest
+      - raw_ack_payload_stored
+    properties:
+      ack_receipt_ref:
+        type: string
+        pattern: "^registry-ack://collective-dissolution/"
+      ack_receipt_digest:
+        $ref: "#/$defs/sha256"
+      ack_status:
+        const: accepted
+      registry_authority_ref:
+        type: string
+        pattern: "^(legal-registry|governance-registry)://"
+      registry_jurisdiction:
+        type: string
+        minLength: 2
+      registry_digest:
+        $ref: "#/$defs/sha256"
+      submission_receipt_digest:
+        $ref: "#/$defs/sha256"
+      raw_ack_payload_stored:
+        const: false
   sha256:
     type: string
     pattern: "^[0-9a-f]{64}$"
