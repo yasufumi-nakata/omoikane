@@ -44,6 +44,13 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             formatted = "\n".join(error.message for error in errors[:5])
             self.fail(f"{schema_path} validation failed:\n{formatted}")
 
+    def _payload_at(self, payload: dict[str, Any], dotted_path: str) -> dict[str, Any]:
+        cursor: Any = payload
+        for part in dotted_path.split("."):
+            cursor = cursor[part]
+        self.assertIsInstance(cursor, dict)
+        return cursor
+
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()
 
@@ -195,6 +202,24 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
+
+    def test_sensory_loopback_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_sensory_loopback_demo()
+
+        self.assertEqual(
+            "sensory-loopback-public-schema-contract-v1",
+            result["profile"]["public_schema_contract_profile"],
+        )
+        self.assertTrue(result["validation"]["public_schema_contract_bound"])
+        schema_contracts = result["schema_contracts"]
+        self.assertEqual(9, len(schema_contracts))
+        for contract in schema_contracts:
+            self._assert_schema_valid(
+                contract["schema_path"],
+                self._payload_at(result, contract["payload_path"]),
+            )
+        self.assertTrue(result["validation"]["shared_loopback_ok"])
+        self.assertTrue(result["shared_loopback"]["validation"]["artifact_family_arbitration_tracked"])
 
 
 if __name__ == "__main__":

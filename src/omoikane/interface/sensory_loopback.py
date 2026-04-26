@@ -35,6 +35,7 @@ SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD = 0.20
 SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD = 0.35
 SENSORY_LOOPBACK_BODY_MAP_PROFILE = "avatar-proprioceptive-map-v1"
 SENSORY_LOOPBACK_PROPRIOCEPTIVE_CALIBRATION_POLICY = "ref-bound-avatar-map-v1"
+SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE = "sensory-loopback-public-schema-contract-v1"
 SENSORY_LOOPBACK_BODY_MAP_SEGMENTS = ("core", "left-hand", "right-hand", "stance")
 SENSORY_LOOPBACK_BODY_MAP_SEGMENT_SET = set(SENSORY_LOOPBACK_BODY_MAP_SEGMENTS)
 SENSORY_LOOPBACK_BODY_MAP_WEIGHTS = {
@@ -88,6 +89,7 @@ class SensoryLoopbackService:
             "body_map_segments": list(SENSORY_LOOPBACK_BODY_MAP_SEGMENTS),
             "body_map_weights": dict(SENSORY_LOOPBACK_BODY_MAP_WEIGHTS),
             "proprioceptive_calibration_policy": SENSORY_LOOPBACK_PROPRIOCEPTIVE_CALIBRATION_POLICY,
+            "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
             "artifact_storage_policy": "artifact-digest+summary-ref-only",
             "qualia_binding_policy": "surrogate-tick-ref",
             "artifact_family_policy": SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY,

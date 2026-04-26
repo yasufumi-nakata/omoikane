@@ -32,6 +32,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | body_schema_mode | `virtual-self-anchor-v1` |
 | body_map_profile | `avatar-proprioceptive-map-v1` |
 | proprioceptive_calibration_policy | `ref-bound-avatar-map-v1` |
+| public_schema_contract_profile | `sensory-loopback-public-schema-contract-v1` |
 | artifact_storage_policy | `artifact-digest+summary-ref-only` |
 | qualia_binding_policy | `surrogate-tick-ref` |
 | artifact_family_policy | `multi-scene-artifact-family-v1` |
@@ -132,6 +133,9 @@ degraded bundle は Guardian observe が無い限り reject する。
 - 同じ demo 内で shared IMC / collective loopback session を開き、
   `shared-aligned` と `guardian-mediated` arbitration path を
   digest-only artifact family として可視化
+- 同じ demo は `schema_contracts` manifest で self-only / shared の
+  session、receipt、artifact family を public schema path へ束縛し、
+  integration test が各 payload を schema に直接通す
 - `evals/interface/sensory_loopback_guard.yaml` で
   body coherence guard、avatar body-map calibration binding、qualia binding を固定
 - `evals/interface/sensory_loopback_artifact_family.yaml` で
@@ -140,6 +144,8 @@ degraded bundle は Guardian observe が無い限り reject する。
 - `evals/interface/sensory_loopback_multi_self_arbitration.yaml` で
   participant binding、IMC/collective binding、owner handoff、
   guardian-mediated arbitration tracking を固定
+- `evals/interface/sensory_loopback_public_schema_contract.yaml` で
+  CLI demo の schema manifest と public schema validation を固定
 
 ## 未解決
 

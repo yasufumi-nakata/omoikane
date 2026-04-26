@@ -79,6 +79,11 @@ threshold policy receipt と raw SLO payload 無しで quorum を検証する。
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
 safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
 
+### Sensory Loopback Public Schema Contract
+`sensory-loopback-demo --json` が self-only と shared loopback の session /
+receipt / artifact family payload を public schema contract manifest に列挙し、
+integration test が各 payload を schema に直接通せることを確認する。
+
 ## 実装済み eval
 
 - `bdb_fail_safe_reversibility.yaml`
@@ -88,6 +93,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 - `sensory_loopback_artifact_family.yaml`
 - `sensory_loopback_guard.yaml`
 - `sensory_loopback_multi_self_arbitration.yaml`
+- `sensory_loopback_public_schema_contract.yaml`
 - `wms_approval_collection_scaling.yaml`
 - `wms_authority_slo_probe_quorum.yaml`
 - `wms_distributed_approval_fanout.yaml`

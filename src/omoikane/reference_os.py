@@ -88,7 +88,10 @@ from .interface.bdb import BiologicalDigitalBridge
 from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import InterMindChannel
-from .interface.sensory_loopback import SensoryLoopbackService
+from .interface.sensory_loopback import (
+    SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
+    SensoryLoopbackService,
+)
 from .interface.wms import WorldModelSync
 from .kernel.continuity import ContinuityLedger
 from .kernel.broker import SubstrateBrokerService
@@ -10182,6 +10185,53 @@ json.dump(response, sys.stdout)
         shared_artifact_family_validation = self.sensory_loopback.validate_artifact_family(
             shared_artifact_family,
         )
+        schema_contracts = [
+            {
+                "payload_path": "session",
+                "schema_path": "specs/schemas/sensory_loopback_session.schema",
+                "contract_role": "self-loopback-final-session",
+            },
+            {
+                "payload_path": "receipts.coherent",
+                "schema_path": "specs/schemas/sensory_loopback_receipt.schema",
+                "contract_role": "self-loopback-coherent-receipt",
+            },
+            {
+                "payload_path": "receipts.degraded",
+                "schema_path": "specs/schemas/sensory_loopback_receipt.schema",
+                "contract_role": "self-loopback-guardian-hold-receipt",
+            },
+            {
+                "payload_path": "receipts.stabilized",
+                "schema_path": "specs/schemas/sensory_loopback_receipt.schema",
+                "contract_role": "self-loopback-stabilization-receipt",
+            },
+            {
+                "payload_path": "artifact_family",
+                "schema_path": "specs/schemas/sensory_loopback_artifact_family.schema",
+                "contract_role": "self-loopback-artifact-family",
+            },
+            {
+                "payload_path": "shared_loopback.session",
+                "schema_path": "specs/schemas/sensory_loopback_session.schema",
+                "contract_role": "shared-loopback-final-session",
+            },
+            {
+                "payload_path": "shared_loopback.receipts.aligned",
+                "schema_path": "specs/schemas/sensory_loopback_receipt.schema",
+                "contract_role": "shared-loopback-aligned-receipt",
+            },
+            {
+                "payload_path": "shared_loopback.receipts.mediated",
+                "schema_path": "specs/schemas/sensory_loopback_receipt.schema",
+                "contract_role": "shared-loopback-guardian-mediated-receipt",
+            },
+            {
+                "payload_path": "shared_loopback.artifact_family",
+                "schema_path": "specs/schemas/sensory_loopback_artifact_family.schema",
+                "contract_role": "shared-loopback-artifact-family",
+            },
+        ]
 
         return {
             "identity": {
@@ -10189,6 +10239,7 @@ json.dump(response, sys.stdout)
                 "lineage_id": identity.lineage_id,
             },
             "profile": self.sensory_loopback.reference_profile(),
+            "schema_contracts": schema_contracts,
             "world_state": world_state,
             "session": final_session,
             "receipts": {
@@ -10296,6 +10347,14 @@ json.dump(response, sys.stdout)
                 and shared_artifact_family["guardian_arbitration_count"] == 1,
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
+                "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
+                "public_schema_contract_bound": len(schema_contracts) == 9
+                and {contract["schema_path"] for contract in schema_contracts}
+                == {
+                    "specs/schemas/sensory_loopback_session.schema",
+                    "specs/schemas/sensory_loopback_receipt.schema",
+                    "specs/schemas/sensory_loopback_artifact_family.schema",
+                },
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

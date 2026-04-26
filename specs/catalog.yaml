@@ -1043,6 +1043,15 @@ entries:
       - agents/builders/eval-builder.yaml
     rationale: Protects shared IMC/collective participant binding, owner handoff, guardian-mediated arbitration, and arbitration-tracked artifact family capture for bounded multi-self loopback sessions.
   - priority: P1
+    kind: eval
+    file: evals/interface/sensory_loopback_public_schema_contract.yaml
+    consumers:
+      - reference-runtime
+      - tests/integration/test_interface_schema_contracts.py
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, and artifact-family payloads from the CLI demo to reviewer-facing public schemas.
+  - priority: P1
     kind: schema
     file: specs/schemas/collective_merge_session.schema
     consumers:
