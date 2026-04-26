@@ -789,7 +789,13 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 (`interface.imc.v0`) を JSON で可視化し、
 peer attestation、forward secrecy、narrow disclosure floor、
 sealed field redaction、summary+digest-only audit、
+Council-witnessed `memory_glimpse` receipt、
 unilateral emergency disconnect をまとめて確認する。
+同じ receipt は `council-witnessed-memory-glimpse-receipt-v1` として
+MemoryCrystal manifest / selected segment digest、IMC message payload digest、
+Council session / resolution / Guardian attestation ref から作る witness digest を束縛し、
+raw memory payload と raw message payload を保存しないことを
+`imc_memory_glimpse_receipt.schema` と integration test で検証する。
 
 `collective-demo` は L6 Collective Identity の reference contract
 (`interface.collective.v0`) を JSON で可視化し、

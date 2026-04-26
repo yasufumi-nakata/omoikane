@@ -7332,6 +7332,10 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://imc-peer-demo/v1",
             metadata={"display_name": "Shared Peer"},
         )
+        self.episodic.build_reference_snapshot(identity.identity_id)
+        source_events = self.episodic.compaction_candidates()
+        memory_manifest = self.memory.compact(identity.identity_id, source_events)
+        memory_segment = memory_manifest["segments"][0]
         session = self.imc.open_session(
             initiator_id=identity.identity_id,
             peer_id=peer.identity_id,
@@ -7359,9 +7363,21 @@ json.dump(response, sys.stdout)
                 "topic": "continuity retrospective",
                 "affect_summary": "careful optimism",
                 "memory_summary": "council retrospective excerpt",
-                "memory_index": "crystal://segment/7",
+                "memory_index": f"crystal://{memory_segment['segment_id']}",
                 "identity_axiom_state": "sealed-core",
             },
+        )
+        memory_glimpse_receipt = self.imc.seal_memory_glimpse_receipt(
+            session["session_id"],
+            message=message,
+            source_manifest=memory_manifest,
+            selected_segment_ids=[memory_segment["segment_id"]],
+            council_session_ref=f"council://imc-memory-glimpse/{session['session_id']}",
+            council_resolution_ref="council://resolution/imc-memory-glimpse-bounded-v1",
+            guardian_attestation_ref="guardian://integrity/imc-memory-glimpse-digest-only-v1",
+        )
+        memory_glimpse_validation = self.imc.validate_memory_glimpse_receipt(
+            memory_glimpse_receipt
         )
         disconnect = self.imc.emergency_disconnect(
             session["session_id"],
@@ -7369,7 +7385,22 @@ json.dump(response, sys.stdout)
             reason="self-initiated withdrawal after bounded glimpse exchange",
         )
         final_session = self.imc.snapshot(session["session_id"])
-        validation = self.imc.validate_session(final_session)
+        session_validation = self.imc.validate_session(final_session)
+        validation = {
+            **session_validation,
+            "memory_glimpse_receipt": memory_glimpse_validation,
+            "memory_glimpse_receipt_ok": memory_glimpse_validation["ok"],
+            "memory_glimpse_source_bound": memory_glimpse_validation["source_bound"],
+            "memory_glimpse_disclosure_bound": memory_glimpse_validation["disclosure_bound"],
+            "memory_glimpse_witness_bound": memory_glimpse_validation["witness_bound"],
+            "memory_glimpse_digest_bound": memory_glimpse_validation["digest_bound"],
+            "memory_glimpse_raw_memory_payload_stored": memory_glimpse_validation[
+                "raw_memory_payload_stored"
+            ],
+            "memory_glimpse_raw_message_payload_stored": memory_glimpse_validation[
+                "raw_message_payload_stored"
+            ],
+        }
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7406,6 +7437,33 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="imc.memory_glimpse.receipt.sealed",
+            payload={
+                "receipt_id": memory_glimpse_receipt["receipt_id"],
+                "session_id": memory_glimpse_receipt["session_id"],
+                "message_id": memory_glimpse_receipt["message_id"],
+                "source_manifest_digest": memory_glimpse_receipt["memory_source"][
+                    "source_manifest_digest"
+                ],
+                "selected_segment_ids": memory_glimpse_receipt["memory_source"][
+                    "selected_segment_ids"
+                ],
+                "receipt_digest": memory_glimpse_receipt["digest"],
+                "raw_memory_payload_stored": memory_glimpse_receipt["memory_source"][
+                    "raw_memory_payload_stored"
+                ],
+                "raw_message_payload_stored": memory_glimpse_receipt["disclosure_binding"][
+                    "raw_message_payload_stored"
+                ],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self", "guardian", "council"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="imc.emergency.disconnect",
             payload={
                 "session_id": disconnect["session_id"],
@@ -7431,6 +7489,7 @@ json.dump(response, sys.stdout)
             "profile": self.imc.reference_profile(),
             "handshake": final_session["handshake"],
             "message": message,
+            "memory_glimpse_receipt": memory_glimpse_receipt,
             "disconnect": disconnect,
             "session": final_session,
             "validation": validation,

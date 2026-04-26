@@ -7,6 +7,8 @@ imports:
   imc_session: ../schemas/imc_session.schema
   imc_handshake: ../schemas/imc_handshake.schema
   imc_message: ../schemas/imc_message.schema
+  imc_memory_glimpse_receipt: ../schemas/imc_memory_glimpse_receipt.schema
+  memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
 operations:
   open_session:
     summary: Open one fail-closed IMC session after identity attestation, disclosure-floor derivation, and forward-secrecy key exchange.
@@ -85,6 +87,49 @@ operations:
       - delivered_fields must remain within mode_allowed_fields
       - redacted_fields must include every sealed or out-of-floor field
       - continuity artifacts must store summary plus payload digest, not raw content
+  seal_memory_glimpse_receipt:
+    summary: Seal one Council-witnessed digest-only receipt for a bounded memory_glimpse exchange.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - message
+          - source_manifest
+          - selected_segment_ids
+          - council_session_ref
+          - council_resolution_ref
+          - guardian_attestation_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          message:
+            schema_ref: imc_message
+          source_manifest:
+            schema_ref: memory_crystal_manifest
+          selected_segment_ids:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          council_session_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_attestation_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: imc_memory_glimpse_receipt
+    guarantees:
+      - operation only applies to memory_glimpse sessions that already required and received Council witness
+      - receipt must bind selected MemoryCrystal segment digests and the IMC message payload digest
+      - receipt must not store raw MemoryCrystal payloads or raw message payloads
+      - witness digest must bind Council session, Council resolution, Guardian attestation, message id, and source manifest digest
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.
     input:
@@ -164,6 +209,9 @@ events:
   imc.message_sent:
     payload:
       schema_ref: imc_message
+  imc.memory_glimpse_receipt_sealed:
+    payload:
+      schema_ref: imc_memory_glimpse_receipt
   imc.session_closed:
     payload:
       inline_schema:

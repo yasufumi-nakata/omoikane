@@ -94,6 +94,23 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dissolution_receipt_bound"])
         self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
 
+    def test_imc_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_imc_demo()
+
+        self._assert_schema_valid("specs/schemas/imc_handshake.schema", result["handshake"])
+        self._assert_schema_valid("specs/schemas/imc_message.schema", result["message"])
+        self._assert_schema_valid("specs/schemas/imc_session.schema", result["session"])
+        self._assert_schema_valid(
+            "specs/schemas/imc_memory_glimpse_receipt.schema",
+            result["memory_glimpse_receipt"],
+        )
+        self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
+        self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_disclosure_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_witness_bound"])
+        self.assertFalse(result["validation"]["memory_glimpse_raw_memory_payload_stored"])
+        self.assertFalse(result["validation"]["memory_glimpse_raw_message_payload_stored"])
+
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
         result = self.runtime.run_wms_demo()
 

@@ -45,6 +45,10 @@ IMC_MODE_SHARE_TOPOLOGY = {
     "co_imagination": "co-authored-scene",
     "merge_thought": "bidirectional",
 }
+IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE = "council-witnessed-memory-glimpse-receipt-v1"
+IMC_MEMORY_GLIMPSE_SOURCE_PROFILE = "digest-only-memory-crystal-source-v1"
+IMC_MEMORY_GLIMPSE_WITNESS_PROFILE = "council-witness-before-peer-delivery-v1"
+IMC_MEMORY_GLIMPSE_REQUIRED_WITNESS_ROLES = ["CouncilWitness", "GuardianLiaison"]
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -55,6 +59,10 @@ def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
             seen.add(value)
             ordered.append(value)
     return ordered
+
+
+def _memory_glimpse_receipt_digest_payload(receipt: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
 
 
 class InterMindChannel:
@@ -207,6 +215,247 @@ class InterMindChannel:
             }
         )
         return deepcopy(message)
+
+    def seal_memory_glimpse_receipt(
+        self,
+        session_id: str,
+        *,
+        message: Mapping[str, Any],
+        source_manifest: Mapping[str, Any],
+        selected_segment_ids: Sequence[str],
+        council_session_ref: str,
+        council_resolution_ref: str,
+        guardian_attestation_ref: str,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        if session["mode"] != "memory_glimpse":
+            raise ValueError("memory glimpse receipt requires a memory_glimpse IMC session")
+        handshake = session["handshake"]
+        if (
+            handshake.get("council_witness_required") is not True
+            or handshake.get("council_witnessed") is not True
+        ):
+            raise PermissionError("memory glimpse receipt requires a witnessed Council session")
+        if not isinstance(message, Mapping):
+            raise ValueError("message must be a mapping")
+        if message.get("session_id") != session_id or message.get("mode") != "memory_glimpse":
+            raise ValueError("message must belong to the memory_glimpse IMC session")
+        self._check_required_message_field(message, "message_id")
+        self._check_required_message_field(message, "payload_digest")
+
+        normalized_segments = self._select_memory_segments(source_manifest, selected_segment_ids)
+        segment_ids = [segment["segment_id"] for segment in normalized_segments]
+        segment_digests = [segment["digest"] for segment in normalized_segments]
+        source_event_ids = _dedupe_preserve_order(
+            event_id
+            for segment in normalized_segments
+            for event_id in segment.get("source_event_ids", [])
+            if isinstance(event_id, str) and event_id.strip()
+        )
+        source_refs = _dedupe_preserve_order(
+            source_ref
+            for segment in normalized_segments
+            for source_ref in segment.get("source_refs", [])
+            if isinstance(source_ref, str) and source_ref.strip()
+        )
+        source_manifest_digest = sha256_text(canonical_json(source_manifest))
+        redacted_fields = self._normalize_field_list(
+            message.get("redacted_fields", []),
+            "message.redacted_fields",
+        )
+        delivered_fields = message.get("delivered_fields", {})
+        if not isinstance(delivered_fields, Mapping):
+            raise ValueError("message.delivered_fields must be a mapping")
+        sealed_fields = self._normalize_field_list(
+            handshake["disclosure_profile"].get("sealed_fields", []),
+            "handshake.disclosure_profile.sealed_fields",
+        )
+        delivered_field_names = sorted(delivered_fields)
+        if any(field in delivered_field_names for field in sealed_fields):
+            raise ValueError("memory glimpse receipt cannot bind delivered sealed fields")
+
+        council_session = self._normalize_non_empty_string(
+            council_session_ref,
+            "council_session_ref",
+        )
+        council_resolution = self._normalize_non_empty_string(
+            council_resolution_ref,
+            "council_resolution_ref",
+        )
+        guardian_attestation = self._normalize_non_empty_string(
+            guardian_attestation_ref,
+            "guardian_attestation_ref",
+        )
+        witness_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": IMC_MEMORY_GLIMPSE_WITNESS_PROFILE,
+                    "session_id": session_id,
+                    "message_id": message["message_id"],
+                    "source_manifest_digest": source_manifest_digest,
+                    "selected_segment_ids": segment_ids,
+                    "council_session_ref": council_session,
+                    "council_resolution_ref": council_resolution,
+                    "guardian_attestation_ref": guardian_attestation,
+                }
+            )
+        )
+        recorded_at = utc_now_iso()
+        receipt = {
+            "schema_version": IMC_SCHEMA_VERSION,
+            "receipt_id": new_id("imc-memory-glimpse"),
+            "profile_id": IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE,
+            "session_id": session_id,
+            "handshake_id": handshake["handshake_id"],
+            "message_id": message["message_id"],
+            "route_mode": "memory_glimpse",
+            "participants": list(session["participants"]),
+            "issued_at": recorded_at,
+            "memory_source": {
+                "source_profile": IMC_MEMORY_GLIMPSE_SOURCE_PROFILE,
+                "source_manifest_ref": f"memory://manifest/{source_manifest_digest[:16]}",
+                "source_manifest_digest": source_manifest_digest,
+                "source_identity_id": self._normalize_non_empty_string(
+                    source_manifest.get("identity_id"),
+                    "source_manifest.identity_id",
+                ),
+                "selected_segment_ids": segment_ids,
+                "selected_segment_digests": segment_digests,
+                "selected_source_event_ids": source_event_ids,
+                "source_ref_set_digest": sha256_text(canonical_json(source_refs)),
+                "segment_digest_set_digest": sha256_text(canonical_json(segment_digests)),
+                "raw_memory_payload_stored": False,
+            },
+            "disclosure_binding": {
+                "message_payload_digest": message["payload_digest"],
+                "delivered_field_names": delivered_field_names,
+                "redacted_fields": redacted_fields,
+                "sealed_fields": sealed_fields,
+                "delivered_field_count": len(delivered_field_names),
+                "redacted_field_count": len(redacted_fields),
+                "raw_memory_payload_stored": False,
+                "raw_message_payload_stored": False,
+                "summary_only_ledger": True,
+            },
+            "council_witness": {
+                "profile_id": IMC_MEMORY_GLIMPSE_WITNESS_PROFILE,
+                "witness_status": "witnessed",
+                "council_session_ref": council_session,
+                "council_resolution_ref": council_resolution,
+                "guardian_attestation_ref": guardian_attestation,
+                "required_roles": list(IMC_MEMORY_GLIMPSE_REQUIRED_WITNESS_ROLES),
+                "accepted_roles": list(IMC_MEMORY_GLIMPSE_REQUIRED_WITNESS_ROLES),
+                "witness_before_peer_delivery": True,
+                "witness_digest": witness_digest,
+            },
+            "continuity_event_ref": f"ledger://imc-memory-glimpse/{session_id}",
+            "status": "sealed",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_memory_glimpse_receipt_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_memory_glimpse_receipt(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        errors: List[str] = []
+        if receipt.get("schema_version") != IMC_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {IMC_SCHEMA_VERSION}")
+        if receipt.get("profile_id") != IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE:
+            errors.append(f"profile_id must be {IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE}")
+        if receipt.get("route_mode") != "memory_glimpse":
+            errors.append("route_mode must be memory_glimpse")
+        if receipt.get("status") != "sealed":
+            errors.append("status must be sealed")
+
+        memory_source = receipt.get("memory_source")
+        source_bound = False
+        raw_memory_payload_stored = True
+        if not isinstance(memory_source, Mapping):
+            errors.append("memory_source must be an object")
+        else:
+            source_bound = (
+                memory_source.get("source_profile") == IMC_MEMORY_GLIMPSE_SOURCE_PROFILE
+                and isinstance(memory_source.get("source_manifest_digest"), str)
+                and isinstance(memory_source.get("selected_segment_ids"), list)
+                and len(memory_source.get("selected_segment_ids")) >= 1
+                and isinstance(memory_source.get("selected_segment_digests"), list)
+                and len(memory_source.get("selected_segment_digests")) >= 1
+            )
+            raw_memory_payload_stored = (
+                memory_source.get("raw_memory_payload_stored") is not False
+            )
+            if not source_bound:
+                errors.append("memory_source must bind manifest and selected segment digests")
+            if raw_memory_payload_stored:
+                errors.append("memory_source.raw_memory_payload_stored must be false")
+
+        disclosure = receipt.get("disclosure_binding")
+        disclosure_bound = False
+        raw_message_payload_stored = True
+        summary_only_ledger = False
+        if not isinstance(disclosure, Mapping):
+            errors.append("disclosure_binding must be an object")
+        else:
+            redacted_fields = disclosure.get("redacted_fields")
+            sealed_fields = disclosure.get("sealed_fields")
+            delivered_fields = disclosure.get("delivered_field_names")
+            disclosure_bound = (
+                isinstance(disclosure.get("message_payload_digest"), str)
+                and isinstance(redacted_fields, list)
+                and isinstance(sealed_fields, list)
+                and isinstance(delivered_fields, list)
+                and set(sealed_fields).isdisjoint(set(delivered_fields))
+                and bool(set(sealed_fields).intersection(set(redacted_fields)))
+            )
+            raw_message_payload_stored = (
+                disclosure.get("raw_message_payload_stored") is not False
+            )
+            summary_only_ledger = disclosure.get("summary_only_ledger") is True
+            if not disclosure_bound:
+                errors.append("disclosure_binding must bind digest-only redaction evidence")
+            if raw_message_payload_stored:
+                errors.append("disclosure_binding.raw_message_payload_stored must be false")
+            if not summary_only_ledger:
+                errors.append("disclosure_binding.summary_only_ledger must be true")
+
+        witness = receipt.get("council_witness")
+        witness_bound = False
+        if not isinstance(witness, Mapping):
+            errors.append("council_witness must be an object")
+        else:
+            witness_bound = (
+                witness.get("profile_id") == IMC_MEMORY_GLIMPSE_WITNESS_PROFILE
+                and witness.get("witness_status") == "witnessed"
+                and witness.get("witness_before_peer_delivery") is True
+                and witness.get("accepted_roles") == IMC_MEMORY_GLIMPSE_REQUIRED_WITNESS_ROLES
+                and isinstance(witness.get("witness_digest"), str)
+            )
+            if not witness_bound:
+                errors.append("council_witness must bind required roles before peer delivery")
+
+        digest_bound = False
+        digest = receipt.get("digest")
+        if isinstance(digest, str):
+            digest_bound = digest == sha256_text(
+                canonical_json(_memory_glimpse_receipt_digest_payload(dict(receipt)))
+            )
+        if not digest_bound:
+            errors.append("receipt digest must match canonical payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": receipt.get("profile_id"),
+            "source_bound": source_bound,
+            "disclosure_bound": disclosure_bound,
+            "witness_bound": witness_bound,
+            "digest_bound": digest_bound,
+            "raw_memory_payload_stored": raw_memory_payload_stored,
+            "raw_message_payload_stored": raw_message_payload_stored,
+            "summary_only_ledger": summary_only_ledger,
+        }
 
     def emergency_disconnect(
         self,
@@ -432,3 +681,38 @@ class InterMindChannel:
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:
         if not isinstance(value, str) or not value.strip():
             errors.append(f"{field_name} must be a non-empty string")
+
+    def _select_memory_segments(
+        self,
+        source_manifest: Mapping[str, Any],
+        selected_segment_ids: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(source_manifest, Mapping):
+            raise ValueError("source_manifest must be a mapping")
+        if not isinstance(selected_segment_ids, Sequence) or isinstance(selected_segment_ids, (str, bytes)):
+            raise ValueError("selected_segment_ids must be a sequence of strings")
+        normalized_ids = self._normalize_field_list(selected_segment_ids, "selected_segment_ids")
+        segments = source_manifest.get("segments")
+        if not isinstance(segments, Sequence) or isinstance(segments, (str, bytes)):
+            raise ValueError("source_manifest.segments must be a sequence")
+        by_id: Dict[str, Dict[str, Any]] = {}
+        for segment in segments:
+            if not isinstance(segment, Mapping):
+                continue
+            segment_id = segment.get("segment_id")
+            if isinstance(segment_id, str) and segment_id.strip():
+                by_id[segment_id] = dict(segment)
+        selected: List[Dict[str, Any]] = []
+        for segment_id in normalized_ids:
+            try:
+                segment = by_id[segment_id]
+            except KeyError as exc:
+                raise ValueError(f"unknown source memory segment: {segment_id}") from exc
+            self._normalize_non_empty_string(segment.get("digest"), f"segment[{segment_id}].digest")
+            selected.append(segment)
+        return selected
+
+    @staticmethod
+    def _check_required_message_field(message: Mapping[str, Any], field_name: str) -> None:
+        if not isinstance(message.get(field_name), str) or not message.get(field_name, "").strip():
+            raise ValueError(f"message.{field_name} must be a non-empty string")

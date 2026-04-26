@@ -1,0 +1,18 @@
+title: IMC Memory Glimpse Council Witness Receipt
+layer: L6
+objective: >
+  Bind a memory_glimpse IMC exchange to a Council-witnessed digest-only
+  MemoryCrystal source receipt without storing raw memory or raw message
+  payloads.
+fixtures:
+  - name: bounded_memory_glimpse_council_witness_receipt
+    command: PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
+    mode: memory_glimpse
+    receipt_profile: council-witnessed-memory-glimpse-receipt-v1
+assertions:
+  - memory_glimpse receipt conforms to imc_memory_glimpse_receipt.schema
+  - receipt binds the IMC message payload digest to selected MemoryCrystal segment digests
+  - Council witness digest binds council session, council resolution, guardian attestation, message id, and source manifest digest
+  - raw_memory_payload_stored remains false in memory_source and disclosure_binding
+  - raw_message_payload_stored remains false in disclosure_binding
+  - summary_only_ledger remains true

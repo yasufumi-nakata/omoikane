@@ -60,8 +60,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("memory_glimpse", result["handshake"]["route_mode"])
         self.assertTrue(result["validation"]["forward_secrecy_enforced"])
         self.assertTrue(result["validation"]["sealed_fields_protected"])
+        self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
+        self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_disclosure_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_witness_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_digest_bound"])
+        self.assertFalse(result["validation"]["memory_glimpse_raw_memory_payload_stored"])
+        self.assertFalse(result["validation"]["memory_glimpse_raw_message_payload_stored"])
         self.assertEqual("closed", result["session"]["status"])
-        self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-imc"])
+        self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-imc"])
 
     def test_collective_demo_reports_bounded_merge_and_dissolution(self) -> None:
         runtime = OmoikaneReferenceOS()

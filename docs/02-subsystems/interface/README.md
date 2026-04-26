@@ -19,7 +19,7 @@
 - 通信内容は両者の SelfModel に従いフィルタ
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli imc-demo --json`
   で fail-closed handshake、narrow disclosure floor、summary+digest-only audit、
-  emergency disconnect をまとめて検証する
+  Council-witnessed memory_glimpse receipt、emergency disconnect をまとめて検証する
 
 ### Collective Identity
 - 複数自我の bounded `merge_thought` を支える実験的 collective ID

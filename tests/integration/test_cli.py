@@ -186,6 +186,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["handshake"]["forward_secrecy"])
         self.assertEqual("delivered-with-redactions", result["message"]["delivery_status"])
         self.assertEqual(["identity_axiom_state", "memory_index", "memory_summary"], result["message"]["redacted_fields"])
+        self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
+        self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_witness_bound"])
+        self.assertFalse(result["memory_glimpse_receipt"]["memory_source"]["raw_memory_payload_stored"])
+        self.assertFalse(
+            result["memory_glimpse_receipt"]["disclosure_binding"][
+                "raw_message_payload_stored"
+            ]
+        )
         self.assertEqual("closed", result["disconnect"]["status"])
 
     def test_collective_demo_emits_bounded_merge_and_recovery_json(self) -> None:

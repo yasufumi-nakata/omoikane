@@ -1435,6 +1435,15 @@ entries:
     rationale: Required to serialize redacted IMC deliveries as summary plus digest without leaking raw content.
   - priority: P1
     kind: schema
+    file: specs/schemas/imc_memory_glimpse_receipt.schema
+    consumers:
+      - specs/interfaces/interface.imc.v0.idl
+      - reference-runtime
+      - evals/interface/imc_memory_glimpse_council_witness.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize one Council-witnessed memory_glimpse receipt that binds selected MemoryCrystal segment digests to an IMC message digest without storing raw memory or raw message payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/imc_session.schema
     consumers:
       - specs/interfaces/interface.imc.v0.idl
@@ -1546,6 +1555,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects the disclosure floor, sealed-field redaction, and unilateral emergency disconnect at the IMC boundary.
+  - priority: P1
+    kind: eval
+    file: evals/interface/imc_memory_glimpse_council_witness.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects memory_glimpse source binding by requiring Council witness, selected MemoryCrystal segment digests, IMC message digest, and raw payload redaction in one receipt.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_irreversible_veto.yaml

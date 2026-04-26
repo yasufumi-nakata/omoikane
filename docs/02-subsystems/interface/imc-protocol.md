@@ -57,6 +57,23 @@ disclosure_profile:
 
 `sealed_fields` は **常に共有禁止**。テンプレート差分では公開側に寄せず、**より狭い側** を採用する。
 
+## memory_glimpse receipt
+
+`memory_glimpse` は L2 `MemoryCrystal` 由来の記憶片を peer-readable に見せるため、
+session が Council witness 済みであるだけでは足りない。
+reference runtime は送信 message とは別に
+`council-witnessed-memory-glimpse-receipt-v1` を発行し、次だけを残す。
+
+- `MemoryCrystal` manifest digest と selected segment digest set
+- IMC message の `payload_digest`
+- Council session / resolution / Guardian attestation ref から作る witness digest
+- delivered field 名、redacted field 名、sealed field 名
+- `raw_memory_payload_stored=false` と `raw_message_payload_stored=false`
+
+receipt は `imc_memory_glimpse_receipt.schema` に直接照合される。
+記憶 synopsis や raw message payload は receipt に入れず、ContinuityLedger も
+summary と digest だけを保持する。
+
 ## 緊急切断
 
 ```
@@ -79,10 +96,16 @@ on emergency_disconnect(session_id, reason):
 
 ## reference runtime の扱い
 
-- `interface.imc.v0.idl` を導入し、`open_session / send / disconnect / snapshot` の 4 op
-- `imc_session.schema` / `imc_handshake.schema` を導入
-- `imc-demo` を CLI に追加し、handshake → text 送信 → emergency disconnect → audit までを 1 シナリオで実行
-- `evals/safety/imc_disclosure_floor.yaml` で sealed_fields が常に守られることを保証
+- `interface.imc.v0.idl` を導入し、
+  `open_session / send / seal_memory_glimpse_receipt / emergency_disconnect / snapshot`
+  の 5 op
+- `imc_session.schema` / `imc_handshake.schema` / `imc_memory_glimpse_receipt.schema` を導入
+- `imc-demo` を CLI に追加し、handshake → memory_glimpse 送信 →
+  Council-witnessed digest-only receipt → emergency disconnect → audit までを
+  1 シナリオで実行
+- `evals/interface/imc_disclosure_floor.yaml` と
+  `evals/interface/imc_memory_glimpse_council_witness.yaml` で sealed_fields と
+  memory_glimpse receipt が常に守られることを保証
 - `collective-demo` を CLI に追加し、`merge_thought` を
   distinct collective ID、WMS private escape、member recovery 付きの
   bounded contract として smoke する
