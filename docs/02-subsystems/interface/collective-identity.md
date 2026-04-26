@@ -98,15 +98,19 @@ collective_profile:
   authenticated non-loopback authority-route trace と OS observer evidence に束縛する
 - `collective-external-registry-ack-route-capture-export-v1` により、その ack route trace を
   verified pcap export と delegated-broker privileged capture acquisition に束縛する
-- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw packet body は保存しない
+- `collective-external-registry-ack-live-endpoint-probe-v1` により、legal / governance
+  registry acknowledgement を live HTTP JSON endpoint response digest、HTTP status、
+  probe latency、endpoint ref に束縛する
+- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw endpoint payload、raw packet body は保存しない
 
 ## reference runtime の扱い
 
 - `interface.collective.v0.idl` を導入し、
   `register_collective / open_merge_session / close_merge_session / dissolve_collective /
   bind_recovery_verifier_transport / bind_recovery_verifier_route_trace /
-  bind_recovery_route_trace_capture_export / sync_dissolution_external_registry`
-  の 8 op を固定する
+  bind_recovery_route_trace_capture_export / sync_dissolution_external_registry /
+  bind_external_registry_ack_endpoint_probes`
+  の 9 op を固定する
 - `collective_record.schema`、`collective_merge_session.schema`、
   `collective_dissolution_receipt.schema`、
   `collective_recovery_verifier_transport_binding.schema`、
@@ -117,7 +121,8 @@ collective_profile:
   identity confirmation、schema-bound dissolution receipt、
   member recovery proof binding、remote verifier transport binding、
   non-loopback authority-route trace binding、packet capture export binding、
-  external legal/governance registry sync、ack route capture export binding を
+  external legal/governance registry sync、ack route capture export binding、
+  live registry acknowledgement endpoint probe binding を
   1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
@@ -136,7 +141,9 @@ collective_profile:
 - `evals/interface/collective_external_registry_sync.yaml` は
   capture export binding と external legal / governance registry digest、
   registry entry、submission、acknowledgement receipt、2 jurisdiction ack quorum の
-  束縛、ack route trace binding、raw registry / ack / ack-route payload redaction を監査する
+  束縛、ack route trace binding、ack route capture export binding、
+  live acknowledgement endpoint probe binding、raw registry / ack / ack-route /
+  endpoint payload redaction を監査する
 
 ## 不変条件
 
@@ -147,7 +154,7 @@ collective_profile:
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
 6. **packet-body redaction** ── recovery capture binding は raw packet body を保存せず digest/readback/route ref だけを持つ
 7. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
-8. **external registry redaction** ── registry sync は legal/governance registry digest、acknowledgement quorum digest、ack route trace digest だけを保持し、raw registry / ack / ack-route payload を保存しない
+8. **external registry redaction** ── registry sync は legal/governance registry digest、acknowledgement quorum digest、ack route trace digest、ack endpoint response digest だけを保持し、raw registry / ack / ack-route / endpoint payload を保存しない
 9. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連

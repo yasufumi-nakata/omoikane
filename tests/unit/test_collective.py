@@ -1,9 +1,43 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 import unittest
 
 from omoikane.common import canonical_json, sha256_text
 from omoikane.interface.collective import CollectiveIdentityService
+
+
+@contextmanager
+def live_ack_endpoint(payload: dict[str, object]):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self) -> None:  # noqa: N802
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+            self.close_connection = True
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/registry-ack"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1.0)
 
 
 class CollectiveIdentityServiceTests(unittest.TestCase):
@@ -303,6 +337,25 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             registry_ack_packet_capture_export=packet_capture,
             registry_ack_privileged_capture_acquisition=privileged_capture,
         )
+        ack_endpoint_probes = []
+        for index, ack_receipt in enumerate(registry_sync["ack_quorum_receipts"]):
+            payload = service.external_registry_ack_endpoint_payload(
+                registry_sync,
+                ack_receipt,
+                checked_at=f"2026-04-26T11:10:0{index}Z",
+            )
+            with live_ack_endpoint(payload) as endpoint:
+                ack_endpoint_probes.append(
+                    service.probe_external_registry_ack_endpoint(
+                        registry_ack_endpoint=endpoint,
+                        external_registry_sync=registry_sync,
+                        ack_receipt=ack_receipt,
+                    )
+                )
+        registry_sync = service.bind_external_registry_ack_endpoint_probes(
+            registry_sync,
+            ack_endpoint_probes,
+        )
         registry_validation = service.validate_collective_external_registry_sync(
             registry_sync,
             capture_binding,
@@ -344,6 +397,20 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         tampered_ack_capture_registry_validation = (
             service.validate_collective_external_registry_sync(
                 tampered_ack_capture_registry_sync,
+                capture_binding,
+                route_trace,
+                packet_capture,
+                privileged_capture,
+            )
+        )
+        tampered_live_probe_registry_sync = dict(registry_sync)
+        tampered_live_probe_registry_sync["ack_live_endpoint_probe_digests"] = [
+            registry_sync["ack_live_endpoint_probe_digests"][0],
+            "0" * 64,
+        ]
+        tampered_live_probe_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_live_probe_registry_sync,
                 capture_binding,
                 route_trace,
                 packet_capture,
@@ -418,9 +485,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertTrue(registry_validation["ack_route_capture_bindings_bound"])
         self.assertTrue(registry_validation["ack_route_capture_route_binding_set_bound"])
         self.assertTrue(registry_validation["ack_route_capture_export_bound"])
+        self.assertTrue(registry_validation["ack_live_endpoint_probe_bound"])
         self.assertFalse(registry_validation["raw_registry_payload_stored"])
         self.assertFalse(registry_validation["raw_ack_payload_stored"])
         self.assertFalse(registry_validation["raw_ack_route_payload_stored"])
+        self.assertFalse(registry_validation["raw_ack_endpoint_payload_stored"])
+        self.assertFalse(registry_validation["raw_packet_body_stored"])
         self.assertEqual(
             "collective-external-registry-ack-quorum-v1",
             registry_sync["ack_quorum_profile_id"],
@@ -442,6 +512,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         )
         self.assertEqual(2, registry_sync["ack_route_capture_binding_count"])
         self.assertTrue(registry_sync["ack_route_capture_export_bound"])
+        self.assertEqual(
+            "collective-external-registry-ack-live-endpoint-probe-v1",
+            registry_sync["ack_live_endpoint_probe_profile_id"],
+        )
+        self.assertEqual(2, registry_sync["ack_live_endpoint_probe_count"])
+        self.assertTrue(registry_sync["ack_live_endpoint_probe_bound"])
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
         self.assertFalse(tampered_route_trace_registry_validation["ok"])
@@ -450,6 +526,8 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertFalse(
             tampered_ack_capture_registry_validation["ack_route_capture_bindings_bound"]
         )
+        self.assertFalse(tampered_live_probe_registry_validation["ok"])
+        self.assertFalse(tampered_live_probe_registry_validation["ack_live_endpoint_probe_bound"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()

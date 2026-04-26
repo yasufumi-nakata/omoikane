@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
+import time
 from typing import Any, Dict, List, Mapping, Sequence, Set
+from urllib import error, request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -65,6 +68,16 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID = (
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_DIGEST_PROFILE_ID = (
     "collective-external-registry-ack-route-capture-export-digest-v1"
 )
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID = (
+    "collective-external-registry-ack-live-endpoint-probe-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-live-endpoint-probe-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE = (
+    "live-http-json-collective-registry-ack-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS = 1_000.0
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -95,6 +108,10 @@ def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
             seen.add(value)
             ordered.append(value)
     return ordered
+
+
+def _is_live_http_endpoint(value: str) -> bool:
+    return value.startswith("http://") or value.startswith("https://")
 
 
 class CollectiveIdentityService:
@@ -145,8 +162,15 @@ class CollectiveIdentityService:
                 "external_registry_ack_route_trace_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
                 ),
+                "external_registry_ack_route_capture_export_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID
+                ),
+                "external_registry_ack_live_endpoint_probe_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
+                "raw_external_registry_ack_endpoint_payload_stored": False,
             },
         }
 
@@ -1354,6 +1378,272 @@ class CollectiveIdentityService:
         }
         return deepcopy(receipt)
 
+    def external_registry_ack_endpoint_payload(
+        self,
+        external_registry_sync: Mapping[str, Any],
+        ack_receipt: Mapping[str, Any],
+        *,
+        checked_at: str | None = None,
+    ) -> Dict[str, Any]:
+        """Build the compact JSON a live registry acknowledgement endpoint returns."""
+
+        if not isinstance(external_registry_sync, Mapping):
+            raise ValueError("external_registry_sync must be a mapping")
+        if not isinstance(ack_receipt, Mapping):
+            raise ValueError("ack_receipt must be a mapping")
+        return {
+            "kind": "collective_external_registry_ack_endpoint_status",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID,
+            "ack_receipt_ref": ack_receipt["ack_receipt_ref"],
+            "ack_receipt_digest": ack_receipt["ack_receipt_digest"],
+            "ack_status": ack_receipt["ack_status"],
+            "registry_authority_ref": ack_receipt["registry_authority_ref"],
+            "registry_jurisdiction": ack_receipt["registry_jurisdiction"],
+            "registry_digest": ack_receipt["registry_digest"],
+            "submission_receipt_digest": ack_receipt["submission_receipt_digest"],
+            "registry_entry_digest": external_registry_sync["registry_entry_digest"],
+            "ack_quorum_digest": external_registry_sync["ack_quorum_digest"],
+            "ack_route_trace_binding_digest": external_registry_sync[
+                "ack_route_trace_binding_digest"
+            ],
+            "ack_route_capture_binding_digest": external_registry_sync[
+                "ack_route_capture_binding_digest"
+            ],
+            "checked_at": checked_at or utc_now_iso(),
+            "raw_ack_payload_stored": False,
+        }
+
+    def probe_external_registry_ack_endpoint(
+        self,
+        *,
+        registry_ack_endpoint: str,
+        external_registry_sync: Mapping[str, Any],
+        ack_receipt: Mapping[str, Any],
+        request_timeout_ms: int = 1_000,
+    ) -> Dict[str, Any]:
+        """Probe one live registry acknowledgement endpoint and return a digest-only receipt."""
+
+        normalized_endpoint = self._normalize_non_empty_string(
+            registry_ack_endpoint,
+            "registry_ack_endpoint",
+        )
+        if not _is_live_http_endpoint(normalized_endpoint):
+            raise ValueError("registry_ack_endpoint must be http:// or https://")
+        normalized_timeout_ms = int(request_timeout_ms)
+        if normalized_timeout_ms <= 0:
+            raise ValueError("request_timeout_ms must be positive")
+        if not isinstance(external_registry_sync, Mapping):
+            raise ValueError("external_registry_sync must be a mapping")
+        if not isinstance(ack_receipt, Mapping):
+            raise ValueError("ack_receipt must be a mapping")
+
+        request_started = time.monotonic()
+        try:
+            with request.urlopen(
+                normalized_endpoint,
+                timeout=normalized_timeout_ms / 1000.0,
+            ) as response:
+                http_status = int(getattr(response, "status", 200))
+                payload_text = response.read().decode("utf-8")
+        except error.URLError as exc:
+            raise ValueError(
+                f"collective registry ack endpoint unreachable: {normalized_endpoint}"
+            ) from exc
+        observed_probe_latency_ms = round(
+            (time.monotonic() - request_started) * 1000.0,
+            3,
+        )
+        if http_status != 200:
+            raise ValueError(
+                "collective registry ack endpoint returned unexpected status "
+                f"{http_status}"
+            )
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("collective registry ack endpoint must return JSON") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("collective registry ack endpoint payload must be a mapping")
+
+        expected_payload = self.external_registry_ack_endpoint_payload(
+            external_registry_sync,
+            ack_receipt,
+            checked_at=str(payload.get("checked_at") or ""),
+        )
+        for field_name, expected_value in expected_payload.items():
+            if field_name == "checked_at":
+                self._normalize_non_empty_string(
+                    payload.get(field_name),
+                    "registry_ack_endpoint_payload.checked_at",
+                )
+                continue
+            if payload.get(field_name) != expected_value:
+                raise ValueError(
+                    "collective registry ack endpoint field mismatch: "
+                    f"{field_name}"
+                )
+
+        network_response_digest = sha256_text(canonical_json(payload))
+        network_probe_bound = (
+            _is_live_http_endpoint(normalized_endpoint)
+            and http_status == 200
+            and observed_probe_latency_ms
+            <= COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS
+            and len(network_response_digest) == 64
+            and payload.get("raw_ack_payload_stored") is False
+        )
+        receipt = {
+            "kind": "collective_external_registry_ack_endpoint_probe",
+            "schema_version": "1.0.0",
+            "probe_id": new_id("collective-registry-ack-probe"),
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID,
+            "digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_DIGEST_PROFILE_ID
+            ),
+            "transport_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE
+            ),
+            "registry_ack_endpoint_ref": normalized_endpoint,
+            "ack_receipt_ref": ack_receipt["ack_receipt_ref"],
+            "ack_receipt_digest": ack_receipt["ack_receipt_digest"],
+            "ack_status": ack_receipt["ack_status"],
+            "registry_authority_ref": ack_receipt["registry_authority_ref"],
+            "registry_jurisdiction": ack_receipt["registry_jurisdiction"],
+            "registry_digest": ack_receipt["registry_digest"],
+            "submission_receipt_digest": ack_receipt["submission_receipt_digest"],
+            "registry_entry_digest": external_registry_sync["registry_entry_digest"],
+            "ack_quorum_digest": external_registry_sync["ack_quorum_digest"],
+            "ack_route_trace_binding_digest": external_registry_sync[
+                "ack_route_trace_binding_digest"
+            ],
+            "ack_route_capture_binding_digest": external_registry_sync[
+                "ack_route_capture_binding_digest"
+            ],
+            "http_status": http_status,
+            "request_timeout_ms": normalized_timeout_ms,
+            "observed_probe_latency_ms": observed_probe_latency_ms,
+            "latency_budget_ms": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS
+            ),
+            "network_response_digest": network_response_digest,
+            "network_probe_status": "reachable",
+            "network_probe_bound": network_probe_bound,
+            "checked_at": payload["checked_at"],
+            "raw_ack_payload_stored": False,
+            "raw_endpoint_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                self._collective_external_registry_ack_endpoint_probe_digest_payload(
+                    receipt
+                )
+            )
+        )
+        return receipt
+
+    def bind_external_registry_ack_endpoint_probes(
+        self,
+        external_registry_sync: Mapping[str, Any],
+        ack_endpoint_probe_receipts: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        """Attach live acknowledgement endpoint probe receipts to registry sync."""
+
+        if not isinstance(external_registry_sync, Mapping):
+            raise ValueError("external_registry_sync must be a mapping")
+        if not isinstance(ack_endpoint_probe_receipts, Sequence):
+            raise ValueError("ack_endpoint_probe_receipts must be a sequence")
+        ack_quorum_receipts = external_registry_sync.get("ack_quorum_receipts")
+        if not isinstance(ack_quorum_receipts, list) or not ack_quorum_receipts:
+            raise ValueError("external_registry_sync must carry ack_quorum_receipts")
+        if len(ack_endpoint_probe_receipts) != len(ack_quorum_receipts):
+            raise ValueError(
+                "ack_endpoint_probe_receipts must cover every registry acknowledgement"
+            )
+
+        bound_probes: List[Dict[str, Any]] = []
+        probe_digests: List[str] = []
+        authority_refs: List[str] = []
+        jurisdictions: List[str] = []
+        network_response_digests: List[str] = []
+        for probe_receipt, ack_receipt in zip(
+            ack_endpoint_probe_receipts,
+            ack_quorum_receipts,
+        ):
+            validation = self.validate_external_registry_ack_endpoint_probe_receipt(
+                probe_receipt,
+                external_registry_sync,
+                ack_receipt,
+            )
+            if not validation["ok"]:
+                raise ValueError(
+                    "ack_endpoint_probe_receipts must validate before binding: "
+                    + "; ".join(validation["errors"])
+                )
+            probe_copy = dict(probe_receipt)
+            bound_probes.append(probe_copy)
+            probe_digests.append(str(probe_copy["digest"]))
+            authority_refs.append(str(probe_copy["registry_authority_ref"]))
+            jurisdictions.append(str(probe_copy["registry_jurisdiction"]))
+            network_response_digests.append(str(probe_copy["network_response_digest"]))
+
+        probe_set_digest = sha256_text(canonical_json(probe_digests))
+        response_digest_set_digest = sha256_text(
+            canonical_json(network_response_digests)
+        )
+        receipt = dict(external_registry_sync)
+        receipt.update(
+            {
+                "ack_live_endpoint_probe_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID
+                ),
+                "ack_live_endpoint_probe_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_probe_transport_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE
+                ),
+                "ack_live_endpoint_probe_receipts": bound_probes,
+                "ack_live_endpoint_probe_digests": probe_digests,
+                "ack_live_endpoint_probe_set_digest": probe_set_digest,
+                "ack_live_endpoint_probe_authority_refs": authority_refs,
+                "ack_live_endpoint_probe_jurisdictions": jurisdictions,
+                "ack_live_endpoint_network_response_digests": (
+                    network_response_digests
+                ),
+                "ack_live_endpoint_network_response_digest_set_digest": (
+                    response_digest_set_digest
+                ),
+                "ack_live_endpoint_probe_count": len(bound_probes),
+                "ack_live_endpoint_probe_bound": True,
+                "raw_ack_endpoint_payload_stored": False,
+            }
+        )
+        receipt["registry_digest_set"] = [
+            receipt["legal_registry_digest"],
+            receipt["governance_registry_digest"],
+            receipt["registry_entry_digest"],
+            receipt["submission_receipt_digest"],
+            receipt["ack_receipt_digest"],
+            receipt["ack_quorum_digest"],
+            receipt["ack_route_trace_binding_digest"],
+            receipt["ack_route_capture_binding_digest"],
+            receipt["ack_live_endpoint_probe_set_digest"],
+        ]
+        receipt["registry_digest_set_digest"] = sha256_text(
+            canonical_json(receipt["registry_digest_set"])
+        )
+        receipt["external_registry_sync_complete"] = bool(
+            receipt.get("ack_route_capture_export_bound")
+            and receipt["ack_live_endpoint_probe_bound"]
+        )
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                self._collective_external_registry_sync_digest_payload(receipt)
+            )
+        )
+        return receipt
+
     def snapshot(self, collective_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_record(collective_id))
 
@@ -2390,6 +2680,21 @@ class CollectiveIdentityService:
             "ack_route_trace_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_DIGEST_PROFILE_ID
             ),
+            "ack_route_capture_export_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID
+            ),
+            "ack_route_capture_export_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_DIGEST_PROFILE_ID
+            ),
+            "ack_live_endpoint_probe_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID
+            ),
+            "ack_live_endpoint_probe_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_DIGEST_PROFILE_ID
+            ),
+            "ack_live_endpoint_probe_transport_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -2483,6 +2788,16 @@ class CollectiveIdentityService:
             "ack_authority_plane_digest",
             "ack_route_trace_binding_digest_set_digest",
             "ack_route_trace_binding_digest",
+            "ack_route_packet_capture_digest",
+            "ack_route_packet_capture_artifact_digest",
+            "ack_route_packet_capture_readback_digest",
+            "ack_route_privileged_capture_digest",
+            "ack_route_capture_filter_digest",
+            "ack_route_capture_command_digest",
+            "ack_route_capture_binding_digest_set_digest",
+            "ack_route_capture_binding_digest",
+            "ack_live_endpoint_probe_set_digest",
+            "ack_live_endpoint_network_response_digest_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -3100,6 +3415,90 @@ class CollectiveIdentityService:
         if not ack_route_capture_export_bound:
             errors.append("ack route capture export must bind ack route trace evidence")
 
+        ack_live_endpoint_probe_receipts = receipt.get(
+            "ack_live_endpoint_probe_receipts"
+        )
+        expected_ack_live_endpoint_probe_digests: List[str] = []
+        expected_ack_live_endpoint_authority_refs: List[str] = []
+        expected_ack_live_endpoint_jurisdictions: List[str] = []
+        expected_ack_live_endpoint_response_digests: List[str] = []
+        ack_live_endpoint_probe_bound = False
+        raw_ack_endpoint_payload_stored = (
+            receipt.get("raw_ack_endpoint_payload_stored") is True
+        )
+        if not isinstance(ack_live_endpoint_probe_receipts, list):
+            errors.append("ack_live_endpoint_probe_receipts must be a list")
+        elif len(ack_live_endpoint_probe_receipts) != len(expected_ack_quorum_receipts):
+            errors.append(
+                "ack_live_endpoint_probe_receipts must cover every ack quorum receipt"
+            )
+        else:
+            probe_receipts_valid = True
+            for probe_receipt, ack_receipt in zip(
+                ack_live_endpoint_probe_receipts,
+                expected_ack_quorum_receipts,
+            ):
+                if not isinstance(probe_receipt, Mapping):
+                    errors.append("ack_live_endpoint_probe_receipts entries must be objects")
+                    probe_receipts_valid = False
+                    continue
+                probe_validation = (
+                    self.validate_external_registry_ack_endpoint_probe_receipt(
+                        probe_receipt,
+                        receipt,
+                        ack_receipt,
+                    )
+                )
+                if not probe_validation["ok"]:
+                    errors.extend(
+                        "ack_live_endpoint_probe_receipts: " + error
+                        for error in probe_validation["errors"]
+                    )
+                    probe_receipts_valid = False
+                expected_ack_live_endpoint_probe_digests.append(
+                    str(probe_receipt.get("digest"))
+                )
+                expected_ack_live_endpoint_authority_refs.append(
+                    str(probe_receipt.get("registry_authority_ref"))
+                )
+                expected_ack_live_endpoint_jurisdictions.append(
+                    str(probe_receipt.get("registry_jurisdiction"))
+                )
+                expected_ack_live_endpoint_response_digests.append(
+                    str(probe_receipt.get("network_response_digest"))
+                )
+            expected_probe_set_digest = sha256_text(
+                canonical_json(expected_ack_live_endpoint_probe_digests)
+            )
+            expected_response_digest_set_digest = sha256_text(
+                canonical_json(expected_ack_live_endpoint_response_digests)
+            )
+            ack_live_endpoint_probe_bound = (
+                probe_receipts_valid
+                and receipt.get("ack_live_endpoint_probe_digests")
+                == expected_ack_live_endpoint_probe_digests
+                and receipt.get("ack_live_endpoint_probe_set_digest")
+                == expected_probe_set_digest
+                and receipt.get("ack_live_endpoint_probe_authority_refs")
+                == expected_ack_live_endpoint_authority_refs
+                and receipt.get("ack_live_endpoint_probe_jurisdictions")
+                == expected_ack_live_endpoint_jurisdictions
+                and receipt.get("ack_live_endpoint_network_response_digests")
+                == expected_ack_live_endpoint_response_digests
+                and receipt.get(
+                    "ack_live_endpoint_network_response_digest_set_digest"
+                )
+                == expected_response_digest_set_digest
+                and receipt.get("ack_live_endpoint_probe_count")
+                == len(expected_ack_live_endpoint_probe_digests)
+                and receipt.get("ack_live_endpoint_probe_bound") is True
+                and not raw_ack_endpoint_payload_stored
+            )
+        if not ack_live_endpoint_probe_bound:
+            errors.append("ack live endpoint probes must bind every registry acknowledgement")
+        if raw_ack_endpoint_payload_stored:
+            errors.append("raw_ack_endpoint_payload_stored must be false")
+
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
             isinstance(registry_digest_set, list)
@@ -3113,6 +3512,7 @@ class CollectiveIdentityService:
                 receipt.get("ack_quorum_digest"),
                 receipt.get("ack_route_trace_binding_digest"),
                 receipt.get("ack_route_capture_binding_digest"),
+                receipt.get("ack_live_endpoint_probe_set_digest"),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -3121,27 +3521,7 @@ class CollectiveIdentityService:
             errors.append("registry digest set must bind legal/governance/entry/ack")
 
         expected_digest = sha256_text(
-            canonical_json(
-                {
-                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
-                    "collective_id": receipt.get("collective_id"),
-                    "recovery_capture_export_binding_digest": receipt.get(
-                        "recovery_capture_export_binding_digest"
-                    ),
-                    "registry_entry_digest": receipt.get("registry_entry_digest"),
-                    "ack_receipt_digest": receipt.get("ack_receipt_digest"),
-                    "ack_quorum_digest": receipt.get("ack_quorum_digest"),
-                    "ack_route_trace_binding_digest": receipt.get(
-                        "ack_route_trace_binding_digest"
-                    ),
-                    "ack_route_capture_binding_digest": receipt.get(
-                        "ack_route_capture_binding_digest"
-                    ),
-                    "registry_digest_set_digest": receipt.get(
-                        "registry_digest_set_digest"
-                    ),
-                }
-            )
+            canonical_json(self._collective_external_registry_sync_digest_payload(receipt))
         )
         digest_bound = receipt.get("digest") == expected_digest
         if not digest_bound:
@@ -3168,12 +3548,14 @@ class CollectiveIdentityService:
             and ack_quorum_bound
             and ack_route_trace_bound
             and ack_route_capture_export_bound
+            and ack_live_endpoint_probe_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
             and not raw_registry_payload_stored
             and not raw_ack_payload_stored
             and not raw_ack_route_payload_stored
+            and not raw_ack_endpoint_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -3199,6 +3581,7 @@ class CollectiveIdentityService:
                 ack_route_capture_route_binding_set_bound
             ),
             "ack_route_capture_export_bound": ack_route_capture_export_bound,
+            "ack_live_endpoint_probe_bound": ack_live_endpoint_probe_bound,
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -3206,7 +3589,119 @@ class CollectiveIdentityService:
             "raw_registry_payload_stored": raw_registry_payload_stored,
             "raw_ack_payload_stored": raw_ack_payload_stored,
             "raw_ack_route_payload_stored": raw_ack_route_payload_stored,
+            "raw_ack_endpoint_payload_stored": raw_ack_endpoint_payload_stored,
             "raw_packet_body_stored": raw_packet_body_stored,
+        }
+
+    def validate_external_registry_ack_endpoint_probe_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        external_registry_sync: Mapping[str, Any],
+        ack_receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        if not isinstance(external_registry_sync, Mapping):
+            raise ValueError("external_registry_sync must be a mapping")
+        if not isinstance(ack_receipt, Mapping):
+            raise ValueError("ack_receipt must be a mapping")
+
+        expected_fields = {
+            "kind": "collective_external_registry_ack_endpoint_probe",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID,
+            "digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_DIGEST_PROFILE_ID
+            ),
+            "transport_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE
+            ),
+            "ack_receipt_ref": ack_receipt.get("ack_receipt_ref"),
+            "ack_receipt_digest": ack_receipt.get("ack_receipt_digest"),
+            "ack_status": ack_receipt.get("ack_status"),
+            "registry_authority_ref": ack_receipt.get("registry_authority_ref"),
+            "registry_jurisdiction": ack_receipt.get("registry_jurisdiction"),
+            "registry_digest": ack_receipt.get("registry_digest"),
+            "submission_receipt_digest": ack_receipt.get(
+                "submission_receipt_digest"
+            ),
+            "registry_entry_digest": external_registry_sync.get(
+                "registry_entry_digest"
+            ),
+            "ack_quorum_digest": external_registry_sync.get("ack_quorum_digest"),
+            "ack_route_trace_binding_digest": external_registry_sync.get(
+                "ack_route_trace_binding_digest"
+            ),
+            "ack_route_capture_binding_digest": external_registry_sync.get(
+                "ack_route_capture_binding_digest"
+            ),
+            "http_status": 200,
+            "network_probe_status": "reachable",
+            "network_probe_bound": True,
+            "raw_ack_payload_stored": False,
+            "raw_endpoint_payload_stored": False,
+        }
+        for field_name, expected in expected_fields.items():
+            if receipt.get(field_name) != expected:
+                errors.append(f"{field_name} must equal {expected}")
+        for field_name in (
+            "ack_receipt_digest",
+            "registry_digest",
+            "submission_receipt_digest",
+            "registry_entry_digest",
+            "ack_quorum_digest",
+            "ack_route_trace_binding_digest",
+            "ack_route_capture_binding_digest",
+            "network_response_digest",
+            "digest",
+        ):
+            if not self._looks_like_digest(receipt.get(field_name)):
+                errors.append(f"{field_name} must be sha256 hex")
+        endpoint = receipt.get("registry_ack_endpoint_ref")
+        if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
+            errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
+        if not isinstance(receipt.get("probe_id"), str) or not receipt.get("probe_id"):
+            errors.append("probe_id must be present")
+        if not isinstance(receipt.get("request_timeout_ms"), int) or receipt.get(
+            "request_timeout_ms"
+        ) <= 0:
+            errors.append("request_timeout_ms must be positive")
+        latency = receipt.get("observed_probe_latency_ms")
+        if not isinstance(latency, (int, float)) or latency < 0:
+            errors.append("observed_probe_latency_ms must be non-negative")
+        if (
+            isinstance(latency, (int, float))
+            and latency
+            > COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS
+        ):
+            errors.append("observed_probe_latency_ms must fit latency budget")
+        if (
+            receipt.get("latency_budget_ms")
+            != COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS
+        ):
+            errors.append("latency_budget_ms mismatch")
+        if not isinstance(receipt.get("checked_at"), str) or not receipt.get(
+            "checked_at"
+        ):
+            errors.append("checked_at must be present")
+        expected_digest = sha256_text(
+            canonical_json(
+                self._collective_external_registry_ack_endpoint_probe_digest_payload(
+                    receipt
+                )
+            )
+        )
+        if receipt.get("digest") != expected_digest:
+            errors.append("digest must match ack endpoint probe payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "network_probe_bound": receipt.get("network_probe_bound") is True,
+            "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
+            "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
+            is True,
         }
 
     def _derive_member_recovery_proofs(
@@ -3863,6 +4358,60 @@ class CollectiveIdentityService:
                 }
             )
         )
+
+    @staticmethod
+    def _collective_external_registry_ack_endpoint_probe_digest_payload(
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "probe_id": receipt.get("probe_id"),
+            "profile_id": receipt.get("profile_id"),
+            "transport_profile": receipt.get("transport_profile"),
+            "registry_ack_endpoint_ref": receipt.get("registry_ack_endpoint_ref"),
+            "ack_receipt_ref": receipt.get("ack_receipt_ref"),
+            "ack_receipt_digest": receipt.get("ack_receipt_digest"),
+            "registry_authority_ref": receipt.get("registry_authority_ref"),
+            "registry_jurisdiction": receipt.get("registry_jurisdiction"),
+            "registry_digest": receipt.get("registry_digest"),
+            "submission_receipt_digest": receipt.get("submission_receipt_digest"),
+            "registry_entry_digest": receipt.get("registry_entry_digest"),
+            "ack_quorum_digest": receipt.get("ack_quorum_digest"),
+            "ack_route_trace_binding_digest": receipt.get(
+                "ack_route_trace_binding_digest"
+            ),
+            "ack_route_capture_binding_digest": receipt.get(
+                "ack_route_capture_binding_digest"
+            ),
+            "network_response_digest": receipt.get("network_response_digest"),
+            "network_probe_bound": receipt.get("network_probe_bound"),
+            "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
+            "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
+        }
+
+    @staticmethod
+    def _collective_external_registry_sync_digest_payload(
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+            "collective_id": receipt.get("collective_id"),
+            "recovery_capture_export_binding_digest": receipt.get(
+                "recovery_capture_export_binding_digest"
+            ),
+            "registry_entry_digest": receipt.get("registry_entry_digest"),
+            "ack_receipt_digest": receipt.get("ack_receipt_digest"),
+            "ack_quorum_digest": receipt.get("ack_quorum_digest"),
+            "ack_route_trace_binding_digest": receipt.get(
+                "ack_route_trace_binding_digest"
+            ),
+            "ack_route_capture_binding_digest": receipt.get(
+                "ack_route_capture_binding_digest"
+            ),
+            "ack_live_endpoint_probe_set_digest": receipt.get(
+                "ack_live_endpoint_probe_set_digest"
+            ),
+            "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
+        }
 
     @staticmethod
     def _external_registry_digest(

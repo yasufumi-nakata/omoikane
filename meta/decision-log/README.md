@@ -107,5 +107,6 @@ status: decided | superseded
 - [2026-04-26_collective-recovery-route-trace-binding.md](2026-04-26_collective-recovery-route-trace-binding.md)
 - [2026-04-26_collective-external-registry-sync.md](2026-04-26_collective-external-registry-sync.md)
 - [2026-04-26_collective-external-registry-ack-route-capture-export.md](2026-04-26_collective-external-registry-ack-route-capture-export.md)
+- [2026-04-26_collective-external-registry-ack-live-endpoint-probe.md](2026-04-26_collective-external-registry-ack-live-endpoint-probe.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

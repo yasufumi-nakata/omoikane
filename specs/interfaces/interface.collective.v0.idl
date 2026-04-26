@@ -292,7 +292,40 @@ operations:
       - ack_quorum_digest must bind legal and governance registry acknowledgement receipts across two distinct jurisdictions without storing raw acknowledgement payloads
       - ack_route_trace_binding_digest must bind the acknowledgement quorum to authenticated non-loopback authority-route trace evidence
       - ack_route_capture_binding_digest must bind the acknowledgement route trace to verified pcap export and delegated privileged capture evidence over the same route set
+      - ack_live_endpoint_probe_set_digest must bind live HTTP JSON acknowledgement endpoint probes for every legal/governance registry acknowledgement without storing raw endpoint payloads
       - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, and raw packet bodies must not be stored
+  bind_external_registry_ack_endpoint_probes:
+    summary: Bind external registry acknowledgement receipts to live HTTP JSON endpoint probe evidence.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - external_registry_sync
+          - ack_endpoint_probe_receipts
+        properties:
+          external_registry_sync:
+            schema_ref: collective_external_registry_sync
+          ack_endpoint_probe_receipts:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              inline_schema:
+                type: object
+                required:
+                  - registry_ack_endpoint_ref
+                  - ack_receipt_digest
+                  - network_response_digest
+                  - network_probe_bound
+                  - raw_endpoint_payload_stored
+    output:
+      schema_ref: collective_external_registry_sync
+    guarantees:
+      - profile_id must remain collective-dissolution-external-registry-sync-v1
+      - ack_live_endpoint_probe_profile_id must equal collective-external-registry-ack-live-endpoint-probe-v1
+      - ack_live_endpoint_probe_receipts must cover every legal/governance acknowledgement receipt in ack_quorum_receipts
+      - network_response_digest must bind each live endpoint JSON response without storing raw endpoint payloads
+      - registry_digest_set must include ack_live_endpoint_probe_set_digest before external_registry_sync_complete is true
 events:
   collective.formed:
     payload:

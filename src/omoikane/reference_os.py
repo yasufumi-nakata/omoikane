@@ -7499,6 +7499,43 @@ json.dump(response, sys.stdout)
         }
 
     def run_collective_demo(self) -> Dict[str, Any]:
+        @contextmanager
+        def live_registry_ack_bridge(ack_payloads: Dict[str, Dict[str, Any]]):
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    payload = ack_payloads.get(self.path)
+                    if payload is None:
+                        self.send_response(404)
+                        self.send_header("Connection", "close")
+                        self.end_headers()
+                        self.close_connection = True
+                        return
+                    body = json.dumps(payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            try:
+                yield base_url
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
+
         identity = self.identity.create(
             human_consent_proof="consent://collective-origin-demo/v1",
             metadata={"display_name": "Collective Origin"},
@@ -7705,6 +7742,39 @@ json.dump(response, sys.stdout)
             registry_ack_privileged_capture_acquisition=(
                 recovery_privileged_capture_acquisition
             ),
+        )
+        ack_endpoint_paths = [
+            f"/registry-ack/{index}"
+            for index, _ack in enumerate(external_registry_sync["ack_quorum_receipts"])
+        ]
+        ack_endpoint_payloads = {
+            path: self.collective.external_registry_ack_endpoint_payload(
+                external_registry_sync,
+                ack_receipt,
+                checked_at=f"2026-04-26T11:00:0{index}Z",
+            )
+            for index, (path, ack_receipt) in enumerate(
+                zip(
+                    ack_endpoint_paths,
+                    external_registry_sync["ack_quorum_receipts"],
+                )
+            )
+        }
+        with live_registry_ack_bridge(ack_endpoint_payloads) as registry_ack_base_url:
+            ack_endpoint_probe_receipts = [
+                self.collective.probe_external_registry_ack_endpoint(
+                    registry_ack_endpoint=f"{registry_ack_base_url}{path}",
+                    external_registry_sync=external_registry_sync,
+                    ack_receipt=ack_receipt,
+                )
+                for path, ack_receipt in zip(
+                    ack_endpoint_paths,
+                    external_registry_sync["ack_quorum_receipts"],
+                )
+            ]
+        external_registry_sync = self.collective.bind_external_registry_ack_endpoint_probes(
+            external_registry_sync,
+            ack_endpoint_probe_receipts,
         )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
@@ -7963,6 +8033,17 @@ json.dump(response, sys.stdout)
                 "ack_route_capture_binding_digest": external_registry_sync[
                     "ack_route_capture_binding_digest"
                 ],
+                "ack_live_endpoint_probe_set_digest": external_registry_sync[
+                    "ack_live_endpoint_probe_set_digest"
+                ],
+                "ack_live_endpoint_network_response_digest_set_digest": (
+                    external_registry_sync[
+                        "ack_live_endpoint_network_response_digest_set_digest"
+                    ]
+                ),
+                "ack_live_endpoint_probe_bound": external_registry_sync[
+                    "ack_live_endpoint_probe_bound"
+                ],
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
                 ],
@@ -7971,6 +8052,12 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_ack_route_payload_stored": external_registry_sync[
                     "raw_ack_route_payload_stored"
+                ],
+                "raw_ack_endpoint_payload_stored": external_registry_sync[
+                    "raw_ack_endpoint_payload_stored"
+                ],
+                "raw_packet_body_stored": external_registry_sync[
+                    "raw_packet_body_stored"
                 ],
             },
             actor="CollectiveIdentityService",
@@ -8149,6 +8236,9 @@ json.dump(response, sys.stdout)
             "external_registry_sync_ack_route_capture_export_bound": (
                 external_registry_sync_validation["ack_route_capture_export_bound"]
             ),
+            "external_registry_sync_ack_live_endpoint_probe_bound": (
+                external_registry_sync_validation["ack_live_endpoint_probe_bound"]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
@@ -8160,6 +8250,12 @@ json.dump(response, sys.stdout)
             ),
             "external_registry_sync_raw_ack_route_payload_stored": (
                 external_registry_sync_validation["raw_ack_route_payload_stored"]
+            ),
+            "external_registry_sync_raw_ack_endpoint_payload_stored": (
+                external_registry_sync_validation["raw_ack_endpoint_payload_stored"]
+            ),
+            "external_registry_sync_raw_packet_body_stored": (
+                external_registry_sync_validation["raw_packet_body_stored"]
             ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
@@ -8199,6 +8295,7 @@ json.dump(response, sys.stdout)
             ),
             "recovery_capture_export_binding": recovery_capture_export_binding,
             "external_registry_sync": external_registry_sync,
+            "external_registry_ack_endpoint_probes": ack_endpoint_probe_receipts,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

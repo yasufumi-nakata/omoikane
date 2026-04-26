@@ -251,6 +251,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["external_registry_sync_ack_route_capture_export_bound"]
         )
+        self.assertTrue(
+            result["validation"]["external_registry_sync_ack_live_endpoint_probe_bound"]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
@@ -258,6 +261,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_ack_route_payload_stored"]
         )
+        self.assertFalse(
+            result["validation"]["external_registry_sync_raw_ack_endpoint_payload_stored"]
+        )
+        self.assertFalse(
+            result["validation"]["external_registry_sync_raw_packet_body_stored"]
+        )
+        self.assertEqual(2, len(result["external_registry_ack_endpoint_probes"]))
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
         self.assertEqual(
