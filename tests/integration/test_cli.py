@@ -359,6 +359,16 @@ class CliIntegrationTests(unittest.TestCase):
                 "remote_authority_slo_quorum_threshold_policy_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_quorum_threshold_policy"][
+                "signer_roster_verifier_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_quorum_threshold_policy"][
+                "revocation_registry_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["remote_authority_retry_budget_bound"])
         self.assertTrue(result["validation"]["static_approval_without_transport_rejected"])
         self.assertEqual("applied", result["scenarios"]["physics_change"]["decision"])
@@ -441,6 +451,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
                 "threshold_policy_signature_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "threshold_signer_roster_verifier_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "threshold_revocation_registry_bound"
             ]
         )
         self.assertEqual(

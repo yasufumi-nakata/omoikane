@@ -18,6 +18,11 @@ expected:
   threshold_profile: jurisdiction-policy-registry-slo-quorum-threshold-v1
   threshold_digest_profile: authority-slo-quorum-threshold-policy-digest-v1
   threshold_signature_digest_profile: authority-slo-quorum-threshold-policy-signature-digest-v1
+  threshold_signer_roster_profile: authority-slo-quorum-threshold-signer-roster-v1
+  threshold_signer_roster_digest_profile: authority-slo-quorum-threshold-signer-roster-digest-v1
+  threshold_signer_roster_verifier_quorum_profile: authority-slo-threshold-signer-roster-live-verifier-quorum-v1
+  threshold_revocation_registry_profile: authority-slo-quorum-threshold-revocation-registry-v1
+  threshold_revocation_registry_digest_profile: authority-slo-quorum-threshold-revocation-registry-digest-v1
   required_quorum_count: 2
   required_jurisdiction_count: 2
   accepted_probe_count: 2
@@ -25,12 +30,20 @@ expected:
   accepted_jurisdiction_count: 2
   threshold_policy_source_bound: true
   threshold_policy_signature_bound: true
+  threshold_signer_roster_bound: true
+  threshold_signer_roster_verifier_quorum_bound: true
+  threshold_revocation_registry_bound: true
+  threshold_authority_binding_status: verified
   multi_authority_bound: true
   multi_jurisdiction_bound: true
   all_probes_live_bound: true
   primary_probe_covered: true
   quorum_status: complete
   raw_slo_payload_stored: false
+  raw_threshold_policy_payload_stored: false
+  raw_threshold_signer_roster_payload_stored: false
+  raw_threshold_revocation_registry_payload_stored: false
+  raw_threshold_authority_payload_stored: false
 metric: boolean
 threshold: 1.0
 ethics_check: true

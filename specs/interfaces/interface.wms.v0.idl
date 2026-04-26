@@ -353,6 +353,8 @@ operations:
       - accepted probes must cover at least two authority refs and two remote jurisdictions
       - primary_probe_digest must be one of the accepted live probe digests
       - required_quorum_count and required_jurisdiction_count must be sourced from signed-authority-slo-quorum-threshold-policy-v1 registry policy evidence
+      - threshold_policy_receipt must bind signer_roster_digest, signer_roster_verifier_response_set_digest, and revocation_registry_digest before quorum_status can become complete
+      - raw threshold policy, signer roster, revocation registry, authority, and SLO payloads must not be stored
       - quorum receipt must bind accepted probe, authority, jurisdiction, route, SLO snapshot, registry, and network response digest sets without storing raw SLO payloads
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.

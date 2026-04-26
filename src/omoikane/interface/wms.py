@@ -88,6 +88,21 @@ WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE = (
 WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE = (
     "authority-slo-quorum-threshold-policy-signature-digest-v1"
 )
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE = (
+    "authority-slo-quorum-threshold-signer-roster-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE = (
+    "authority-slo-quorum-threshold-signer-roster-digest-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE = (
+    "authority-slo-threshold-signer-roster-live-verifier-quorum-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE = (
+    "authority-slo-quorum-threshold-revocation-registry-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE = (
+    "authority-slo-quorum-threshold-revocation-registry-digest-v1"
+)
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
     "registry-slo-derived-retry-schedule-v1"
 )
@@ -216,6 +231,67 @@ def _remote_authority_slo_quorum_threshold_policy_receipt_digest_payload(
     receipt: Mapping[str, Any],
 ) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _remote_authority_slo_threshold_signer_roster_payload(
+    *,
+    policy_ref: str,
+    signer_roster_ref: str,
+    signer_key_ref: str,
+    remote_jurisdictions: Sequence[str],
+    jurisdiction_policy_registry_set_digest: str,
+) -> Dict[str, Any]:
+    return {
+        "signer_roster_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE,
+        "signer_roster_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE,
+        "policy_ref": policy_ref,
+        "signer_roster_ref": signer_roster_ref,
+        "signer_key_ref": signer_key_ref,
+        "remote_jurisdictions": list(remote_jurisdictions),
+        "jurisdiction_policy_registry_set_digest": jurisdiction_policy_registry_set_digest,
+    }
+
+
+def _remote_authority_slo_threshold_revocation_registry_payload(
+    *,
+    policy_ref: str,
+    revocation_registry_ref: str,
+    signer_key_ref: str,
+    signer_roster_digest: str,
+) -> Dict[str, Any]:
+    return {
+        "revocation_registry_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
+        "revocation_registry_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
+        "policy_ref": policy_ref,
+        "revocation_registry_ref": revocation_registry_ref,
+        "signer_key_ref": signer_key_ref,
+        "signer_roster_digest": signer_roster_digest,
+    }
+
+
+def _remote_authority_slo_threshold_verifier_response_payload(
+    *,
+    verifier_ref: str,
+    remote_jurisdiction: str,
+    policy_ref: str,
+    signer_key_ref: str,
+    signer_roster_ref: str,
+    signer_roster_digest: str,
+    revocation_registry_ref: str,
+    revocation_registry_digest: str,
+) -> Dict[str, Any]:
+    return {
+        "verifier_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE,
+        "verifier_ref": verifier_ref,
+        "remote_jurisdiction": remote_jurisdiction,
+        "policy_ref": policy_ref,
+        "signer_key_ref": signer_key_ref,
+        "signer_roster_ref": signer_roster_ref,
+        "signer_roster_digest": signer_roster_digest,
+        "revocation_registry_ref": revocation_registry_ref,
+        "revocation_registry_digest": revocation_registry_digest,
+        "raw_authority_payload_stored": False,
+    }
 
 
 def _remote_authority_slo_snapshot_payload(
@@ -363,6 +439,11 @@ class WorldModelSync:
                 "remote_authority_slo_quorum_threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
                 "remote_authority_slo_quorum_threshold_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_DIGEST_PROFILE,
                 "remote_authority_slo_quorum_threshold_signature_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE,
+                "remote_authority_slo_quorum_threshold_signer_roster_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE,
+                "remote_authority_slo_quorum_threshold_signer_roster_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE,
+                "remote_authority_slo_quorum_threshold_signer_roster_verifier_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE,
+                "remote_authority_slo_quorum_threshold_revocation_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
+                "remote_authority_slo_quorum_threshold_revocation_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
                 "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
@@ -1285,9 +1366,12 @@ class WorldModelSync:
         signer_key_ref: str,
         required_authority_count: int = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
         required_jurisdiction_count: int = 2,
+        signer_roster_ref: str | None = None,
+        signer_roster_verifier_refs: Sequence[str] | None = None,
+        revocation_registry_ref: str | None = None,
         effective_at: str | None = None,
     ) -> Dict[str, Any]:
-        """Bind WMS SLO quorum thresholds to a signed registry policy digest."""
+        """Bind WMS SLO quorum thresholds to signed policy and roster proof."""
 
         registry_refs = self._normalize_string_list(
             jurisdiction_policy_registry_refs,
@@ -1323,8 +1407,90 @@ class WorldModelSync:
             signer_key_ref,
             "signer_key_ref",
         )
+        normalized_signer_roster_ref = self._normalize_non_empty_string(
+            signer_roster_ref
+            or (
+                "signer-roster://wms-authority-slo-quorum/"
+                f"{sha256_text(normalized_policy_ref)[:12]}"
+            ),
+            "signer_roster_ref",
+        )
+        normalized_revocation_registry_ref = self._normalize_non_empty_string(
+            revocation_registry_ref
+            or (
+                "revocation-registry://wms-authority-slo-quorum/"
+                f"{sha256_text(normalized_policy_ref)[:12]}"
+            ),
+            "revocation_registry_ref",
+        )
+        if signer_roster_verifier_refs is None:
+            verifier_refs = [
+                (
+                    "verifier://wms-authority-slo-quorum/"
+                    f"{jurisdiction.lower()}/signer-roster"
+                )
+                for jurisdiction in jurisdictions
+            ]
+        else:
+            verifier_refs = self._normalize_string_list(
+                signer_roster_verifier_refs,
+                "signer_roster_verifier_refs",
+            )
+        if len(verifier_refs) < required_jurisdictions:
+            raise ValueError(
+                "signer_roster_verifier_refs must satisfy required jurisdictions"
+            )
+        if len(set(verifier_refs)) != len(verifier_refs):
+            raise ValueError("signer_roster_verifier_refs must be unique")
         normalized_effective_at = effective_at or utc_now_iso()
         registry_set_digest = sha256_text(canonical_json(registry_digests))
+        signer_roster_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_threshold_signer_roster_payload(
+                    policy_ref=normalized_policy_ref,
+                    signer_roster_ref=normalized_signer_roster_ref,
+                    signer_key_ref=normalized_signer_key_ref,
+                    remote_jurisdictions=jurisdictions,
+                    jurisdiction_policy_registry_set_digest=registry_set_digest,
+                )
+            )
+        )
+        revocation_registry_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_threshold_revocation_registry_payload(
+                    policy_ref=normalized_policy_ref,
+                    revocation_registry_ref=normalized_revocation_registry_ref,
+                    signer_key_ref=normalized_signer_key_ref,
+                    signer_roster_digest=signer_roster_digest,
+                )
+            )
+        )
+        verifier_response_digests = [
+            sha256_text(
+                canonical_json(
+                    _remote_authority_slo_threshold_verifier_response_payload(
+                        verifier_ref=verifier_ref,
+                        remote_jurisdiction=jurisdictions[
+                            min(index, len(jurisdictions) - 1)
+                        ],
+                        policy_ref=normalized_policy_ref,
+                        signer_key_ref=normalized_signer_key_ref,
+                        signer_roster_ref=normalized_signer_roster_ref,
+                        signer_roster_digest=signer_roster_digest,
+                        revocation_registry_ref=normalized_revocation_registry_ref,
+                        revocation_registry_digest=revocation_registry_digest,
+                    )
+                )
+            )
+            for index, verifier_ref in enumerate(verifier_refs)
+        ]
+        verifier_response_set_digest = sha256_text(
+            canonical_json(verifier_response_digests)
+        )
+        signer_roster_verifier_quorum_bound = (
+            len(verifier_refs) >= required_jurisdictions
+            and len(verifier_response_digests) == len(verifier_refs)
+        )
         policy_body = {
             "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
             "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
@@ -1335,6 +1501,18 @@ class WorldModelSync:
             "remote_jurisdictions": jurisdictions,
             "required_authority_count": required_authorities,
             "required_jurisdiction_count": required_jurisdictions,
+            "signer_roster_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE,
+            "signer_roster_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE,
+            "signer_roster_ref": normalized_signer_roster_ref,
+            "signer_roster_digest": signer_roster_digest,
+            "signer_roster_verifier_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE,
+            "signer_roster_verifier_refs": verifier_refs,
+            "signer_roster_verifier_response_digests": verifier_response_digests,
+            "signer_roster_verifier_response_set_digest": verifier_response_set_digest,
+            "revocation_registry_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
+            "revocation_registry_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
+            "revocation_registry_ref": normalized_revocation_registry_ref,
+            "revocation_registry_digest": revocation_registry_digest,
         }
         policy_body_digest = sha256_text(canonical_json(policy_body))
         signature_digest = sha256_text(
@@ -1362,11 +1540,32 @@ class WorldModelSync:
             "required_authority_count": required_authorities,
             "required_jurisdiction_count": required_jurisdictions,
             "signer_key_ref": normalized_signer_key_ref,
+            "signer_roster_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE,
+            "signer_roster_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE,
+            "signer_roster_ref": normalized_signer_roster_ref,
+            "signer_roster_digest": signer_roster_digest,
+            "signer_roster_bound": True,
+            "signer_roster_verifier_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE,
+            "signer_roster_verifier_refs": verifier_refs,
+            "signer_roster_verifier_response_digests": verifier_response_digests,
+            "signer_roster_verifier_response_set_digest": verifier_response_set_digest,
+            "signer_roster_verifier_quorum_bound": signer_roster_verifier_quorum_bound,
+            "revocation_registry_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
+            "revocation_registry_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
+            "revocation_registry_ref": normalized_revocation_registry_ref,
+            "revocation_registry_digest": revocation_registry_digest,
+            "revocation_registry_bound": True,
             "policy_body_digest": policy_body_digest,
             "policy_signature_digest": signature_digest,
             "threshold_source_bound": True,
             "signature_bound": True,
+            "threshold_authority_binding_status": (
+                "verified" if signer_roster_verifier_quorum_bound else "incomplete"
+            ),
             "raw_threshold_policy_payload_stored": False,
+            "raw_signer_roster_payload_stored": False,
+            "raw_revocation_registry_payload_stored": False,
+            "raw_authority_payload_stored": False,
             "effective_at": normalized_effective_at,
         }
         receipt["digest"] = sha256_text(
@@ -1406,16 +1605,46 @@ class WorldModelSync:
             "receipt_id",
             "policy_ref",
             "signer_key_ref",
+            "signer_roster_ref",
+            "revocation_registry_ref",
             "effective_at",
         ):
             self._check_non_empty_string(receipt.get(field_name), field_name, errors)
         for field_name in (
             "jurisdiction_policy_registry_set_digest",
+            "signer_roster_digest",
+            "signer_roster_verifier_response_set_digest",
+            "revocation_registry_digest",
             "policy_body_digest",
             "policy_signature_digest",
             "digest",
         ):
             self._check_digest(receipt.get(field_name), field_name, errors)
+        if (
+            receipt.get("signer_roster_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE
+        ):
+            errors.append("signer_roster_profile mismatch")
+        if (
+            receipt.get("signer_roster_digest_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE
+        ):
+            errors.append("signer_roster_digest_profile mismatch")
+        if (
+            receipt.get("signer_roster_verifier_quorum_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE
+        ):
+            errors.append("signer_roster_verifier_quorum_profile mismatch")
+        if (
+            receipt.get("revocation_registry_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE
+        ):
+            errors.append("revocation_registry_profile mismatch")
+        if (
+            receipt.get("revocation_registry_digest_profile")
+            != WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE
+        ):
+            errors.append("revocation_registry_digest_profile mismatch")
         registry_refs = receipt.get("jurisdiction_policy_registry_refs")
         if not isinstance(registry_refs, list) or not registry_refs:
             errors.append("jurisdiction_policy_registry_refs must be a non-empty list")
@@ -1453,10 +1682,100 @@ class WorldModelSync:
             errors.append(
                 "required_jurisdiction_count cannot exceed covered jurisdictions"
             )
+        verifier_refs = receipt.get("signer_roster_verifier_refs")
+        if not isinstance(verifier_refs, list) or len(verifier_refs) < required_jurisdictions:
+            errors.append("signer_roster_verifier_refs must satisfy required jurisdictions")
+            verifier_refs = []
+        elif len(set(verifier_refs)) != len(verifier_refs):
+            errors.append("signer_roster_verifier_refs must be unique")
+        verifier_response_digests = receipt.get("signer_roster_verifier_response_digests")
+        if (
+            not isinstance(verifier_response_digests, list)
+            or len(verifier_response_digests) != len(verifier_refs)
+        ):
+            errors.append("signer_roster_verifier_response_digests must match verifier refs")
+            verifier_response_digests = []
+        for digest in verifier_response_digests:
+            self._check_digest(digest, "signer_roster_verifier_response_digests", errors)
 
         expected_registry_set_digest = sha256_text(canonical_json(registry_digests))
         if receipt.get("jurisdiction_policy_registry_set_digest") != expected_registry_set_digest:
             errors.append("jurisdiction_policy_registry_set_digest mismatch")
+        expected_signer_roster_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_threshold_signer_roster_payload(
+                    policy_ref=str(receipt.get("policy_ref", "")),
+                    signer_roster_ref=str(receipt.get("signer_roster_ref", "")),
+                    signer_key_ref=str(receipt.get("signer_key_ref", "")),
+                    remote_jurisdictions=jurisdictions,
+                    jurisdiction_policy_registry_set_digest=expected_registry_set_digest,
+                )
+            )
+        )
+        signer_roster_bound = (
+            receipt.get("signer_roster_digest") == expected_signer_roster_digest
+            and receipt.get("signer_roster_bound") is True
+            and receipt.get("raw_signer_roster_payload_stored") is False
+        )
+        if not signer_roster_bound:
+            errors.append("signer_roster_digest must bind signer roster payload")
+        expected_revocation_registry_digest = sha256_text(
+            canonical_json(
+                _remote_authority_slo_threshold_revocation_registry_payload(
+                    policy_ref=str(receipt.get("policy_ref", "")),
+                    revocation_registry_ref=str(receipt.get("revocation_registry_ref", "")),
+                    signer_key_ref=str(receipt.get("signer_key_ref", "")),
+                    signer_roster_digest=expected_signer_roster_digest,
+                )
+            )
+        )
+        revocation_registry_bound = (
+            receipt.get("revocation_registry_digest")
+            == expected_revocation_registry_digest
+            and receipt.get("revocation_registry_bound") is True
+            and receipt.get("raw_revocation_registry_payload_stored") is False
+        )
+        if not revocation_registry_bound:
+            errors.append("revocation_registry_digest must bind threshold revocation registry")
+        expected_verifier_response_digests = [
+            sha256_text(
+                canonical_json(
+                    _remote_authority_slo_threshold_verifier_response_payload(
+                        verifier_ref=str(verifier_ref),
+                        remote_jurisdiction=str(
+                            jurisdictions[min(index, len(jurisdictions) - 1)]
+                            if jurisdictions
+                            else ""
+                        ),
+                        policy_ref=str(receipt.get("policy_ref", "")),
+                        signer_key_ref=str(receipt.get("signer_key_ref", "")),
+                        signer_roster_ref=str(receipt.get("signer_roster_ref", "")),
+                        signer_roster_digest=expected_signer_roster_digest,
+                        revocation_registry_ref=str(
+                            receipt.get("revocation_registry_ref", "")
+                        ),
+                        revocation_registry_digest=expected_revocation_registry_digest,
+                    )
+                )
+            )
+            for index, verifier_ref in enumerate(verifier_refs)
+        ]
+        if verifier_response_digests != expected_verifier_response_digests:
+            errors.append("signer_roster_verifier_response_digests must bind verifier responses")
+        expected_verifier_response_set_digest = sha256_text(
+            canonical_json(expected_verifier_response_digests)
+        )
+        signer_roster_verifier_quorum_bound = (
+            bool(verifier_refs)
+            and len(verifier_refs) >= required_jurisdictions
+            and verifier_response_digests == expected_verifier_response_digests
+            and receipt.get("signer_roster_verifier_response_set_digest")
+            == expected_verifier_response_set_digest
+            and receipt.get("signer_roster_verifier_quorum_bound") is True
+            and receipt.get("raw_authority_payload_stored") is False
+        )
+        if not signer_roster_verifier_quorum_bound:
+            errors.append("signer_roster_verifier_quorum_bound must reflect verifier quorum responses")
         policy_body = {
             "policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID,
             "threshold_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_PROFILE,
@@ -1467,6 +1786,18 @@ class WorldModelSync:
             "remote_jurisdictions": jurisdictions,
             "required_authority_count": required_authorities,
             "required_jurisdiction_count": required_jurisdictions,
+            "signer_roster_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_PROFILE,
+            "signer_roster_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_DIGEST_PROFILE,
+            "signer_roster_ref": str(receipt.get("signer_roster_ref", "")),
+            "signer_roster_digest": expected_signer_roster_digest,
+            "signer_roster_verifier_quorum_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_SIGNER_ROSTER_VERIFIER_QUORUM_PROFILE,
+            "signer_roster_verifier_refs": verifier_refs,
+            "signer_roster_verifier_response_digests": expected_verifier_response_digests,
+            "signer_roster_verifier_response_set_digest": expected_verifier_response_set_digest,
+            "revocation_registry_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
+            "revocation_registry_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
+            "revocation_registry_ref": str(receipt.get("revocation_registry_ref", "")),
+            "revocation_registry_digest": expected_revocation_registry_digest,
         }
         expected_policy_body_digest = sha256_text(canonical_json(policy_body))
         policy_body_bound = receipt.get("policy_body_digest") == expected_policy_body_digest
@@ -1490,13 +1821,23 @@ class WorldModelSync:
         threshold_source_bound = bool(
             policy_body_bound
             and signature_bound
+            and signer_roster_bound
+            and signer_roster_verifier_quorum_bound
+            and revocation_registry_bound
             and receipt.get("threshold_source_bound") is True
+            and receipt.get("threshold_authority_binding_status") == "verified"
             and receipt.get("raw_threshold_policy_payload_stored") is False
         )
         if not threshold_source_bound:
             errors.append("threshold_source_bound must reflect signed registry policy")
         if receipt.get("raw_threshold_policy_payload_stored") is not False:
             errors.append("raw_threshold_policy_payload_stored must be false")
+        if receipt.get("raw_signer_roster_payload_stored") is not False:
+            errors.append("raw_signer_roster_payload_stored must be false")
+        if receipt.get("raw_revocation_registry_payload_stored") is not False:
+            errors.append("raw_revocation_registry_payload_stored must be false")
+        if receipt.get("raw_authority_payload_stored") is not False:
+            errors.append("raw_authority_payload_stored must be false")
         expected_digest = sha256_text(
             canonical_json(
                 _remote_authority_slo_quorum_threshold_policy_receipt_digest_payload(
@@ -1512,9 +1853,15 @@ class WorldModelSync:
             "errors": errors,
             "threshold_source_bound": threshold_source_bound,
             "signature_bound": signature_bound,
+            "signer_roster_bound": signer_roster_bound,
+            "signer_roster_verifier_quorum_bound": signer_roster_verifier_quorum_bound,
+            "revocation_registry_bound": revocation_registry_bound,
             "policy_body_bound": policy_body_bound,
             "digest_bound": digest_bound,
             "raw_policy_redacted": receipt.get("raw_threshold_policy_payload_stored") is False,
+            "raw_signer_roster_redacted": receipt.get("raw_signer_roster_payload_stored") is False,
+            "raw_revocation_registry_redacted": receipt.get("raw_revocation_registry_payload_stored") is False,
+            "raw_authority_payload_redacted": receipt.get("raw_authority_payload_stored") is False,
         }
 
     def build_authority_slo_probe_quorum_receipt(
@@ -1683,11 +2030,32 @@ class WorldModelSync:
             "threshold_policy_signature_digest": threshold_policy[
                 "policy_signature_digest"
             ],
+            "threshold_signer_roster_digest": threshold_policy[
+                "signer_roster_digest"
+            ],
+            "threshold_signer_roster_verifier_response_set_digest": threshold_policy[
+                "signer_roster_verifier_response_set_digest"
+            ],
+            "threshold_signer_roster_verifier_quorum_bound": threshold_policy[
+                "signer_roster_verifier_quorum_bound"
+            ],
+            "threshold_revocation_registry_digest": threshold_policy[
+                "revocation_registry_digest"
+            ],
+            "threshold_revocation_registry_bound": threshold_policy[
+                "revocation_registry_bound"
+            ],
+            "threshold_authority_binding_status": threshold_policy[
+                "threshold_authority_binding_status"
+            ],
             "threshold_policy_source_bound": threshold_source_bound,
             "threshold_policy_signature_bound": threshold_policy_validation[
                 "signature_bound"
             ],
             "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_signer_roster_payload_stored": False,
+            "raw_threshold_revocation_registry_payload_stored": False,
+            "raw_threshold_authority_payload_stored": False,
             "authority_slo_snapshot_digests": authority_slo_snapshot_digests,
             "authority_slo_snapshot_set_digest": sha256_text(
                 canonical_json(authority_slo_snapshot_digests)
@@ -1840,6 +2208,9 @@ class WorldModelSync:
             "ok": False,
             "threshold_source_bound": False,
             "signature_bound": False,
+            "signer_roster_bound": False,
+            "signer_roster_verifier_quorum_bound": False,
+            "revocation_registry_bound": False,
         }
         if not isinstance(threshold_policy, Mapping):
             errors.append("threshold_policy_receipt must be an object")
@@ -1862,6 +2233,24 @@ class WorldModelSync:
             "threshold_policy_signature_digest": threshold_policy.get(
                 "policy_signature_digest"
             ),
+            "threshold_signer_roster_digest": threshold_policy.get(
+                "signer_roster_digest"
+            ),
+            "threshold_signer_roster_verifier_response_set_digest": (
+                threshold_policy.get("signer_roster_verifier_response_set_digest")
+            ),
+            "threshold_signer_roster_verifier_quorum_bound": threshold_policy.get(
+                "signer_roster_verifier_quorum_bound"
+            ),
+            "threshold_revocation_registry_digest": threshold_policy.get(
+                "revocation_registry_digest"
+            ),
+            "threshold_revocation_registry_bound": threshold_policy.get(
+                "revocation_registry_bound"
+            ),
+            "threshold_authority_binding_status": threshold_policy.get(
+                "threshold_authority_binding_status"
+            ),
         }
         for field_name, expected_value in threshold_expected_values.items():
             if receipt.get(field_name) != expected_value:
@@ -1877,6 +2266,9 @@ class WorldModelSync:
             and threshold_policy.get("jurisdiction_policy_registry_digests")
             == jurisdiction_policy_registry_digests
             and threshold_policy.get("remote_jurisdictions") == deduped_jurisdictions
+            and threshold_policy_validation["signer_roster_bound"]
+            and threshold_policy_validation["signer_roster_verifier_quorum_bound"]
+            and threshold_policy_validation["revocation_registry_bound"]
         )
         threshold_signature_bound = bool(threshold_policy_validation["signature_bound"])
         if receipt.get("threshold_policy_source_bound") is not threshold_source_bound:
@@ -1885,6 +2277,12 @@ class WorldModelSync:
             errors.append("threshold_policy_signature_bound must reflect threshold signature")
         if receipt.get("raw_threshold_policy_payload_stored") is not False:
             errors.append("raw_threshold_policy_payload_stored must be false")
+        if receipt.get("raw_threshold_signer_roster_payload_stored") is not False:
+            errors.append("raw_threshold_signer_roster_payload_stored must be false")
+        if receipt.get("raw_threshold_revocation_registry_payload_stored") is not False:
+            errors.append("raw_threshold_revocation_registry_payload_stored must be false")
+        if receipt.get("raw_threshold_authority_payload_stored") is not False:
+            errors.append("raw_threshold_authority_payload_stored must be false")
 
         all_probes_live_bound = bool(
             probe_receipts_valid
@@ -1949,6 +2347,15 @@ class WorldModelSync:
             "primary_probe_covered": primary_probe_covered,
             "threshold_policy_source_bound": threshold_source_bound,
             "threshold_policy_signature_bound": threshold_signature_bound,
+            "threshold_signer_roster_bound": bool(
+                threshold_policy_validation["signer_roster_bound"]
+            ),
+            "threshold_signer_roster_verifier_quorum_bound": bool(
+                threshold_policy_validation["signer_roster_verifier_quorum_bound"]
+            ),
+            "threshold_revocation_registry_bound": bool(
+                threshold_policy_validation["revocation_registry_bound"]
+            ),
             "digest_bound": digest_bound,
             "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,
         }

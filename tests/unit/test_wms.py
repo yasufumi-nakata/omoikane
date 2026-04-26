@@ -1155,17 +1155,47 @@ class WorldModelSyncTests(unittest.TestCase):
             slo_quorum_threshold_policy_validation["threshold_source_bound"]
         )
         self.assertTrue(slo_quorum_threshold_policy_validation["signature_bound"])
+        self.assertTrue(slo_quorum_threshold_policy_validation["signer_roster_bound"])
+        self.assertTrue(
+            slo_quorum_threshold_policy_validation[
+                "signer_roster_verifier_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            slo_quorum_threshold_policy_validation["revocation_registry_bound"]
+        )
         self.assertEqual(2, slo_quorum_threshold_policy["required_authority_count"])
         self.assertEqual(2, slo_quorum_threshold_policy["required_jurisdiction_count"])
+        self.assertTrue(slo_quorum_threshold_policy["signer_roster_bound"])
+        self.assertTrue(
+            slo_quorum_threshold_policy["signer_roster_verifier_quorum_bound"]
+        )
+        self.assertTrue(slo_quorum_threshold_policy["revocation_registry_bound"])
+        self.assertEqual(
+            "verified",
+            slo_quorum_threshold_policy["threshold_authority_binding_status"],
+        )
         self.assertFalse(
             slo_quorum_threshold_policy["raw_threshold_policy_payload_stored"]
         )
+        self.assertFalse(
+            slo_quorum_threshold_policy["raw_signer_roster_payload_stored"]
+        )
+        self.assertFalse(
+            slo_quorum_threshold_policy["raw_revocation_registry_payload_stored"]
+        )
+        self.assertFalse(slo_quorum_threshold_policy["raw_authority_payload_stored"])
         self.assertTrue(slo_quorum_validation["ok"])
         self.assertTrue(slo_quorum_validation["quorum_bound"])
         self.assertTrue(slo_quorum_validation["multi_authority_bound"])
         self.assertTrue(slo_quorum_validation["multi_jurisdiction_bound"])
         self.assertTrue(slo_quorum_validation["threshold_policy_source_bound"])
         self.assertTrue(slo_quorum_validation["threshold_policy_signature_bound"])
+        self.assertTrue(slo_quorum_validation["threshold_signer_roster_bound"])
+        self.assertTrue(
+            slo_quorum_validation["threshold_signer_roster_verifier_quorum_bound"]
+        )
+        self.assertTrue(slo_quorum_validation["threshold_revocation_registry_bound"])
         self.assertEqual(2, slo_quorum["accepted_probe_count"])
         self.assertEqual(2, slo_quorum["accepted_authority_count"])
         self.assertEqual(2, slo_quorum["accepted_jurisdiction_count"])
@@ -1180,10 +1210,31 @@ class WorldModelSyncTests(unittest.TestCase):
             slo_quorum["threshold_policy_signature_digest"],
         )
         self.assertEqual(
+            slo_quorum_threshold_policy["signer_roster_digest"],
+            slo_quorum["threshold_signer_roster_digest"],
+        )
+        self.assertEqual(
+            slo_quorum_threshold_policy[
+                "signer_roster_verifier_response_set_digest"
+            ],
+            slo_quorum["threshold_signer_roster_verifier_response_set_digest"],
+        )
+        self.assertTrue(slo_quorum["threshold_signer_roster_verifier_quorum_bound"])
+        self.assertEqual(
+            slo_quorum_threshold_policy["revocation_registry_digest"],
+            slo_quorum["threshold_revocation_registry_digest"],
+        )
+        self.assertTrue(slo_quorum["threshold_revocation_registry_bound"])
+        self.assertEqual("verified", slo_quorum["threshold_authority_binding_status"])
+        self.assertEqual(
             [slo_probe["digest"], backup_slo_probe["digest"]],
             slo_quorum["accepted_probe_digests"],
         )
         self.assertFalse(slo_quorum["raw_slo_payload_stored"])
+        self.assertFalse(slo_quorum["raw_threshold_policy_payload_stored"])
+        self.assertFalse(slo_quorum["raw_threshold_signer_roster_payload_stored"])
+        self.assertFalse(slo_quorum["raw_threshold_revocation_registry_payload_stored"])
+        self.assertFalse(slo_quorum["raw_threshold_authority_payload_stored"])
         self.assertTrue(retry_budget_validation["ok"])
         self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
@@ -1233,6 +1284,28 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_slo_quorum_validation["multi_jurisdiction_bound"])
         self.assertFalse(tampered_threshold_policy_validation["ok"])
         self.assertFalse(tampered_threshold_policy_validation["policy_body_bound"])
+        tampered_roster_policy = dict(slo_quorum_threshold_policy)
+        tampered_roster_policy["signer_roster_digest"] = sha256_text(
+            "tampered-threshold-signer-roster"
+        )
+        tampered_roster_validation = (
+            sync.validate_authority_slo_quorum_threshold_policy_receipt(
+                tampered_roster_policy
+            )
+        )
+        self.assertFalse(tampered_roster_validation["ok"])
+        self.assertFalse(tampered_roster_validation["signer_roster_bound"])
+        tampered_revocation_policy = dict(slo_quorum_threshold_policy)
+        tampered_revocation_policy["revocation_registry_digest"] = sha256_text(
+            "tampered-threshold-revocation-registry"
+        )
+        tampered_revocation_validation = (
+            sync.validate_authority_slo_quorum_threshold_policy_receipt(
+                tampered_revocation_policy
+            )
+        )
+        self.assertFalse(tampered_revocation_validation["ok"])
+        self.assertFalse(tampered_revocation_validation["revocation_registry_bound"])
 
     def test_engine_transaction_log_binds_ordered_digest_only_entries(self) -> None:
         sync = WorldModelSync()

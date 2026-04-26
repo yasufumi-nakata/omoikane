@@ -344,6 +344,21 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 "remote_authority_slo_quorum_threshold_policy_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_quorum_threshold_policy"][
+                "signer_roster_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_quorum_threshold_policy"][
+                "signer_roster_verifier_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_quorum_threshold_policy"][
+                "revocation_registry_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["approval_fanout"]["retry_policy_bound"])
         self.assertTrue(result["validation"]["physics_revert"]["digest_bound"])
 

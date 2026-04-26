@@ -103,7 +103,10 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   primary retry SLO probe が quorum に含まれることを raw SLO payload 無しで検証する。
   quorum threshold は `signed-authority-slo-quorum-threshold-policy-v1` の
   signed jurisdiction policy registry receipt から取り込み、
+  signer roster digest、live verifier response digest set、revocation registry digest も
+  同じ threshold policy receipt に束縛してから取り込み、
   reviewer 側の固定値だけでは `quorum_status=complete` にしない。
+  raw threshold policy / signer roster / revocation registry / authority verifier payload は保存しない。
   さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、

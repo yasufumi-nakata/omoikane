@@ -40,9 +40,18 @@ required:
   - threshold_policy_receipt
   - threshold_policy_digest
   - threshold_policy_signature_digest
+  - threshold_signer_roster_digest
+  - threshold_signer_roster_verifier_response_set_digest
+  - threshold_signer_roster_verifier_quorum_bound
+  - threshold_revocation_registry_digest
+  - threshold_revocation_registry_bound
+  - threshold_authority_binding_status
   - threshold_policy_source_bound
   - threshold_policy_signature_bound
   - raw_threshold_policy_payload_stored
+  - raw_threshold_signer_roster_payload_stored
+  - raw_threshold_revocation_registry_payload_stored
+  - raw_threshold_authority_payload_stored
   - authority_slo_snapshot_digests
   - authority_slo_snapshot_set_digest
   - network_response_digests
@@ -166,6 +175,21 @@ properties:
     $ref: "#/$defs/sha256"
   threshold_policy_signature_digest:
     $ref: "#/$defs/sha256"
+  threshold_signer_roster_digest:
+    $ref: "#/$defs/sha256"
+  threshold_signer_roster_verifier_response_set_digest:
+    $ref: "#/$defs/sha256"
+  threshold_signer_roster_verifier_quorum_bound:
+    type: boolean
+    const: true
+  threshold_revocation_registry_digest:
+    $ref: "#/$defs/sha256"
+  threshold_revocation_registry_bound:
+    type: boolean
+    const: true
+  threshold_authority_binding_status:
+    type: string
+    const: verified
   threshold_policy_source_bound:
     type: boolean
     const: true
@@ -173,6 +197,15 @@ properties:
     type: boolean
     const: true
   raw_threshold_policy_payload_stored:
+    type: boolean
+    const: false
+  raw_threshold_signer_roster_payload_stored:
+    type: boolean
+    const: false
+  raw_threshold_revocation_registry_payload_stored:
+    type: boolean
+    const: false
+  raw_threshold_authority_payload_stored:
     type: boolean
     const: false
   authority_slo_snapshot_digests:

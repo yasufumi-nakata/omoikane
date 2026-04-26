@@ -10567,6 +10567,18 @@ json.dump(response, sys.stdout)
                         "threshold_policy_source_bound"
                     ]
                     is True
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "threshold_signer_roster_verifier_quorum_bound"
+                    ]
+                    is True
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "threshold_revocation_registry_bound"
+                    ]
+                    is True
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "threshold_authority_binding_status"
+                    ]
+                    == "verified"
                 ),
                 "remote_authority_slo_quorum_threshold_policy_bound": (
                     remote_authority_slo_quorum_threshold_policy_validation["ok"]
@@ -10575,6 +10587,15 @@ json.dump(response, sys.stdout)
                     ]
                     and remote_authority_slo_quorum_threshold_policy_validation[
                         "signature_bound"
+                    ]
+                    and remote_authority_slo_quorum_threshold_policy_validation[
+                        "signer_roster_bound"
+                    ]
+                    and remote_authority_slo_quorum_threshold_policy_validation[
+                        "signer_roster_verifier_quorum_bound"
+                    ]
+                    and remote_authority_slo_quorum_threshold_policy_validation[
+                        "revocation_registry_bound"
                     ]
                     and remote_authority_slo_quorum_threshold_policy[
                         "required_authority_count"
@@ -10588,6 +10609,22 @@ json.dump(response, sys.stdout)
                         "raw_threshold_policy_payload_stored"
                     ]
                     is False
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "raw_signer_roster_payload_stored"
+                    ]
+                    is False
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "raw_revocation_registry_payload_stored"
+                    ]
+                    is False
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "raw_authority_payload_stored"
+                    ]
+                    is False
+                    and remote_authority_slo_quorum_threshold_policy[
+                        "threshold_authority_binding_status"
+                    ]
+                    == "verified"
                 ),
                 "remote_authority_slo_probe_quorum": (
                     remote_authority_slo_probe_quorum_validation

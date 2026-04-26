@@ -23,11 +23,30 @@ required:
   - required_authority_count
   - required_jurisdiction_count
   - signer_key_ref
+  - signer_roster_profile
+  - signer_roster_digest_profile
+  - signer_roster_ref
+  - signer_roster_digest
+  - signer_roster_bound
+  - signer_roster_verifier_quorum_profile
+  - signer_roster_verifier_refs
+  - signer_roster_verifier_response_digests
+  - signer_roster_verifier_response_set_digest
+  - signer_roster_verifier_quorum_bound
+  - revocation_registry_profile
+  - revocation_registry_digest_profile
+  - revocation_registry_ref
+  - revocation_registry_digest
+  - revocation_registry_bound
   - policy_body_digest
   - policy_signature_digest
   - threshold_source_bound
   - signature_bound
+  - threshold_authority_binding_status
   - raw_threshold_policy_payload_stored
+  - raw_signer_roster_payload_stored
+  - raw_revocation_registry_payload_stored
+  - raw_authority_payload_stored
   - effective_at
   - digest
 properties:
@@ -85,6 +104,54 @@ properties:
   signer_key_ref:
     type: string
     minLength: 1
+  signer_roster_profile:
+    type: string
+    const: authority-slo-quorum-threshold-signer-roster-v1
+  signer_roster_digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-signer-roster-digest-v1
+  signer_roster_ref:
+    type: string
+    minLength: 1
+  signer_roster_digest:
+    $ref: "#/$defs/sha256"
+  signer_roster_bound:
+    type: boolean
+    const: true
+  signer_roster_verifier_quorum_profile:
+    type: string
+    const: authority-slo-threshold-signer-roster-live-verifier-quorum-v1
+  signer_roster_verifier_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  signer_roster_verifier_response_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  signer_roster_verifier_response_set_digest:
+    $ref: "#/$defs/sha256"
+  signer_roster_verifier_quorum_bound:
+    type: boolean
+    const: true
+  revocation_registry_profile:
+    type: string
+    const: authority-slo-quorum-threshold-revocation-registry-v1
+  revocation_registry_digest_profile:
+    type: string
+    const: authority-slo-quorum-threshold-revocation-registry-digest-v1
+  revocation_registry_ref:
+    type: string
+    minLength: 1
+  revocation_registry_digest:
+    $ref: "#/$defs/sha256"
+  revocation_registry_bound:
+    type: boolean
+    const: true
   policy_body_digest:
     $ref: "#/$defs/sha256"
   policy_signature_digest:
@@ -95,7 +162,19 @@ properties:
   signature_bound:
     type: boolean
     const: true
+  threshold_authority_binding_status:
+    type: string
+    const: verified
   raw_threshold_policy_payload_stored:
+    type: boolean
+    const: false
+  raw_signer_roster_payload_stored:
+    type: boolean
+    const: false
+  raw_revocation_registry_payload_stored:
+    type: boolean
+    const: false
+  raw_authority_payload_stored:
     type: boolean
     const: false
   effective_at:
