@@ -8,7 +8,8 @@ description: >
   payloads, raw acknowledgement endpoint payloads, raw response signature
   payloads, raw client certificate payloads, raw client certificate freshness
   payloads, raw client certificate lifecycle payloads, raw client certificate
-  lifecycle chain payloads, or raw packet bodies.
+  lifecycle chain payloads, raw client certificate transparency readback
+  payloads, or raw packet bodies.
 type: object
 additionalProperties: false
 required:
@@ -135,6 +136,11 @@ required:
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proofs
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_digests
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest
+  - ack_live_endpoint_mtls_client_certificate_ct_log_readback_profile_id
+  - ack_live_endpoint_mtls_client_certificate_ct_log_readback_digest_profile
+  - ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs
+  - ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests
+  - ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest
   - ack_live_endpoint_client_certificate_refs
   - ack_live_endpoint_client_certificate_fingerprints
   - ack_live_endpoint_client_certificate_chain_digests
@@ -152,6 +158,10 @@ required:
   - ack_live_endpoint_client_certificate_lifecycle_statuses
   - ack_live_endpoint_client_certificate_lifecycle_chain_depths
   - ack_live_endpoint_client_certificate_lifecycle_chain_statuses
+  - ack_live_endpoint_client_certificate_ct_log_refs
+  - ack_live_endpoint_client_certificate_ct_log_leaf_digests
+  - ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests
+  - ack_live_endpoint_client_certificate_ct_log_readback_statuses
   - ack_live_endpoint_probe_count
   - ack_live_endpoint_probe_bound
   - ack_live_endpoint_signed_response_envelope_bound
@@ -159,6 +169,7 @@ required:
   - ack_live_endpoint_mtls_client_certificate_freshness_bound
   - ack_live_endpoint_mtls_client_certificate_lifecycle_bound
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
+  - ack_live_endpoint_mtls_client_certificate_ct_log_bound
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -181,6 +192,7 @@ required:
   - raw_client_certificate_freshness_payload_stored
   - raw_client_certificate_lifecycle_payload_stored
   - raw_client_certificate_lifecycle_chain_payload_stored
+  - raw_client_certificate_ct_log_payload_stored
   - raw_packet_body_stored
   - digest
 properties:
@@ -579,6 +591,24 @@ properties:
       $ref: "#/$defs/sha256"
   ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest:
     $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_ct_log_readback_profile_id:
+    const: collective-external-registry-ack-client-certificate-ct-log-readback-v1
+  ack_live_endpoint_mtls_client_certificate_ct_log_readback_digest_profile:
+    const: collective-external-registry-ack-client-certificate-ct-log-readback-digest-v1
+  ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/ack_mtls_client_certificate_ct_log_readback_proof"
+  ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest:
+    $ref: "#/$defs/sha256"
   ack_live_endpoint_client_certificate_refs:
     type: array
     minItems: 2
@@ -688,6 +718,31 @@ properties:
     maxItems: 2
     items:
       const: complete
+  ack_live_endpoint_client_certificate_ct_log_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^registry-client-cert-ctlog://"
+  ack_live_endpoint_client_certificate_ct_log_leaf_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_ct_log_readback_statuses:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      const: included
   ack_live_endpoint_probe_count:
     const: 2
   ack_live_endpoint_probe_bound:
@@ -702,10 +757,12 @@ properties:
     const: true
   ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound:
     const: true
+  ack_live_endpoint_mtls_client_certificate_ct_log_bound:
+    const: true
   registry_digest_set:
     type: array
-    minItems: 14
-    maxItems: 14
+    minItems: 15
+    maxItems: 15
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -749,6 +806,8 @@ properties:
   raw_client_certificate_lifecycle_payload_stored:
     const: false
   raw_client_certificate_lifecycle_chain_payload_stored:
+    const: false
+  raw_client_certificate_ct_log_payload_stored:
     const: false
   raw_packet_body_stored:
     const: false
@@ -996,6 +1055,15 @@ $defs:
       - mtls_client_certificate_lifecycle_chain_status
       - mtls_client_certificate_lifecycle_chain_proof_digest
       - mtls_client_certificate_lifecycle_chain_bound
+      - mtls_client_certificate_ct_log_readback_profile
+      - mtls_client_certificate_ct_log_readback_digest_profile
+      - mtls_client_certificate_ct_log_ref
+      - mtls_client_certificate_ct_log_leaf_digest
+      - mtls_client_certificate_ct_log_inclusion_proof_digest
+      - mtls_client_certificate_ct_log_readback_digest
+      - mtls_client_certificate_ct_log_readback_status
+      - mtls_client_certificate_ct_log_checked_at
+      - mtls_client_certificate_ct_log_bound
       - checked_at
       - raw_ack_payload_stored
       - raw_endpoint_payload_stored
@@ -1004,6 +1072,7 @@ $defs:
       - raw_client_certificate_freshness_payload_stored
       - raw_client_certificate_lifecycle_payload_stored
       - raw_client_certificate_lifecycle_chain_payload_stored
+      - raw_client_certificate_ct_log_payload_stored
       - digest
     properties:
       kind:
@@ -1189,6 +1258,26 @@ $defs:
         $ref: "#/$defs/sha256"
       mtls_client_certificate_lifecycle_chain_bound:
         const: true
+      mtls_client_certificate_ct_log_readback_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-readback-v1
+      mtls_client_certificate_ct_log_readback_digest_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-readback-digest-v1
+      mtls_client_certificate_ct_log_ref:
+        type: string
+        pattern: "^registry-client-cert-ctlog://"
+      mtls_client_certificate_ct_log_leaf_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_inclusion_proof_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_readback_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_readback_status:
+        const: included
+      mtls_client_certificate_ct_log_checked_at:
+        type: string
+        format: date-time
+      mtls_client_certificate_ct_log_bound:
+        const: true
       checked_at:
         type: string
         format: date-time
@@ -1205,6 +1294,8 @@ $defs:
       raw_client_certificate_lifecycle_payload_stored:
         const: false
       raw_client_certificate_lifecycle_chain_payload_stored:
+        const: false
+      raw_client_certificate_ct_log_payload_stored:
         const: false
       digest:
         $ref: "#/$defs/sha256"
@@ -1473,6 +1564,56 @@ $defs:
       mtls_client_certificate_lifecycle_chain_proof_digest:
         $ref: "#/$defs/sha256"
       raw_client_certificate_lifecycle_chain_payload_stored:
+        const: false
+  ack_mtls_client_certificate_ct_log_readback_proof:
+    type: object
+    additionalProperties: false
+    required:
+      - probe_id
+      - ack_receipt_digest
+      - registry_authority_ref
+      - registry_jurisdiction
+      - registry_ack_endpoint_ref
+      - mtls_client_certificate_ref
+      - mtls_client_certificate_lifecycle_chain_proof_digest
+      - mtls_client_certificate_ct_log_ref
+      - mtls_client_certificate_ct_log_leaf_digest
+      - mtls_client_certificate_ct_log_inclusion_proof_digest
+      - mtls_client_certificate_ct_log_readback_digest
+      - mtls_client_certificate_ct_log_readback_status
+      - raw_client_certificate_ct_log_payload_stored
+    properties:
+      probe_id:
+        type: string
+        pattern: "^collective-registry-ack-probe-[a-f0-9]{12}$"
+      ack_receipt_digest:
+        $ref: "#/$defs/sha256"
+      registry_authority_ref:
+        type: string
+        pattern: "^(legal-registry|governance-registry)://"
+      registry_jurisdiction:
+        type: string
+        minLength: 2
+      registry_ack_endpoint_ref:
+        type: string
+        pattern: "^https?://"
+      mtls_client_certificate_ref:
+        type: string
+        pattern: "^registry-client-cert://"
+      mtls_client_certificate_lifecycle_chain_proof_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_ref:
+        type: string
+        pattern: "^registry-client-cert-ctlog://"
+      mtls_client_certificate_ct_log_leaf_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_inclusion_proof_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_readback_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_readback_status:
+        const: included
+      raw_client_certificate_ct_log_payload_stored:
         const: false
   sha256:
     type: string

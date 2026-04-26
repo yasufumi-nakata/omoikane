@@ -503,6 +503,24 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 privileged_capture,
             )
         )
+        tampered_client_certificate_ct_log_registry_sync = dict(registry_sync)
+        tampered_client_certificate_ct_log_registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests"
+        ] = [
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests"
+            ][0],
+            "0" * 64,
+        ]
+        tampered_client_certificate_ct_log_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_client_certificate_ct_log_registry_sync,
+                capture_binding,
+                route_trace,
+                packet_capture,
+                privileged_capture,
+            )
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -647,6 +665,11 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
             ]
         )
+        self.assertTrue(
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_bound"
+            ]
+        )
         self.assertEqual(
             "collective-external-registry-ack-client-certificate-rollover-chain-v1",
             registry_sync[
@@ -678,6 +701,14 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             len(
                 registry_sync[
                     "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proofs"
+                ]
+            ),
+        )
+        self.assertEqual(
+            2,
+            len(
+                registry_sync[
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs"
                 ]
             ),
         )
@@ -720,6 +751,18 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                     ]
                 ),
             )
+        for ct_log_proof in registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs"
+        ]:
+            self.assertTrue(
+                ct_log_proof["mtls_client_certificate_ct_log_ref"].startswith(
+                    "registry-client-cert-ctlog://"
+                )
+            )
+            self.assertEqual(
+                "included",
+                ct_log_proof["mtls_client_certificate_ct_log_readback_status"],
+            )
         self.assertFalse(registry_sync["raw_client_certificate_payload_stored"])
         self.assertFalse(
             registry_sync["raw_client_certificate_freshness_payload_stored"]
@@ -729,6 +772,9 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         )
         self.assertFalse(
             registry_sync["raw_client_certificate_lifecycle_chain_payload_stored"]
+        )
+        self.assertFalse(
+            registry_sync["raw_client_certificate_ct_log_payload_stored"]
         )
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
@@ -768,6 +814,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertFalse(
             tampered_client_certificate_lifecycle_chain_registry_validation[
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
+            ]
+        )
+        self.assertFalse(tampered_client_certificate_ct_log_registry_validation["ok"])
+        self.assertFalse(
+            tampered_client_certificate_ct_log_registry_validation[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_bound"
             ]
         )
 

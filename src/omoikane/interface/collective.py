@@ -111,6 +111,12 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_CHAIN_DIGEST_PROFI
     "collective-external-registry-ack-client-certificate-rollover-chain-digest-v1"
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_CHAIN_DEPTH = 3
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-ct-log-readback-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-ct-log-readback-digest-v1"
+)
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -216,6 +222,9 @@ class CollectiveIdentityService:
                 "external_registry_ack_client_certificate_lifecycle_chain_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_CHAIN_PROFILE_ID
                 ),
+                "external_registry_ack_client_certificate_ct_log_readback_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
                 "raw_external_registry_ack_endpoint_payload_stored": False,
@@ -224,6 +233,7 @@ class CollectiveIdentityService:
                 "raw_external_registry_ack_client_certificate_freshness_payload_stored": False,
                 "raw_external_registry_ack_client_certificate_lifecycle_payload_stored": False,
                 "raw_external_registry_ack_client_certificate_lifecycle_chain_payload_stored": False,
+                "raw_external_registry_ack_client_certificate_ct_log_payload_stored": False,
             },
         }
 
@@ -1958,6 +1968,40 @@ class CollectiveIdentityService:
                 checked_at=str(payload["checked_at"]),
             )
         )
+        ct_log_ref = self._collective_external_registry_ack_client_certificate_ct_log_ref(
+            client_certificate_authority_ref=normalized_client_certificate_authority_ref,
+            registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+            registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+        )
+        ct_log_leaf_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
+                client_certificate_ref=normalized_client_certificate_ref,
+                client_certificate_fingerprint=normalized_client_certificate_fingerprint,
+                client_certificate_chain_digest=normalized_client_certificate_chain_digest,
+                lifecycle_chain_set_digest=lifecycle_chain_set_digest,
+            )
+        )
+        ct_log_inclusion_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
+                ct_log_ref=ct_log_ref,
+                ct_log_leaf_digest=ct_log_leaf_digest,
+                lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
+                checked_at=str(payload["checked_at"]),
+            )
+        )
+        ct_log_readback_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+                registry_ack_endpoint_ref=normalized_endpoint,
+                ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                client_certificate_ref=normalized_client_certificate_ref,
+                lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
+                ct_log_ref=ct_log_ref,
+                ct_log_leaf_digest=ct_log_leaf_digest,
+                ct_log_inclusion_proof_digest=ct_log_inclusion_proof_digest,
+                checked_at=str(payload["checked_at"]),
+                readback_status="included",
+            )
+        )
         mtls_client_certificate_bound = bool(
             signed_response_envelope_bound
             and normalized_client_certificate_ref.startswith("registry-client-cert://")
@@ -2010,6 +2054,13 @@ class CollectiveIdentityService:
             and len(lifecycle_chain_set_digest) == 64
             and len(lifecycle_chain_proof_digest) == 64
         )
+        mtls_client_certificate_ct_log_bound = bool(
+            mtls_client_certificate_lifecycle_chain_bound
+            and ct_log_ref.startswith("registry-client-cert-ctlog://")
+            and len(ct_log_leaf_digest) == 64
+            and len(ct_log_inclusion_proof_digest) == 64
+            and len(ct_log_readback_digest) == 64
+        )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
             _is_live_http_endpoint(normalized_endpoint)
@@ -2023,6 +2074,7 @@ class CollectiveIdentityService:
             and mtls_client_certificate_freshness_bound
             and mtls_client_certificate_lifecycle_bound
             and mtls_client_certificate_lifecycle_chain_bound
+            and mtls_client_certificate_ct_log_bound
         )
         receipt = {
             "kind": "collective_external_registry_ack_endpoint_probe",
@@ -2181,6 +2233,21 @@ class CollectiveIdentityService:
             "mtls_client_certificate_lifecycle_chain_bound": (
                 mtls_client_certificate_lifecycle_chain_bound
             ),
+            "mtls_client_certificate_ct_log_readback_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+            ),
+            "mtls_client_certificate_ct_log_readback_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_ct_log_ref": ct_log_ref,
+            "mtls_client_certificate_ct_log_leaf_digest": ct_log_leaf_digest,
+            "mtls_client_certificate_ct_log_inclusion_proof_digest": (
+                ct_log_inclusion_proof_digest
+            ),
+            "mtls_client_certificate_ct_log_readback_digest": ct_log_readback_digest,
+            "mtls_client_certificate_ct_log_readback_status": "included",
+            "mtls_client_certificate_ct_log_checked_at": payload["checked_at"],
+            "mtls_client_certificate_ct_log_bound": mtls_client_certificate_ct_log_bound,
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
@@ -2189,6 +2256,7 @@ class CollectiveIdentityService:
             "raw_client_certificate_freshness_payload_stored": False,
             "raw_client_certificate_lifecycle_payload_stored": False,
             "raw_client_certificate_lifecycle_chain_payload_stored": False,
+            "raw_client_certificate_ct_log_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -2233,6 +2301,8 @@ class CollectiveIdentityService:
         client_certificate_lifecycle_proof_digests: List[str] = []
         client_certificate_lifecycle_chain_proofs: List[Dict[str, Any]] = []
         client_certificate_lifecycle_chain_proof_digests: List[str] = []
+        client_certificate_ct_log_readback_proofs: List[Dict[str, Any]] = []
+        client_certificate_ct_log_readback_digests: List[str] = []
         client_certificate_refs: List[str] = []
         client_certificate_fingerprints: List[str] = []
         client_certificate_chain_digests: List[str] = []
@@ -2250,6 +2320,10 @@ class CollectiveIdentityService:
         client_certificate_lifecycle_statuses: List[str] = []
         client_certificate_lifecycle_chain_depths: List[int] = []
         client_certificate_lifecycle_chain_statuses: List[str] = []
+        client_certificate_ct_log_refs: List[str] = []
+        client_certificate_ct_log_leaf_digests: List[str] = []
+        client_certificate_ct_log_inclusion_proof_digests: List[str] = []
+        client_certificate_ct_log_readback_statuses: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -2455,6 +2529,41 @@ class CollectiveIdentityService:
             client_certificate_lifecycle_chain_proof_digests.append(
                 str(probe_copy["mtls_client_certificate_lifecycle_chain_proof_digest"])
             )
+            client_certificate_ct_log_readback_proof = {
+                "probe_id": probe_copy["probe_id"],
+                "ack_receipt_digest": probe_copy["ack_receipt_digest"],
+                "registry_authority_ref": probe_copy["registry_authority_ref"],
+                "registry_jurisdiction": probe_copy["registry_jurisdiction"],
+                "registry_ack_endpoint_ref": probe_copy["registry_ack_endpoint_ref"],
+                "mtls_client_certificate_ref": probe_copy[
+                    "mtls_client_certificate_ref"
+                ],
+                "mtls_client_certificate_lifecycle_chain_proof_digest": probe_copy[
+                    "mtls_client_certificate_lifecycle_chain_proof_digest"
+                ],
+                "mtls_client_certificate_ct_log_ref": probe_copy[
+                    "mtls_client_certificate_ct_log_ref"
+                ],
+                "mtls_client_certificate_ct_log_leaf_digest": probe_copy[
+                    "mtls_client_certificate_ct_log_leaf_digest"
+                ],
+                "mtls_client_certificate_ct_log_inclusion_proof_digest": probe_copy[
+                    "mtls_client_certificate_ct_log_inclusion_proof_digest"
+                ],
+                "mtls_client_certificate_ct_log_readback_digest": probe_copy[
+                    "mtls_client_certificate_ct_log_readback_digest"
+                ],
+                "mtls_client_certificate_ct_log_readback_status": probe_copy[
+                    "mtls_client_certificate_ct_log_readback_status"
+                ],
+                "raw_client_certificate_ct_log_payload_stored": False,
+            }
+            client_certificate_ct_log_readback_proofs.append(
+                client_certificate_ct_log_readback_proof
+            )
+            client_certificate_ct_log_readback_digests.append(
+                str(probe_copy["mtls_client_certificate_ct_log_readback_digest"])
+            )
             client_certificate_refs.append(str(probe_copy["mtls_client_certificate_ref"]))
             client_certificate_fingerprints.append(
                 str(probe_copy["mtls_client_certificate_fingerprint"])
@@ -2504,6 +2613,18 @@ class CollectiveIdentityService:
             client_certificate_lifecycle_chain_statuses.append(
                 str(probe_copy["mtls_client_certificate_lifecycle_chain_status"])
             )
+            client_certificate_ct_log_refs.append(
+                str(probe_copy["mtls_client_certificate_ct_log_ref"])
+            )
+            client_certificate_ct_log_leaf_digests.append(
+                str(probe_copy["mtls_client_certificate_ct_log_leaf_digest"])
+            )
+            client_certificate_ct_log_inclusion_proof_digests.append(
+                str(probe_copy["mtls_client_certificate_ct_log_inclusion_proof_digest"])
+            )
+            client_certificate_ct_log_readback_statuses.append(
+                str(probe_copy["mtls_client_certificate_ct_log_readback_status"])
+            )
 
         probe_set_digest = sha256_text(canonical_json(probe_digests))
         response_digest_set_digest = sha256_text(
@@ -2523,6 +2644,9 @@ class CollectiveIdentityService:
         )
         client_certificate_lifecycle_chain_proof_set_digest = sha256_text(
             canonical_json(client_certificate_lifecycle_chain_proof_digests)
+        )
+        client_certificate_ct_log_readback_set_digest = sha256_text(
+            canonical_json(client_certificate_ct_log_readback_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -2616,6 +2740,21 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest": (
                     client_certificate_lifecycle_chain_proof_set_digest
                 ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs": (
+                    client_certificate_ct_log_readback_proofs
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests": (
+                    client_certificate_ct_log_readback_digests
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest": (
+                    client_certificate_ct_log_readback_set_digest
+                ),
                 "ack_live_endpoint_client_certificate_refs": client_certificate_refs,
                 "ack_live_endpoint_client_certificate_fingerprints": (
                     client_certificate_fingerprints
@@ -2665,6 +2804,18 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_client_certificate_lifecycle_chain_statuses": (
                     client_certificate_lifecycle_chain_statuses
                 ),
+                "ack_live_endpoint_client_certificate_ct_log_refs": (
+                    client_certificate_ct_log_refs
+                ),
+                "ack_live_endpoint_client_certificate_ct_log_leaf_digests": (
+                    client_certificate_ct_log_leaf_digests
+                ),
+                "ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests": (
+                    client_certificate_ct_log_inclusion_proof_digests
+                ),
+                "ack_live_endpoint_client_certificate_ct_log_readback_statuses": (
+                    client_certificate_ct_log_readback_statuses
+                ),
                 "ack_live_endpoint_probe_count": len(bound_probes),
                 "ack_live_endpoint_probe_bound": True,
                 "ack_live_endpoint_signed_response_envelope_bound": True,
@@ -2672,12 +2823,14 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_freshness_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound": True,
+                "ack_live_endpoint_mtls_client_certificate_ct_log_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
                 "raw_response_signature_payload_stored": False,
                 "raw_client_certificate_payload_stored": False,
                 "raw_client_certificate_freshness_payload_stored": False,
                 "raw_client_certificate_lifecycle_payload_stored": False,
                 "raw_client_certificate_lifecycle_chain_payload_stored": False,
+                "raw_client_certificate_ct_log_payload_stored": False,
             }
         )
         receipt["registry_digest_set"] = [
@@ -2701,6 +2854,9 @@ class CollectiveIdentityService:
             receipt[
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest"
             ],
+            receipt[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
+            ],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -2715,6 +2871,7 @@ class CollectiveIdentityService:
             and receipt[
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
             ]
+            and receipt["ack_live_endpoint_mtls_client_certificate_ct_log_bound"]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -3792,6 +3949,18 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_lifecycle_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
             ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_CHAIN_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_CHAIN_DIGEST_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -3899,6 +4068,8 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_proof_set_digest",
             "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest",
             "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest",
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest",
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -4545,6 +4716,12 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_client_certificate_lifecycle_chain_proof_digests: List[
             str
         ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_readback_proofs: List[
+            Dict[str, Any]
+        ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_readback_digests: List[
+            str
+        ] = []
         expected_ack_live_endpoint_client_certificate_refs: List[str] = []
         expected_ack_live_endpoint_client_certificate_fingerprints: List[str] = []
         expected_ack_live_endpoint_client_certificate_chain_digests: List[str] = []
@@ -4576,12 +4753,21 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_client_certificate_lifecycle_chain_statuses: List[
             str
         ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_refs: List[str] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_leaf_digests: List[str] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_readback_statuses: List[
+            str
+        ] = []
         ack_live_endpoint_probe_bound = False
         ack_live_endpoint_signed_response_envelope_bound = False
         ack_live_endpoint_mtls_client_certificate_bound = False
         ack_live_endpoint_mtls_client_certificate_freshness_bound = False
         ack_live_endpoint_mtls_client_certificate_lifecycle_bound = False
         ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound = False
+        ack_live_endpoint_mtls_client_certificate_ct_log_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
         )
@@ -4600,6 +4786,9 @@ class CollectiveIdentityService:
         raw_client_certificate_lifecycle_chain_payload_stored = (
             receipt.get("raw_client_certificate_lifecycle_chain_payload_stored")
             is True
+        )
+        raw_client_certificate_ct_log_payload_stored = (
+            receipt.get("raw_client_certificate_ct_log_payload_stored") is True
         )
         if not isinstance(ack_live_endpoint_probe_receipts, list):
             errors.append("ack_live_endpoint_probe_receipts must be a list")
@@ -4899,6 +5088,59 @@ class CollectiveIdentityService:
                         )
                     )
                 )
+                expected_ack_live_endpoint_client_certificate_ct_log_readback_proof = {
+                    "probe_id": probe_receipt.get("probe_id"),
+                    "ack_receipt_digest": probe_receipt.get("ack_receipt_digest"),
+                    "registry_authority_ref": probe_receipt.get(
+                        "registry_authority_ref"
+                    ),
+                    "registry_jurisdiction": probe_receipt.get(
+                        "registry_jurisdiction"
+                    ),
+                    "registry_ack_endpoint_ref": probe_receipt.get(
+                        "registry_ack_endpoint_ref"
+                    ),
+                    "mtls_client_certificate_ref": probe_receipt.get(
+                        "mtls_client_certificate_ref"
+                    ),
+                    "mtls_client_certificate_lifecycle_chain_proof_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_chain_proof_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_ref": probe_receipt.get(
+                        "mtls_client_certificate_ct_log_ref"
+                    ),
+                    "mtls_client_certificate_ct_log_leaf_digest": probe_receipt.get(
+                        "mtls_client_certificate_ct_log_leaf_digest"
+                    ),
+                    "mtls_client_certificate_ct_log_inclusion_proof_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_inclusion_proof_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_readback_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_readback_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_readback_status": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_readback_status"
+                        )
+                    ),
+                    "raw_client_certificate_ct_log_payload_stored": False,
+                }
+                expected_ack_live_endpoint_client_certificate_ct_log_readback_proofs.append(
+                    expected_ack_live_endpoint_client_certificate_ct_log_readback_proof
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_readback_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_readback_digest"
+                        )
+                    )
+                )
                 expected_ack_live_endpoint_client_certificate_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_ref"))
                 )
@@ -4973,6 +5215,30 @@ class CollectiveIdentityService:
                         )
                     )
                 )
+                expected_ack_live_endpoint_client_certificate_ct_log_refs.append(
+                    str(probe_receipt.get("mtls_client_certificate_ct_log_ref"))
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_leaf_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_leaf_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_inclusion_proof_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_readback_statuses.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_readback_status"
+                        )
+                    )
+                )
             expected_probe_set_digest = sha256_text(
                 canonical_json(expected_ack_live_endpoint_probe_digests)
             )
@@ -5000,6 +5266,11 @@ class CollectiveIdentityService:
             expected_client_certificate_lifecycle_chain_proof_set_digest = sha256_text(
                 canonical_json(
                     expected_ack_live_endpoint_client_certificate_lifecycle_chain_proof_digests
+                )
+            )
+            expected_client_certificate_ct_log_readback_set_digest = sha256_text(
+                canonical_json(
+                    expected_ack_live_endpoint_client_certificate_ct_log_readback_digests
                 )
             )
             ack_live_endpoint_probe_bound = (
@@ -5241,6 +5512,53 @@ class CollectiveIdentityService:
                 is True
                 and not raw_client_certificate_lifecycle_chain_payload_stored
             )
+            ack_live_endpoint_mtls_client_certificate_ct_log_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get("mtls_client_certificate_ct_log_bound") is True
+                    and probe_receipt.get(
+                        "raw_client_certificate_ct_log_payload_stored"
+                    )
+                    is False
+                    and probe_receipt.get(
+                        "mtls_client_certificate_ct_log_readback_status"
+                    )
+                    == "included"
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_readback_proofs
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_readback_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
+                )
+                == expected_client_certificate_ct_log_readback_set_digest
+                and receipt.get("ack_live_endpoint_client_certificate_ct_log_refs")
+                == expected_ack_live_endpoint_client_certificate_ct_log_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ct_log_leaf_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_leaf_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ct_log_readback_statuses"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_readback_statuses
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_bound"
+                )
+                is True
+                and not raw_client_certificate_ct_log_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
         if not ack_live_endpoint_signed_response_envelope_bound:
@@ -5263,6 +5581,10 @@ class CollectiveIdentityService:
             errors.append(
                 "ack live endpoint probes must bind mTLS client certificate lifecycle chain proofs"
             )
+        if not ack_live_endpoint_mtls_client_certificate_ct_log_bound:
+            errors.append(
+                "ack live endpoint probes must bind mTLS client certificate CT log readback proofs"
+            )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
         if raw_response_signature_payload_stored:
@@ -5281,6 +5603,8 @@ class CollectiveIdentityService:
             errors.append(
                 "raw_client_certificate_lifecycle_chain_payload_stored must be false"
             )
+        if raw_client_certificate_ct_log_payload_stored:
+            errors.append("raw_client_certificate_ct_log_payload_stored must be false")
 
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
@@ -5308,6 +5632,9 @@ class CollectiveIdentityService:
                 ),
                 receipt.get(
                     "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest"
+                ),
+                receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
                 ),
             ]
             and receipt.get("registry_digest_set_digest")
@@ -5350,6 +5677,7 @@ class CollectiveIdentityService:
             and ack_live_endpoint_mtls_client_certificate_freshness_bound
             and ack_live_endpoint_mtls_client_certificate_lifecycle_bound
             and ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
+            and ack_live_endpoint_mtls_client_certificate_ct_log_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -5362,6 +5690,7 @@ class CollectiveIdentityService:
             and not raw_client_certificate_freshness_payload_stored
             and not raw_client_certificate_lifecycle_payload_stored
             and not raw_client_certificate_lifecycle_chain_payload_stored
+            and not raw_client_certificate_ct_log_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -5403,6 +5732,9 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound": (
                 ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
             ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_bound": (
+                ack_live_endpoint_mtls_client_certificate_ct_log_bound
+            ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -5425,6 +5757,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_lifecycle_chain_payload_stored": (
                 raw_client_certificate_lifecycle_chain_payload_stored
+            ),
+            "raw_client_certificate_ct_log_payload_stored": (
+                raw_client_certificate_ct_log_payload_stored
             ),
             "raw_packet_body_stored": raw_packet_body_stored,
         }
@@ -5512,6 +5847,8 @@ class CollectiveIdentityService:
                 "accept-renewed-client-certificate"
             ),
             "mtls_client_certificate_lifecycle_bound": True,
+            "mtls_client_certificate_ct_log_readback_status": "included",
+            "mtls_client_certificate_ct_log_bound": True,
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
             "raw_response_signature_payload_stored": False,
@@ -5519,6 +5856,7 @@ class CollectiveIdentityService:
             "raw_client_certificate_freshness_payload_stored": False,
             "raw_client_certificate_lifecycle_payload_stored": False,
             "raw_client_certificate_lifecycle_chain_payload_stored": False,
+            "raw_client_certificate_ct_log_payload_stored": False,
         }
         expected_payload = self.external_registry_ack_endpoint_payload(
             external_registry_sync,
@@ -5930,6 +6268,44 @@ class CollectiveIdentityService:
                 checked_at=str(receipt.get("checked_at") or ""),
             )
         )
+        expected_ct_log_ref = (
+            self._collective_external_registry_ack_client_certificate_ct_log_ref(
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_ct_log_leaf_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
+                client_certificate_ref=client_certificate_ref,
+                client_certificate_fingerprint=client_certificate_fingerprint,
+                client_certificate_chain_digest=client_certificate_chain_digest,
+                lifecycle_chain_set_digest=expected_lifecycle_chain_set_digest,
+            )
+        )
+        expected_ct_log_inclusion_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
+                ct_log_ref=expected_ct_log_ref,
+                ct_log_leaf_digest=expected_ct_log_leaf_digest,
+                lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
+                checked_at=str(receipt.get("checked_at") or ""),
+            )
+        )
+        expected_ct_log_readback_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+                registry_ack_endpoint_ref=str(
+                    receipt.get("registry_ack_endpoint_ref") or ""
+                ),
+                ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
+                client_certificate_ref=client_certificate_ref,
+                lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
+                ct_log_ref=expected_ct_log_ref,
+                ct_log_leaf_digest=expected_ct_log_leaf_digest,
+                ct_log_inclusion_proof_digest=expected_ct_log_inclusion_proof_digest,
+                checked_at=str(receipt.get("checked_at") or ""),
+                readback_status="included",
+            )
+        )
         expected_fields.update(
             {
                 "mtls_client_certificate_ref": expected_client_certificate_ref,
@@ -6010,6 +6386,23 @@ class CollectiveIdentityService:
                     expected_lifecycle_chain_proof_digest
                 ),
                 "mtls_client_certificate_lifecycle_chain_bound": True,
+                "mtls_client_certificate_ct_log_readback_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                ),
+                "mtls_client_certificate_ct_log_readback_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+                ),
+                "mtls_client_certificate_ct_log_ref": expected_ct_log_ref,
+                "mtls_client_certificate_ct_log_leaf_digest": (
+                    expected_ct_log_leaf_digest
+                ),
+                "mtls_client_certificate_ct_log_inclusion_proof_digest": (
+                    expected_ct_log_inclusion_proof_digest
+                ),
+                "mtls_client_certificate_ct_log_readback_digest": (
+                    expected_ct_log_readback_digest
+                ),
+                "mtls_client_certificate_ct_log_checked_at": receipt.get("checked_at"),
             }
         )
         for field_name, expected in expected_fields.items():
@@ -6038,6 +6431,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_lifecycle_proof_digest",
             "mtls_client_certificate_lifecycle_chain_set_digest",
             "mtls_client_certificate_lifecycle_chain_proof_digest",
+            "mtls_client_certificate_ct_log_leaf_digest",
+            "mtls_client_certificate_ct_log_inclusion_proof_digest",
+            "mtls_client_certificate_ct_log_readback_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
@@ -6177,6 +6573,30 @@ class CollectiveIdentityService:
             errors.append(
                 "mTLS client certificate lifecycle chain must bind multi-generation rollover evidence"
             )
+        mtls_client_certificate_ct_log_bound = bool(
+            mtls_client_certificate_lifecycle_chain_bound
+            and receipt.get("mtls_client_certificate_ct_log_readback_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+            and receipt.get("mtls_client_certificate_ct_log_readback_digest_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+            and receipt.get("mtls_client_certificate_ct_log_ref") == expected_ct_log_ref
+            and receipt.get("mtls_client_certificate_ct_log_leaf_digest")
+            == expected_ct_log_leaf_digest
+            and receipt.get("mtls_client_certificate_ct_log_inclusion_proof_digest")
+            == expected_ct_log_inclusion_proof_digest
+            and receipt.get("mtls_client_certificate_ct_log_readback_digest")
+            == expected_ct_log_readback_digest
+            and receipt.get("mtls_client_certificate_ct_log_readback_status")
+            == "included"
+            and receipt.get("mtls_client_certificate_ct_log_checked_at")
+            == receipt.get("checked_at")
+            and receipt.get("mtls_client_certificate_ct_log_bound") is True
+            and receipt.get("raw_client_certificate_ct_log_payload_stored") is False
+        )
+        if not mtls_client_certificate_ct_log_bound:
+            errors.append(
+                "mTLS client certificate CT log readback must bind lifecycle chain evidence"
+            )
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -6229,6 +6649,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_lifecycle_chain_bound": (
                 mtls_client_certificate_lifecycle_chain_bound
             ),
+            "mtls_client_certificate_ct_log_bound": (
+                mtls_client_certificate_ct_log_bound
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
             is True,
@@ -6247,6 +6670,9 @@ class CollectiveIdentityService:
             "raw_client_certificate_lifecycle_chain_payload_stored": (
                 receipt.get("raw_client_certificate_lifecycle_chain_payload_stored")
                 is True
+            ),
+            "raw_client_certificate_ct_log_payload_stored": (
+                receipt.get("raw_client_certificate_ct_log_payload_stored") is True
             ),
         }
 
@@ -7069,6 +7495,33 @@ class CollectiveIdentityService:
             "mtls_client_certificate_lifecycle_chain_bound": receipt.get(
                 "mtls_client_certificate_lifecycle_chain_bound"
             ),
+            "mtls_client_certificate_ct_log_readback_profile": receipt.get(
+                "mtls_client_certificate_ct_log_readback_profile"
+            ),
+            "mtls_client_certificate_ct_log_readback_digest_profile": receipt.get(
+                "mtls_client_certificate_ct_log_readback_digest_profile"
+            ),
+            "mtls_client_certificate_ct_log_ref": receipt.get(
+                "mtls_client_certificate_ct_log_ref"
+            ),
+            "mtls_client_certificate_ct_log_leaf_digest": receipt.get(
+                "mtls_client_certificate_ct_log_leaf_digest"
+            ),
+            "mtls_client_certificate_ct_log_inclusion_proof_digest": receipt.get(
+                "mtls_client_certificate_ct_log_inclusion_proof_digest"
+            ),
+            "mtls_client_certificate_ct_log_readback_digest": receipt.get(
+                "mtls_client_certificate_ct_log_readback_digest"
+            ),
+            "mtls_client_certificate_ct_log_readback_status": receipt.get(
+                "mtls_client_certificate_ct_log_readback_status"
+            ),
+            "mtls_client_certificate_ct_log_checked_at": receipt.get(
+                "mtls_client_certificate_ct_log_checked_at"
+            ),
+            "mtls_client_certificate_ct_log_bound": receipt.get(
+                "mtls_client_certificate_ct_log_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
             "raw_response_signature_payload_stored": receipt.get(
@@ -7085,6 +7538,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_lifecycle_chain_payload_stored": receipt.get(
                 "raw_client_certificate_lifecycle_chain_payload_stored"
+            ),
+            "raw_client_certificate_ct_log_payload_stored": receipt.get(
+                "raw_client_certificate_ct_log_payload_stored"
             ),
         }
 
@@ -7727,6 +8183,113 @@ class CollectiveIdentityService:
                     "chain_depth": chain_depth,
                     "chain_status": chain_status,
                     "checked_at": checked_at,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_ref(
+        *,
+        client_certificate_authority_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        ct_log_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                    ),
+                    "client_certificate_authority_ref": client_certificate_authority_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+        return f"registry-client-cert-ctlog://collective-ack-endpoint/{ct_log_digest[:16]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
+        *,
+        client_certificate_ref: str,
+        client_certificate_fingerprint: str,
+        client_certificate_chain_digest: str,
+        lifecycle_chain_set_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+                    ),
+                    "client_certificate_ref": client_certificate_ref,
+                    "client_certificate_fingerprint": client_certificate_fingerprint,
+                    "client_certificate_chain_digest": client_certificate_chain_digest,
+                    "lifecycle_chain_set_digest": lifecycle_chain_set_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
+        *,
+        ct_log_ref: str,
+        ct_log_leaf_digest: str,
+        lifecycle_chain_proof_digest: str,
+        checked_at: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+                    ),
+                    "ct_log_ref": ct_log_ref,
+                    "ct_log_leaf_digest": ct_log_leaf_digest,
+                    "lifecycle_chain_proof_digest": lifecycle_chain_proof_digest,
+                    "checked_at": checked_at,
+                    "inclusion_status": "included",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+        *,
+        registry_ack_endpoint_ref: str,
+        ack_receipt_digest: str,
+        client_certificate_ref: str,
+        lifecycle_chain_proof_digest: str,
+        ct_log_ref: str,
+        ct_log_leaf_digest: str,
+        ct_log_inclusion_proof_digest: str,
+        checked_at: str,
+        readback_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
+                    ),
+                    "registry_ack_endpoint_ref": registry_ack_endpoint_ref,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "client_certificate_ref": client_certificate_ref,
+                    "lifecycle_chain_proof_digest": lifecycle_chain_proof_digest,
+                    "ct_log_ref": ct_log_ref,
+                    "ct_log_leaf_digest": ct_log_leaf_digest,
+                    "ct_log_inclusion_proof_digest": ct_log_inclusion_proof_digest,
+                    "checked_at": checked_at,
+                    "readback_status": readback_status,
                 }
             )
         )

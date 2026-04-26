@@ -864,9 +864,13 @@ previous certificate ref、retirement digest、renewal event digest を同じ pr
 ancestor -> previous -> current の 3 generation certificate refs、
 2 件の retirement digest、2 件の renewal event digest、terminal lifecycle proof digest を
 chain proof digest に束縛し、単一 rollover だけで complete にならないようにする。
+さらに `collective-external-registry-ack-client-certificate-ct-log-readback-v1` が
+CT-style log ref、certificate leaf digest、inclusion proof digest、chain proof digest を
+同じ endpoint probe に束縛し、raw CT log payload を保存しない。
 probe set digest、response signature digest set、client certificate proof set digest、
 client certificate freshness proof set digest、client certificate lifecycle proof set digest、
-client certificate lifecycle chain proof set digest
+client certificate lifecycle chain proof set digest、
+client certificate CT log readback set digest
 を registry digest set に含めてから
 complete になる。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
@@ -874,6 +878,7 @@ raw ack payload、raw ack-route payload、raw endpoint payload、
 raw response signature payload、raw client certificate payload、
 raw client certificate freshness payload、raw client certificate lifecycle payload、
 raw client certificate lifecycle chain payload、
+raw client certificate CT log payload、
 raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract

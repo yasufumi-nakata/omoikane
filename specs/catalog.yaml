@@ -842,7 +842,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - evals/interface/collective_external_registry_sync.yaml
       - reference-runtime
-    rationale: Required to synchronize collective dissolution recovery evidence to external legal and governance registries as digest-only entry, submission, acknowledgement, acknowledgement-quorum, ack route-trace, ack route capture-export, live acknowledgement endpoint probe, signed response envelope, mTLS client certificate proof, certificate freshness/revocation, certificate lifecycle, and 3 generation certificate rollover chain receipts without storing raw registry, acknowledgement, route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, or packet payloads.
+    rationale: Required to synchronize collective dissolution recovery evidence to external legal and governance registries as digest-only entry, submission, acknowledgement, acknowledgement-quorum, ack route-trace, ack route capture-export, live acknowledgement endpoint probe, signed response envelope, mTLS client certificate proof, certificate freshness/revocation, certificate lifecycle, 3 generation certificate rollover chain, and CT-style readback receipts without storing raw registry, acknowledgement, route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, CT log, or packet payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/reasoning_trace.schema
