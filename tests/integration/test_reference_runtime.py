@@ -107,6 +107,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["validation"]["recovery_verifier_transport_all_receipts_verified"]
         )
         self.assertFalse(result["validation"]["recovery_verifier_transport_raw_payload_stored"])
+        self.assertTrue(result["validation"]["recovery_route_trace_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_profile_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_transport_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_authority_trace_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_authenticated"])
+        self.assertTrue(result["validation"]["recovery_route_trace_member_bindings_bound"])
+        self.assertTrue(
+            result["validation"]["recovery_route_trace_all_member_receipts_route_traced"]
+        )
+        self.assertFalse(result["validation"]["recovery_route_trace_raw_payload_stored"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
@@ -116,7 +126,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
         self.assertEqual(
-            2,
+            3,
             result["ledger_verification"]["category_counts"]["interface-collective-dissolution"],
         )
 

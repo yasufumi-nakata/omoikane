@@ -817,6 +817,12 @@ confirmation digest set を持つため、単独に検証できる。
 dissolution receipt digest、member recovery binding digest、member ごとの
 verified remote reviewer transport receipt、transport exchange digest set、
 raw verifier payload 非保存を同じ ledger category へ束縛する。
+同じ demo は `collective_recovery_route_trace_binding.schema` に合う
+`collective-recovery-non-loopback-route-trace-binding-v1` artifact も返し、
+recovery verifier transport binding digest、authenticated non-loopback
+distributed authority-route trace digest、member ごとの route binding ref /
+remote host attestation ref / socket response digest を束ねる。
+raw verifier payload と raw route payload は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

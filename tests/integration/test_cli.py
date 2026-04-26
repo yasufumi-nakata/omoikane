@@ -222,6 +222,11 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["recovery_verifier_transport_all_receipts_verified"])
         self.assertFalse(result["validation"]["recovery_verifier_transport_raw_payload_stored"])
+        self.assertTrue(result["validation"]["recovery_route_trace_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_profile_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_authority_trace_bound"])
+        self.assertTrue(result["validation"]["recovery_route_trace_member_bindings_bound"])
+        self.assertFalse(result["validation"]["recovery_route_trace_raw_payload_stored"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
         self.assertEqual(

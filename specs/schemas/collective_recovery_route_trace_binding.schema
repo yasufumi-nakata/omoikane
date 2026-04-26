@@ -1,0 +1,248 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_recovery_route_trace_binding.schema"
+title: CollectiveRecoveryRouteTraceBinding
+description: >
+  Digest-only binding that connects post-dissolution collective member recovery
+  verifier transport receipts to an authenticated non-loopback distributed
+  authority-route trace.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - digest_profile
+  - collective_id
+  - recorded_at
+  - status
+  - recovery_verifier_transport_profile_id
+  - recovery_verifier_transport_binding_digest
+  - verifier_transport_digest_set_digest
+  - dissolution_receipt_digest
+  - member_recovery_binding_digest
+  - authority_route_trace_ref
+  - authority_route_trace_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - route_target_discovery_ref
+  - route_target_discovery_digest
+  - council_tier
+  - transport_profile
+  - trace_profile
+  - socket_trace_profile
+  - os_observer_profile
+  - cross_host_binding_profile
+  - route_target_discovery_profile
+  - route_count
+  - mtls_authenticated_count
+  - distinct_remote_host_count
+  - route_binding_refs
+  - remote_host_refs
+  - remote_host_attestation_refs
+  - member_route_bindings
+  - member_route_binding_digest_set
+  - member_route_binding_digest_set_digest
+  - member_route_binding_count
+  - recovery_transport_bound
+  - authority_route_trace_bound
+  - all_member_receipts_route_traced
+  - non_loopback_verified
+  - cross_host_verified
+  - socket_trace_complete
+  - os_observer_complete
+  - route_target_discovery_bound
+  - raw_verifier_payload_stored
+  - raw_route_payload_stored
+  - digest
+properties:
+  kind:
+    const: collective_recovery_route_trace_binding
+  schema_version:
+    const: 1.0.0
+  profile_id:
+    const: collective-recovery-non-loopback-route-trace-binding-v1
+  digest_profile:
+    const: collective-recovery-route-trace-binding-digest-v1
+  collective_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  status:
+    const: route-trace-bound
+  recovery_verifier_transport_profile_id:
+    const: collective-dissolution-recovery-verifier-transport-v1
+  recovery_verifier_transport_binding_digest:
+    $ref: "#/$defs/sha256"
+  verifier_transport_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  dissolution_receipt_digest:
+    $ref: "#/$defs/sha256"
+  member_recovery_binding_digest:
+    $ref: "#/$defs/sha256"
+  authority_route_trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  authority_route_trace_digest:
+    $ref: "#/$defs/sha256"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    $ref: "#/$defs/sha256"
+  route_target_discovery_ref:
+    type: string
+    pattern: "^authority-route-targets://"
+  route_target_discovery_digest:
+    $ref: "#/$defs/sha256"
+  council_tier:
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  trace_profile:
+    const: non-loopback-mtls-authority-route-v1
+  socket_trace_profile:
+    const: mtls-socket-trace-v1
+  os_observer_profile:
+    const: os-native-tcp-observer-v1
+  cross_host_binding_profile:
+    const: attested-cross-host-authority-binding-v1
+  route_target_discovery_profile:
+    const: bounded-authority-route-target-discovery-v1
+  route_count:
+    type: integer
+    minimum: 2
+  mtls_authenticated_count:
+    type: integer
+    minimum: 2
+  distinct_remote_host_count:
+    type: integer
+    minimum: 2
+  route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  remote_host_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^host://"
+  remote_host_attestation_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^host-attestation://"
+  member_route_bindings:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - member_id
+        - verifier_transport_receipt_id
+        - verifier_transport_receipt_digest
+        - verifier_ref
+        - jurisdiction
+        - route_binding_ref
+        - remote_host_ref
+        - remote_host_attestation_ref
+        - authority_cluster_ref
+        - remote_jurisdiction
+        - remote_network_zone
+        - os_observer_receipt_id
+        - os_observer_host_binding_digest
+        - socket_response_digest
+        - mtls_status
+        - member_route_binding_digest
+      properties:
+        member_id:
+          type: string
+          minLength: 1
+        verifier_transport_receipt_id:
+          type: string
+          pattern: "^collective-recovery-verifier-receipt-[a-f0-9]{12}$"
+        verifier_transport_receipt_digest:
+          $ref: "#/$defs/sha256"
+        verifier_ref:
+          type: string
+          pattern: "^verifier://collective-recovery/"
+        jurisdiction:
+          type: string
+          minLength: 1
+        route_binding_ref:
+          type: string
+          pattern: "^authority-route://"
+        remote_host_ref:
+          type: string
+          pattern: "^host://"
+        remote_host_attestation_ref:
+          type: string
+          pattern: "^host-attestation://"
+        authority_cluster_ref:
+          type: string
+          pattern: "^authority-cluster://"
+        remote_jurisdiction:
+          type: string
+          minLength: 1
+        remote_network_zone:
+          type: string
+          minLength: 1
+        os_observer_receipt_id:
+          type: string
+          pattern: "^authority-os-observer://"
+        os_observer_host_binding_digest:
+          $ref: "#/$defs/sha256"
+        socket_response_digest:
+          $ref: "#/$defs/sha256"
+        mtls_status:
+          const: authenticated
+        member_route_binding_digest:
+          $ref: "#/$defs/sha256"
+  member_route_binding_digest_set:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  member_route_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  member_route_binding_count:
+    type: integer
+    minimum: 2
+  recovery_transport_bound:
+    const: true
+  authority_route_trace_bound:
+    const: true
+  all_member_receipts_route_traced:
+    const: true
+  non_loopback_verified:
+    const: true
+  cross_host_verified:
+    const: true
+  socket_trace_complete:
+    const: true
+  os_observer_complete:
+    const: true
+  route_target_discovery_bound:
+    const: true
+  raw_verifier_payload_stored:
+    const: false
+  raw_route_payload_stored:
+    const: false
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

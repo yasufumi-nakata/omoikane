@@ -7677,6 +7677,13 @@ json.dump(response, sys.stdout)
         recovery_verifier_transport = self.collective.bind_recovery_verifier_transport(
             dissolution
         )
+        recovery_route_trace = OmoikaneReferenceOS().run_distributed_transport_demo()[
+            "authority_route_trace"
+        ]["federation_rotated"]
+        recovery_route_trace_binding = self.collective.bind_recovery_verifier_route_trace(
+            recovery_verifier_transport,
+            recovery_route_trace,
+        )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
         collective_validation = self.collective.validate_record(final_collective)
@@ -7686,6 +7693,13 @@ json.dump(response, sys.stdout)
             self.collective.validate_recovery_verifier_transport_binding(
                 recovery_verifier_transport,
                 dissolution,
+            )
+        )
+        recovery_route_trace_validation = (
+            self.collective.validate_recovery_verifier_route_trace_binding(
+                recovery_route_trace_binding,
+                recovery_verifier_transport,
+                recovery_route_trace,
             )
         )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
@@ -7812,12 +7826,43 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.recovery_route_trace.bound",
+            payload={
+                "collective_id": recovery_route_trace_binding["collective_id"],
+                "profile_id": recovery_route_trace_binding["profile_id"],
+                "recovery_verifier_transport_binding_digest": (
+                    recovery_route_trace_binding[
+                        "recovery_verifier_transport_binding_digest"
+                    ]
+                ),
+                "authority_route_trace_ref": recovery_route_trace_binding[
+                    "authority_route_trace_ref"
+                ],
+                "authority_route_trace_digest": recovery_route_trace_binding[
+                    "authority_route_trace_digest"
+                ],
+                "member_route_binding_digest_set": recovery_route_trace_binding[
+                    "member_route_binding_digest_set"
+                ],
+                "raw_route_payload_stored": recovery_route_trace_binding[
+                    "raw_route_payload_stored"
+                ],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective-dissolution",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         validation = {
             "ok": collective_validation["ok"]
             and merge_validation["ok"]
             and dissolution_validation["ok"]
             and recovery_verifier_transport_validation["ok"]
+            and recovery_route_trace_validation["ok"]
             and all(validation["ok"] for validation in member_recovery_validations.values()),
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
@@ -7881,6 +7926,31 @@ json.dump(response, sys.stdout)
             "recovery_verifier_transport_raw_payload_stored": (
                 recovery_verifier_transport_validation["raw_verifier_payload_stored"]
             ),
+            "recovery_route_trace_bound": recovery_route_trace_validation["ok"],
+            "recovery_route_trace_profile_bound": recovery_route_trace_validation[
+                "profile_bound"
+            ],
+            "recovery_route_trace_transport_bound": (
+                recovery_route_trace_validation["recovery_transport_bound"]
+            ),
+            "recovery_route_trace_authority_trace_bound": (
+                recovery_route_trace_validation["authority_route_trace_bound"]
+            ),
+            "recovery_route_trace_authenticated": recovery_route_trace_validation[
+                "route_trace_authenticated"
+            ],
+            "recovery_route_trace_member_bindings_bound": (
+                recovery_route_trace_validation["member_route_bindings_bound"]
+            ),
+            "recovery_route_trace_all_member_receipts_route_traced": (
+                recovery_route_trace_validation["all_member_receipts_route_traced"]
+            ),
+            "recovery_route_trace_digest_bound": recovery_route_trace_validation[
+                "digest_bound"
+            ],
+            "recovery_route_trace_raw_payload_stored": (
+                recovery_route_trace_validation["raw_route_payload_stored"]
+            ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
         }
@@ -7911,6 +7981,8 @@ json.dump(response, sys.stdout)
                 "validations": member_recovery_validations,
             },
             "recovery_verifier_transport": recovery_verifier_transport,
+            "recovery_route_trace": recovery_route_trace,
+            "recovery_route_trace_binding": recovery_route_trace_binding,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

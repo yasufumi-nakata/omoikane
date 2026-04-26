@@ -1,0 +1,18 @@
+name: collective_recovery_route_trace_binding
+description: >
+  Ensure post-dissolution collective member recovery verifier transport receipts
+  are bound to an authenticated non-loopback distributed authority-route trace
+  without storing raw verifier or route payloads.
+scenarios:
+  - name: recovery_verifier_transport_to_non_loopback_route_trace
+    command: PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
+    binding_profile: collective-recovery-non-loopback-route-trace-binding-v1
+    expected_status: route-trace-bound
+assertions:
+  - recovery route trace binding conforms to collective_recovery_route_trace_binding.schema
+  - recovery_verifier_transport_binding_digest matches the verifier transport artifact
+  - authority_route_trace_digest binds an authenticated distributed authority-route trace
+  - member_route_bindings cover every recovery verifier transport receipt
+  - non_loopback_verified, cross_host_verified, socket_trace_complete, and os_observer_complete are true
+  - all_member_receipts_route_traced remains true
+  - raw_verifier_payload_stored and raw_route_payload_stored remain false

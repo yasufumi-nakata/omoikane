@@ -31,6 +31,71 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             },
         }
 
+    @staticmethod
+    def _authority_route_trace() -> dict:
+        def route_binding(index: int, digest_seed: str) -> dict:
+            suffix = f"{index}" * 16
+            return {
+                "key_server_ref": f"keyserver://federation/notary-{index}",
+                "server_role": "quorum-notary" if index == 1 else "directory-mirror",
+                "authority_status": "active",
+                "server_endpoint": f"https://10.0.0.{index}:443/authority-route-{index}",
+                "server_name": "authority.local",
+                "remote_host_ref": f"host://federation/authority-edge-{index}",
+                "remote_host_attestation_ref": (
+                    f"host-attestation://federation/authority-edge-{index}/2026-04-26"
+                ),
+                "authority_cluster_ref": "authority-cluster://federation/review-window",
+                "remote_jurisdiction": "JP-13" if index == 1 else "US-CA",
+                "remote_network_zone": "apne1" if index == 1 else "usw2",
+                "route_binding_ref": f"authority-route://federation/{suffix}",
+                "matched_root_refs": [f"root://federation/pki-{index}"],
+                "mtls_status": "authenticated",
+                "response_digest_bound": True,
+                "os_observer_receipt": {
+                    "receipt_id": f"authority-os-observer://{suffix}",
+                    "receipt_status": "observed",
+                    "host_binding_digest": digest_seed * 64,
+                },
+                "socket_trace": {
+                    "non_loopback": True,
+                    "response_digest": digest_seed * 64,
+                },
+            }
+
+        return {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_ref": "authority-route-trace://federation/test",
+            "authority_plane_ref": "authority-plane://federation/test",
+            "authority_plane_digest": "d" * 64,
+            "route_target_discovery_ref": "authority-route-targets://federation/test",
+            "route_target_discovery_digest": "e" * 64,
+            "council_tier": "federation",
+            "transport_profile": "federation-mtls-quorum-v1",
+            "trace_profile": "non-loopback-mtls-authority-route-v1",
+            "socket_trace_profile": "mtls-socket-trace-v1",
+            "os_observer_profile": "os-native-tcp-observer-v1",
+            "cross_host_binding_profile": "attested-cross-host-authority-binding-v1",
+            "route_target_discovery_profile": "bounded-authority-route-target-discovery-v1",
+            "route_count": 2,
+            "mtls_authenticated_count": 2,
+            "distinct_remote_host_count": 2,
+            "non_loopback_verified": True,
+            "authority_plane_bound": True,
+            "response_digest_bound": True,
+            "socket_trace_complete": True,
+            "os_observer_complete": True,
+            "route_target_discovery_bound": True,
+            "cross_host_verified": True,
+            "route_bindings": [
+                route_binding(1, "4"),
+                route_binding(2, "5"),
+            ],
+            "trace_status": "authenticated",
+            "digest": "f" * 64,
+        }
+
     def test_register_open_close_and_dissolve_collective(self) -> None:
         service = CollectiveIdentityService()
         record = service.register_collective(
@@ -90,6 +155,15 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             transport_binding,
             dissolved,
         )
+        route_trace_binding = service.bind_recovery_verifier_route_trace(
+            transport_binding,
+            self._authority_route_trace(),
+        )
+        route_trace_validation = service.validate_recovery_verifier_route_trace_binding(
+            route_trace_binding,
+            transport_binding,
+            self._authority_route_trace(),
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -127,6 +201,16 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             transport_binding["profile_id"],
         )
         self.assertEqual(2, transport_binding["verifier_transport_receipt_count"])
+        self.assertTrue(route_trace_validation["ok"])
+        self.assertTrue(route_trace_validation["recovery_transport_bound"])
+        self.assertTrue(route_trace_validation["authority_route_trace_bound"])
+        self.assertTrue(route_trace_validation["member_route_bindings_bound"])
+        self.assertFalse(route_trace_validation["raw_route_payload_stored"])
+        self.assertEqual(
+            "collective-recovery-non-loopback-route-trace-binding-v1",
+            route_trace_binding["profile_id"],
+        )
+        self.assertEqual(2, route_trace_binding["member_route_binding_count"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()

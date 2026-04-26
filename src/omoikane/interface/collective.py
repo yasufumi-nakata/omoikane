@@ -20,6 +20,12 @@ COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID = (
 COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID = (
     "collective-dissolution-recovery-verifier-transport-v1"
 )
+COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID = (
+    "collective-recovery-non-loopback-route-trace-binding-v1"
+)
+COLLECTIVE_RECOVERY_ROUTE_TRACE_DIGEST_PROFILE_ID = (
+    "collective-recovery-route-trace-binding-digest-v1"
+)
 COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID = "multidimensional-identity-confirmation-v1"
 COLLECTIVE_IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = (
     "identity-self-report-witness-consistency-v1"
@@ -83,6 +89,7 @@ class CollectiveIdentityService:
                 "member_recovery_verifier_transport_profile": (
                     COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
                 ),
+                "member_recovery_route_trace_profile": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
                 "raw_identity_confirmation_profiles_stored": False,
             },
         }
@@ -376,6 +383,185 @@ class CollectiveIdentityService:
             "all_verifier_transport_receipts_verified": True,
             "raw_verifier_payload_stored": False,
         }
+
+    def bind_recovery_verifier_route_trace(
+        self,
+        recovery_verifier_transport_binding: Mapping[str, Any],
+        authority_route_trace: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        transport_validation = self.validate_recovery_verifier_transport_binding(
+            recovery_verifier_transport_binding,
+        )
+        if not transport_validation["ok"]:
+            raise ValueError(
+                "recovery_verifier_transport_binding must pass validation before route trace binding"
+            )
+        self._validate_authority_route_trace_contract(authority_route_trace)
+
+        verifier_receipts = recovery_verifier_transport_binding[
+            "verifier_transport_receipts"
+        ]
+        if not isinstance(verifier_receipts, Mapping):
+            raise ValueError("verifier_transport_receipts must be an object")
+        route_bindings = authority_route_trace["route_bindings"]
+        if len(route_bindings) < len(verifier_receipts):
+            raise ValueError("authority_route_trace must cover every recovery verifier receipt")
+
+        member_route_bindings: List[Dict[str, Any]] = []
+        member_route_binding_digests: List[str] = []
+        for index, (member_id, verifier_receipt) in enumerate(verifier_receipts.items()):
+            if not isinstance(verifier_receipt, Mapping):
+                raise ValueError(f"verifier transport receipt for {member_id} must be an object")
+            route_binding = route_bindings[index]
+            if not isinstance(route_binding, Mapping):
+                raise ValueError(f"route_bindings[{index}] must be an object")
+            socket_trace = route_binding.get("socket_trace")
+            if not isinstance(socket_trace, Mapping):
+                raise ValueError(f"route_bindings[{index}].socket_trace must be an object")
+            os_observer = route_binding.get("os_observer_receipt")
+            if not isinstance(os_observer, Mapping):
+                raise ValueError(
+                    f"route_bindings[{index}].os_observer_receipt must be an object"
+                )
+
+            route_binding_digest = self._collective_member_route_binding_digest(
+                member_id=member_id,
+                verifier_receipt_digest=str(verifier_receipt["digest"]),
+                authority_route_trace_digest=str(authority_route_trace["digest"]),
+                route_binding_ref=str(route_binding["route_binding_ref"]),
+                response_digest=str(socket_trace["response_digest"]),
+                remote_host_ref=str(route_binding["remote_host_ref"]),
+                remote_host_attestation_ref=str(
+                    route_binding["remote_host_attestation_ref"]
+                ),
+                authority_cluster_ref=str(route_binding["authority_cluster_ref"]),
+            )
+            member_route_bindings.append(
+                {
+                    "member_id": member_id,
+                    "verifier_transport_receipt_id": verifier_receipt["receipt_id"],
+                    "verifier_transport_receipt_digest": verifier_receipt["digest"],
+                    "verifier_ref": verifier_receipt["verifier_ref"],
+                    "jurisdiction": verifier_receipt["jurisdiction"],
+                    "route_binding_ref": route_binding["route_binding_ref"],
+                    "remote_host_ref": route_binding["remote_host_ref"],
+                    "remote_host_attestation_ref": route_binding[
+                        "remote_host_attestation_ref"
+                    ],
+                    "authority_cluster_ref": route_binding["authority_cluster_ref"],
+                    "remote_jurisdiction": route_binding["remote_jurisdiction"],
+                    "remote_network_zone": route_binding["remote_network_zone"],
+                    "os_observer_receipt_id": os_observer["receipt_id"],
+                    "os_observer_host_binding_digest": os_observer[
+                        "host_binding_digest"
+                    ],
+                    "socket_response_digest": socket_trace["response_digest"],
+                    "mtls_status": route_binding["mtls_status"],
+                    "member_route_binding_digest": route_binding_digest,
+                }
+            )
+            member_route_binding_digests.append(route_binding_digest)
+
+        route_binding_refs = [
+            item["route_binding_ref"] for item in member_route_bindings
+        ]
+        remote_host_refs = [item["remote_host_ref"] for item in member_route_bindings]
+        remote_host_attestation_refs = [
+            item["remote_host_attestation_ref"] for item in member_route_bindings
+        ]
+        recorded_at = utc_now_iso()
+        digest_payload = {
+            "profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "collective_id": recovery_verifier_transport_binding["collective_id"],
+            "recovery_verifier_transport_binding_digest": (
+                recovery_verifier_transport_binding[
+                    "verifier_transport_binding_digest"
+                ]
+            ),
+            "authority_route_trace_digest": authority_route_trace["digest"],
+            "member_route_binding_digest_set": member_route_binding_digests,
+        }
+        receipt = {
+            "kind": "collective_recovery_route_trace_binding",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "digest_profile": COLLECTIVE_RECOVERY_ROUTE_TRACE_DIGEST_PROFILE_ID,
+            "collective_id": recovery_verifier_transport_binding["collective_id"],
+            "recorded_at": recorded_at,
+            "status": "route-trace-bound",
+            "recovery_verifier_transport_profile_id": (
+                COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
+            ),
+            "recovery_verifier_transport_binding_digest": (
+                recovery_verifier_transport_binding[
+                    "verifier_transport_binding_digest"
+                ]
+            ),
+            "verifier_transport_digest_set_digest": sha256_text(
+                canonical_json(
+                    recovery_verifier_transport_binding[
+                        "verifier_transport_digest_set"
+                    ]
+                )
+            ),
+            "dissolution_receipt_digest": recovery_verifier_transport_binding[
+                "dissolution_receipt_digest"
+            ],
+            "member_recovery_binding_digest": recovery_verifier_transport_binding[
+                "member_recovery_binding_digest"
+            ],
+            "authority_route_trace_ref": authority_route_trace["trace_ref"],
+            "authority_route_trace_digest": authority_route_trace["digest"],
+            "authority_plane_ref": authority_route_trace["authority_plane_ref"],
+            "authority_plane_digest": authority_route_trace["authority_plane_digest"],
+            "route_target_discovery_ref": authority_route_trace[
+                "route_target_discovery_ref"
+            ],
+            "route_target_discovery_digest": authority_route_trace[
+                "route_target_discovery_digest"
+            ],
+            "council_tier": authority_route_trace["council_tier"],
+            "transport_profile": authority_route_trace["transport_profile"],
+            "trace_profile": authority_route_trace["trace_profile"],
+            "socket_trace_profile": authority_route_trace["socket_trace_profile"],
+            "os_observer_profile": authority_route_trace["os_observer_profile"],
+            "cross_host_binding_profile": authority_route_trace[
+                "cross_host_binding_profile"
+            ],
+            "route_target_discovery_profile": authority_route_trace[
+                "route_target_discovery_profile"
+            ],
+            "route_count": authority_route_trace["route_count"],
+            "mtls_authenticated_count": authority_route_trace[
+                "mtls_authenticated_count"
+            ],
+            "distinct_remote_host_count": authority_route_trace[
+                "distinct_remote_host_count"
+            ],
+            "route_binding_refs": route_binding_refs,
+            "remote_host_refs": remote_host_refs,
+            "remote_host_attestation_refs": remote_host_attestation_refs,
+            "member_route_bindings": member_route_bindings,
+            "member_route_binding_digest_set": member_route_binding_digests,
+            "member_route_binding_digest_set_digest": sha256_text(
+                canonical_json(member_route_binding_digests)
+            ),
+            "member_route_binding_count": len(member_route_bindings),
+            "recovery_transport_bound": True,
+            "authority_route_trace_bound": True,
+            "all_member_receipts_route_traced": True,
+            "non_loopback_verified": authority_route_trace["non_loopback_verified"],
+            "cross_host_verified": authority_route_trace["cross_host_verified"],
+            "socket_trace_complete": authority_route_trace["socket_trace_complete"],
+            "os_observer_complete": authority_route_trace["os_observer_complete"],
+            "route_target_discovery_bound": authority_route_trace[
+                "route_target_discovery_bound"
+            ],
+            "raw_verifier_payload_stored": False,
+            "raw_route_payload_stored": False,
+            "digest": sha256_text(canonical_json(digest_payload)),
+        }
+        return deepcopy(receipt)
 
     def snapshot(self, collective_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_record(collective_id))
@@ -828,6 +1014,243 @@ class CollectiveIdentityService:
             "raw_verifier_payload_stored": binding.get("raw_verifier_payload_stored") is True,
         }
 
+    def validate_recovery_verifier_route_trace_binding(
+        self,
+        binding: Mapping[str, Any],
+        recovery_verifier_transport_binding: Mapping[str, Any] | None = None,
+        authority_route_trace: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(binding, Mapping):
+            raise ValueError("binding must be a mapping")
+
+        expected_fields = {
+            "kind": "collective_recovery_route_trace_binding",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "digest_profile": COLLECTIVE_RECOVERY_ROUTE_TRACE_DIGEST_PROFILE_ID,
+            "status": "route-trace-bound",
+            "recovery_verifier_transport_profile_id": (
+                COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
+            ),
+        }
+        for field_name, expected in expected_fields.items():
+            if binding.get(field_name) != expected:
+                errors.append(f"{field_name} must equal {expected}")
+        self._check_non_empty_string(binding.get("collective_id"), "collective_id", errors)
+        self._check_non_empty_string(binding.get("recorded_at"), "recorded_at", errors)
+
+        if recovery_verifier_transport_binding is not None:
+            transport_validation = self.validate_recovery_verifier_transport_binding(
+                recovery_verifier_transport_binding,
+            )
+            if not transport_validation["ok"]:
+                errors.append("recovery_verifier_transport_binding must validate")
+            expected_transport_digest = recovery_verifier_transport_binding.get(
+                "verifier_transport_binding_digest"
+            )
+            expected_verifier_digest_set_digest = sha256_text(
+                canonical_json(
+                    recovery_verifier_transport_binding.get(
+                        "verifier_transport_digest_set",
+                        [],
+                    )
+                )
+            )
+            expected_dissolution_digest = recovery_verifier_transport_binding.get(
+                "dissolution_receipt_digest"
+            )
+            expected_member_recovery_binding_digest = (
+                recovery_verifier_transport_binding.get(
+                    "member_recovery_binding_digest"
+                )
+            )
+        else:
+            expected_transport_digest = binding.get(
+                "recovery_verifier_transport_binding_digest"
+            )
+            expected_verifier_digest_set_digest = binding.get(
+                "verifier_transport_digest_set_digest"
+            )
+            expected_dissolution_digest = binding.get("dissolution_receipt_digest")
+            expected_member_recovery_binding_digest = binding.get(
+                "member_recovery_binding_digest"
+            )
+
+        recovery_transport_bound = (
+            binding.get("recovery_verifier_transport_binding_digest")
+            == expected_transport_digest
+            and self._looks_like_digest(
+                binding.get("recovery_verifier_transport_binding_digest")
+            )
+            and binding.get("verifier_transport_digest_set_digest")
+            == expected_verifier_digest_set_digest
+            and binding.get("dissolution_receipt_digest") == expected_dissolution_digest
+            and binding.get("member_recovery_binding_digest")
+            == expected_member_recovery_binding_digest
+            and binding.get("recovery_transport_bound") is True
+        )
+        if not recovery_transport_bound:
+            errors.append("recovery transport binding digests must match")
+
+        route_trace_bound = False
+        route_trace_authenticated = False
+        if authority_route_trace is not None:
+            try:
+                self._validate_authority_route_trace_contract(authority_route_trace)
+                route_trace_authenticated = True
+            except ValueError as exc:
+                errors.append(str(exc))
+            expected_route_trace_ref = authority_route_trace.get("trace_ref")
+            expected_route_trace_digest = authority_route_trace.get("digest")
+            expected_route_binding_refs = [
+                route["route_binding_ref"]
+                for route in authority_route_trace.get("route_bindings", [])
+                if isinstance(route, Mapping)
+            ][: len(binding.get("member_route_bindings", []))]
+        else:
+            expected_route_trace_ref = binding.get("authority_route_trace_ref")
+            expected_route_trace_digest = binding.get("authority_route_trace_digest")
+            expected_route_binding_refs = binding.get("route_binding_refs", [])
+            route_trace_authenticated = (
+                binding.get("non_loopback_verified") is True
+                and binding.get("cross_host_verified") is True
+                and binding.get("socket_trace_complete") is True
+                and binding.get("os_observer_complete") is True
+                and binding.get("route_target_discovery_bound") is True
+            )
+
+        route_trace_bound = (
+            binding.get("authority_route_trace_ref") == expected_route_trace_ref
+            and binding.get("authority_route_trace_digest") == expected_route_trace_digest
+            and self._looks_like_digest(binding.get("authority_route_trace_digest"))
+            and binding.get("route_binding_refs") == expected_route_binding_refs
+            and binding.get("authority_route_trace_bound") is True
+            and route_trace_authenticated
+        )
+        if not route_trace_bound:
+            errors.append("authority route trace metadata must match authenticated trace")
+
+        member_route_bindings = binding.get("member_route_bindings")
+        member_route_binding_digest_set = binding.get("member_route_binding_digest_set")
+        member_route_bindings_bound = False
+        if not isinstance(member_route_bindings, list) or not member_route_bindings:
+            errors.append("member_route_bindings must be a non-empty list")
+        elif not isinstance(member_route_binding_digest_set, list):
+            errors.append("member_route_binding_digest_set must be a list")
+        else:
+            recomputed_digests: List[str] = []
+            member_route_bindings_bound = True
+            for index, item in enumerate(member_route_bindings):
+                if not isinstance(item, Mapping):
+                    errors.append(f"member_route_bindings[{index}] must be an object")
+                    member_route_bindings_bound = False
+                    continue
+                for field_name in (
+                    "member_id",
+                    "verifier_transport_receipt_id",
+                    "verifier_transport_receipt_digest",
+                    "route_binding_ref",
+                    "remote_host_ref",
+                    "remote_host_attestation_ref",
+                    "authority_cluster_ref",
+                    "socket_response_digest",
+                    "member_route_binding_digest",
+                ):
+                    if not item.get(field_name):
+                        errors.append(
+                            f"member_route_bindings[{index}].{field_name} must be present"
+                        )
+                        member_route_bindings_bound = False
+                if item.get("mtls_status") != "authenticated":
+                    errors.append(
+                        f"member_route_bindings[{index}].mtls_status must be authenticated"
+                    )
+                    member_route_bindings_bound = False
+                recomputed_digest = self._collective_member_route_binding_digest(
+                    member_id=str(item.get("member_id")),
+                    verifier_receipt_digest=str(
+                        item.get("verifier_transport_receipt_digest")
+                    ),
+                    authority_route_trace_digest=str(
+                        binding.get("authority_route_trace_digest")
+                    ),
+                    route_binding_ref=str(item.get("route_binding_ref")),
+                    response_digest=str(item.get("socket_response_digest")),
+                    remote_host_ref=str(item.get("remote_host_ref")),
+                    remote_host_attestation_ref=str(
+                        item.get("remote_host_attestation_ref")
+                    ),
+                    authority_cluster_ref=str(item.get("authority_cluster_ref")),
+                )
+                recomputed_digests.append(recomputed_digest)
+                if item.get("member_route_binding_digest") != recomputed_digest:
+                    errors.append(
+                        f"member_route_bindings[{index}].member_route_binding_digest mismatch"
+                    )
+                    member_route_bindings_bound = False
+            if member_route_binding_digest_set != recomputed_digests:
+                errors.append("member_route_binding_digest_set must match member bindings")
+                member_route_bindings_bound = False
+            if binding.get("member_route_binding_count") != len(member_route_bindings):
+                errors.append("member_route_binding_count must match member bindings")
+                member_route_bindings_bound = False
+            if binding.get("member_route_binding_digest_set_digest") != sha256_text(
+                canonical_json(recomputed_digests)
+            ):
+                errors.append(
+                    "member_route_binding_digest_set_digest must match member digests"
+                )
+                member_route_bindings_bound = False
+            if binding.get("all_member_receipts_route_traced") is not True:
+                errors.append("all_member_receipts_route_traced must be true")
+                member_route_bindings_bound = False
+
+        expected_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+                    "collective_id": binding.get("collective_id"),
+                    "recovery_verifier_transport_binding_digest": binding.get(
+                        "recovery_verifier_transport_binding_digest"
+                    ),
+                    "authority_route_trace_digest": binding.get(
+                        "authority_route_trace_digest"
+                    ),
+                    "member_route_binding_digest_set": binding.get(
+                        "member_route_binding_digest_set"
+                    ),
+                }
+            )
+        )
+        digest_bound = binding.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match collective recovery route trace binding payload")
+
+        raw_verifier_payload_stored = binding.get("raw_verifier_payload_stored") is True
+        raw_route_payload_stored = binding.get("raw_route_payload_stored") is True
+        if raw_verifier_payload_stored:
+            errors.append("raw_verifier_payload_stored must be false")
+        if raw_route_payload_stored:
+            errors.append("raw_route_payload_stored must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_bound": binding.get("profile_id")
+            == COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "recovery_transport_bound": recovery_transport_bound,
+            "authority_route_trace_bound": route_trace_bound,
+            "route_trace_authenticated": route_trace_authenticated,
+            "member_route_bindings_bound": member_route_bindings_bound,
+            "all_member_receipts_route_traced": (
+                binding.get("all_member_receipts_route_traced") is True
+            ),
+            "digest_bound": digest_bound,
+            "raw_verifier_payload_stored": raw_verifier_payload_stored,
+            "raw_route_payload_stored": raw_route_payload_stored,
+        }
+
     def _derive_member_recovery_proofs(
         self,
         identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
@@ -1119,6 +1542,116 @@ class CollectiveIdentityService:
             "receipt_status": receipt.get("receipt_status"),
             "raw_verifier_payload_stored": receipt.get("raw_verifier_payload_stored"),
         }
+
+    @staticmethod
+    def _collective_member_route_binding_digest(
+        *,
+        member_id: str,
+        verifier_receipt_digest: str,
+        authority_route_trace_digest: str,
+        route_binding_ref: str,
+        response_digest: str,
+        remote_host_ref: str,
+        remote_host_attestation_ref: str,
+        authority_cluster_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "member_id": member_id,
+                    "verifier_transport_receipt_digest": verifier_receipt_digest,
+                    "authority_route_trace_digest": authority_route_trace_digest,
+                    "route_binding_ref": route_binding_ref,
+                    "response_digest": response_digest,
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": remote_host_attestation_ref,
+                    "authority_cluster_ref": authority_cluster_ref,
+                }
+            )
+        )
+
+    def _validate_authority_route_trace_contract(
+        self,
+        authority_route_trace: Mapping[str, Any],
+    ) -> None:
+        if not isinstance(authority_route_trace, Mapping):
+            raise ValueError("authority_route_trace must be a mapping")
+        expected_fields = {
+            "kind": "distributed_transport_authority_route_trace",
+            "schema_version": "1.0.0",
+            "trace_status": "authenticated",
+            "trace_profile": "non-loopback-mtls-authority-route-v1",
+            "socket_trace_profile": "mtls-socket-trace-v1",
+            "os_observer_profile": "os-native-tcp-observer-v1",
+            "cross_host_binding_profile": "attested-cross-host-authority-binding-v1",
+            "route_target_discovery_profile": "bounded-authority-route-target-discovery-v1",
+        }
+        for field_name, expected in expected_fields.items():
+            if authority_route_trace.get(field_name) != expected:
+                raise ValueError(f"authority_route_trace.{field_name} must equal {expected}")
+        for flag_name in (
+            "non_loopback_verified",
+            "authority_plane_bound",
+            "response_digest_bound",
+            "socket_trace_complete",
+            "os_observer_complete",
+            "route_target_discovery_bound",
+            "cross_host_verified",
+        ):
+            if authority_route_trace.get(flag_name) is not True:
+                raise ValueError(f"authority_route_trace.{flag_name} must be true")
+        if not self._looks_like_digest(authority_route_trace.get("digest")):
+            raise ValueError("authority_route_trace.digest must be sha256 hex")
+        if not self._looks_like_digest(authority_route_trace.get("authority_plane_digest")):
+            raise ValueError("authority_route_trace.authority_plane_digest must be sha256 hex")
+        if not self._looks_like_digest(
+            authority_route_trace.get("route_target_discovery_digest")
+        ):
+            raise ValueError(
+                "authority_route_trace.route_target_discovery_digest must be sha256 hex"
+            )
+        route_bindings = authority_route_trace.get("route_bindings")
+        if not isinstance(route_bindings, list) or len(route_bindings) < 2:
+            raise ValueError("authority_route_trace.route_bindings must contain at least 2 routes")
+        if authority_route_trace.get("route_count") != len(route_bindings):
+            raise ValueError("authority_route_trace.route_count must match route_bindings")
+        if authority_route_trace.get("mtls_authenticated_count") < len(route_bindings):
+            raise ValueError("authority_route_trace must authenticate every route binding")
+        if authority_route_trace.get("distinct_remote_host_count") < 2:
+            raise ValueError("authority_route_trace must bind at least 2 remote hosts")
+        for index, route in enumerate(route_bindings):
+            if not isinstance(route, Mapping):
+                raise ValueError(f"authority_route_trace.route_bindings[{index}] must be an object")
+            if route.get("mtls_status") != "authenticated":
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].mtls_status must be authenticated"
+                )
+            socket_trace = route.get("socket_trace")
+            if not isinstance(socket_trace, Mapping):
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].socket_trace must be an object"
+                )
+            if socket_trace.get("non_loopback") is not True:
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].socket_trace.non_loopback must be true"
+                )
+            if not self._looks_like_digest(socket_trace.get("response_digest")):
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].socket_trace.response_digest must be sha256 hex"
+                )
+            os_observer = route.get("os_observer_receipt")
+            if not isinstance(os_observer, Mapping):
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].os_observer_receipt must be an object"
+                )
+            if os_observer.get("receipt_status") != "observed":
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].os_observer_receipt.receipt_status must be observed"
+                )
+            if not self._looks_like_digest(os_observer.get("host_binding_digest")):
+                raise ValueError(
+                    f"authority_route_trace.route_bindings[{index}].os_observer_receipt.host_binding_digest must be sha256 hex"
+                )
 
     def _require_record(self, collective_id: str) -> Dict[str, Any]:
         collective = self._normalize_non_empty_string(collective_id, "collective_id")

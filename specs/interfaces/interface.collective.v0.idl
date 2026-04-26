@@ -8,6 +8,8 @@ imports:
   collective_merge_session: ../schemas/collective_merge_session.schema
   collective_dissolution_receipt: ../schemas/collective_dissolution_receipt.schema
   collective_recovery_verifier_transport_binding: ../schemas/collective_recovery_verifier_transport_binding.schema
+  collective_recovery_route_trace_binding: ../schemas/collective_recovery_route_trace_binding.schema
+  distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
   identity_confirmation_profile: ../schemas/identity_confirmation_profile.schema
 operations:
   register_collective:
@@ -204,6 +206,27 @@ operations:
       - verifier_transport_receipts must cover every member recovery proof
       - each verifier transport receipt must be verified and digest-bound
       - raw verifier request/response payloads must not be stored
+  bind_recovery_verifier_route_trace:
+    summary: Bind the recovery verifier transport receipt set to an authenticated non-loopback distributed authority-route trace.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - recovery_verifier_transport_binding
+          - authority_route_trace
+        properties:
+          recovery_verifier_transport_binding:
+            schema_ref: collective_recovery_verifier_transport_binding
+          authority_route_trace:
+            schema_ref: distributed_transport_authority_route_trace
+    output:
+      schema_ref: collective_recovery_route_trace_binding
+    guarantees:
+      - profile_id must equal collective-recovery-non-loopback-route-trace-binding-v1
+      - recovery_verifier_transport_binding_digest must match the verified recovery verifier transport artifact
+      - authority_route_trace_digest must bind one authenticated non-loopback route trace
+      - member_route_bindings must cover every recovery verifier transport receipt
+      - raw route payloads and raw verifier payloads must not be stored
 events:
   collective.formed:
     payload:
@@ -217,3 +240,6 @@ events:
   collective.recovery_verifier_transport_bound:
     payload:
       schema_ref: collective_recovery_verifier_transport_binding
+  collective.recovery_route_trace_bound:
+    payload:
+      schema_ref: collective_recovery_route_trace_binding
