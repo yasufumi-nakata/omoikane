@@ -1,0 +1,279 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_recovery_capture_export_binding.schema"
+title: CollectiveRecoveryCaptureExportBinding
+description: >
+  Digest-only binding that connects post-dissolution collective member recovery
+  route trace evidence to verified packet-capture export and delegated privileged
+  capture acquisition without storing raw verifier, route, or packet payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - digest_profile
+  - collective_id
+  - recorded_at
+  - status
+  - recovery_route_trace_profile_id
+  - recovery_route_trace_binding_digest
+  - recovery_verifier_transport_binding_digest
+  - authority_route_trace_ref
+  - authority_route_trace_digest
+  - authority_plane_ref
+  - authority_plane_digest
+  - council_tier
+  - transport_profile
+  - route_count
+  - route_binding_refs
+  - route_binding_digest_set_digest
+  - packet_capture_ref
+  - packet_capture_digest
+  - packet_capture_profile
+  - packet_capture_artifact_format
+  - packet_capture_artifact_digest
+  - packet_capture_readback_digest
+  - packet_count
+  - packet_capture_export_status
+  - packet_capture_route_binding_refs
+  - packet_capture_route_binding_set_digest
+  - os_native_readback_available
+  - os_native_readback_ok
+  - privileged_capture_ref
+  - privileged_capture_digest
+  - privileged_capture_profile
+  - privilege_mode
+  - broker_profile
+  - broker_attestation_ref
+  - lease_ref
+  - interface_name
+  - local_ips
+  - capture_filter_digest
+  - capture_command_digest
+  - acquisition_route_binding_refs
+  - acquisition_route_binding_set_digest
+  - member_capture_bindings
+  - member_capture_binding_digest_set
+  - member_capture_binding_digest_set_digest
+  - member_capture_binding_count
+  - recovery_route_trace_bound
+  - packet_capture_bound
+  - privileged_capture_bound
+  - route_binding_set_bound
+  - all_member_route_traces_capture_bound
+  - raw_verifier_payload_stored
+  - raw_route_payload_stored
+  - raw_packet_body_stored
+  - capture_binding_status
+  - digest
+properties:
+  kind:
+    const: collective_recovery_capture_export_binding
+  schema_version:
+    const: "1.0.0"
+  profile_id:
+    const: collective-recovery-route-trace-capture-export-v1
+  digest_profile:
+    const: collective-recovery-capture-export-binding-digest-v1
+  collective_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  status:
+    const: capture-export-bound
+  recovery_route_trace_profile_id:
+    const: collective-recovery-non-loopback-route-trace-binding-v1
+  recovery_route_trace_binding_digest:
+    $ref: "#/$defs/sha256"
+  recovery_verifier_transport_binding_digest:
+    $ref: "#/$defs/sha256"
+  authority_route_trace_ref:
+    type: string
+    pattern: "^authority-route-trace://"
+  authority_route_trace_digest:
+    $ref: "#/$defs/sha256"
+  authority_plane_ref:
+    type: string
+    pattern: "^authority-plane://"
+  authority_plane_digest:
+    $ref: "#/$defs/sha256"
+  council_tier:
+    enum:
+      - federation
+      - heritage
+  transport_profile:
+    type: string
+    minLength: 1
+  route_count:
+    type: integer
+    minimum: 2
+  route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  route_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_ref:
+    type: string
+    pattern: "^authority-packet-capture://"
+  packet_capture_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_profile:
+    const: trace-bound-pcap-export-v1
+  packet_capture_artifact_format:
+    const: pcap
+  packet_capture_artifact_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_readback_digest:
+    $ref: "#/$defs/sha256"
+  packet_count:
+    type: integer
+    minimum: 4
+  packet_capture_export_status:
+    const: verified
+  packet_capture_route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  packet_capture_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  os_native_readback_available:
+    type: boolean
+  os_native_readback_ok:
+    type: boolean
+  privileged_capture_ref:
+    type: string
+    pattern: "^authority-live-capture://"
+  privileged_capture_digest:
+    $ref: "#/$defs/sha256"
+  privileged_capture_profile:
+    const: bounded-live-interface-capture-acquisition-v1
+  privilege_mode:
+    const: delegated-broker
+  broker_profile:
+    type: string
+    minLength: 1
+  broker_attestation_ref:
+    type: string
+    pattern: "^broker://"
+  lease_ref:
+    type: string
+    pattern: "^capture-lease://"
+  interface_name:
+    type: string
+    minLength: 1
+  local_ips:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  capture_filter_digest:
+    $ref: "#/$defs/sha256"
+  capture_command_digest:
+    $ref: "#/$defs/sha256"
+  acquisition_route_binding_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^authority-route://"
+  acquisition_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  member_capture_bindings:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - member_id
+        - verifier_transport_receipt_digest
+        - member_route_binding_digest
+        - route_binding_ref
+        - packet_capture_route_export_digest
+        - outbound_tuple_digest
+        - inbound_tuple_digest
+        - outbound_payload_digest
+        - inbound_payload_digest
+        - readback_packet_count
+        - readback_verified
+        - os_native_readback_verified
+        - privileged_capture_route_ref
+        - member_capture_binding_digest
+      properties:
+        member_id:
+          type: string
+          minLength: 1
+        verifier_transport_receipt_digest:
+          $ref: "#/$defs/sha256"
+        member_route_binding_digest:
+          $ref: "#/$defs/sha256"
+        route_binding_ref:
+          type: string
+          pattern: "^authority-route://"
+        packet_capture_route_export_digest:
+          $ref: "#/$defs/sha256"
+        outbound_tuple_digest:
+          $ref: "#/$defs/sha256"
+        inbound_tuple_digest:
+          $ref: "#/$defs/sha256"
+        outbound_payload_digest:
+          $ref: "#/$defs/sha256"
+        inbound_payload_digest:
+          $ref: "#/$defs/sha256"
+        readback_packet_count:
+          const: 2
+        readback_verified:
+          const: true
+        os_native_readback_verified:
+          type: boolean
+        privileged_capture_route_ref:
+          type: string
+          pattern: "^authority-route://"
+        member_capture_binding_digest:
+          $ref: "#/$defs/sha256"
+  member_capture_binding_digest_set:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  member_capture_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  member_capture_binding_count:
+    type: integer
+    minimum: 2
+  recovery_route_trace_bound:
+    const: true
+  packet_capture_bound:
+    const: true
+  privileged_capture_bound:
+    const: true
+  route_binding_set_bound:
+    const: true
+  all_member_route_traces_capture_bound:
+    const: true
+  raw_verifier_payload_stored:
+    const: false
+  raw_route_payload_stored:
+    const: false
+  raw_packet_body_stored:
+    const: false
+  capture_binding_status:
+    const: complete
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

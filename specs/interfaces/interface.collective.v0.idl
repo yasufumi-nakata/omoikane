@@ -9,7 +9,10 @@ imports:
   collective_dissolution_receipt: ../schemas/collective_dissolution_receipt.schema
   collective_recovery_verifier_transport_binding: ../schemas/collective_recovery_verifier_transport_binding.schema
   collective_recovery_route_trace_binding: ../schemas/collective_recovery_route_trace_binding.schema
+  collective_recovery_capture_export_binding: ../schemas/collective_recovery_capture_export_binding.schema
   distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
+  distributed_transport_packet_capture_export: ../schemas/distributed_transport_packet_capture_export.schema
+  distributed_transport_privileged_capture_acquisition: ../schemas/distributed_transport_privileged_capture_acquisition.schema
   identity_confirmation_profile: ../schemas/identity_confirmation_profile.schema
 operations:
   register_collective:
@@ -227,6 +230,30 @@ operations:
       - authority_route_trace_digest must bind one authenticated non-loopback route trace
       - member_route_bindings must cover every recovery verifier transport receipt
       - raw route payloads and raw verifier payloads must not be stored
+  bind_recovery_route_trace_capture_export:
+    summary: Bind the recovery route-trace artifact to verified packet-capture export and delegated privileged capture acquisition.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - recovery_route_trace_binding
+          - packet_capture_export
+          - privileged_capture_acquisition
+        properties:
+          recovery_route_trace_binding:
+            schema_ref: collective_recovery_route_trace_binding
+          packet_capture_export:
+            schema_ref: distributed_transport_packet_capture_export
+          privileged_capture_acquisition:
+            schema_ref: distributed_transport_privileged_capture_acquisition
+    output:
+      schema_ref: collective_recovery_capture_export_binding
+    guarantees:
+      - profile_id must equal collective-recovery-route-trace-capture-export-v1
+      - recovery_route_trace_binding_digest must match the verified collective route trace artifact
+      - packet_capture_digest must bind a verified pcap export over the same route refs
+      - privileged_capture_digest must bind a delegated-broker live capture lease over the same route refs
+      - raw verifier payloads, raw route payloads, and raw packet bodies must not be stored
 events:
   collective.formed:
     payload:
@@ -243,3 +270,6 @@ events:
   collective.recovery_route_trace_bound:
     payload:
       schema_ref: collective_recovery_route_trace_binding
+  collective.recovery_capture_export_bound:
+    payload:
+      schema_ref: collective_recovery_capture_export_binding

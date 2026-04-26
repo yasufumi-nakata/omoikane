@@ -822,7 +822,12 @@ raw verifier payload 非保存を同じ ledger category へ束縛する。
 recovery verifier transport binding digest、authenticated non-loopback
 distributed authority-route trace digest、member ごとの route binding ref /
 remote host attestation ref / socket response digest を束ねる。
-raw verifier payload と raw route payload は保存しない。
+さらに `collective_recovery_capture_export_binding.schema` に合う
+`collective-recovery-route-trace-capture-export-v1` artifact が、
+同じ route binding ref set を verified pcap export、pcap readback digest、
+delegated-broker privileged capture acquisition、member ごとの capture binding digest へ
+束縛する。
+raw verifier payload、raw route payload、raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

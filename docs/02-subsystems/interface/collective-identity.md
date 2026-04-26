@@ -84,20 +84,27 @@ collective_profile:
   distributed authority-route trace、cross-host route binding、OS observer digest に束縛する
 - raw route payload は保存せず、route binding ref、socket response digest、
   remote host attestation ref、member route binding digest だけを保持する
+- `collective-recovery-route-trace-capture-export-v1` により、
+  recovery route trace binding を verified pcap export と delegated-broker
+  privileged capture acquisition に束縛する
+- raw packet body は保存せず、packet capture artifact digest、readback digest、
+  capture filter digest、member capture binding digest だけを保持する
 
 ## reference runtime の扱い
 
 - `interface.collective.v0.idl` を導入し、
   `register_collective / open_merge_session / close_merge_session / dissolve_collective /
-  bind_recovery_verifier_transport / bind_recovery_verifier_route_trace` の 6 op を固定する
+  bind_recovery_verifier_transport / bind_recovery_verifier_route_trace /
+  bind_recovery_route_trace_capture_export` の 7 op を固定する
 - `collective_record.schema`、`collective_merge_session.schema`、
   `collective_dissolution_receipt.schema`、
   `collective_recovery_verifier_transport_binding.schema`、
-  `collective_recovery_route_trace_binding.schema` を追加する
+  `collective_recovery_route_trace_binding.schema`、
+  `collective_recovery_capture_export_binding.schema` を追加する
 - `collective-demo` は IMC `merge_thought`、WMS divergence、private escape、
   identity confirmation、schema-bound dissolution receipt、
   member recovery proof binding、remote verifier transport binding、
-  non-loopback authority-route trace binding を
+  non-loopback authority-route trace binding、packet capture export binding を
   1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
@@ -110,6 +117,9 @@ collective_profile:
 - `evals/interface/collective_recovery_route_trace_binding.yaml` は
   recovery verifier transport receipt set と authenticated non-loopback route trace の
   digest-only binding、cross-host route coverage、raw route payload redaction を監査する
+- `evals/interface/collective_recovery_capture_export_binding.yaml` は
+  route trace binding と verified pcap export / delegated privileged capture acquisition の
+  route-ref alignment、member capture digest、raw packet body redaction を監査する
 
 ## 不変条件
 
@@ -118,8 +128,9 @@ collective_profile:
 3. **escape freedom** ── divergence 後の private reality 退避を阻害しない
 4. **recovery first** ── dissolution 前に全 member の identity confirmation を必須化
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
-6. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
-7. **no silent persistence** ── active merge 無しで Collective を存続させない
+6. **packet-body redaction** ── recovery capture binding は raw packet body を保存せず digest/readback/route ref だけを持つ
+7. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
+8. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連
 

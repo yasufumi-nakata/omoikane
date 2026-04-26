@@ -7677,12 +7677,26 @@ json.dump(response, sys.stdout)
         recovery_verifier_transport = self.collective.bind_recovery_verifier_transport(
             dissolution
         )
-        recovery_route_trace = OmoikaneReferenceOS().run_distributed_transport_demo()[
-            "authority_route_trace"
+        recovery_transport_demo = OmoikaneReferenceOS().run_distributed_transport_demo()
+        recovery_route_trace = recovery_transport_demo["authority_route_trace"][
+            "federation_rotated"
+        ]
+        recovery_packet_capture_export = recovery_transport_demo["packet_capture_export"][
+            "federation_rotated"
+        ]
+        recovery_privileged_capture_acquisition = recovery_transport_demo[
+            "privileged_capture_acquisition"
         ]["federation_rotated"]
         recovery_route_trace_binding = self.collective.bind_recovery_verifier_route_trace(
             recovery_verifier_transport,
             recovery_route_trace,
+        )
+        recovery_capture_export_binding = (
+            self.collective.bind_recovery_route_trace_capture_export(
+                recovery_route_trace_binding,
+                recovery_packet_capture_export,
+                recovery_privileged_capture_acquisition,
+            )
         )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
@@ -7700,6 +7714,14 @@ json.dump(response, sys.stdout)
                 recovery_route_trace_binding,
                 recovery_verifier_transport,
                 recovery_route_trace,
+            )
+        )
+        recovery_capture_export_validation = (
+            self.collective.validate_recovery_route_trace_capture_export_binding(
+                recovery_capture_export_binding,
+                recovery_route_trace_binding,
+                recovery_packet_capture_export,
+                recovery_privileged_capture_acquisition,
             )
         )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
@@ -7856,6 +7878,36 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.recovery_capture_export.bound",
+            payload={
+                "collective_id": recovery_capture_export_binding["collective_id"],
+                "profile_id": recovery_capture_export_binding["profile_id"],
+                "recovery_route_trace_binding_digest": (
+                    recovery_capture_export_binding[
+                        "recovery_route_trace_binding_digest"
+                    ]
+                ),
+                "packet_capture_digest": recovery_capture_export_binding[
+                    "packet_capture_digest"
+                ],
+                "privileged_capture_digest": recovery_capture_export_binding[
+                    "privileged_capture_digest"
+                ],
+                "member_capture_binding_digest_set": recovery_capture_export_binding[
+                    "member_capture_binding_digest_set"
+                ],
+                "raw_packet_body_stored": recovery_capture_export_binding[
+                    "raw_packet_body_stored"
+                ],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective-dissolution",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         validation = {
             "ok": collective_validation["ok"]
@@ -7863,6 +7915,7 @@ json.dump(response, sys.stdout)
             and dissolution_validation["ok"]
             and recovery_verifier_transport_validation["ok"]
             and recovery_route_trace_validation["ok"]
+            and recovery_capture_export_validation["ok"]
             and all(validation["ok"] for validation in member_recovery_validations.values()),
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
@@ -7951,6 +8004,37 @@ json.dump(response, sys.stdout)
             "recovery_route_trace_raw_payload_stored": (
                 recovery_route_trace_validation["raw_route_payload_stored"]
             ),
+            "recovery_capture_export_bound": recovery_capture_export_validation["ok"],
+            "recovery_capture_export_profile_bound": (
+                recovery_capture_export_validation["profile_bound"]
+            ),
+            "recovery_capture_export_route_trace_bound": (
+                recovery_capture_export_validation["recovery_route_trace_bound"]
+            ),
+            "recovery_capture_export_packet_capture_bound": (
+                recovery_capture_export_validation["packet_capture_bound"]
+            ),
+            "recovery_capture_export_privileged_capture_bound": (
+                recovery_capture_export_validation["privileged_capture_bound"]
+            ),
+            "recovery_capture_export_route_binding_set_bound": (
+                recovery_capture_export_validation["route_binding_set_bound"]
+            ),
+            "recovery_capture_export_member_bindings_bound": (
+                recovery_capture_export_validation["member_capture_bindings_bound"]
+            ),
+            "recovery_capture_export_complete": (
+                recovery_capture_export_validation["capture_binding_complete"]
+            ),
+            "recovery_capture_export_digest_bound": (
+                recovery_capture_export_validation["digest_bound"]
+            ),
+            "recovery_capture_export_raw_payload_stored": (
+                recovery_capture_export_validation["raw_route_payload_stored"]
+            ),
+            "recovery_capture_export_raw_packet_body_stored": (
+                recovery_capture_export_validation["raw_packet_body_stored"]
+            ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
         }
@@ -7983,6 +8067,11 @@ json.dump(response, sys.stdout)
             "recovery_verifier_transport": recovery_verifier_transport,
             "recovery_route_trace": recovery_route_trace,
             "recovery_route_trace_binding": recovery_route_trace_binding,
+            "recovery_packet_capture_export": recovery_packet_capture_export,
+            "recovery_privileged_capture_acquisition": (
+                recovery_privileged_capture_acquisition
+            ),
+            "recovery_capture_export_binding": recovery_capture_export_binding,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

@@ -821,6 +821,19 @@ entries:
     rationale: Required to bind post-dissolution recovery verifier receipts to authenticated non-loopback distributed authority-route traces without storing raw verifier or route payloads.
   - priority: P1
     kind: schema
+    file: specs/schemas/collective_recovery_capture_export_binding.schema
+    consumers:
+      - specs/interfaces/interface.collective.v0.idl
+      - specs/schemas/collective_recovery_route_trace_binding.schema
+      - specs/schemas/distributed_transport_packet_capture_export.schema
+      - specs/schemas/distributed_transport_privileged_capture_acquisition.schema
+      - docs/02-subsystems/interface/collective-identity.md
+      - docs/07-reference-implementation/README.md
+      - evals/interface/collective_recovery_capture_export_binding.yaml
+      - reference-runtime
+    rationale: Required to bind collective recovery route trace evidence to verified pcap export and delegated privileged capture acquisition without storing raw packet bodies.
+  - priority: P1
+    kind: schema
     file: specs/schemas/reasoning_trace.schema
     consumers:
       - specs/interfaces/cognitive.reasoning.v0.idl
@@ -1122,6 +1135,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects non-loopback distributed authority-route trace binding for every post-dissolution recovery verifier transport receipt, including cross-host trace evidence and raw route payload redaction.
+  - priority: P1
+    kind: eval
+    file: evals/interface/collective_recovery_capture_export_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects packet-capture export and delegated privileged capture acquisition binding for every post-dissolution recovery route trace while preserving raw packet-body redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/perception_frame.schema

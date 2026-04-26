@@ -103,6 +103,18 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/collective_recovery_route_trace_binding.schema",
             result["recovery_route_trace_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/distributed_transport_packet_capture_export.schema",
+            result["recovery_packet_capture_export"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/distributed_transport_privileged_capture_acquisition.schema",
+            result["recovery_privileged_capture_acquisition"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/collective_recovery_capture_export_binding.schema",
+            result["recovery_capture_export_binding"],
+        )
         for profile in result["member_recovery"]["identity_confirmation_profiles"].values():
             self._assert_schema_valid(
                 "specs/schemas/identity_confirmation_profile.schema",
@@ -123,6 +135,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["recovery_route_trace_authority_trace_bound"])
         self.assertTrue(result["validation"]["recovery_route_trace_member_bindings_bound"])
         self.assertFalse(result["validation"]["recovery_route_trace_raw_payload_stored"])
+        self.assertTrue(result["validation"]["recovery_capture_export_bound"])
+        self.assertTrue(result["validation"]["recovery_capture_export_packet_capture_bound"])
+        self.assertTrue(result["validation"]["recovery_capture_export_member_bindings_bound"])
+        self.assertFalse(result["validation"]["recovery_capture_export_raw_packet_body_stored"])
 
     def test_imc_demo_matches_public_schemas(self) -> None:
         result = self.runtime.run_imc_demo()

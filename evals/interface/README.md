@@ -28,6 +28,11 @@ post-dissolution recovery verifier transport receipt set を authenticated
 non-loopback distributed authority-route trace、cross-host route binding、
 OS observer digest に束縛し、raw verifier / route payload を保存しないことを確認する。
 
+### Collective Recovery Capture Export Binding
+post-dissolution recovery route trace binding を verified pcap export と
+delegated privileged capture acquisition に束縛し、route ref set と
+member capture binding digest が揃い、raw packet body を保存しないことを確認する。
+
 ### WMS Private Reality Escape
 minor diff の shared reconciliation、major diff での private reality escape 提示、
 malicious inject の guardian isolation をまとめて確認する。
@@ -104,6 +109,7 @@ integration test が各 payload を schema に直接通せることを確認す�
 - `bdb_fail_safe_reversibility.yaml`
 - `collective_dissolution_receipt.yaml`
 - `collective_merge_reversibility.yaml`
+- `collective_recovery_capture_export_binding.yaml`
 - `collective_recovery_route_trace_binding.yaml`
 - `collective_recovery_verifier_transport.yaml`
 - `imc_disclosure_floor.yaml`

@@ -26,6 +26,16 @@ COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID = (
 COLLECTIVE_RECOVERY_ROUTE_TRACE_DIGEST_PROFILE_ID = (
     "collective-recovery-route-trace-binding-digest-v1"
 )
+COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID = (
+    "collective-recovery-route-trace-capture-export-v1"
+)
+COLLECTIVE_RECOVERY_CAPTURE_EXPORT_DIGEST_PROFILE_ID = (
+    "collective-recovery-capture-export-binding-digest-v1"
+)
+COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
+COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
+COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
+COLLECTIVE_PRIVILEGED_CAPTURE_MODE = "delegated-broker"
 COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID = "multidimensional-identity-confirmation-v1"
 COLLECTIVE_IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = (
     "identity-self-report-witness-consistency-v1"
@@ -90,6 +100,9 @@ class CollectiveIdentityService:
                     COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
                 ),
                 "member_recovery_route_trace_profile": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+                "member_recovery_capture_export_profile": (
+                    COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
             },
         }
@@ -559,6 +572,203 @@ class CollectiveIdentityService:
             ],
             "raw_verifier_payload_stored": False,
             "raw_route_payload_stored": False,
+            "digest": sha256_text(canonical_json(digest_payload)),
+        }
+        return deepcopy(receipt)
+
+    def bind_recovery_route_trace_capture_export(
+        self,
+        recovery_route_trace_binding: Mapping[str, Any],
+        packet_capture_export: Mapping[str, Any],
+        privileged_capture_acquisition: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        route_trace_validation = self.validate_recovery_verifier_route_trace_binding(
+            recovery_route_trace_binding,
+        )
+        if not route_trace_validation["ok"]:
+            raise ValueError(
+                "recovery_route_trace_binding must pass validation before capture export binding"
+            )
+        capture_validation = self._validate_packet_capture_export(
+            packet_capture_export,
+            recovery_route_trace_binding=recovery_route_trace_binding,
+        )
+        acquisition_validation = self._validate_privileged_capture_acquisition(
+            privileged_capture_acquisition,
+            recovery_route_trace_binding=recovery_route_trace_binding,
+            packet_capture_export=packet_capture_export,
+        )
+        if not capture_validation["ok"]:
+            raise ValueError("packet_capture_export must validate before binding")
+        if not acquisition_validation["ok"]:
+            raise ValueError("privileged_capture_acquisition must validate before binding")
+
+        route_binding_refs = list(recovery_route_trace_binding["route_binding_refs"])
+        route_binding_set_digest = sha256_text(canonical_json(route_binding_refs))
+        capture_route_binding_refs = capture_validation["route_binding_refs"]
+        capture_route_binding_set_digest = sha256_text(
+            canonical_json(capture_route_binding_refs)
+        )
+        acquisition_route_binding_refs = list(
+            privileged_capture_acquisition["route_binding_refs"]
+        )
+        acquisition_route_binding_set_digest = sha256_text(
+            canonical_json(sorted(acquisition_route_binding_refs))
+        )
+        route_binding_set_bound = (
+            route_binding_set_digest == capture_route_binding_set_digest
+            and sorted(route_binding_refs) == sorted(acquisition_route_binding_refs)
+        )
+
+        route_exports_by_ref = {
+            route_export["route_binding_ref"]: route_export
+            for route_export in packet_capture_export["route_exports"]
+            if isinstance(route_export, Mapping)
+        }
+        member_capture_bindings: List[Dict[str, Any]] = []
+        member_capture_binding_digests: List[str] = []
+        for member_route_binding in recovery_route_trace_binding["member_route_bindings"]:
+            route_binding_ref = member_route_binding["route_binding_ref"]
+            route_export = route_exports_by_ref.get(route_binding_ref)
+            if not isinstance(route_export, Mapping):
+                raise ValueError(
+                    f"packet_capture_export missing route export for {route_binding_ref}"
+                )
+            route_export_digest = sha256_text(canonical_json(route_export))
+            member_capture_digest = self._collective_member_capture_binding_digest(
+                collective_id=str(recovery_route_trace_binding["collective_id"]),
+                member_id=str(member_route_binding["member_id"]),
+                recovery_route_trace_binding_digest=str(
+                    recovery_route_trace_binding["digest"]
+                ),
+                member_route_binding_digest=str(
+                    member_route_binding["member_route_binding_digest"]
+                ),
+                packet_capture_digest=str(packet_capture_export["digest"]),
+                privileged_capture_digest=str(privileged_capture_acquisition["digest"]),
+                route_binding_ref=str(route_binding_ref),
+                route_export_digest=route_export_digest,
+            )
+            member_capture_bindings.append(
+                {
+                    "member_id": member_route_binding["member_id"],
+                    "verifier_transport_receipt_digest": member_route_binding[
+                        "verifier_transport_receipt_digest"
+                    ],
+                    "member_route_binding_digest": member_route_binding[
+                        "member_route_binding_digest"
+                    ],
+                    "route_binding_ref": route_binding_ref,
+                    "packet_capture_route_export_digest": route_export_digest,
+                    "outbound_tuple_digest": route_export["outbound_tuple_digest"],
+                    "inbound_tuple_digest": route_export["inbound_tuple_digest"],
+                    "outbound_payload_digest": route_export["outbound_payload_digest"],
+                    "inbound_payload_digest": route_export["inbound_payload_digest"],
+                    "readback_packet_count": route_export["readback_packet_count"],
+                    "readback_verified": route_export["readback_verified"],
+                    "os_native_readback_verified": route_export.get(
+                        "os_native_readback_verified",
+                        False,
+                    ),
+                    "privileged_capture_route_ref": route_binding_ref,
+                    "member_capture_binding_digest": member_capture_digest,
+                }
+            )
+            member_capture_binding_digests.append(member_capture_digest)
+
+        complete = (
+            route_trace_validation["ok"]
+            and capture_validation["ok"]
+            and acquisition_validation["ok"]
+            and route_binding_set_bound
+            and bool(member_capture_bindings)
+        )
+        digest_payload = {
+            "profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+            "collective_id": recovery_route_trace_binding["collective_id"],
+            "recovery_route_trace_binding_digest": recovery_route_trace_binding["digest"],
+            "packet_capture_digest": packet_capture_export["digest"],
+            "privileged_capture_digest": privileged_capture_acquisition["digest"],
+            "member_capture_binding_digest_set": member_capture_binding_digests,
+        }
+        receipt = {
+            "kind": "collective_recovery_capture_export_binding",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+            "digest_profile": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_DIGEST_PROFILE_ID,
+            "collective_id": recovery_route_trace_binding["collective_id"],
+            "recorded_at": utc_now_iso(),
+            "status": "capture-export-bound" if complete else "capture-export-incomplete",
+            "recovery_route_trace_profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "recovery_route_trace_binding_digest": recovery_route_trace_binding["digest"],
+            "recovery_verifier_transport_binding_digest": (
+                recovery_route_trace_binding[
+                    "recovery_verifier_transport_binding_digest"
+                ]
+            ),
+            "authority_route_trace_ref": recovery_route_trace_binding[
+                "authority_route_trace_ref"
+            ],
+            "authority_route_trace_digest": recovery_route_trace_binding[
+                "authority_route_trace_digest"
+            ],
+            "authority_plane_ref": recovery_route_trace_binding["authority_plane_ref"],
+            "authority_plane_digest": recovery_route_trace_binding[
+                "authority_plane_digest"
+            ],
+            "council_tier": recovery_route_trace_binding["council_tier"],
+            "transport_profile": recovery_route_trace_binding["transport_profile"],
+            "route_count": recovery_route_trace_binding["route_count"],
+            "route_binding_refs": route_binding_refs,
+            "route_binding_digest_set_digest": route_binding_set_digest,
+            "packet_capture_ref": packet_capture_export["capture_ref"],
+            "packet_capture_digest": packet_capture_export["digest"],
+            "packet_capture_profile": packet_capture_export["capture_profile"],
+            "packet_capture_artifact_format": packet_capture_export["artifact_format"],
+            "packet_capture_artifact_digest": packet_capture_export["artifact_digest"],
+            "packet_capture_readback_digest": packet_capture_export["readback_digest"],
+            "packet_count": packet_capture_export["packet_count"],
+            "packet_capture_export_status": packet_capture_export["export_status"],
+            "packet_capture_route_binding_refs": capture_route_binding_refs,
+            "packet_capture_route_binding_set_digest": capture_route_binding_set_digest,
+            "os_native_readback_available": packet_capture_export[
+                "os_native_readback_available"
+            ],
+            "os_native_readback_ok": packet_capture_export["os_native_readback_ok"],
+            "privileged_capture_ref": privileged_capture_acquisition["acquisition_ref"],
+            "privileged_capture_digest": privileged_capture_acquisition["digest"],
+            "privileged_capture_profile": privileged_capture_acquisition[
+                "acquisition_profile"
+            ],
+            "privilege_mode": privileged_capture_acquisition["privilege_mode"],
+            "broker_profile": privileged_capture_acquisition["broker_profile"],
+            "broker_attestation_ref": privileged_capture_acquisition[
+                "broker_attestation_ref"
+            ],
+            "lease_ref": privileged_capture_acquisition["lease_ref"],
+            "interface_name": privileged_capture_acquisition["interface_name"],
+            "local_ips": list(privileged_capture_acquisition["local_ips"]),
+            "capture_filter_digest": privileged_capture_acquisition["filter_digest"],
+            "capture_command_digest": sha256_text(
+                canonical_json(privileged_capture_acquisition["capture_command"])
+            ),
+            "acquisition_route_binding_refs": acquisition_route_binding_refs,
+            "acquisition_route_binding_set_digest": acquisition_route_binding_set_digest,
+            "member_capture_bindings": member_capture_bindings,
+            "member_capture_binding_digest_set": member_capture_binding_digests,
+            "member_capture_binding_digest_set_digest": sha256_text(
+                canonical_json(member_capture_binding_digests)
+            ),
+            "member_capture_binding_count": len(member_capture_bindings),
+            "recovery_route_trace_bound": route_trace_validation["ok"],
+            "packet_capture_bound": capture_validation["ok"],
+            "privileged_capture_bound": acquisition_validation["ok"],
+            "route_binding_set_bound": route_binding_set_bound,
+            "all_member_route_traces_capture_bound": True,
+            "raw_verifier_payload_stored": False,
+            "raw_route_payload_stored": False,
+            "raw_packet_body_stored": False,
+            "capture_binding_status": "complete" if complete else "incomplete",
             "digest": sha256_text(canonical_json(digest_payload)),
         }
         return deepcopy(receipt)
@@ -1251,6 +1461,320 @@ class CollectiveIdentityService:
             "raw_route_payload_stored": raw_route_payload_stored,
         }
 
+    def validate_recovery_route_trace_capture_export_binding(
+        self,
+        binding: Mapping[str, Any],
+        recovery_route_trace_binding: Mapping[str, Any] | None = None,
+        packet_capture_export: Mapping[str, Any] | None = None,
+        privileged_capture_acquisition: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(binding, Mapping):
+            raise ValueError("binding must be a mapping")
+
+        expected_fields = {
+            "kind": "collective_recovery_capture_export_binding",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+            "digest_profile": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_DIGEST_PROFILE_ID,
+            "status": "capture-export-bound",
+            "recovery_route_trace_profile_id": COLLECTIVE_RECOVERY_ROUTE_TRACE_PROFILE_ID,
+            "packet_capture_profile": COLLECTIVE_PACKET_CAPTURE_PROFILE,
+            "packet_capture_artifact_format": COLLECTIVE_PACKET_CAPTURE_FORMAT,
+            "packet_capture_export_status": "verified",
+            "privileged_capture_profile": COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE,
+            "privilege_mode": COLLECTIVE_PRIVILEGED_CAPTURE_MODE,
+            "capture_binding_status": "complete",
+        }
+        for field_name, expected in expected_fields.items():
+            if binding.get(field_name) != expected:
+                errors.append(f"{field_name} must equal {expected}")
+        self._check_non_empty_string(binding.get("collective_id"), "collective_id", errors)
+        self._check_non_empty_string(binding.get("recorded_at"), "recorded_at", errors)
+
+        if recovery_route_trace_binding is not None:
+            route_trace_validation = self.validate_recovery_verifier_route_trace_binding(
+                recovery_route_trace_binding,
+            )
+            expected_route_trace_binding_digest = recovery_route_trace_binding.get(
+                "digest"
+            )
+            expected_authority_trace_ref = recovery_route_trace_binding.get(
+                "authority_route_trace_ref"
+            )
+            expected_authority_trace_digest = recovery_route_trace_binding.get(
+                "authority_route_trace_digest"
+            )
+            expected_route_binding_refs = list(
+                recovery_route_trace_binding.get("route_binding_refs", [])
+            )
+        else:
+            route_trace_validation = {
+                "ok": binding.get("recovery_route_trace_bound") is True
+            }
+            expected_route_trace_binding_digest = binding.get(
+                "recovery_route_trace_binding_digest"
+            )
+            expected_authority_trace_ref = binding.get("authority_route_trace_ref")
+            expected_authority_trace_digest = binding.get("authority_route_trace_digest")
+            expected_route_binding_refs = list(binding.get("route_binding_refs", []))
+
+        route_trace_bound = (
+            route_trace_validation["ok"]
+            and binding.get("recovery_route_trace_binding_digest")
+            == expected_route_trace_binding_digest
+            and binding.get("authority_route_trace_ref") == expected_authority_trace_ref
+            and binding.get("authority_route_trace_digest")
+            == expected_authority_trace_digest
+            and binding.get("route_binding_refs") == expected_route_binding_refs
+            and self._looks_like_digest(binding.get("recovery_route_trace_binding_digest"))
+            and binding.get("recovery_route_trace_bound") is True
+        )
+        if not route_trace_bound:
+            errors.append("recovery route trace binding metadata must match")
+
+        if packet_capture_export is not None:
+            capture_validation = self._validate_packet_capture_export(
+                packet_capture_export,
+                recovery_route_trace_binding=recovery_route_trace_binding or binding,
+            )
+            packet_capture_bound = (
+                capture_validation["ok"]
+                and binding.get("packet_capture_ref")
+                == packet_capture_export.get("capture_ref")
+                and binding.get("packet_capture_digest")
+                == packet_capture_export.get("digest")
+                and binding.get("packet_capture_artifact_digest")
+                == packet_capture_export.get("artifact_digest")
+                and binding.get("packet_capture_readback_digest")
+                == packet_capture_export.get("readback_digest")
+                and binding.get("packet_count")
+                == packet_capture_export.get("packet_count")
+                and binding.get("packet_capture_route_binding_refs")
+                == capture_validation["route_binding_refs"]
+            )
+        else:
+            capture_validation = {"ok": binding.get("packet_capture_bound") is True}
+            packet_capture_bound = (
+                binding.get("packet_capture_bound") is True
+                and self._looks_like_digest(binding.get("packet_capture_digest"))
+                and self._looks_like_digest(
+                    binding.get("packet_capture_artifact_digest")
+                )
+                and self._looks_like_digest(
+                    binding.get("packet_capture_readback_digest")
+                )
+            )
+        if not packet_capture_bound:
+            errors.append("packet capture export metadata must match")
+
+        if privileged_capture_acquisition is not None:
+            acquisition_validation = self._validate_privileged_capture_acquisition(
+                privileged_capture_acquisition,
+                recovery_route_trace_binding=recovery_route_trace_binding or binding,
+                packet_capture_export=packet_capture_export,
+            )
+            privileged_capture_bound = (
+                acquisition_validation["ok"]
+                and binding.get("privileged_capture_ref")
+                == privileged_capture_acquisition.get("acquisition_ref")
+                and binding.get("privileged_capture_digest")
+                == privileged_capture_acquisition.get("digest")
+                and binding.get("broker_attestation_ref")
+                == privileged_capture_acquisition.get("broker_attestation_ref")
+                and binding.get("lease_ref")
+                == privileged_capture_acquisition.get("lease_ref")
+                and binding.get("capture_filter_digest")
+                == privileged_capture_acquisition.get("filter_digest")
+                and binding.get("capture_command_digest")
+                == sha256_text(
+                    canonical_json(privileged_capture_acquisition.get("capture_command", []))
+                )
+            )
+        else:
+            acquisition_validation = {
+                "ok": binding.get("privileged_capture_bound") is True
+            }
+            privileged_capture_bound = (
+                binding.get("privileged_capture_bound") is True
+                and self._looks_like_digest(binding.get("privileged_capture_digest"))
+                and self._looks_like_digest(binding.get("capture_filter_digest"))
+            )
+        if not privileged_capture_bound:
+            errors.append("privileged capture acquisition metadata must match")
+
+        route_binding_refs = list(binding.get("route_binding_refs", []))
+        packet_capture_route_binding_refs = list(
+            binding.get("packet_capture_route_binding_refs", [])
+        )
+        acquisition_route_binding_refs = list(
+            binding.get("acquisition_route_binding_refs", [])
+        )
+        route_binding_set_bound = (
+            binding.get("route_binding_digest_set_digest")
+            == sha256_text(canonical_json(route_binding_refs))
+            and binding.get("packet_capture_route_binding_set_digest")
+            == sha256_text(canonical_json(packet_capture_route_binding_refs))
+            and binding.get("acquisition_route_binding_set_digest")
+            == sha256_text(canonical_json(sorted(acquisition_route_binding_refs)))
+            and route_binding_refs == packet_capture_route_binding_refs
+            and sorted(route_binding_refs) == sorted(acquisition_route_binding_refs)
+            and binding.get("route_binding_set_bound") is True
+        )
+        if not route_binding_set_bound:
+            errors.append("route binding refs must match across trace/capture/acquisition")
+
+        member_capture_bindings = binding.get("member_capture_bindings")
+        member_capture_binding_digest_set = binding.get(
+            "member_capture_binding_digest_set"
+        )
+        member_capture_bindings_bound = False
+        if not isinstance(member_capture_bindings, list) or not member_capture_bindings:
+            errors.append("member_capture_bindings must be a non-empty list")
+        elif not isinstance(member_capture_binding_digest_set, list):
+            errors.append("member_capture_binding_digest_set must be a list")
+        else:
+            recomputed_digests: List[str] = []
+            member_capture_bindings_bound = True
+            for index, item in enumerate(member_capture_bindings):
+                if not isinstance(item, Mapping):
+                    errors.append(f"member_capture_bindings[{index}] must be an object")
+                    member_capture_bindings_bound = False
+                    continue
+                for field_name in (
+                    "member_id",
+                    "verifier_transport_receipt_digest",
+                    "member_route_binding_digest",
+                    "route_binding_ref",
+                    "packet_capture_route_export_digest",
+                    "outbound_tuple_digest",
+                    "inbound_tuple_digest",
+                    "outbound_payload_digest",
+                    "inbound_payload_digest",
+                    "member_capture_binding_digest",
+                ):
+                    if not item.get(field_name):
+                        errors.append(
+                            f"member_capture_bindings[{index}].{field_name} must be present"
+                        )
+                        member_capture_bindings_bound = False
+                if item.get("readback_verified") is not True:
+                    errors.append(
+                        f"member_capture_bindings[{index}].readback_verified must be true"
+                    )
+                    member_capture_bindings_bound = False
+                if item.get("readback_packet_count") != 2:
+                    errors.append(
+                        f"member_capture_bindings[{index}].readback_packet_count must equal 2"
+                    )
+                    member_capture_bindings_bound = False
+                recomputed_digest = self._collective_member_capture_binding_digest(
+                    collective_id=str(binding.get("collective_id")),
+                    member_id=str(item.get("member_id")),
+                    recovery_route_trace_binding_digest=str(
+                        binding.get("recovery_route_trace_binding_digest")
+                    ),
+                    member_route_binding_digest=str(
+                        item.get("member_route_binding_digest")
+                    ),
+                    packet_capture_digest=str(binding.get("packet_capture_digest")),
+                    privileged_capture_digest=str(
+                        binding.get("privileged_capture_digest")
+                    ),
+                    route_binding_ref=str(item.get("route_binding_ref")),
+                    route_export_digest=str(
+                        item.get("packet_capture_route_export_digest")
+                    ),
+                )
+                recomputed_digests.append(recomputed_digest)
+                if item.get("member_capture_binding_digest") != recomputed_digest:
+                    errors.append(
+                        f"member_capture_bindings[{index}].member_capture_binding_digest mismatch"
+                    )
+                    member_capture_bindings_bound = False
+            if member_capture_binding_digest_set != recomputed_digests:
+                errors.append(
+                    "member_capture_binding_digest_set must match member capture bindings"
+                )
+                member_capture_bindings_bound = False
+            if binding.get("member_capture_binding_count") != len(
+                member_capture_bindings
+            ):
+                errors.append(
+                    "member_capture_binding_count must match member capture bindings"
+                )
+                member_capture_bindings_bound = False
+            if binding.get("member_capture_binding_digest_set_digest") != sha256_text(
+                canonical_json(recomputed_digests)
+            ):
+                errors.append(
+                    "member_capture_binding_digest_set_digest must match member capture digests"
+                )
+                member_capture_bindings_bound = False
+
+        expected_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+                    "collective_id": binding.get("collective_id"),
+                    "recovery_route_trace_binding_digest": binding.get(
+                        "recovery_route_trace_binding_digest"
+                    ),
+                    "packet_capture_digest": binding.get("packet_capture_digest"),
+                    "privileged_capture_digest": binding.get(
+                        "privileged_capture_digest"
+                    ),
+                    "member_capture_binding_digest_set": binding.get(
+                        "member_capture_binding_digest_set"
+                    ),
+                }
+            )
+        )
+        digest_bound = binding.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match collective recovery capture export binding")
+
+        raw_verifier_payload_stored = binding.get("raw_verifier_payload_stored") is True
+        raw_route_payload_stored = binding.get("raw_route_payload_stored") is True
+        raw_packet_body_stored = binding.get("raw_packet_body_stored") is True
+        if raw_verifier_payload_stored:
+            errors.append("raw_verifier_payload_stored must be false")
+        if raw_route_payload_stored:
+            errors.append("raw_route_payload_stored must be false")
+        if raw_packet_body_stored:
+            errors.append("raw_packet_body_stored must be false")
+
+        complete = (
+            route_trace_bound
+            and packet_capture_bound
+            and privileged_capture_bound
+            and route_binding_set_bound
+            and member_capture_bindings_bound
+            and not raw_verifier_payload_stored
+            and not raw_route_payload_stored
+            and not raw_packet_body_stored
+        )
+        if binding.get("capture_binding_status") != ("complete" if complete else "incomplete"):
+            errors.append("capture_binding_status must reflect binding completeness")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_bound": (
+                binding.get("profile_id") == COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID
+            ),
+            "recovery_route_trace_bound": route_trace_bound,
+            "packet_capture_bound": packet_capture_bound,
+            "privileged_capture_bound": privileged_capture_bound,
+            "route_binding_set_bound": route_binding_set_bound,
+            "member_capture_bindings_bound": member_capture_bindings_bound,
+            "capture_binding_complete": complete,
+            "digest_bound": digest_bound,
+            "raw_verifier_payload_stored": raw_verifier_payload_stored,
+            "raw_route_payload_stored": raw_route_payload_stored,
+            "raw_packet_body_stored": raw_packet_body_stored,
+        }
+
     def _derive_member_recovery_proofs(
         self,
         identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
@@ -1569,6 +2093,312 @@ class CollectiveIdentityService:
                 }
             )
         )
+
+    @staticmethod
+    def _collective_member_capture_binding_digest(
+        *,
+        collective_id: str,
+        member_id: str,
+        recovery_route_trace_binding_digest: str,
+        member_route_binding_digest: str,
+        packet_capture_digest: str,
+        privileged_capture_digest: str,
+        route_binding_ref: str,
+        route_export_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "collective_id": collective_id,
+                    "member_id": member_id,
+                    "recovery_route_trace_binding_digest": (
+                        recovery_route_trace_binding_digest
+                    ),
+                    "member_route_binding_digest": member_route_binding_digest,
+                    "packet_capture_digest": packet_capture_digest,
+                    "privileged_capture_digest": privileged_capture_digest,
+                    "route_binding_ref": route_binding_ref,
+                    "route_export_digest": route_export_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _transport_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            key: deepcopy(value)
+            for key, value in receipt.items()
+            if key not in {"kind", "schema_version", "digest"}
+        }
+
+    def _validate_packet_capture_export(
+        self,
+        packet_capture_export: Mapping[str, Any],
+        *,
+        recovery_route_trace_binding: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(packet_capture_export, Mapping):
+            raise ValueError("packet_capture_export must be a mapping")
+        if packet_capture_export.get("kind") != "distributed_transport_packet_capture_export":
+            errors.append("packet_capture_export.kind mismatch")
+        if packet_capture_export.get("schema_version") != "1.0.0":
+            errors.append("packet_capture_export.schema_version mismatch")
+        for field_name in (
+            "capture_ref",
+            "trace_ref",
+            "authority_plane_ref",
+            "envelope_ref",
+            "council_tier",
+            "transport_profile",
+            "capture_profile",
+            "artifact_format",
+            "readback_profile",
+            "os_native_readback_profile",
+            "export_status",
+        ):
+            self._check_non_empty_string(
+                packet_capture_export.get(field_name),
+                field_name,
+                errors,
+            )
+        for field_name in (
+            "trace_digest",
+            "authority_plane_digest",
+            "envelope_digest",
+            "artifact_digest",
+            "readback_digest",
+            "digest",
+        ):
+            if not self._looks_like_digest(packet_capture_export.get(field_name)):
+                errors.append(f"{field_name} must be sha256 hex")
+        if packet_capture_export.get("capture_profile") != COLLECTIVE_PACKET_CAPTURE_PROFILE:
+            errors.append("packet_capture_export.capture_profile mismatch")
+        if packet_capture_export.get("artifact_format") != COLLECTIVE_PACKET_CAPTURE_FORMAT:
+            errors.append("packet_capture_export.artifact_format mismatch")
+        if packet_capture_export.get("export_status") != "verified":
+            errors.append("packet_capture_export.export_status must be verified")
+
+        route_exports = packet_capture_export.get("route_exports")
+        if not isinstance(route_exports, list) or not route_exports:
+            errors.append("packet_capture_export.route_exports must be a non-empty list")
+            route_exports = []
+        route_binding_refs: List[str] = []
+        route_export_errors = 0
+        for index, route_export in enumerate(route_exports):
+            if not isinstance(route_export, Mapping):
+                errors.append(f"route_exports[{index}] must be an object")
+                route_export_errors += 1
+                continue
+            for field_name in (
+                "route_binding_ref",
+                "local_ip",
+                "remote_ip",
+                "outbound_tuple_digest",
+                "inbound_tuple_digest",
+                "outbound_payload_digest",
+                "inbound_payload_digest",
+            ):
+                value = route_export.get(field_name)
+                if field_name.endswith("digest"):
+                    if not self._looks_like_digest(value):
+                        errors.append(f"route_exports[{index}].{field_name} must be sha256 hex")
+                        route_export_errors += 1
+                else:
+                    self._check_non_empty_string(
+                        value,
+                        f"route_exports[{index}].{field_name}",
+                        errors,
+                    )
+            route_binding_ref = route_export.get("route_binding_ref")
+            if isinstance(route_binding_ref, str):
+                route_binding_refs.append(route_binding_ref)
+            if route_export.get("readback_verified") is not True:
+                errors.append(f"route_exports[{index}].readback_verified must be true")
+                route_export_errors += 1
+            if route_export.get("readback_packet_count") != 2:
+                errors.append(
+                    f"route_exports[{index}].readback_packet_count must equal 2"
+                )
+                route_export_errors += 1
+            if (
+                packet_capture_export.get("os_native_readback_available") is True
+                and route_export.get("os_native_readback_verified") is not True
+            ):
+                errors.append(
+                    f"route_exports[{index}].os_native_readback_verified must be true"
+                )
+                route_export_errors += 1
+
+        route_count = packet_capture_export.get("route_count")
+        packet_count = packet_capture_export.get("packet_count")
+        if not isinstance(route_count, int) or route_count != len(route_exports):
+            errors.append("packet_capture_export.route_count must match route_exports")
+            route_count = len(route_exports)
+        if not isinstance(packet_count, int) or packet_count != route_count * 2:
+            errors.append(
+                "packet_capture_export.packet_count must equal two packets per route"
+            )
+        if (
+            packet_capture_export.get("os_native_readback_available") is True
+            and packet_capture_export.get("os_native_readback_ok") is not True
+        ):
+            errors.append("packet_capture_export.os_native_readback_ok must be true")
+        if recovery_route_trace_binding is not None:
+            expected_route_refs = list(
+                recovery_route_trace_binding.get("route_binding_refs", [])
+            )
+            if packet_capture_export.get("trace_ref") != recovery_route_trace_binding.get(
+                "authority_route_trace_ref"
+            ):
+                errors.append("packet_capture_export.trace_ref must match route trace")
+            if packet_capture_export.get("trace_digest") != recovery_route_trace_binding.get(
+                "authority_route_trace_digest"
+            ):
+                errors.append("packet_capture_export.trace_digest must match route trace")
+            if route_binding_refs != expected_route_refs:
+                errors.append("packet_capture_export route refs must match route trace")
+            if route_count != recovery_route_trace_binding.get("route_count"):
+                errors.append("packet_capture_export.route_count must match route trace")
+
+        expected_digest = sha256_text(
+            canonical_json(self._transport_receipt_digest_payload(packet_capture_export))
+        )
+        digest_bound = packet_capture_export.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("packet_capture_export.digest must bind payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "digest_bound": digest_bound,
+            "route_binding_refs": route_binding_refs,
+            "packet_capture_complete": route_export_errors == 0 and not errors,
+        }
+
+    def _validate_privileged_capture_acquisition(
+        self,
+        privileged_capture_acquisition: Mapping[str, Any],
+        *,
+        recovery_route_trace_binding: Mapping[str, Any] | None = None,
+        packet_capture_export: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(privileged_capture_acquisition, Mapping):
+            raise ValueError("privileged_capture_acquisition must be a mapping")
+        if (
+            privileged_capture_acquisition.get("kind")
+            != "distributed_transport_privileged_capture_acquisition"
+        ):
+            errors.append("privileged_capture_acquisition.kind mismatch")
+        if privileged_capture_acquisition.get("schema_version") != "1.0.0":
+            errors.append("privileged_capture_acquisition.schema_version mismatch")
+        for field_name in (
+            "acquisition_ref",
+            "trace_ref",
+            "capture_ref",
+            "authority_plane_ref",
+            "envelope_ref",
+            "council_tier",
+            "transport_profile",
+            "acquisition_profile",
+            "broker_profile",
+            "privilege_mode",
+            "lease_ref",
+            "broker_attestation_ref",
+            "interface_name",
+            "capture_filter",
+            "grant_status",
+        ):
+            self._check_non_empty_string(
+                privileged_capture_acquisition.get(field_name),
+                field_name,
+                errors,
+            )
+        for field_name in (
+            "trace_digest",
+            "capture_digest",
+            "authority_plane_digest",
+            "envelope_digest",
+            "filter_digest",
+            "digest",
+        ):
+            if not self._looks_like_digest(privileged_capture_acquisition.get(field_name)):
+                errors.append(f"{field_name} must be sha256 hex")
+        if (
+            privileged_capture_acquisition.get("acquisition_profile")
+            != COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE
+        ):
+            errors.append("privileged_capture_acquisition.acquisition_profile mismatch")
+        if (
+            privileged_capture_acquisition.get("privilege_mode")
+            != COLLECTIVE_PRIVILEGED_CAPTURE_MODE
+        ):
+            errors.append("privileged_capture_acquisition.privilege_mode mismatch")
+        if privileged_capture_acquisition.get("grant_status") != "granted":
+            errors.append("privileged_capture_acquisition.grant_status must be granted")
+        local_ips = privileged_capture_acquisition.get("local_ips")
+        if not isinstance(local_ips, list) or not local_ips:
+            errors.append("privileged_capture_acquisition.local_ips must be non-empty")
+        route_binding_refs = privileged_capture_acquisition.get("route_binding_refs")
+        if not isinstance(route_binding_refs, list) or not route_binding_refs:
+            errors.append(
+                "privileged_capture_acquisition.route_binding_refs must be non-empty"
+            )
+            route_binding_refs = []
+        capture_command = privileged_capture_acquisition.get("capture_command")
+        if not isinstance(capture_command, list) or not capture_command:
+            errors.append("privileged_capture_acquisition.capture_command must be non-empty")
+            capture_command = []
+        else:
+            if not str(capture_command[0]).endswith("tcpdump"):
+                errors.append("capture_command must start with tcpdump")
+            if privileged_capture_acquisition.get("interface_name") not in capture_command:
+                errors.append("capture_command must bind interface_name")
+            if privileged_capture_acquisition.get("capture_filter") not in capture_command:
+                errors.append("capture_command must bind capture_filter")
+        expected_filter_digest = sha256_text(
+            str(privileged_capture_acquisition.get("capture_filter", ""))
+        )
+        if privileged_capture_acquisition.get("filter_digest") != expected_filter_digest:
+            errors.append("filter_digest must bind capture_filter")
+        if recovery_route_trace_binding is not None:
+            if privileged_capture_acquisition.get(
+                "trace_ref"
+            ) != recovery_route_trace_binding.get("authority_route_trace_ref"):
+                errors.append("privileged capture trace_ref must match route trace")
+            if privileged_capture_acquisition.get(
+                "trace_digest"
+            ) != recovery_route_trace_binding.get("authority_route_trace_digest"):
+                errors.append("privileged capture trace_digest must match route trace")
+            if sorted(route_binding_refs) != sorted(
+                recovery_route_trace_binding.get("route_binding_refs", [])
+            ):
+                errors.append("privileged capture route refs must match route trace")
+        if packet_capture_export is not None:
+            if privileged_capture_acquisition.get(
+                "capture_ref"
+            ) != packet_capture_export.get("capture_ref"):
+                errors.append("privileged capture capture_ref must match packet capture")
+            if privileged_capture_acquisition.get(
+                "capture_digest"
+            ) != packet_capture_export.get("digest"):
+                errors.append(
+                    "privileged capture capture_digest must match packet capture"
+                )
+
+        expected_digest = sha256_text(
+            canonical_json(
+                self._transport_receipt_digest_payload(privileged_capture_acquisition)
+            )
+        )
+        digest_bound = privileged_capture_acquisition.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("privileged_capture_acquisition.digest must bind payload")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "digest_bound": digest_bound,
+        }
 
     def _validate_authority_route_trace_contract(
         self,

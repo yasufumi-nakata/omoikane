@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from omoikane.common import canonical_json, sha256_text
 from omoikane.interface.collective import CollectiveIdentityService
 
 
@@ -96,6 +97,121 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             "digest": "f" * 64,
         }
 
+    @staticmethod
+    def _packet_capture_export(route_trace: dict) -> dict:
+        route_exports = []
+        for index, route in enumerate(route_trace["route_bindings"], start=1):
+            socket = route["socket_trace"]
+            route_exports.append(
+                {
+                    "key_server_ref": route["key_server_ref"],
+                    "route_binding_ref": route["route_binding_ref"],
+                    "local_ip": f"192.0.2.{index}",
+                    "local_port": 51000 + index,
+                    "remote_ip": f"198.51.100.{index}",
+                    "remote_port": 443,
+                    "outbound_tuple_digest": sha256_text(f"outbound-{index}"),
+                    "inbound_tuple_digest": sha256_text(f"inbound-{index}"),
+                    "packet_order": ["outbound-request", "inbound-response"],
+                    "outbound_request_bytes": 96 + index,
+                    "inbound_response_bytes": 320 + index,
+                    "outbound_payload_digest": sha256_text(f"request-{index}"),
+                    "inbound_payload_digest": socket["response_digest"],
+                    "readback_packet_count": 2,
+                    "readback_verified": True,
+                    "os_native_readback_verified": True,
+                }
+            )
+        receipt = {
+            "kind": "distributed_transport_packet_capture_export",
+            "schema_version": "1.0.0",
+            "capture_ref": "authority-packet-capture://federation/test",
+            "trace_ref": route_trace["trace_ref"],
+            "trace_digest": route_trace["digest"],
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "envelope_ref": "distributed-envelope-test",
+            "envelope_digest": "6" * 64,
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "capture_profile": "trace-bound-pcap-export-v1",
+            "artifact_format": "pcap",
+            "readback_profile": "pcap-readback-v1",
+            "os_native_readback_profile": "tcpdump-readback-v1",
+            "route_count": len(route_exports),
+            "packet_count": len(route_exports) * 2,
+            "artifact_size_bytes": 512,
+            "artifact_digest": sha256_text("collective-pcap-artifact"),
+            "readback_digest": sha256_text("collective-pcap-readback"),
+            "route_exports": route_exports,
+            "os_native_readback_available": True,
+            "os_native_readback_ok": True,
+            "export_status": "verified",
+            "recorded_at": "2026-04-26T00:00:00Z",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                {
+                    key: value
+                    for key, value in receipt.items()
+                    if key not in {"kind", "schema_version", "digest"}
+                }
+            )
+        )
+        return receipt
+
+    @staticmethod
+    def _privileged_capture_acquisition(route_trace: dict, capture_export: dict) -> dict:
+        route_refs = [route["route_binding_ref"] for route in route_trace["route_bindings"]]
+        capture_filter = "tcp and host 192.0.2.1"
+        receipt = {
+            "kind": "distributed_transport_privileged_capture_acquisition",
+            "schema_version": "1.0.0",
+            "acquisition_ref": "authority-live-capture://federation/test",
+            "trace_ref": route_trace["trace_ref"],
+            "trace_digest": route_trace["digest"],
+            "capture_ref": capture_export["capture_ref"],
+            "capture_digest": capture_export["digest"],
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "envelope_ref": "distributed-envelope-test",
+            "envelope_digest": "6" * 64,
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "acquisition_profile": "bounded-live-interface-capture-acquisition-v1",
+            "broker_profile": "delegated-privileged-capture-broker-v1",
+            "privilege_mode": "delegated-broker",
+            "lease_ref": "capture-lease://federation/test",
+            "broker_attestation_ref": "broker://authority-capture/test",
+            "interface_name": "en0",
+            "local_ips": ["192.0.2.1"],
+            "capture_filter": capture_filter,
+            "filter_digest": sha256_text(capture_filter),
+            "route_binding_refs": route_refs,
+            "capture_command": [
+                "/usr/sbin/tcpdump",
+                "-i",
+                "en0",
+                "-w",
+                "{capture_output_path}",
+                capture_filter,
+            ],
+            "lease_duration_s": 300,
+            "lease_expires_at": "2026-04-26T00:05:00Z",
+            "grant_status": "granted",
+            "recorded_at": "2026-04-26T00:00:00Z",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                {
+                    key: value
+                    for key, value in receipt.items()
+                    if key not in {"kind", "schema_version", "digest"}
+                }
+            )
+        )
+        return receipt
+
     def test_register_open_close_and_dissolve_collective(self) -> None:
         service = CollectiveIdentityService()
         record = service.register_collective(
@@ -164,6 +280,23 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             transport_binding,
             self._authority_route_trace(),
         )
+        route_trace = self._authority_route_trace()
+        packet_capture = self._packet_capture_export(route_trace)
+        privileged_capture = self._privileged_capture_acquisition(
+            route_trace,
+            packet_capture,
+        )
+        capture_binding = service.bind_recovery_route_trace_capture_export(
+            route_trace_binding,
+            packet_capture,
+            privileged_capture,
+        )
+        capture_validation = service.validate_recovery_route_trace_capture_export_binding(
+            capture_binding,
+            route_trace_binding,
+            packet_capture,
+            privileged_capture,
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -211,6 +344,17 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             route_trace_binding["profile_id"],
         )
         self.assertEqual(2, route_trace_binding["member_route_binding_count"])
+        self.assertTrue(capture_validation["ok"])
+        self.assertTrue(capture_validation["recovery_route_trace_bound"])
+        self.assertTrue(capture_validation["packet_capture_bound"])
+        self.assertTrue(capture_validation["privileged_capture_bound"])
+        self.assertTrue(capture_validation["member_capture_bindings_bound"])
+        self.assertFalse(capture_validation["raw_packet_body_stored"])
+        self.assertEqual(
+            "collective-recovery-route-trace-capture-export-v1",
+            capture_binding["profile_id"],
+        )
+        self.assertEqual(2, capture_binding["member_capture_binding_count"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()
