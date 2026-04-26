@@ -1,0 +1,194 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_recovery_verifier_transport_binding.schema"
+title: CollectiveRecoveryVerifierTransportBinding
+description: >
+  Digest-only binding between post-dissolution member recovery proofs and remote
+  reviewer verifier transport receipts.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - collective_id
+  - recorded_at
+  - status
+  - dissolution_receipt_digest
+  - member_recovery_binding_digest
+  - member_recovery_confirmation_digest_set
+  - verifier_transport_receipts
+  - verifier_transport_digest_set
+  - verifier_transport_binding_digest
+  - verifier_transport_receipt_count
+  - all_member_recovery_proofs_transport_bound
+  - all_verifier_transport_receipts_verified
+  - raw_verifier_payload_stored
+properties:
+  kind:
+    const: collective_recovery_verifier_transport_binding
+  schema_version:
+    const: 1.0.0
+  profile_id:
+    const: collective-dissolution-recovery-verifier-transport-v1
+  collective_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  status:
+    const: verified
+  dissolution_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  member_recovery_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  member_recovery_confirmation_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  verifier_transport_receipts:
+    type: object
+    minProperties: 2
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - schema_version
+        - receipt_id
+        - collective_id
+        - member_id
+        - profile_id
+        - identity_confirmation_ref
+        - identity_confirmation_digest
+        - self_report_witness_consistency_digest
+        - member_recovery_binding_digest
+        - dissolution_receipt_digest
+        - verifier_network_receipt_id
+        - verifier_ref
+        - verifier_endpoint
+        - jurisdiction
+        - network_profile_id
+        - transport_profile
+        - transport_exchange_profile_id
+        - transport_exchange_id
+        - transport_exchange_digest
+        - challenge_ref
+        - challenge_digest
+        - request_payload_ref
+        - request_payload_digest
+        - response_payload_ref
+        - response_payload_digest
+        - receipt_status
+        - observed_latency_ms
+        - recorded_at
+        - raw_verifier_payload_stored
+        - digest
+      properties:
+        kind:
+          const: collective_recovery_verifier_transport_receipt
+        schema_version:
+          const: 1.0.0
+        receipt_id:
+          type: string
+          pattern: "^collective-recovery-verifier-receipt-[a-f0-9]{12}$"
+        collective_id:
+          type: string
+          minLength: 8
+        member_id:
+          type: string
+          minLength: 1
+        profile_id:
+          const: collective-dissolution-recovery-verifier-transport-v1
+        identity_confirmation_ref:
+          type: string
+          pattern: "^identity-confirmation://"
+        identity_confirmation_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        self_report_witness_consistency_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        member_recovery_binding_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        dissolution_receipt_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        verifier_network_receipt_id:
+          type: string
+          pattern: "^verifier-network-receipt-[a-f0-9]{12}$"
+        verifier_ref:
+          type: string
+          pattern: "^verifier://collective-recovery/"
+        verifier_endpoint:
+          type: string
+          pattern: "^verifier://collective-recovery/"
+        jurisdiction:
+          type: string
+          minLength: 1
+        network_profile_id:
+          const: guardian-reviewer-remote-attestation-v1
+        transport_profile:
+          const: reviewer-live-proof-bridge-v1
+        transport_exchange_profile_id:
+          const: digest-bound-reviewer-transport-exchange-v1
+        transport_exchange_id:
+          type: string
+          pattern: "^verifier-transport-exchange-[a-f0-9]{12}$"
+        transport_exchange_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        challenge_ref:
+          type: string
+          pattern: "^challenge://collective-recovery/"
+        challenge_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        request_payload_ref:
+          type: string
+          pattern: "^sealed://collective-recovery/"
+        request_payload_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        response_payload_ref:
+          type: string
+          pattern: "^sealed://collective-recovery/"
+        response_payload_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        receipt_status:
+          const: verified
+        observed_latency_ms:
+          type: number
+          minimum: 0
+        recorded_at:
+          type: string
+          format: date-time
+        raw_verifier_payload_stored:
+          const: false
+        digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  verifier_transport_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  verifier_transport_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  verifier_transport_receipt_count:
+    type: integer
+    minimum: 2
+  all_member_recovery_proofs_transport_bound:
+    const: true
+  all_verifier_transport_receipts_verified:
+    const: true
+  raw_verifier_payload_stored:
+    const: false

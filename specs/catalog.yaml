@@ -798,6 +798,17 @@ entries:
     rationale: Required to serialize collective teardown as a first-class receipt with member recovery confirmation, identity-confirmation digest binding, and digest-only audit binding.
   - priority: P1
     kind: schema
+    file: specs/schemas/collective_recovery_verifier_transport_binding.schema
+    consumers:
+      - specs/interfaces/interface.collective.v0.idl
+      - specs/schemas/collective_dissolution_receipt.schema
+      - docs/02-subsystems/interface/collective-identity.md
+      - docs/07-reference-implementation/README.md
+      - evals/interface/collective_recovery_verifier_transport.yaml
+      - reference-runtime
+    rationale: Required to bind post-dissolution member recovery proofs to verified remote reviewer verifier transport receipts without storing raw verifier payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/reasoning_trace.schema
     consumers:
       - specs/interfaces/cognitive.reasoning.v0.idl
@@ -1068,7 +1079,7 @@ entries:
       - reference-runtime
       - docs/02-subsystems/interface/collective-identity.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to fix the L6 collective formation, merge closure, and dissolution contract across docs, CLI, and runtime.
+    rationale: Required to fix the L6 collective formation, merge closure, dissolution, and recovery verifier transport binding contract across docs, CLI, and runtime.
   - priority: P1
     kind: eval
     file: evals/interface/collective_merge_reversibility.yaml
@@ -1083,6 +1094,14 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects first-class collective dissolution receipts, member confirmation completeness, IdentityConfirmation digest binding, and digest-only audit evidence after bounded merge teardown.
+  - priority: P1
+    kind: eval
+    file: evals/interface/collective_recovery_verifier_transport.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects remote verifier transport binding for post-dissolution member recovery proofs, including dissolution digest binding and raw verifier payload redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/perception_frame.schema

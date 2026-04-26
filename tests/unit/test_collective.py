@@ -85,6 +85,11 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         record_validation = service.validate_record(final_record)
         session_validation = service.validate_merge_session(closed)
         dissolution_validation = service.validate_dissolution_receipt(dissolved)
+        transport_binding = service.bind_recovery_verifier_transport(dissolved)
+        transport_validation = service.validate_recovery_verifier_transport_binding(
+            transport_binding,
+            dissolved,
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -112,6 +117,16 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             ["a" * 64, "c" * 64],
             dissolved["member_recovery_confirmation_digest_set"],
         )
+        self.assertTrue(transport_validation["ok"])
+        self.assertTrue(transport_validation["dissolution_receipt_digest_bound"])
+        self.assertTrue(transport_validation["verifier_transport_receipts_bound"])
+        self.assertTrue(transport_validation["verifier_transport_binding_digest_bound"])
+        self.assertFalse(transport_validation["raw_verifier_payload_stored"])
+        self.assertEqual(
+            "collective-dissolution-recovery-verifier-transport-v1",
+            transport_binding["profile_id"],
+        )
+        self.assertEqual(2, transport_binding["verifier_transport_receipt_count"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()

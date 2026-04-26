@@ -91,6 +91,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["validation"]["dissolution_raw_identity_confirmation_profiles_stored"])
         self.assertTrue(result["validation"]["member_recovery_identity_confirmation_profiles_ok"])
         self.assertTrue(result["validation"]["dissolution_audit_bound"])
+        self.assertTrue(result["validation"]["recovery_verifier_transport_bound"])
+        self.assertTrue(result["validation"]["recovery_verifier_transport_profile_bound"])
+        self.assertTrue(
+            result["validation"]["recovery_verifier_transport_dissolution_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["recovery_verifier_transport_member_binding_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["recovery_verifier_transport_digest_set_bound"])
+        self.assertTrue(
+            result["validation"]["recovery_verifier_transport_binding_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["recovery_verifier_transport_all_receipts_verified"]
+        )
+        self.assertFalse(result["validation"]["recovery_verifier_transport_raw_payload_stored"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
@@ -100,7 +116,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
         self.assertEqual(
-            1,
+            2,
             result["ledger_verification"]["category_counts"]["interface-collective-dissolution"],
         )
 

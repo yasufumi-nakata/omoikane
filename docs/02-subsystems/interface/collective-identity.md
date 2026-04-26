@@ -74,22 +74,32 @@ collective_profile:
   confirmation digest、witness quorum status、
   self-report/witness consistency digest だけを receipt へ縮約する
 - raw identity confirmation profile は dissolution receipt に保存しない
+- `collective-dissolution-recovery-verifier-transport-v1` により、
+  dissolution receipt digest と各 member recovery proof を remote reviewer verifier
+  transport receipt に束縛する
+- raw verifier request / response payload は保存せず、challenge digest、
+  request / response digest、transport exchange digest だけを保持する
 
 ## reference runtime の扱い
 
 - `interface.collective.v0.idl` を導入し、
-  `register_collective / open_merge_session / close_merge_session / dissolve_collective`
-  の 4 op を固定する
+  `register_collective / open_merge_session / close_merge_session / dissolve_collective /
+  bind_recovery_verifier_transport` の 5 op を固定する
 - `collective_record.schema`、`collective_merge_session.schema`、
-  `collective_dissolution_receipt.schema` を追加する
+  `collective_dissolution_receipt.schema`、
+  `collective_recovery_verifier_transport_binding.schema` を追加する
 - `collective-demo` は IMC `merge_thought`、WMS divergence、private escape、
   identity confirmation、schema-bound dissolution receipt、
-  member recovery proof binding を 1 シナリオで smoke する
+  member recovery proof binding、remote verifier transport binding を
+  1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
 - `evals/interface/collective_dissolution_receipt.yaml` は
   dissolution receipt の public schema、全 member confirmation、
   IdentityConfirmation digest binding、digest-only audit ref を監査する
+- `evals/interface/collective_recovery_verifier_transport.yaml` は
+  dissolution receipt digest、member recovery binding digest、
+  per-member verified transport receipt、raw verifier payload redaction を監査する
 
 ## 不変条件
 
@@ -98,7 +108,8 @@ collective_profile:
 3. **escape freedom** ── divergence 後の private reality 退避を阻害しない
 4. **recovery first** ── dissolution 前に全 member の identity confirmation を必須化
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
-6. **no silent persistence** ── active merge 無しで Collective を存続させない
+6. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
+7. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連
 

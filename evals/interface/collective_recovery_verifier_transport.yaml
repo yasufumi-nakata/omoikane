@@ -1,0 +1,19 @@
+name: collective_recovery_verifier_transport
+description: >
+  Protect post-dissolution member recovery by binding every digest-only recovery
+  proof to a verified remote reviewer transport receipt without storing raw
+  verifier request or response payloads.
+scenarios:
+  - name: recovery_proof_remote_verifier_transport
+    command: PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
+    transport_profile: collective-dissolution-recovery-verifier-transport-v1
+    expected_status: verified
+assertions:
+  - recovery verifier transport binding conforms to collective_recovery_verifier_transport_binding.schema
+  - dissolution_receipt_digest binds the complete collective_dissolution_receipt
+  - member_recovery_binding_digest matches the dissolution recovery proof bundle
+  - verifier_transport_receipts cover every member recovery proof
+  - every verifier transport receipt has receipt_status verified
+  - verifier_transport_digest_set matches member order
+  - verifier_transport_binding_digest binds the receipt set
+  - raw_verifier_payload_stored remains false

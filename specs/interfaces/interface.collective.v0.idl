@@ -7,6 +7,7 @@ imports:
   collective_record: ../schemas/collective_record.schema
   collective_merge_session: ../schemas/collective_merge_session.schema
   collective_dissolution_receipt: ../schemas/collective_dissolution_receipt.schema
+  collective_recovery_verifier_transport_binding: ../schemas/collective_recovery_verifier_transport_binding.schema
   identity_confirmation_profile: ../schemas/identity_confirmation_profile.schema
 operations:
   register_collective:
@@ -185,6 +186,24 @@ operations:
       - member_recovery_proofs must bind every member to a passed multidimensional-identity-confirmation-v1 profile
       - raw identity confirmation profiles must not be stored in the dissolution receipt
       - dissolution audit evidence must be digest-only ledger ref metadata, not raw merge payload
+  bind_recovery_verifier_transport:
+    summary: Bind post-dissolution member recovery proofs to remote reviewer verifier transport receipts without storing raw verifier payloads.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - dissolution_receipt
+        properties:
+          dissolution_receipt:
+            schema_ref: collective_dissolution_receipt
+    output:
+      schema_ref: collective_recovery_verifier_transport_binding
+    guarantees:
+      - profile_id must equal collective-dissolution-recovery-verifier-transport-v1
+      - dissolution_receipt_digest must bind the complete dissolution receipt
+      - verifier_transport_receipts must cover every member recovery proof
+      - each verifier transport receipt must be verified and digest-bound
+      - raw verifier request/response payloads must not be stored
 events:
   collective.formed:
     payload:
@@ -195,3 +214,6 @@ events:
   collective.dissolved:
     payload:
       schema_ref: collective_dissolution_receipt
+  collective.recovery_verifier_transport_bound:
+    payload:
+      schema_ref: collective_recovery_verifier_transport_binding

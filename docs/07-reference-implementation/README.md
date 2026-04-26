@@ -812,6 +812,11 @@ witness quorum status、self-report/witness consistency digest を束縛し、
 raw identity confirmation profile を保存しない。
 `interface-collective-dissolution` ledger event は same binding digest と
 confirmation digest set を持つため、単独に検証できる。
+さらに `collective_recovery_verifier_transport_binding.schema` に合う
+`collective-dissolution-recovery-verifier-transport-v1` artifact を返し、
+dissolution receipt digest、member recovery binding digest、member ごとの
+verified remote reviewer transport receipt、transport exchange digest set、
+raw verifier payload 非保存を同じ ledger category へ束縛する。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

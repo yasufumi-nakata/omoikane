@@ -215,6 +215,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dissolution_member_recovery_binding_digest_bound"])
         self.assertFalse(result["validation"]["dissolution_raw_identity_confirmation_profiles_stored"])
         self.assertTrue(result["validation"]["member_recovery_identity_confirmation_profiles_ok"])
+        self.assertTrue(result["validation"]["recovery_verifier_transport_bound"])
+        self.assertTrue(result["validation"]["recovery_verifier_transport_profile_bound"])
+        self.assertTrue(
+            result["validation"]["recovery_verifier_transport_dissolution_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["recovery_verifier_transport_all_receipts_verified"])
+        self.assertFalse(result["validation"]["recovery_verifier_transport_raw_payload_stored"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
         self.assertEqual(

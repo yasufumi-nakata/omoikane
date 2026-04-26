@@ -6,6 +6,7 @@ capabilities:
   - rollback.trigger
   - continuity.public-verification.attest
   - collective.dissolution-receipt.attest
+  - collective.recovery-verifier-transport.attest
   - imc.memory-glimpse-receipt.attest
   - ewa.stop-signal-adapter.attest
   - ewa.production-connector.attest
@@ -40,6 +41,7 @@ when_to_invoke: |
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
   - Collective dissolution receipt が全 member confirmation、schema version、IdentityConfirmation digest proof、digest-only audit ref に束縛されていることを検証する時
+  - Collective dissolution 後の member recovery proof が remote reviewer verifier transport receipt と raw payload 非保存に束縛されていることを検証する時
   - IMC memory_glimpse receipt が MemoryCrystal source digest、message digest、Council witness digest に束縛され、raw memory/message payload を保存していないことを検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - EWA authorization 前に vendor API connector certificate / installation proof / safety PLC installation digest が stop-signal adapter receipt に束縛されていることを検証する時

@@ -21,6 +21,7 @@
 - `cognitive_audit_resolution.schema`
 - `cognitive_audit_verifier_transport_binding.schema`
 - `collective_dissolution_receipt.schema`
+- `collective_recovery_verifier_transport_binding.schema`
 - `collective_merge_session.schema`
 - `collective_record.schema`
 - `connectome_document.schema`

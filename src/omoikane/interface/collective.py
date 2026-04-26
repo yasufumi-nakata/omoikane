@@ -17,10 +17,19 @@ COLLECTIVE_ALLOWED_WMS_MODES = {"shared_reality", "private_reality", "mixed"}
 COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID = (
     "collective-dissolution-identity-confirmation-binding-v1"
 )
+COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID = (
+    "collective-dissolution-recovery-verifier-transport-v1"
+)
 COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID = "multidimensional-identity-confirmation-v1"
 COLLECTIVE_IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = (
     "identity-self-report-witness-consistency-v1"
 )
+COLLECTIVE_VERIFIER_NETWORK_PROFILE_ID = "guardian-reviewer-remote-attestation-v1"
+COLLECTIVE_VERIFIER_TRANSPORT_PROFILE = "reviewer-live-proof-bridge-v1"
+COLLECTIVE_VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID = (
+    "digest-bound-reviewer-transport-exchange-v1"
+)
+COLLECTIVE_RECOVERY_VERIFIER_JURISDICTIONS = ["JP-13", "US-CA", "EU-DE", "SG-01"]
 COLLECTIVE_REQUIRED_IDENTITY_CONFIRMATION_DIMENSIONS = [
     "episodic_recall",
     "self_model_alignment",
@@ -71,6 +80,9 @@ class CollectiveIdentityService:
                 "member_recovery_required": True,
                 "member_recovery_binding_profile": COLLECTIVE_DISSOLUTION_RECOVERY_BINDING_PROFILE_ID,
                 "identity_confirmation_profile": COLLECTIVE_IDENTITY_CONFIRMATION_PROFILE_ID,
+                "member_recovery_verifier_transport_profile": (
+                    COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
             },
         }
@@ -296,6 +308,74 @@ class CollectiveIdentityService:
         record["dissolved_at"] = dissolved_at
         record["last_dissolution"] = receipt
         return deepcopy(receipt)
+
+    def bind_recovery_verifier_transport(
+        self,
+        dissolution_receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        dissolution_validation = self.validate_dissolution_receipt(dissolution_receipt)
+        if not dissolution_validation["ok"]:
+            raise ValueError(
+                "dissolution_receipt must pass validation before verifier transport binding"
+            )
+
+        collective_id = str(dissolution_receipt["collective_id"])
+        recovery_proofs = dissolution_receipt["member_recovery_proofs"]
+        member_ids = list(dissolution_receipt["member_confirmations"])
+        member_recovery_binding_digest = str(
+            dissolution_receipt["member_recovery_binding_digest"]
+        )
+        dissolution_receipt_digest = sha256_text(canonical_json(dissolution_receipt))
+        recorded_at = utc_now_iso()
+
+        verifier_receipts: Dict[str, Dict[str, Any]] = {}
+        verifier_digest_set: List[str] = []
+        for index, member_id in enumerate(member_ids):
+            proof = recovery_proofs[member_id]
+            receipt = self._build_member_recovery_verifier_transport_receipt(
+                collective_id=collective_id,
+                member_id=member_id,
+                proof=proof,
+                member_recovery_binding_digest=member_recovery_binding_digest,
+                dissolution_receipt_digest=dissolution_receipt_digest,
+                recorded_at=recorded_at,
+                index=index,
+            )
+            verifier_receipts[member_id] = receipt
+            verifier_digest_set.append(receipt["digest"])
+
+        binding_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID,
+                    "collective_id": collective_id,
+                    "member_ids": member_ids,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                    "member_recovery_binding_digest": member_recovery_binding_digest,
+                    "verifier_transport_digest_set": verifier_digest_set,
+                }
+            )
+        )
+        return {
+            "kind": "collective_recovery_verifier_transport_binding",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID,
+            "collective_id": collective_id,
+            "recorded_at": recorded_at,
+            "status": "verified",
+            "dissolution_receipt_digest": dissolution_receipt_digest,
+            "member_recovery_binding_digest": member_recovery_binding_digest,
+            "member_recovery_confirmation_digest_set": list(
+                dissolution_receipt["member_recovery_confirmation_digest_set"]
+            ),
+            "verifier_transport_receipts": verifier_receipts,
+            "verifier_transport_digest_set": verifier_digest_set,
+            "verifier_transport_binding_digest": binding_digest,
+            "verifier_transport_receipt_count": len(verifier_receipts),
+            "all_member_recovery_proofs_transport_bound": True,
+            "all_verifier_transport_receipts_verified": True,
+            "raw_verifier_payload_stored": False,
+        }
 
     def snapshot(self, collective_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_record(collective_id))
@@ -570,6 +650,184 @@ class CollectiveIdentityService:
             and bool(receipt.get("audit_event_ref")),
         }
 
+    def validate_recovery_verifier_transport_binding(
+        self,
+        binding: Mapping[str, Any],
+        dissolution_receipt: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(binding, Mapping):
+            raise ValueError("binding must be a mapping")
+
+        self._check_non_empty_string(binding.get("collective_id"), "collective_id", errors)
+        self._check_non_empty_string(binding.get("recorded_at"), "recorded_at", errors)
+        if binding.get("kind") != "collective_recovery_verifier_transport_binding":
+            errors.append("kind must equal collective_recovery_verifier_transport_binding")
+        if binding.get("schema_version") != "1.0.0":
+            errors.append("schema_version must equal 1.0.0")
+        if binding.get("profile_id") != COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID:
+            errors.append(
+                f"profile_id must equal {COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID}"
+            )
+        if binding.get("status") != "verified":
+            errors.append("status must equal verified")
+        if binding.get("raw_verifier_payload_stored") is not False:
+            errors.append("raw_verifier_payload_stored must be false")
+
+        if dissolution_receipt is not None:
+            dissolution_validation = self.validate_dissolution_receipt(dissolution_receipt)
+            if not dissolution_validation["ok"]:
+                errors.append("dissolution_receipt must validate before transport binding")
+            expected_dissolution_digest = sha256_text(canonical_json(dissolution_receipt))
+            member_ids = list(dissolution_receipt.get("member_confirmations", {}))
+            recovery_proofs = dissolution_receipt.get("member_recovery_proofs", {})
+            expected_member_recovery_binding_digest = dissolution_receipt.get(
+                "member_recovery_binding_digest"
+            )
+            expected_recovery_digest_set = dissolution_receipt.get(
+                "member_recovery_confirmation_digest_set"
+            )
+        else:
+            expected_dissolution_digest = binding.get("dissolution_receipt_digest")
+            member_ids = list(binding.get("verifier_transport_receipts", {}))
+            recovery_proofs = {}
+            expected_member_recovery_binding_digest = binding.get(
+                "member_recovery_binding_digest"
+            )
+            expected_recovery_digest_set = binding.get(
+                "member_recovery_confirmation_digest_set"
+            )
+
+        dissolution_digest_bound = (
+            binding.get("dissolution_receipt_digest") == expected_dissolution_digest
+            and self._looks_like_digest(binding.get("dissolution_receipt_digest"))
+        )
+        if not dissolution_digest_bound:
+            errors.append("dissolution_receipt_digest must match the dissolution receipt")
+
+        member_recovery_binding_digest_bound = (
+            binding.get("member_recovery_binding_digest")
+            == expected_member_recovery_binding_digest
+            and self._looks_like_digest(binding.get("member_recovery_binding_digest"))
+        )
+        if not member_recovery_binding_digest_bound:
+            errors.append("member_recovery_binding_digest must match dissolution receipt")
+
+        recovery_digest_set_bound = (
+            binding.get("member_recovery_confirmation_digest_set")
+            == expected_recovery_digest_set
+        )
+        if not recovery_digest_set_bound:
+            errors.append("member_recovery_confirmation_digest_set must match dissolution receipt")
+
+        verifier_receipts = binding.get("verifier_transport_receipts")
+        if not isinstance(verifier_receipts, Mapping):
+            errors.append("verifier_transport_receipts must be an object")
+            verifier_receipts_bound = False
+            verifier_digest_set_bound = False
+        else:
+            verifier_receipts_bound = set(verifier_receipts) == set(member_ids)
+            if not verifier_receipts_bound:
+                errors.append("verifier_transport_receipts must include exactly every member")
+            digest_set: List[str] = []
+            for member_id in member_ids:
+                receipt = verifier_receipts.get(member_id)
+                if not isinstance(receipt, Mapping):
+                    errors.append(f"verifier_transport_receipts[{member_id}] must be an object")
+                    verifier_receipts_bound = False
+                    continue
+                proof = recovery_proofs.get(member_id, {}) if isinstance(recovery_proofs, Mapping) else {}
+                receipt_ok = self._validate_member_recovery_verifier_transport_receipt(
+                    receipt,
+                    member_id=member_id,
+                    proof=proof if isinstance(proof, Mapping) else {},
+                    member_recovery_binding_digest=str(
+                        expected_member_recovery_binding_digest
+                    ),
+                    dissolution_receipt_digest=str(expected_dissolution_digest),
+                    errors=errors,
+                )
+                verifier_receipts_bound = verifier_receipts_bound and receipt_ok
+                if self._looks_like_digest(receipt.get("digest")):
+                    digest_set.append(str(receipt["digest"]))
+            verifier_digest_set_bound = binding.get("verifier_transport_digest_set") == digest_set
+            if not verifier_digest_set_bound:
+                errors.append("verifier_transport_digest_set must match member receipt order")
+            if binding.get("verifier_transport_receipt_count") != len(verifier_receipts):
+                errors.append(
+                    "verifier_transport_receipt_count must match verifier receipt count"
+                )
+                verifier_receipts_bound = False
+
+        expected_binding_digest = None
+        if isinstance(binding.get("verifier_transport_digest_set"), list):
+            expected_binding_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID,
+                        "collective_id": binding.get("collective_id"),
+                        "member_ids": member_ids,
+                        "dissolution_receipt_digest": binding.get(
+                            "dissolution_receipt_digest"
+                        ),
+                        "member_recovery_binding_digest": binding.get(
+                            "member_recovery_binding_digest"
+                        ),
+                        "verifier_transport_digest_set": binding.get(
+                            "verifier_transport_digest_set"
+                        ),
+                    }
+                )
+            )
+        verifier_transport_binding_digest_bound = (
+            isinstance(expected_binding_digest, str)
+            and binding.get("verifier_transport_binding_digest") == expected_binding_digest
+        )
+        if not verifier_transport_binding_digest_bound:
+            errors.append("verifier_transport_binding_digest must match transport receipt set")
+
+        all_member_recovery_proofs_transport_bound = (
+            verifier_receipts_bound
+            and verifier_digest_set_bound
+            and member_recovery_binding_digest_bound
+            and binding.get("all_member_recovery_proofs_transport_bound") is True
+        )
+        if not all_member_recovery_proofs_transport_bound:
+            errors.append("all_member_recovery_proofs_transport_bound must be true")
+
+        all_verifier_transport_receipts_verified = (
+            isinstance(verifier_receipts, Mapping)
+            and all(
+                isinstance(receipt, Mapping) and receipt.get("receipt_status") == "verified"
+                for receipt in verifier_receipts.values()
+            )
+            and binding.get("all_verifier_transport_receipts_verified") is True
+        )
+        if not all_verifier_transport_receipts_verified:
+            errors.append("all_verifier_transport_receipts_verified must be true")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_bound": (
+                binding.get("profile_id")
+                == COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID
+            ),
+            "dissolution_receipt_digest_bound": dissolution_digest_bound,
+            "member_recovery_binding_digest_bound": member_recovery_binding_digest_bound,
+            "member_recovery_confirmation_digest_set_bound": recovery_digest_set_bound,
+            "verifier_transport_receipts_bound": verifier_receipts_bound,
+            "verifier_transport_digest_set_bound": verifier_digest_set_bound,
+            "verifier_transport_binding_digest_bound": (
+                verifier_transport_binding_digest_bound
+            ),
+            "all_member_recovery_proofs_transport_bound": (
+                all_member_recovery_proofs_transport_bound
+            ),
+            "all_verifier_transport_receipts_verified": all_verifier_transport_receipts_verified,
+            "raw_verifier_payload_stored": binding.get("raw_verifier_payload_stored") is True,
+        }
+
     def _derive_member_recovery_proofs(
         self,
         identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
@@ -645,6 +903,222 @@ class CollectiveIdentityService:
                 "raw_profile_stored": False,
             }
         return recovery_proofs
+
+    def _build_member_recovery_verifier_transport_receipt(
+        self,
+        *,
+        collective_id: str,
+        member_id: str,
+        proof: Mapping[str, Any],
+        member_recovery_binding_digest: str,
+        dissolution_receipt_digest: str,
+        recorded_at: str,
+        index: int,
+    ) -> Dict[str, Any]:
+        jurisdiction = COLLECTIVE_RECOVERY_VERIFIER_JURISDICTIONS[
+            index % len(COLLECTIVE_RECOVERY_VERIFIER_JURISDICTIONS)
+        ]
+        suffix = sha256_text(
+            canonical_json(
+                {
+                    "collective_id": collective_id,
+                    "member_id": member_id,
+                    "identity_confirmation_digest": proof["identity_confirmation_digest"],
+                    "member_recovery_binding_digest": member_recovery_binding_digest,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                    "jurisdiction": jurisdiction,
+                }
+            )
+        )[:12]
+        challenge_ref = f"challenge://collective-recovery/{collective_id}/{member_id}/{suffix}"
+        challenge_digest = sha256_text(
+            canonical_json(
+                {
+                    "challenge_ref": challenge_ref,
+                    "identity_confirmation_digest": proof["identity_confirmation_digest"],
+                    "member_recovery_binding_digest": member_recovery_binding_digest,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                }
+            )
+        )
+        request_payload_digest = sha256_text(
+            canonical_json(
+                {
+                    "payload_kind": "collective-recovery-verifier-request",
+                    "member_id": member_id,
+                    "identity_confirmation_ref": proof["identity_confirmation_ref"],
+                    "challenge_digest": challenge_digest,
+                }
+            )
+        )
+        response_payload_digest = sha256_text(
+            canonical_json(
+                {
+                    "payload_kind": "collective-recovery-verifier-response",
+                    "member_id": member_id,
+                    "receipt_status": "verified",
+                    "challenge_digest": challenge_digest,
+                    "request_payload_digest": request_payload_digest,
+                }
+            )
+        )
+        exchange_digest = sha256_text(
+            canonical_json(
+                {
+                    "exchange_id": f"verifier-transport-exchange-{suffix}",
+                    "challenge_digest": challenge_digest,
+                    "request_payload_digest": request_payload_digest,
+                    "response_payload_digest": response_payload_digest,
+                }
+            )
+        )
+        receipt = {
+            "kind": "collective_recovery_verifier_transport_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": f"collective-recovery-verifier-receipt-{suffix}",
+            "collective_id": collective_id,
+            "member_id": member_id,
+            "profile_id": COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID,
+            "identity_confirmation_ref": proof["identity_confirmation_ref"],
+            "identity_confirmation_digest": proof["identity_confirmation_digest"],
+            "self_report_witness_consistency_digest": proof[
+                "self_report_witness_consistency_digest"
+            ],
+            "member_recovery_binding_digest": member_recovery_binding_digest,
+            "dissolution_receipt_digest": dissolution_receipt_digest,
+            "verifier_network_receipt_id": f"verifier-network-receipt-{suffix}",
+            "verifier_ref": f"verifier://collective-recovery/{jurisdiction}/{suffix}",
+            "verifier_endpoint": f"verifier://collective-recovery/{jurisdiction.lower()}",
+            "jurisdiction": jurisdiction,
+            "network_profile_id": COLLECTIVE_VERIFIER_NETWORK_PROFILE_ID,
+            "transport_profile": COLLECTIVE_VERIFIER_TRANSPORT_PROFILE,
+            "transport_exchange_profile_id": COLLECTIVE_VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID,
+            "transport_exchange_id": f"verifier-transport-exchange-{suffix}",
+            "transport_exchange_digest": exchange_digest,
+            "challenge_ref": challenge_ref,
+            "challenge_digest": challenge_digest,
+            "request_payload_ref": f"sealed://collective-recovery/{member_id}/request/{suffix}",
+            "request_payload_digest": request_payload_digest,
+            "response_payload_ref": f"sealed://collective-recovery/{member_id}/response/{suffix}",
+            "response_payload_digest": response_payload_digest,
+            "receipt_status": "verified",
+            "observed_latency_ms": 42.0 + index,
+            "recorded_at": recorded_at,
+            "raw_verifier_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(self._member_recovery_verifier_transport_receipt_digest_payload(receipt))
+        )
+        return receipt
+
+    def _validate_member_recovery_verifier_transport_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        member_id: str,
+        proof: Mapping[str, Any],
+        member_recovery_binding_digest: str,
+        dissolution_receipt_digest: str,
+        errors: List[str],
+    ) -> bool:
+        ok = True
+        expected_fields = {
+            "kind": "collective_recovery_verifier_transport_receipt",
+            "schema_version": "1.0.0",
+            "member_id": member_id,
+            "profile_id": COLLECTIVE_RECOVERY_VERIFIER_TRANSPORT_PROFILE_ID,
+            "member_recovery_binding_digest": member_recovery_binding_digest,
+            "dissolution_receipt_digest": dissolution_receipt_digest,
+            "network_profile_id": COLLECTIVE_VERIFIER_NETWORK_PROFILE_ID,
+            "transport_profile": COLLECTIVE_VERIFIER_TRANSPORT_PROFILE,
+            "transport_exchange_profile_id": COLLECTIVE_VERIFIER_TRANSPORT_EXCHANGE_PROFILE_ID,
+            "receipt_status": "verified",
+        }
+        for field_name, expected in expected_fields.items():
+            if receipt.get(field_name) != expected:
+                errors.append(
+                    f"verifier_transport_receipts[{member_id}].{field_name} must equal {expected}"
+                )
+                ok = False
+        if proof:
+            for field_name in (
+                "identity_confirmation_ref",
+                "identity_confirmation_digest",
+                "self_report_witness_consistency_digest",
+            ):
+                if receipt.get(field_name) != proof.get(field_name):
+                    errors.append(
+                        f"verifier_transport_receipts[{member_id}].{field_name} "
+                        "must match member recovery proof"
+                    )
+                    ok = False
+        digest_fields = (
+            "identity_confirmation_digest",
+            "self_report_witness_consistency_digest",
+            "member_recovery_binding_digest",
+            "dissolution_receipt_digest",
+            "transport_exchange_digest",
+            "challenge_digest",
+            "request_payload_digest",
+            "response_payload_digest",
+            "digest",
+        )
+        for field_name in digest_fields:
+            if not self._looks_like_digest(receipt.get(field_name)):
+                errors.append(
+                    f"verifier_transport_receipts[{member_id}].{field_name} must be sha256 hex"
+                )
+                ok = False
+        if receipt.get("raw_verifier_payload_stored") is not False:
+            errors.append(
+                f"verifier_transport_receipts[{member_id}].raw_verifier_payload_stored must be false"
+            )
+            ok = False
+        if not isinstance(receipt.get("observed_latency_ms"), (int, float)):
+            errors.append(
+                f"verifier_transport_receipts[{member_id}].observed_latency_ms must be numeric"
+            )
+            ok = False
+        expected_digest = sha256_text(
+            canonical_json(self._member_recovery_verifier_transport_receipt_digest_payload(receipt))
+        )
+        if receipt.get("digest") != expected_digest:
+            errors.append(f"verifier_transport_receipts[{member_id}].digest mismatch")
+            ok = False
+        return ok
+
+    @staticmethod
+    def _member_recovery_verifier_transport_receipt_digest_payload(
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "receipt_id": receipt.get("receipt_id"),
+            "collective_id": receipt.get("collective_id"),
+            "member_id": receipt.get("member_id"),
+            "profile_id": receipt.get("profile_id"),
+            "identity_confirmation_digest": receipt.get("identity_confirmation_digest"),
+            "self_report_witness_consistency_digest": receipt.get(
+                "self_report_witness_consistency_digest"
+            ),
+            "member_recovery_binding_digest": receipt.get(
+                "member_recovery_binding_digest"
+            ),
+            "dissolution_receipt_digest": receipt.get("dissolution_receipt_digest"),
+            "verifier_network_receipt_id": receipt.get("verifier_network_receipt_id"),
+            "verifier_ref": receipt.get("verifier_ref"),
+            "jurisdiction": receipt.get("jurisdiction"),
+            "network_profile_id": receipt.get("network_profile_id"),
+            "transport_profile": receipt.get("transport_profile"),
+            "transport_exchange_profile_id": receipt.get(
+                "transport_exchange_profile_id"
+            ),
+            "transport_exchange_digest": receipt.get("transport_exchange_digest"),
+            "challenge_digest": receipt.get("challenge_digest"),
+            "request_payload_digest": receipt.get("request_payload_digest"),
+            "response_payload_digest": receipt.get("response_payload_digest"),
+            "receipt_status": receipt.get("receipt_status"),
+            "raw_verifier_payload_stored": receipt.get("raw_verifier_payload_stored"),
+        }
 
     def _require_record(self, collective_id: str) -> Dict[str, Any]:
         collective = self._normalize_non_empty_string(collective_id, "collective_id")

@@ -7674,11 +7674,20 @@ json.dump(response, sys.stdout)
             identity_confirmation_profiles=member_recovery_profiles,
             reason="bounded merge session ended and both members recovered independent subjectivity",
         )
+        recovery_verifier_transport = self.collective.bind_recovery_verifier_transport(
+            dissolution
+        )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
         collective_validation = self.collective.validate_record(final_collective)
         merge_validation = self.collective.validate_merge_session(final_merge)
         dissolution_validation = self.collective.validate_dissolution_receipt(dissolution)
+        recovery_verifier_transport_validation = (
+            self.collective.validate_recovery_verifier_transport_binding(
+                recovery_verifier_transport,
+                dissolution,
+            )
+        )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
 
         self.ledger.append(
@@ -7775,11 +7784,40 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.recovery_verifier_transport.bound",
+            payload={
+                "collective_id": recovery_verifier_transport["collective_id"],
+                "profile_id": recovery_verifier_transport["profile_id"],
+                "dissolution_receipt_digest": recovery_verifier_transport[
+                    "dissolution_receipt_digest"
+                ],
+                "member_recovery_binding_digest": recovery_verifier_transport[
+                    "member_recovery_binding_digest"
+                ],
+                "verifier_transport_digest_set": recovery_verifier_transport[
+                    "verifier_transport_digest_set"
+                ],
+                "verifier_transport_binding_digest": recovery_verifier_transport[
+                    "verifier_transport_binding_digest"
+                ],
+                "raw_verifier_payload_stored": recovery_verifier_transport[
+                    "raw_verifier_payload_stored"
+                ],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective-dissolution",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         validation = {
             "ok": collective_validation["ok"]
             and merge_validation["ok"]
             and dissolution_validation["ok"]
+            and recovery_verifier_transport_validation["ok"]
             and all(validation["ok"] for validation in member_recovery_validations.values()),
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
@@ -7809,6 +7847,40 @@ json.dump(response, sys.stdout)
                 validation["ok"] for validation in member_recovery_validations.values()
             ),
             "dissolution_audit_bound": dissolution_validation["audit_bound"],
+            "recovery_verifier_transport_bound": (
+                recovery_verifier_transport_validation["ok"]
+            ),
+            "recovery_verifier_transport_profile_bound": (
+                recovery_verifier_transport_validation["profile_bound"]
+            ),
+            "recovery_verifier_transport_dissolution_digest_bound": (
+                recovery_verifier_transport_validation[
+                    "dissolution_receipt_digest_bound"
+                ]
+            ),
+            "recovery_verifier_transport_member_binding_digest_bound": (
+                recovery_verifier_transport_validation[
+                    "member_recovery_binding_digest_bound"
+                ]
+            ),
+            "recovery_verifier_transport_digest_set_bound": (
+                recovery_verifier_transport_validation[
+                    "verifier_transport_digest_set_bound"
+                ]
+            ),
+            "recovery_verifier_transport_binding_digest_bound": (
+                recovery_verifier_transport_validation[
+                    "verifier_transport_binding_digest_bound"
+                ]
+            ),
+            "recovery_verifier_transport_all_receipts_verified": (
+                recovery_verifier_transport_validation[
+                    "all_verifier_transport_receipts_verified"
+                ]
+            ),
+            "recovery_verifier_transport_raw_payload_stored": (
+                recovery_verifier_transport_validation["raw_verifier_payload_stored"]
+            ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
         }
@@ -7838,6 +7910,7 @@ json.dump(response, sys.stdout)
                 "identity_confirmation_profiles": member_recovery_profiles,
                 "validations": member_recovery_validations,
             },
+            "recovery_verifier_transport": recovery_verifier_transport,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

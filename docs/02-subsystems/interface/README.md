@@ -27,7 +27,8 @@
 - merge 後の `private_reality` 退避と member recovery
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
   で collective formation、merge window cap、WMS private escape、
-  identity confirmation、dissolution をまとめて検証する
+  identity confirmation、dissolution、recovery verifier transport binding を
+  まとめて検証する
 
 ### World Model Sync (WMS)
 - 外界状態の同期
