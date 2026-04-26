@@ -14,6 +14,7 @@ imports:
   wms_engine_transaction_log: ../schemas/wms_engine_transaction_log.schema
   wms_engine_route_binding_receipt: ../schemas/wms_engine_route_binding_receipt.schema
   wms_engine_capture_binding_receipt: ../schemas/wms_engine_capture_binding_receipt.schema
+  distributed_transport_authority_route_trace: ../schemas/distributed_transport_authority_route_trace.schema
   wms_authority_slo_probe_receipt: ../schemas/wms_authority_slo_probe_receipt.schema
   wms_authority_slo_probe_quorum_receipt: ../schemas/wms_authority_slo_probe_quorum_receipt.schema
   wms_authority_slo_quorum_threshold_policy_receipt: ../schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema
@@ -331,6 +332,7 @@ operations:
         required:
           - authority_slo_probe_receipts
           - primary_probe_digest
+          - authority_route_trace
         properties:
           authority_slo_probe_receipts:
             type: array
@@ -340,6 +342,8 @@ operations:
           primary_probe_digest:
             type: string
             pattern: "^[0-9a-f]{64}$"
+          authority_route_trace:
+            schema_ref: distributed_transport_authority_route_trace
           required_quorum_count:
             type: integer
             minimum: 2
@@ -352,9 +356,11 @@ operations:
       - quorum can complete only when at least two live-bound SLO probe receipts are accepted
       - accepted probes must cover at least two authority refs and two remote jurisdictions
       - primary_probe_digest must be one of the accepted live probe digests
+      - authority_route_trace must be an authenticated non-loopback distributed transport trace whose route_binding_refs exactly cover quorum route_refs
+      - authority_slo_transport_trace_bound and authority_slo_transport_cross_host_bound must be true before quorum_status can become complete
       - required_quorum_count and required_jurisdiction_count must be sourced from signed-authority-slo-quorum-threshold-policy-v1 registry policy evidence
       - threshold_policy_receipt must bind signer_roster_digest, signer_roster_verifier_response_set_digest, and revocation_registry_digest before quorum_status can become complete
-      - raw threshold policy, signer roster, revocation registry, authority, and SLO payloads must not be stored
+      - raw threshold policy, signer roster, revocation registry, authority, route trace, and SLO payloads must not be stored
       - quorum receipt must bind accepted probe, authority, jurisdiction, route, SLO snapshot, registry, and network response digest sets without storing raw SLO payloads
   bind_remote_authority_retry_budget:
     summary: Bind recovered remote authority partial-outage retries to a signed, jurisdiction-aware adaptive retry budget and engine transaction evidence.

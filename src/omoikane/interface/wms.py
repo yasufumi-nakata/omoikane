@@ -76,6 +76,12 @@ WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE = (
     "authority-slo-probe-quorum-digest-v1"
 )
 WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES = 2
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_POLICY_ID = (
+    "authority-slo-quorum-non-loopback-transport-binding-v1"
+)
+WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_DIGEST_PROFILE = (
+    "authority-slo-quorum-transport-binding-digest-v1"
+)
 WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_POLICY_ID = (
     "signed-authority-slo-quorum-threshold-policy-v1"
 )
@@ -1868,6 +1874,7 @@ class WorldModelSync:
         self,
         authority_slo_probe_receipts: Sequence[Mapping[str, Any]],
         *,
+        authority_route_trace: Mapping[str, Any],
         primary_probe_digest: str | None = None,
         required_quorum_count: int = WMS_REMOTE_AUTHORITY_SLO_QUORUM_MIN_AUTHORITIES,
         threshold_policy_receipt: Mapping[str, Any] | None = None,
@@ -1912,6 +1919,25 @@ class WorldModelSync:
         )
         route_refs = _dedupe_preserve_order(
             [str(probe["route_ref"]) for probe in accepted_probes]
+        )
+        route_trace = deepcopy(authority_route_trace)
+        route_trace_validation = self._validate_engine_authority_route_trace(
+            route_trace
+        )
+        if not route_trace_validation["ok"]:
+            raise ValueError("authority_route_trace must validate")
+        transport_route_binding_refs = list(
+            route_trace_validation["route_binding_refs"]
+        )
+        transport_remote_host_refs = list(route_trace_validation["remote_host_refs"])
+        transport_remote_host_attestation_refs = list(
+            route_trace_validation["remote_host_attestation_refs"]
+        )
+        transport_os_observer_tuple_digests = list(
+            route_trace_validation["os_observer_tuple_digests"]
+        )
+        transport_os_observer_host_binding_digests = list(
+            route_trace_validation["os_observer_host_binding_digests"]
         )
         jurisdiction_policy_registry_refs = _dedupe_preserve_order(
             [str(probe["jurisdiction_policy_registry_ref"]) for probe in accepted_probes]
@@ -1979,6 +2005,21 @@ class WorldModelSync:
             and probe.get("raw_slo_payload_stored") is False
             for probe in accepted_probes
         )
+        authority_slo_transport_trace_bound = bool(
+            route_trace_validation["ok"]
+            and route_trace_validation["digest_bound"]
+            and route_trace_validation["cross_host_route_bound"]
+            and route_refs == transport_route_binding_refs
+            and len(transport_route_binding_refs) >= normalized_required_count
+            and len(set(transport_remote_host_refs)) >= normalized_required_count
+        )
+        authority_slo_transport_cross_host_bound = bool(
+            authority_slo_transport_trace_bound
+            and route_trace.get("cross_host_verified") is True
+            and route_trace.get("non_loopback_verified") is True
+            and route_trace.get("os_observer_complete") is True
+            and route_trace.get("route_target_discovery_bound") is True
+        )
         primary_probe_covered = normalized_primary_digest in accepted_probe_digests
         quorum_bound = bool(
             all_probes_live_bound
@@ -1986,6 +2027,8 @@ class WorldModelSync:
             and multi_authority_bound
             and multi_jurisdiction_bound
             and threshold_source_bound
+            and authority_slo_transport_trace_bound
+            and authority_slo_transport_cross_host_bound
         )
         receipt = {
             "kind": "wms_authority_slo_probe_quorum_receipt",
@@ -2015,6 +2058,57 @@ class WorldModelSync:
             ),
             "route_refs": route_refs,
             "route_ref_set_digest": sha256_text(canonical_json(route_refs)),
+            "transport_binding_policy_id": (
+                WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_POLICY_ID
+            ),
+            "transport_binding_digest_profile": (
+                WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_DIGEST_PROFILE
+            ),
+            "authority_route_trace_ref": route_trace["trace_ref"],
+            "authority_route_trace_digest": route_trace["digest"],
+            "authority_plane_ref": route_trace["authority_plane_ref"],
+            "authority_plane_digest": route_trace["authority_plane_digest"],
+            "route_target_discovery_ref": route_trace["route_target_discovery_ref"],
+            "route_target_discovery_digest": route_trace[
+                "route_target_discovery_digest"
+            ],
+            "council_tier": route_trace["council_tier"],
+            "transport_profile": route_trace["transport_profile"],
+            "trace_profile": route_trace["trace_profile"],
+            "socket_trace_profile": route_trace["socket_trace_profile"],
+            "os_observer_profile": route_trace["os_observer_profile"],
+            "cross_host_binding_profile": route_trace["cross_host_binding_profile"],
+            "route_target_discovery_profile": route_trace[
+                "route_target_discovery_profile"
+            ],
+            "transport_route_binding_refs": transport_route_binding_refs,
+            "transport_route_binding_set_digest": sha256_text(
+                canonical_json(transport_route_binding_refs)
+            ),
+            "transport_remote_host_refs": transport_remote_host_refs,
+            "transport_remote_host_attestation_refs": (
+                transport_remote_host_attestation_refs
+            ),
+            "transport_os_observer_tuple_digests": (
+                transport_os_observer_tuple_digests
+            ),
+            "transport_os_observer_host_binding_digests": (
+                transport_os_observer_host_binding_digests
+            ),
+            "transport_route_count": route_trace["route_count"],
+            "transport_mtls_authenticated_count": route_trace[
+                "mtls_authenticated_count"
+            ],
+            "transport_distinct_remote_host_count": route_trace[
+                "distinct_remote_host_count"
+            ],
+            "authority_slo_transport_trace_bound": (
+                authority_slo_transport_trace_bound
+            ),
+            "authority_slo_transport_cross_host_bound": (
+                authority_slo_transport_cross_host_bound
+            ),
+            "raw_transport_payload_stored": False,
             "jurisdiction_policy_registry_refs": jurisdiction_policy_registry_refs,
             "jurisdiction_policy_registry_digests": jurisdiction_policy_registry_digests,
             "jurisdiction_policy_registry_set_digest": sha256_text(
@@ -2082,6 +2176,8 @@ class WorldModelSync:
     def validate_authority_slo_probe_quorum_receipt(
         self,
         receipt: Mapping[str, Any],
+        *,
+        authority_route_trace: Mapping[str, Any],
     ) -> Dict[str, Any]:
         errors: List[str] = []
         if not isinstance(receipt, Mapping):
@@ -2203,6 +2299,115 @@ class WorldModelSync:
             if receipt.get(field_name) != expected_value:
                 errors.append(f"{field_name} must match live SLO probe quorum inputs")
 
+        route_trace_validation = {
+            "ok": False,
+            "digest_bound": False,
+            "cross_host_route_bound": False,
+            "route_binding_refs": [],
+            "remote_host_refs": [],
+            "remote_host_attestation_refs": [],
+            "os_observer_tuple_digests": [],
+            "os_observer_host_binding_digests": [],
+        }
+        route_trace: Mapping[str, Any] = {}
+        if not isinstance(authority_route_trace, Mapping):
+            errors.append("authority_route_trace must be an object")
+        else:
+            route_trace = authority_route_trace
+            route_trace_validation = self._validate_engine_authority_route_trace(
+                route_trace
+            )
+            if not route_trace_validation["ok"]:
+                errors.append("authority_route_trace must validate")
+        transport_route_binding_refs = list(
+            route_trace_validation["route_binding_refs"]
+        )
+        transport_remote_host_refs = list(route_trace_validation["remote_host_refs"])
+        transport_expected_values = {
+            "transport_binding_policy_id": (
+                WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_POLICY_ID
+            ),
+            "transport_binding_digest_profile": (
+                WMS_REMOTE_AUTHORITY_SLO_QUORUM_TRANSPORT_BINDING_DIGEST_PROFILE
+            ),
+            "authority_route_trace_ref": route_trace.get("trace_ref"),
+            "authority_route_trace_digest": route_trace.get("digest"),
+            "authority_plane_ref": route_trace.get("authority_plane_ref"),
+            "authority_plane_digest": route_trace.get("authority_plane_digest"),
+            "route_target_discovery_ref": route_trace.get(
+                "route_target_discovery_ref"
+            ),
+            "route_target_discovery_digest": route_trace.get(
+                "route_target_discovery_digest"
+            ),
+            "council_tier": route_trace.get("council_tier"),
+            "transport_profile": route_trace.get("transport_profile"),
+            "trace_profile": route_trace.get("trace_profile"),
+            "socket_trace_profile": route_trace.get("socket_trace_profile"),
+            "os_observer_profile": route_trace.get("os_observer_profile"),
+            "cross_host_binding_profile": route_trace.get(
+                "cross_host_binding_profile"
+            ),
+            "route_target_discovery_profile": route_trace.get(
+                "route_target_discovery_profile"
+            ),
+            "transport_route_binding_refs": transport_route_binding_refs,
+            "transport_route_binding_set_digest": sha256_text(
+                canonical_json(transport_route_binding_refs)
+            ),
+            "transport_remote_host_refs": transport_remote_host_refs,
+            "transport_remote_host_attestation_refs": route_trace_validation[
+                "remote_host_attestation_refs"
+            ],
+            "transport_os_observer_tuple_digests": route_trace_validation[
+                "os_observer_tuple_digests"
+            ],
+            "transport_os_observer_host_binding_digests": route_trace_validation[
+                "os_observer_host_binding_digests"
+            ],
+            "transport_route_count": route_trace.get("route_count"),
+            "transport_mtls_authenticated_count": route_trace.get(
+                "mtls_authenticated_count"
+            ),
+            "transport_distinct_remote_host_count": route_trace.get(
+                "distinct_remote_host_count"
+            ),
+        }
+        for field_name, expected_value in transport_expected_values.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must match authority route trace")
+        authority_slo_transport_trace_bound = bool(
+            route_trace_validation["ok"]
+            and route_trace_validation["digest_bound"]
+            and route_trace_validation["cross_host_route_bound"]
+            and deduped_routes == transport_route_binding_refs
+            and len(transport_route_binding_refs) >= required_quorum_count
+            and len(set(transport_remote_host_refs)) >= required_quorum_count
+        )
+        authority_slo_transport_cross_host_bound = bool(
+            authority_slo_transport_trace_bound
+            and route_trace.get("cross_host_verified") is True
+            and route_trace.get("non_loopback_verified") is True
+            and route_trace.get("os_observer_complete") is True
+            and route_trace.get("route_target_discovery_bound") is True
+        )
+        if (
+            receipt.get("authority_slo_transport_trace_bound")
+            is not authority_slo_transport_trace_bound
+        ):
+            errors.append(
+                "authority_slo_transport_trace_bound must reflect route trace binding"
+            )
+        if (
+            receipt.get("authority_slo_transport_cross_host_bound")
+            is not authority_slo_transport_cross_host_bound
+        ):
+            errors.append(
+                "authority_slo_transport_cross_host_bound must reflect route trace binding"
+            )
+        if receipt.get("raw_transport_payload_stored") is not False:
+            errors.append("raw_transport_payload_stored must be false")
+
         threshold_policy = receipt.get("threshold_policy_receipt")
         threshold_policy_validation = {
             "ok": False,
@@ -2312,6 +2517,8 @@ class WorldModelSync:
             and multi_jurisdiction_bound
             and primary_probe_covered
             and threshold_source_bound
+            and authority_slo_transport_trace_bound
+            and authority_slo_transport_cross_host_bound
         )
         bool_expectations = {
             "all_probes_live_bound": all_probes_live_bound,
@@ -2320,6 +2527,12 @@ class WorldModelSync:
             "primary_probe_covered": primary_probe_covered,
             "threshold_policy_source_bound": threshold_source_bound,
             "threshold_policy_signature_bound": threshold_signature_bound,
+            "authority_slo_transport_trace_bound": (
+                authority_slo_transport_trace_bound
+            ),
+            "authority_slo_transport_cross_host_bound": (
+                authority_slo_transport_cross_host_bound
+            ),
             "quorum_bound": quorum_bound,
         }
         for field_name, expected_value in bool_expectations.items():
@@ -2355,6 +2568,15 @@ class WorldModelSync:
             ),
             "threshold_revocation_registry_bound": bool(
                 threshold_policy_validation["revocation_registry_bound"]
+            ),
+            "authority_slo_transport_trace_bound": (
+                authority_slo_transport_trace_bound
+            ),
+            "authority_slo_transport_cross_host_bound": (
+                authority_slo_transport_cross_host_bound
+            ),
+            "raw_transport_payload_redacted": (
+                receipt.get("raw_transport_payload_stored") is False
             ),
             "digest_bound": digest_bound,
             "raw_payload_redacted": receipt.get("raw_slo_payload_stored") is False,

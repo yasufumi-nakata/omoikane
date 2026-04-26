@@ -4,7 +4,8 @@ level: L6
 description: >
   World Model Sync の live authority SLO probe evidence が、primary retry probe
   だけでなく backup authority / remote jurisdiction も含む digest-only quorum
-  receipt に束縛され、raw SLO payload を保存しないことを確認する。
+  receipt と同じ non-loopback transport route trace に束縛され、raw SLO /
+  raw route trace payload を保存しないことを確認する。
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli wms-demo --json
@@ -14,6 +15,13 @@ expected:
   policy_id: multi-authority-slo-probe-quorum-v1
   quorum_profile: multi-jurisdiction-authority-slo-quorum-v1
   digest_profile: authority-slo-probe-quorum-digest-v1
+  transport_binding_policy_id: authority-slo-quorum-non-loopback-transport-binding-v1
+  transport_binding_digest_profile: authority-slo-quorum-transport-binding-digest-v1
+  trace_profile: non-loopback-mtls-authority-route-v1
+  socket_trace_profile: mtls-socket-trace-v1
+  os_observer_profile: os-native-tcp-observer-v1
+  cross_host_binding_profile: attested-cross-host-authority-binding-v1
+  route_target_discovery_profile: bounded-authority-route-target-discovery-v1
   threshold_policy_id: signed-authority-slo-quorum-threshold-policy-v1
   threshold_profile: jurisdiction-policy-registry-slo-quorum-threshold-v1
   threshold_digest_profile: authority-slo-quorum-threshold-policy-digest-v1
@@ -38,8 +46,14 @@ expected:
   multi_jurisdiction_bound: true
   all_probes_live_bound: true
   primary_probe_covered: true
+  authority_slo_transport_trace_bound: true
+  authority_slo_transport_cross_host_bound: true
+  transport_route_count: 2
+  transport_mtls_authenticated_count: 2
+  transport_distinct_remote_host_count: 2
   quorum_status: complete
   raw_slo_payload_stored: false
+  raw_transport_payload_stored: false
   raw_threshold_policy_payload_stored: false
   raw_threshold_signer_roster_payload_stored: false
   raw_threshold_revocation_registry_payload_stored: false

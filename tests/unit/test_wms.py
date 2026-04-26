@@ -840,9 +840,10 @@ class WorldModelSyncTests(unittest.TestCase):
             required_operations=["approval_fanout_bound"],
             source_artifact_digests={"approval_fanout_bound": fanout["digest"]},
         )
+        route_trace = self._authority_route_trace()
         route_health_observation = {
             "authority_ref": "authority://test/federation",
-            "route_ref": "route://test/federation/observer",
+            "route_ref": route_trace["route_bindings"][0]["route_binding_ref"],
             "participant_id": session["current_state"]["participants"][-1],
             "outage_kind": "timeout",
             "route_status": "partial-outage",
@@ -927,7 +928,7 @@ class WorldModelSyncTests(unittest.TestCase):
             )
         backup_route_health_observation = {
             "authority_ref": "authority://test/heritage",
-            "route_ref": "route://test/heritage/observer",
+            "route_ref": route_trace["route_bindings"][1]["route_binding_ref"],
             "participant_id": session["current_state"]["participants"][-1],
             "outage_kind": "timeout",
             "route_status": "recovered",
@@ -1049,6 +1050,7 @@ class WorldModelSyncTests(unittest.TestCase):
         )
         slo_quorum = sync.build_authority_slo_probe_quorum_receipt(
             [slo_probe, backup_slo_probe],
+            authority_route_trace=route_trace,
             primary_probe_digest=slo_probe["digest"],
             threshold_policy_receipt=slo_quorum_threshold_policy,
         )
@@ -1059,7 +1061,8 @@ class WorldModelSyncTests(unittest.TestCase):
             )
         )
         slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
-            slo_quorum
+            slo_quorum,
+            authority_route_trace=route_trace,
         )
         retry_budget = sync.build_remote_authority_retry_budget_receipt(
             session["session_id"],
@@ -1116,7 +1119,14 @@ class WorldModelSyncTests(unittest.TestCase):
         tampered_slo_quorum = dict(slo_quorum)
         tampered_slo_quorum["authority_slo_probe_receipts"] = [slo_probe]
         tampered_slo_quorum_validation = sync.validate_authority_slo_probe_quorum_receipt(
-            tampered_slo_quorum
+            tampered_slo_quorum,
+            authority_route_trace=route_trace,
+        )
+        tampered_route_trace = dict(route_trace)
+        tampered_route_trace["digest"] = sha256_text("tampered-slo-route-trace")
+        tampered_slo_route_validation = sync.validate_authority_slo_probe_quorum_receipt(
+            slo_quorum,
+            authority_route_trace=tampered_route_trace,
         )
         tampered_threshold_policy = dict(slo_quorum_threshold_policy)
         tampered_threshold_policy["required_authority_count"] = 3
@@ -1196,11 +1206,22 @@ class WorldModelSyncTests(unittest.TestCase):
             slo_quorum_validation["threshold_signer_roster_verifier_quorum_bound"]
         )
         self.assertTrue(slo_quorum_validation["threshold_revocation_registry_bound"])
+        self.assertTrue(slo_quorum_validation["authority_slo_transport_trace_bound"])
+        self.assertTrue(
+            slo_quorum_validation["authority_slo_transport_cross_host_bound"]
+        )
+        self.assertTrue(slo_quorum_validation["raw_transport_payload_redacted"])
         self.assertEqual(2, slo_quorum["accepted_probe_count"])
         self.assertEqual(2, slo_quorum["accepted_authority_count"])
         self.assertEqual(2, slo_quorum["accepted_jurisdiction_count"])
         self.assertEqual(2, slo_quorum["required_jurisdiction_count"])
         self.assertEqual(slo_probe["digest"], slo_quorum["primary_probe_digest"])
+        self.assertEqual(route_trace["digest"], slo_quorum["authority_route_trace_digest"])
+        self.assertEqual(
+            [binding["route_binding_ref"] for binding in route_trace["route_bindings"]],
+            slo_quorum["transport_route_binding_refs"],
+        )
+        self.assertEqual(slo_quorum["route_refs"], slo_quorum["transport_route_binding_refs"])
         self.assertEqual(
             slo_quorum_threshold_policy["digest"],
             slo_quorum["threshold_policy_digest"],
@@ -1235,6 +1256,7 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(slo_quorum["raw_threshold_signer_roster_payload_stored"])
         self.assertFalse(slo_quorum["raw_threshold_revocation_registry_payload_stored"])
         self.assertFalse(slo_quorum["raw_threshold_authority_payload_stored"])
+        self.assertFalse(slo_quorum["raw_transport_payload_stored"])
         self.assertTrue(retry_budget_validation["ok"])
         self.assertTrue(retry_budget_validation["adaptive_retry_budget_bound"])
         self.assertTrue(retry_budget_validation["engine_log_fanout_bound"])
@@ -1282,6 +1304,10 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_slo_probe_validation["authority_slo_live_probe_bound"])
         self.assertFalse(tampered_slo_quorum_validation["ok"])
         self.assertFalse(tampered_slo_quorum_validation["multi_jurisdiction_bound"])
+        self.assertFalse(tampered_slo_route_validation["ok"])
+        self.assertFalse(
+            tampered_slo_route_validation["authority_slo_transport_trace_bound"]
+        )
         self.assertFalse(tampered_threshold_policy_validation["ok"])
         self.assertFalse(tampered_threshold_policy_validation["policy_body_bound"])
         tampered_roster_policy = dict(slo_quorum_threshold_policy)

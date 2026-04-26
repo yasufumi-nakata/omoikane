@@ -989,7 +989,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to bind WMS live authority SLO probes into a multi-authority and multi-jurisdiction digest-only quorum before reviewers accept the primary retry SLO probe as durable evidence.
+    rationale: Required to bind WMS live authority SLO probes into a multi-authority and multi-jurisdiction digest-only quorum on the same non-loopback distributed transport route trace before reviewers accept the primary retry SLO probe as durable evidence.
   - priority: P1
     kind: schema
     file: specs/schemas/wms_authority_slo_quorum_threshold_policy_receipt.schema
@@ -1490,7 +1490,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects WMS authority SLO evidence by requiring the primary live SLO probe to be covered by a multi-authority and multi-jurisdiction digest-only quorum receipt.
+    rationale: Protects WMS authority SLO evidence by requiring the primary live SLO probe to be covered by a multi-authority and multi-jurisdiction digest-only quorum receipt bound to the same non-loopback route trace.
   - priority: P1
     kind: eval
     file: evals/interface/wms_participant_approval_transport.yaml

@@ -997,17 +997,19 @@ route binding ref set、PCAP artifact / readback digest、broker lease / filter 
 signed jurisdiction-specific rate limit digest、authority signature digest、
 remote authority route-health observation と
 `registry-bound-authority-retry-slo-v1` の jurisdiction policy registry digest、
-authority SLO snapshot digest、`registry-slo-derived-retry-schedule-v1` の
-schedule derivation、`live-authority-slo-snapshot-probe-v1` の live HTTP SLO probe receipt、
-`multi-authority-slo-probe-quorum-v1` の 2 authority / 2 jurisdiction quorum receipt、
-`signed-authority-slo-quorum-threshold-policy-v1` の signed threshold policy receipt、
+	authority SLO snapshot digest、`registry-slo-derived-retry-schedule-v1` の
+	schedule derivation、`live-authority-slo-snapshot-probe-v1` の live HTTP SLO probe receipt、
+	`multi-authority-slo-probe-quorum-v1` の 2 authority / 2 jurisdiction quorum receipt、
+	`authority-slo-quorum-non-loopback-transport-binding-v1` の
+	non-loopback route trace digest / route binding refs / OS observer digest set、
+	`signed-authority-slo-quorum-threshold-policy-v1` の signed threshold policy receipt、
 `authority-slo-quorum-threshold-signer-roster-v1` の signer roster digest、
 `authority-slo-threshold-signer-roster-live-verifier-quorum-v1` の verifier response set digest、
 `authority-slo-quorum-threshold-revocation-registry-v1` の revocation registry digest、
 `fixed-exponential-backoff-with-health-cap-v1` schedule entry へ束ね、
 engine transaction log の `approval_fanout_bound` entry と同じ fan-out digest を共有し、
-raw remote authority transcript と raw threshold policy / signer roster / revocation registry /
-authority verifier payload を保存しないことを確認する。
+	raw remote authority transcript と raw threshold policy / signer roster / revocation registry /
+	authority verifier payload / route trace payload を保存しないことを確認する。
 
 `sensory-loopback-demo` は L6 Sensory Loopback の reference contract
 (`interface.sensory_loopback.v0`) を JSON で可視化し、

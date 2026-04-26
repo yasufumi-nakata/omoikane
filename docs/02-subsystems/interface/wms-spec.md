@@ -122,7 +122,7 @@ wms.collect_distributed_approval_fanout(session_id, collection, transport_result
 wms.bind_engine_transaction_log(session_id, entries, engine_adapter_key_ref) → EngineTransactionLogReceipt
 wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
 wms.probe_remote_authority_slo_snapshot_endpoint(endpoint, route_health) → WMSAuthoritySLOProbeReceipt
-wms.build_authority_slo_probe_quorum(slo_probes, primary_probe_digest, threshold_policy_receipt) → WMSAuthoritySLOProbeQuorumReceipt
+wms.build_authority_slo_probe_quorum(slo_probes, primary_probe_digest, authority_route_trace, threshold_policy_receipt) → WMSAuthoritySLOProbeQuorumReceipt
 wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health, slo_probes) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt
@@ -160,6 +160,7 @@ wms.observe_violation(session_id) → ViolationReport
   partial outage retry を含む distributed Council transport fan-out →
   unanimous physics_rules change → rollback-token revert → engine transaction log →
   engine route binding → engine packet capture binding →
+  non-loopback transport trace-bound multi-authority SLO probe quorum →
   signed threshold policy-bound multi-authority SLO probe quorum →
   signed jurisdiction-aware remote authority retry budget →
   malicious veto → mode 切替を実行

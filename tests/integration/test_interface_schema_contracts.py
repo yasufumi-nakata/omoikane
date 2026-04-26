@@ -365,6 +365,21 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["remote_authority_slo_probe_quorum_bound"])
         self.assertTrue(
+            result["validation"]["remote_authority_slo_probe_quorum"][
+                "authority_slo_transport_trace_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_slo_probe_quorum"][
+                "authority_slo_transport_cross_host_bound"
+            ]
+        )
+        self.assertFalse(
+            result["scenarios"]["remote_authority_slo_probe_quorum_receipt"][
+                "raw_transport_payload_stored"
+            ]
+        )
+        self.assertTrue(
             result["validation"][
                 "remote_authority_slo_quorum_threshold_policy_bound"
             ]

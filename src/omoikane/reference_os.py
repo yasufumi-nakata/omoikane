@@ -10087,10 +10087,9 @@ json.dump(response, sys.stdout)
                 f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
             ),
             "authority_ref": "authority://federation/wms-approval",
-            "route_ref": (
-                "route://federation/wms-approval/observer/"
-                f"{approval_subject['digest'][:12]}"
-            ),
+            "route_ref": engine_authority_route_trace["route_bindings"][0][
+                "route_binding_ref"
+            ],
             "participant_id": observer.identity_id,
             "outage_kind": "timeout",
             "route_status": "partial-outage",
@@ -10186,10 +10185,9 @@ json.dump(response, sys.stdout)
                 f"{observer.identity_id.split('://', 1)[-1]}/timeout-1"
             ),
             "authority_ref": "authority://heritage/wms-approval",
-            "route_ref": (
-                "route://heritage/wms-approval/observer/"
-                f"{approval_subject['digest'][:12]}"
-            ),
+            "route_ref": engine_authority_route_trace["route_bindings"][1][
+                "route_binding_ref"
+            ],
             "participant_id": observer.identity_id,
             "outage_kind": "timeout",
             "route_status": "recovered",
@@ -10340,6 +10338,7 @@ json.dump(response, sys.stdout)
                     remote_authority_slo_probe_receipt,
                     backup_authority_slo_probe_receipt,
                 ],
+                authority_route_trace=engine_authority_route_trace,
                 primary_probe_digest=remote_authority_slo_probe_receipt["digest"],
                 threshold_policy_receipt=(
                     remote_authority_slo_quorum_threshold_policy
@@ -10348,7 +10347,8 @@ json.dump(response, sys.stdout)
         )
         remote_authority_slo_probe_quorum_validation = (
             self.wms.validate_authority_slo_probe_quorum_receipt(
-                remote_authority_slo_probe_quorum_receipt
+                remote_authority_slo_probe_quorum_receipt,
+                authority_route_trace=engine_authority_route_trace,
             )
         )
         self.ledger.append(
@@ -10612,6 +10612,12 @@ json.dump(response, sys.stdout)
                     and remote_authority_slo_probe_quorum_validation[
                         "multi_jurisdiction_bound"
                     ]
+                    and remote_authority_slo_probe_quorum_validation[
+                        "authority_slo_transport_trace_bound"
+                    ]
+                    and remote_authority_slo_probe_quorum_validation[
+                        "authority_slo_transport_cross_host_bound"
+                    ]
                     and remote_authority_slo_probe_quorum_receipt[
                         "primary_probe_digest"
                     ]
@@ -10644,6 +10650,18 @@ json.dump(response, sys.stdout)
                         "threshold_authority_binding_status"
                     ]
                     == "verified"
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "authority_route_trace_digest"
+                    ]
+                    == engine_authority_route_trace["digest"]
+                    and remote_authority_slo_probe_quorum_receipt["route_refs"]
+                    == remote_authority_slo_probe_quorum_receipt[
+                        "transport_route_binding_refs"
+                    ]
+                    and remote_authority_slo_probe_quorum_receipt[
+                        "raw_transport_payload_stored"
+                    ]
+                    is False
                 ),
                 "remote_authority_slo_quorum_threshold_policy_bound": (
                     remote_authority_slo_quorum_threshold_policy_validation["ok"]
