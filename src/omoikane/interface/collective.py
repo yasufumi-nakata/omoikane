@@ -117,6 +117,17 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID =
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID = (
     "collective-external-registry-ack-client-certificate-ct-log-readback-digest-v1"
 )
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-ct-log-quorum-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-ct-log-quorum-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT = 2
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID = (
+    "collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS = 300
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -224,6 +235,12 @@ class CollectiveIdentityService:
                 ),
                 "external_registry_ack_client_certificate_ct_log_readback_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_PROFILE_ID
+                ),
+                "external_registry_ack_client_certificate_ct_log_quorum_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+                ),
+                "external_registry_ack_client_certificate_sct_timestamp_policy": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID
                 ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
@@ -1973,33 +1990,91 @@ class CollectiveIdentityService:
             registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
             registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
         )
+        backup_ct_log_ref = (
+            self._collective_external_registry_ack_client_certificate_ct_log_ref(
+                client_certificate_authority_ref=normalized_client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                quorum_member="witness",
+            )
+        )
+        ct_log_quorum_refs = [ct_log_ref, backup_ct_log_ref]
         ct_log_leaf_digest = (
             self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
                 client_certificate_ref=normalized_client_certificate_ref,
                 client_certificate_fingerprint=normalized_client_certificate_fingerprint,
                 client_certificate_chain_digest=normalized_client_certificate_chain_digest,
                 lifecycle_chain_set_digest=lifecycle_chain_set_digest,
+                ct_log_ref=ct_log_ref,
             )
         )
-        ct_log_inclusion_proof_digest = (
-            self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
-                ct_log_ref=ct_log_ref,
-                ct_log_leaf_digest=ct_log_leaf_digest,
+        ct_log_quorum_leaf_digests: List[str] = []
+        ct_log_quorum_inclusion_proof_digests: List[str] = []
+        ct_log_quorum_readback_digests: List[str] = []
+        for quorum_log_ref in ct_log_quorum_refs:
+            quorum_leaf_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
+                    client_certificate_ref=normalized_client_certificate_ref,
+                    client_certificate_fingerprint=normalized_client_certificate_fingerprint,
+                    client_certificate_chain_digest=normalized_client_certificate_chain_digest,
+                    lifecycle_chain_set_digest=lifecycle_chain_set_digest,
+                    ct_log_ref=quorum_log_ref,
+                )
+            )
+            quorum_inclusion_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
+                    ct_log_ref=quorum_log_ref,
+                    ct_log_leaf_digest=quorum_leaf_digest,
+                    lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
+                    checked_at=str(payload["checked_at"]),
+                )
+            )
+            quorum_readback_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+                    registry_ack_endpoint_ref=normalized_endpoint,
+                    ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                    client_certificate_ref=normalized_client_certificate_ref,
+                    lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
+                    ct_log_ref=quorum_log_ref,
+                    ct_log_leaf_digest=quorum_leaf_digest,
+                    ct_log_inclusion_proof_digest=quorum_inclusion_digest,
+                    checked_at=str(payload["checked_at"]),
+                    readback_status="included",
+                )
+            )
+            ct_log_quorum_leaf_digests.append(quorum_leaf_digest)
+            ct_log_quorum_inclusion_proof_digests.append(quorum_inclusion_digest)
+            ct_log_quorum_readback_digests.append(quorum_readback_digest)
+        ct_log_inclusion_proof_digest = ct_log_quorum_inclusion_proof_digests[0]
+        ct_log_readback_digest = ct_log_quorum_readback_digests[0]
+        ct_log_quorum_set_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_quorum_set_digest(
+                ct_log_refs=ct_log_quorum_refs,
+                ct_log_leaf_digests=ct_log_quorum_leaf_digests,
+                ct_log_inclusion_proof_digests=ct_log_quorum_inclusion_proof_digests,
+                ct_log_readback_digests=ct_log_quorum_readback_digests,
+            )
+        )
+        sct_timestamp_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_timestamp_digest(
+                ct_log_quorum_set_digest=ct_log_quorum_set_digest,
                 lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
                 checked_at=str(payload["checked_at"]),
+                timestamp_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                ),
+                timestamp_status="within-window",
             )
         )
-        ct_log_readback_digest = (
-            self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+        ct_log_quorum_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_quorum_digest(
                 registry_ack_endpoint_ref=normalized_endpoint,
                 ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
                 client_certificate_ref=normalized_client_certificate_ref,
                 lifecycle_chain_proof_digest=lifecycle_chain_proof_digest,
-                ct_log_ref=ct_log_ref,
-                ct_log_leaf_digest=ct_log_leaf_digest,
-                ct_log_inclusion_proof_digest=ct_log_inclusion_proof_digest,
-                checked_at=str(payload["checked_at"]),
-                readback_status="included",
+                ct_log_quorum_set_digest=ct_log_quorum_set_digest,
+                sct_timestamp_digest=sct_timestamp_digest,
+                quorum_status="quorum-met",
             )
         )
         mtls_client_certificate_bound = bool(
@@ -2060,6 +2135,19 @@ class CollectiveIdentityService:
             and len(ct_log_leaf_digest) == 64
             and len(ct_log_inclusion_proof_digest) == 64
             and len(ct_log_readback_digest) == 64
+        )
+        mtls_client_certificate_ct_log_quorum_bound = bool(
+            mtls_client_certificate_ct_log_bound
+            and len(ct_log_quorum_refs)
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            and len(set(ct_log_quorum_refs)) == len(ct_log_quorum_refs)
+            and all(ref.startswith("registry-client-cert-ctlog://") for ref in ct_log_quorum_refs)
+            and all(len(digest) == 64 for digest in ct_log_quorum_leaf_digests)
+            and all(len(digest) == 64 for digest in ct_log_quorum_inclusion_proof_digests)
+            and all(len(digest) == 64 for digest in ct_log_quorum_readback_digests)
+            and len(ct_log_quorum_set_digest) == 64
+            and len(sct_timestamp_digest) == 64
+            and len(ct_log_quorum_digest) == 64
         )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
@@ -2248,6 +2336,42 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_readback_status": "included",
             "mtls_client_certificate_ct_log_checked_at": payload["checked_at"],
             "mtls_client_certificate_ct_log_bound": mtls_client_certificate_ct_log_bound,
+            "mtls_client_certificate_ct_log_quorum_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+            ),
+            "mtls_client_certificate_ct_log_quorum_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_ct_log_quorum_required_log_count": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ),
+            "mtls_client_certificate_ct_log_quorum_log_refs": ct_log_quorum_refs,
+            "mtls_client_certificate_ct_log_quorum_leaf_digests": (
+                ct_log_quorum_leaf_digests
+            ),
+            "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests": (
+                ct_log_quorum_inclusion_proof_digests
+            ),
+            "mtls_client_certificate_ct_log_quorum_readback_digests": (
+                ct_log_quorum_readback_digests
+            ),
+            "mtls_client_certificate_ct_log_quorum_set_digest": (
+                ct_log_quorum_set_digest
+            ),
+            "mtls_client_certificate_sct_timestamp_policy": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID
+            ),
+            "mtls_client_certificate_sct_timestamp_window_seconds": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+            ),
+            "mtls_client_certificate_sct_timestamp_checked_at": payload["checked_at"],
+            "mtls_client_certificate_sct_timestamp_digest": sct_timestamp_digest,
+            "mtls_client_certificate_sct_timestamp_status": "within-window",
+            "mtls_client_certificate_ct_log_quorum_status": "quorum-met",
+            "mtls_client_certificate_ct_log_quorum_digest": ct_log_quorum_digest,
+            "mtls_client_certificate_ct_log_quorum_bound": (
+                mtls_client_certificate_ct_log_quorum_bound
+            ),
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
@@ -2324,6 +2448,10 @@ class CollectiveIdentityService:
         client_certificate_ct_log_leaf_digests: List[str] = []
         client_certificate_ct_log_inclusion_proof_digests: List[str] = []
         client_certificate_ct_log_readback_statuses: List[str] = []
+        client_certificate_ct_log_quorum_digests: List[str] = []
+        client_certificate_ct_log_quorum_set_digests: List[str] = []
+        client_certificate_sct_timestamp_digests: List[str] = []
+        client_certificate_sct_timestamp_statuses: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -2556,6 +2684,53 @@ class CollectiveIdentityService:
                 "mtls_client_certificate_ct_log_readback_status": probe_copy[
                     "mtls_client_certificate_ct_log_readback_status"
                 ],
+                "mtls_client_certificate_ct_log_quorum_profile": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_profile"
+                ],
+                "mtls_client_certificate_ct_log_quorum_digest_profile": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_digest_profile"
+                ],
+                "mtls_client_certificate_ct_log_quorum_required_log_count": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_required_log_count"
+                ],
+                "mtls_client_certificate_ct_log_quorum_log_refs": list(
+                    probe_copy["mtls_client_certificate_ct_log_quorum_log_refs"]
+                ),
+                "mtls_client_certificate_ct_log_quorum_leaf_digests": list(
+                    probe_copy["mtls_client_certificate_ct_log_quorum_leaf_digests"]
+                ),
+                "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests": list(
+                    probe_copy[
+                        "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests"
+                    ]
+                ),
+                "mtls_client_certificate_ct_log_quorum_readback_digests": list(
+                    probe_copy["mtls_client_certificate_ct_log_quorum_readback_digests"]
+                ),
+                "mtls_client_certificate_ct_log_quorum_set_digest": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_set_digest"
+                ],
+                "mtls_client_certificate_sct_timestamp_policy": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_policy"
+                ],
+                "mtls_client_certificate_sct_timestamp_window_seconds": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_window_seconds"
+                ],
+                "mtls_client_certificate_sct_timestamp_checked_at": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_checked_at"
+                ],
+                "mtls_client_certificate_sct_timestamp_digest": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_digest"
+                ],
+                "mtls_client_certificate_sct_timestamp_status": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_status"
+                ],
+                "mtls_client_certificate_ct_log_quorum_status": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_status"
+                ],
+                "mtls_client_certificate_ct_log_quorum_digest": probe_copy[
+                    "mtls_client_certificate_ct_log_quorum_digest"
+                ],
                 "raw_client_certificate_ct_log_payload_stored": False,
             }
             client_certificate_ct_log_readback_proofs.append(
@@ -2625,6 +2800,18 @@ class CollectiveIdentityService:
             client_certificate_ct_log_readback_statuses.append(
                 str(probe_copy["mtls_client_certificate_ct_log_readback_status"])
             )
+            client_certificate_ct_log_quorum_digests.append(
+                str(probe_copy["mtls_client_certificate_ct_log_quorum_digest"])
+            )
+            client_certificate_ct_log_quorum_set_digests.append(
+                str(probe_copy["mtls_client_certificate_ct_log_quorum_set_digest"])
+            )
+            client_certificate_sct_timestamp_digests.append(
+                str(probe_copy["mtls_client_certificate_sct_timestamp_digest"])
+            )
+            client_certificate_sct_timestamp_statuses.append(
+                str(probe_copy["mtls_client_certificate_sct_timestamp_status"])
+            )
 
         probe_set_digest = sha256_text(canonical_json(probe_digests))
         response_digest_set_digest = sha256_text(
@@ -2647,6 +2834,9 @@ class CollectiveIdentityService:
         )
         client_certificate_ct_log_readback_set_digest = sha256_text(
             canonical_json(client_certificate_ct_log_readback_digests)
+        )
+        client_certificate_ct_log_quorum_digest_set_digest = sha256_text(
+            canonical_json(client_certificate_ct_log_quorum_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -2755,6 +2945,30 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest": (
                     client_certificate_ct_log_readback_set_digest
                 ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_required_log_count": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                ),
+                "ack_live_endpoint_client_certificate_ct_log_quorum_digests": (
+                    client_certificate_ct_log_quorum_digests
+                ),
+                "ack_live_endpoint_client_certificate_ct_log_quorum_set_digests": (
+                    client_certificate_ct_log_quorum_set_digests
+                ),
+                "ack_live_endpoint_client_certificate_sct_timestamp_digests": (
+                    client_certificate_sct_timestamp_digests
+                ),
+                "ack_live_endpoint_client_certificate_sct_timestamp_statuses": (
+                    client_certificate_sct_timestamp_statuses
+                ),
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest": (
+                    client_certificate_ct_log_quorum_digest_set_digest
+                ),
                 "ack_live_endpoint_client_certificate_refs": client_certificate_refs,
                 "ack_live_endpoint_client_certificate_fingerprints": (
                     client_certificate_fingerprints
@@ -2824,6 +3038,7 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_ct_log_bound": True,
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
                 "raw_response_signature_payload_stored": False,
                 "raw_client_certificate_payload_stored": False,
@@ -2857,6 +3072,9 @@ class CollectiveIdentityService:
             receipt[
                 "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
             ],
+            receipt[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+            ],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -2872,6 +3090,7 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
             ]
             and receipt["ack_live_endpoint_mtls_client_certificate_ct_log_bound"]
+            and receipt["ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -3961,6 +4180,15 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_ct_log_readback_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_READBACK_DIGEST_PROFILE_ID
             ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_required_log_count": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -4070,6 +4298,7 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest",
             "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest",
             "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest",
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -4761,6 +4990,18 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_client_certificate_ct_log_readback_statuses: List[
             str
         ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_quorum_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_ct_log_quorum_set_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_timestamp_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_timestamp_statuses: List[
+            str
+        ] = []
         ack_live_endpoint_probe_bound = False
         ack_live_endpoint_signed_response_envelope_bound = False
         ack_live_endpoint_mtls_client_certificate_bound = False
@@ -4768,6 +5009,7 @@ class CollectiveIdentityService:
         ack_live_endpoint_mtls_client_certificate_lifecycle_bound = False
         ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound = False
         ack_live_endpoint_mtls_client_certificate_ct_log_bound = False
+        ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
         )
@@ -5129,6 +5371,81 @@ class CollectiveIdentityService:
                             "mtls_client_certificate_ct_log_readback_status"
                         )
                     ),
+                    "mtls_client_certificate_ct_log_quorum_profile": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_profile"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_digest_profile": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_digest_profile"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_required_log_count": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_required_log_count"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_log_refs": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_log_refs"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_leaf_digests": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_leaf_digests"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_readback_digests": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_readback_digests"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_set_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_set_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_timestamp_policy": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_policy"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_timestamp_window_seconds": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_window_seconds"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_timestamp_checked_at": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_checked_at"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_timestamp_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_timestamp_status": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_status"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_status": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_status"
+                        )
+                    ),
+                    "mtls_client_certificate_ct_log_quorum_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_digest"
+                        )
+                    ),
                     "raw_client_certificate_ct_log_payload_stored": False,
                 }
                 expected_ack_live_endpoint_client_certificate_ct_log_readback_proofs.append(
@@ -5140,6 +5457,22 @@ class CollectiveIdentityService:
                             "mtls_client_certificate_ct_log_readback_digest"
                         )
                     )
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_quorum_digests.append(
+                    str(probe_receipt.get("mtls_client_certificate_ct_log_quorum_digest"))
+                )
+                expected_ack_live_endpoint_client_certificate_ct_log_quorum_set_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_ct_log_quorum_set_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_timestamp_digests.append(
+                    str(probe_receipt.get("mtls_client_certificate_sct_timestamp_digest"))
+                )
+                expected_ack_live_endpoint_client_certificate_sct_timestamp_statuses.append(
+                    str(probe_receipt.get("mtls_client_certificate_sct_timestamp_status"))
                 )
                 expected_ack_live_endpoint_client_certificate_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_ref"))
@@ -5271,6 +5604,11 @@ class CollectiveIdentityService:
             expected_client_certificate_ct_log_readback_set_digest = sha256_text(
                 canonical_json(
                     expected_ack_live_endpoint_client_certificate_ct_log_readback_digests
+                )
+            )
+            expected_client_certificate_ct_log_quorum_digest_set_digest = sha256_text(
+                canonical_json(
+                    expected_ack_live_endpoint_client_certificate_ct_log_quorum_digests
                 )
             )
             ack_live_endpoint_probe_bound = (
@@ -5559,6 +5897,52 @@ class CollectiveIdentityService:
                 is True
                 and not raw_client_certificate_ct_log_payload_stored
             )
+            ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get(
+                        "mtls_client_certificate_ct_log_quorum_bound"
+                    )
+                    is True
+                    and probe_receipt.get(
+                        "raw_client_certificate_ct_log_payload_stored"
+                    )
+                    is False
+                    and probe_receipt.get(
+                        "mtls_client_certificate_ct_log_quorum_status"
+                    )
+                    == "quorum-met"
+                    and probe_receipt.get(
+                        "mtls_client_certificate_sct_timestamp_status"
+                    )
+                    == "within-window"
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get("ack_live_endpoint_client_certificate_ct_log_quorum_digests")
+                == expected_ack_live_endpoint_client_certificate_ct_log_quorum_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ct_log_quorum_set_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_ct_log_quorum_set_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_timestamp_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_timestamp_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_timestamp_statuses"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_timestamp_statuses
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+                )
+                == expected_client_certificate_ct_log_quorum_digest_set_digest
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
+                )
+                is True
+                and not raw_client_certificate_ct_log_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
         if not ack_live_endpoint_signed_response_envelope_bound:
@@ -5584,6 +5968,10 @@ class CollectiveIdentityService:
         if not ack_live_endpoint_mtls_client_certificate_ct_log_bound:
             errors.append(
                 "ack live endpoint probes must bind mTLS client certificate CT log readback proofs"
+            )
+        if not ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound:
+            errors.append(
+                "ack live endpoint probes must bind mTLS client certificate CT log quorum proofs"
             )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
@@ -5636,6 +6024,9 @@ class CollectiveIdentityService:
                 receipt.get(
                     "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
                 ),
+                receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+                ),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -5678,6 +6069,7 @@ class CollectiveIdentityService:
             and ack_live_endpoint_mtls_client_certificate_lifecycle_bound
             and ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
             and ack_live_endpoint_mtls_client_certificate_ct_log_bound
+            and ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -5734,6 +6126,9 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_mtls_client_certificate_ct_log_bound": (
                 ack_live_endpoint_mtls_client_certificate_ct_log_bound
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound": (
+                ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
             ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
@@ -6275,35 +6670,95 @@ class CollectiveIdentityService:
                 registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
             )
         )
-        expected_ct_log_leaf_digest = (
-            self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
-                client_certificate_ref=client_certificate_ref,
-                client_certificate_fingerprint=client_certificate_fingerprint,
-                client_certificate_chain_digest=client_certificate_chain_digest,
-                lifecycle_chain_set_digest=expected_lifecycle_chain_set_digest,
+        expected_backup_ct_log_ref = (
+            self._collective_external_registry_ack_client_certificate_ct_log_ref(
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+                quorum_member="witness",
             )
         )
+        expected_ct_log_quorum_refs = [expected_ct_log_ref, expected_backup_ct_log_ref]
+        expected_ct_log_quorum_leaf_digests: List[str] = []
+        expected_ct_log_quorum_inclusion_proof_digests: List[str] = []
+        expected_ct_log_quorum_readback_digests: List[str] = []
+        for quorum_ct_log_ref in expected_ct_log_quorum_refs:
+            quorum_ct_log_leaf_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_leaf_digest(
+                    client_certificate_ref=client_certificate_ref,
+                    client_certificate_fingerprint=client_certificate_fingerprint,
+                    client_certificate_chain_digest=client_certificate_chain_digest,
+                    lifecycle_chain_set_digest=expected_lifecycle_chain_set_digest,
+                    ct_log_ref=quorum_ct_log_ref,
+                )
+            )
+            quorum_ct_log_inclusion_proof_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
+                    ct_log_ref=quorum_ct_log_ref,
+                    ct_log_leaf_digest=quorum_ct_log_leaf_digest,
+                    lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
+                    checked_at=str(receipt.get("checked_at") or ""),
+                )
+            )
+            quorum_ct_log_readback_digest = (
+                self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+                    registry_ack_endpoint_ref=str(
+                        receipt.get("registry_ack_endpoint_ref") or ""
+                    ),
+                    ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
+                    client_certificate_ref=client_certificate_ref,
+                    lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
+                    ct_log_ref=quorum_ct_log_ref,
+                    ct_log_leaf_digest=quorum_ct_log_leaf_digest,
+                    ct_log_inclusion_proof_digest=quorum_ct_log_inclusion_proof_digest,
+                    checked_at=str(receipt.get("checked_at") or ""),
+                    readback_status="included",
+                )
+            )
+            expected_ct_log_quorum_leaf_digests.append(quorum_ct_log_leaf_digest)
+            expected_ct_log_quorum_inclusion_proof_digests.append(
+                quorum_ct_log_inclusion_proof_digest
+            )
+            expected_ct_log_quorum_readback_digests.append(
+                quorum_ct_log_readback_digest
+            )
+        expected_ct_log_leaf_digest = expected_ct_log_quorum_leaf_digests[0]
         expected_ct_log_inclusion_proof_digest = (
-            self._collective_external_registry_ack_client_certificate_ct_log_inclusion_proof_digest(
-                ct_log_ref=expected_ct_log_ref,
-                ct_log_leaf_digest=expected_ct_log_leaf_digest,
+            expected_ct_log_quorum_inclusion_proof_digests[0]
+        )
+        expected_ct_log_readback_digest = expected_ct_log_quorum_readback_digests[0]
+        expected_ct_log_quorum_set_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_quorum_set_digest(
+                ct_log_refs=expected_ct_log_quorum_refs,
+                ct_log_leaf_digests=expected_ct_log_quorum_leaf_digests,
+                ct_log_inclusion_proof_digests=(
+                    expected_ct_log_quorum_inclusion_proof_digests
+                ),
+                ct_log_readback_digests=expected_ct_log_quorum_readback_digests,
+            )
+        )
+        expected_sct_timestamp_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_timestamp_digest(
+                ct_log_quorum_set_digest=expected_ct_log_quorum_set_digest,
                 lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
                 checked_at=str(receipt.get("checked_at") or ""),
+                timestamp_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                ),
+                timestamp_status="within-window",
             )
         )
-        expected_ct_log_readback_digest = (
-            self._collective_external_registry_ack_client_certificate_ct_log_readback_digest(
+        expected_ct_log_quorum_digest = (
+            self._collective_external_registry_ack_client_certificate_ct_log_quorum_digest(
                 registry_ack_endpoint_ref=str(
                     receipt.get("registry_ack_endpoint_ref") or ""
                 ),
                 ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
                 client_certificate_ref=client_certificate_ref,
                 lifecycle_chain_proof_digest=expected_lifecycle_chain_proof_digest,
-                ct_log_ref=expected_ct_log_ref,
-                ct_log_leaf_digest=expected_ct_log_leaf_digest,
-                ct_log_inclusion_proof_digest=expected_ct_log_inclusion_proof_digest,
-                checked_at=str(receipt.get("checked_at") or ""),
-                readback_status="included",
+                ct_log_quorum_set_digest=expected_ct_log_quorum_set_digest,
+                sct_timestamp_digest=expected_sct_timestamp_digest,
+                quorum_status="quorum-met",
             )
         )
         expected_fields.update(
@@ -6403,6 +6858,48 @@ class CollectiveIdentityService:
                     expected_ct_log_readback_digest
                 ),
                 "mtls_client_certificate_ct_log_checked_at": receipt.get("checked_at"),
+                "mtls_client_certificate_ct_log_quorum_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+                ),
+                "mtls_client_certificate_ct_log_quorum_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+                ),
+                "mtls_client_certificate_ct_log_quorum_required_log_count": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                ),
+                "mtls_client_certificate_ct_log_quorum_log_refs": (
+                    expected_ct_log_quorum_refs
+                ),
+                "mtls_client_certificate_ct_log_quorum_leaf_digests": (
+                    expected_ct_log_quorum_leaf_digests
+                ),
+                "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests": (
+                    expected_ct_log_quorum_inclusion_proof_digests
+                ),
+                "mtls_client_certificate_ct_log_quorum_readback_digests": (
+                    expected_ct_log_quorum_readback_digests
+                ),
+                "mtls_client_certificate_ct_log_quorum_set_digest": (
+                    expected_ct_log_quorum_set_digest
+                ),
+                "mtls_client_certificate_sct_timestamp_policy": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID
+                ),
+                "mtls_client_certificate_sct_timestamp_window_seconds": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                ),
+                "mtls_client_certificate_sct_timestamp_checked_at": (
+                    receipt.get("checked_at")
+                ),
+                "mtls_client_certificate_sct_timestamp_digest": (
+                    expected_sct_timestamp_digest
+                ),
+                "mtls_client_certificate_sct_timestamp_status": "within-window",
+                "mtls_client_certificate_ct_log_quorum_status": "quorum-met",
+                "mtls_client_certificate_ct_log_quorum_digest": (
+                    expected_ct_log_quorum_digest
+                ),
+                "mtls_client_certificate_ct_log_quorum_bound": True,
             }
         )
         for field_name, expected in expected_fields.items():
@@ -6434,6 +6931,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_leaf_digest",
             "mtls_client_certificate_ct_log_inclusion_proof_digest",
             "mtls_client_certificate_ct_log_readback_digest",
+            "mtls_client_certificate_ct_log_quorum_set_digest",
+            "mtls_client_certificate_sct_timestamp_digest",
+            "mtls_client_certificate_ct_log_quorum_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
@@ -6597,6 +7097,47 @@ class CollectiveIdentityService:
             errors.append(
                 "mTLS client certificate CT log readback must bind lifecycle chain evidence"
             )
+        mtls_client_certificate_ct_log_quorum_bound = bool(
+            mtls_client_certificate_ct_log_bound
+            and receipt.get("mtls_client_certificate_ct_log_quorum_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+            and receipt.get("mtls_client_certificate_ct_log_quorum_digest_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+            and receipt.get("mtls_client_certificate_ct_log_quorum_required_log_count")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            and receipt.get("mtls_client_certificate_ct_log_quorum_log_refs")
+            == expected_ct_log_quorum_refs
+            and receipt.get("mtls_client_certificate_ct_log_quorum_leaf_digests")
+            == expected_ct_log_quorum_leaf_digests
+            and receipt.get(
+                "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests"
+            )
+            == expected_ct_log_quorum_inclusion_proof_digests
+            and receipt.get("mtls_client_certificate_ct_log_quorum_readback_digests")
+            == expected_ct_log_quorum_readback_digests
+            and receipt.get("mtls_client_certificate_ct_log_quorum_set_digest")
+            == expected_ct_log_quorum_set_digest
+            and receipt.get("mtls_client_certificate_sct_timestamp_policy")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID
+            and receipt.get("mtls_client_certificate_sct_timestamp_window_seconds")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+            and receipt.get("mtls_client_certificate_sct_timestamp_checked_at")
+            == receipt.get("checked_at")
+            and receipt.get("mtls_client_certificate_sct_timestamp_digest")
+            == expected_sct_timestamp_digest
+            and receipt.get("mtls_client_certificate_sct_timestamp_status")
+            == "within-window"
+            and receipt.get("mtls_client_certificate_ct_log_quorum_status")
+            == "quorum-met"
+            and receipt.get("mtls_client_certificate_ct_log_quorum_digest")
+            == expected_ct_log_quorum_digest
+            and receipt.get("mtls_client_certificate_ct_log_quorum_bound") is True
+            and receipt.get("raw_client_certificate_ct_log_payload_stored") is False
+        )
+        if not mtls_client_certificate_ct_log_quorum_bound:
+            errors.append(
+                "mTLS client certificate CT log quorum must bind multi-log SCT evidence"
+            )
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -6651,6 +7192,9 @@ class CollectiveIdentityService:
             ),
             "mtls_client_certificate_ct_log_bound": (
                 mtls_client_certificate_ct_log_bound
+            ),
+            "mtls_client_certificate_ct_log_quorum_bound": (
+                mtls_client_certificate_ct_log_quorum_bound
             ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
@@ -7522,6 +8066,54 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_bound": receipt.get(
                 "mtls_client_certificate_ct_log_bound"
             ),
+            "mtls_client_certificate_ct_log_quorum_profile": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_profile"
+            ),
+            "mtls_client_certificate_ct_log_quorum_digest_profile": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_digest_profile"
+            ),
+            "mtls_client_certificate_ct_log_quorum_required_log_count": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_required_log_count"
+            ),
+            "mtls_client_certificate_ct_log_quorum_log_refs": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_log_refs"
+            ),
+            "mtls_client_certificate_ct_log_quorum_leaf_digests": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_leaf_digests"
+            ),
+            "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_inclusion_proof_digests"
+            ),
+            "mtls_client_certificate_ct_log_quorum_readback_digests": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_readback_digests"
+            ),
+            "mtls_client_certificate_ct_log_quorum_set_digest": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_set_digest"
+            ),
+            "mtls_client_certificate_sct_timestamp_policy": receipt.get(
+                "mtls_client_certificate_sct_timestamp_policy"
+            ),
+            "mtls_client_certificate_sct_timestamp_window_seconds": receipt.get(
+                "mtls_client_certificate_sct_timestamp_window_seconds"
+            ),
+            "mtls_client_certificate_sct_timestamp_checked_at": receipt.get(
+                "mtls_client_certificate_sct_timestamp_checked_at"
+            ),
+            "mtls_client_certificate_sct_timestamp_digest": receipt.get(
+                "mtls_client_certificate_sct_timestamp_digest"
+            ),
+            "mtls_client_certificate_sct_timestamp_status": receipt.get(
+                "mtls_client_certificate_sct_timestamp_status"
+            ),
+            "mtls_client_certificate_ct_log_quorum_status": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_status"
+            ),
+            "mtls_client_certificate_ct_log_quorum_digest": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_digest"
+            ),
+            "mtls_client_certificate_ct_log_quorum_bound": receipt.get(
+                "mtls_client_certificate_ct_log_quorum_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
             "raw_response_signature_payload_stored": receipt.get(
@@ -8193,6 +8785,7 @@ class CollectiveIdentityService:
         client_certificate_authority_ref: str,
         registry_authority_ref: str,
         registry_jurisdiction: str,
+        quorum_member: str = "primary",
     ) -> str:
         ct_log_digest = sha256_text(
             canonical_json(
@@ -8203,6 +8796,7 @@ class CollectiveIdentityService:
                     "client_certificate_authority_ref": client_certificate_authority_ref,
                     "registry_authority_ref": registry_authority_ref,
                     "registry_jurisdiction": registry_jurisdiction,
+                    "quorum_member": quorum_member,
                 }
             )
         )
@@ -8215,6 +8809,7 @@ class CollectiveIdentityService:
         client_certificate_fingerprint: str,
         client_certificate_chain_digest: str,
         lifecycle_chain_set_digest: str,
+        ct_log_ref: str | None = None,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -8229,6 +8824,7 @@ class CollectiveIdentityService:
                     "client_certificate_fingerprint": client_certificate_fingerprint,
                     "client_certificate_chain_digest": client_certificate_chain_digest,
                     "lifecycle_chain_set_digest": lifecycle_chain_set_digest,
+                    "ct_log_ref": ct_log_ref,
                 }
             )
         )
@@ -8295,6 +8891,89 @@ class CollectiveIdentityService:
         )
 
     @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_quorum_set_digest(
+        *,
+        ct_log_refs: Sequence[str],
+        ct_log_leaf_digests: Sequence[str],
+        ct_log_inclusion_proof_digests: Sequence[str],
+        ct_log_readback_digests: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+                    ),
+                    "required_log_count": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                    ),
+                    "ct_log_refs": list(ct_log_refs),
+                    "ct_log_leaf_digests": list(ct_log_leaf_digests),
+                    "ct_log_inclusion_proof_digests": list(ct_log_inclusion_proof_digests),
+                    "ct_log_readback_digests": list(ct_log_readback_digests),
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_timestamp_digest(
+        *,
+        ct_log_quorum_set_digest: str,
+        lifecycle_chain_proof_digest: str,
+        checked_at: str,
+        timestamp_window_seconds: int,
+        timestamp_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID
+                    ),
+                    "ct_log_quorum_set_digest": ct_log_quorum_set_digest,
+                    "lifecycle_chain_proof_digest": lifecycle_chain_proof_digest,
+                    "checked_at": checked_at,
+                    "timestamp_window_seconds": timestamp_window_seconds,
+                    "timestamp_status": timestamp_status,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ct_log_quorum_digest(
+        *,
+        registry_ack_endpoint_ref: str,
+        ack_receipt_digest: str,
+        client_certificate_ref: str,
+        lifecycle_chain_proof_digest: str,
+        ct_log_quorum_set_digest: str,
+        sct_timestamp_digest: str,
+        quorum_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_CT_LOG_QUORUM_DIGEST_PROFILE_ID
+                    ),
+                    "registry_ack_endpoint_ref": registry_ack_endpoint_ref,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "client_certificate_ref": client_certificate_ref,
+                    "lifecycle_chain_proof_digest": lifecycle_chain_proof_digest,
+                    "ct_log_quorum_set_digest": ct_log_quorum_set_digest,
+                    "sct_timestamp_digest": sct_timestamp_digest,
+                    "quorum_status": quorum_status,
+                }
+            )
+        )
+
+    @staticmethod
     def _collective_external_registry_sync_digest_payload(
         receipt: Mapping[str, Any],
     ) -> Dict[str, Any]:
@@ -8330,6 +9009,12 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest": receipt.get(
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest"
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest": receipt.get(
+                "ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest"
+            ),
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest": receipt.get(
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
             ),
             "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
         }

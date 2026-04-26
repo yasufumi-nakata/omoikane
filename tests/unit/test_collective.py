@@ -521,6 +521,19 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 privileged_capture,
             )
         )
+        tampered_client_certificate_ct_log_quorum_registry_sync = dict(registry_sync)
+        tampered_client_certificate_ct_log_quorum_registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+        ] = "0" * 64
+        tampered_client_certificate_ct_log_quorum_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_client_certificate_ct_log_quorum_registry_sync,
+                capture_binding,
+                route_trace,
+                packet_capture,
+                privileged_capture,
+            )
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -592,6 +605,11 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertTrue(registry_validation["ack_live_endpoint_probe_bound"])
         self.assertTrue(
             registry_validation["ack_live_endpoint_signed_response_envelope_bound"]
+        )
+        self.assertTrue(
+            registry_validation[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
+            ]
         )
         self.assertFalse(registry_validation["raw_registry_payload_stored"])
         self.assertFalse(registry_validation["raw_ack_payload_stored"])
@@ -670,6 +688,23 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 "ack_live_endpoint_mtls_client_certificate_ct_log_bound"
             ]
         )
+        self.assertTrue(
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
+            ]
+        )
+        self.assertEqual(
+            "collective-external-registry-ack-client-certificate-ct-log-quorum-v1",
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_profile_id"
+            ],
+        )
+        self.assertEqual(
+            2,
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_required_log_count"
+            ],
+        )
         self.assertEqual(
             "collective-external-registry-ack-client-certificate-rollover-chain-v1",
             registry_sync[
@@ -711,6 +746,28 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                     "ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs"
                 ]
             ),
+        )
+        self.assertEqual(
+            2,
+            len(
+                registry_sync[
+                    "ack_live_endpoint_client_certificate_ct_log_quorum_digests"
+                ]
+            ),
+        )
+        self.assertEqual(
+            2,
+            len(
+                registry_sync[
+                    "ack_live_endpoint_client_certificate_sct_timestamp_digests"
+                ]
+            ),
+        )
+        self.assertEqual(
+            ["within-window", "within-window"],
+            registry_sync[
+                "ack_live_endpoint_client_certificate_sct_timestamp_statuses"
+            ],
         )
         self.assertEqual(
             ["renewed", "renewed"],
@@ -762,6 +819,18 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             self.assertEqual(
                 "included",
                 ct_log_proof["mtls_client_certificate_ct_log_readback_status"],
+            )
+            self.assertEqual(
+                2,
+                len(ct_log_proof["mtls_client_certificate_ct_log_quorum_log_refs"]),
+            )
+            self.assertEqual(
+                "quorum-met",
+                ct_log_proof["mtls_client_certificate_ct_log_quorum_status"],
+            )
+            self.assertEqual(
+                "within-window",
+                ct_log_proof["mtls_client_certificate_sct_timestamp_status"],
             )
         self.assertFalse(registry_sync["raw_client_certificate_payload_stored"])
         self.assertFalse(
@@ -820,6 +889,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertFalse(
             tampered_client_certificate_ct_log_registry_validation[
                 "ack_live_endpoint_mtls_client_certificate_ct_log_bound"
+            ]
+        )
+        self.assertFalse(tampered_client_certificate_ct_log_quorum_registry_validation["ok"])
+        self.assertFalse(
+            tampered_client_certificate_ct_log_quorum_registry_validation[
+                "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
             ]
         )
 

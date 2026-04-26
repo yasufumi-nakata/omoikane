@@ -197,6 +197,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["external_registry_sync_complete"])
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]

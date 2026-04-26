@@ -141,6 +141,10 @@ required:
   - ack_live_endpoint_mtls_client_certificate_ct_log_readback_proofs
   - ack_live_endpoint_mtls_client_certificate_ct_log_readback_digests
   - ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest
+  - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_profile_id
+  - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_profile
+  - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_required_log_count
+  - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest
   - ack_live_endpoint_client_certificate_refs
   - ack_live_endpoint_client_certificate_fingerprints
   - ack_live_endpoint_client_certificate_chain_digests
@@ -162,6 +166,10 @@ required:
   - ack_live_endpoint_client_certificate_ct_log_leaf_digests
   - ack_live_endpoint_client_certificate_ct_log_inclusion_proof_digests
   - ack_live_endpoint_client_certificate_ct_log_readback_statuses
+  - ack_live_endpoint_client_certificate_ct_log_quorum_digests
+  - ack_live_endpoint_client_certificate_ct_log_quorum_set_digests
+  - ack_live_endpoint_client_certificate_sct_timestamp_digests
+  - ack_live_endpoint_client_certificate_sct_timestamp_statuses
   - ack_live_endpoint_probe_count
   - ack_live_endpoint_probe_bound
   - ack_live_endpoint_signed_response_envelope_bound
@@ -170,6 +178,7 @@ required:
   - ack_live_endpoint_mtls_client_certificate_lifecycle_bound
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
   - ack_live_endpoint_mtls_client_certificate_ct_log_bound
+  - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -609,6 +618,12 @@ properties:
       $ref: "#/$defs/sha256"
   ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest:
     $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_ct_log_quorum_profile_id:
+    const: collective-external-registry-ack-client-certificate-ct-log-quorum-v1
+  ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_profile:
+    const: collective-external-registry-ack-client-certificate-ct-log-quorum-digest-v1
+  ack_live_endpoint_mtls_client_certificate_ct_log_quorum_required_log_count:
+    const: 2
   ack_live_endpoint_client_certificate_refs:
     type: array
     minItems: 2
@@ -743,6 +758,32 @@ properties:
     maxItems: 2
     items:
       const: included
+  ack_live_endpoint_client_certificate_ct_log_quorum_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_ct_log_quorum_set_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_sct_timestamp_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_sct_timestamp_statuses:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      const: within-window
+  ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest:
+    $ref: "#/$defs/sha256"
   ack_live_endpoint_probe_count:
     const: 2
   ack_live_endpoint_probe_bound:
@@ -759,10 +800,12 @@ properties:
     const: true
   ack_live_endpoint_mtls_client_certificate_ct_log_bound:
     const: true
+  ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound:
+    const: true
   registry_digest_set:
     type: array
-    minItems: 15
-    maxItems: 15
+    minItems: 16
+    maxItems: 16
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -1064,6 +1107,22 @@ $defs:
       - mtls_client_certificate_ct_log_readback_status
       - mtls_client_certificate_ct_log_checked_at
       - mtls_client_certificate_ct_log_bound
+      - mtls_client_certificate_ct_log_quorum_profile
+      - mtls_client_certificate_ct_log_quorum_digest_profile
+      - mtls_client_certificate_ct_log_quorum_required_log_count
+      - mtls_client_certificate_ct_log_quorum_log_refs
+      - mtls_client_certificate_ct_log_quorum_leaf_digests
+      - mtls_client_certificate_ct_log_quorum_inclusion_proof_digests
+      - mtls_client_certificate_ct_log_quorum_readback_digests
+      - mtls_client_certificate_ct_log_quorum_set_digest
+      - mtls_client_certificate_sct_timestamp_policy
+      - mtls_client_certificate_sct_timestamp_window_seconds
+      - mtls_client_certificate_sct_timestamp_checked_at
+      - mtls_client_certificate_sct_timestamp_digest
+      - mtls_client_certificate_sct_timestamp_status
+      - mtls_client_certificate_ct_log_quorum_status
+      - mtls_client_certificate_ct_log_quorum_digest
+      - mtls_client_certificate_ct_log_quorum_bound
       - checked_at
       - raw_ack_payload_stored
       - raw_endpoint_payload_stored
@@ -1277,6 +1336,56 @@ $defs:
         type: string
         format: date-time
       mtls_client_certificate_ct_log_bound:
+        const: true
+      mtls_client_certificate_ct_log_quorum_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-quorum-v1
+      mtls_client_certificate_ct_log_quorum_digest_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-quorum-digest-v1
+      mtls_client_certificate_ct_log_quorum_required_log_count:
+        const: 2
+      mtls_client_certificate_ct_log_quorum_log_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          pattern: "^registry-client-cert-ctlog://"
+      mtls_client_certificate_ct_log_quorum_leaf_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_inclusion_proof_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_readback_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_set_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_timestamp_policy:
+        const: collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1
+      mtls_client_certificate_sct_timestamp_window_seconds:
+        const: 300
+      mtls_client_certificate_sct_timestamp_checked_at:
+        type: string
+        format: date-time
+      mtls_client_certificate_sct_timestamp_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_timestamp_status:
+        const: within-window
+      mtls_client_certificate_ct_log_quorum_status:
+        const: quorum-met
+      mtls_client_certificate_ct_log_quorum_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_bound:
         const: true
       checked_at:
         type: string
@@ -1581,6 +1690,21 @@ $defs:
       - mtls_client_certificate_ct_log_inclusion_proof_digest
       - mtls_client_certificate_ct_log_readback_digest
       - mtls_client_certificate_ct_log_readback_status
+      - mtls_client_certificate_ct_log_quorum_profile
+      - mtls_client_certificate_ct_log_quorum_digest_profile
+      - mtls_client_certificate_ct_log_quorum_required_log_count
+      - mtls_client_certificate_ct_log_quorum_log_refs
+      - mtls_client_certificate_ct_log_quorum_leaf_digests
+      - mtls_client_certificate_ct_log_quorum_inclusion_proof_digests
+      - mtls_client_certificate_ct_log_quorum_readback_digests
+      - mtls_client_certificate_ct_log_quorum_set_digest
+      - mtls_client_certificate_sct_timestamp_policy
+      - mtls_client_certificate_sct_timestamp_window_seconds
+      - mtls_client_certificate_sct_timestamp_checked_at
+      - mtls_client_certificate_sct_timestamp_digest
+      - mtls_client_certificate_sct_timestamp_status
+      - mtls_client_certificate_ct_log_quorum_status
+      - mtls_client_certificate_ct_log_quorum_digest
       - raw_client_certificate_ct_log_payload_stored
     properties:
       probe_id:
@@ -1613,6 +1737,54 @@ $defs:
         $ref: "#/$defs/sha256"
       mtls_client_certificate_ct_log_readback_status:
         const: included
+      mtls_client_certificate_ct_log_quorum_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-quorum-v1
+      mtls_client_certificate_ct_log_quorum_digest_profile:
+        const: collective-external-registry-ack-client-certificate-ct-log-quorum-digest-v1
+      mtls_client_certificate_ct_log_quorum_required_log_count:
+        const: 2
+      mtls_client_certificate_ct_log_quorum_log_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          pattern: "^registry-client-cert-ctlog://"
+      mtls_client_certificate_ct_log_quorum_leaf_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_inclusion_proof_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_readback_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_ct_log_quorum_set_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_timestamp_policy:
+        const: collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1
+      mtls_client_certificate_sct_timestamp_window_seconds:
+        const: 300
+      mtls_client_certificate_sct_timestamp_checked_at:
+        type: string
+        format: date-time
+      mtls_client_certificate_sct_timestamp_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_timestamp_status:
+        const: within-window
+      mtls_client_certificate_ct_log_quorum_status:
+        const: quorum-met
+      mtls_client_certificate_ct_log_quorum_digest:
+        $ref: "#/$defs/sha256"
       raw_client_certificate_ct_log_payload_stored:
         const: false
   sha256:

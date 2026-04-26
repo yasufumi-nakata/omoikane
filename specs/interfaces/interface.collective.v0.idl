@@ -299,6 +299,7 @@ operations:
       - ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest must bind renewed certificate rollover evidence for every acknowledgement endpoint probe and stale/revoked lifecycle states must fail closed
       - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest must bind a 3 generation certificate rollover chain for every acknowledgement endpoint probe
       - ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest must bind certificate transparency-style readback proof for every lifecycle chain without storing raw CT log payloads
+      - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest must bind a two-log CT quorum and SCT timestamp policy for every lifecycle chain without storing raw CT log payloads
       - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, raw endpoint payloads, raw response signature payloads, raw client certificate payloads, raw certificate freshness payloads, raw certificate lifecycle payloads, raw certificate lifecycle chain payloads, raw CT log payloads, and raw packet bodies must not be stored
   bind_external_registry_ack_endpoint_probes:
     summary: Bind external registry acknowledgement receipts to live HTTP JSON endpoint probe evidence.
@@ -348,6 +349,12 @@ operations:
                   - mtls_client_certificate_ct_log_readback_digest
                   - mtls_client_certificate_ct_log_readback_status
                   - mtls_client_certificate_ct_log_bound
+                  - mtls_client_certificate_ct_log_quorum_log_refs
+                  - mtls_client_certificate_ct_log_quorum_set_digest
+                  - mtls_client_certificate_sct_timestamp_digest
+                  - mtls_client_certificate_sct_timestamp_status
+                  - mtls_client_certificate_ct_log_quorum_digest
+                  - mtls_client_certificate_ct_log_quorum_bound
                   - raw_endpoint_payload_stored
                   - raw_response_signature_payload_stored
                   - raw_client_certificate_payload_stored
@@ -368,6 +375,7 @@ operations:
       - mtls_client_certificate_lifecycle_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest must enter registry_digest_set
       - mtls_client_certificate_lifecycle_chain_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest must enter registry_digest_set
       - mtls_client_certificate_ct_log_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest must enter registry_digest_set
+      - mtls_client_certificate_ct_log_quorum_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest must enter registry_digest_set
       - registry_digest_set must include ack_live_endpoint_probe_set_digest before external_registry_sync_complete is true
 events:
   collective.formed:

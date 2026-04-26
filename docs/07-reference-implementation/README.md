@@ -867,10 +867,15 @@ chain proof digest に束縛し、単一 rollover だけで complete になら�
 さらに `collective-external-registry-ack-client-certificate-ct-log-readback-v1` が
 CT-style log ref、certificate leaf digest、inclusion proof digest、chain proof digest を
 同じ endpoint probe に束縛し、raw CT log payload を保存しない。
+加えて `collective-external-registry-ack-client-certificate-ct-log-quorum-v1`
+が primary / witness の 2 log readback を quorum set digest に束縛し、
+`collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1`
+が 300 秒 SCT timestamp window を同じ endpoint probe に固定する。
 probe set digest、response signature digest set、client certificate proof set digest、
 client certificate freshness proof set digest、client certificate lifecycle proof set digest、
 client certificate lifecycle chain proof set digest、
-client certificate CT log readback set digest
+client certificate CT log readback set digest、
+client certificate CT log quorum digest set digest
 を registry digest set に含めてから
 complete になる。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、

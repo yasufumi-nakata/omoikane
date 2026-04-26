@@ -113,6 +113,7 @@ status: decided | superseded
 - [2026-04-26_collective-external-registry-ack-signed-response-envelope.md](2026-04-26_collective-external-registry-ack-signed-response-envelope.md)
 - [2026-04-27_collective-external-registry-ack-mtls-client-certificate.md](2026-04-27_collective-external-registry-ack-mtls-client-certificate.md)
 - [2026-04-27_collective-external-registry-ack-certificate-lifecycle.md](2026-04-27_collective-external-registry-ack-certificate-lifecycle.md)
+- [2026-04-27_collective-external-registry-ack-ct-log-quorum.md](2026-04-27_collective-external-registry-ack-ct-log-quorum.md)
 - [2026-04-27_wms-slo-threshold-authority-binding.md](2026-04-27_wms-slo-threshold-authority-binding.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)
