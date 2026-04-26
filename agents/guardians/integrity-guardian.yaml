@@ -5,6 +5,7 @@ capabilities:
   - integrity.check
   - rollback.trigger
   - continuity.public-verification.attest
+  - collective.dissolution-receipt.attest
   - ewa.stop-signal-adapter.attest
   - ewa.production-connector.attest
   - workspace.preseed.attest
@@ -37,6 +38,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
+  - Collective dissolution receipt が全 member confirmation、schema version、digest-only audit ref に束縛されていることを検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - EWA authorization 前に vendor API connector certificate / installation proof / safety PLC installation digest が stop-signal adapter receipt に束縛されていることを検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時

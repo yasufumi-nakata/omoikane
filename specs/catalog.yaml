@@ -787,6 +787,15 @@ entries:
     rationale: Required to serialize one temporary collective identity distinct from its member identities.
   - priority: P1
     kind: schema
+    file: specs/schemas/collective_dissolution_receipt.schema
+    consumers:
+      - specs/interfaces/interface.collective.v0.idl
+      - docs/02-subsystems/interface/collective-identity.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize collective teardown as a first-class receipt with member recovery confirmation and digest-only audit binding.
+  - priority: P1
+    kind: schema
     file: specs/schemas/reasoning_trace.schema
     consumers:
       - specs/interfaces/cognitive.reasoning.v0.idl
@@ -1056,6 +1065,13 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects bounded merge windows, private-reality escape, and post-disconnect member recovery before dissolution.
+  - priority: P1
+    kind: eval
+    file: evals/interface/collective_dissolution_receipt.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects first-class collective dissolution receipts, member confirmation completeness, and digest-only audit evidence after bounded merge teardown.
   - priority: P1
     kind: schema
     file: specs/schemas/perception_frame.schema

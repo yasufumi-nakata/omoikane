@@ -75,9 +75,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["identity_confirmation_complete"])
         self.assertTrue(result["validation"]["dissolution_clears_collective"])
+        self.assertTrue(result["validation"]["dissolution_receipt_bound"])
+        self.assertTrue(result["validation"]["dissolution_schema_version_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
+        self.assertTrue(result["validation"]["dissolution_audit_bound"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
+        self.assertEqual("1.0", result["dissolution"]["schema_version"])
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"]["interface-collective-dissolution"],
+        )
 
     def test_wms_demo_reports_reversible_physics_rules_change(self) -> None:
         runtime = OmoikaneReferenceOS()

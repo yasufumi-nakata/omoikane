@@ -6,6 +6,7 @@ summary: Canonical L6 contract for bounded collective identity formation and rev
 imports:
   collective_record: ../schemas/collective_record.schema
   collective_merge_session: ../schemas/collective_merge_session.schema
+  collective_dissolution_receipt: ../schemas/collective_dissolution_receipt.schema
 operations:
   register_collective:
     summary: Register one temporary collective identity distinct from its members after unanimous bounded-merge consent.
@@ -166,45 +167,11 @@ operations:
             type: string
             minLength: 1
     output:
-      inline_schema:
-        type: object
-        required:
-          - collective_id
-          - recorded_at
-          - requested_by
-          - status
-          - member_confirmations
-          - reason
-          - member_recovery_required
-          - audit_event_ref
-        properties:
-          collective_id:
-            type: string
-            minLength: 8
-          recorded_at:
-            type: string
-            format: date-time
-          requested_by:
-            type: string
-            minLength: 1
-          status:
-            type: string
-            const: dissolved
-          member_confirmations:
-            type: object
-            minProperties: 2
-            additionalProperties:
-              type: boolean
-              const: true
-          reason:
-            type: string
-            minLength: 1
-          member_recovery_required:
-            type: boolean
-            const: true
-          audit_event_ref:
-            type: string
-            minLength: 1
+      schema_ref: collective_dissolution_receipt
+    guarantees:
+      - receipt schema_version must match the reference runtime collective schema profile
+      - member_confirmations must include every member with true confirmation
+      - dissolution audit evidence must be digest-only ledger ref metadata, not raw merge payload
 events:
   collective.formed:
     payload:
@@ -214,19 +181,4 @@ events:
       schema_ref: collective_merge_session
   collective.dissolved:
     payload:
-      inline_schema:
-        type: object
-        required:
-          - collective_id
-          - status
-          - member_recovery_required
-        properties:
-          collective_id:
-            type: string
-            minLength: 8
-          status:
-            type: string
-            const: dissolved
-          member_recovery_required:
-            type: boolean
-            const: true
+      schema_ref: collective_dissolution_receipt

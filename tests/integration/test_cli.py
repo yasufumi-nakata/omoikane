@@ -200,7 +200,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["merge_window_bounded"])
         self.assertTrue(result["validation"]["private_escape_honored"])
         self.assertTrue(result["validation"]["identity_confirmation_complete"])
+        self.assertTrue(result["validation"]["dissolution_receipt_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
         self.assertEqual("dissolved", result["collective"]["status"])
+        self.assertEqual("1.0", result["dissolution"]["schema_version"])
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("private_reality", result["wms"]["escape"]["new_mode"])
 

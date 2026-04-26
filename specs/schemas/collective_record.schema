@@ -121,6 +121,7 @@ properties:
       - "null"
     additionalProperties: false
     required:
+      - schema_version
       - collective_id
       - recorded_at
       - requested_by
@@ -130,6 +131,8 @@ properties:
       - member_recovery_required
       - audit_event_ref
     properties:
+      schema_version:
+        const: "1.0"
       collective_id:
         type: string
         minLength: 8

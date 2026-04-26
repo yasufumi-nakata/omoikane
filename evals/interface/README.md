@@ -82,6 +82,7 @@ safe baseline からの stabilize 復帰、qualia binding ref をまとめて確
 ## 実装済み eval
 
 - `bdb_fail_safe_reversibility.yaml`
+- `collective_dissolution_receipt.yaml`
 - `collective_merge_reversibility.yaml`
 - `imc_disclosure_floor.yaml`
 - `sensory_loopback_artifact_family.yaml`

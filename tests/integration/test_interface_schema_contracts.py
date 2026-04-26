@@ -72,6 +72,21 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             )
         self.assertTrue(result["validation"]["time_rate_attestation_transport_bound"])
 
+    def test_collective_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_collective_demo()
+
+        self._assert_schema_valid("specs/schemas/collective_record.schema", result["collective"])
+        self._assert_schema_valid(
+            "specs/schemas/collective_merge_session.schema",
+            result["merge"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/collective_dissolution_receipt.schema",
+            result["dissolution"],
+        )
+        self.assertTrue(result["validation"]["dissolution_receipt_bound"])
+        self.assertTrue(result["validation"]["dissolution_member_confirmations_bound"])
+
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
         result = self.runtime.run_wms_demo()
 

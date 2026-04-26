@@ -66,17 +66,23 @@ collective_profile:
 - active merge session が残っている間は不可
 - 構成員全員の confirmation が揃って初めて `dissolved`
 - collective 側の目的は終了し、各構成員は独立 subjectivity へ戻る
+- `collective_dissolution_receipt.schema` に合う
+  first-class receipt を返し、`schema_version`、全 member confirmation、
+  `member_recovery_required=true`、digest-only `audit_event_ref` を束縛する
 
 ## reference runtime の扱い
 
 - `interface.collective.v0.idl` を導入し、
   `register_collective / open_merge_session / close_merge_session / dissolve_collective`
   の 4 op を固定する
-- `collective_record.schema` と `collective_merge_session.schema` を追加する
+- `collective_record.schema`、`collective_merge_session.schema`、
+  `collective_dissolution_receipt.schema` を追加する
 - `collective-demo` は IMC `merge_thought`、WMS divergence、private escape、
-  identity confirmation、dissolution を 1 シナリオで smoke する
+  identity confirmation、schema-bound dissolution receipt を 1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
+- `evals/interface/collective_dissolution_receipt.yaml` は
+  dissolution receipt の public schema、全 member confirmation、digest-only audit ref を監査する
 
 ## 不変条件
 

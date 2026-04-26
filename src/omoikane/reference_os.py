@@ -7553,6 +7553,7 @@ json.dump(response, sys.stdout)
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
         collective_validation = self.collective.validate_record(final_collective)
         merge_validation = self.collective.validate_merge_session(final_merge)
+        dissolution_validation = self.collective.validate_dissolution_receipt(dissolution)
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
 
         self.ledger.append(
@@ -7620,9 +7621,28 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.dissolved",
+            payload={
+                "collective_id": dissolution["collective_id"],
+                "schema_version": dissolution["schema_version"],
+                "status": dissolution["status"],
+                "member_confirmations": dissolution["member_confirmations"],
+                "member_recovery_required": dissolution["member_recovery_required"],
+                "audit_event_ref": dissolution["audit_event_ref"],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective-dissolution",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         validation = {
-            "ok": collective_validation["ok"] and merge_validation["ok"],
+            "ok": collective_validation["ok"]
+            and merge_validation["ok"]
+            and dissolution_validation["ok"],
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
             "merge_window_bounded": merge_validation["merge_window_bounded"],
@@ -7630,6 +7650,12 @@ json.dump(response, sys.stdout)
             "private_escape_honored": escape["private_escape_honored"],
             "identity_confirmation_complete": merge_validation["identity_confirmation_complete"],
             "dissolution_clears_collective": final_collective["status"] == "dissolved",
+            "dissolution_receipt_bound": dissolution_validation["ok"],
+            "dissolution_schema_version_bound": dissolution_validation["schema_version_bound"],
+            "dissolution_member_confirmations_bound": dissolution_validation[
+                "member_confirmation_complete"
+            ],
+            "dissolution_audit_bound": dissolution_validation["audit_bound"],
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
         }

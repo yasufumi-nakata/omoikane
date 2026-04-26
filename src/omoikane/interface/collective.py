@@ -242,6 +242,7 @@ class CollectiveIdentityService:
 
         dissolved_at = utc_now_iso()
         receipt = {
+            "schema_version": COLLECTIVE_SCHEMA_VERSION,
             "collective_id": record["collective_id"],
             "recorded_at": dissolved_at,
             "requested_by": requester,
@@ -368,6 +369,44 @@ class CollectiveIdentityService:
             "identity_confirmation_complete": bool(session.get("identity_confirmations"))
             and all(bool(value) for value in session.get("identity_confirmations", {}).values()),
             "private_escape_honored": session.get("private_escape_honored") is True,
+        }
+
+    def validate_dissolution_receipt(self, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        self._check_non_empty_string(receipt.get("collective_id"), "collective_id", errors)
+        self._check_non_empty_string(receipt.get("recorded_at"), "recorded_at", errors)
+        self._check_non_empty_string(receipt.get("requested_by"), "requested_by", errors)
+        self._check_non_empty_string(receipt.get("reason"), "reason", errors)
+        self._check_non_empty_string(receipt.get("audit_event_ref"), "audit_event_ref", errors)
+        if receipt.get("schema_version") != COLLECTIVE_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {COLLECTIVE_SCHEMA_VERSION}")
+        if receipt.get("status") != "dissolved":
+            errors.append("status must equal dissolved")
+        if receipt.get("member_recovery_required") is not True:
+            errors.append("member_recovery_required must be true")
+
+        confirmations = receipt.get("member_confirmations")
+        if not isinstance(confirmations, Mapping):
+            errors.append("member_confirmations must be an object")
+            member_confirmation_complete = False
+        else:
+            member_confirmation_complete = len(confirmations) >= COLLECTIVE_MIN_MEMBERS and all(
+                value is True for value in confirmations.values()
+            )
+            if not member_confirmation_complete:
+                errors.append("member_confirmations must include every member with true confirmation")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "schema_version_bound": receipt.get("schema_version") == COLLECTIVE_SCHEMA_VERSION,
+            "member_confirmation_complete": member_confirmation_complete,
+            "member_recovery_required": receipt.get("member_recovery_required") is True,
+            "audit_bound": isinstance(receipt.get("audit_event_ref"), str)
+            and bool(receipt.get("audit_event_ref")),
         }
 
     def _require_record(self, collective_id: str) -> Dict[str, Any]:

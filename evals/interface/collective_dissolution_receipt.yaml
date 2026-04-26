@@ -1,0 +1,18 @@
+title: Collective Dissolution Receipt Contract
+layer: L6
+objective: >
+  Protect bounded collective teardown by requiring a first-class dissolution
+  receipt after merge closure, member recovery confirmation, and digest-only audit
+  binding.
+fixtures:
+  - name: bounded_collective_dissolution_receipt
+    command: PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
+    collective_status: dissolved
+    dissolution_status: dissolved
+assertions:
+  - collective dissolution output conforms to collective_dissolution_receipt.schema
+  - dissolution receipt carries schema_version 1.0
+  - every member confirmation in the receipt is true
+  - member_recovery_required remains true after dissolution
+  - audit_event_ref is retained as digest-only ledger reference metadata
+  - ledger includes one interface-collective-dissolution event for the first-class receipt

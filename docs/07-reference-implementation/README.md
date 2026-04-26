@@ -796,7 +796,11 @@ unilateral emergency disconnect をまとめて確認する。
 distinct collective ID、`merge_thought` 10 秒 cap、Federation attested merge、
 WMS major divergence 後の `private_reality` escape、
 全 member の post-disconnect identity confirmation、
-collective dissolution を 1 シナリオで確認する。
+`collective_dissolution_receipt.schema` に合う
+schema-bound collective dissolution receipt を 1 シナリオで確認する。
+同じ receipt は `schema_version=1.0`、全 member confirmation、
+`member_recovery_required=true`、digest-only `audit_event_ref` を保持し、
+`interface-collective-dissolution` ledger event として単独に検証できる。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

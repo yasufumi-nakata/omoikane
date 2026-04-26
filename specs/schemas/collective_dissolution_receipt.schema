@@ -1,0 +1,60 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_dissolution_receipt.schema"
+title: CollectiveDissolutionReceipt
+description: >
+  First-class dissolution receipt proving that a bounded collective identity ended
+  after every member reclaimed independent subjectivity.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - collective_id
+  - recorded_at
+  - requested_by
+  - status
+  - member_confirmations
+  - reason
+  - member_recovery_required
+  - audit_event_ref
+properties:
+  schema_version:
+    const: "1.0"
+  collective_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  requested_by:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    const: dissolved
+  member_confirmations:
+    type: object
+    minProperties: 2
+    additionalProperties:
+      type: boolean
+      const: true
+  reason:
+    type: string
+    minLength: 1
+  member_recovery_required:
+    type: boolean
+    const: true
+  audit_event_ref:
+    type: string
+    minLength: 1
+examples:
+  - schema_version: "1.0"
+    collective_id: identity://collective-meridian
+    recorded_at: "2026-04-26T00:00:00Z"
+    requested_by: identity://origin
+    status: dissolved
+    member_confirmations:
+      identity://origin: true
+      identity://peer: true
+    reason: bounded merge ended and both members recovered independent subjectivity
+    member_recovery_required: true
+    audit_event_ref: ledger://collective-dissolution/collective-dissolution-0123456789ab
