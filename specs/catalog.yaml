@@ -2927,10 +2927,21 @@ entries:
     consumers:
       - specs/interfaces/kernel.energy_budget.v0.idl
       - specs/schemas/energy_budget_voluntary_subsidy_receipt.schema
+      - specs/schemas/energy_budget_subsidy_verifier_quorum_threshold_policy_receipt.schema
       - reference-runtime
       - evals/safety/energy_budget_subsidy_verifier.yaml
       - docs/02-subsystems/kernel/energy-budget.md
-    rationale: Required to serialize multi-authority, multi-jurisdiction live verifier quorum receipts, including accepted response signature digest coverage, before voluntary subsidy authority binding can become verified.
+    rationale: Required to serialize multi-authority, multi-jurisdiction live verifier quorum receipts, including accepted response signature digest coverage and signed threshold-policy binding, before voluntary subsidy authority binding can become verified.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/energy_budget_subsidy_verifier_quorum_threshold_policy_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.energy_budget.v0.idl
+      - specs/schemas/energy_budget_subsidy_verifier_quorum_receipt.schema
+      - reference-runtime
+      - evals/safety/energy_budget_subsidy_verifier.yaml
+      - docs/02-subsystems/kernel/energy-budget.md
+    rationale: Required to serialize the signed jurisdiction policy registry receipt that proves EnergyBudget subsidy verifier quorum thresholds were not hard-coded reviewer constants.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_shared_fabric_allocation_receipt.schema

@@ -133,6 +133,21 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(receipt["all_consent_digests_valid"])
         self.assertTrue(receipt["funding_policy_signature_bound"])
         self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_source_bound"
+            ]
+        )
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_signature_bound"
+            ]
+        )
+        self.assertFalse(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "raw_threshold_policy_payload_stored"
+            ]
+        )
         self.assertEqual(
             "verified",
             receipt["signer_roster_verifier_receipt"]["verifier_receipt_status"],

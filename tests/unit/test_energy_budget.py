@@ -523,10 +523,99 @@ class EnergyBudgetTests(unittest.TestCase):
             receipt["signer_roster_verifier_quorum_receipt"]["quorum_status"],
         )
         self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_source_bound"
+            ]
+        )
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_signature_bound"
+            ]
+        )
+        self.assertFalse(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "raw_threshold_policy_payload_stored"
+            ]
+        )
+        self.assertEqual(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_receipt"
+            ]["digest"],
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_digest"
+            ],
+        )
+        self.assertTrue(
             receipt["signer_roster_verifier_receipt"]["network_probe_bound"]
         )
         self.assertFalse(
             receipt["signer_roster_verifier_receipt"]["raw_verifier_payload_stored"]
+        )
+
+    def test_verifier_quorum_rejects_tampered_threshold_policy(self) -> None:
+        service = EnergyBudgetService()
+        pool_receipt = service.evaluate_pool_floor(
+            pool_id="energy-pool://subsidy-threshold-tamper",
+            member_requests=[
+                {
+                    "identity_id": "identity://energy-budget/subsidy-a",
+                    "workload_class": "migration",
+                    "requested_budget_jps": 22,
+                    "observed_capacity_jps": 30,
+                },
+                {
+                    "identity_id": "identity://energy-budget/subsidy-b",
+                    "workload_class": "council",
+                    "requested_budget_jps": 38,
+                    "observed_capacity_jps": 32,
+                },
+            ],
+        )
+        draft_receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+        )
+        primary_verifier, _backup_verifier, verifier_quorum = (
+            build_live_subsidy_verifier_quorum(service, draft_receipt)
+        )
+        verifier_quorum["threshold_policy_receipt"]["policy_signature_digest"] = (
+            "0" * 64
+        )
+
+        receipt = service.evaluate_voluntary_subsidy(
+            pool_receipt=pool_receipt,
+            subsidy_offers=[
+                {
+                    "donor_identity_id": "identity://energy-budget/subsidy-b",
+                    "recipient_identity_id": "identity://energy-budget/subsidy-a",
+                    "offered_jps": 8,
+                    "consent_ref": "consent://energy-budget/subsidy-b-to-a/v1",
+                    "revocation_ref": "revocation://energy-budget/subsidy-b-to-a/v1",
+                }
+            ],
+            signer_roster_verifier_receipt=primary_verifier,
+            signer_roster_verifier_quorum_receipt=verifier_quorum,
+        )
+        validation = service.validate_voluntary_subsidy_receipt(receipt)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["signer_roster_verifier_quorum_bound"])
+        self.assertFalse(
+            validation["signer_roster_verifier_threshold_policy_signature_bound"]
+        )
+        self.assertEqual("rejected", receipt["authority_binding_status"])
+        self.assertIn("signer-roster-verifier-quorum-unbound", receipt["rejection_reasons"])
+        self.assertIn(
+            "signer_roster_verifier_quorum_receipt: threshold_policy_receipt must validate",
+            validation["errors"],
         )
 
     def test_voluntary_subsidy_validation_rejects_tampered_consent_digest(self) -> None:

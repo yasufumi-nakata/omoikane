@@ -6996,6 +6996,11 @@ json.dump(response, sys.stdout)
                 "signer_roster_verifier_quorum_receipt_digest": subsidy_receipt[
                     "signer_roster_verifier_quorum_receipt_digest"
                 ],
+                "signer_roster_verifier_quorum_threshold_policy_digest": (
+                    subsidy_receipt["signer_roster_verifier_quorum_receipt"][
+                        "threshold_policy_digest"
+                    ]
+                ),
                 "signer_roster_verifier_response_signature_digest": subsidy_receipt[
                     "signer_roster_verifier_receipt"
                 ]["response_signature_digest"],
@@ -7035,6 +7040,16 @@ json.dump(response, sys.stdout)
                     and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
                         "signed_response_envelope_quorum_bound"
                     ]
+                    and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
+                        "threshold_policy_source_bound"
+                    ]
+                    and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
+                        "threshold_policy_signature_bound"
+                    ]
+                    and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
+                        "raw_threshold_policy_payload_stored"
+                    ]
+                    is False
                     and subsidy_receipt["signer_roster_verifier_quorum_receipt"][
                         "quorum_status"
                     ]
@@ -7101,6 +7116,29 @@ json.dump(response, sys.stdout)
                 "signer_roster_verifier_quorum_signed_response_envelope_bound": subsidy_receipt[
                     "signer_roster_verifier_quorum_receipt"
                 ]["signed_response_envelope_quorum_bound"],
+                "signer_roster_verifier_quorum_threshold_policy_bound": (
+                    subsidy_validation[
+                        "signer_roster_verifier_threshold_policy_bound"
+                    ]
+                ),
+                "signer_roster_verifier_quorum_threshold_policy_signature_bound": (
+                    subsidy_validation[
+                        "signer_roster_verifier_threshold_policy_signature_bound"
+                    ]
+                ),
+                "signer_roster_verifier_quorum_threshold_policy_digest": subsidy_receipt[
+                    "signer_roster_verifier_quorum_receipt"
+                ]["threshold_policy_digest"],
+                "signer_roster_verifier_quorum_threshold_policy_ref": subsidy_receipt[
+                    "signer_roster_verifier_quorum_receipt"
+                ]["threshold_policy_ref"],
+                "signer_roster_verifier_quorum_policy_registry_refs": subsidy_receipt[
+                    "signer_roster_verifier_quorum_receipt"
+                ]["jurisdiction_policy_registry_refs"],
+                "raw_threshold_policy_payload_redacted": subsidy_receipt[
+                    "signer_roster_verifier_quorum_receipt"
+                ]["raw_threshold_policy_payload_stored"]
+                is False,
                 "raw_verifier_payload_redacted": subsidy_receipt[
                     "signer_roster_verifier_receipt"
                 ]["raw_verifier_payload_stored"]

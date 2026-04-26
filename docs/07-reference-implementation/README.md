@@ -192,18 +192,24 @@ response signature digest も確認し、
 primary `JP-13` verifier と backup `SG-01` verifier の live receipt を
 accepted authority refs / verifier jurisdictions / route refs /
 response digest set / response signature digest set に束ね、
+`signed-energy-subsidy-verifier-quorum-threshold-policy-v1` が
+quorum threshold を jurisdiction policy registry refs / digests、
+verifier jurisdiction set、policy body digest、signature digest に束縛し、
 offer revocation refs を revocation registry digest に束ね、
 audit authority digest が signer roster と revocation registry の両方を同じ法域で監査する。
 `authority_binding_status=verified`、`funding_policy_signature_bound=true`、
 `signer_roster_verifier_bound=true`、`network_probe_bound=true`、
 `signer_roster_verifier_quorum_bound=true`、`quorum_status=complete`、
+`threshold_policy_source_bound=true`、`threshold_policy_signature_bound=true`、
 `signed_response_envelope_bound=true`、
 `signed_response_envelope_quorum_bound=true`、
 `revocation_registry_bound=true`、`audit_authority_bound=true`、
 `jurisdiction_authority_bound=true`、`raw_verifier_payload_stored=false`、
 `raw_response_signature_payload_stored=false`、
+`raw_threshold_policy_payload_stored=false`、
 `raw_authority_payload_stored=false` が
 `energy_budget_subsidy_verifier_receipt.schema` /
+`energy_budget_subsidy_verifier_quorum_threshold_policy_receipt.schema` /
 `energy_budget_subsidy_verifier_quorum_receipt.schema` /
 `energy_budget_voluntary_subsidy_receipt.schema` と CLI smoke で検証される。
 

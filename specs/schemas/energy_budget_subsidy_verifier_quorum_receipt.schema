@@ -25,6 +25,20 @@ required:
   - accepted_verifier_route_refs
   - accepted_verifier_response_digests
   - accepted_verifier_response_signature_digests
+  - threshold_policy_id
+  - threshold_profile
+  - threshold_digest_profile
+  - threshold_signature_digest_profile
+  - threshold_policy_ref
+  - threshold_policy_receipt
+  - threshold_policy_digest
+  - threshold_policy_signature_digest
+  - threshold_policy_source_bound
+  - threshold_policy_signature_bound
+  - jurisdiction_policy_registry_refs
+  - jurisdiction_policy_registry_digests
+  - jurisdiction_policy_registry_set_digest
+  - raw_threshold_policy_payload_stored
   - primary_verifier_receipt_digest
   - primary_verifier_digest_included
   - signer_roster_ref
@@ -110,6 +124,51 @@ properties:
       type: string
       minLength: 64
       maxLength: 64
+  threshold_policy_id:
+    const: signed-energy-subsidy-verifier-quorum-threshold-policy-v1
+  threshold_profile:
+    const: jurisdiction-policy-registry-energy-subsidy-verifier-quorum-threshold-v1
+  threshold_digest_profile:
+    const: energy-subsidy-verifier-quorum-threshold-policy-digest-v1
+  threshold_signature_digest_profile:
+    const: energy-subsidy-verifier-quorum-threshold-policy-signature-digest-v1
+  threshold_policy_ref:
+    type: string
+    pattern: "^policy://"
+  threshold_policy_receipt:
+    $ref: "energy_budget_subsidy_verifier_quorum_threshold_policy_receipt.schema"
+  threshold_policy_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  threshold_policy_signature_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  threshold_policy_source_bound:
+    const: true
+  threshold_policy_signature_bound:
+    const: true
+  jurisdiction_policy_registry_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^policy-registry://"
+  jurisdiction_policy_registry_digests:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 64
+      maxLength: 64
+  jurisdiction_policy_registry_set_digest:
+    type: string
+    minLength: 64
+    maxLength: 64
+  raw_threshold_policy_payload_stored:
+    const: false
   primary_verifier_receipt_digest:
     type: string
     minLength: 64

@@ -8,6 +8,7 @@ imports:
   energy_budget_pool_receipt: ../schemas/energy_budget_pool_receipt.schema
   energy_budget_subsidy_verifier_receipt: ../schemas/energy_budget_subsidy_verifier_receipt.schema
   energy_budget_subsidy_verifier_quorum_receipt: ../schemas/energy_budget_subsidy_verifier_quorum_receipt.schema
+  energy_budget_subsidy_verifier_quorum_threshold_policy_receipt: ../schemas/energy_budget_subsidy_verifier_quorum_threshold_policy_receipt.schema
   energy_budget_voluntary_subsidy_receipt: ../schemas/energy_budget_voluntary_subsidy_receipt.schema
   energy_budget_shared_fabric_allocation_receipt: ../schemas/energy_budget_shared_fabric_allocation_receipt.schema
   energy_floor: ../schemas/energy_floor.schema
@@ -296,6 +297,7 @@ operations:
       - funding policy signature must bind to a jurisdiction-specific signer roster and signer key reference
       - signer roster must bind to a digest-only live verifier receipt before authority_binding_status can become verified
       - signer roster verifier evidence must also bind to a multi-authority, multi-jurisdiction live verifier quorum before subsidy acceptance
+      - signer roster verifier quorum must bind to a signed jurisdiction policy registry threshold receipt before subsidy acceptance
       - caller-supplied signer_roster_verifier_receipt may come from a live HTTP endpoint probe, but must still match the funding policy and signer roster digests
       - revocation refs must bind to a revocation registry digest before subsidy acceptance
       - audit authority must share the signer jurisdiction and bind the signer roster plus revocation registry digests
@@ -403,6 +405,8 @@ operations:
           required_jurisdiction_count:
             type: integer
             minimum: 2
+          threshold_policy_receipt:
+            schema_ref: energy_budget_subsidy_verifier_quorum_threshold_policy_receipt
     output:
       schema_ref: energy_budget_subsidy_verifier_quorum_receipt
     guarantees:
@@ -411,7 +415,99 @@ operations:
       - primary_verifier_receipt_digest must be included in accepted_verifier_receipt_digests
       - signer roster, signer key, funding policy digest, and policy signature digest must match across accepted receipts
       - every accepted verifier receipt must have signed_response_envelope_bound=true and the quorum must mirror accepted response signature digests
+      - threshold_policy_receipt must validate under energy_budget_subsidy_verifier_quorum_threshold_policy_receipt and match accepted verifier jurisdictions
       - raw verifier payloads must remain outside the quorum receipt
+      - raw threshold policy payloads must remain outside the quorum receipt
+  build_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt:
+    summary: Bind subsidy verifier quorum thresholds to one signed jurisdiction policy registry receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - policy_ref
+          - jurisdiction_policy_registry_refs
+          - jurisdiction_policy_registry_digests
+          - verifier_jurisdictions
+          - signer_key_ref
+        additionalProperties: false
+        properties:
+          policy_ref:
+            type: string
+            minLength: 1
+          jurisdiction_policy_registry_refs:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              minLength: 1
+          jurisdiction_policy_registry_digests:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              minLength: 64
+              maxLength: 64
+          verifier_jurisdictions:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              minLength: 1
+          signer_key_ref:
+            type: string
+            minLength: 1
+          required_authority_count:
+            type: integer
+            minimum: 2
+          required_jurisdiction_count:
+            type: integer
+            minimum: 2
+          effective_at:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: energy_budget_subsidy_verifier_quorum_threshold_policy_receipt
+    guarantees:
+      - threshold policy body digest must bind registry refs, registry digests, verifier jurisdictions, and required quorum counts
+      - policy_signature_digest must bind signer_key_ref and policy_body_digest
+      - raw_threshold_policy_payload_stored must remain false
+  validate_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt:
+    summary: Validate one EnergyBudgetSubsidyVerifierQuorumThresholdPolicyReceipt.
+    input:
+      schema_ref: energy_budget_subsidy_verifier_quorum_threshold_policy_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - errors
+          - threshold_source_bound
+          - signature_bound
+          - policy_body_bound
+          - digest_bound
+          - raw_policy_redacted
+        additionalProperties: false
+        properties:
+          ok:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+          threshold_source_bound:
+            type: boolean
+          signature_bound:
+            type: boolean
+          policy_body_bound:
+            type: boolean
+          digest_bound:
+            type: boolean
+          raw_policy_redacted:
+            type: boolean
+    guarantees:
+      - digest must match energy-subsidy-verifier-quorum-threshold-policy-digest-v1 payload
+      - policy_signature_digest must match energy-subsidy-verifier-quorum-threshold-policy-signature-digest-v1
+      - raw threshold policy payloads must not be stored
   validate_subsidy_signer_roster_verifier_quorum_receipt:
     summary: Validate one EnergyBudgetSubsidyVerifierQuorumReceipt against multi-authority live verifier coverage.
     input:
@@ -428,6 +524,9 @@ operations:
           - primary_verifier_digest_included
           - live_network_probe_quorum_bound
           - signed_response_envelope_quorum_bound
+          - threshold_policy_source_bound
+          - threshold_policy_signature_bound
+          - raw_threshold_policy_payload_redacted
           - raw_payload_redacted
         additionalProperties: false
         properties:
@@ -449,6 +548,12 @@ operations:
             type: boolean
           signed_response_envelope_quorum_bound:
             type: boolean
+          threshold_policy_source_bound:
+            type: boolean
+          threshold_policy_signature_bound:
+            type: boolean
+          raw_threshold_policy_payload_redacted:
+            type: boolean
           raw_payload_redacted:
             type: boolean
     guarantees:
@@ -456,7 +561,9 @@ operations:
       - each nested verifier receipt must validate under energy_budget_subsidy_verifier_receipt
       - live_network_probe_quorum_bound must be true before quorum_status can become complete
       - signed_response_envelope_quorum_bound must be true before quorum_status can become complete
+      - threshold_policy_source_bound and threshold_policy_signature_bound must be true before quorum_status can become complete
       - accepted authority refs, jurisdictions, route refs, response digests, response signature digests, and receipt digests must mirror the nested verifier receipts
+      - threshold policy receipt, registry refs, and registry digests must mirror the nested threshold policy
   validate_subsidy_signer_roster_verifier_receipt:
     summary: Validate one EnergyBudgetSubsidyVerifierReceipt against the live signer roster verifier bridge.
     input:
@@ -557,6 +664,7 @@ operations:
       - authority_binding_status must be verified before voluntary_subsidy_allowed can be true
       - signer_roster_verifier_receipt must validate under energy_budget_subsidy_verifier_receipt and match the signer roster digest
       - signer_roster_verifier_quorum_receipt must validate under energy_budget_subsidy_verifier_quorum_receipt and match the primary verifier receipt digest
+      - signer_roster_verifier_quorum_receipt must bind a signed threshold-policy receipt before authority_binding_status can become verified
       - signer roster, revocation registry, and audit authority digests must be recomputable from refs
       - raw_funding_payload_stored must remain false
       - raw_authority_payload_stored must remain false

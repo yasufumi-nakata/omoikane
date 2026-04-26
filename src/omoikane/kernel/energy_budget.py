@@ -71,6 +71,18 @@ ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_DIGEST_PROFILE = (
 )
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_AUTHORITY_COUNT = 2
 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT = 2
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID = (
+    "signed-energy-subsidy-verifier-quorum-threshold-policy-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE = (
+    "jurisdiction-policy-registry-energy-subsidy-verifier-quorum-threshold-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_DIGEST_PROFILE = (
+    "energy-subsidy-verifier-quorum-threshold-policy-digest-v1"
+)
+ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE = (
+    "energy-subsidy-verifier-quorum-threshold-policy-signature-digest-v1"
+)
 ENERGY_BUDGET_SHARED_FABRIC_POLICY_ID = (
     "ap1-shared-fabric-capacity-allocation-v1"
 )
@@ -1203,6 +1215,302 @@ class EnergyBudgetService:
             "raw_payload_redacted": receipt.get("raw_verifier_payload_stored") is False,
         }
 
+    def build_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt(
+        self,
+        *,
+        policy_ref: str,
+        jurisdiction_policy_registry_refs: Sequence[str],
+        jurisdiction_policy_registry_digests: Sequence[str],
+        verifier_jurisdictions: Sequence[str],
+        signer_key_ref: str,
+        required_authority_count: int = (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_AUTHORITY_COUNT
+        ),
+        required_jurisdiction_count: int = (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT
+        ),
+        effective_at: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Bind subsidy verifier quorum thresholds to a signed registry policy."""
+
+        registry_refs = self._normalize_string_list(
+            jurisdiction_policy_registry_refs,
+            "jurisdiction_policy_registry_refs",
+        )
+        registry_digests = [
+            self._normalize_sha256_digest(
+                digest,
+                "jurisdiction_policy_registry_digests",
+            )
+            for digest in jurisdiction_policy_registry_digests
+        ]
+        if len(registry_refs) != len(registry_digests):
+            raise ValueError(
+                "jurisdiction_policy_registry_refs and digests must have equal length"
+            )
+        jurisdictions = self._normalize_string_list(
+            verifier_jurisdictions,
+            "verifier_jurisdictions",
+        )
+        required_authorities = int(required_authority_count)
+        required_jurisdictions = int(required_jurisdiction_count)
+        if (
+            required_authorities
+            < ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_AUTHORITY_COUNT
+        ):
+            raise ValueError("required_authority_count must require at least two authorities")
+        if (
+            required_jurisdictions
+            < ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT
+        ):
+            raise ValueError("required_jurisdiction_count must require at least two jurisdictions")
+        if required_jurisdictions > len(jurisdictions):
+            raise ValueError(
+                "required_jurisdiction_count cannot exceed covered verifier jurisdictions"
+            )
+        normalized_policy_ref = self._normalize_non_empty_string(
+            policy_ref,
+            "policy_ref",
+        )
+        normalized_signer_key_ref = self._normalize_non_empty_string(
+            signer_key_ref,
+            "signer_key_ref",
+        )
+        registry_set_digest = sha256_text(canonical_json(registry_digests))
+        policy_body = {
+            "policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+            ),
+            "threshold_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+            ),
+            "policy_ref": normalized_policy_ref,
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": registry_set_digest,
+            "verifier_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+        }
+        policy_body_digest = sha256_text(canonical_json(policy_body))
+        signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "signature_digest_profile": (
+                        ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+                    ),
+                    "signer_key_ref": normalized_signer_key_ref,
+                    "policy_body_digest": policy_body_digest,
+                }
+            )
+        )
+        receipt = {
+            "kind": "energy_budget_subsidy_verifier_quorum_threshold_policy_receipt",
+            "schema_version": ENERGY_BUDGET_SCHEMA_VERSION,
+            "receipt_id": new_id("energy-subsidy-verifier-quorum-policy"),
+            "policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+            ),
+            "threshold_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+            ),
+            "digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_DIGEST_PROFILE
+            ),
+            "signature_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+            ),
+            "policy_ref": normalized_policy_ref,
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": registry_set_digest,
+            "verifier_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+            "signer_key_ref": normalized_signer_key_ref,
+            "policy_body_digest": policy_body_digest,
+            "policy_signature_digest": signature_digest,
+            "threshold_source_bound": True,
+            "signature_bound": True,
+            "raw_threshold_policy_payload_stored": False,
+            "effective_at": effective_at or utc_now_iso(),
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                _subsidy_verifier_quorum_threshold_policy_receipt_digest_payload(
+                    receipt
+                )
+            )
+        )
+        return receipt
+
+    def validate_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors = []
+        if receipt.get("kind") != (
+            "energy_budget_subsidy_verifier_quorum_threshold_policy_receipt"
+        ):
+            errors.append(
+                "kind must equal energy_budget_subsidy_verifier_quorum_threshold_policy_receipt"
+            )
+        if receipt.get("schema_version") != ENERGY_BUDGET_SCHEMA_VERSION:
+            errors.append(f"schema_version must equal {ENERGY_BUDGET_SCHEMA_VERSION}")
+        if receipt.get("policy_id") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+        ):
+            errors.append("policy_id mismatch")
+        if receipt.get("threshold_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+        ):
+            errors.append("threshold_profile mismatch")
+        if receipt.get("digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_DIGEST_PROFILE
+        ):
+            errors.append("digest_profile mismatch")
+        if receipt.get("signature_digest_profile") != (
+            ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+        ):
+            errors.append("signature_digest_profile mismatch")
+        policy_ref = receipt.get("policy_ref")
+        if not isinstance(policy_ref, str) or not policy_ref.startswith("policy://"):
+            errors.append("policy_ref must start with policy://")
+            policy_ref = ""
+        signer_key_ref = receipt.get("signer_key_ref")
+        if (
+            not isinstance(signer_key_ref, str)
+            or not signer_key_ref.startswith("key://")
+        ):
+            errors.append("signer_key_ref must start with key://")
+            signer_key_ref = ""
+        registry_refs = receipt.get("jurisdiction_policy_registry_refs")
+        if not isinstance(registry_refs, list) or len(registry_refs) < 2:
+            errors.append("jurisdiction_policy_registry_refs must contain at least two values")
+            registry_refs = []
+        elif len(set(registry_refs)) != len(registry_refs):
+            errors.append("jurisdiction_policy_registry_refs must be unique")
+        for registry_ref in registry_refs:
+            if not isinstance(registry_ref, str) or not registry_ref.startswith(
+                "policy-registry://"
+            ):
+                errors.append("jurisdiction_policy_registry_refs must use policy-registry:// refs")
+        registry_digests = receipt.get("jurisdiction_policy_registry_digests")
+        if not isinstance(registry_digests, list) or len(registry_digests) < 2:
+            errors.append("jurisdiction_policy_registry_digests must contain at least two values")
+            registry_digests = []
+        for digest in registry_digests:
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+            ):
+                errors.append("jurisdiction_policy_registry_digests must be sha256 digests")
+        if len(registry_refs) != len(registry_digests):
+            errors.append(
+                "jurisdiction_policy_registry_refs and digests must have equal length"
+            )
+        jurisdictions = receipt.get("verifier_jurisdictions")
+        if not isinstance(jurisdictions, list) or len(jurisdictions) < 2:
+            errors.append("verifier_jurisdictions must contain at least two values")
+            jurisdictions = []
+        elif len(set(jurisdictions)) != len(jurisdictions):
+            errors.append("verifier_jurisdictions must be unique")
+        required_authorities = receipt.get("required_authority_count")
+        if (
+            not isinstance(required_authorities, int)
+            or required_authorities
+            < ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_AUTHORITY_COUNT
+        ):
+            errors.append("required_authority_count must require at least two authorities")
+            required_authorities = (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_AUTHORITY_COUNT
+            )
+        required_jurisdictions = receipt.get("required_jurisdiction_count")
+        if (
+            not isinstance(required_jurisdictions, int)
+            or required_jurisdictions
+            < ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT
+        ):
+            errors.append("required_jurisdiction_count must require at least two jurisdictions")
+            required_jurisdictions = (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT
+            )
+        if isinstance(jurisdictions, list) and required_jurisdictions > len(jurisdictions):
+            errors.append(
+                "required_jurisdiction_count cannot exceed covered verifier jurisdictions"
+            )
+        expected_registry_set_digest = sha256_text(canonical_json(registry_digests))
+        if receipt.get("jurisdiction_policy_registry_set_digest") != expected_registry_set_digest:
+            errors.append("jurisdiction_policy_registry_set_digest mismatch")
+        policy_body = {
+            "policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+            ),
+            "threshold_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+            ),
+            "policy_ref": policy_ref,
+            "jurisdiction_policy_registry_refs": registry_refs,
+            "jurisdiction_policy_registry_digests": registry_digests,
+            "jurisdiction_policy_registry_set_digest": expected_registry_set_digest,
+            "verifier_jurisdictions": jurisdictions,
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
+        }
+        expected_policy_body_digest = sha256_text(canonical_json(policy_body))
+        policy_body_bound = receipt.get("policy_body_digest") == expected_policy_body_digest
+        if not policy_body_bound:
+            errors.append("policy_body_digest must bind threshold policy fields")
+        expected_signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "signature_digest_profile": (
+                        ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+                    ),
+                    "signer_key_ref": signer_key_ref,
+                    "policy_body_digest": expected_policy_body_digest,
+                }
+            )
+        )
+        signature_bound = bool(
+            receipt.get("policy_signature_digest") == expected_signature_digest
+            and receipt.get("signature_bound") is True
+        )
+        if not signature_bound:
+            errors.append("policy_signature_digest must bind signer key and policy body")
+        threshold_source_bound = bool(
+            policy_body_bound
+            and signature_bound
+            and receipt.get("threshold_source_bound") is True
+            and receipt.get("raw_threshold_policy_payload_stored") is False
+        )
+        if not threshold_source_bound:
+            errors.append("threshold_source_bound must reflect signed registry policy")
+        if receipt.get("raw_threshold_policy_payload_stored") is not False:
+            errors.append("raw_threshold_policy_payload_stored must be false")
+        expected_digest = sha256_text(
+            canonical_json(
+                _subsidy_verifier_quorum_threshold_policy_receipt_digest_payload(
+                    receipt
+                )
+            )
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match subsidy verifier quorum threshold policy")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "threshold_source_bound": threshold_source_bound,
+            "signature_bound": signature_bound,
+            "policy_body_bound": policy_body_bound,
+            "digest_bound": digest_bound,
+            "raw_policy_redacted": (
+                receipt.get("raw_threshold_policy_payload_stored") is False
+            ),
+        }
+
     def build_subsidy_signer_roster_verifier_quorum_receipt(
         self,
         *,
@@ -1214,6 +1522,7 @@ class EnergyBudgetService:
         required_jurisdiction_count: int = (
             ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_REQUIRED_JURISDICTION_COUNT
         ),
+        threshold_policy_receipt: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Bind multiple live verifier probes to one digest-only subsidy quorum."""
 
@@ -1254,6 +1563,8 @@ class EnergyBudgetService:
             primary_verifier_receipt_digest or str(receipts[0].get("digest", "")),
             "primary_verifier_receipt_digest",
         )
+        required_authorities = int(required_authority_count)
+        required_jurisdictions = int(required_jurisdiction_count)
         common_evidence_fields = (
             "signer_roster_ref",
             "signer_roster_digest",
@@ -1286,15 +1597,67 @@ class EnergyBudgetService:
             )
         )
         primary_digest_included = primary_digest in accepted_digests
+        if threshold_policy_receipt is None:
+            registry_refs = [
+                _subsidy_verifier_quorum_registry_ref(jurisdiction)
+                for jurisdiction in accepted_jurisdictions
+            ]
+            threshold_policy = (
+                self.build_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt(
+                    policy_ref=(
+                        "policy://energy-budget-subsidy-verifier-quorum/"
+                        "default-threshold/v1"
+                    ),
+                    jurisdiction_policy_registry_refs=registry_refs,
+                    jurisdiction_policy_registry_digests=[
+                        _subsidy_verifier_quorum_registry_digest(
+                            registry_ref=registry_ref,
+                            verifier_jurisdiction=jurisdiction,
+                            required_authority_count=required_authorities,
+                            required_jurisdiction_count=required_jurisdictions,
+                        )
+                        for registry_ref, jurisdiction in zip(
+                            registry_refs,
+                            accepted_jurisdictions,
+                        )
+                    ],
+                    verifier_jurisdictions=accepted_jurisdictions,
+                    signer_key_ref=(
+                        "key://energy-budget/subsidy-verifier-quorum/"
+                        "threshold-policy-signer"
+                    ),
+                    required_authority_count=required_authorities,
+                    required_jurisdiction_count=required_jurisdictions,
+                )
+            )
+        else:
+            threshold_policy = dict(threshold_policy_receipt)
+        threshold_policy_validation = (
+            self.validate_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt(
+                threshold_policy
+            )
+        )
+        if not threshold_policy_validation["ok"]:
+            raise ValueError("threshold_policy_receipt must validate")
+        threshold_source_bound = bool(
+            threshold_policy_validation["threshold_source_bound"]
+            and threshold_policy_validation["signature_bound"]
+            and int(threshold_policy["required_authority_count"]) == required_authorities
+            and int(threshold_policy["required_jurisdiction_count"])
+            == required_jurisdictions
+            and list(threshold_policy["verifier_jurisdictions"])
+            == accepted_jurisdictions
+        )
         quorum_complete = bool(
-            len(accepted_receipts) >= int(required_authority_count)
-            and len(accepted_authority_refs) >= int(required_authority_count)
-            and len(accepted_jurisdictions) >= int(required_jurisdiction_count)
+            len(accepted_receipts) >= required_authorities
+            and len(accepted_authority_refs) >= required_authorities
+            and len(accepted_jurisdictions) >= required_jurisdictions
             and primary_digest_included
             and all_verifier_receipts_verified
             and live_network_probe_quorum_bound
             and signed_response_envelope_quorum_bound
             and common_evidence_bound
+            and threshold_source_bound
         )
         receipt = {
             "kind": "energy_budget_subsidy_verifier_quorum_receipt",
@@ -1306,8 +1669,8 @@ class EnergyBudgetService:
             "quorum_digest_profile": (
                 ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_DIGEST_PROFILE
             ),
-            "required_authority_count": int(required_authority_count),
-            "required_jurisdiction_count": int(required_jurisdiction_count),
+            "required_authority_count": required_authorities,
+            "required_jurisdiction_count": required_jurisdictions,
             "verifier_receipts": receipts,
             "accepted_probe_count": len(accepted_receipts),
             "accepted_verifier_receipt_digests": accepted_digests,
@@ -1321,6 +1684,38 @@ class EnergyBudgetService:
             "accepted_verifier_response_signature_digests": (
                 accepted_response_signature_digests
             ),
+            "threshold_policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+            ),
+            "threshold_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+            ),
+            "threshold_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_DIGEST_PROFILE
+            ),
+            "threshold_signature_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+            ),
+            "threshold_policy_ref": threshold_policy["policy_ref"],
+            "threshold_policy_receipt": threshold_policy,
+            "threshold_policy_digest": threshold_policy["digest"],
+            "threshold_policy_signature_digest": threshold_policy[
+                "policy_signature_digest"
+            ],
+            "threshold_policy_source_bound": threshold_source_bound,
+            "threshold_policy_signature_bound": threshold_policy_validation[
+                "signature_bound"
+            ],
+            "jurisdiction_policy_registry_refs": threshold_policy[
+                "jurisdiction_policy_registry_refs"
+            ],
+            "jurisdiction_policy_registry_digests": threshold_policy[
+                "jurisdiction_policy_registry_digests"
+            ],
+            "jurisdiction_policy_registry_set_digest": threshold_policy[
+                "jurisdiction_policy_registry_set_digest"
+            ],
+            "raw_threshold_policy_payload_stored": False,
             "primary_verifier_receipt_digest": primary_digest,
             "primary_verifier_digest_included": primary_digest_included,
             "signer_roster_ref": str(first_receipt.get("signer_roster_ref", "")),
@@ -1496,6 +1891,71 @@ class EnergyBudgetService:
 
         required_authority_count = int(receipt.get("required_authority_count", 0))
         required_jurisdiction_count = int(receipt.get("required_jurisdiction_count", 0))
+        threshold_policy = receipt.get("threshold_policy_receipt")
+        threshold_policy_validation = {
+            "ok": False,
+            "threshold_source_bound": False,
+            "signature_bound": False,
+        }
+        if not isinstance(threshold_policy, Mapping):
+            errors.append("threshold_policy_receipt must be an object")
+            threshold_policy = {}
+        else:
+            threshold_policy_validation = (
+                self.validate_subsidy_signer_roster_verifier_quorum_threshold_policy_receipt(
+                    threshold_policy
+                )
+            )
+            if not threshold_policy_validation["ok"]:
+                errors.append("threshold_policy_receipt must validate")
+        threshold_expected_values = {
+            "threshold_policy_id": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+            ),
+            "threshold_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+            ),
+            "threshold_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_DIGEST_PROFILE
+            ),
+            "threshold_signature_digest_profile": (
+                ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_SIGNATURE_DIGEST_PROFILE
+            ),
+            "threshold_policy_ref": threshold_policy.get("policy_ref"),
+            "threshold_policy_digest": threshold_policy.get("digest"),
+            "threshold_policy_signature_digest": threshold_policy.get(
+                "policy_signature_digest"
+            ),
+            "jurisdiction_policy_registry_refs": threshold_policy.get(
+                "jurisdiction_policy_registry_refs"
+            ),
+            "jurisdiction_policy_registry_digests": threshold_policy.get(
+                "jurisdiction_policy_registry_digests"
+            ),
+            "jurisdiction_policy_registry_set_digest": threshold_policy.get(
+                "jurisdiction_policy_registry_set_digest"
+            ),
+        }
+        for field_name, expected_value in threshold_expected_values.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must match threshold policy receipt")
+        threshold_source_bound = bool(
+            threshold_policy_validation["threshold_source_bound"]
+            and threshold_policy_validation["signature_bound"]
+            and threshold_policy.get("required_authority_count")
+            == required_authority_count
+            and threshold_policy.get("required_jurisdiction_count")
+            == required_jurisdiction_count
+            and threshold_policy.get("verifier_jurisdictions")
+            == accepted_jurisdictions
+        )
+        threshold_signature_bound = bool(threshold_policy_validation["signature_bound"])
+        if receipt.get("threshold_policy_source_bound") is not threshold_source_bound:
+            errors.append("threshold_policy_source_bound must reflect signed threshold policy")
+        if receipt.get("threshold_policy_signature_bound") is not threshold_signature_bound:
+            errors.append("threshold_policy_signature_bound must reflect threshold signature")
+        if receipt.get("raw_threshold_policy_payload_stored") is not False:
+            errors.append("raw_threshold_policy_payload_stored must be false")
         quorum_complete = bool(
             len(accepted_receipts) >= required_authority_count
             and len(accepted_authority_refs) >= required_authority_count
@@ -1505,6 +1965,7 @@ class EnergyBudgetService:
             and live_network_probe_quorum_bound
             and signed_response_envelope_quorum_bound
             and common_evidence_bound
+            and threshold_source_bound
         )
         expected_status = "complete" if quorum_complete else "rejected"
         if receipt.get("quorum_status") != expected_status:
@@ -1526,6 +1987,11 @@ class EnergyBudgetService:
             "live_network_probe_quorum_bound": live_network_probe_quorum_bound,
             "signed_response_envelope_quorum_bound": (
                 signed_response_envelope_quorum_bound
+            ),
+            "threshold_policy_source_bound": threshold_source_bound,
+            "threshold_policy_signature_bound": threshold_signature_bound,
+            "raw_threshold_policy_payload_redacted": (
+                receipt.get("raw_threshold_policy_payload_stored") is False
             ),
             "raw_payload_redacted": receipt.get("raw_verifier_payload_stored") is False,
         }
@@ -2364,6 +2830,12 @@ class EnergyBudgetService:
             "signer_roster_verifier_quorum_bound": (
                 signer_roster_verifier_quorum_bound
             ),
+            "signer_roster_verifier_threshold_policy_bound": bool(
+                quorum_validation.get("threshold_policy_source_bound")
+            ),
+            "signer_roster_verifier_threshold_policy_signature_bound": bool(
+                quorum_validation.get("threshold_policy_signature_bound")
+            ),
             "revocation_registry_bound": revocation_registry_bound,
             "audit_authority_bound": audit_authority_bound,
             "jurisdiction_authority_bound": jurisdiction_authority_bound,
@@ -2748,6 +3220,29 @@ class EnergyBudgetService:
             raise ValueError(f"{field_name} must be a non-empty string")
         return value.strip()
 
+    @classmethod
+    def _normalize_string_list(
+        cls,
+        values: Sequence[str],
+        field_name: str,
+    ) -> list[str]:
+        if not values:
+            raise ValueError(f"{field_name} must not be empty")
+        normalized = [
+            cls._normalize_non_empty_string(value, field_name)
+            for value in values
+        ]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError(f"{field_name} must contain unique values")
+        return normalized
+
+    @classmethod
+    def _normalize_sha256_digest(cls, value: Any, field_name: str) -> str:
+        digest = cls._normalize_non_empty_string(value, field_name)
+        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            raise ValueError(f"{field_name} must be a sha256 hex digest")
+        return digest
+
     @staticmethod
     def _member_floor_summary(member_receipt: Mapping[str, Any]) -> Dict[str, Any]:
         required_floor = int(member_receipt["energy_floor"]["minimum_joules_per_second"])
@@ -2877,6 +3372,12 @@ def _subsidy_verifier_quorum_receipt_digest_payload(
     return {key: value for key, value in receipt.items() if key != "digest"}
 
 
+def _subsidy_verifier_quorum_threshold_policy_receipt_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
+
+
 def _shared_fabric_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
 
@@ -2896,6 +3397,36 @@ def _is_live_http_endpoint(endpoint_ref: str) -> bool:
 
 def _is_verifier_route_ref(route_ref: str) -> bool:
     return route_ref.startswith("route://") or _is_live_http_endpoint(route_ref)
+
+
+def _subsidy_verifier_quorum_registry_ref(verifier_jurisdiction: str) -> str:
+    normalized = verifier_jurisdiction.lower().replace("_", "-")
+    return f"policy-registry://{normalized}/energy-subsidy-verifier-quorum/v1"
+
+
+def _subsidy_verifier_quorum_registry_digest(
+    *,
+    registry_ref: str,
+    verifier_jurisdiction: str,
+    required_authority_count: int,
+    required_jurisdiction_count: int,
+) -> str:
+    return sha256_text(
+        canonical_json(
+            {
+                "registry_ref": registry_ref,
+                "verifier_jurisdiction": verifier_jurisdiction,
+                "required_authority_count": int(required_authority_count),
+                "required_jurisdiction_count": int(required_jurisdiction_count),
+                "policy_id": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_POLICY_ID
+                ),
+                "threshold_profile": (
+                    ENERGY_BUDGET_VOLUNTARY_SUBSIDY_VERIFIER_QUORUM_THRESHOLD_PROFILE
+                ),
+            }
+        )
+    )
 
 
 def _default_subsidy_verifier_response_signing_key_ref(

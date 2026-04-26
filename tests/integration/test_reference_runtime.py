@@ -1363,6 +1363,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["all_consent_digests_valid"])
         self.assertTrue(result["validation"]["funding_policy_signature_bound"])
         self.assertTrue(result["validation"]["signer_roster_verifier_bound"])
+        self.assertTrue(
+            result["validation"]["signer_roster_verifier_quorum_threshold_policy_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "signer_roster_verifier_quorum_threshold_policy_signature_bound"
+            ]
+        )
+        self.assertTrue(result["validation"]["raw_threshold_policy_payload_redacted"])
         self.assertEqual(
             "verified",
             result["validation"]["signer_roster_verifier_status"],
@@ -1387,6 +1396,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("accepted", receipt["subsidy_status"])
         self.assertEqual("verified", receipt["authority_binding_status"])
         self.assertTrue(receipt["signer_roster_verifier_bound"])
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_source_bound"
+            ]
+        )
+        self.assertTrue(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "threshold_policy_signature_bound"
+            ]
+        )
+        self.assertFalse(
+            receipt["signer_roster_verifier_quorum_receipt"][
+                "raw_threshold_policy_payload_stored"
+            ]
+        )
         self.assertEqual(
             receipt["signer_roster_verifier_receipt"]["digest"],
             receipt["signer_roster_verifier_receipt_digest"],
