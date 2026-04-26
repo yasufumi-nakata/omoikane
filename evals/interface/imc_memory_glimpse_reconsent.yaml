@@ -1,0 +1,18 @@
+title: IMC Memory Glimpse Reconsent Receipt
+layer: L6
+objective: >
+  Timebox a Council-witnessed memory_glimpse disclosure and require
+  participant-withdrawal revocation plus Council/Guardian re-consent before
+  the same MemoryCrystal source can be disclosed again.
+fixtures:
+  - name: timeboxed_memory_glimpse_reconsent_receipt
+    command: PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
+    mode: memory_glimpse
+    receipt_profile: timeboxed-memory-glimpse-reconsent-receipt-v1
+assertions:
+  - reconsent receipt conforms to imc_memory_glimpse_reconsent_receipt.schema
+  - receipt binds the original memory_glimpse receipt digest and message id
+  - consent_window expires_after_seconds is greater than 0 and no more than 86400
+  - participant revocation binds an emergency disconnect audit event ref
+  - Council re-consent and Guardian attestation refs are required before redisclosure
+  - raw_memory_payload_stored, raw_message_payload_stored, and raw_reconsent_payload_stored remain false

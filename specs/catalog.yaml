@@ -1525,6 +1525,15 @@ entries:
     rationale: Required to serialize one Council-witnessed memory_glimpse receipt that binds selected MemoryCrystal segment digests to an IMC message digest without storing raw memory or raw message payloads.
   - priority: P1
     kind: schema
+    file: specs/schemas/imc_memory_glimpse_reconsent_receipt.schema
+    consumers:
+      - specs/interfaces/interface.imc.v0.idl
+      - reference-runtime
+      - evals/interface/imc_memory_glimpse_reconsent.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize one timeboxed memory_glimpse revoke/re-consent receipt that binds the original glimpse receipt, participant withdrawal event, Council re-consent, and Guardian attestation without storing raw memory, message, or re-consent payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/imc_session.schema
     consumers:
       - specs/interfaces/interface.imc.v0.idl
@@ -1644,6 +1653,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects memory_glimpse source binding by requiring Council witness, selected MemoryCrystal segment digests, IMC message digest, and raw payload redaction in one receipt.
+  - priority: P1
+    kind: eval
+    file: evals/interface/imc_memory_glimpse_reconsent.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects memory_glimpse redisclosure by requiring a timeboxed consent window, participant withdrawal revocation binding, Council re-consent, Guardian attestation, and digest-only payload policy.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_irreversible_veto.yaml

@@ -49,6 +49,19 @@ IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE = "council-witnessed-memory-glimpse-receipt-v
 IMC_MEMORY_GLIMPSE_SOURCE_PROFILE = "digest-only-memory-crystal-source-v1"
 IMC_MEMORY_GLIMPSE_WITNESS_PROFILE = "council-witness-before-peer-delivery-v1"
 IMC_MEMORY_GLIMPSE_REQUIRED_WITNESS_ROLES = ["CouncilWitness", "GuardianLiaison"]
+IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE = (
+    "timeboxed-memory-glimpse-reconsent-receipt-v1"
+)
+IMC_MEMORY_GLIMPSE_RECONSENT_WINDOW_PROFILE = (
+    "bounded-memory-glimpse-consent-window-v1"
+)
+IMC_MEMORY_GLIMPSE_RECONSENT_DIGEST_PROFILE = (
+    "memory-glimpse-reconsent-digest-v1"
+)
+IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE = (
+    "participant-withdrawal-memory-glimpse-revocation-v1"
+)
+IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS = 86_400
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -62,6 +75,12 @@ def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
 
 
 def _memory_glimpse_receipt_digest_payload(receipt: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _memory_glimpse_reconsent_receipt_digest_payload(
+    receipt: Dict[str, Any],
+) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
 
 
@@ -86,6 +105,12 @@ class InterMindChannel:
                 "self_authorized": True,
                 "close_before_notice": True,
                 "key_state_after_disconnect": "revoked",
+            },
+            "memory_glimpse_reconsent": {
+                "profile_id": IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE,
+                "max_window_seconds": IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS,
+                "revocation_profile": IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE,
+                "raw_payload_policy": "digest-only",
             },
         }
 
@@ -457,6 +482,274 @@ class InterMindChannel:
             "summary_only_ledger": summary_only_ledger,
         }
 
+    def seal_memory_glimpse_reconsent_receipt(
+        self,
+        session_id: str,
+        *,
+        memory_glimpse_receipt: Mapping[str, Any],
+        requested_by: str,
+        expires_after_seconds: int,
+        revoke_after_event_ref: str,
+        council_reconsent_ref: str,
+        guardian_attestation_ref: str,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        requester = self._normalize_non_empty_string(requested_by, "requested_by")
+        if requester not in session["participants"]:
+            raise PermissionError("requested_by must be a participant in the IMC session")
+        if not isinstance(memory_glimpse_receipt, Mapping):
+            raise ValueError("memory_glimpse_receipt must be a mapping")
+        if memory_glimpse_receipt.get("session_id") != session_id:
+            raise ValueError("memory_glimpse_receipt must belong to the IMC session")
+        if memory_glimpse_receipt.get("profile_id") != IMC_MEMORY_GLIMPSE_RECEIPT_PROFILE:
+            raise ValueError("memory_glimpse_receipt must use the memory glimpse profile")
+        if memory_glimpse_receipt.get("status") != "sealed":
+            raise ValueError("memory_glimpse_receipt must be sealed before re-consent")
+        source = memory_glimpse_receipt.get("memory_source")
+        disclosure = memory_glimpse_receipt.get("disclosure_binding")
+        witness = memory_glimpse_receipt.get("council_witness")
+        if not isinstance(source, Mapping):
+            raise ValueError("memory_glimpse_receipt.memory_source must be a mapping")
+        if not isinstance(disclosure, Mapping):
+            raise ValueError("memory_glimpse_receipt.disclosure_binding must be a mapping")
+        if not isinstance(witness, Mapping):
+            raise ValueError("memory_glimpse_receipt.council_witness must be a mapping")
+
+        receipt_digest = self._normalize_non_empty_string(
+            memory_glimpse_receipt.get("digest"),
+            "memory_glimpse_receipt.digest",
+        )
+        receipt_id = self._normalize_non_empty_string(
+            memory_glimpse_receipt.get("receipt_id"),
+            "memory_glimpse_receipt.receipt_id",
+        )
+        selected_segment_ids = self._normalize_field_list(
+            source.get("selected_segment_ids"),
+            "memory_glimpse_receipt.memory_source.selected_segment_ids",
+        )
+        selected_segment_digests = self._normalize_field_list(
+            source.get("selected_segment_digests"),
+            "memory_glimpse_receipt.memory_source.selected_segment_digests",
+        )
+        selected_source_event_ids = self._normalize_field_list(
+            source.get("selected_source_event_ids"),
+            "memory_glimpse_receipt.memory_source.selected_source_event_ids",
+        )
+        window_seconds = self._normalize_reconsent_window(expires_after_seconds)
+        revoke_event = self._normalize_non_empty_string(
+            revoke_after_event_ref,
+            "revoke_after_event_ref",
+        )
+        council_reconsent = self._normalize_non_empty_string(
+            council_reconsent_ref,
+            "council_reconsent_ref",
+        )
+        guardian_attestation = self._normalize_non_empty_string(
+            guardian_attestation_ref,
+            "guardian_attestation_ref",
+        )
+        recorded_at = utc_now_iso()
+        reconsent_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": IMC_MEMORY_GLIMPSE_RECONSENT_DIGEST_PROFILE,
+                    "session_id": session_id,
+                    "memory_glimpse_receipt_digest": receipt_digest,
+                    "source_manifest_digest": source.get("source_manifest_digest"),
+                    "selected_segment_digests": selected_segment_digests,
+                    "message_payload_digest": disclosure.get("message_payload_digest"),
+                    "witness_digest": witness.get("witness_digest"),
+                    "requested_by": requester,
+                    "expires_after_seconds": window_seconds,
+                    "revoke_after_event_ref": revoke_event,
+                    "council_reconsent_ref": council_reconsent,
+                    "guardian_attestation_ref": guardian_attestation,
+                }
+            )
+        )
+        receipt = {
+            "schema_version": IMC_SCHEMA_VERSION,
+            "receipt_id": new_id("imc-memory-glimpse-reconsent"),
+            "profile_id": IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE,
+            "session_id": session_id,
+            "memory_glimpse_receipt_id": receipt_id,
+            "memory_glimpse_receipt_digest": receipt_digest,
+            "message_id": memory_glimpse_receipt.get("message_id"),
+            "participants": list(session["participants"]),
+            "requested_by": requester,
+            "issued_at": recorded_at,
+            "session_status_at_issue": session["status"],
+            "key_state_at_issue": session["key_state"],
+            "consent_window": {
+                "window_profile": IMC_MEMORY_GLIMPSE_RECONSENT_WINDOW_PROFILE,
+                "issued_at": recorded_at,
+                "expires_after_seconds": window_seconds,
+                "expires_at_ref": f"issued_at+PT{window_seconds}S",
+                "reconsent_required_before_redisclosure": True,
+                "max_window_seconds": IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS,
+            },
+            "revocation_binding": {
+                "revocation_profile": IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE,
+                "revoke_after_event_ref": revoke_event,
+                "requester_is_participant": True,
+                "emergency_disconnect_compatible": True,
+                "key_revocation_required": True,
+                "reconsent_required_after_revocation": True,
+            },
+            "reconsent_binding": {
+                "digest_profile": IMC_MEMORY_GLIMPSE_RECONSENT_DIGEST_PROFILE,
+                "council_reconsent_ref": council_reconsent,
+                "guardian_attestation_ref": guardian_attestation,
+                "source_manifest_digest": source.get("source_manifest_digest"),
+                "selected_segment_ids": selected_segment_ids,
+                "selected_segment_digests": selected_segment_digests,
+                "selected_source_event_ids": selected_source_event_ids,
+                "message_payload_digest": disclosure.get("message_payload_digest"),
+                "witness_digest": witness.get("witness_digest"),
+                "reconsent_digest": reconsent_digest,
+            },
+            "payload_policy": {
+                "raw_memory_payload_stored": False,
+                "raw_message_payload_stored": False,
+                "raw_reconsent_payload_stored": False,
+                "summary_only_ledger": True,
+            },
+            "continuity_event_ref": f"ledger://imc-memory-glimpse-reconsent/{session_id}",
+            "status": (
+                "revoked-pending-reconsent"
+                if session["status"] == "closed"
+                else "active-until-expiry"
+            ),
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_memory_glimpse_reconsent_receipt_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_memory_glimpse_reconsent_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        errors: List[str] = []
+        if receipt.get("schema_version") != IMC_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {IMC_SCHEMA_VERSION}")
+        if receipt.get("profile_id") != IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE:
+            errors.append(f"profile_id must be {IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE}")
+        if receipt.get("status") not in {"active-until-expiry", "revoked-pending-reconsent"}:
+            errors.append("status must be active-until-expiry or revoked-pending-reconsent")
+
+        consent_window = receipt.get("consent_window")
+        consent_window_bound = False
+        if not isinstance(consent_window, Mapping):
+            errors.append("consent_window must be an object")
+        else:
+            expires_after = consent_window.get("expires_after_seconds")
+            consent_window_bound = (
+                consent_window.get("window_profile")
+                == IMC_MEMORY_GLIMPSE_RECONSENT_WINDOW_PROFILE
+                and isinstance(expires_after, int)
+                and 0 < expires_after <= IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS
+                and consent_window.get("reconsent_required_before_redisclosure") is True
+                and consent_window.get("max_window_seconds")
+                == IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS
+            )
+            if not consent_window_bound:
+                errors.append("consent_window must bind bounded timeboxed re-consent")
+
+        revocation = receipt.get("revocation_binding")
+        revocation_bound = False
+        if not isinstance(revocation, Mapping):
+            errors.append("revocation_binding must be an object")
+        else:
+            revocation_bound = (
+                revocation.get("revocation_profile") == IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE
+                and isinstance(revocation.get("revoke_after_event_ref"), str)
+                and revocation.get("requester_is_participant") is True
+                and revocation.get("emergency_disconnect_compatible") is True
+                and revocation.get("key_revocation_required") is True
+                and revocation.get("reconsent_required_after_revocation") is True
+            )
+            if not revocation_bound:
+                errors.append("revocation_binding must require participant withdrawal and re-consent")
+
+        reconsent = receipt.get("reconsent_binding")
+        reconsent_bound = False
+        if not isinstance(reconsent, Mapping):
+            errors.append("reconsent_binding must be an object")
+        else:
+            reconsent_bound = (
+                reconsent.get("digest_profile") == IMC_MEMORY_GLIMPSE_RECONSENT_DIGEST_PROFILE
+                and isinstance(reconsent.get("council_reconsent_ref"), str)
+                and isinstance(reconsent.get("guardian_attestation_ref"), str)
+                and isinstance(reconsent.get("source_manifest_digest"), str)
+                and isinstance(reconsent.get("selected_segment_ids"), list)
+                and len(reconsent.get("selected_segment_ids")) >= 1
+                and isinstance(reconsent.get("selected_segment_digests"), list)
+                and len(reconsent.get("selected_segment_digests")) >= 1
+                and isinstance(reconsent.get("message_payload_digest"), str)
+                and isinstance(reconsent.get("witness_digest"), str)
+                and isinstance(reconsent.get("reconsent_digest"), str)
+            )
+            if not reconsent_bound:
+                errors.append("reconsent_binding must bind Council, Guardian, source, and message digests")
+
+        source_receipt_bound = (
+            isinstance(receipt.get("memory_glimpse_receipt_id"), str)
+            and isinstance(receipt.get("memory_glimpse_receipt_digest"), str)
+            and isinstance(receipt.get("message_id"), str)
+        )
+        if not source_receipt_bound:
+            errors.append("receipt must bind the source memory_glimpse receipt")
+
+        payload_policy = receipt.get("payload_policy")
+        raw_memory_payload_stored = True
+        raw_message_payload_stored = True
+        raw_reconsent_payload_stored = True
+        summary_only_ledger = False
+        if not isinstance(payload_policy, Mapping):
+            errors.append("payload_policy must be an object")
+        else:
+            raw_memory_payload_stored = payload_policy.get("raw_memory_payload_stored") is not False
+            raw_message_payload_stored = payload_policy.get("raw_message_payload_stored") is not False
+            raw_reconsent_payload_stored = payload_policy.get("raw_reconsent_payload_stored") is not False
+            summary_only_ledger = payload_policy.get("summary_only_ledger") is True
+            if raw_memory_payload_stored:
+                errors.append("payload_policy.raw_memory_payload_stored must be false")
+            if raw_message_payload_stored:
+                errors.append("payload_policy.raw_message_payload_stored must be false")
+            if raw_reconsent_payload_stored:
+                errors.append("payload_policy.raw_reconsent_payload_stored must be false")
+            if not summary_only_ledger:
+                errors.append("payload_policy.summary_only_ledger must be true")
+
+        digest_bound = False
+        digest = receipt.get("digest")
+        if isinstance(digest, str):
+            digest_bound = digest == sha256_text(
+                canonical_json(
+                    _memory_glimpse_reconsent_receipt_digest_payload(dict(receipt))
+                )
+            )
+        if not digest_bound:
+            errors.append("receipt digest must match canonical payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": receipt.get("profile_id"),
+            "source_receipt_bound": source_receipt_bound,
+            "consent_window_bound": consent_window_bound,
+            "revocation_bound": revocation_bound,
+            "reconsent_bound": reconsent_bound,
+            "digest_bound": digest_bound,
+            "raw_memory_payload_stored": raw_memory_payload_stored,
+            "raw_message_payload_stored": raw_message_payload_stored,
+            "raw_reconsent_payload_stored": raw_reconsent_payload_stored,
+            "summary_only_ledger": summary_only_ledger,
+        }
+
     def emergency_disconnect(
         self,
         session_id: str,
@@ -681,6 +974,17 @@ class InterMindChannel:
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:
         if not isinstance(value, str) or not value.strip():
             errors.append(f"{field_name} must be a non-empty string")
+
+    @staticmethod
+    def _normalize_reconsent_window(value: Any) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError("expires_after_seconds must be an integer")
+        if value <= 0 or value > IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS:
+            raise ValueError(
+                "expires_after_seconds must be between 1 and "
+                f"{IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS}"
+            )
+        return value
 
     def _select_memory_segments(
         self,

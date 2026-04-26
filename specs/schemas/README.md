@@ -97,6 +97,7 @@
 - `imagination_shift.schema`
 - `imc_handshake.schema`
 - `imc_memory_glimpse_receipt.schema`
+- `imc_memory_glimpse_reconsent_receipt.schema`
 - `imc_message.schema`
 - `imc_session.schema`
 - `language_render.schema`

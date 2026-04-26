@@ -56,6 +56,9 @@ reference runtime では IMC を bounded contract として扱い、
 - `memory_glimpse` は MemoryCrystal manifest/segment digest、message payload digest、
   Council session / resolution / Guardian attestation ref の witness digest を持つ
   digest-only receipt に束縛する
+- `memory_glimpse` の再共有は元 receipt digest、revocation event、
+  `expires_after_seconds<=86400` の consent window、Council re-consent、
+  Guardian attestation を持つ digest-only receipt に束縛する
 - disclosure template は双方のうち **より狭い側** に揃え、
   `sealed_fields` は常に redaction される
 - ContinuityLedger には生メッセージを書かず、summary と payload digest だけを記録する

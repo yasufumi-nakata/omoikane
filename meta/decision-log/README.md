@@ -103,6 +103,7 @@ status: decided | superseded
 - [2026-04-26_energy-budget-subsidy-signer-roster-verifier.md](2026-04-26_energy-budget-subsidy-signer-roster-verifier.md)
 - [2026-04-26_energy-budget-subsidy-verifier-quorum.md](2026-04-26_energy-budget-subsidy-verifier-quorum.md)
 - [2026-04-26_imc-memory-glimpse-council-witness-receipt.md](2026-04-26_imc-memory-glimpse-council-witness-receipt.md)
+- [2026-04-26_imc-memory-glimpse-reconsent-receipt.md](2026-04-26_imc-memory-glimpse-reconsent-receipt.md)
 - [2026-04-26_collective-dissolution-identity-confirmation-binding.md](2026-04-26_collective-dissolution-identity-confirmation-binding.md)
 - [2026-04-26_collective-recovery-route-trace-binding.md](2026-04-26_collective-recovery-route-trace-binding.md)
 - [2026-04-26_collective-external-registry-sync.md](2026-04-26_collective-external-registry-sync.md)

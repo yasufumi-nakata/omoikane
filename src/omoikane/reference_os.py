@@ -7384,6 +7384,26 @@ json.dump(response, sys.stdout)
             requested_by=identity.identity_id,
             reason="self-initiated withdrawal after bounded glimpse exchange",
         )
+        memory_glimpse_reconsent_receipt = (
+            self.imc.seal_memory_glimpse_reconsent_receipt(
+                session["session_id"],
+                memory_glimpse_receipt=memory_glimpse_receipt,
+                requested_by=identity.identity_id,
+                expires_after_seconds=3600,
+                revoke_after_event_ref=disconnect["audit_event_ref"],
+                council_reconsent_ref=(
+                    "council://resolution/imc-memory-glimpse-reconsent-required-v1"
+                ),
+                guardian_attestation_ref=(
+                    "guardian://integrity/imc-memory-glimpse-reconsent-digest-only-v1"
+                ),
+            )
+        )
+        memory_glimpse_reconsent_validation = (
+            self.imc.validate_memory_glimpse_reconsent_receipt(
+                memory_glimpse_reconsent_receipt
+            )
+        )
         final_session = self.imc.snapshot(session["session_id"])
         session_validation = self.imc.validate_session(final_session)
         validation = {
@@ -7400,6 +7420,28 @@ json.dump(response, sys.stdout)
             "memory_glimpse_raw_message_payload_stored": memory_glimpse_validation[
                 "raw_message_payload_stored"
             ],
+            "memory_glimpse_reconsent_receipt": memory_glimpse_reconsent_validation,
+            "memory_glimpse_reconsent_receipt_ok": memory_glimpse_reconsent_validation[
+                "ok"
+            ],
+            "memory_glimpse_reconsent_source_receipt_bound": (
+                memory_glimpse_reconsent_validation["source_receipt_bound"]
+            ),
+            "memory_glimpse_reconsent_consent_window_bound": (
+                memory_glimpse_reconsent_validation["consent_window_bound"]
+            ),
+            "memory_glimpse_reconsent_revocation_bound": (
+                memory_glimpse_reconsent_validation["revocation_bound"]
+            ),
+            "memory_glimpse_reconsent_bound": memory_glimpse_reconsent_validation[
+                "reconsent_bound"
+            ],
+            "memory_glimpse_reconsent_digest_bound": (
+                memory_glimpse_reconsent_validation["digest_bound"]
+            ),
+            "memory_glimpse_reconsent_raw_payload_stored": (
+                memory_glimpse_reconsent_validation["raw_reconsent_payload_stored"]
+            ),
         }
 
         self.ledger.append(
@@ -7479,6 +7521,41 @@ json.dump(response, sys.stdout)
             signature_roles=["self"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="imc.memory_glimpse.reconsent.sealed",
+            payload={
+                "receipt_id": memory_glimpse_reconsent_receipt["receipt_id"],
+                "session_id": memory_glimpse_reconsent_receipt["session_id"],
+                "memory_glimpse_receipt_digest": memory_glimpse_reconsent_receipt[
+                    "memory_glimpse_receipt_digest"
+                ],
+                "expires_after_seconds": memory_glimpse_reconsent_receipt[
+                    "consent_window"
+                ]["expires_after_seconds"],
+                "revoke_after_event_ref": memory_glimpse_reconsent_receipt[
+                    "revocation_binding"
+                ]["revoke_after_event_ref"],
+                "reconsent_digest": memory_glimpse_reconsent_receipt[
+                    "reconsent_binding"
+                ]["reconsent_digest"],
+                "receipt_digest": memory_glimpse_reconsent_receipt["digest"],
+                "raw_memory_payload_stored": memory_glimpse_reconsent_receipt[
+                    "payload_policy"
+                ]["raw_memory_payload_stored"],
+                "raw_message_payload_stored": memory_glimpse_reconsent_receipt[
+                    "payload_policy"
+                ]["raw_message_payload_stored"],
+                "raw_reconsent_payload_stored": memory_glimpse_reconsent_receipt[
+                    "payload_policy"
+                ]["raw_reconsent_payload_stored"],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self", "guardian", "council"],
+            substrate="classical-silicon",
+        )
 
         return {
             "identity": {
@@ -7490,6 +7567,7 @@ json.dump(response, sys.stdout)
             "handshake": final_session["handshake"],
             "message": message,
             "memory_glimpse_receipt": memory_glimpse_receipt,
+            "memory_glimpse_reconsent_receipt": memory_glimpse_reconsent_receipt,
             "disconnect": disconnect,
             "session": final_session,
             "validation": validation,

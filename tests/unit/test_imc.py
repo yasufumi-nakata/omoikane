@@ -67,6 +67,16 @@ class InterMindChannelTests(unittest.TestCase):
             requested_by="identity://origin",
             reason="withdraw after bounded glimpse",
         )
+        reconsent = imc.seal_memory_glimpse_reconsent_receipt(
+            session["session_id"],
+            memory_glimpse_receipt=receipt,
+            requested_by="identity://origin",
+            expires_after_seconds=3600,
+            revoke_after_event_ref=disconnect["audit_event_ref"],
+            council_reconsent_ref="council://resolution/imc-memory-glimpse-reconsent/test",
+            guardian_attestation_ref="guardian://integrity/imc-memory-glimpse-reconsent/test",
+        )
+        reconsent_validation = imc.validate_memory_glimpse_reconsent_receipt(reconsent)
         snapshot = imc.snapshot(session["session_id"])
         validation = imc.validate_session(snapshot)
 
@@ -96,6 +106,26 @@ class InterMindChannelTests(unittest.TestCase):
             ["affect_summary", "display_name", "topic"],
             receipt["disclosure_binding"]["delivered_field_names"],
         )
+        self.assertEqual(
+            "timeboxed-memory-glimpse-reconsent-receipt-v1",
+            reconsent["profile_id"],
+        )
+        self.assertEqual("revoked-pending-reconsent", reconsent["status"])
+        self.assertEqual(
+            receipt["digest"],
+            reconsent["memory_glimpse_receipt_digest"],
+        )
+        self.assertEqual(
+            disconnect["audit_event_ref"],
+            reconsent["revocation_binding"]["revoke_after_event_ref"],
+        )
+        self.assertTrue(reconsent_validation["ok"])
+        self.assertTrue(reconsent_validation["source_receipt_bound"])
+        self.assertTrue(reconsent_validation["consent_window_bound"])
+        self.assertTrue(reconsent_validation["revocation_bound"])
+        self.assertTrue(reconsent_validation["reconsent_bound"])
+        self.assertTrue(reconsent_validation["digest_bound"])
+        self.assertFalse(reconsent_validation["raw_reconsent_payload_stored"])
         self.assertTrue(disconnect["close_committed_before_notice"])
         self.assertEqual("closed", snapshot["status"])
         self.assertEqual("revoked", snapshot["key_state"])
@@ -161,6 +191,74 @@ class InterMindChannelTests(unittest.TestCase):
                 council_session_ref="council://imc-memory-glimpse/test",
                 council_resolution_ref="council://resolution/imc-memory-glimpse/test",
                 guardian_attestation_ref="guardian://integrity/imc-memory-glimpse/test",
+            )
+
+    def test_memory_glimpse_reconsent_rejects_unbounded_window(self) -> None:
+        imc = InterMindChannel()
+        session = imc.open_session(
+            initiator_id="identity://origin",
+            peer_id="identity://peer",
+            mode="memory_glimpse",
+            initiator_template={
+                "public_fields": ["display_name", "topic"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["memory_index"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "topic"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["memory_index"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        message = imc.send(
+            session["session_id"],
+            sender_id="identity://origin",
+            summary="bounded disclosure",
+            payload={
+                "display_name": "Origin",
+                "topic": "continuity",
+                "affect_summary": "careful",
+                "memory_index": "crystal://segment/7",
+            },
+        )
+        source_manifest = {
+            "identity_id": "identity://origin",
+            "segments": [
+                {
+                    "segment_id": "segment-council-review",
+                    "digest": sha256_text("segment-council-review"),
+                    "source_event_ids": ["episode-0001"],
+                    "source_refs": ["ledger://entry/council-review-0001"],
+                }
+            ],
+        }
+        receipt = imc.seal_memory_glimpse_receipt(
+            session["session_id"],
+            message=message,
+            source_manifest=source_manifest,
+            selected_segment_ids=["segment-council-review"],
+            council_session_ref="council://imc-memory-glimpse/test",
+            council_resolution_ref="council://resolution/imc-memory-glimpse/test",
+            guardian_attestation_ref="guardian://integrity/imc-memory-glimpse/test",
+        )
+        disconnect = imc.emergency_disconnect(
+            session["session_id"],
+            requested_by="identity://origin",
+            reason="withdraw after bounded glimpse",
+        )
+
+        with self.assertRaisesRegex(ValueError, "expires_after_seconds"):
+            imc.seal_memory_glimpse_reconsent_receipt(
+                session["session_id"],
+                memory_glimpse_receipt=receipt,
+                requested_by="identity://origin",
+                expires_after_seconds=86401,
+                revoke_after_event_ref=disconnect["audit_event_ref"],
+                council_reconsent_ref="council://resolution/imc-memory-glimpse-reconsent/test",
+                guardian_attestation_ref="guardian://integrity/imc-memory-glimpse-reconsent/test",
             )
 
     def test_merge_thought_requires_council_witness_and_redacts_intimate_floor_overreach(self) -> None:

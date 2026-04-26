@@ -177,12 +177,26 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/imc_memory_glimpse_receipt.schema",
             result["memory_glimpse_receipt"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/imc_memory_glimpse_reconsent_receipt.schema",
+            result["memory_glimpse_reconsent_receipt"],
+        )
         self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
         self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_disclosure_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_witness_bound"])
         self.assertFalse(result["validation"]["memory_glimpse_raw_memory_payload_stored"])
         self.assertFalse(result["validation"]["memory_glimpse_raw_message_payload_stored"])
+        self.assertTrue(result["validation"]["memory_glimpse_reconsent_receipt_ok"])
+        self.assertTrue(
+            result["validation"]["memory_glimpse_reconsent_source_receipt_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["memory_glimpse_reconsent_consent_window_bound"]
+        )
+        self.assertTrue(result["validation"]["memory_glimpse_reconsent_revocation_bound"])
+        self.assertTrue(result["validation"]["memory_glimpse_reconsent_bound"])
+        self.assertFalse(result["validation"]["memory_glimpse_reconsent_raw_payload_stored"])
 
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
         result = self.runtime.run_wms_demo()

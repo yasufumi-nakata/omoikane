@@ -8,6 +8,7 @@ imports:
   imc_handshake: ../schemas/imc_handshake.schema
   imc_message: ../schemas/imc_message.schema
   imc_memory_glimpse_receipt: ../schemas/imc_memory_glimpse_receipt.schema
+  imc_memory_glimpse_reconsent_receipt: ../schemas/imc_memory_glimpse_reconsent_receipt.schema
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
 operations:
   open_session:
@@ -130,6 +131,48 @@ operations:
       - receipt must bind selected MemoryCrystal segment digests and the IMC message payload digest
       - receipt must not store raw MemoryCrystal payloads or raw message payloads
       - witness digest must bind Council session, Council resolution, Guardian attestation, message id, and source manifest digest
+  seal_memory_glimpse_reconsent_receipt:
+    summary: Seal one timeboxed revoke/re-consent receipt for a bounded memory_glimpse disclosure.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - memory_glimpse_receipt
+          - requested_by
+          - expires_after_seconds
+          - revoke_after_event_ref
+          - council_reconsent_ref
+          - guardian_attestation_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          memory_glimpse_receipt:
+            schema_ref: imc_memory_glimpse_receipt
+          requested_by:
+            type: string
+            minLength: 1
+          expires_after_seconds:
+            type: integer
+            minimum: 1
+            maximum: 86400
+          revoke_after_event_ref:
+            type: string
+            minLength: 1
+          council_reconsent_ref:
+            type: string
+            minLength: 1
+          guardian_attestation_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: imc_memory_glimpse_reconsent_receipt
+    guarantees:
+      - operation only applies to a sealed memory_glimpse receipt from the same IMC session
+      - participant withdrawal must bind to an emergency-disconnect-compatible revocation event
+      - consent window must be timeboxed to at most 86400 seconds and require Council re-consent before redisclosure
+      - receipt must not store raw MemoryCrystal payloads, raw message payloads, or raw re-consent payloads
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.
     input:
@@ -212,6 +255,9 @@ events:
   imc.memory_glimpse_receipt_sealed:
     payload:
       schema_ref: imc_memory_glimpse_receipt
+  imc.memory_glimpse_reconsent_receipt_sealed:
+    payload:
+      schema_ref: imc_memory_glimpse_reconsent_receipt
   imc.session_closed:
     payload:
       inline_schema:

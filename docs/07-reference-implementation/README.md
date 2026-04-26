@@ -790,12 +790,18 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 peer attestation、forward secrecy、narrow disclosure floor、
 sealed field redaction、summary+digest-only audit、
 Council-witnessed `memory_glimpse` receipt、
-unilateral emergency disconnect をまとめて確認する。
+unilateral emergency disconnect、
+timeboxed revoke / re-consent receipt をまとめて確認する。
 同じ receipt は `council-witnessed-memory-glimpse-receipt-v1` として
 MemoryCrystal manifest / selected segment digest、IMC message payload digest、
 Council session / resolution / Guardian attestation ref から作る witness digest を束縛し、
 raw memory payload と raw message payload を保存しないことを
 `imc_memory_glimpse_receipt.schema` と integration test で検証する。
+さらに `timeboxed-memory-glimpse-reconsent-receipt-v1` が
+元の memory_glimpse receipt digest、participant withdrawal による revocation event、
+`expires_after_seconds<=86400` の consent window、Council re-consent ref、
+Guardian attestation ref を束縛し、raw re-consent payload を保存しないことを
+`imc_memory_glimpse_reconsent_receipt.schema` と integration test で検証する。
 
 `collective-demo` は L6 Collective Identity の reference contract
 (`interface.collective.v0`) を JSON で可視化し、

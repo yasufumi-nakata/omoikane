@@ -74,6 +74,22 @@ receipt は `imc_memory_glimpse_receipt.schema` に直接照合される。
 記憶 synopsis や raw message payload は receipt に入れず、ContinuityLedger も
 summary と digest だけを保持する。
 
+## memory_glimpse revoke / re-consent
+
+`memory_glimpse` は一度 Council witness 済みでも、以後の redisclosure を
+無期限に許可しない。reference runtime は
+`timeboxed-memory-glimpse-reconsent-receipt-v1` を発行し、次を固定する。
+
+- 元の `memory_glimpse` receipt digest と message id
+- `expires_after_seconds <= 86400` の timeboxed consent window
+- participant withdrawal / emergency disconnect に束縛された revocation event ref
+- redisclosure 前に必要な Council re-consent ref と Guardian attestation ref
+- `raw_memory_payload_stored=false` / `raw_message_payload_stored=false` /
+  `raw_reconsent_payload_stored=false`
+
+re-consent receipt は `imc_memory_glimpse_reconsent_receipt.schema` に直接照合され、
+revoked session では `revoked-pending-reconsent` として残る。
+
 ## 緊急切断
 
 ```
@@ -97,15 +113,19 @@ on emergency_disconnect(session_id, reason):
 ## reference runtime の扱い
 
 - `interface.imc.v0.idl` を導入し、
-  `open_session / send / seal_memory_glimpse_receipt / emergency_disconnect / snapshot`
-  の 5 op
-- `imc_session.schema` / `imc_handshake.schema` / `imc_memory_glimpse_receipt.schema` を導入
+  `open_session / send / seal_memory_glimpse_receipt /
+  seal_memory_glimpse_reconsent_receipt / emergency_disconnect / snapshot`
+  の 6 op
+- `imc_session.schema` / `imc_handshake.schema` / `imc_memory_glimpse_receipt.schema` /
+  `imc_memory_glimpse_reconsent_receipt.schema` を導入
 - `imc-demo` を CLI に追加し、handshake → memory_glimpse 送信 →
-  Council-witnessed digest-only receipt → emergency disconnect → audit までを
+  Council-witnessed digest-only receipt → emergency disconnect →
+  timeboxed re-consent receipt → audit までを
   1 シナリオで実行
 - `evals/interface/imc_disclosure_floor.yaml` と
-  `evals/interface/imc_memory_glimpse_council_witness.yaml` で sealed_fields と
-  memory_glimpse receipt が常に守られることを保証
+  `evals/interface/imc_memory_glimpse_council_witness.yaml` と
+  `evals/interface/imc_memory_glimpse_reconsent.yaml` で sealed_fields、
+  memory_glimpse receipt、re-consent receipt が常に守られることを保証
 - `collective-demo` を CLI に追加し、`merge_thought` を
   distinct collective ID、WMS private escape、member recovery 付きの
   bounded contract として smoke する

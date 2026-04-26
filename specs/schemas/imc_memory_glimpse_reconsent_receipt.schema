@@ -1,0 +1,222 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCMemoryGlimpseReconsentReceipt
+description: >
+  Digest-only receipt that timeboxes a Council-witnessed IMC memory_glimpse
+  disclosure, binds participant revocation to the original glimpse receipt, and
+  requires Council plus Guardian re-consent before redisclosure.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - receipt_id
+  - profile_id
+  - session_id
+  - memory_glimpse_receipt_id
+  - memory_glimpse_receipt_digest
+  - message_id
+  - participants
+  - requested_by
+  - issued_at
+  - session_status_at_issue
+  - key_state_at_issue
+  - consent_window
+  - revocation_binding
+  - reconsent_binding
+  - payload_policy
+  - continuity_event_ref
+  - status
+  - digest
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    minLength: 8
+  profile_id:
+    type: string
+    const: timeboxed-memory-glimpse-reconsent-receipt-v1
+  session_id:
+    type: string
+    minLength: 8
+  memory_glimpse_receipt_id:
+    type: string
+    minLength: 8
+  memory_glimpse_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  message_id:
+    type: string
+    minLength: 8
+  participants:
+    type: array
+    minItems: 2
+    maxItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  requested_by:
+    type: string
+    minLength: 1
+  issued_at:
+    type: string
+    format: date-time
+  session_status_at_issue:
+    type: string
+    enum:
+      - open
+      - closed
+  key_state_at_issue:
+    type: string
+    enum:
+      - established
+      - revoked
+  consent_window:
+    type: object
+    additionalProperties: false
+    required:
+      - window_profile
+      - issued_at
+      - expires_after_seconds
+      - expires_at_ref
+      - reconsent_required_before_redisclosure
+      - max_window_seconds
+    properties:
+      window_profile:
+        type: string
+        const: bounded-memory-glimpse-consent-window-v1
+      issued_at:
+        type: string
+        format: date-time
+      expires_after_seconds:
+        type: integer
+        minimum: 1
+        maximum: 86400
+      expires_at_ref:
+        type: string
+        minLength: 1
+      reconsent_required_before_redisclosure:
+        type: boolean
+        const: true
+      max_window_seconds:
+        type: integer
+        const: 86400
+  revocation_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - revocation_profile
+      - revoke_after_event_ref
+      - requester_is_participant
+      - emergency_disconnect_compatible
+      - key_revocation_required
+      - reconsent_required_after_revocation
+    properties:
+      revocation_profile:
+        type: string
+        const: participant-withdrawal-memory-glimpse-revocation-v1
+      revoke_after_event_ref:
+        type: string
+        minLength: 1
+      requester_is_participant:
+        type: boolean
+        const: true
+      emergency_disconnect_compatible:
+        type: boolean
+        const: true
+      key_revocation_required:
+        type: boolean
+        const: true
+      reconsent_required_after_revocation:
+        type: boolean
+        const: true
+  reconsent_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - digest_profile
+      - council_reconsent_ref
+      - guardian_attestation_ref
+      - source_manifest_digest
+      - selected_segment_ids
+      - selected_segment_digests
+      - selected_source_event_ids
+      - message_payload_digest
+      - witness_digest
+      - reconsent_digest
+    properties:
+      digest_profile:
+        type: string
+        const: memory-glimpse-reconsent-digest-v1
+      council_reconsent_ref:
+        type: string
+        minLength: 1
+      guardian_attestation_ref:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      selected_segment_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      selected_segment_digests:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+      selected_source_event_ids:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      message_payload_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      witness_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      reconsent_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  payload_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - raw_memory_payload_stored
+      - raw_message_payload_stored
+      - raw_reconsent_payload_stored
+      - summary_only_ledger
+    properties:
+      raw_memory_payload_stored:
+        type: boolean
+        const: false
+      raw_message_payload_stored:
+        type: boolean
+        const: false
+      raw_reconsent_payload_stored:
+        type: boolean
+        const: false
+      summary_only_ledger:
+        type: boolean
+        const: true
+  continuity_event_ref:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - active-until-expiry
+      - revoked-pending-reconsent
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
