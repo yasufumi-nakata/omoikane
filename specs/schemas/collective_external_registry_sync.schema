@@ -67,6 +67,38 @@ required:
   - ack_route_trace_binding_digest_set_digest
   - ack_route_trace_binding_digest
   - ack_route_trace_binding_count
+  - ack_route_capture_export_profile_id
+  - ack_route_capture_export_digest_profile
+  - ack_route_packet_capture_ref
+  - ack_route_packet_capture_digest
+  - ack_route_packet_capture_profile
+  - ack_route_packet_capture_artifact_format
+  - ack_route_packet_capture_artifact_digest
+  - ack_route_packet_capture_readback_digest
+  - ack_route_packet_count
+  - ack_route_packet_capture_export_status
+  - ack_route_packet_capture_route_binding_refs
+  - ack_route_packet_capture_route_binding_set_digest
+  - ack_route_os_native_readback_available
+  - ack_route_os_native_readback_ok
+  - ack_route_privileged_capture_ref
+  - ack_route_privileged_capture_digest
+  - ack_route_privileged_capture_profile
+  - ack_route_privilege_mode
+  - ack_route_broker_profile
+  - ack_route_broker_attestation_ref
+  - ack_route_lease_ref
+  - ack_route_interface_name
+  - ack_route_local_ips
+  - ack_route_capture_filter_digest
+  - ack_route_capture_command_digest
+  - ack_route_acquisition_route_binding_refs
+  - ack_route_acquisition_route_binding_set_digest
+  - ack_route_capture_bindings
+  - ack_route_capture_binding_digest_set
+  - ack_route_capture_binding_digest_set_digest
+  - ack_route_capture_binding_digest
+  - ack_route_capture_binding_count
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -76,6 +108,8 @@ required:
   - submission_ack_bound
   - ack_quorum_bound
   - ack_route_trace_bound
+  - ack_route_capture_export_bound
+  - ack_route_capture_route_binding_set_bound
   - external_registry_sync_complete
   - raw_dissolution_payload_stored
   - raw_registry_payload_stored
@@ -258,10 +292,102 @@ properties:
     $ref: "#/$defs/sha256"
   ack_route_trace_binding_count:
     const: 2
+  ack_route_capture_export_profile_id:
+    const: collective-external-registry-ack-route-capture-export-v1
+  ack_route_capture_export_digest_profile:
+    const: collective-external-registry-ack-route-capture-export-digest-v1
+  ack_route_packet_capture_ref:
+    type: string
+    pattern: "^authority-packet-capture://"
+  ack_route_packet_capture_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_packet_capture_profile:
+    const: trace-bound-pcap-export-v1
+  ack_route_packet_capture_artifact_format:
+    const: pcap
+  ack_route_packet_capture_artifact_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_packet_capture_readback_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_packet_count:
+    const: 4
+  ack_route_packet_capture_export_status:
+    const: verified
+  ack_route_packet_capture_route_binding_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^authority-route://"
+  ack_route_packet_capture_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_os_native_readback_available:
+    const: true
+  ack_route_os_native_readback_ok:
+    const: true
+  ack_route_privileged_capture_ref:
+    type: string
+    pattern: "^authority-live-capture://"
+  ack_route_privileged_capture_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_privileged_capture_profile:
+    const: bounded-live-interface-capture-acquisition-v1
+  ack_route_privilege_mode:
+    const: delegated-broker
+  ack_route_broker_profile:
+    type: string
+    minLength: 8
+  ack_route_broker_attestation_ref:
+    type: string
+    minLength: 8
+  ack_route_lease_ref:
+    type: string
+    minLength: 8
+  ack_route_interface_name:
+    type: string
+    minLength: 2
+  ack_route_local_ips:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 3
+  ack_route_capture_filter_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_capture_command_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_acquisition_route_binding_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^authority-route://"
+  ack_route_acquisition_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_capture_bindings:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/ack_route_capture_binding"
+  ack_route_capture_binding_digest_set:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_route_capture_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_capture_binding_digest:
+    $ref: "#/$defs/sha256"
+  ack_route_capture_binding_count:
+    const: 2
   registry_digest_set:
     type: array
-    minItems: 7
-    maxItems: 7
+    minItems: 8
+    maxItems: 8
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -279,6 +405,10 @@ properties:
   ack_quorum_bound:
     const: true
   ack_route_trace_bound:
+    const: true
+  ack_route_capture_export_bound:
+    const: true
+  ack_route_capture_route_binding_set_bound:
     const: true
   external_registry_sync_complete:
     const: true
@@ -396,6 +526,67 @@ $defs:
       ack_route_binding_digest:
         $ref: "#/$defs/sha256"
       raw_ack_route_payload_stored:
+        const: false
+  ack_route_capture_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - ack_receipt_ref
+      - ack_receipt_digest
+      - registry_authority_ref
+      - registry_jurisdiction
+      - ack_route_binding_digest
+      - route_binding_ref
+      - packet_capture_route_export_digest
+      - outbound_tuple_digest
+      - inbound_tuple_digest
+      - outbound_payload_digest
+      - inbound_payload_digest
+      - readback_packet_count
+      - readback_verified
+      - os_native_readback_verified
+      - privileged_capture_route_ref
+      - ack_route_capture_binding_digest
+      - raw_packet_body_stored
+    properties:
+      ack_receipt_ref:
+        type: string
+        pattern: "^registry-ack://collective-dissolution/"
+      ack_receipt_digest:
+        $ref: "#/$defs/sha256"
+      registry_authority_ref:
+        type: string
+        pattern: "^(legal-registry|governance-registry)://"
+      registry_jurisdiction:
+        type: string
+        minLength: 2
+      ack_route_binding_digest:
+        $ref: "#/$defs/sha256"
+      route_binding_ref:
+        type: string
+        pattern: "^authority-route://"
+      packet_capture_route_export_digest:
+        $ref: "#/$defs/sha256"
+      outbound_tuple_digest:
+        $ref: "#/$defs/sha256"
+      inbound_tuple_digest:
+        $ref: "#/$defs/sha256"
+      outbound_payload_digest:
+        $ref: "#/$defs/sha256"
+      inbound_payload_digest:
+        $ref: "#/$defs/sha256"
+      readback_packet_count:
+        const: 2
+      readback_verified:
+        const: true
+      os_native_readback_verified:
+        const: true
+      privileged_capture_route_ref:
+        type: string
+        pattern: "^authority-route://"
+      ack_route_capture_binding_digest:
+        $ref: "#/$defs/sha256"
+      raw_packet_body_stored:
         const: false
   sha256:
     type: string

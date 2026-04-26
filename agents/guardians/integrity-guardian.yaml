@@ -12,6 +12,7 @@ capabilities:
   - collective.external-registry-sync.attest
   - collective.external-registry-ack-quorum.attest
   - collective.external-registry-ack-route-trace.attest
+  - collective.external-registry-ack-route-capture.attest
   - imc.memory-glimpse-receipt.attest
   - ewa.stop-signal-adapter.attest
   - ewa.production-connector.attest
@@ -52,6 +53,7 @@ when_to_invoke: |
   - Collective dissolution 後の recovery capture export binding が external legal / governance registry の digest-only entry、submission、ack receipt と raw registry payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の external registry acknowledgement が legal / governance の 2 jurisdiction quorum digest と raw ack payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の external registry acknowledgement quorum が authenticated non-loopback authority-route trace と raw ack-route payload 非保存に束縛されていることを検証する時
+  - Collective dissolution 後の external registry acknowledgement route trace が verified pcap export と delegated privileged capture acquisition に raw packet body 非保存で束縛されていることを検証する時
   - IMC memory_glimpse receipt が MemoryCrystal source digest、message digest、Council witness digest に束縛され、raw memory/message payload を保存していないことを検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - EWA authorization 前に vendor API connector certificate / installation proof / safety PLC installation digest が stop-signal adapter receipt に束縛されていることを検証する時

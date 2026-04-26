@@ -263,6 +263,8 @@ operations:
         required:
           - recovery_capture_export_binding
           - registry_ack_authority_route_trace
+          - registry_ack_packet_capture_export
+          - registry_ack_privileged_capture_acquisition
           - legal_registry_ref
           - governance_registry_ref
         properties:
@@ -270,6 +272,10 @@ operations:
             schema_ref: collective_recovery_capture_export_binding
           registry_ack_authority_route_trace:
             schema_ref: distributed_transport_authority_route_trace
+          registry_ack_packet_capture_export:
+            schema_ref: distributed_transport_packet_capture_export
+          registry_ack_privileged_capture_acquisition:
+            schema_ref: distributed_transport_privileged_capture_acquisition
           legal_registry_ref:
             type: string
             pattern: "^legal-registry://"
@@ -285,6 +291,7 @@ operations:
       - submission_receipt_digest and ack_receipt_digest must bind the registry entry without storing raw registry payloads
       - ack_quorum_digest must bind legal and governance registry acknowledgement receipts across two distinct jurisdictions without storing raw acknowledgement payloads
       - ack_route_trace_binding_digest must bind the acknowledgement quorum to authenticated non-loopback authority-route trace evidence
+      - ack_route_capture_binding_digest must bind the acknowledgement route trace to verified pcap export and delegated privileged capture evidence over the same route set
       - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, and raw packet bodies must not be stored
 events:
   collective.formed:

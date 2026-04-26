@@ -239,6 +239,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["external_registry_sync_submission_ack_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_ack_quorum_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_ack_route_trace_bound"])
+        self.assertTrue(
+            result["validation"]["external_registry_sync_ack_route_packet_capture_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["external_registry_sync_ack_route_privileged_capture_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["external_registry_sync_ack_route_capture_bindings_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["external_registry_sync_ack_route_capture_export_bound"]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )

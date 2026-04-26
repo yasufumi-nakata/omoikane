@@ -96,6 +96,8 @@ collective_profile:
   2 registry acknowledgement を 2 jurisdiction quorum として digest-only に束縛する
 - `collective-external-registry-ack-route-trace-v1` により、その acknowledgement quorum を
   authenticated non-loopback authority-route trace と OS observer evidence に束縛する
+- `collective-external-registry-ack-route-capture-export-v1` により、その ack route trace を
+  verified pcap export と delegated-broker privileged capture acquisition に束縛する
 - raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw packet body は保存しない
 
 ## reference runtime の扱い
@@ -115,7 +117,8 @@ collective_profile:
   identity confirmation、schema-bound dissolution receipt、
   member recovery proof binding、remote verifier transport binding、
   non-loopback authority-route trace binding、packet capture export binding、
-  external legal/governance registry sync を 1 シナリオで smoke する
+  external legal/governance registry sync、ack route capture export binding を
+  1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
 - `evals/interface/collective_dissolution_receipt.yaml` は

@@ -59,6 +59,12 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID = (
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_DIGEST_PROFILE_ID = (
     "collective-external-registry-ack-route-trace-digest-v1"
 )
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID = (
+    "collective-external-registry-ack-route-capture-export-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-route-capture-export-digest-v1"
+)
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -821,6 +827,8 @@ class CollectiveIdentityService:
         recovery_capture_export_binding: Mapping[str, Any],
         *,
         registry_ack_authority_route_trace: Mapping[str, Any],
+        registry_ack_packet_capture_export: Mapping[str, Any],
+        registry_ack_privileged_capture_acquisition: Mapping[str, Any],
         legal_registry_ref: str = "legal-registry://collective-dissolution/jp-13/v1",
         governance_registry_ref: str = (
             "governance-registry://collective-dissolution/federation/v1"
@@ -1037,6 +1045,89 @@ class CollectiveIdentityService:
                 for binding in ack_route_trace_bindings
             )
         )
+        ack_route_packet_capture_route_binding_refs = [
+            route_export["route_binding_ref"]
+            for route_export in registry_ack_packet_capture_export.get(
+                "route_exports",
+                [],
+            )
+            if isinstance(route_export, Mapping)
+            and isinstance(route_export.get("route_binding_ref"), str)
+        ]
+        ack_route_trace_for_capture = {
+            "authority_route_trace_ref": registry_ack_authority_route_trace["trace_ref"],
+            "authority_route_trace_digest": registry_ack_authority_route_trace["digest"],
+            "route_binding_refs": ack_route_packet_capture_route_binding_refs,
+            "route_count": len(ack_route_packet_capture_route_binding_refs),
+        }
+        ack_packet_capture_validation = self._validate_packet_capture_export(
+            registry_ack_packet_capture_export,
+            recovery_route_trace_binding=ack_route_trace_for_capture,
+        )
+        ack_privileged_capture_validation = (
+            self._validate_privileged_capture_acquisition(
+                registry_ack_privileged_capture_acquisition,
+                recovery_route_trace_binding=ack_route_trace_for_capture,
+                packet_capture_export=registry_ack_packet_capture_export,
+            )
+        )
+        if not ack_packet_capture_validation["ok"]:
+            raise ValueError("registry_ack_packet_capture_export must validate before binding")
+        if not ack_privileged_capture_validation["ok"]:
+            raise ValueError(
+                "registry_ack_privileged_capture_acquisition must validate before binding"
+            )
+        ack_route_capture_bindings = (
+            self._build_collective_external_registry_ack_route_capture_bindings(
+                collective_id=collective_id,
+                ack_route_trace_bindings=ack_route_trace_bindings,
+                packet_capture_export=registry_ack_packet_capture_export,
+                privileged_capture_acquisition=registry_ack_privileged_capture_acquisition,
+                ack_route_trace_binding_digest=ack_route_trace_binding_digest,
+            )
+        )
+        ack_route_capture_binding_digest_set = [
+            binding["ack_route_capture_binding_digest"]
+            for binding in ack_route_capture_bindings
+        ]
+        ack_route_capture_binding_digest_set_digest = sha256_text(
+            canonical_json(ack_route_capture_binding_digest_set)
+        )
+        ack_route_packet_capture_route_binding_set_digest = sha256_text(
+            canonical_json(ack_route_packet_capture_route_binding_refs)
+        )
+        ack_route_acquisition_route_binding_refs = list(
+            registry_ack_privileged_capture_acquisition["route_binding_refs"]
+        )
+        ack_route_acquisition_route_binding_set_digest = sha256_text(
+            canonical_json(sorted(ack_route_acquisition_route_binding_refs))
+        )
+        ack_route_capture_route_binding_set_bound = (
+            sorted(ack_route_trace_route_binding_refs)
+            == sorted(ack_route_packet_capture_route_binding_refs)
+            and sorted(ack_route_trace_route_binding_refs)
+            == sorted(ack_route_acquisition_route_binding_refs)
+        )
+        ack_route_capture_binding_digest = (
+            self._collective_external_registry_ack_route_capture_export_digest(
+                collective_id=collective_id,
+                ack_route_trace_binding_digest=ack_route_trace_binding_digest,
+                packet_capture_digest=str(registry_ack_packet_capture_export["digest"]),
+                privileged_capture_digest=str(
+                    registry_ack_privileged_capture_acquisition["digest"]
+                ),
+                ack_route_capture_binding_digest_set_digest=(
+                    ack_route_capture_binding_digest_set_digest
+                ),
+            )
+        )
+        ack_route_capture_export_bound = (
+            ack_route_trace_bound
+            and ack_packet_capture_validation["ok"]
+            and ack_privileged_capture_validation["ok"]
+            and ack_route_capture_route_binding_set_bound
+            and len(ack_route_capture_bindings) == len(ack_route_trace_bindings)
+        )
         registry_digest_set = [
             legal_registry_digest,
             governance_registry_digest,
@@ -1045,6 +1136,7 @@ class CollectiveIdentityService:
             ack_receipt_digest,
             ack_quorum_digest,
             ack_route_trace_binding_digest,
+            ack_route_capture_binding_digest,
         ]
         registry_digest_set_digest = sha256_text(canonical_json(registry_digest_set))
         digest_payload = {
@@ -1055,6 +1147,7 @@ class CollectiveIdentityService:
             "ack_receipt_digest": ack_receipt_digest,
             "ack_quorum_digest": ack_quorum_digest,
             "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
+            "ack_route_capture_binding_digest": ack_route_capture_binding_digest,
             "registry_digest_set_digest": registry_digest_set_digest,
         }
         receipt = {
@@ -1148,6 +1241,96 @@ class CollectiveIdentityService:
             ),
             "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
             "ack_route_trace_binding_count": len(ack_route_trace_bindings),
+            "ack_route_capture_export_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID
+            ),
+            "ack_route_capture_export_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_DIGEST_PROFILE_ID
+            ),
+            "ack_route_packet_capture_ref": registry_ack_packet_capture_export[
+                "capture_ref"
+            ],
+            "ack_route_packet_capture_digest": registry_ack_packet_capture_export[
+                "digest"
+            ],
+            "ack_route_packet_capture_profile": registry_ack_packet_capture_export[
+                "capture_profile"
+            ],
+            "ack_route_packet_capture_artifact_format": (
+                registry_ack_packet_capture_export["artifact_format"]
+            ),
+            "ack_route_packet_capture_artifact_digest": (
+                registry_ack_packet_capture_export["artifact_digest"]
+            ),
+            "ack_route_packet_capture_readback_digest": (
+                registry_ack_packet_capture_export["readback_digest"]
+            ),
+            "ack_route_packet_count": registry_ack_packet_capture_export["packet_count"],
+            "ack_route_packet_capture_export_status": (
+                registry_ack_packet_capture_export["export_status"]
+            ),
+            "ack_route_packet_capture_route_binding_refs": (
+                ack_route_packet_capture_route_binding_refs
+            ),
+            "ack_route_packet_capture_route_binding_set_digest": (
+                ack_route_packet_capture_route_binding_set_digest
+            ),
+            "ack_route_os_native_readback_available": (
+                registry_ack_packet_capture_export["os_native_readback_available"]
+            ),
+            "ack_route_os_native_readback_ok": (
+                registry_ack_packet_capture_export["os_native_readback_ok"]
+            ),
+            "ack_route_privileged_capture_ref": (
+                registry_ack_privileged_capture_acquisition["acquisition_ref"]
+            ),
+            "ack_route_privileged_capture_digest": (
+                registry_ack_privileged_capture_acquisition["digest"]
+            ),
+            "ack_route_privileged_capture_profile": (
+                registry_ack_privileged_capture_acquisition["acquisition_profile"]
+            ),
+            "ack_route_privilege_mode": registry_ack_privileged_capture_acquisition[
+                "privilege_mode"
+            ],
+            "ack_route_broker_profile": registry_ack_privileged_capture_acquisition[
+                "broker_profile"
+            ],
+            "ack_route_broker_attestation_ref": (
+                registry_ack_privileged_capture_acquisition["broker_attestation_ref"]
+            ),
+            "ack_route_lease_ref": registry_ack_privileged_capture_acquisition[
+                "lease_ref"
+            ],
+            "ack_route_interface_name": registry_ack_privileged_capture_acquisition[
+                "interface_name"
+            ],
+            "ack_route_local_ips": list(
+                registry_ack_privileged_capture_acquisition["local_ips"]
+            ),
+            "ack_route_capture_filter_digest": (
+                registry_ack_privileged_capture_acquisition["filter_digest"]
+            ),
+            "ack_route_capture_command_digest": sha256_text(
+                canonical_json(
+                    registry_ack_privileged_capture_acquisition["capture_command"]
+                )
+            ),
+            "ack_route_acquisition_route_binding_refs": (
+                ack_route_acquisition_route_binding_refs
+            ),
+            "ack_route_acquisition_route_binding_set_digest": (
+                ack_route_acquisition_route_binding_set_digest
+            ),
+            "ack_route_capture_bindings": ack_route_capture_bindings,
+            "ack_route_capture_binding_digest_set": (
+                ack_route_capture_binding_digest_set
+            ),
+            "ack_route_capture_binding_digest_set_digest": (
+                ack_route_capture_binding_digest_set_digest
+            ),
+            "ack_route_capture_binding_digest": ack_route_capture_binding_digest,
+            "ack_route_capture_binding_count": len(ack_route_capture_bindings),
             "registry_digest_set": registry_digest_set,
             "registry_digest_set_digest": registry_digest_set_digest,
             "capture_export_bound": True,
@@ -1157,7 +1340,11 @@ class CollectiveIdentityService:
             "submission_ack_bound": True,
             "ack_quorum_bound": True,
             "ack_route_trace_bound": ack_route_trace_bound,
-            "external_registry_sync_complete": True,
+            "ack_route_capture_export_bound": ack_route_capture_export_bound,
+            "ack_route_capture_route_binding_set_bound": (
+                ack_route_capture_route_binding_set_bound
+            ),
+            "external_registry_sync_complete": ack_route_capture_export_bound,
             "raw_dissolution_payload_stored": False,
             "raw_registry_payload_stored": False,
             "raw_ack_payload_stored": False,
@@ -2174,6 +2361,8 @@ class CollectiveIdentityService:
         receipt: Mapping[str, Any],
         recovery_capture_export_binding: Mapping[str, Any] | None = None,
         registry_ack_authority_route_trace: Mapping[str, Any] | None = None,
+        registry_ack_packet_capture_export: Mapping[str, Any] | None = None,
+        registry_ack_privileged_capture_acquisition: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         if not isinstance(receipt, Mapping):
@@ -2657,6 +2846,260 @@ class CollectiveIdentityService:
         if raw_ack_route_payload_stored:
             errors.append("raw_ack_route_payload_stored must be false")
 
+        expected_ack_route_trace_route_binding_refs = [
+            binding["route_binding_ref"]
+            for binding in expected_ack_route_trace_bindings
+        ]
+        if registry_ack_packet_capture_export is not None:
+            expected_packet_capture_route_refs = [
+                route_export["route_binding_ref"]
+                for route_export in registry_ack_packet_capture_export.get(
+                    "route_exports",
+                    [],
+                )
+                if isinstance(route_export, Mapping)
+                and isinstance(route_export.get("route_binding_ref"), str)
+            ]
+        else:
+            expected_packet_capture_route_refs = list(
+                receipt.get("ack_route_packet_capture_route_binding_refs", [])
+            )
+        ack_route_trace_for_capture = {
+            "authority_route_trace_ref": receipt.get("ack_authority_route_trace_ref"),
+            "authority_route_trace_digest": receipt.get(
+                "ack_authority_route_trace_digest"
+            ),
+            "route_binding_refs": expected_packet_capture_route_refs,
+            "route_count": len(expected_packet_capture_route_refs),
+        }
+        if registry_ack_packet_capture_export is not None:
+            ack_packet_capture_validation = self._validate_packet_capture_export(
+                registry_ack_packet_capture_export,
+                recovery_route_trace_binding=ack_route_trace_for_capture,
+            )
+            ack_route_packet_capture_bound = (
+                ack_packet_capture_validation["ok"]
+                and receipt.get("ack_route_packet_capture_ref")
+                == registry_ack_packet_capture_export.get("capture_ref")
+                and receipt.get("ack_route_packet_capture_digest")
+                == registry_ack_packet_capture_export.get("digest")
+                and receipt.get("ack_route_packet_capture_artifact_digest")
+                == registry_ack_packet_capture_export.get("artifact_digest")
+                and receipt.get("ack_route_packet_capture_readback_digest")
+                == registry_ack_packet_capture_export.get("readback_digest")
+                and receipt.get("ack_route_packet_count")
+                == registry_ack_packet_capture_export.get("packet_count")
+                and receipt.get("ack_route_packet_capture_route_binding_refs")
+                == expected_packet_capture_route_refs
+            )
+        else:
+            ack_route_packet_capture_bound = (
+                receipt.get("ack_route_packet_capture_profile")
+                == COLLECTIVE_PACKET_CAPTURE_PROFILE
+                and receipt.get("ack_route_packet_capture_artifact_format")
+                == COLLECTIVE_PACKET_CAPTURE_FORMAT
+                and receipt.get("ack_route_packet_capture_export_status") == "verified"
+                and self._looks_like_digest(
+                    receipt.get("ack_route_packet_capture_digest")
+                )
+                and self._looks_like_digest(
+                    receipt.get("ack_route_packet_capture_artifact_digest")
+                )
+                and self._looks_like_digest(
+                    receipt.get("ack_route_packet_capture_readback_digest")
+                )
+            )
+        if not ack_route_packet_capture_bound:
+            errors.append("ack route packet capture metadata must match")
+
+        if registry_ack_privileged_capture_acquisition is not None:
+            ack_privileged_capture_validation = (
+                self._validate_privileged_capture_acquisition(
+                    registry_ack_privileged_capture_acquisition,
+                    recovery_route_trace_binding=ack_route_trace_for_capture,
+                    packet_capture_export=registry_ack_packet_capture_export,
+                )
+            )
+            expected_acquisition_route_refs = list(
+                registry_ack_privileged_capture_acquisition.get(
+                    "route_binding_refs",
+                    [],
+                )
+            )
+            ack_route_privileged_capture_bound = (
+                ack_privileged_capture_validation["ok"]
+                and receipt.get("ack_route_privileged_capture_ref")
+                == registry_ack_privileged_capture_acquisition.get("acquisition_ref")
+                and receipt.get("ack_route_privileged_capture_digest")
+                == registry_ack_privileged_capture_acquisition.get("digest")
+                and receipt.get("ack_route_broker_attestation_ref")
+                == registry_ack_privileged_capture_acquisition.get(
+                    "broker_attestation_ref"
+                )
+                and receipt.get("ack_route_lease_ref")
+                == registry_ack_privileged_capture_acquisition.get("lease_ref")
+                and receipt.get("ack_route_capture_filter_digest")
+                == registry_ack_privileged_capture_acquisition.get("filter_digest")
+                and receipt.get("ack_route_capture_command_digest")
+                == sha256_text(
+                    canonical_json(
+                        registry_ack_privileged_capture_acquisition.get(
+                            "capture_command",
+                            [],
+                        )
+                    )
+                )
+            )
+        else:
+            expected_acquisition_route_refs = list(
+                receipt.get("ack_route_acquisition_route_binding_refs", [])
+            )
+            ack_route_privileged_capture_bound = (
+                receipt.get("ack_route_privileged_capture_profile")
+                == COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE
+                and receipt.get("ack_route_privilege_mode")
+                == COLLECTIVE_PRIVILEGED_CAPTURE_MODE
+                and self._looks_like_digest(
+                    receipt.get("ack_route_privileged_capture_digest")
+                )
+                and self._looks_like_digest(
+                    receipt.get("ack_route_capture_filter_digest")
+                )
+            )
+        if not ack_route_privileged_capture_bound:
+            errors.append("ack route privileged capture metadata must match")
+
+        ack_route_capture_route_binding_set_bound = (
+            receipt.get("ack_route_packet_capture_route_binding_set_digest")
+            == sha256_text(canonical_json(expected_packet_capture_route_refs))
+            and receipt.get("ack_route_acquisition_route_binding_set_digest")
+            == sha256_text(canonical_json(sorted(expected_acquisition_route_refs)))
+            and sorted(expected_packet_capture_route_refs)
+            == sorted(expected_ack_route_trace_route_binding_refs)
+            and sorted(expected_acquisition_route_refs)
+            == sorted(expected_ack_route_trace_route_binding_refs)
+            and receipt.get("ack_route_capture_route_binding_set_bound") is True
+        )
+        if not ack_route_capture_route_binding_set_bound:
+            errors.append("ack route capture refs must match route trace refs")
+
+        ack_route_capture_bindings = receipt.get("ack_route_capture_bindings")
+        expected_ack_route_capture_bindings: List[Dict[str, Any]] = []
+        if not isinstance(ack_route_capture_bindings, list):
+            errors.append("ack_route_capture_bindings must be a list")
+            ack_route_capture_bindings_bound = False
+        elif (
+            registry_ack_packet_capture_export is not None
+            and registry_ack_privileged_capture_acquisition is not None
+        ):
+            expected_ack_route_capture_bindings = (
+                self._build_collective_external_registry_ack_route_capture_bindings(
+                    collective_id=str(receipt.get("collective_id")),
+                    ack_route_trace_bindings=expected_ack_route_trace_bindings,
+                    packet_capture_export=registry_ack_packet_capture_export,
+                    privileged_capture_acquisition=(
+                        registry_ack_privileged_capture_acquisition
+                    ),
+                    ack_route_trace_binding_digest=str(
+                        receipt.get("ack_route_trace_binding_digest")
+                    ),
+                )
+            )
+            ack_route_capture_bindings_bound = (
+                ack_route_capture_bindings == expected_ack_route_capture_bindings
+            )
+        else:
+            for binding, route_binding in zip(
+                ack_route_capture_bindings,
+                expected_ack_route_trace_bindings,
+            ):
+                if not isinstance(binding, Mapping):
+                    errors.append("ack_route_capture_bindings entries must be objects")
+                    continue
+                expected_binding = dict(binding)
+                expected_binding["ack_route_capture_binding_digest"] = (
+                    self._collective_external_registry_ack_route_capture_binding_digest(
+                        collective_id=str(receipt.get("collective_id")),
+                        ack_receipt_digest=str(route_binding.get("ack_receipt_digest")),
+                        ack_route_binding_digest=str(
+                            route_binding.get("ack_route_binding_digest")
+                        ),
+                        ack_route_trace_binding_digest=str(
+                            receipt.get("ack_route_trace_binding_digest")
+                        ),
+                        packet_capture_digest=str(
+                            receipt.get("ack_route_packet_capture_digest")
+                        ),
+                        privileged_capture_digest=str(
+                            receipt.get("ack_route_privileged_capture_digest")
+                        ),
+                        route_binding_ref=str(binding.get("route_binding_ref")),
+                        route_export_digest=str(
+                            binding.get("packet_capture_route_export_digest")
+                        ),
+                    )
+                )
+                expected_ack_route_capture_bindings.append(expected_binding)
+            ack_route_capture_bindings_bound = (
+                ack_route_capture_bindings == expected_ack_route_capture_bindings
+            )
+
+        expected_ack_route_capture_digest_set = [
+            binding["ack_route_capture_binding_digest"]
+            for binding in expected_ack_route_capture_bindings
+        ]
+        expected_ack_route_capture_digest_set_digest = sha256_text(
+            canonical_json(expected_ack_route_capture_digest_set)
+        )
+        expected_ack_route_capture_binding_digest = (
+            self._collective_external_registry_ack_route_capture_export_digest(
+                collective_id=str(receipt.get("collective_id")),
+                ack_route_trace_binding_digest=str(
+                    receipt.get("ack_route_trace_binding_digest")
+                ),
+                packet_capture_digest=str(
+                    receipt.get("ack_route_packet_capture_digest")
+                ),
+                privileged_capture_digest=str(
+                    receipt.get("ack_route_privileged_capture_digest")
+                ),
+                ack_route_capture_binding_digest_set_digest=(
+                    expected_ack_route_capture_digest_set_digest
+                ),
+            )
+        )
+        ack_route_capture_bindings_bound = (
+            ack_route_capture_bindings_bound
+            and receipt.get("ack_route_capture_binding_digest_set")
+            == expected_ack_route_capture_digest_set
+            and receipt.get("ack_route_capture_binding_digest_set_digest")
+            == expected_ack_route_capture_digest_set_digest
+            and receipt.get("ack_route_capture_binding_digest")
+            == expected_ack_route_capture_binding_digest
+            and receipt.get("ack_route_capture_binding_count")
+            == len(expected_ack_route_capture_bindings)
+            and all(
+                binding.get("readback_verified") is True
+                and binding.get("readback_packet_count") == 2
+                and binding.get("raw_packet_body_stored") is False
+                for binding in ack_route_capture_bindings
+                if isinstance(binding, Mapping)
+            )
+        )
+        if not ack_route_capture_bindings_bound:
+            errors.append("ack route capture bindings must bind packet readback evidence")
+
+        ack_route_capture_export_bound = (
+            ack_route_trace_bound
+            and ack_route_packet_capture_bound
+            and ack_route_privileged_capture_bound
+            and ack_route_capture_route_binding_set_bound
+            and ack_route_capture_bindings_bound
+            and receipt.get("ack_route_capture_export_bound") is True
+        )
+        if not ack_route_capture_export_bound:
+            errors.append("ack route capture export must bind ack route trace evidence")
+
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
             isinstance(registry_digest_set, list)
@@ -2669,6 +3112,7 @@ class CollectiveIdentityService:
                 receipt.get("ack_receipt_digest"),
                 receipt.get("ack_quorum_digest"),
                 receipt.get("ack_route_trace_binding_digest"),
+                receipt.get("ack_route_capture_binding_digest"),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -2689,6 +3133,9 @@ class CollectiveIdentityService:
                     "ack_quorum_digest": receipt.get("ack_quorum_digest"),
                     "ack_route_trace_binding_digest": receipt.get(
                         "ack_route_trace_binding_digest"
+                    ),
+                    "ack_route_capture_binding_digest": receipt.get(
+                        "ack_route_capture_binding_digest"
                     ),
                     "registry_digest_set_digest": receipt.get(
                         "registry_digest_set_digest"
@@ -2720,6 +3167,7 @@ class CollectiveIdentityService:
             and submission_ack_bound
             and ack_quorum_bound
             and ack_route_trace_bound
+            and ack_route_capture_export_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -2744,6 +3192,13 @@ class CollectiveIdentityService:
             "submission_ack_bound": submission_ack_bound,
             "ack_quorum_bound": ack_quorum_bound,
             "ack_route_trace_bound": ack_route_trace_bound,
+            "ack_route_packet_capture_bound": ack_route_packet_capture_bound,
+            "ack_route_privileged_capture_bound": ack_route_privileged_capture_bound,
+            "ack_route_capture_bindings_bound": ack_route_capture_bindings_bound,
+            "ack_route_capture_route_binding_set_bound": (
+                ack_route_capture_route_binding_set_bound
+            ),
+            "ack_route_capture_export_bound": ack_route_capture_export_bound,
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -3184,6 +3639,90 @@ class CollectiveIdentityService:
             )
         return bound
 
+    def _build_collective_external_registry_ack_route_capture_bindings(
+        self,
+        *,
+        collective_id: str,
+        ack_route_trace_bindings: Sequence[Mapping[str, Any]],
+        packet_capture_export: Mapping[str, Any],
+        privileged_capture_acquisition: Mapping[str, Any],
+        ack_route_trace_binding_digest: str,
+    ) -> List[Dict[str, Any]]:
+        route_exports = packet_capture_export.get("route_exports")
+        if not isinstance(route_exports, list):
+            raise ValueError("registry_ack_packet_capture_export.route_exports must be a list")
+        acquisition_route_refs = privileged_capture_acquisition.get("route_binding_refs")
+        if not isinstance(acquisition_route_refs, list):
+            raise ValueError(
+                "registry_ack_privileged_capture_acquisition.route_binding_refs must be a list"
+            )
+        route_exports_by_ref = {
+            route_export["route_binding_ref"]: route_export
+            for route_export in route_exports
+            if isinstance(route_export, Mapping)
+            and isinstance(route_export.get("route_binding_ref"), str)
+        }
+        bound: List[Dict[str, Any]] = []
+        for route_binding in ack_route_trace_bindings:
+            route_binding_ref = str(route_binding["route_binding_ref"])
+            if route_binding_ref not in acquisition_route_refs:
+                raise ValueError(
+                    "registry_ack_privileged_capture_acquisition must cover every ack route"
+                )
+            route_export = route_exports_by_ref.get(route_binding_ref)
+            if not isinstance(route_export, Mapping):
+                raise ValueError(
+                    f"registry_ack_packet_capture_export missing route export for {route_binding_ref}"
+                )
+            route_export_digest = sha256_text(canonical_json(route_export))
+            binding_digest = (
+                self._collective_external_registry_ack_route_capture_binding_digest(
+                    collective_id=collective_id,
+                    ack_receipt_digest=str(route_binding["ack_receipt_digest"]),
+                    ack_route_binding_digest=str(
+                        route_binding["ack_route_binding_digest"]
+                    ),
+                    ack_route_trace_binding_digest=ack_route_trace_binding_digest,
+                    packet_capture_digest=str(packet_capture_export["digest"]),
+                    privileged_capture_digest=str(
+                        privileged_capture_acquisition["digest"]
+                    ),
+                    route_binding_ref=route_binding_ref,
+                    route_export_digest=route_export_digest,
+                )
+            )
+            bound.append(
+                {
+                    "ack_receipt_ref": route_binding["ack_receipt_ref"],
+                    "ack_receipt_digest": route_binding["ack_receipt_digest"],
+                    "registry_authority_ref": route_binding[
+                        "registry_authority_ref"
+                    ],
+                    "registry_jurisdiction": route_binding[
+                        "registry_jurisdiction"
+                    ],
+                    "ack_route_binding_digest": route_binding[
+                        "ack_route_binding_digest"
+                    ],
+                    "route_binding_ref": route_binding_ref,
+                    "packet_capture_route_export_digest": route_export_digest,
+                    "outbound_tuple_digest": route_export["outbound_tuple_digest"],
+                    "inbound_tuple_digest": route_export["inbound_tuple_digest"],
+                    "outbound_payload_digest": route_export["outbound_payload_digest"],
+                    "inbound_payload_digest": route_export["inbound_payload_digest"],
+                    "readback_packet_count": route_export["readback_packet_count"],
+                    "readback_verified": route_export["readback_verified"],
+                    "os_native_readback_verified": route_export.get(
+                        "os_native_readback_verified",
+                        False,
+                    ),
+                    "privileged_capture_route_ref": route_binding_ref,
+                    "ack_route_capture_binding_digest": binding_digest,
+                    "raw_packet_body_stored": False,
+                }
+            )
+        return bound
+
     @staticmethod
     def _select_registry_ack_route_binding(
         *,
@@ -3237,6 +3776,62 @@ class CollectiveIdentityService:
                         os_observer_host_binding_digest
                     ),
                     "socket_response_digest": socket_response_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_route_capture_binding_digest(
+        *,
+        collective_id: str,
+        ack_receipt_digest: str,
+        ack_route_binding_digest: str,
+        ack_route_trace_binding_digest: str,
+        packet_capture_digest: str,
+        privileged_capture_digest: str,
+        route_binding_ref: str,
+        route_export_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID
+                    ),
+                    "collective_id": collective_id,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "ack_route_binding_digest": ack_route_binding_digest,
+                    "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
+                    "packet_capture_digest": packet_capture_digest,
+                    "privileged_capture_digest": privileged_capture_digest,
+                    "route_binding_ref": route_binding_ref,
+                    "route_export_digest": route_export_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_route_capture_export_digest(
+        *,
+        collective_id: str,
+        ack_route_trace_binding_digest: str,
+        packet_capture_digest: str,
+        privileged_capture_digest: str,
+        ack_route_capture_binding_digest_set_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_CAPTURE_EXPORT_PROFILE_ID
+                    ),
+                    "collective_id": collective_id,
+                    "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
+                    "packet_capture_digest": packet_capture_digest,
+                    "privileged_capture_digest": privileged_capture_digest,
+                    "ack_route_capture_binding_digest_set_digest": (
+                        ack_route_capture_binding_digest_set_digest
+                    ),
                 }
             )
         )

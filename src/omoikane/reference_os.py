@@ -7701,6 +7701,10 @@ json.dump(response, sys.stdout)
         external_registry_sync = self.collective.sync_dissolution_external_registry(
             recovery_capture_export_binding,
             registry_ack_authority_route_trace=recovery_route_trace,
+            registry_ack_packet_capture_export=recovery_packet_capture_export,
+            registry_ack_privileged_capture_acquisition=(
+                recovery_privileged_capture_acquisition
+            ),
         )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
@@ -7733,6 +7737,8 @@ json.dump(response, sys.stdout)
                 external_registry_sync,
                 recovery_capture_export_binding,
                 recovery_route_trace,
+                recovery_packet_capture_export,
+                recovery_privileged_capture_acquisition,
             )
         )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
@@ -7948,6 +7954,15 @@ json.dump(response, sys.stdout)
                 "ack_route_trace_route_binding_refs": external_registry_sync[
                     "ack_route_trace_route_binding_refs"
                 ],
+                "ack_route_packet_capture_digest": external_registry_sync[
+                    "ack_route_packet_capture_digest"
+                ],
+                "ack_route_privileged_capture_digest": external_registry_sync[
+                    "ack_route_privileged_capture_digest"
+                ],
+                "ack_route_capture_binding_digest": external_registry_sync[
+                    "ack_route_capture_binding_digest"
+                ],
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
                 ],
@@ -8116,6 +8131,23 @@ json.dump(response, sys.stdout)
             ),
             "external_registry_sync_ack_route_trace_bound": (
                 external_registry_sync_validation["ack_route_trace_bound"]
+            ),
+            "external_registry_sync_ack_route_packet_capture_bound": (
+                external_registry_sync_validation["ack_route_packet_capture_bound"]
+            ),
+            "external_registry_sync_ack_route_privileged_capture_bound": (
+                external_registry_sync_validation["ack_route_privileged_capture_bound"]
+            ),
+            "external_registry_sync_ack_route_capture_bindings_bound": (
+                external_registry_sync_validation["ack_route_capture_bindings_bound"]
+            ),
+            "external_registry_sync_ack_route_capture_route_binding_set_bound": (
+                external_registry_sync_validation[
+                    "ack_route_capture_route_binding_set_bound"
+                ]
+            ),
+            "external_registry_sync_ack_route_capture_export_bound": (
+                external_registry_sync_validation["ack_route_capture_export_bound"]
             ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]

@@ -36,6 +36,7 @@ member capture binding digest が揃い、raw packet body を保存しないこ�
 ### Collective External Registry Sync
 post-dissolution recovery capture export binding を external legal / governance
 registry の digest-only entry、submission、ack receipt、2 jurisdiction ack quorum に
+束縛し、ack route trace を verified pcap export / delegated privileged capture に
 束縛し、raw dissolution / registry / ack / packet payload を保存しないことを確認する。
 
 ### WMS Private Reality Escape

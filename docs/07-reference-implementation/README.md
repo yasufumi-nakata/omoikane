@@ -832,7 +832,10 @@ delegated-broker privileged capture acquisition、member ごとの capture bindi
 recovery capture export binding digest を external legal registry digest、
 governance registry digest、registry entry digest、submission receipt digest、
 ack receipt digest、2 jurisdiction ack quorum digest、
-ack route trace binding digest に束縛する。
+ack route trace binding digest、ack route capture binding digest に束縛する。
+ack route capture binding は acknowledgement route trace を verified pcap export、
+pcap readback digest、delegated-broker privileged capture acquisition、
+ack ごとの capture binding digest へつなぐ。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
 raw ack payload、raw ack-route payload、raw packet body は保存しない。
 
