@@ -19,6 +19,7 @@ assertions:
   - ack_live_endpoint_probe_set_digest binds live HTTP JSON acknowledgement endpoint probes for every legal/governance acknowledgement without storing raw endpoint payloads
   - ack_live_endpoint_response_signature_digest_set_digest binds signed response envelopes for every acknowledgement endpoint response without storing raw response signature payloads
   - ack_live_endpoint_mtls_client_certificate_proof_set_digest binds mTLS client certificate proofs for every acknowledgement endpoint response without storing raw client certificate payloads
+  - ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest binds revocation registry and OCSP-style freshness proof for every acknowledgement endpoint response without storing raw freshness payloads
   - raw_dissolution_payload_stored is false
   - raw_registry_payload_stored is false
   - raw_ack_payload_stored is false
@@ -26,4 +27,5 @@ assertions:
   - raw_ack_endpoint_payload_stored is false
   - raw_response_signature_payload_stored is false
   - raw_client_certificate_payload_stored is false
+  - raw_client_certificate_freshness_payload_stored is false
   - raw_packet_body_stored is false

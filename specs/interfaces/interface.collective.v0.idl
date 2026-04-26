@@ -295,7 +295,8 @@ operations:
       - ack_live_endpoint_probe_set_digest must bind live HTTP JSON acknowledgement endpoint probes for every legal/governance registry acknowledgement without storing raw endpoint payloads
       - ack_live_endpoint_response_signature_digest_set_digest must bind signed response envelopes for every acknowledgement endpoint response
       - ack_live_endpoint_mtls_client_certificate_proof_set_digest must bind mTLS client certificate proof for every acknowledgement endpoint probe without storing raw certificate payloads
-      - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, raw endpoint payloads, raw response signature payloads, raw client certificate payloads, and raw packet bodies must not be stored
+      - ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest must bind client certificate revocation/freshness proof for every acknowledgement endpoint probe without storing raw freshness payloads
+      - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, raw endpoint payloads, raw response signature payloads, raw client certificate payloads, raw certificate freshness payloads, and raw packet bodies must not be stored
   bind_external_registry_ack_endpoint_probes:
     summary: Bind external registry acknowledgement receipts to live HTTP JSON endpoint probe evidence.
     input:
@@ -326,9 +327,15 @@ operations:
                   - mtls_client_certificate_chain_digest
                   - mtls_client_certificate_proof_digest
                   - mtls_client_certificate_bound
+                  - mtls_client_certificate_revocation_registry_ref
+                  - mtls_client_certificate_revocation_registry_digest
+                  - mtls_client_certificate_ocsp_response_digest
+                  - mtls_client_certificate_freshness_proof_digest
+                  - mtls_client_certificate_freshness_bound
                   - raw_endpoint_payload_stored
                   - raw_response_signature_payload_stored
                   - raw_client_certificate_payload_stored
+                  - raw_client_certificate_freshness_payload_stored
     output:
       schema_ref: collective_external_registry_sync
     guarantees:
@@ -338,6 +345,7 @@ operations:
       - network_response_digest must bind each live endpoint JSON response without storing raw endpoint payloads
       - signed_response_envelope_bound must be true for each endpoint response and ack_live_endpoint_response_signature_digest_set_digest must enter registry_digest_set
       - mtls_client_certificate_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_proof_set_digest must enter registry_digest_set
+      - mtls_client_certificate_freshness_bound must be true for each endpoint response and ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest must enter registry_digest_set
       - registry_digest_set must include ack_live_endpoint_probe_set_digest before external_registry_sync_complete is true
 events:
   collective.formed:

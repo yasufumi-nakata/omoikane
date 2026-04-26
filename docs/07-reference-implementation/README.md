@@ -853,11 +853,16 @@ legal / governance registry acknowledgement を live HTTP JSON endpoint response
 HTTP status、probe latency、endpoint ref、signed response envelope digest に束縛し、
 さらに mTLS client certificate ref / fingerprint / chain digest / client CA ref を
 response digest と同じ probe receipt に束縛する。
-probe set digest、response signature digest set、client certificate proof set digest を
-registry digest set に含めてから complete になる。
+さらに `collective-external-registry-ack-client-certificate-freshness-revocation-v1`
+により、client certificate revocation registry ref、OCSP-style response digest、
+not-revoked status、24h freshness window を同じ probe receipt に束縛する。
+probe set digest、response signature digest set、client certificate proof set digest、
+client certificate freshness proof set digest を registry digest set に含めてから
+complete になる。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
 raw ack payload、raw ack-route payload、raw endpoint payload、
-raw response signature payload、raw client certificate payload、raw packet body は保存しない。
+raw response signature payload、raw client certificate payload、
+raw client certificate freshness payload、raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

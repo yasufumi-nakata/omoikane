@@ -90,6 +90,13 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_PROOF_PROFILE_ID = (
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_DIGEST_PROFILE_ID = (
     "collective-external-registry-ack-client-certificate-digest-v1"
 )
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-freshness-revocation-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-freshness-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS = 86_400
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -186,11 +193,15 @@ class CollectiveIdentityService:
                 "external_registry_ack_client_certificate_proof_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_PROOF_PROFILE_ID
                 ),
+                "external_registry_ack_client_certificate_freshness_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
                 "raw_external_registry_ack_endpoint_payload_stored": False,
                 "raw_external_registry_ack_response_signature_payload_stored": False,
                 "raw_external_registry_ack_client_certificate_payload_stored": False,
+                "raw_external_registry_ack_client_certificate_freshness_payload_stored": False,
             },
         }
 
@@ -1476,6 +1487,10 @@ class CollectiveIdentityService:
         client_certificate_fingerprint: str | None = None,
         client_certificate_chain_digest: str | None = None,
         client_certificate_authority_ref: str | None = None,
+        client_certificate_revocation_registry_ref: str | None = None,
+        client_certificate_revocation_registry_digest: str | None = None,
+        client_certificate_ocsp_responder_ref: str | None = None,
+        client_certificate_ocsp_response_digest: str | None = None,
     ) -> Dict[str, Any]:
         """Probe one live registry acknowledgement endpoint and return a digest-only receipt."""
 
@@ -1615,6 +1630,108 @@ class CollectiveIdentityService:
                 ),
             )
         )
+        normalized_client_certificate_revocation_registry_ref = (
+            self._normalize_non_empty_string(
+                client_certificate_revocation_registry_ref
+                or self._collective_external_registry_ack_client_certificate_revocation_registry_ref(
+                    client_certificate_authority_ref=(
+                        normalized_client_certificate_authority_ref
+                    ),
+                    registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                    registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                ),
+                "client_certificate_revocation_registry_ref",
+            )
+        )
+        normalized_client_certificate_revocation_registry_digest = (
+            self._normalize_digest(
+                client_certificate_revocation_registry_digest
+                or self._collective_external_registry_ack_client_certificate_revocation_registry_digest(
+                    client_certificate_ref=normalized_client_certificate_ref,
+                    client_certificate_fingerprint=(
+                        normalized_client_certificate_fingerprint
+                    ),
+                    client_certificate_authority_ref=(
+                        normalized_client_certificate_authority_ref
+                    ),
+                    revocation_registry_ref=(
+                        normalized_client_certificate_revocation_registry_ref
+                    ),
+                    registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                    registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                ),
+                "client_certificate_revocation_registry_digest",
+            )
+        )
+        normalized_client_certificate_ocsp_responder_ref = (
+            self._normalize_non_empty_string(
+                client_certificate_ocsp_responder_ref
+                or self._collective_external_registry_ack_client_certificate_ocsp_responder_ref(
+                    client_certificate_authority_ref=(
+                        normalized_client_certificate_authority_ref
+                    ),
+                    registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                    registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                ),
+                "client_certificate_ocsp_responder_ref",
+            )
+        )
+        normalized_client_certificate_ocsp_response_digest = self._normalize_digest(
+            client_certificate_ocsp_response_digest
+            or self._collective_external_registry_ack_client_certificate_ocsp_response_digest(
+                client_certificate_ref=normalized_client_certificate_ref,
+                client_certificate_fingerprint=(
+                    normalized_client_certificate_fingerprint
+                ),
+                client_certificate_chain_digest=(
+                    normalized_client_certificate_chain_digest
+                ),
+                revocation_registry_digest=(
+                    normalized_client_certificate_revocation_registry_digest
+                ),
+                ocsp_responder_ref=normalized_client_certificate_ocsp_responder_ref,
+                checked_at=str(payload["checked_at"]),
+            ),
+            "client_certificate_ocsp_response_digest",
+        )
+        if not normalized_client_certificate_revocation_registry_ref.startswith(
+            "registry-client-cert-revocation://"
+        ):
+            raise ValueError(
+                "client_certificate_revocation_registry_ref must start with "
+                "registry-client-cert-revocation://"
+            )
+        if not normalized_client_certificate_ocsp_responder_ref.startswith(
+            "registry-client-cert-ocsp://"
+        ):
+            raise ValueError(
+                "client_certificate_ocsp_responder_ref must start with "
+                "registry-client-cert-ocsp://"
+            )
+        mtls_client_certificate_freshness_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_freshness_proof_digest(
+                registry_ack_endpoint_ref=normalized_endpoint,
+                ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                client_certificate_proof_digest=mtls_client_certificate_proof_digest,
+                client_certificate_revocation_registry_ref=(
+                    normalized_client_certificate_revocation_registry_ref
+                ),
+                client_certificate_revocation_registry_digest=(
+                    normalized_client_certificate_revocation_registry_digest
+                ),
+                client_certificate_ocsp_responder_ref=(
+                    normalized_client_certificate_ocsp_responder_ref
+                ),
+                client_certificate_ocsp_response_digest=(
+                    normalized_client_certificate_ocsp_response_digest
+                ),
+                checked_at=str(payload["checked_at"]),
+                freshness_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS
+                ),
+                revocation_status="not_revoked",
+            )
+        )
         mtls_client_certificate_bound = bool(
             signed_response_envelope_bound
             and normalized_client_certificate_ref.startswith("registry-client-cert://")
@@ -1624,6 +1741,18 @@ class CollectiveIdentityService:
             and len(normalized_client_certificate_fingerprint) == 64
             and len(normalized_client_certificate_chain_digest) == 64
             and len(mtls_client_certificate_proof_digest) == 64
+        )
+        mtls_client_certificate_freshness_bound = bool(
+            mtls_client_certificate_bound
+            and normalized_client_certificate_revocation_registry_ref.startswith(
+                "registry-client-cert-revocation://"
+            )
+            and normalized_client_certificate_ocsp_responder_ref.startswith(
+                "registry-client-cert-ocsp://"
+            )
+            and len(normalized_client_certificate_revocation_registry_digest) == 64
+            and len(normalized_client_certificate_ocsp_response_digest) == 64
+            and len(mtls_client_certificate_freshness_proof_digest) == 64
         )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
@@ -1635,6 +1764,7 @@ class CollectiveIdentityService:
             and payload.get("raw_ack_payload_stored") is False
             and signed_response_envelope_bound
             and mtls_client_certificate_bound
+            and mtls_client_certificate_freshness_bound
         )
         receipt = {
             "kind": "collective_external_registry_ack_endpoint_probe",
@@ -1699,11 +1829,41 @@ class CollectiveIdentityService:
                 mtls_client_certificate_proof_digest
             ),
             "mtls_client_certificate_bound": mtls_client_certificate_bound,
+            "mtls_client_certificate_freshness_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+            ),
+            "mtls_client_certificate_freshness_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_revocation_registry_ref": (
+                normalized_client_certificate_revocation_registry_ref
+            ),
+            "mtls_client_certificate_revocation_registry_digest": (
+                normalized_client_certificate_revocation_registry_digest
+            ),
+            "mtls_client_certificate_ocsp_responder_ref": (
+                normalized_client_certificate_ocsp_responder_ref
+            ),
+            "mtls_client_certificate_ocsp_response_digest": (
+                normalized_client_certificate_ocsp_response_digest
+            ),
+            "mtls_client_certificate_revocation_status": "not_revoked",
+            "mtls_client_certificate_freshness_window_seconds": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS
+            ),
+            "mtls_client_certificate_freshness_checked_at": payload["checked_at"],
+            "mtls_client_certificate_freshness_proof_digest": (
+                mtls_client_certificate_freshness_proof_digest
+            ),
+            "mtls_client_certificate_freshness_bound": (
+                mtls_client_certificate_freshness_bound
+            ),
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
             "raw_response_signature_payload_stored": False,
             "raw_client_certificate_payload_stored": False,
+            "raw_client_certificate_freshness_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -1742,10 +1902,16 @@ class CollectiveIdentityService:
         response_signature_digests: List[str] = []
         client_certificate_proofs: List[Dict[str, Any]] = []
         client_certificate_proof_digests: List[str] = []
+        client_certificate_freshness_proofs: List[Dict[str, Any]] = []
+        client_certificate_freshness_proof_digests: List[str] = []
         client_certificate_refs: List[str] = []
         client_certificate_fingerprints: List[str] = []
         client_certificate_chain_digests: List[str] = []
         client_certificate_authority_refs: List[str] = []
+        client_certificate_revocation_registry_refs: List[str] = []
+        client_certificate_revocation_registry_digests: List[str] = []
+        client_certificate_ocsp_responder_refs: List[str] = []
+        client_certificate_ocsp_response_digests: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -1798,6 +1964,53 @@ class CollectiveIdentityService:
             client_certificate_proof_digests.append(
                 str(probe_copy["mtls_client_certificate_proof_digest"])
             )
+            client_certificate_freshness_proof = {
+                "probe_id": probe_copy["probe_id"],
+                "ack_receipt_digest": probe_copy["ack_receipt_digest"],
+                "registry_authority_ref": probe_copy["registry_authority_ref"],
+                "registry_jurisdiction": probe_copy["registry_jurisdiction"],
+                "registry_ack_endpoint_ref": probe_copy["registry_ack_endpoint_ref"],
+                "mtls_client_certificate_ref": probe_copy[
+                    "mtls_client_certificate_ref"
+                ],
+                "mtls_client_certificate_fingerprint": probe_copy[
+                    "mtls_client_certificate_fingerprint"
+                ],
+                "mtls_client_certificate_proof_digest": probe_copy[
+                    "mtls_client_certificate_proof_digest"
+                ],
+                "mtls_client_certificate_revocation_registry_ref": probe_copy[
+                    "mtls_client_certificate_revocation_registry_ref"
+                ],
+                "mtls_client_certificate_revocation_registry_digest": probe_copy[
+                    "mtls_client_certificate_revocation_registry_digest"
+                ],
+                "mtls_client_certificate_ocsp_responder_ref": probe_copy[
+                    "mtls_client_certificate_ocsp_responder_ref"
+                ],
+                "mtls_client_certificate_ocsp_response_digest": probe_copy[
+                    "mtls_client_certificate_ocsp_response_digest"
+                ],
+                "mtls_client_certificate_revocation_status": probe_copy[
+                    "mtls_client_certificate_revocation_status"
+                ],
+                "mtls_client_certificate_freshness_window_seconds": probe_copy[
+                    "mtls_client_certificate_freshness_window_seconds"
+                ],
+                "mtls_client_certificate_freshness_checked_at": probe_copy[
+                    "mtls_client_certificate_freshness_checked_at"
+                ],
+                "mtls_client_certificate_freshness_proof_digest": probe_copy[
+                    "mtls_client_certificate_freshness_proof_digest"
+                ],
+                "raw_client_certificate_freshness_payload_stored": False,
+            }
+            client_certificate_freshness_proofs.append(
+                client_certificate_freshness_proof
+            )
+            client_certificate_freshness_proof_digests.append(
+                str(probe_copy["mtls_client_certificate_freshness_proof_digest"])
+            )
             client_certificate_refs.append(str(probe_copy["mtls_client_certificate_ref"]))
             client_certificate_fingerprints.append(
                 str(probe_copy["mtls_client_certificate_fingerprint"])
@@ -1807,6 +2020,18 @@ class CollectiveIdentityService:
             )
             client_certificate_authority_refs.append(
                 str(probe_copy["mtls_client_certificate_authority_ref"])
+            )
+            client_certificate_revocation_registry_refs.append(
+                str(probe_copy["mtls_client_certificate_revocation_registry_ref"])
+            )
+            client_certificate_revocation_registry_digests.append(
+                str(probe_copy["mtls_client_certificate_revocation_registry_digest"])
+            )
+            client_certificate_ocsp_responder_refs.append(
+                str(probe_copy["mtls_client_certificate_ocsp_responder_ref"])
+            )
+            client_certificate_ocsp_response_digests.append(
+                str(probe_copy["mtls_client_certificate_ocsp_response_digest"])
             )
 
         probe_set_digest = sha256_text(canonical_json(probe_digests))
@@ -1818,6 +2043,9 @@ class CollectiveIdentityService:
         )
         client_certificate_proof_set_digest = sha256_text(
             canonical_json(client_certificate_proof_digests)
+        )
+        client_certificate_freshness_proof_set_digest = sha256_text(
+            canonical_json(client_certificate_freshness_proof_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -1866,6 +2094,21 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_proof_set_digest": (
                     client_certificate_proof_set_digest
                 ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_proofs": (
+                    client_certificate_freshness_proofs
+                ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_proof_digests": (
+                    client_certificate_freshness_proof_digests
+                ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest": (
+                    client_certificate_freshness_proof_set_digest
+                ),
                 "ack_live_endpoint_client_certificate_refs": client_certificate_refs,
                 "ack_live_endpoint_client_certificate_fingerprints": (
                     client_certificate_fingerprints
@@ -1876,13 +2119,27 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_client_certificate_authority_refs": (
                     client_certificate_authority_refs
                 ),
+                "ack_live_endpoint_client_certificate_revocation_registry_refs": (
+                    client_certificate_revocation_registry_refs
+                ),
+                "ack_live_endpoint_client_certificate_revocation_registry_digests": (
+                    client_certificate_revocation_registry_digests
+                ),
+                "ack_live_endpoint_client_certificate_ocsp_responder_refs": (
+                    client_certificate_ocsp_responder_refs
+                ),
+                "ack_live_endpoint_client_certificate_ocsp_response_digests": (
+                    client_certificate_ocsp_response_digests
+                ),
                 "ack_live_endpoint_probe_count": len(bound_probes),
                 "ack_live_endpoint_probe_bound": True,
                 "ack_live_endpoint_signed_response_envelope_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_bound": True,
+                "ack_live_endpoint_mtls_client_certificate_freshness_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
                 "raw_response_signature_payload_stored": False,
                 "raw_client_certificate_payload_stored": False,
+                "raw_client_certificate_freshness_payload_stored": False,
             }
         )
         receipt["registry_digest_set"] = [
@@ -1897,6 +2154,9 @@ class CollectiveIdentityService:
             receipt["ack_live_endpoint_probe_set_digest"],
             receipt["ack_live_endpoint_response_signature_digest_set_digest"],
             receipt["ack_live_endpoint_mtls_client_certificate_proof_set_digest"],
+            receipt[
+                "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
+            ],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -1906,6 +2166,7 @@ class CollectiveIdentityService:
             and receipt["ack_live_endpoint_probe_bound"]
             and receipt["ack_live_endpoint_signed_response_envelope_bound"]
             and receipt["ack_live_endpoint_mtls_client_certificate_bound"]
+            and receipt["ack_live_endpoint_mtls_client_certificate_freshness_bound"]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -2971,6 +3232,12 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_DIGEST_PROFILE_ID
             ),
+            "ack_live_endpoint_mtls_client_certificate_freshness_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_freshness_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -3076,6 +3343,7 @@ class CollectiveIdentityService:
             "ack_live_endpoint_network_response_digest_set_digest",
             "ack_live_endpoint_response_signature_digest_set_digest",
             "ack_live_endpoint_mtls_client_certificate_proof_set_digest",
+            "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -3704,13 +3972,28 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_response_signature_digests: List[str] = []
         expected_ack_live_endpoint_client_certificate_proofs: List[Dict[str, Any]] = []
         expected_ack_live_endpoint_client_certificate_proof_digests: List[str] = []
+        expected_ack_live_endpoint_client_certificate_freshness_proofs: List[
+            Dict[str, Any]
+        ] = []
+        expected_ack_live_endpoint_client_certificate_freshness_proof_digests: List[
+            str
+        ] = []
         expected_ack_live_endpoint_client_certificate_refs: List[str] = []
         expected_ack_live_endpoint_client_certificate_fingerprints: List[str] = []
         expected_ack_live_endpoint_client_certificate_chain_digests: List[str] = []
         expected_ack_live_endpoint_client_certificate_authority_refs: List[str] = []
+        expected_ack_live_endpoint_client_certificate_revocation_registry_refs: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_revocation_registry_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_ocsp_responder_refs: List[str] = []
+        expected_ack_live_endpoint_client_certificate_ocsp_response_digests: List[str] = []
         ack_live_endpoint_probe_bound = False
         ack_live_endpoint_signed_response_envelope_bound = False
         ack_live_endpoint_mtls_client_certificate_bound = False
+        ack_live_endpoint_mtls_client_certificate_freshness_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
         )
@@ -3719,6 +4002,9 @@ class CollectiveIdentityService:
         )
         raw_client_certificate_payload_stored = (
             receipt.get("raw_client_certificate_payload_stored") is True
+        )
+        raw_client_certificate_freshness_payload_stored = (
+            receipt.get("raw_client_certificate_freshness_payload_stored") is True
         )
         if not isinstance(ack_live_endpoint_probe_receipts, list):
             errors.append("ack_live_endpoint_probe_receipts must be a list")
@@ -3803,6 +4089,67 @@ class CollectiveIdentityService:
                 expected_ack_live_endpoint_client_certificate_proof_digests.append(
                     str(probe_receipt.get("mtls_client_certificate_proof_digest"))
                 )
+                expected_ack_live_endpoint_client_certificate_freshness_proof = {
+                    "probe_id": probe_receipt.get("probe_id"),
+                    "ack_receipt_digest": probe_receipt.get("ack_receipt_digest"),
+                    "registry_authority_ref": probe_receipt.get(
+                        "registry_authority_ref"
+                    ),
+                    "registry_jurisdiction": probe_receipt.get(
+                        "registry_jurisdiction"
+                    ),
+                    "registry_ack_endpoint_ref": probe_receipt.get(
+                        "registry_ack_endpoint_ref"
+                    ),
+                    "mtls_client_certificate_ref": probe_receipt.get(
+                        "mtls_client_certificate_ref"
+                    ),
+                    "mtls_client_certificate_fingerprint": probe_receipt.get(
+                        "mtls_client_certificate_fingerprint"
+                    ),
+                    "mtls_client_certificate_proof_digest": probe_receipt.get(
+                        "mtls_client_certificate_proof_digest"
+                    ),
+                    "mtls_client_certificate_revocation_registry_ref": probe_receipt.get(
+                        "mtls_client_certificate_revocation_registry_ref"
+                    ),
+                    "mtls_client_certificate_revocation_registry_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_revocation_registry_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_ocsp_responder_ref": probe_receipt.get(
+                        "mtls_client_certificate_ocsp_responder_ref"
+                    ),
+                    "mtls_client_certificate_ocsp_response_digest": probe_receipt.get(
+                        "mtls_client_certificate_ocsp_response_digest"
+                    ),
+                    "mtls_client_certificate_revocation_status": probe_receipt.get(
+                        "mtls_client_certificate_revocation_status"
+                    ),
+                    "mtls_client_certificate_freshness_window_seconds": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_freshness_window_seconds"
+                        )
+                    ),
+                    "mtls_client_certificate_freshness_checked_at": probe_receipt.get(
+                        "mtls_client_certificate_freshness_checked_at"
+                    ),
+                    "mtls_client_certificate_freshness_proof_digest": probe_receipt.get(
+                        "mtls_client_certificate_freshness_proof_digest"
+                    ),
+                    "raw_client_certificate_freshness_payload_stored": False,
+                }
+                expected_ack_live_endpoint_client_certificate_freshness_proofs.append(
+                    expected_ack_live_endpoint_client_certificate_freshness_proof
+                )
+                expected_ack_live_endpoint_client_certificate_freshness_proof_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_freshness_proof_digest"
+                        )
+                    )
+                )
                 expected_ack_live_endpoint_client_certificate_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_ref"))
                 )
@@ -3814,6 +4161,26 @@ class CollectiveIdentityService:
                 )
                 expected_ack_live_endpoint_client_certificate_authority_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_authority_ref"))
+                )
+                expected_ack_live_endpoint_client_certificate_revocation_registry_refs.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_revocation_registry_ref"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_revocation_registry_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_revocation_registry_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_ocsp_responder_refs.append(
+                    str(probe_receipt.get("mtls_client_certificate_ocsp_responder_ref"))
+                )
+                expected_ack_live_endpoint_client_certificate_ocsp_response_digests.append(
+                    str(probe_receipt.get("mtls_client_certificate_ocsp_response_digest"))
                 )
             expected_probe_set_digest = sha256_text(
                 canonical_json(expected_ack_live_endpoint_probe_digests)
@@ -3827,6 +4194,11 @@ class CollectiveIdentityService:
             expected_client_certificate_proof_set_digest = sha256_text(
                 canonical_json(
                     expected_ack_live_endpoint_client_certificate_proof_digests
+                )
+            )
+            expected_client_certificate_freshness_proof_set_digest = sha256_text(
+                canonical_json(
+                    expected_ack_live_endpoint_client_certificate_freshness_proof_digests
                 )
             )
             ack_live_endpoint_probe_bound = (
@@ -3906,6 +4278,54 @@ class CollectiveIdentityService:
                 is True
                 and not raw_client_certificate_payload_stored
             )
+            ack_live_endpoint_mtls_client_certificate_freshness_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get(
+                        "mtls_client_certificate_freshness_bound"
+                    )
+                    is True
+                    and probe_receipt.get(
+                        "raw_client_certificate_freshness_payload_stored"
+                    )
+                    is False
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_freshness_proofs"
+                )
+                == expected_ack_live_endpoint_client_certificate_freshness_proofs
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_freshness_proof_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_freshness_proof_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
+                )
+                == expected_client_certificate_freshness_proof_set_digest
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_revocation_registry_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_revocation_registry_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_revocation_registry_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_revocation_registry_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ocsp_responder_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_ocsp_responder_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_ocsp_response_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_ocsp_response_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_freshness_bound"
+                )
+                is True
+                and not raw_client_certificate_freshness_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
         if not ack_live_endpoint_signed_response_envelope_bound:
@@ -3916,12 +4336,20 @@ class CollectiveIdentityService:
             errors.append(
                 "ack live endpoint probes must bind mTLS client certificate proofs"
             )
+        if not ack_live_endpoint_mtls_client_certificate_freshness_bound:
+            errors.append(
+                "ack live endpoint probes must bind mTLS client certificate freshness proofs"
+            )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
         if raw_response_signature_payload_stored:
             errors.append("raw_response_signature_payload_stored must be false")
         if raw_client_certificate_payload_stored:
             errors.append("raw_client_certificate_payload_stored must be false")
+        if raw_client_certificate_freshness_payload_stored:
+            errors.append(
+                "raw_client_certificate_freshness_payload_stored must be false"
+            )
 
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
@@ -3940,6 +4368,9 @@ class CollectiveIdentityService:
                 receipt.get("ack_live_endpoint_response_signature_digest_set_digest"),
                 receipt.get(
                     "ack_live_endpoint_mtls_client_certificate_proof_set_digest"
+                ),
+                receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
                 ),
             ]
             and receipt.get("registry_digest_set_digest")
@@ -3979,6 +4410,7 @@ class CollectiveIdentityService:
             and ack_live_endpoint_probe_bound
             and ack_live_endpoint_signed_response_envelope_bound
             and ack_live_endpoint_mtls_client_certificate_bound
+            and ack_live_endpoint_mtls_client_certificate_freshness_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -3988,6 +4420,7 @@ class CollectiveIdentityService:
             and not raw_ack_endpoint_payload_stored
             and not raw_response_signature_payload_stored
             and not raw_client_certificate_payload_stored
+            and not raw_client_certificate_freshness_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -4020,6 +4453,9 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_bound": (
                 ack_live_endpoint_mtls_client_certificate_bound
             ),
+            "ack_live_endpoint_mtls_client_certificate_freshness_bound": (
+                ack_live_endpoint_mtls_client_certificate_freshness_bound
+            ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -4033,6 +4469,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_payload_stored": (
                 raw_client_certificate_payload_stored
+            ),
+            "raw_client_certificate_freshness_payload_stored": (
+                raw_client_certificate_freshness_payload_stored
             ),
             "raw_packet_body_stored": raw_packet_body_stored,
         }
@@ -4093,10 +4532,23 @@ class CollectiveIdentityService:
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_DIGEST_PROFILE_ID
             ),
             "mtls_client_certificate_bound": True,
+            "mtls_client_certificate_freshness_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+            ),
+            "mtls_client_certificate_freshness_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_revocation_status": "not_revoked",
+            "mtls_client_certificate_freshness_window_seconds": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS
+            ),
+            "mtls_client_certificate_freshness_checked_at": receipt.get("checked_at"),
+            "mtls_client_certificate_freshness_bound": True,
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
             "raw_response_signature_payload_stored": False,
             "raw_client_certificate_payload_stored": False,
+            "raw_client_certificate_freshness_payload_stored": False,
         }
         expected_payload = self.external_registry_ack_endpoint_payload(
             external_registry_sync,
@@ -4174,6 +4626,88 @@ class CollectiveIdentityService:
                 client_certificate_authority_ref=client_certificate_authority_ref,
             )
         )
+        expected_client_certificate_revocation_registry_ref = (
+            self._collective_external_registry_ack_client_certificate_revocation_registry_ref(
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        client_certificate_revocation_registry_ref = receipt.get(
+            "mtls_client_certificate_revocation_registry_ref"
+        )
+        client_certificate_revocation_registry_digest = receipt.get(
+            "mtls_client_certificate_revocation_registry_digest"
+        )
+        client_certificate_ocsp_responder_ref = receipt.get(
+            "mtls_client_certificate_ocsp_responder_ref"
+        )
+        client_certificate_ocsp_response_digest = receipt.get(
+            "mtls_client_certificate_ocsp_response_digest"
+        )
+        if not isinstance(client_certificate_revocation_registry_ref, str):
+            client_certificate_revocation_registry_ref = ""
+        if not isinstance(client_certificate_revocation_registry_digest, str):
+            client_certificate_revocation_registry_digest = ""
+        if not isinstance(client_certificate_ocsp_responder_ref, str):
+            client_certificate_ocsp_responder_ref = ""
+        if not isinstance(client_certificate_ocsp_response_digest, str):
+            client_certificate_ocsp_response_digest = ""
+        expected_client_certificate_revocation_registry_digest = (
+            self._collective_external_registry_ack_client_certificate_revocation_registry_digest(
+                client_certificate_ref=client_certificate_ref,
+                client_certificate_fingerprint=client_certificate_fingerprint,
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                revocation_registry_ref=client_certificate_revocation_registry_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_client_certificate_ocsp_responder_ref = (
+            self._collective_external_registry_ack_client_certificate_ocsp_responder_ref(
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_client_certificate_ocsp_response_digest = (
+            self._collective_external_registry_ack_client_certificate_ocsp_response_digest(
+                client_certificate_ref=client_certificate_ref,
+                client_certificate_fingerprint=client_certificate_fingerprint,
+                client_certificate_chain_digest=client_certificate_chain_digest,
+                revocation_registry_digest=client_certificate_revocation_registry_digest,
+                ocsp_responder_ref=client_certificate_ocsp_responder_ref,
+                checked_at=str(receipt.get("checked_at") or ""),
+            )
+        )
+        expected_client_certificate_freshness_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_freshness_proof_digest(
+                registry_ack_endpoint_ref=str(
+                    receipt.get("registry_ack_endpoint_ref") or ""
+                ),
+                ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
+                client_certificate_proof_digest=(
+                    expected_client_certificate_proof_digest
+                ),
+                client_certificate_revocation_registry_ref=(
+                    client_certificate_revocation_registry_ref
+                ),
+                client_certificate_revocation_registry_digest=(
+                    client_certificate_revocation_registry_digest
+                ),
+                client_certificate_ocsp_responder_ref=(
+                    client_certificate_ocsp_responder_ref
+                ),
+                client_certificate_ocsp_response_digest=(
+                    client_certificate_ocsp_response_digest
+                ),
+                checked_at=str(receipt.get("checked_at") or ""),
+                freshness_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS
+                ),
+                revocation_status="not_revoked",
+            )
+        )
         expected_fields.update(
             {
                 "mtls_client_certificate_ref": expected_client_certificate_ref,
@@ -4188,6 +4722,21 @@ class CollectiveIdentityService:
                 ),
                 "mtls_client_certificate_proof_digest": (
                     expected_client_certificate_proof_digest
+                ),
+                "mtls_client_certificate_revocation_registry_ref": (
+                    expected_client_certificate_revocation_registry_ref
+                ),
+                "mtls_client_certificate_revocation_registry_digest": (
+                    expected_client_certificate_revocation_registry_digest
+                ),
+                "mtls_client_certificate_ocsp_responder_ref": (
+                    expected_client_certificate_ocsp_responder_ref
+                ),
+                "mtls_client_certificate_ocsp_response_digest": (
+                    expected_client_certificate_ocsp_response_digest
+                ),
+                "mtls_client_certificate_freshness_proof_digest": (
+                    expected_client_certificate_freshness_proof_digest
                 ),
             }
         )
@@ -4208,6 +4757,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_fingerprint",
             "mtls_client_certificate_chain_digest",
             "mtls_client_certificate_proof_digest",
+            "mtls_client_certificate_revocation_registry_digest",
+            "mtls_client_certificate_ocsp_response_digest",
+            "mtls_client_certificate_freshness_proof_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
@@ -4248,6 +4800,35 @@ class CollectiveIdentityService:
         )
         if not mtls_client_certificate_bound:
             errors.append("mTLS client certificate proof must bind ack endpoint probe")
+        mtls_client_certificate_freshness_bound = bool(
+            receipt.get("mtls_client_certificate_freshness_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+            and receipt.get("mtls_client_certificate_freshness_digest_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+            and receipt.get("mtls_client_certificate_revocation_registry_ref")
+            == expected_client_certificate_revocation_registry_ref
+            and receipt.get("mtls_client_certificate_revocation_registry_digest")
+            == expected_client_certificate_revocation_registry_digest
+            and receipt.get("mtls_client_certificate_ocsp_responder_ref")
+            == expected_client_certificate_ocsp_responder_ref
+            and receipt.get("mtls_client_certificate_ocsp_response_digest")
+            == expected_client_certificate_ocsp_response_digest
+            and receipt.get("mtls_client_certificate_revocation_status")
+            == "not_revoked"
+            and receipt.get("mtls_client_certificate_freshness_window_seconds")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS
+            and receipt.get("mtls_client_certificate_freshness_checked_at")
+            == receipt.get("checked_at")
+            and receipt.get("mtls_client_certificate_freshness_proof_digest")
+            == expected_client_certificate_freshness_proof_digest
+            and receipt.get("mtls_client_certificate_freshness_bound") is True
+            and receipt.get("raw_client_certificate_freshness_payload_stored")
+            is False
+        )
+        if not mtls_client_certificate_freshness_bound:
+            errors.append(
+                "mTLS client certificate freshness proof must bind revocation evidence"
+            )
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -4291,6 +4872,9 @@ class CollectiveIdentityService:
             "network_probe_bound": receipt.get("network_probe_bound") is True,
             "signed_response_envelope_bound": signed_response_envelope_bound,
             "mtls_client_certificate_bound": mtls_client_certificate_bound,
+            "mtls_client_certificate_freshness_bound": (
+                mtls_client_certificate_freshness_bound
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
             is True,
@@ -4299,6 +4883,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_payload_stored": (
                 receipt.get("raw_client_certificate_payload_stored") is True
+            ),
+            "raw_client_certificate_freshness_payload_stored": (
+                receipt.get("raw_client_certificate_freshness_payload_stored") is True
             ),
         }
 
@@ -5013,6 +5600,39 @@ class CollectiveIdentityService:
             "mtls_client_certificate_bound": receipt.get(
                 "mtls_client_certificate_bound"
             ),
+            "mtls_client_certificate_freshness_profile": receipt.get(
+                "mtls_client_certificate_freshness_profile"
+            ),
+            "mtls_client_certificate_freshness_digest_profile": receipt.get(
+                "mtls_client_certificate_freshness_digest_profile"
+            ),
+            "mtls_client_certificate_revocation_registry_ref": receipt.get(
+                "mtls_client_certificate_revocation_registry_ref"
+            ),
+            "mtls_client_certificate_revocation_registry_digest": receipt.get(
+                "mtls_client_certificate_revocation_registry_digest"
+            ),
+            "mtls_client_certificate_ocsp_responder_ref": receipt.get(
+                "mtls_client_certificate_ocsp_responder_ref"
+            ),
+            "mtls_client_certificate_ocsp_response_digest": receipt.get(
+                "mtls_client_certificate_ocsp_response_digest"
+            ),
+            "mtls_client_certificate_revocation_status": receipt.get(
+                "mtls_client_certificate_revocation_status"
+            ),
+            "mtls_client_certificate_freshness_window_seconds": receipt.get(
+                "mtls_client_certificate_freshness_window_seconds"
+            ),
+            "mtls_client_certificate_freshness_checked_at": receipt.get(
+                "mtls_client_certificate_freshness_checked_at"
+            ),
+            "mtls_client_certificate_freshness_proof_digest": receipt.get(
+                "mtls_client_certificate_freshness_proof_digest"
+            ),
+            "mtls_client_certificate_freshness_bound": receipt.get(
+                "mtls_client_certificate_freshness_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
             "raw_response_signature_payload_stored": receipt.get(
@@ -5020,6 +5640,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_payload_stored": receipt.get(
                 "raw_client_certificate_payload_stored"
+            ),
+            "raw_client_certificate_freshness_payload_stored": receipt.get(
+                "raw_client_certificate_freshness_payload_stored"
             ),
         }
 
@@ -5214,6 +5837,155 @@ class CollectiveIdentityService:
         )
 
     @staticmethod
+    def _collective_external_registry_ack_client_certificate_revocation_registry_ref(
+        *,
+        client_certificate_authority_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        revocation_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                    ),
+                    "client_certificate_authority_ref": client_certificate_authority_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+        return (
+            "registry-client-cert-revocation://collective-ack-endpoint/"
+            f"{revocation_digest[:16]}"
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_revocation_registry_digest(
+        *,
+        client_certificate_ref: str,
+        client_certificate_fingerprint: str,
+        client_certificate_authority_ref: str,
+        revocation_registry_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+                    ),
+                    "client_certificate_ref": client_certificate_ref,
+                    "client_certificate_fingerprint": client_certificate_fingerprint,
+                    "client_certificate_authority_ref": client_certificate_authority_ref,
+                    "revocation_registry_ref": revocation_registry_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ocsp_responder_ref(
+        *,
+        client_certificate_authority_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        responder_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                    ),
+                    "client_certificate_authority_ref": client_certificate_authority_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+        return f"registry-client-cert-ocsp://collective-ack-endpoint/{responder_digest[:16]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_ocsp_response_digest(
+        *,
+        client_certificate_ref: str,
+        client_certificate_fingerprint: str,
+        client_certificate_chain_digest: str,
+        revocation_registry_digest: str,
+        ocsp_responder_ref: str,
+        checked_at: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+                    ),
+                    "client_certificate_ref": client_certificate_ref,
+                    "client_certificate_fingerprint": client_certificate_fingerprint,
+                    "client_certificate_chain_digest": client_certificate_chain_digest,
+                    "revocation_registry_digest": revocation_registry_digest,
+                    "ocsp_responder_ref": ocsp_responder_ref,
+                    "checked_at": checked_at,
+                    "revocation_status": "not_revoked",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_freshness_proof_digest(
+        *,
+        registry_ack_endpoint_ref: str,
+        ack_receipt_digest: str,
+        client_certificate_proof_digest: str,
+        client_certificate_revocation_registry_ref: str,
+        client_certificate_revocation_registry_digest: str,
+        client_certificate_ocsp_responder_ref: str,
+        client_certificate_ocsp_response_digest: str,
+        checked_at: str,
+        freshness_window_seconds: int,
+        revocation_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
+                    ),
+                    "registry_ack_endpoint_ref": registry_ack_endpoint_ref,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "client_certificate_proof_digest": client_certificate_proof_digest,
+                    "client_certificate_revocation_registry_ref": (
+                        client_certificate_revocation_registry_ref
+                    ),
+                    "client_certificate_revocation_registry_digest": (
+                        client_certificate_revocation_registry_digest
+                    ),
+                    "client_certificate_ocsp_responder_ref": (
+                        client_certificate_ocsp_responder_ref
+                    ),
+                    "client_certificate_ocsp_response_digest": (
+                        client_certificate_ocsp_response_digest
+                    ),
+                    "checked_at": checked_at,
+                    "freshness_window_seconds": freshness_window_seconds,
+                    "revocation_status": revocation_status,
+                }
+            )
+        )
+
+    @staticmethod
     def _collective_external_registry_sync_digest_payload(
         receipt: Mapping[str, Any],
     ) -> Dict[str, Any]:
@@ -5240,6 +6012,9 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_mtls_client_certificate_proof_set_digest": receipt.get(
                 "ack_live_endpoint_mtls_client_certificate_proof_set_digest"
+            ),
+            "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest": receipt.get(
+                "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
             ),
             "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
         }

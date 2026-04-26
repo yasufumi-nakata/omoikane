@@ -8167,6 +8167,11 @@ json.dump(response, sys.stdout)
                         "ack_live_endpoint_mtls_client_certificate_proof_set_digest"
                     ]
                 ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest": (
+                    external_registry_sync[
+                        "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
+                    ]
+                ),
                 "ack_live_endpoint_probe_bound": external_registry_sync[
                     "ack_live_endpoint_probe_bound"
                 ],
@@ -8178,6 +8183,11 @@ json.dump(response, sys.stdout)
                 "ack_live_endpoint_mtls_client_certificate_bound": (
                     external_registry_sync[
                         "ack_live_endpoint_mtls_client_certificate_bound"
+                    ]
+                ),
+                "ack_live_endpoint_mtls_client_certificate_freshness_bound": (
+                    external_registry_sync[
+                        "ack_live_endpoint_mtls_client_certificate_freshness_bound"
                     ]
                 ),
                 "raw_registry_payload_stored": external_registry_sync[
@@ -8198,6 +8208,11 @@ json.dump(response, sys.stdout)
                 "raw_client_certificate_payload_stored": external_registry_sync[
                     "raw_client_certificate_payload_stored"
                 ],
+                "raw_client_certificate_freshness_payload_stored": (
+                    external_registry_sync[
+                        "raw_client_certificate_freshness_payload_stored"
+                    ]
+                ),
                 "raw_packet_body_stored": external_registry_sync[
                     "raw_packet_body_stored"
                 ],
@@ -8391,6 +8406,11 @@ json.dump(response, sys.stdout)
                     "ack_live_endpoint_mtls_client_certificate_bound"
                 ]
             ),
+            "external_registry_sync_ack_live_endpoint_mtls_client_certificate_freshness_bound": (
+                external_registry_sync_validation[
+                    "ack_live_endpoint_mtls_client_certificate_freshness_bound"
+                ]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
@@ -8414,6 +8434,11 @@ json.dump(response, sys.stdout)
             "external_registry_sync_raw_client_certificate_payload_stored": (
                 external_registry_sync_validation[
                     "raw_client_certificate_payload_stored"
+                ]
+            ),
+            "external_registry_sync_raw_client_certificate_freshness_payload_stored": (
+                external_registry_sync_validation[
+                    "raw_client_certificate_freshness_payload_stored"
                 ]
             ),
             "external_registry_sync_raw_packet_body_stored": (
