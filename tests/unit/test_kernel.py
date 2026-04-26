@@ -582,7 +582,22 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(validation["third_party_witness_quorum_met"])
         self.assertTrue(validation["self_report_witness_consistency_bound"])
         self.assertTrue(validation["consistency_digest_bound"])
+        self.assertTrue(validation["witness_registry_binding_bound"])
+        self.assertTrue(validation["registry_binding_digest_bound"])
         self.assertTrue(validation["confirmation_digest_bound"])
+        self.assertEqual(
+            "identity-witness-registry-binding-v1",
+            profile["witness_registry_binding"]["policy_id"],
+        )
+        self.assertEqual("bound", profile["witness_registry_binding"]["status"])
+        self.assertFalse(profile["witness_registry_binding"]["raw_registry_payload_stored"])
+        self.assertTrue(
+            all(
+                receipt["registry_status"] == "current"
+                and receipt["revocation_status"] == "not-revoked"
+                for receipt in profile["third_party_witness_receipts"]
+            )
+        )
         self.assertEqual(
             "identity-self-report-witness-consistency-v1",
             profile["self_report_witness_consistency"]["policy_id"],
@@ -631,6 +646,7 @@ class KernelTests(unittest.TestCase):
             "self-report-witness-consistency-not-bound",
             blocked["failure_reasons"],
         )
+        self.assertIn("witness-registry-binding-not-bound", blocked["failure_reasons"])
 
     def test_identity_confirmation_blocks_divergent_self_report_witness_consistency(self) -> None:
         registry = IdentityRegistry()
@@ -681,6 +697,59 @@ class KernelTests(unittest.TestCase):
             "self-report-witness-consistency-not-bound",
             profile["failure_reasons"],
         )
+
+    def test_identity_confirmation_blocks_revoked_witness_registry_entry(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-confirmation-revoked-witness")
+
+        profile = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-revoked-witness",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-revoked-witness",
+            episodic_recall_ref="episodic://identity-confirmation-revoked-witness/recall",
+            self_model_ref="self-model://identity-confirmation-revoked-witness/stable",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-revoked-witness/high",
+                "statement": "I confirm continuity with the pre-upload self.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation-revoked-witness/clinician",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation-revoked-witness/recall",
+                    "alignment_score": 0.89,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation-revoked-witness/guardian",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation-revoked-witness/self-model",
+                    "alignment_score": 0.9,
+                    "revocation_status": "revoked",
+                },
+            ],
+        )
+
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+
+        self.assertEqual("failed", profile["result"])
+        self.assertFalse(profile["active_transition_allowed"])
+        self.assertFalse(validation["ok"])
+        self.assertTrue(validation["confirmation_digest_bound"])
+        self.assertFalse(validation["third_party_witness_quorum_met"])
+        self.assertFalse(validation["witness_registry_binding_bound"])
+        self.assertTrue(validation["registry_binding_digest_bound"])
+        self.assertIn("third-party-witness-quorum-not-met", profile["failure_reasons"])
+        self.assertIn("witness-registry-binding-not-bound", profile["failure_reasons"])
+        revoked_receipts = [
+            receipt
+            for receipt in profile["third_party_witness_receipts"]
+            if receipt["revocation_status"] == "revoked"
+        ]
+        self.assertEqual(1, len(revoked_receipts))
+        self.assertEqual("fail", revoked_receipts[0]["status"])
 
     def test_termination_gate_completes_and_releases_allocation(self) -> None:
         registry = IdentityRegistry()

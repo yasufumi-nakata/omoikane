@@ -10,6 +10,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `cognitive/backend_failover.yaml`
 - `identity-fidelity/self_model_stability.yaml`
 - `identity-fidelity/identity_confirmation_profile.yaml`
+  - includes self-report / witness score consistency and digest-only witness registry / verifier key / revocation binding
 - `continuity/ledger_integrity.yaml`
 - `continuity/continuity_chain_self_modify.yaml`
 - `continuity/termination_scheduler_cancellation.yaml`

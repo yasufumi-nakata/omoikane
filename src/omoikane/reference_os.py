@@ -16284,6 +16284,12 @@ json.dump(response, sys.stdout)
                 "active_transition_allowed": profile["active_transition_allowed"],
                 "aggregate_score": profile["aggregate_score"],
                 "witness_quorum_status": profile["witness_quorum"]["status"],
+                "witness_registry_binding_status": profile["witness_registry_binding"][
+                    "status"
+                ],
+                "witness_registry_binding_digest": profile["witness_registry_binding"][
+                    "registry_binding_digest"
+                ],
                 "self_report_witness_consistency_status": profile[
                     "self_report_witness_consistency"
                 ]["status"],
@@ -16321,6 +16327,38 @@ json.dump(response, sys.stdout)
             ],
         )
         blocked_validation = IdentityRegistry.validate_identity_confirmation(blocked_profile)
+        revoked_witness_profile = self.identity.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-demo/revoked-witness",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-revoked-witness",
+            episodic_recall_ref="episodic://identity-confirmation-demo/revoked-recall",
+            self_model_ref="self-model://identity-confirmation-demo/revoked-snapshot",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-demo/revoked",
+                "statement": "I confirm continuity, but one required observer has been revoked.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician-current",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/revoked-recall",
+                    "alignment_score": 0.89,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation/guardian-revoked",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation/revoked-self-model",
+                    "alignment_score": 0.9,
+                    "revocation_status": "revoked",
+                },
+            ],
+        )
+        revoked_witness_validation = IdentityRegistry.validate_identity_confirmation(
+            revoked_witness_profile
+        )
 
         return {
             "identity": {
@@ -16336,10 +16374,12 @@ json.dump(response, sys.stdout)
                 "self_report_witness_consistency_policy": profile[
                     "self_report_witness_consistency"
                 ]["policy_id"],
+                "witness_registry_policy": profile["witness_registry_binding"]["policy_id"],
                 "failure_action": "failed-ascension-or-repeat-ascending",
             },
             "confirmation_profile": profile,
             "blocked_profile": blocked_profile,
+            "revoked_witness_profile": revoked_witness_profile,
             "validation": {
                 **validation,
                 "blocked_profile_fail_closed": (
@@ -16349,14 +16389,26 @@ json.dump(response, sys.stdout)
                     in blocked_profile["failure_reasons"]
                     and "third-party-witness-quorum-not-met"
                     in blocked_profile["failure_reasons"]
+                    and "witness-registry-binding-not-bound"
+                    in blocked_profile["failure_reasons"]
                     and blocked_validation["ok"] is False
                     and blocked_validation["confirmation_digest_bound"] is True
+                ),
+                "revoked_witness_registry_fail_closed": (
+                    revoked_witness_profile["result"] == "failed"
+                    and revoked_witness_profile["active_transition_allowed"] is False
+                    and "witness-registry-binding-not-bound"
+                    in revoked_witness_profile["failure_reasons"]
+                    and revoked_witness_validation["ok"] is False
+                    and revoked_witness_validation["confirmation_digest_bound"] is True
                 ),
                 "ledger_event_bound": (
                     ledger_event.payload["confirmation_digest"]
                     == profile["confirmation_digest"]
                     and ledger_event.payload["self_report_witness_consistency_digest"]
                     == profile["self_report_witness_consistency"]["consistency_digest"]
+                    and ledger_event.payload["witness_registry_binding_digest"]
+                    == profile["witness_registry_binding"]["registry_binding_digest"]
                 ),
             },
             "ledger_profile": self.ledger.profile(),

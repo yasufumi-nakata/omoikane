@@ -94,6 +94,7 @@
 - `guardian_verifier_network_receipt.schema`
 - `guardian_verifier_transport_exchange.schema`
 - `identity_confirmation_profile.schema`
+  - includes self-report/witness consistency plus digest-only witness registry, verifier key, and revocation binding
 - `identity_record.schema`
 - `imagination_scene.schema`
 - `imagination_shift.schema`

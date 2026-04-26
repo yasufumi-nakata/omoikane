@@ -20,6 +20,7 @@ required:
   - self_report
   - third_party_witness_receipts
   - witness_quorum
+  - witness_registry_binding
   - self_report_witness_consistency
   - result
   - active_transition_allowed
@@ -149,6 +150,12 @@ properties:
         - witness_id
         - witness_role
         - observation_ref
+        - registry_entry_ref
+        - registry_entry_digest
+        - verifier_key_ref
+        - revocation_ref
+        - registry_status
+        - revocation_status
         - alignment_score
         - threshold
         - status
@@ -163,6 +170,24 @@ properties:
         observation_ref:
           type: string
           minLength: 1
+        registry_entry_ref:
+          type: string
+          minLength: 1
+        registry_entry_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        verifier_key_ref:
+          type: string
+          minLength: 1
+        revocation_ref:
+          type: string
+          minLength: 1
+        registry_status:
+          type: string
+          enum: [current, stale, unknown]
+        revocation_status:
+          type: string
+          enum: [not-revoked, revoked, unknown]
         alignment_score:
           type: number
           minimum: 0
@@ -209,6 +234,96 @@ properties:
       status:
         type: string
         enum: [met, missing]
+  witness_registry_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - policy_id
+      - registry_profile
+      - continuity_subject_ref
+      - continuity_subject_digest
+      - registry_ref
+      - registry_snapshot_digest
+      - required_witness_roles
+      - accepted_witness_roles
+      - accepted_witness_registry_digest_set
+      - accepted_witness_key_refs
+      - accepted_witness_revocation_refs
+      - witness_registry_status
+      - witness_revocation_status
+      - role_binding_status
+      - raw_registry_payload_stored
+      - status
+      - registry_binding_digest
+    properties:
+      policy_id:
+        type: string
+        const: identity-witness-registry-binding-v1
+      registry_profile:
+        type: string
+        const: role-roster-revocation-bound-v1
+      continuity_subject_ref:
+        type: string
+        pattern: "^identity://.+/ascending-to-active$"
+      continuity_subject_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      registry_ref:
+        type: string
+        minLength: 1
+      registry_snapshot_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      required_witness_roles:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          enum: [clinician, guardian]
+      accepted_witness_roles:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      accepted_witness_registry_digest_set:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      accepted_witness_key_refs:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      accepted_witness_revocation_refs:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      witness_registry_status:
+        type: string
+        enum: [current, stale-or-missing]
+      witness_revocation_status:
+        type: string
+        enum: [not-revoked, revoked-or-unknown]
+      role_binding_status:
+        type: string
+        enum: [bound, missing]
+      raw_registry_payload_stored:
+        type: boolean
+        const: false
+      status:
+        type: string
+        enum: [bound, unbound]
+      registry_binding_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
   self_report_witness_consistency:
     type: object
     additionalProperties: false
@@ -313,6 +428,7 @@ properties:
         - subjective-self-report-not-bound
         - third-party-witness-quorum-not-met
         - self-report-witness-consistency-not-bound
+        - witness-registry-binding-not-bound
         - aggregate-threshold-not-met
   confirmation_digest:
     type: string
@@ -369,6 +485,12 @@ examples:
       - witness_id: witness://identity-confirmation/clinician-primary
         witness_role: clinician
         observation_ref: observation://identity-confirmation/episodic-recall
+        registry_entry_ref: identity-witness-registry://entry/clinician-primary
+        registry_entry_digest: "1212121212121212121212121212121212121212121212121212121212121212"
+        verifier_key_ref: identity-witness-key://clinician-primary
+        revocation_ref: identity-witness-revocation://clinician-primary
+        registry_status: current
+        revocation_status: not-revoked
         alignment_score: 0.88
         threshold: 0.8
         status: pass
@@ -376,6 +498,12 @@ examples:
       - witness_id: witness://identity-confirmation/guardian-observer
         witness_role: guardian
         observation_ref: observation://identity-confirmation/self-model-check
+        registry_entry_ref: identity-witness-registry://entry/guardian-observer
+        registry_entry_digest: "3434343434343434343434343434343434343434343434343434343434343434"
+        verifier_key_ref: identity-witness-key://guardian-observer
+        revocation_ref: identity-witness-revocation://guardian-observer
+        registry_status: current
+        revocation_status: not-revoked
         alignment_score: 0.9
         threshold: 0.8
         status: pass
@@ -386,6 +514,30 @@ examples:
       required_roles: [clinician, guardian]
       accepted_roles: [clinician, guardian]
       status: met
+    witness_registry_binding:
+      policy_id: identity-witness-registry-binding-v1
+      registry_profile: role-roster-revocation-bound-v1
+      continuity_subject_ref: identity://id-0001/ascending-to-active
+      continuity_subject_digest: "9999999999999999999999999999999999999999999999999999999999999999"
+      registry_ref: identity-witness-registry://reference-runtime/current
+      registry_snapshot_digest: "7878787878787878787878787878787878787878787878787878787878787878"
+      required_witness_roles: [clinician, guardian]
+      accepted_witness_roles: [clinician, guardian]
+      accepted_witness_registry_digest_set:
+        - "1212121212121212121212121212121212121212121212121212121212121212"
+        - "3434343434343434343434343434343434343434343434343434343434343434"
+      accepted_witness_key_refs:
+        - identity-witness-key://clinician-primary
+        - identity-witness-key://guardian-observer
+      accepted_witness_revocation_refs:
+        - identity-witness-revocation://clinician-primary
+        - identity-witness-revocation://guardian-observer
+      witness_registry_status: current
+      witness_revocation_status: not-revoked
+      role_binding_status: bound
+      raw_registry_payload_stored: false
+      status: bound
+      registry_binding_digest: "8989898989898989898989898989898989898989898989898989898989898989"
     self_report_witness_consistency:
       policy_id: identity-self-report-witness-consistency-v1
       consistency_profile: score-delta-and-role-bound-v1

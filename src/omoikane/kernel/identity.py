@@ -10,10 +10,14 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 IDENTITY_CONFIRMATION_POLICY_ID = "multidimensional-identity-confirmation-v1"
 IDENTITY_CONFIRMATION_CONSISTENCY_POLICY_ID = "identity-self-report-witness-consistency-v1"
+IDENTITY_CONFIRMATION_WITNESS_REGISTRY_POLICY_ID = "identity-witness-registry-binding-v1"
 IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD = 0.85
 IDENTITY_CONFIRMATION_WITNESS_QUORUM = 2
 IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES = ("clinician", "guardian")
 IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA = 0.12
+IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REGISTRY_REF = (
+    "identity-witness-registry://reference-runtime/current"
+)
 IDENTITY_CONFIRMATION_DIMENSION_THRESHOLDS = {
     "episodic_recall": 0.85,
     "self_model_alignment": 0.80,
@@ -80,6 +84,12 @@ class IdentityWitnessReceipt:
     witness_id: str
     witness_role: str
     observation_ref: str
+    registry_entry_ref: str
+    registry_entry_digest: str
+    verifier_key_ref: str
+    revocation_ref: str
+    registry_status: str
+    revocation_status: str
     alignment_score: float
     threshold: float
     status: str
@@ -243,6 +253,7 @@ class IdentityRegistry:
         witness_receipts: List[Dict[str, Any]],
         episodic_recall_score: float,
         self_model_alignment_score: float,
+        witness_registry_ref: str = IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REGISTRY_REF,
     ) -> Dict[str, Any]:
         record = self.get(identity_id)
         normalized_consent_ref = self._non_empty_string(consent_ref, "consent_ref")
@@ -256,6 +267,10 @@ class IdentityRegistry:
         )
         normalized_self_model_ref = self._non_empty_string(self_model_ref, "self_model_ref")
         normalized_self_report = self._normalize_self_report(self_report)
+        normalized_witness_registry_ref = self._non_empty_string(
+            witness_registry_ref,
+            "witness_registry_ref",
+        )
         normalized_witnesses = [
             self._normalize_witness_receipt(receipt) for receipt in witness_receipts
         ]
@@ -325,11 +340,23 @@ class IdentityRegistry:
         self_report_witness_consistency_bound = (
             self_report_witness_consistency["status"] == "bound"
         )
+        witness_registry_binding = self._build_witness_registry_binding(
+            identity_id=record.identity_id,
+            lineage_id=record.lineage_id,
+            consent_ref=normalized_consent_ref,
+            scheduler_stage_ref=normalized_scheduler_ref,
+            witness_registry_ref=normalized_witness_registry_ref,
+            accepted_witnesses=accepted_witnesses,
+            accepted_roles=accepted_roles,
+            witness_quorum_met=witness_quorum_met,
+        )
+        witness_registry_binding_bound = witness_registry_binding["status"] == "bound"
         active_transition_allowed = (
             all_dimensions_pass
             and subjective_self_report_bound
             and witness_quorum_met
             and self_report_witness_consistency_bound
+            and witness_registry_binding_bound
             and aggregate_score >= IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD
         )
         result = "passed" if active_transition_allowed else "failed"
@@ -342,6 +369,8 @@ class IdentityRegistry:
             failure_reasons.append("third-party-witness-quorum-not-met")
         if not self_report_witness_consistency_bound:
             failure_reasons.append("self-report-witness-consistency-not-bound")
+        if not witness_registry_binding_bound:
+            failure_reasons.append("witness-registry-binding-not-bound")
         if aggregate_score < IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD:
             failure_reasons.append("aggregate-threshold-not-met")
 
@@ -367,6 +396,7 @@ class IdentityRegistry:
                 "accepted_roles": accepted_roles,
                 "status": "met" if witness_quorum_met else "missing",
             },
+            "witness_registry_binding": witness_registry_binding,
             "self_report_witness_consistency": self_report_witness_consistency,
             "result": result,
             "active_transition_allowed": active_transition_allowed,
@@ -417,6 +447,7 @@ class IdentityRegistry:
         witness_quorum = profile.get("witness_quorum", {})
         self_report = profile.get("self_report", {})
         consistency = profile.get("self_report_witness_consistency", {})
+        witness_registry_binding = profile.get("witness_registry_binding", {})
         witness_receipts = profile.get("third_party_witness_receipts", [])
         dimension_map = {
             item.get("dimension_id"): item
@@ -444,6 +475,21 @@ class IdentityRegistry:
             receipt.get("evidence_digest")
             for receipt in accepted_witnesses
             if isinstance(receipt.get("evidence_digest"), str)
+        )
+        accepted_witness_registry_digest_set = sorted(
+            receipt.get("registry_entry_digest")
+            for receipt in accepted_witnesses
+            if isinstance(receipt.get("registry_entry_digest"), str)
+        )
+        accepted_witness_key_refs = sorted(
+            receipt.get("verifier_key_ref")
+            for receipt in accepted_witnesses
+            if isinstance(receipt.get("verifier_key_ref"), str)
+        )
+        accepted_witness_revocation_refs = sorted(
+            receipt.get("revocation_ref")
+            for receipt in accepted_witnesses
+            if isinstance(receipt.get("revocation_ref"), str)
         )
         accepted_witness_roles = sorted(
             {
@@ -479,6 +525,113 @@ class IdentityRegistry:
         )
         role_binding_status = (
             "bound" if third_party_witness_quorum_met else "missing"
+        )
+        registry_ref = (
+            witness_registry_binding.get("registry_ref")
+            if isinstance(witness_registry_binding, dict)
+            else None
+        )
+        registry_snapshot_digest = (
+            sha256_text(
+                canonical_json(
+                    {
+                        "registry_ref": registry_ref,
+                        "accepted_witness_registry_digest_set": (
+                            accepted_witness_registry_digest_set
+                        ),
+                        "accepted_witness_key_refs": accepted_witness_key_refs,
+                        "accepted_witness_revocation_refs": accepted_witness_revocation_refs,
+                        "accepted_witness_roles": accepted_witness_roles,
+                    }
+                )
+            )
+            if isinstance(registry_ref, str)
+            else None
+        )
+        expected_continuity_subject_ref = (
+            f"identity://{profile.get('identity_id')}/ascending-to-active"
+        )
+        expected_continuity_subject_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": profile.get("identity_id"),
+                    "lineage_id": profile.get("lineage_id"),
+                    "transition": "ascending-to-active",
+                    "consent_ref": profile.get("consent_ref"),
+                    "scheduler_stage_ref": profile.get("scheduler_stage_ref"),
+                }
+            )
+        )
+        witness_registry_status = (
+            "current"
+            if accepted_witnesses
+            and all(receipt.get("registry_status") == "current" for receipt in accepted_witnesses)
+            else "stale-or-missing"
+        )
+        witness_revocation_status = (
+            "not-revoked"
+            if accepted_witnesses
+            and all(
+                receipt.get("revocation_status") == "not-revoked"
+                for receipt in accepted_witnesses
+            )
+            else "revoked-or-unknown"
+        )
+        registry_binding_status = (
+            "bound"
+            if third_party_witness_quorum_met
+            and witness_registry_status == "current"
+            and witness_revocation_status == "not-revoked"
+            else "unbound"
+        )
+        registry_binding_core = (
+            {
+                key: value
+                for key, value in witness_registry_binding.items()
+                if key != "registry_binding_digest"
+            }
+            if isinstance(witness_registry_binding, dict)
+            else {}
+        )
+        registry_binding_digest_bound = (
+            isinstance(witness_registry_binding, dict)
+            and witness_registry_binding.get("registry_binding_digest")
+            == sha256_text(canonical_json(registry_binding_core))
+        )
+        witness_registry_binding_bound = (
+            isinstance(witness_registry_binding, dict)
+            and witness_registry_binding.get("policy_id")
+            == IDENTITY_CONFIRMATION_WITNESS_REGISTRY_POLICY_ID
+            and witness_registry_binding.get("registry_profile")
+            == "role-roster-revocation-bound-v1"
+            and witness_registry_binding.get("continuity_subject_ref")
+            == expected_continuity_subject_ref
+            and witness_registry_binding.get("continuity_subject_digest")
+            == expected_continuity_subject_digest
+            and witness_registry_binding.get("registry_ref")
+            == registry_ref
+            and witness_registry_binding.get("registry_snapshot_digest")
+            == registry_snapshot_digest
+            and witness_registry_binding.get("accepted_witness_registry_digest_set")
+            == accepted_witness_registry_digest_set
+            and witness_registry_binding.get("accepted_witness_key_refs")
+            == accepted_witness_key_refs
+            and witness_registry_binding.get("accepted_witness_revocation_refs")
+            == accepted_witness_revocation_refs
+            and witness_registry_binding.get("accepted_witness_roles")
+            == accepted_witness_roles
+            and witness_registry_binding.get("required_witness_roles")
+            == list(IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES)
+            and witness_registry_binding.get("witness_registry_status")
+            == witness_registry_status
+            and witness_registry_binding.get("witness_revocation_status")
+            == witness_revocation_status
+            and witness_registry_binding.get("role_binding_status")
+            == role_binding_status
+            and witness_registry_binding.get("raw_registry_payload_stored") is False
+            and witness_registry_binding.get("status") == registry_binding_status
+            and witness_registry_binding.get("status") == "bound"
+            and registry_binding_digest_bound
         )
         consistency_core = (
             {
@@ -524,6 +677,7 @@ class IdentityRegistry:
             and subjective_self_report_bound
             and third_party_witness_quorum_met
             and self_report_witness_consistency_bound
+            and witness_registry_binding_bound
             and aggregate_threshold_met
             and profile.get("result") == "passed"
             and profile.get("active_transition_allowed") is True
@@ -546,6 +700,8 @@ class IdentityRegistry:
             "third_party_witness_quorum_met": third_party_witness_quorum_met,
             "self_report_witness_consistency_bound": self_report_witness_consistency_bound,
             "consistency_digest_bound": consistency_digest_bound,
+            "witness_registry_binding_bound": witness_registry_binding_bound,
+            "registry_binding_digest_bound": registry_binding_digest_bound,
             "aggregate_threshold_met": aggregate_threshold_met,
             "active_transition_allowed": active_transition_allowed,
             "confirmation_digest_bound": confirmation_digest_bound,
@@ -565,6 +721,13 @@ class IdentityRegistry:
         if score < 0.0 or score > 1.0:
             raise ValueError(f"{field_name} must be between 0.0 and 1.0")
         return round(score, 3)
+
+    @staticmethod
+    def _bounded_enum(value: Any, field_name: str, allowed: set[str]) -> str:
+        if not isinstance(value, str) or value not in allowed:
+            choices = ", ".join(sorted(allowed))
+            raise ValueError(f"{field_name} must be one of: {choices}")
+        return value
 
     @classmethod
     def _normalize_self_report(cls, self_report: Dict[str, Any]) -> Dict[str, Any]:
@@ -617,6 +780,31 @@ class IdentityRegistry:
             witness_receipt.get("observation_ref"),
             "witness_receipt.observation_ref",
         )
+        registry_entry_ref = cls._non_empty_string(
+            witness_receipt.get("registry_entry_ref")
+            or f"identity-witness-registry://entry/{sha256_text(witness_id)[:16]}",
+            "witness_receipt.registry_entry_ref",
+        )
+        verifier_key_ref = cls._non_empty_string(
+            witness_receipt.get("verifier_key_ref")
+            or f"identity-witness-key://{sha256_text(witness_id + witness_role)[:16]}",
+            "witness_receipt.verifier_key_ref",
+        )
+        revocation_ref = cls._non_empty_string(
+            witness_receipt.get("revocation_ref")
+            or f"identity-witness-revocation://{sha256_text(registry_entry_ref)[:16]}",
+            "witness_receipt.revocation_ref",
+        )
+        registry_status = cls._bounded_enum(
+            witness_receipt.get("registry_status", "current"),
+            "witness_receipt.registry_status",
+            {"current", "stale", "unknown"},
+        )
+        revocation_status = cls._bounded_enum(
+            witness_receipt.get("revocation_status", "not-revoked"),
+            "witness_receipt.revocation_status",
+            {"not-revoked", "revoked", "unknown"},
+        )
         alignment_score = cls._bounded_score(
             witness_receipt.get("alignment_score"),
             "witness_receipt.alignment_score",
@@ -624,12 +812,31 @@ class IdentityRegistry:
         threshold = IDENTITY_CONFIRMATION_DIMENSION_THRESHOLDS[
             "third_party_witness_alignment"
         ]
+        registry_entry_digest = sha256_text(
+            canonical_json(
+                {
+                    "witness_id": witness_id,
+                    "witness_role": witness_role,
+                    "registry_entry_ref": registry_entry_ref,
+                    "verifier_key_ref": verifier_key_ref,
+                    "revocation_ref": revocation_ref,
+                    "registry_status": registry_status,
+                    "revocation_status": revocation_status,
+                }
+            )
+        )
         evidence_digest = sha256_text(
             canonical_json(
                 {
                     "witness_id": witness_id,
                     "witness_role": witness_role,
                     "observation_ref": observation_ref,
+                    "registry_entry_ref": registry_entry_ref,
+                    "registry_entry_digest": registry_entry_digest,
+                    "verifier_key_ref": verifier_key_ref,
+                    "revocation_ref": revocation_ref,
+                    "registry_status": registry_status,
+                    "revocation_status": revocation_status,
                     "alignment_score": alignment_score,
                 }
             )
@@ -638,11 +845,112 @@ class IdentityRegistry:
             witness_id=witness_id,
             witness_role=witness_role,
             observation_ref=observation_ref,
+            registry_entry_ref=registry_entry_ref,
+            registry_entry_digest=registry_entry_digest,
+            verifier_key_ref=verifier_key_ref,
+            revocation_ref=revocation_ref,
+            registry_status=registry_status,
+            revocation_status=revocation_status,
             alignment_score=alignment_score,
             threshold=threshold,
-            status="pass" if alignment_score >= threshold else "fail",
+            status=(
+                "pass"
+                if alignment_score >= threshold
+                and registry_status == "current"
+                and revocation_status == "not-revoked"
+                else "fail"
+            ),
             evidence_digest=evidence_digest,
         )
+
+    @classmethod
+    def _build_witness_registry_binding(
+        cls,
+        *,
+        identity_id: str,
+        lineage_id: str,
+        consent_ref: str,
+        scheduler_stage_ref: str,
+        witness_registry_ref: str,
+        accepted_witnesses: List[IdentityWitnessReceipt],
+        accepted_roles: List[str],
+        witness_quorum_met: bool,
+    ) -> Dict[str, Any]:
+        accepted_witness_registry_digest_set = sorted(
+            receipt.registry_entry_digest for receipt in accepted_witnesses
+        )
+        accepted_witness_key_refs = sorted(
+            receipt.verifier_key_ref for receipt in accepted_witnesses
+        )
+        accepted_witness_revocation_refs = sorted(
+            receipt.revocation_ref for receipt in accepted_witnesses
+        )
+        registry_snapshot_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_ref": witness_registry_ref,
+                    "accepted_witness_registry_digest_set": (
+                        accepted_witness_registry_digest_set
+                    ),
+                    "accepted_witness_key_refs": accepted_witness_key_refs,
+                    "accepted_witness_revocation_refs": accepted_witness_revocation_refs,
+                    "accepted_witness_roles": accepted_roles,
+                }
+            )
+        )
+        witness_registry_status = (
+            "current"
+            if accepted_witnesses
+            and all(receipt.registry_status == "current" for receipt in accepted_witnesses)
+            else "stale-or-missing"
+        )
+        witness_revocation_status = (
+            "not-revoked"
+            if accepted_witnesses
+            and all(receipt.revocation_status == "not-revoked" for receipt in accepted_witnesses)
+            else "revoked-or-unknown"
+        )
+        role_binding_status = "bound" if witness_quorum_met else "missing"
+        status = (
+            "bound"
+            if witness_quorum_met
+            and witness_registry_status == "current"
+            and witness_revocation_status == "not-revoked"
+            else "unbound"
+        )
+        continuity_subject_ref = f"identity://{identity_id}/ascending-to-active"
+        registry_binding_core = {
+            "policy_id": IDENTITY_CONFIRMATION_WITNESS_REGISTRY_POLICY_ID,
+            "registry_profile": "role-roster-revocation-bound-v1",
+            "continuity_subject_ref": continuity_subject_ref,
+            "continuity_subject_digest": sha256_text(
+                canonical_json(
+                    {
+                        "identity_id": identity_id,
+                        "lineage_id": lineage_id,
+                        "transition": "ascending-to-active",
+                        "consent_ref": consent_ref,
+                        "scheduler_stage_ref": scheduler_stage_ref,
+                    }
+                )
+            ),
+            "registry_ref": witness_registry_ref,
+            "registry_snapshot_digest": registry_snapshot_digest,
+            "required_witness_roles": list(IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES),
+            "accepted_witness_roles": accepted_roles,
+            "accepted_witness_registry_digest_set": accepted_witness_registry_digest_set,
+            "accepted_witness_key_refs": accepted_witness_key_refs,
+            "accepted_witness_revocation_refs": accepted_witness_revocation_refs,
+            "witness_registry_status": witness_registry_status,
+            "witness_revocation_status": witness_revocation_status,
+            "role_binding_status": role_binding_status,
+            "raw_registry_payload_stored": False,
+            "status": status,
+        }
+        return {
+            **registry_binding_core,
+            "registry_binding_digest": sha256_text(canonical_json(registry_binding_core)),
+        }
 
     @classmethod
     def _build_self_report_witness_consistency(

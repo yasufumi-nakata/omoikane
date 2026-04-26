@@ -96,6 +96,7 @@ operations:
     policy_refs:
       - multidimensional-identity-confirmation-v1
       - identity-self-report-witness-consistency-v1
+      - identity-witness-registry-binding-v1
     input:
       inline_schema:
         type: object
@@ -162,10 +163,34 @@ operations:
                 observation_ref:
                   type: string
                   minLength: 1
+                registry_entry_ref:
+                  type: string
+                  minLength: 1
+                verifier_key_ref:
+                  type: string
+                  minLength: 1
+                revocation_ref:
+                  type: string
+                  minLength: 1
+                registry_status:
+                  type: string
+                  enum:
+                    - current
+                    - stale
+                    - unknown
+                revocation_status:
+                  type: string
+                  enum:
+                    - not-revoked
+                    - revoked
+                    - unknown
                 alignment_score:
                   type: number
                   minimum: 0
                   maximum: 1
+          witness_registry_ref:
+            type: string
+            minLength: 1
           episodic_recall_score:
             type: number
             minimum: 0
@@ -199,3 +224,4 @@ compatibility:
     - pause_state preserves the most recent pause/resume cycle as machine-readable audit metadata.
     - confirm_active_transition uses a fixed multidimensional profile with episodic recall, self-model alignment, subjective self-report, and third-party witness quorum.
     - active transition also requires identity-self-report-witness-consistency-v1, which binds the self-report evidence digest, accepted witness digest set, required roles, and bounded score delta to the same continuity subject.
+    - accepted witnesses must also bind current witness registry entries, verifier key refs, and not-revoked revocation refs via identity-witness-registry-binding-v1; raw registry payloads are not stored.

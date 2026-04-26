@@ -1561,17 +1561,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["third_party_witness_quorum_met"])
         self.assertTrue(result["validation"]["self_report_witness_consistency_bound"])
         self.assertTrue(result["validation"]["consistency_digest_bound"])
+        self.assertTrue(result["validation"]["witness_registry_binding_bound"])
+        self.assertTrue(result["validation"]["registry_binding_digest_bound"])
         self.assertTrue(result["validation"]["confirmation_digest_bound"])
         self.assertTrue(result["validation"]["ledger_event_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
+        self.assertTrue(result["validation"]["revoked_witness_registry_fail_closed"])
         self.assertEqual("passed", result["confirmation_profile"]["result"])
         self.assertTrue(result["confirmation_profile"]["active_transition_allowed"])
+        self.assertEqual(
+            "bound",
+            result["confirmation_profile"]["witness_registry_binding"]["status"],
+        )
         self.assertEqual(
             "bound",
             result["confirmation_profile"]["self_report_witness_consistency"]["status"],
         )
         self.assertEqual("failed", result["blocked_profile"]["result"])
         self.assertFalse(result["blocked_profile"]["active_transition_allowed"])
+        self.assertEqual("failed", result["revoked_witness_profile"]["result"])
+        self.assertFalse(result["revoked_witness_profile"]["active_transition_allowed"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])
 
     def test_scheduler_demo_reports_timeout_rollback_and_completion(self) -> None:

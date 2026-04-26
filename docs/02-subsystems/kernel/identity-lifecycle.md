@@ -59,7 +59,14 @@
   subjective self-report digest binding、clinician + guardian の witness quorum
   に加えて、`identity-self-report-witness-consistency-v1` が同じ continuity subject 上で
   self-report evidence digest、accepted witness digest set、required roles、
-  score delta `<=0.12` を束縛した場合のみ許可する
+  score delta `<=0.12` を束縛し、さらに
+  `identity-witness-registry-binding-v1` が accepted witness の current registry entry、
+  verifier key ref、not-revoked revocation ref を digest-only に束縛した場合のみ許可する
+- witness registry の raw roster / raw revocation payload は保存せず、
+  `registry_entry_digest`、`registry_snapshot_digest`、`registry_binding_digest` のみを
+  continuity subject に束縛する
+- witness が stale / unknown / revoked の場合は alignment score が閾値を超えていても
+  accepted witness から除外し、`witness-registry-binding-not-bound` で fail-closed する
 - 失敗時は `active_transition_allowed=false` と
   `failure_action=failed-ascension-or-repeat-ascending` を返し、Active へ進めない
 
@@ -77,6 +84,7 @@ Ascending → Active への遷移時に必ず実施：
 reference runtime ではこの確認を `identity_confirmation_profile.schema` で
 machine-readable に固定する。生の主観報告文や第三者観察本文は保持せず、
 `self_report.statement_digest`、各 dimension の `evidence_digest`、
+`witness_registry_binding.registry_binding_digest`、
 `self_report_witness_consistency.consistency_digest`、`confirmation_digest` を
 ContinuityLedger の `identity-fidelity` event へ束縛する。
 

@@ -1387,7 +1387,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["third_party_witness_quorum_met"])
         self.assertTrue(result["validation"]["self_report_witness_consistency_bound"])
         self.assertTrue(result["validation"]["consistency_digest_bound"])
+        self.assertTrue(result["validation"]["witness_registry_binding_bound"])
+        self.assertTrue(result["validation"]["registry_binding_digest_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
+        self.assertTrue(result["validation"]["revoked_witness_registry_fail_closed"])
         self.assertEqual(
             "multidimensional-identity-confirmation-v1",
             result["confirmation_profile"]["profile_id"],
@@ -1399,6 +1402,17 @@ class CliIntegrationTests(unittest.TestCase):
             result["confirmation_profile"]["self_report_witness_consistency"]["policy_id"],
         )
         self.assertEqual("failed", result["blocked_profile"]["result"])
+        self.assertEqual(
+            "identity-witness-registry-binding-v1",
+            result["confirmation_profile"]["witness_registry_binding"]["policy_id"],
+        )
+        self.assertEqual("bound", result["confirmation_profile"]["witness_registry_binding"]["status"])
+        self.assertFalse(
+            result["confirmation_profile"]["witness_registry_binding"][
+                "raw_registry_payload_stored"
+            ]
+        )
+        self.assertEqual("failed", result["revoked_witness_profile"]["result"])
 
     def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:
         stdout = io.StringIO()
