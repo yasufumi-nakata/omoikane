@@ -153,6 +153,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["external_registry_sync_ack_live_endpoint_probe_bound"]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_signed_response_envelope_bound"
+            ]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
@@ -162,6 +167,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_ack_endpoint_payload_stored"]
+        )
+        self.assertFalse(
+            result["validation"][
+                "external_registry_sync_raw_response_signature_payload_stored"
+            ]
         )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_packet_body_stored"]

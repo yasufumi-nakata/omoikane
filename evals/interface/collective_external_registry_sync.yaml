@@ -17,9 +17,11 @@ assertions:
   - ack_route_trace_binding_digest binds the acknowledgement quorum to authenticated non-loopback authority-route trace evidence without storing raw ack-route payloads
   - ack_route_capture_binding_digest binds the acknowledgement route trace to verified pcap export and delegated privileged capture acquisition over the same route set
   - ack_live_endpoint_probe_set_digest binds live HTTP JSON acknowledgement endpoint probes for every legal/governance acknowledgement without storing raw endpoint payloads
+  - ack_live_endpoint_response_signature_digest_set_digest binds signed response envelopes for every acknowledgement endpoint response without storing raw response signature payloads
   - raw_dissolution_payload_stored is false
   - raw_registry_payload_stored is false
   - raw_ack_payload_stored is false
   - raw_ack_route_payload_stored is false
   - raw_ack_endpoint_payload_stored is false
+  - raw_response_signature_payload_stored is false
   - raw_packet_body_stored is false

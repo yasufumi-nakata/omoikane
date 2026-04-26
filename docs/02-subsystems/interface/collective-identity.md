@@ -100,8 +100,8 @@ collective_profile:
   verified pcap export と delegated-broker privileged capture acquisition に束縛する
 - `collective-external-registry-ack-live-endpoint-probe-v1` により、legal / governance
   registry acknowledgement を live HTTP JSON endpoint response digest、HTTP status、
-  probe latency、endpoint ref に束縛する
-- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw endpoint payload、raw packet body は保存しない
+  probe latency、endpoint ref、signed response envelope digest に束縛する
+- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw endpoint payload、raw response signature payload、raw packet body は保存しない
 
 ## reference runtime の扱い
 

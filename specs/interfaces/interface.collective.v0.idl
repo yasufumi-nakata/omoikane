@@ -293,7 +293,8 @@ operations:
       - ack_route_trace_binding_digest must bind the acknowledgement quorum to authenticated non-loopback authority-route trace evidence
       - ack_route_capture_binding_digest must bind the acknowledgement route trace to verified pcap export and delegated privileged capture evidence over the same route set
       - ack_live_endpoint_probe_set_digest must bind live HTTP JSON acknowledgement endpoint probes for every legal/governance registry acknowledgement without storing raw endpoint payloads
-      - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, and raw packet bodies must not be stored
+      - ack_live_endpoint_response_signature_digest_set_digest must bind signed response envelopes for every acknowledgement endpoint response
+      - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, raw endpoint payloads, raw response signature payloads, and raw packet bodies must not be stored
   bind_external_registry_ack_endpoint_probes:
     summary: Bind external registry acknowledgement receipts to live HTTP JSON endpoint probe evidence.
     input:
@@ -317,7 +318,10 @@ operations:
                   - ack_receipt_digest
                   - network_response_digest
                   - network_probe_bound
+                  - response_signature_digest
+                  - signed_response_envelope_bound
                   - raw_endpoint_payload_stored
+                  - raw_response_signature_payload_stored
     output:
       schema_ref: collective_external_registry_sync
     guarantees:
@@ -325,6 +329,7 @@ operations:
       - ack_live_endpoint_probe_profile_id must equal collective-external-registry-ack-live-endpoint-probe-v1
       - ack_live_endpoint_probe_receipts must cover every legal/governance acknowledgement receipt in ack_quorum_receipts
       - network_response_digest must bind each live endpoint JSON response without storing raw endpoint payloads
+      - signed_response_envelope_bound must be true for each endpoint response and ack_live_endpoint_response_signature_digest_set_digest must enter registry_digest_set
       - registry_digest_set must include ack_live_endpoint_probe_set_digest before external_registry_sync_complete is true
 events:
   collective.formed:

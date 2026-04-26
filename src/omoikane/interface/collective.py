@@ -78,6 +78,12 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_TRANSPORT_PROFILE = (
     "live-http-json-collective-registry-ack-v1"
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS = 1_000.0
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID = (
+    "collective-external-registry-ack-signed-response-envelope-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_SIGNATURE_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-response-signature-digest-v1"
+)
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -168,9 +174,13 @@ class CollectiveIdentityService:
                 "external_registry_ack_live_endpoint_probe_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID
                 ),
+                "external_registry_ack_response_envelope_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
                 "raw_external_registry_ack_endpoint_payload_stored": False,
+                "raw_external_registry_ack_response_signature_payload_stored": False,
             },
         }
 
@@ -1384,6 +1394,7 @@ class CollectiveIdentityService:
         ack_receipt: Mapping[str, Any],
         *,
         checked_at: str | None = None,
+        response_signing_key_ref: str | None = None,
     ) -> Dict[str, Any]:
         """Build the compact JSON a live registry acknowledgement endpoint returns."""
 
@@ -1391,7 +1402,15 @@ class CollectiveIdentityService:
             raise ValueError("external_registry_sync must be a mapping")
         if not isinstance(ack_receipt, Mapping):
             raise ValueError("ack_receipt must be a mapping")
-        return {
+        signing_key_ref = self._normalize_non_empty_string(
+            response_signing_key_ref
+            or self._collective_external_registry_ack_response_signing_key_ref(
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            ),
+            "response_signing_key_ref",
+        )
+        payload = {
             "kind": "collective_external_registry_ack_endpoint_status",
             "schema_version": "1.0.0",
             "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_PROFILE_ID,
@@ -1413,6 +1432,27 @@ class CollectiveIdentityService:
             "checked_at": checked_at or utc_now_iso(),
             "raw_ack_payload_stored": False,
         }
+        response_digest = self._collective_external_registry_ack_response_digest(payload)
+        payload.update(
+            {
+                "response_envelope_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+                ),
+                "response_digest": response_digest,
+                "response_signing_key_ref": signing_key_ref,
+                "response_signature_digest": (
+                    self._collective_external_registry_ack_response_signature_digest(
+                        response_digest=response_digest,
+                        ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                        registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                        registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                        response_signing_key_ref=signing_key_ref,
+                    )
+                ),
+                "raw_response_signature_payload_stored": False,
+            }
+        )
+        return payload
 
     def probe_external_registry_ack_endpoint(
         self,
@@ -1421,6 +1461,7 @@ class CollectiveIdentityService:
         external_registry_sync: Mapping[str, Any],
         ack_receipt: Mapping[str, Any],
         request_timeout_ms: int = 1_000,
+        response_signing_key_ref: str | None = None,
     ) -> Dict[str, Any]:
         """Probe one live registry acknowledgement endpoint and return a digest-only receipt."""
 
@@ -1470,6 +1511,10 @@ class CollectiveIdentityService:
             external_registry_sync,
             ack_receipt,
             checked_at=str(payload.get("checked_at") or ""),
+            response_signing_key_ref=(
+                response_signing_key_ref
+                or str(payload.get("response_signing_key_ref") or "")
+            ),
         )
         for field_name, expected_value in expected_payload.items():
             if field_name == "checked_at":
@@ -1484,6 +1529,18 @@ class CollectiveIdentityService:
                     f"{field_name}"
                 )
 
+        signed_response_envelope_bound = bool(
+            payload.get("response_envelope_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+            and isinstance(payload.get("response_signing_key_ref"), str)
+            and str(payload.get("response_signing_key_ref")).startswith(
+                "registry-key://"
+            )
+            and payload.get("response_digest") == expected_payload["response_digest"]
+            and payload.get("response_signature_digest")
+            == expected_payload["response_signature_digest"]
+            and payload.get("raw_response_signature_payload_stored") is False
+        )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
             _is_live_http_endpoint(normalized_endpoint)
@@ -1492,6 +1549,7 @@ class CollectiveIdentityService:
             <= COLLECTIVE_EXTERNAL_REGISTRY_ACK_LIVE_ENDPOINT_LATENCY_BUDGET_MS
             and len(network_response_digest) == 64
             and payload.get("raw_ack_payload_stored") is False
+            and signed_response_envelope_bound
         )
         receipt = {
             "kind": "collective_external_registry_ack_endpoint_probe",
@@ -1529,9 +1587,17 @@ class CollectiveIdentityService:
             "network_response_digest": network_response_digest,
             "network_probe_status": "reachable",
             "network_probe_bound": network_probe_bound,
+            "response_envelope_profile": expected_payload["response_envelope_profile"],
+            "response_digest": expected_payload["response_digest"],
+            "response_signing_key_ref": expected_payload["response_signing_key_ref"],
+            "response_signature_digest": expected_payload[
+                "response_signature_digest"
+            ],
+            "signed_response_envelope_bound": signed_response_envelope_bound,
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -1566,6 +1632,8 @@ class CollectiveIdentityService:
         authority_refs: List[str] = []
         jurisdictions: List[str] = []
         network_response_digests: List[str] = []
+        response_signing_key_refs: List[str] = []
+        response_signature_digests: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -1586,10 +1654,17 @@ class CollectiveIdentityService:
             authority_refs.append(str(probe_copy["registry_authority_ref"]))
             jurisdictions.append(str(probe_copy["registry_jurisdiction"]))
             network_response_digests.append(str(probe_copy["network_response_digest"]))
+            response_signing_key_refs.append(str(probe_copy["response_signing_key_ref"]))
+            response_signature_digests.append(
+                str(probe_copy["response_signature_digest"])
+            )
 
         probe_set_digest = sha256_text(canonical_json(probe_digests))
         response_digest_set_digest = sha256_text(
             canonical_json(network_response_digests)
+        )
+        response_signature_digest_set_digest = sha256_text(
+            canonical_json(response_signature_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -1614,9 +1689,20 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_network_response_digest_set_digest": (
                     response_digest_set_digest
                 ),
+                "ack_live_endpoint_response_signing_key_refs": (
+                    response_signing_key_refs
+                ),
+                "ack_live_endpoint_response_signature_digests": (
+                    response_signature_digests
+                ),
+                "ack_live_endpoint_response_signature_digest_set_digest": (
+                    response_signature_digest_set_digest
+                ),
                 "ack_live_endpoint_probe_count": len(bound_probes),
                 "ack_live_endpoint_probe_bound": True,
+                "ack_live_endpoint_signed_response_envelope_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
+                "raw_response_signature_payload_stored": False,
             }
         )
         receipt["registry_digest_set"] = [
@@ -1629,6 +1715,7 @@ class CollectiveIdentityService:
             receipt["ack_route_trace_binding_digest"],
             receipt["ack_route_capture_binding_digest"],
             receipt["ack_live_endpoint_probe_set_digest"],
+            receipt["ack_live_endpoint_response_signature_digest_set_digest"],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -1636,6 +1723,7 @@ class CollectiveIdentityService:
         receipt["external_registry_sync_complete"] = bool(
             receipt.get("ack_route_capture_export_bound")
             and receipt["ack_live_endpoint_probe_bound"]
+            and receipt["ack_live_endpoint_signed_response_envelope_bound"]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -2798,6 +2886,7 @@ class CollectiveIdentityService:
             "ack_route_capture_binding_digest",
             "ack_live_endpoint_probe_set_digest",
             "ack_live_endpoint_network_response_digest_set_digest",
+            "ack_live_endpoint_response_signature_digest_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -3422,9 +3511,15 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_authority_refs: List[str] = []
         expected_ack_live_endpoint_jurisdictions: List[str] = []
         expected_ack_live_endpoint_response_digests: List[str] = []
+        expected_ack_live_endpoint_response_signing_key_refs: List[str] = []
+        expected_ack_live_endpoint_response_signature_digests: List[str] = []
         ack_live_endpoint_probe_bound = False
+        ack_live_endpoint_signed_response_envelope_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
+        )
+        raw_response_signature_payload_stored = (
+            receipt.get("raw_response_signature_payload_stored") is True
         )
         if not isinstance(ack_live_endpoint_probe_receipts, list):
             errors.append("ack_live_endpoint_probe_receipts must be a list")
@@ -3467,11 +3562,20 @@ class CollectiveIdentityService:
                 expected_ack_live_endpoint_response_digests.append(
                     str(probe_receipt.get("network_response_digest"))
                 )
+                expected_ack_live_endpoint_response_signing_key_refs.append(
+                    str(probe_receipt.get("response_signing_key_ref"))
+                )
+                expected_ack_live_endpoint_response_signature_digests.append(
+                    str(probe_receipt.get("response_signature_digest"))
+                )
             expected_probe_set_digest = sha256_text(
                 canonical_json(expected_ack_live_endpoint_probe_digests)
             )
             expected_response_digest_set_digest = sha256_text(
                 canonical_json(expected_ack_live_endpoint_response_digests)
+            )
+            expected_response_signature_digest_set_digest = sha256_text(
+                canonical_json(expected_ack_live_endpoint_response_signature_digests)
             )
             ack_live_endpoint_probe_bound = (
                 probe_receipts_valid
@@ -3494,10 +3598,37 @@ class CollectiveIdentityService:
                 and receipt.get("ack_live_endpoint_probe_bound") is True
                 and not raw_ack_endpoint_payload_stored
             )
+            ack_live_endpoint_signed_response_envelope_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get("signed_response_envelope_bound") is True
+                    and probe_receipt.get("raw_response_signature_payload_stored")
+                    is False
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get("ack_live_endpoint_response_signing_key_refs")
+                == expected_ack_live_endpoint_response_signing_key_refs
+                and receipt.get("ack_live_endpoint_response_signature_digests")
+                == expected_ack_live_endpoint_response_signature_digests
+                and receipt.get(
+                    "ack_live_endpoint_response_signature_digest_set_digest"
+                )
+                == expected_response_signature_digest_set_digest
+                and receipt.get("ack_live_endpoint_signed_response_envelope_bound")
+                is True
+                and not raw_response_signature_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
+        if not ack_live_endpoint_signed_response_envelope_bound:
+            errors.append(
+                "ack live endpoint probes must bind signed response envelopes"
+            )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
+        if raw_response_signature_payload_stored:
+            errors.append("raw_response_signature_payload_stored must be false")
 
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
@@ -3513,6 +3644,7 @@ class CollectiveIdentityService:
                 receipt.get("ack_route_trace_binding_digest"),
                 receipt.get("ack_route_capture_binding_digest"),
                 receipt.get("ack_live_endpoint_probe_set_digest"),
+                receipt.get("ack_live_endpoint_response_signature_digest_set_digest"),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -3549,6 +3681,7 @@ class CollectiveIdentityService:
             and ack_route_trace_bound
             and ack_route_capture_export_bound
             and ack_live_endpoint_probe_bound
+            and ack_live_endpoint_signed_response_envelope_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -3556,6 +3689,7 @@ class CollectiveIdentityService:
             and not raw_ack_payload_stored
             and not raw_ack_route_payload_stored
             and not raw_ack_endpoint_payload_stored
+            and not raw_response_signature_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -3582,6 +3716,9 @@ class CollectiveIdentityService:
             ),
             "ack_route_capture_export_bound": ack_route_capture_export_bound,
             "ack_live_endpoint_probe_bound": ack_live_endpoint_probe_bound,
+            "ack_live_endpoint_signed_response_envelope_bound": (
+                ack_live_endpoint_signed_response_envelope_bound
+            ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -3590,6 +3727,9 @@ class CollectiveIdentityService:
             "raw_ack_payload_stored": raw_ack_payload_stored,
             "raw_ack_route_payload_stored": raw_ack_route_payload_stored,
             "raw_ack_endpoint_payload_stored": raw_ack_endpoint_payload_stored,
+            "raw_response_signature_payload_stored": (
+                raw_response_signature_payload_stored
+            ),
             "raw_packet_body_stored": raw_packet_body_stored,
         }
 
@@ -3639,9 +3779,31 @@ class CollectiveIdentityService:
             "http_status": 200,
             "network_probe_status": "reachable",
             "network_probe_bound": True,
+            "response_envelope_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+            ),
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
         }
+        expected_payload = self.external_registry_ack_endpoint_payload(
+            external_registry_sync,
+            ack_receipt,
+            checked_at=str(receipt.get("checked_at") or ""),
+            response_signing_key_ref=(
+                str(receipt.get("response_signing_key_ref"))
+                if isinstance(receipt.get("response_signing_key_ref"), str)
+                else None
+            ),
+        )
+        expected_fields.update(
+            {
+                "response_digest": expected_payload["response_digest"],
+                "response_signature_digest": expected_payload[
+                    "response_signature_digest"
+                ],
+            }
+        )
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
                 errors.append(f"{field_name} must equal {expected}")
@@ -3654,10 +3816,28 @@ class CollectiveIdentityService:
             "ack_route_trace_binding_digest",
             "ack_route_capture_binding_digest",
             "network_response_digest",
+            "response_digest",
+            "response_signature_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
                 errors.append(f"{field_name} must be sha256 hex")
+        signing_key_ref = receipt.get("response_signing_key_ref")
+        if not isinstance(signing_key_ref, str) or not signing_key_ref.startswith(
+            "registry-key://"
+        ):
+            errors.append("response_signing_key_ref must be a registry key ref")
+        signed_response_envelope_bound = bool(
+            receipt.get("response_envelope_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+            and receipt.get("response_digest") == expected_payload["response_digest"]
+            and receipt.get("response_signature_digest")
+            == expected_payload["response_signature_digest"]
+            and receipt.get("signed_response_envelope_bound") is True
+            and receipt.get("raw_response_signature_payload_stored") is False
+        )
+        if not signed_response_envelope_bound:
+            errors.append("signed response envelope must bind ack endpoint response")
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -3699,9 +3879,13 @@ class CollectiveIdentityService:
             "ok": not errors,
             "errors": errors,
             "network_probe_bound": receipt.get("network_probe_bound") is True,
+            "signed_response_envelope_bound": signed_response_envelope_bound,
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
             is True,
+            "raw_response_signature_payload_stored": (
+                receipt.get("raw_response_signature_payload_stored") is True
+            ),
         }
 
     def _derive_member_recovery_proofs(
@@ -4384,9 +4568,98 @@ class CollectiveIdentityService:
             ),
             "network_response_digest": receipt.get("network_response_digest"),
             "network_probe_bound": receipt.get("network_probe_bound"),
+            "response_envelope_profile": receipt.get("response_envelope_profile"),
+            "response_digest": receipt.get("response_digest"),
+            "response_signing_key_ref": receipt.get("response_signing_key_ref"),
+            "response_signature_digest": receipt.get("response_signature_digest"),
+            "signed_response_envelope_bound": receipt.get(
+                "signed_response_envelope_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
+            "raw_response_signature_payload_stored": receipt.get(
+                "raw_response_signature_payload_stored"
+            ),
         }
+
+    @staticmethod
+    def _collective_external_registry_ack_response_signing_key_ref(
+        *,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        key_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+                    ),
+                }
+            )
+        )
+        return f"registry-key://collective-ack-endpoint/{key_digest[:16]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_response_digest(
+        payload: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "kind": payload.get("kind"),
+                    "schema_version": payload.get("schema_version"),
+                    "profile_id": payload.get("profile_id"),
+                    "ack_receipt_ref": payload.get("ack_receipt_ref"),
+                    "ack_receipt_digest": payload.get("ack_receipt_digest"),
+                    "ack_status": payload.get("ack_status"),
+                    "registry_authority_ref": payload.get("registry_authority_ref"),
+                    "registry_jurisdiction": payload.get("registry_jurisdiction"),
+                    "registry_digest": payload.get("registry_digest"),
+                    "submission_receipt_digest": payload.get(
+                        "submission_receipt_digest"
+                    ),
+                    "registry_entry_digest": payload.get("registry_entry_digest"),
+                    "ack_quorum_digest": payload.get("ack_quorum_digest"),
+                    "ack_route_trace_binding_digest": payload.get(
+                        "ack_route_trace_binding_digest"
+                    ),
+                    "ack_route_capture_binding_digest": payload.get(
+                        "ack_route_capture_binding_digest"
+                    ),
+                    "checked_at": payload.get("checked_at"),
+                    "raw_ack_payload_stored": payload.get("raw_ack_payload_stored"),
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_response_signature_digest(
+        *,
+        response_digest: str,
+        ack_receipt_digest: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+        response_signing_key_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "response_envelope_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_ENVELOPE_PROFILE_ID
+                    ),
+                    "response_signature_digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_RESPONSE_SIGNATURE_DIGEST_PROFILE_ID
+                    ),
+                    "response_digest": response_digest,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "response_signing_key_ref": response_signing_key_ref,
+                }
+            )
+        )
 
     @staticmethod
     def _collective_external_registry_sync_digest_payload(
@@ -4409,6 +4682,9 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_probe_set_digest": receipt.get(
                 "ack_live_endpoint_probe_set_digest"
+            ),
+            "ack_live_endpoint_response_signature_digest_set_digest": receipt.get(
+                "ack_live_endpoint_response_signature_digest_set_digest"
             ),
             "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
         }

@@ -5,7 +5,8 @@ description: >
   Digest-only receipt proving that a post-dissolution collective recovery chain
   was synchronized to external legal and governance registries without storing
   raw dissolution payloads, raw registry payloads, raw acknowledgement route
-  payloads, raw acknowledgement endpoint payloads, or raw packet bodies.
+  payloads, raw acknowledgement endpoint payloads, raw response signature
+  payloads, or raw packet bodies.
 type: object
 additionalProperties: false
 required:
@@ -109,8 +110,12 @@ required:
   - ack_live_endpoint_probe_jurisdictions
   - ack_live_endpoint_network_response_digests
   - ack_live_endpoint_network_response_digest_set_digest
+  - ack_live_endpoint_response_signing_key_refs
+  - ack_live_endpoint_response_signature_digests
+  - ack_live_endpoint_response_signature_digest_set_digest
   - ack_live_endpoint_probe_count
   - ack_live_endpoint_probe_bound
+  - ack_live_endpoint_signed_response_envelope_bound
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -128,6 +133,7 @@ required:
   - raw_ack_payload_stored
   - raw_ack_route_payload_stored
   - raw_ack_endpoint_payload_stored
+  - raw_response_signature_payload_stored
   - raw_packet_body_stored
   - digest
 properties:
@@ -439,14 +445,31 @@ properties:
       $ref: "#/$defs/sha256"
   ack_live_endpoint_network_response_digest_set_digest:
     $ref: "#/$defs/sha256"
+  ack_live_endpoint_response_signing_key_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^registry-key://"
+  ack_live_endpoint_response_signature_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_response_signature_digest_set_digest:
+    $ref: "#/$defs/sha256"
   ack_live_endpoint_probe_count:
     const: 2
   ack_live_endpoint_probe_bound:
     const: true
+  ack_live_endpoint_signed_response_envelope_bound:
+    const: true
   registry_digest_set:
     type: array
-    minItems: 9
-    maxItems: 9
+    minItems: 10
+    maxItems: 10
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -480,6 +503,8 @@ properties:
   raw_ack_route_payload_stored:
     const: false
   raw_ack_endpoint_payload_stored:
+    const: false
+  raw_response_signature_payload_stored:
     const: false
   raw_packet_body_stored:
     const: false
@@ -678,9 +703,15 @@ $defs:
       - network_response_digest
       - network_probe_status
       - network_probe_bound
+      - response_envelope_profile
+      - response_digest
+      - response_signing_key_ref
+      - response_signature_digest
+      - signed_response_envelope_bound
       - checked_at
       - raw_ack_payload_stored
       - raw_endpoint_payload_stored
+      - raw_response_signature_payload_stored
       - digest
     properties:
       kind:
@@ -741,12 +772,25 @@ $defs:
         const: reachable
       network_probe_bound:
         const: true
+      response_envelope_profile:
+        const: collective-external-registry-ack-signed-response-envelope-v1
+      response_digest:
+        $ref: "#/$defs/sha256"
+      response_signing_key_ref:
+        type: string
+        pattern: "^registry-key://"
+      response_signature_digest:
+        $ref: "#/$defs/sha256"
+      signed_response_envelope_bound:
+        const: true
       checked_at:
         type: string
         format: date-time
       raw_ack_payload_stored:
         const: false
       raw_endpoint_payload_stored:
+        const: false
+      raw_response_signature_payload_stored:
         const: false
       digest:
         $ref: "#/$defs/sha256"

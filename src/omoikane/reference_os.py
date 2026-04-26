@@ -8157,9 +8157,19 @@ json.dump(response, sys.stdout)
                         "ack_live_endpoint_network_response_digest_set_digest"
                     ]
                 ),
+                "ack_live_endpoint_response_signature_digest_set_digest": (
+                    external_registry_sync[
+                        "ack_live_endpoint_response_signature_digest_set_digest"
+                    ]
+                ),
                 "ack_live_endpoint_probe_bound": external_registry_sync[
                     "ack_live_endpoint_probe_bound"
                 ],
+                "ack_live_endpoint_signed_response_envelope_bound": (
+                    external_registry_sync[
+                        "ack_live_endpoint_signed_response_envelope_bound"
+                    ]
+                ),
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
                 ],
@@ -8171,6 +8181,9 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_ack_endpoint_payload_stored": external_registry_sync[
                     "raw_ack_endpoint_payload_stored"
+                ],
+                "raw_response_signature_payload_stored": external_registry_sync[
+                    "raw_response_signature_payload_stored"
                 ],
                 "raw_packet_body_stored": external_registry_sync[
                     "raw_packet_body_stored"
@@ -8355,6 +8368,11 @@ json.dump(response, sys.stdout)
             "external_registry_sync_ack_live_endpoint_probe_bound": (
                 external_registry_sync_validation["ack_live_endpoint_probe_bound"]
             ),
+            "external_registry_sync_ack_live_endpoint_signed_response_envelope_bound": (
+                external_registry_sync_validation[
+                    "ack_live_endpoint_signed_response_envelope_bound"
+                ]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
@@ -8369,6 +8387,11 @@ json.dump(response, sys.stdout)
             ),
             "external_registry_sync_raw_ack_endpoint_payload_stored": (
                 external_registry_sync_validation["raw_ack_endpoint_payload_stored"]
+            ),
+            "external_registry_sync_raw_response_signature_payload_stored": (
+                external_registry_sync_validation[
+                    "raw_response_signature_payload_stored"
+                ]
             ),
             "external_registry_sync_raw_packet_body_stored": (
                 external_registry_sync_validation["raw_packet_body_stored"]
