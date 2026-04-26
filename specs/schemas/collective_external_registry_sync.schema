@@ -1,0 +1,160 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/collective_external_registry_sync.schema"
+title: CollectiveExternalRegistrySync
+description: >
+  Digest-only receipt proving that a post-dissolution collective recovery chain
+  was synchronized to external legal and governance registries without storing
+  raw dissolution payloads, raw registry payloads, or raw packet bodies.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - digest_profile
+  - registry_entry_digest_profile
+  - collective_id
+  - recorded_at
+  - status
+  - source_capture_export_profile_id
+  - recovery_capture_export_binding_digest
+  - recovery_route_trace_binding_digest
+  - recovery_verifier_transport_binding_digest
+  - dissolution_receipt_digest
+  - member_recovery_binding_digest
+  - packet_capture_digest
+  - privileged_capture_digest
+  - member_capture_binding_digest_set_digest
+  - legal_registry_ref
+  - legal_jurisdiction
+  - legal_registry_digest
+  - governance_registry_ref
+  - governance_jurisdiction
+  - governance_registry_digest
+  - registry_authority_digest
+  - registry_entry_ref
+  - registry_entry_digest
+  - submission_profile_id
+  - submission_receipt_ref
+  - submission_receipt_digest
+  - ack_profile_id
+  - ack_receipt_ref
+  - ack_receipt_digest
+  - registry_digest_set
+  - registry_digest_set_digest
+  - capture_export_bound
+  - legal_registry_bound
+  - governance_registry_bound
+  - registry_entry_bound
+  - submission_ack_bound
+  - external_registry_sync_complete
+  - raw_dissolution_payload_stored
+  - raw_registry_payload_stored
+  - raw_packet_body_stored
+  - digest
+properties:
+  kind:
+    const: collective_external_registry_sync
+  schema_version:
+    const: "1.0.0"
+  profile_id:
+    const: collective-dissolution-external-registry-sync-v1
+  digest_profile:
+    const: collective-external-registry-sync-digest-v1
+  registry_entry_digest_profile:
+    const: collective-external-registry-entry-digest-v1
+  collective_id:
+    type: string
+    minLength: 8
+  recorded_at:
+    type: string
+    format: date-time
+  status:
+    const: synced
+  source_capture_export_profile_id:
+    const: collective-recovery-route-trace-capture-export-v1
+  recovery_capture_export_binding_digest:
+    $ref: "#/$defs/sha256"
+  recovery_route_trace_binding_digest:
+    $ref: "#/$defs/sha256"
+  recovery_verifier_transport_binding_digest:
+    $ref: "#/$defs/sha256"
+  dissolution_receipt_digest:
+    $ref: "#/$defs/sha256"
+  member_recovery_binding_digest:
+    $ref: "#/$defs/sha256"
+  packet_capture_digest:
+    $ref: "#/$defs/sha256"
+  privileged_capture_digest:
+    $ref: "#/$defs/sha256"
+  member_capture_binding_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  legal_registry_ref:
+    type: string
+    pattern: "^legal-registry://"
+  legal_jurisdiction:
+    type: string
+    minLength: 2
+  legal_registry_digest:
+    $ref: "#/$defs/sha256"
+  governance_registry_ref:
+    type: string
+    pattern: "^governance-registry://"
+  governance_jurisdiction:
+    type: string
+    minLength: 2
+  governance_registry_digest:
+    $ref: "#/$defs/sha256"
+  registry_authority_digest:
+    $ref: "#/$defs/sha256"
+  registry_entry_ref:
+    type: string
+    pattern: "^registry-entry://collective-dissolution/"
+  registry_entry_digest:
+    $ref: "#/$defs/sha256"
+  submission_profile_id:
+    const: collective-external-registry-submission-v1
+  submission_receipt_ref:
+    type: string
+    pattern: "^registry-submission://collective-dissolution/"
+  submission_receipt_digest:
+    $ref: "#/$defs/sha256"
+  ack_profile_id:
+    const: collective-external-registry-ack-v1
+  ack_receipt_ref:
+    type: string
+    pattern: "^registry-ack://collective-dissolution/"
+  ack_receipt_digest:
+    $ref: "#/$defs/sha256"
+  registry_digest_set:
+    type: array
+    minItems: 5
+    maxItems: 5
+    items:
+      $ref: "#/$defs/sha256"
+  registry_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  capture_export_bound:
+    const: true
+  legal_registry_bound:
+    const: true
+  governance_registry_bound:
+    const: true
+  registry_entry_bound:
+    const: true
+  submission_ack_bound:
+    const: true
+  external_registry_sync_complete:
+    const: true
+  raw_dissolution_payload_stored:
+    const: false
+  raw_registry_payload_stored:
+    const: false
+  raw_packet_body_stored:
+    const: false
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[0-9a-f]{64}$"

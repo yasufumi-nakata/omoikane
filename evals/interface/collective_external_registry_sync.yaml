@@ -1,0 +1,18 @@
+name: collective_external_registry_sync
+description: >
+  Ensure post-dissolution collective recovery evidence is synchronized to
+  external legal and governance registries as digest-only entry, submission, and
+  acknowledgement receipts without storing raw dissolution, registry, or packet
+  payloads.
+target:
+  command: PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
+  binding_profile: collective-dissolution-external-registry-sync-v1
+assertions:
+  - external registry sync conforms to collective_external_registry_sync.schema
+  - recovery_capture_export_binding_digest binds the verified collective recovery capture export artifact
+  - legal_registry_digest and governance_registry_digest bind the same dissolution and capture-export digests
+  - registry_entry_digest covers the legal registry, governance registry, and member capture digest set
+  - submission_receipt_digest and ack_receipt_digest bind the registry entry without storing raw registry payloads
+  - raw_dissolution_payload_stored is false
+  - raw_registry_payload_stored is false
+  - raw_packet_body_stored is false

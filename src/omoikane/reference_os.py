@@ -7698,6 +7698,9 @@ json.dump(response, sys.stdout)
                 recovery_privileged_capture_acquisition,
             )
         )
+        external_registry_sync = self.collective.sync_dissolution_external_registry(
+            recovery_capture_export_binding,
+        )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
         collective_validation = self.collective.validate_record(final_collective)
@@ -7722,6 +7725,12 @@ json.dump(response, sys.stdout)
                 recovery_route_trace_binding,
                 recovery_packet_capture_export,
                 recovery_privileged_capture_acquisition,
+            )
+        )
+        external_registry_sync_validation = (
+            self.collective.validate_collective_external_registry_sync(
+                external_registry_sync,
+                recovery_capture_export_binding,
             )
         )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
@@ -7908,6 +7917,35 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "council", "guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=collective_identity.identity_id,
+            event_type="collective.external_registry_sync.bound",
+            payload={
+                "collective_id": external_registry_sync["collective_id"],
+                "profile_id": external_registry_sync["profile_id"],
+                "recovery_capture_export_binding_digest": external_registry_sync[
+                    "recovery_capture_export_binding_digest"
+                ],
+                "legal_registry_digest": external_registry_sync[
+                    "legal_registry_digest"
+                ],
+                "governance_registry_digest": external_registry_sync[
+                    "governance_registry_digest"
+                ],
+                "registry_entry_digest": external_registry_sync[
+                    "registry_entry_digest"
+                ],
+                "ack_receipt_digest": external_registry_sync["ack_receipt_digest"],
+                "raw_registry_payload_stored": external_registry_sync[
+                    "raw_registry_payload_stored"
+                ],
+            },
+            actor="CollectiveIdentityService",
+            category="interface-collective-dissolution",
+            layer="L6",
+            signature_roles=["self", "council", "guardian"],
+            substrate="classical-silicon",
+        )
 
         validation = {
             "ok": collective_validation["ok"]
@@ -7916,6 +7954,7 @@ json.dump(response, sys.stdout)
             and recovery_verifier_transport_validation["ok"]
             and recovery_route_trace_validation["ok"]
             and recovery_capture_export_validation["ok"]
+            and external_registry_sync_validation["ok"]
             and all(validation["ok"] for validation in member_recovery_validations.values()),
             "collective_identity_distinct": collective_identity.identity_id
             not in {identity.identity_id, peer.identity_id},
@@ -8035,6 +8074,31 @@ json.dump(response, sys.stdout)
             "recovery_capture_export_raw_packet_body_stored": (
                 recovery_capture_export_validation["raw_packet_body_stored"]
             ),
+            "external_registry_sync_bound": external_registry_sync_validation["ok"],
+            "external_registry_sync_profile_bound": (
+                external_registry_sync_validation["profile_bound"]
+            ),
+            "external_registry_sync_capture_export_bound": (
+                external_registry_sync_validation["capture_export_bound"]
+            ),
+            "external_registry_sync_legal_registry_bound": (
+                external_registry_sync_validation["legal_registry_bound"]
+            ),
+            "external_registry_sync_governance_registry_bound": (
+                external_registry_sync_validation["governance_registry_bound"]
+            ),
+            "external_registry_sync_registry_entry_bound": (
+                external_registry_sync_validation["registry_entry_bound"]
+            ),
+            "external_registry_sync_submission_ack_bound": (
+                external_registry_sync_validation["submission_ack_bound"]
+            ),
+            "external_registry_sync_complete": (
+                external_registry_sync_validation["external_registry_sync_complete"]
+            ),
+            "external_registry_sync_raw_registry_payload_stored": (
+                external_registry_sync_validation["raw_registry_payload_stored"]
+            ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],
         }
@@ -8072,6 +8136,7 @@ json.dump(response, sys.stdout)
                 recovery_privileged_capture_acquisition
             ),
             "recovery_capture_export_binding": recovery_capture_export_binding,
+            "external_registry_sync": external_registry_sync,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

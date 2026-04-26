@@ -115,6 +115,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/collective_recovery_capture_export_binding.schema",
             result["recovery_capture_export_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/collective_external_registry_sync.schema",
+            result["external_registry_sync"],
+        )
         for profile in result["member_recovery"]["identity_confirmation_profiles"].values():
             self._assert_schema_valid(
                 "specs/schemas/identity_confirmation_profile.schema",
@@ -139,6 +143,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["recovery_capture_export_packet_capture_bound"])
         self.assertTrue(result["validation"]["recovery_capture_export_member_bindings_bound"])
         self.assertFalse(result["validation"]["recovery_capture_export_raw_packet_body_stored"])
+        self.assertTrue(result["validation"]["external_registry_sync_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_capture_export_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_legal_registry_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_governance_registry_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_submission_ack_bound"])
+        self.assertFalse(
+            result["validation"]["external_registry_sync_raw_registry_payload_stored"]
+        )
 
     def test_imc_demo_matches_public_schemas(self) -> None:
         result = self.runtime.run_imc_demo()

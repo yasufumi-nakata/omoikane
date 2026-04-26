@@ -130,6 +130,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["recovery_capture_export_member_bindings_bound"])
         self.assertTrue(result["validation"]["recovery_capture_export_complete"])
         self.assertFalse(result["validation"]["recovery_capture_export_raw_packet_body_stored"])
+        self.assertTrue(result["validation"]["external_registry_sync_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_profile_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_capture_export_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_legal_registry_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_governance_registry_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_registry_entry_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_submission_ack_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_complete"])
+        self.assertFalse(
+            result["validation"]["external_registry_sync_raw_registry_payload_stored"]
+        )
         self.assertEqual("merge_thought", result["merge"]["merge_mode"])
         self.assertEqual("dissolved", result["collective"]["status"])
         self.assertEqual("1.0", result["dissolution"]["schema_version"])
@@ -139,7 +150,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(4, result["ledger_verification"]["category_counts"]["interface-collective"])
         self.assertEqual(
-            4,
+            5,
             result["ledger_verification"]["category_counts"]["interface-collective-dissolution"],
         )
 

@@ -827,7 +827,13 @@ remote host attestation ref / socket response digest を束ねる。
 同じ route binding ref set を verified pcap export、pcap readback digest、
 delegated-broker privileged capture acquisition、member ごとの capture binding digest へ
 束縛する。
-raw verifier payload、raw route payload、raw packet body は保存しない。
+続けて `collective_external_registry_sync.schema` に合う
+`collective-dissolution-external-registry-sync-v1` artifact が、
+recovery capture export binding digest を external legal registry digest、
+governance registry digest、registry entry digest、submission receipt digest、
+ack receipt digest に束縛する。
+raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
+raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

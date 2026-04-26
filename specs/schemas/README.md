@@ -21,6 +21,7 @@
 - `cognitive_audit_resolution.schema`
 - `cognitive_audit_verifier_transport_binding.schema`
 - `collective_dissolution_receipt.schema`
+- `collective_external_registry_sync.schema`
 - `collective_recovery_capture_export_binding.schema`
 - `collective_recovery_route_trace_binding.schema`
 - `collective_recovery_verifier_transport_binding.schema`

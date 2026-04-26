@@ -89,23 +89,29 @@ collective_profile:
   privileged capture acquisition に束縛する
 - raw packet body は保存せず、packet capture artifact digest、readback digest、
   capture filter digest、member capture binding digest だけを保持する
+- `collective-dissolution-external-registry-sync-v1` により、
+  recovery capture export binding を external legal registry と governance registry の
+  digest-only entry / submission / acknowledgement receipt へ同期する
+- raw dissolution payload、raw registry payload、raw packet body は保存しない
 
 ## reference runtime の扱い
 
 - `interface.collective.v0.idl` を導入し、
   `register_collective / open_merge_session / close_merge_session / dissolve_collective /
   bind_recovery_verifier_transport / bind_recovery_verifier_route_trace /
-  bind_recovery_route_trace_capture_export` の 7 op を固定する
+  bind_recovery_route_trace_capture_export / sync_dissolution_external_registry`
+  の 8 op を固定する
 - `collective_record.schema`、`collective_merge_session.schema`、
   `collective_dissolution_receipt.schema`、
   `collective_recovery_verifier_transport_binding.schema`、
   `collective_recovery_route_trace_binding.schema`、
-  `collective_recovery_capture_export_binding.schema` を追加する
+  `collective_recovery_capture_export_binding.schema`、
+  `collective_external_registry_sync.schema` を追加する
 - `collective-demo` は IMC `merge_thought`、WMS divergence、private escape、
   identity confirmation、schema-bound dissolution receipt、
   member recovery proof binding、remote verifier transport binding、
-  non-loopback authority-route trace binding、packet capture export binding を
-  1 シナリオで smoke する
+  non-loopback authority-route trace binding、packet capture export binding、
+  external legal/governance registry sync を 1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
 - `evals/interface/collective_dissolution_receipt.yaml` は
@@ -120,6 +126,10 @@ collective_profile:
 - `evals/interface/collective_recovery_capture_export_binding.yaml` は
   route trace binding と verified pcap export / delegated privileged capture acquisition の
   route-ref alignment、member capture digest、raw packet body redaction を監査する
+- `evals/interface/collective_external_registry_sync.yaml` は
+  capture export binding と external legal / governance registry digest、
+  registry entry、submission、acknowledgement receipt の束縛と
+  raw registry payload redaction を監査する
 
 ## 不変条件
 
@@ -130,7 +140,8 @@ collective_profile:
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
 6. **packet-body redaction** ── recovery capture binding は raw packet body を保存せず digest/readback/route ref だけを持つ
 7. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
-8. **no silent persistence** ── active merge 無しで Collective を存続させない
+8. **external registry redaction** ── registry sync は legal/governance registry digest と acknowledgement digest だけを保持し、raw registry payload を保存しない
+9. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連
 

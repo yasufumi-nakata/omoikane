@@ -32,6 +32,19 @@ COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID = (
 COLLECTIVE_RECOVERY_CAPTURE_EXPORT_DIGEST_PROFILE_ID = (
     "collective-recovery-capture-export-binding-digest-v1"
 )
+COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID = (
+    "collective-dissolution-external-registry-sync-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_SYNC_DIGEST_PROFILE_ID = (
+    "collective-external-registry-sync-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ENTRY_DIGEST_PROFILE_ID = (
+    "collective-external-registry-entry-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID = (
+    "collective-external-registry-submission-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID = "collective-external-registry-ack-v1"
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -103,7 +116,11 @@ class CollectiveIdentityService:
                 "member_recovery_capture_export_profile": (
                     COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID
                 ),
+                "external_registry_sync_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
+                "raw_external_registry_payload_stored": False,
             },
         }
 
@@ -706,6 +723,12 @@ class CollectiveIdentityService:
                     "recovery_verifier_transport_binding_digest"
                 ]
             ),
+            "dissolution_receipt_digest": recovery_route_trace_binding[
+                "dissolution_receipt_digest"
+            ],
+            "member_recovery_binding_digest": recovery_route_trace_binding[
+                "member_recovery_binding_digest"
+            ],
             "authority_route_trace_ref": recovery_route_trace_binding[
                 "authority_route_trace_ref"
             ],
@@ -769,6 +792,197 @@ class CollectiveIdentityService:
             "raw_route_payload_stored": False,
             "raw_packet_body_stored": False,
             "capture_binding_status": "complete" if complete else "incomplete",
+            "digest": sha256_text(canonical_json(digest_payload)),
+        }
+        return deepcopy(receipt)
+
+    def sync_dissolution_external_registry(
+        self,
+        recovery_capture_export_binding: Mapping[str, Any],
+        *,
+        legal_registry_ref: str = "legal-registry://collective-dissolution/jp-13/v1",
+        governance_registry_ref: str = (
+            "governance-registry://collective-dissolution/federation/v1"
+        ),
+        legal_jurisdiction: str = "JP-13",
+        governance_jurisdiction: str = "FEDERATION",
+    ) -> Dict[str, Any]:
+        capture_validation = self.validate_recovery_route_trace_capture_export_binding(
+            recovery_capture_export_binding,
+        )
+        if not capture_validation["ok"]:
+            raise ValueError(
+                "recovery_capture_export_binding must validate before external registry sync"
+            )
+
+        legal_ref = self._normalize_non_empty_string(legal_registry_ref, "legal_registry_ref")
+        governance_ref = self._normalize_non_empty_string(
+            governance_registry_ref,
+            "governance_registry_ref",
+        )
+        legal_zone = self._normalize_non_empty_string(legal_jurisdiction, "legal_jurisdiction")
+        governance_zone = self._normalize_non_empty_string(
+            governance_jurisdiction,
+            "governance_jurisdiction",
+        )
+        if not legal_ref.startswith("legal-registry://"):
+            raise ValueError("legal_registry_ref must start with legal-registry://")
+        if not governance_ref.startswith("governance-registry://"):
+            raise ValueError(
+                "governance_registry_ref must start with governance-registry://"
+            )
+
+        recorded_at = utc_now_iso()
+        collective_id = str(recovery_capture_export_binding["collective_id"])
+        capture_binding_digest = str(recovery_capture_export_binding["digest"])
+        route_trace_binding_digest = str(
+            recovery_capture_export_binding["recovery_route_trace_binding_digest"]
+        )
+        verifier_transport_binding_digest = str(
+            recovery_capture_export_binding["recovery_verifier_transport_binding_digest"]
+        )
+        dissolution_receipt_digest = str(
+            recovery_capture_export_binding.get("dissolution_receipt_digest", "")
+        )
+        member_capture_digest_set_digest = str(
+            recovery_capture_export_binding["member_capture_binding_digest_set_digest"]
+        )
+        registry_authority_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+                    "legal_registry_ref": legal_ref,
+                    "governance_registry_ref": governance_ref,
+                    "legal_jurisdiction": legal_zone,
+                    "governance_jurisdiction": governance_zone,
+                    "collective_id": collective_id,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                    "recovery_capture_export_binding_digest": capture_binding_digest,
+                }
+            )
+        )
+        legal_registry_digest = self._external_registry_digest(
+            registry_ref=legal_ref,
+            jurisdiction=legal_zone,
+            collective_id=collective_id,
+            dissolution_receipt_digest=dissolution_receipt_digest,
+            recovery_capture_export_binding_digest=capture_binding_digest,
+            registry_kind="legal",
+        )
+        governance_registry_digest = self._external_registry_digest(
+            registry_ref=governance_ref,
+            jurisdiction=governance_zone,
+            collective_id=collective_id,
+            dissolution_receipt_digest=dissolution_receipt_digest,
+            recovery_capture_export_binding_digest=capture_binding_digest,
+            registry_kind="governance",
+        )
+        registry_entry_digest = self._collective_external_registry_entry_digest(
+            collective_id=collective_id,
+            dissolution_receipt_digest=dissolution_receipt_digest,
+            recovery_capture_export_binding_digest=capture_binding_digest,
+            legal_registry_digest=legal_registry_digest,
+            governance_registry_digest=governance_registry_digest,
+            member_capture_binding_digest_set_digest=member_capture_digest_set_digest,
+        )
+        suffix = registry_entry_digest[:12]
+        registry_entry_ref = (
+            f"registry-entry://collective-dissolution/{collective_id}/{suffix}"
+        )
+        submission_receipt_ref = (
+            f"registry-submission://collective-dissolution/{collective_id}/{suffix}"
+        )
+        submission_receipt_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID,
+                    "registry_entry_ref": registry_entry_ref,
+                    "registry_entry_digest": registry_entry_digest,
+                    "legal_registry_digest": legal_registry_digest,
+                    "governance_registry_digest": governance_registry_digest,
+                }
+            )
+        )
+        ack_receipt_ref = f"registry-ack://collective-dissolution/{collective_id}/{suffix}"
+        ack_receipt_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+                    "submission_receipt_ref": submission_receipt_ref,
+                    "submission_receipt_digest": submission_receipt_digest,
+                    "ack_status": "accepted",
+                    "registry_authority_digest": registry_authority_digest,
+                }
+            )
+        )
+        registry_digest_set = [
+            legal_registry_digest,
+            governance_registry_digest,
+            registry_entry_digest,
+            submission_receipt_digest,
+            ack_receipt_digest,
+        ]
+        registry_digest_set_digest = sha256_text(canonical_json(registry_digest_set))
+        digest_payload = {
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+            "collective_id": collective_id,
+            "recovery_capture_export_binding_digest": capture_binding_digest,
+            "registry_entry_digest": registry_entry_digest,
+            "ack_receipt_digest": ack_receipt_digest,
+            "registry_digest_set_digest": registry_digest_set_digest,
+        }
+        receipt = {
+            "kind": "collective_external_registry_sync",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+            "digest_profile": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_DIGEST_PROFILE_ID,
+            "registry_entry_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ENTRY_DIGEST_PROFILE_ID
+            ),
+            "collective_id": collective_id,
+            "recorded_at": recorded_at,
+            "status": "synced",
+            "source_capture_export_profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+            "recovery_capture_export_binding_digest": capture_binding_digest,
+            "recovery_route_trace_binding_digest": route_trace_binding_digest,
+            "recovery_verifier_transport_binding_digest": verifier_transport_binding_digest,
+            "dissolution_receipt_digest": dissolution_receipt_digest,
+            "member_recovery_binding_digest": recovery_capture_export_binding[
+                "member_recovery_binding_digest"
+            ],
+            "packet_capture_digest": recovery_capture_export_binding[
+                "packet_capture_digest"
+            ],
+            "privileged_capture_digest": recovery_capture_export_binding[
+                "privileged_capture_digest"
+            ],
+            "member_capture_binding_digest_set_digest": member_capture_digest_set_digest,
+            "legal_registry_ref": legal_ref,
+            "legal_jurisdiction": legal_zone,
+            "legal_registry_digest": legal_registry_digest,
+            "governance_registry_ref": governance_ref,
+            "governance_jurisdiction": governance_zone,
+            "governance_registry_digest": governance_registry_digest,
+            "registry_authority_digest": registry_authority_digest,
+            "registry_entry_ref": registry_entry_ref,
+            "registry_entry_digest": registry_entry_digest,
+            "submission_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID,
+            "submission_receipt_ref": submission_receipt_ref,
+            "submission_receipt_digest": submission_receipt_digest,
+            "ack_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+            "ack_receipt_ref": ack_receipt_ref,
+            "ack_receipt_digest": ack_receipt_digest,
+            "registry_digest_set": registry_digest_set,
+            "registry_digest_set_digest": registry_digest_set_digest,
+            "capture_export_bound": True,
+            "legal_registry_bound": True,
+            "governance_registry_bound": True,
+            "registry_entry_bound": True,
+            "submission_ack_bound": True,
+            "external_registry_sync_complete": True,
+            "raw_dissolution_payload_stored": False,
+            "raw_registry_payload_stored": False,
+            "raw_packet_body_stored": False,
             "digest": sha256_text(canonical_json(digest_payload)),
         }
         return deepcopy(receipt)
@@ -1775,6 +1989,335 @@ class CollectiveIdentityService:
             "raw_packet_body_stored": raw_packet_body_stored,
         }
 
+    def validate_collective_external_registry_sync(
+        self,
+        receipt: Mapping[str, Any],
+        recovery_capture_export_binding: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        expected_fields = {
+            "kind": "collective_external_registry_sync",
+            "schema_version": "1.0.0",
+            "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+            "digest_profile": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_DIGEST_PROFILE_ID,
+            "registry_entry_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ENTRY_DIGEST_PROFILE_ID
+            ),
+            "status": "synced",
+            "source_capture_export_profile_id": COLLECTIVE_RECOVERY_CAPTURE_EXPORT_PROFILE_ID,
+            "submission_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID,
+            "ack_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+        }
+        for field_name, expected in expected_fields.items():
+            if receipt.get(field_name) != expected:
+                errors.append(f"{field_name} must equal {expected}")
+        self._check_non_empty_string(receipt.get("collective_id"), "collective_id", errors)
+        self._check_non_empty_string(receipt.get("recorded_at"), "recorded_at", errors)
+
+        if recovery_capture_export_binding is not None:
+            capture_validation = self.validate_recovery_route_trace_capture_export_binding(
+                recovery_capture_export_binding,
+            )
+            expected_capture_digest = recovery_capture_export_binding.get("digest")
+            expected_route_trace_digest = recovery_capture_export_binding.get(
+                "recovery_route_trace_binding_digest"
+            )
+            expected_verifier_transport_digest = recovery_capture_export_binding.get(
+                "recovery_verifier_transport_binding_digest"
+            )
+            expected_dissolution_digest = recovery_capture_export_binding.get(
+                "dissolution_receipt_digest"
+            )
+            expected_member_recovery_binding_digest = recovery_capture_export_binding.get(
+                "member_recovery_binding_digest"
+            )
+            expected_packet_capture_digest = recovery_capture_export_binding.get(
+                "packet_capture_digest"
+            )
+            expected_privileged_capture_digest = recovery_capture_export_binding.get(
+                "privileged_capture_digest"
+            )
+            expected_member_capture_set_digest = recovery_capture_export_binding.get(
+                "member_capture_binding_digest_set_digest"
+            )
+        else:
+            capture_validation = {"ok": receipt.get("capture_export_bound") is True}
+            expected_capture_digest = receipt.get("recovery_capture_export_binding_digest")
+            expected_route_trace_digest = receipt.get("recovery_route_trace_binding_digest")
+            expected_verifier_transport_digest = receipt.get(
+                "recovery_verifier_transport_binding_digest"
+            )
+            expected_dissolution_digest = receipt.get("dissolution_receipt_digest")
+            expected_member_recovery_binding_digest = receipt.get(
+                "member_recovery_binding_digest"
+            )
+            expected_packet_capture_digest = receipt.get("packet_capture_digest")
+            expected_privileged_capture_digest = receipt.get("privileged_capture_digest")
+            expected_member_capture_set_digest = receipt.get(
+                "member_capture_binding_digest_set_digest"
+            )
+
+        capture_export_bound = (
+            capture_validation["ok"]
+            and receipt.get("recovery_capture_export_binding_digest")
+            == expected_capture_digest
+            and receipt.get("recovery_route_trace_binding_digest")
+            == expected_route_trace_digest
+            and receipt.get("recovery_verifier_transport_binding_digest")
+            == expected_verifier_transport_digest
+            and receipt.get("dissolution_receipt_digest")
+            == expected_dissolution_digest
+            and receipt.get("member_recovery_binding_digest")
+            == expected_member_recovery_binding_digest
+            and receipt.get("packet_capture_digest") == expected_packet_capture_digest
+            and receipt.get("privileged_capture_digest")
+            == expected_privileged_capture_digest
+            and receipt.get("member_capture_binding_digest_set_digest")
+            == expected_member_capture_set_digest
+            and receipt.get("capture_export_bound") is True
+        )
+        if not capture_export_bound:
+            errors.append("capture export metadata must match external registry sync")
+
+        for field_name in (
+            "recovery_capture_export_binding_digest",
+            "recovery_route_trace_binding_digest",
+            "recovery_verifier_transport_binding_digest",
+            "dissolution_receipt_digest",
+            "member_recovery_binding_digest",
+            "packet_capture_digest",
+            "privileged_capture_digest",
+            "member_capture_binding_digest_set_digest",
+            "legal_registry_digest",
+            "governance_registry_digest",
+            "registry_authority_digest",
+            "registry_entry_digest",
+            "submission_receipt_digest",
+            "ack_receipt_digest",
+            "registry_digest_set_digest",
+            "digest",
+        ):
+            if not self._looks_like_digest(receipt.get(field_name)):
+                errors.append(f"{field_name} must be sha256 hex")
+
+        legal_ref = receipt.get("legal_registry_ref")
+        governance_ref = receipt.get("governance_registry_ref")
+        legal_jurisdiction = receipt.get("legal_jurisdiction")
+        governance_jurisdiction = receipt.get("governance_jurisdiction")
+        legal_registry_bound = (
+            isinstance(legal_ref, str)
+            and legal_ref.startswith("legal-registry://")
+            and isinstance(legal_jurisdiction, str)
+            and bool(legal_jurisdiction)
+            and receipt.get("legal_registry_digest")
+            == self._external_registry_digest(
+                registry_ref=legal_ref,
+                jurisdiction=legal_jurisdiction,
+                collective_id=str(receipt.get("collective_id")),
+                dissolution_receipt_digest=str(receipt.get("dissolution_receipt_digest")),
+                recovery_capture_export_binding_digest=str(
+                    receipt.get("recovery_capture_export_binding_digest")
+                ),
+                registry_kind="legal",
+            )
+            and receipt.get("legal_registry_bound") is True
+        )
+        if not legal_registry_bound:
+            errors.append("legal registry ref/digest must be bound")
+
+        governance_registry_bound = (
+            isinstance(governance_ref, str)
+            and governance_ref.startswith("governance-registry://")
+            and isinstance(governance_jurisdiction, str)
+            and bool(governance_jurisdiction)
+            and receipt.get("governance_registry_digest")
+            == self._external_registry_digest(
+                registry_ref=governance_ref,
+                jurisdiction=governance_jurisdiction,
+                collective_id=str(receipt.get("collective_id")),
+                dissolution_receipt_digest=str(receipt.get("dissolution_receipt_digest")),
+                recovery_capture_export_binding_digest=str(
+                    receipt.get("recovery_capture_export_binding_digest")
+                ),
+                registry_kind="governance",
+            )
+            and receipt.get("governance_registry_bound") is True
+        )
+        if not governance_registry_bound:
+            errors.append("governance registry ref/digest must be bound")
+
+        expected_authority_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+                    "legal_registry_ref": legal_ref,
+                    "governance_registry_ref": governance_ref,
+                    "legal_jurisdiction": legal_jurisdiction,
+                    "governance_jurisdiction": governance_jurisdiction,
+                    "collective_id": receipt.get("collective_id"),
+                    "dissolution_receipt_digest": receipt.get(
+                        "dissolution_receipt_digest"
+                    ),
+                    "recovery_capture_export_binding_digest": receipt.get(
+                        "recovery_capture_export_binding_digest"
+                    ),
+                }
+            )
+        )
+        if receipt.get("registry_authority_digest") != expected_authority_digest:
+            errors.append("registry_authority_digest mismatch")
+
+        expected_entry_digest = self._collective_external_registry_entry_digest(
+            collective_id=str(receipt.get("collective_id")),
+            dissolution_receipt_digest=str(receipt.get("dissolution_receipt_digest")),
+            recovery_capture_export_binding_digest=str(
+                receipt.get("recovery_capture_export_binding_digest")
+            ),
+            legal_registry_digest=str(receipt.get("legal_registry_digest")),
+            governance_registry_digest=str(receipt.get("governance_registry_digest")),
+            member_capture_binding_digest_set_digest=str(
+                receipt.get("member_capture_binding_digest_set_digest")
+            ),
+        )
+        registry_entry_bound = (
+            receipt.get("registry_entry_digest") == expected_entry_digest
+            and isinstance(receipt.get("registry_entry_ref"), str)
+            and str(receipt.get("registry_entry_ref")).startswith(
+                "registry-entry://collective-dissolution/"
+            )
+            and receipt.get("registry_entry_bound") is True
+        )
+        if not registry_entry_bound:
+            errors.append("registry entry digest must bind source artifacts")
+
+        expected_submission_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SUBMISSION_PROFILE_ID,
+                    "registry_entry_ref": receipt.get("registry_entry_ref"),
+                    "registry_entry_digest": receipt.get("registry_entry_digest"),
+                    "legal_registry_digest": receipt.get("legal_registry_digest"),
+                    "governance_registry_digest": receipt.get("governance_registry_digest"),
+                }
+            )
+        )
+        expected_ack_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_PROFILE_ID,
+                    "submission_receipt_ref": receipt.get("submission_receipt_ref"),
+                    "submission_receipt_digest": receipt.get(
+                        "submission_receipt_digest"
+                    ),
+                    "ack_status": "accepted",
+                    "registry_authority_digest": receipt.get(
+                        "registry_authority_digest"
+                    ),
+                }
+            )
+        )
+        submission_ack_bound = (
+            receipt.get("submission_receipt_digest") == expected_submission_digest
+            and receipt.get("ack_receipt_digest") == expected_ack_digest
+            and isinstance(receipt.get("submission_receipt_ref"), str)
+            and str(receipt.get("submission_receipt_ref")).startswith(
+                "registry-submission://collective-dissolution/"
+            )
+            and isinstance(receipt.get("ack_receipt_ref"), str)
+            and str(receipt.get("ack_receipt_ref")).startswith(
+                "registry-ack://collective-dissolution/"
+            )
+            and receipt.get("submission_ack_bound") is True
+        )
+        if not submission_ack_bound:
+            errors.append("submission and acknowledgement digests must be bound")
+
+        registry_digest_set = receipt.get("registry_digest_set")
+        registry_digest_set_bound = (
+            isinstance(registry_digest_set, list)
+            and registry_digest_set
+            == [
+                receipt.get("legal_registry_digest"),
+                receipt.get("governance_registry_digest"),
+                receipt.get("registry_entry_digest"),
+                receipt.get("submission_receipt_digest"),
+                receipt.get("ack_receipt_digest"),
+            ]
+            and receipt.get("registry_digest_set_digest")
+            == sha256_text(canonical_json(registry_digest_set))
+        )
+        if not registry_digest_set_bound:
+            errors.append("registry digest set must bind legal/governance/entry/ack")
+
+        expected_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+                    "collective_id": receipt.get("collective_id"),
+                    "recovery_capture_export_binding_digest": receipt.get(
+                        "recovery_capture_export_binding_digest"
+                    ),
+                    "registry_entry_digest": receipt.get("registry_entry_digest"),
+                    "ack_receipt_digest": receipt.get("ack_receipt_digest"),
+                    "registry_digest_set_digest": receipt.get(
+                        "registry_digest_set_digest"
+                    ),
+                }
+            )
+        )
+        digest_bound = receipt.get("digest") == expected_digest
+        if not digest_bound:
+            errors.append("digest must match external registry sync payload")
+
+        raw_dissolution_payload_stored = (
+            receipt.get("raw_dissolution_payload_stored") is True
+        )
+        raw_registry_payload_stored = receipt.get("raw_registry_payload_stored") is True
+        raw_packet_body_stored = receipt.get("raw_packet_body_stored") is True
+        if raw_dissolution_payload_stored:
+            errors.append("raw_dissolution_payload_stored must be false")
+        if raw_registry_payload_stored:
+            errors.append("raw_registry_payload_stored must be false")
+        if raw_packet_body_stored:
+            errors.append("raw_packet_body_stored must be false")
+
+        complete = (
+            capture_export_bound
+            and legal_registry_bound
+            and governance_registry_bound
+            and registry_entry_bound
+            and submission_ack_bound
+            and registry_digest_set_bound
+            and digest_bound
+            and not raw_dissolution_payload_stored
+            and not raw_registry_payload_stored
+            and not raw_packet_body_stored
+        )
+        if receipt.get("external_registry_sync_complete") is not complete:
+            errors.append("external_registry_sync_complete must reflect validation result")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_bound": (
+                receipt.get("profile_id") == COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID
+            ),
+            "capture_export_bound": capture_export_bound,
+            "legal_registry_bound": legal_registry_bound,
+            "governance_registry_bound": governance_registry_bound,
+            "registry_entry_bound": registry_entry_bound,
+            "submission_ack_bound": submission_ack_bound,
+            "registry_digest_set_bound": registry_digest_set_bound,
+            "external_registry_sync_complete": complete,
+            "digest_bound": digest_bound,
+            "raw_dissolution_payload_stored": raw_dissolution_payload_stored,
+            "raw_registry_payload_stored": raw_registry_payload_stored,
+            "raw_packet_body_stored": raw_packet_body_stored,
+        }
+
     def _derive_member_recovery_proofs(
         self,
         identity_confirmation_profiles: Mapping[str, Mapping[str, Any]],
@@ -2119,6 +2662,60 @@ class CollectiveIdentityService:
                     "privileged_capture_digest": privileged_capture_digest,
                     "route_binding_ref": route_binding_ref,
                     "route_export_digest": route_export_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _external_registry_digest(
+        *,
+        registry_ref: str,
+        jurisdiction: str,
+        collective_id: str,
+        dissolution_receipt_digest: str,
+        recovery_capture_export_binding_digest: str,
+        registry_kind: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "registry_ref": registry_ref,
+                    "jurisdiction": jurisdiction,
+                    "collective_id": collective_id,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                    "recovery_capture_export_binding_digest": (
+                        recovery_capture_export_binding_digest
+                    ),
+                    "registry_kind": registry_kind,
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_SYNC_PROFILE_ID,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_entry_digest(
+        *,
+        collective_id: str,
+        dissolution_receipt_digest: str,
+        recovery_capture_export_binding_digest: str,
+        legal_registry_digest: str,
+        governance_registry_digest: str,
+        member_capture_binding_digest_set_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ENTRY_DIGEST_PROFILE_ID,
+                    "collective_id": collective_id,
+                    "dissolution_receipt_digest": dissolution_receipt_digest,
+                    "recovery_capture_export_binding_digest": (
+                        recovery_capture_export_binding_digest
+                    ),
+                    "legal_registry_digest": legal_registry_digest,
+                    "governance_registry_digest": governance_registry_digest,
+                    "member_capture_binding_digest_set_digest": (
+                        member_capture_binding_digest_set_digest
+                    ),
                 }
             )
         )

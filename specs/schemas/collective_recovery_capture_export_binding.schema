@@ -18,6 +18,8 @@ required:
   - recovery_route_trace_profile_id
   - recovery_route_trace_binding_digest
   - recovery_verifier_transport_binding_digest
+  - dissolution_receipt_digest
+  - member_recovery_binding_digest
   - authority_route_trace_ref
   - authority_route_trace_digest
   - authority_plane_ref
@@ -88,6 +90,10 @@ properties:
   recovery_route_trace_binding_digest:
     $ref: "#/$defs/sha256"
   recovery_verifier_transport_binding_digest:
+    $ref: "#/$defs/sha256"
+  dissolution_receipt_digest:
+    $ref: "#/$defs/sha256"
+  member_recovery_binding_digest:
     $ref: "#/$defs/sha256"
   authority_route_trace_ref:
     type: string
