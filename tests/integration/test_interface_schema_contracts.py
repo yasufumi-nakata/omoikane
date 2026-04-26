@@ -149,10 +149,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["external_registry_sync_governance_registry_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_submission_ack_bound"])
         self.assertTrue(result["validation"]["external_registry_sync_ack_quorum_bound"])
+        self.assertTrue(result["validation"]["external_registry_sync_ack_route_trace_bound"])
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
         self.assertFalse(result["validation"]["external_registry_sync_raw_ack_payload_stored"])
+        self.assertFalse(
+            result["validation"]["external_registry_sync_raw_ack_route_payload_stored"]
+        )
 
     def test_imc_demo_matches_public_schemas(self) -> None:
         result = self.runtime.run_imc_demo()

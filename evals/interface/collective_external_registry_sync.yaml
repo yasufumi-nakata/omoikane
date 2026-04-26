@@ -14,7 +14,9 @@ assertions:
   - registry_entry_digest covers the legal registry, governance registry, and member capture digest set
   - submission_receipt_digest and ack_receipt_digest bind the registry entry without storing raw registry payloads
   - ack_quorum_digest binds legal and governance acknowledgement receipts across two jurisdictions without storing raw acknowledgement payloads
+  - ack_route_trace_binding_digest binds the acknowledgement quorum to authenticated non-loopback authority-route trace evidence without storing raw ack-route payloads
   - raw_dissolution_payload_stored is false
   - raw_registry_payload_stored is false
   - raw_ack_payload_stored is false
+  - raw_ack_route_payload_stored is false
   - raw_packet_body_stored is false

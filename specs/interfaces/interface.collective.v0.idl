@@ -262,11 +262,14 @@ operations:
         type: object
         required:
           - recovery_capture_export_binding
+          - registry_ack_authority_route_trace
           - legal_registry_ref
           - governance_registry_ref
         properties:
           recovery_capture_export_binding:
             schema_ref: collective_recovery_capture_export_binding
+          registry_ack_authority_route_trace:
+            schema_ref: distributed_transport_authority_route_trace
           legal_registry_ref:
             type: string
             pattern: "^legal-registry://"
@@ -281,7 +284,8 @@ operations:
       - legal_registry_digest and governance_registry_digest must bind the same dissolution and capture-export digests
       - submission_receipt_digest and ack_receipt_digest must bind the registry entry without storing raw registry payloads
       - ack_quorum_digest must bind legal and governance registry acknowledgement receipts across two distinct jurisdictions without storing raw acknowledgement payloads
-      - raw dissolution payloads, raw registry payloads, and raw packet bodies must not be stored
+      - ack_route_trace_binding_digest must bind the acknowledgement quorum to authenticated non-loopback authority-route trace evidence
+      - raw dissolution payloads, raw registry payloads, raw acknowledgement payloads, raw ack-route payloads, and raw packet bodies must not be stored
 events:
   collective.formed:
     payload:

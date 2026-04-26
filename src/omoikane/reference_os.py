@@ -7700,6 +7700,7 @@ json.dump(response, sys.stdout)
         )
         external_registry_sync = self.collective.sync_dissolution_external_registry(
             recovery_capture_export_binding,
+            registry_ack_authority_route_trace=recovery_route_trace,
         )
         final_collective = self.collective.snapshot(collective_record["collective_id"])
         final_merge = self.collective.merge_snapshot(merge_session["merge_session_id"])
@@ -7731,6 +7732,7 @@ json.dump(response, sys.stdout)
             self.collective.validate_collective_external_registry_sync(
                 external_registry_sync,
                 recovery_capture_export_binding,
+                recovery_route_trace,
             )
         )
         wms_snapshot = self.wms.snapshot(wms_session["session_id"])
@@ -7940,11 +7942,20 @@ json.dump(response, sys.stdout)
                 "ack_quorum_jurisdictions": external_registry_sync[
                     "ack_quorum_jurisdictions"
                 ],
+                "ack_route_trace_binding_digest": external_registry_sync[
+                    "ack_route_trace_binding_digest"
+                ],
+                "ack_route_trace_route_binding_refs": external_registry_sync[
+                    "ack_route_trace_route_binding_refs"
+                ],
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
                 ],
                 "raw_ack_payload_stored": external_registry_sync[
                     "raw_ack_payload_stored"
+                ],
+                "raw_ack_route_payload_stored": external_registry_sync[
+                    "raw_ack_route_payload_stored"
                 ],
             },
             actor="CollectiveIdentityService",
@@ -8103,6 +8114,9 @@ json.dump(response, sys.stdout)
             "external_registry_sync_ack_quorum_bound": (
                 external_registry_sync_validation["ack_quorum_bound"]
             ),
+            "external_registry_sync_ack_route_trace_bound": (
+                external_registry_sync_validation["ack_route_trace_bound"]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
@@ -8111,6 +8125,9 @@ json.dump(response, sys.stdout)
             ),
             "external_registry_sync_raw_ack_payload_stored": (
                 external_registry_sync_validation["raw_ack_payload_stored"]
+            ),
+            "external_registry_sync_raw_ack_route_payload_stored": (
+                external_registry_sync_validation["raw_ack_route_payload_stored"]
             ),
             "merge_message_redacted": merge_message["delivery_status"] == "delivered-with-redactions",
             "federation_attested": final_collective["oversight"]["federation_attested"],

@@ -53,6 +53,12 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_DIGEST_PROFILE_ID = (
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_AUTHORITIES = 2
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_REQUIRED_JURISDICTIONS = 2
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID = (
+    "collective-external-registry-ack-route-trace-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-route-trace-digest-v1"
+)
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -129,6 +135,9 @@ class CollectiveIdentityService:
                 ),
                 "external_registry_ack_quorum_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID
+                ),
+                "external_registry_ack_route_trace_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
                 ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
@@ -811,6 +820,7 @@ class CollectiveIdentityService:
         self,
         recovery_capture_export_binding: Mapping[str, Any],
         *,
+        registry_ack_authority_route_trace: Mapping[str, Any],
         legal_registry_ref: str = "legal-registry://collective-dissolution/jp-13/v1",
         governance_registry_ref: str = (
             "governance-registry://collective-dissolution/federation/v1"
@@ -846,6 +856,7 @@ class CollectiveIdentityService:
             raise ValueError(
                 "legal_jurisdiction and governance_jurisdiction must be distinct for ack quorum"
             )
+        self._validate_authority_route_trace_contract(registry_ack_authority_route_trace)
 
         recorded_at = utc_now_iso()
         collective_id = str(recovery_capture_export_binding["collective_id"])
@@ -976,6 +987,56 @@ class CollectiveIdentityService:
             ack_quorum_authority_refs=ack_quorum_authority_refs,
             ack_quorum_jurisdictions=ack_quorum_jurisdictions,
         )
+        ack_route_trace_bindings = (
+            self._build_collective_external_registry_ack_route_trace_bindings(
+                collective_id=collective_id,
+                ack_quorum_receipts=ack_quorum_receipts,
+                authority_route_trace=registry_ack_authority_route_trace,
+            )
+        )
+        ack_route_trace_binding_digest_set = [
+            binding["ack_route_binding_digest"]
+            for binding in ack_route_trace_bindings
+        ]
+        ack_route_trace_binding_digest_set_digest = sha256_text(
+            canonical_json(ack_route_trace_binding_digest_set)
+        )
+        ack_route_trace_route_binding_refs = [
+            binding["route_binding_ref"] for binding in ack_route_trace_bindings
+        ]
+        ack_route_trace_remote_host_refs = [
+            binding["remote_host_ref"] for binding in ack_route_trace_bindings
+        ]
+        ack_route_trace_remote_host_attestation_refs = [
+            binding["remote_host_attestation_ref"]
+            for binding in ack_route_trace_bindings
+        ]
+        ack_route_trace_remote_jurisdictions = [
+            binding["remote_jurisdiction"] for binding in ack_route_trace_bindings
+        ]
+        ack_route_trace_binding_digest = (
+            self._collective_external_registry_ack_route_trace_digest(
+                collective_id=collective_id,
+                ack_quorum_digest=ack_quorum_digest,
+                authority_route_trace_digest=str(registry_ack_authority_route_trace["digest"]),
+                ack_route_trace_binding_digest_set_digest=(
+                    ack_route_trace_binding_digest_set_digest
+                ),
+                ack_quorum_authority_refs=ack_quorum_authority_refs,
+                route_binding_refs=ack_route_trace_route_binding_refs,
+            )
+        )
+        ack_route_trace_bound = (
+            len(ack_route_trace_bindings) == len(ack_quorum_receipts)
+            and registry_ack_authority_route_trace.get("non_loopback_verified") is True
+            and registry_ack_authority_route_trace.get("cross_host_verified") is True
+            and registry_ack_authority_route_trace.get("socket_trace_complete") is True
+            and registry_ack_authority_route_trace.get("os_observer_complete") is True
+            and all(
+                binding["mtls_status"] == "authenticated"
+                for binding in ack_route_trace_bindings
+            )
+        )
         registry_digest_set = [
             legal_registry_digest,
             governance_registry_digest,
@@ -983,6 +1044,7 @@ class CollectiveIdentityService:
             submission_receipt_digest,
             ack_receipt_digest,
             ack_quorum_digest,
+            ack_route_trace_binding_digest,
         ]
         registry_digest_set_digest = sha256_text(canonical_json(registry_digest_set))
         digest_payload = {
@@ -992,6 +1054,7 @@ class CollectiveIdentityService:
             "registry_entry_digest": registry_entry_digest,
             "ack_receipt_digest": ack_receipt_digest,
             "ack_quorum_digest": ack_quorum_digest,
+            "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
             "registry_digest_set_digest": registry_digest_set_digest,
         }
         receipt = {
@@ -1052,6 +1115,39 @@ class CollectiveIdentityService:
             "ack_quorum_digest_set_digest": ack_quorum_digest_set_digest,
             "ack_quorum_digest": ack_quorum_digest,
             "ack_quorum_status": "complete",
+            "ack_route_trace_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
+            ),
+            "ack_route_trace_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_DIGEST_PROFILE_ID
+            ),
+            "ack_authority_route_trace_ref": registry_ack_authority_route_trace[
+                "trace_ref"
+            ],
+            "ack_authority_route_trace_digest": registry_ack_authority_route_trace[
+                "digest"
+            ],
+            "ack_authority_plane_ref": registry_ack_authority_route_trace[
+                "authority_plane_ref"
+            ],
+            "ack_authority_plane_digest": registry_ack_authority_route_trace[
+                "authority_plane_digest"
+            ],
+            "ack_route_trace_route_binding_refs": ack_route_trace_route_binding_refs,
+            "ack_route_trace_remote_host_refs": ack_route_trace_remote_host_refs,
+            "ack_route_trace_remote_host_attestation_refs": (
+                ack_route_trace_remote_host_attestation_refs
+            ),
+            "ack_route_trace_remote_jurisdictions": (
+                ack_route_trace_remote_jurisdictions
+            ),
+            "ack_route_trace_bindings": ack_route_trace_bindings,
+            "ack_route_trace_binding_digest_set": ack_route_trace_binding_digest_set,
+            "ack_route_trace_binding_digest_set_digest": (
+                ack_route_trace_binding_digest_set_digest
+            ),
+            "ack_route_trace_binding_digest": ack_route_trace_binding_digest,
+            "ack_route_trace_binding_count": len(ack_route_trace_bindings),
             "registry_digest_set": registry_digest_set,
             "registry_digest_set_digest": registry_digest_set_digest,
             "capture_export_bound": True,
@@ -1060,10 +1156,12 @@ class CollectiveIdentityService:
             "registry_entry_bound": True,
             "submission_ack_bound": True,
             "ack_quorum_bound": True,
+            "ack_route_trace_bound": ack_route_trace_bound,
             "external_registry_sync_complete": True,
             "raw_dissolution_payload_stored": False,
             "raw_registry_payload_stored": False,
             "raw_ack_payload_stored": False,
+            "raw_ack_route_payload_stored": False,
             "raw_packet_body_stored": False,
             "digest": sha256_text(canonical_json(digest_payload)),
         }
@@ -2075,6 +2173,7 @@ class CollectiveIdentityService:
         self,
         receipt: Mapping[str, Any],
         recovery_capture_export_binding: Mapping[str, Any] | None = None,
+        registry_ack_authority_route_trace: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         if not isinstance(receipt, Mapping):
@@ -2095,6 +2194,12 @@ class CollectiveIdentityService:
             "ack_quorum_profile_id": COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_PROFILE_ID,
             "ack_quorum_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_QUORUM_DIGEST_PROFILE_ID
+            ),
+            "ack_route_trace_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
+            ),
+            "ack_route_trace_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_DIGEST_PROFILE_ID
             ),
         }
         for field_name, expected in expected_fields.items():
@@ -2185,6 +2290,10 @@ class CollectiveIdentityService:
             "ack_receipt_digest",
             "ack_quorum_digest_set_digest",
             "ack_quorum_digest",
+            "ack_authority_route_trace_digest",
+            "ack_authority_plane_digest",
+            "ack_route_trace_binding_digest_set_digest",
+            "ack_route_trace_binding_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -2391,6 +2500,163 @@ class CollectiveIdentityService:
         if raw_ack_payload_stored:
             errors.append("raw_ack_payload_stored must be false")
 
+        raw_ack_route_payload_stored = (
+            receipt.get("raw_ack_route_payload_stored") is True
+        )
+        ack_route_trace_bindings = receipt.get("ack_route_trace_bindings")
+        expected_ack_route_trace_bindings: List[Dict[str, Any]] = []
+        if not isinstance(ack_route_trace_bindings, list):
+            errors.append("ack_route_trace_bindings must be a list")
+            ack_route_trace_bound = False
+        else:
+            if registry_ack_authority_route_trace is not None:
+                try:
+                    self._validate_authority_route_trace_contract(
+                        registry_ack_authority_route_trace
+                    )
+                    expected_ack_route_trace_bindings = (
+                        self._build_collective_external_registry_ack_route_trace_bindings(
+                            collective_id=str(receipt.get("collective_id")),
+                            ack_quorum_receipts=expected_ack_quorum_receipts,
+                            authority_route_trace=registry_ack_authority_route_trace,
+                        )
+                    )
+                    expected_trace_ref = registry_ack_authority_route_trace.get(
+                        "trace_ref"
+                    )
+                    expected_trace_digest = registry_ack_authority_route_trace.get(
+                        "digest"
+                    )
+                    expected_plane_ref = registry_ack_authority_route_trace.get(
+                        "authority_plane_ref"
+                    )
+                    expected_plane_digest = registry_ack_authority_route_trace.get(
+                        "authority_plane_digest"
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
+                    expected_trace_ref = receipt.get("ack_authority_route_trace_ref")
+                    expected_trace_digest = receipt.get(
+                        "ack_authority_route_trace_digest"
+                    )
+                    expected_plane_ref = receipt.get("ack_authority_plane_ref")
+                    expected_plane_digest = receipt.get("ack_authority_plane_digest")
+            else:
+                expected_trace_ref = receipt.get("ack_authority_route_trace_ref")
+                expected_trace_digest = receipt.get("ack_authority_route_trace_digest")
+                expected_plane_ref = receipt.get("ack_authority_plane_ref")
+                expected_plane_digest = receipt.get("ack_authority_plane_digest")
+                for binding, ack_receipt in zip(
+                    ack_route_trace_bindings,
+                    expected_ack_quorum_receipts,
+                ):
+                    if not isinstance(binding, Mapping):
+                        errors.append("ack_route_trace_bindings entries must be objects")
+                        continue
+                    expected_binding = dict(binding)
+                    expected_binding["ack_route_binding_digest"] = (
+                        self._collective_external_registry_ack_route_binding_digest(
+                            collective_id=str(receipt.get("collective_id")),
+                            ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                            registry_authority_ref=str(
+                                ack_receipt["registry_authority_ref"]
+                            ),
+                            registry_jurisdiction=str(
+                                ack_receipt["registry_jurisdiction"]
+                            ),
+                            authority_route_trace_digest=str(
+                                receipt.get("ack_authority_route_trace_digest")
+                            ),
+                            route_binding_ref=str(binding.get("route_binding_ref")),
+                            remote_host_ref=str(binding.get("remote_host_ref")),
+                            remote_host_attestation_ref=str(
+                                binding.get("remote_host_attestation_ref")
+                            ),
+                            os_observer_host_binding_digest=str(
+                                binding.get("os_observer_host_binding_digest")
+                            ),
+                            socket_response_digest=str(
+                                binding.get("socket_response_digest")
+                            ),
+                        )
+                    )
+                    expected_ack_route_trace_bindings.append(expected_binding)
+
+            expected_ack_route_trace_digest_set = [
+                binding["ack_route_binding_digest"]
+                for binding in expected_ack_route_trace_bindings
+            ]
+            expected_ack_route_trace_digest_set_digest = sha256_text(
+                canonical_json(expected_ack_route_trace_digest_set)
+            )
+            expected_ack_route_trace_route_binding_refs = [
+                binding["route_binding_ref"]
+                for binding in expected_ack_route_trace_bindings
+            ]
+            expected_ack_route_trace_binding_digest = (
+                self._collective_external_registry_ack_route_trace_digest(
+                    collective_id=str(receipt.get("collective_id")),
+                    ack_quorum_digest=str(receipt.get("ack_quorum_digest")),
+                    authority_route_trace_digest=str(
+                        receipt.get("ack_authority_route_trace_digest")
+                    ),
+                    ack_route_trace_binding_digest_set_digest=(
+                        expected_ack_route_trace_digest_set_digest
+                    ),
+                    ack_quorum_authority_refs=[str(legal_ref), str(governance_ref)],
+                    route_binding_refs=expected_ack_route_trace_route_binding_refs,
+                )
+            )
+            ack_route_trace_bound = (
+                receipt.get("ack_authority_route_trace_ref") == expected_trace_ref
+                and receipt.get("ack_authority_route_trace_digest")
+                == expected_trace_digest
+                and receipt.get("ack_authority_plane_ref") == expected_plane_ref
+                and receipt.get("ack_authority_plane_digest") == expected_plane_digest
+                and isinstance(receipt.get("ack_authority_route_trace_ref"), str)
+                and str(receipt.get("ack_authority_route_trace_ref")).startswith(
+                    "authority-route-trace://"
+                )
+                and ack_route_trace_bindings == expected_ack_route_trace_bindings
+                and receipt.get("ack_route_trace_route_binding_refs")
+                == expected_ack_route_trace_route_binding_refs
+                and receipt.get("ack_route_trace_remote_host_refs")
+                == [
+                    binding["remote_host_ref"]
+                    for binding in expected_ack_route_trace_bindings
+                ]
+                and receipt.get("ack_route_trace_remote_host_attestation_refs")
+                == [
+                    binding["remote_host_attestation_ref"]
+                    for binding in expected_ack_route_trace_bindings
+                ]
+                and receipt.get("ack_route_trace_remote_jurisdictions")
+                == [
+                    binding["remote_jurisdiction"]
+                    for binding in expected_ack_route_trace_bindings
+                ]
+                and receipt.get("ack_route_trace_binding_digest_set")
+                == expected_ack_route_trace_digest_set
+                and receipt.get("ack_route_trace_binding_digest_set_digest")
+                == expected_ack_route_trace_digest_set_digest
+                and receipt.get("ack_route_trace_binding_digest")
+                == expected_ack_route_trace_binding_digest
+                and receipt.get("ack_route_trace_binding_count")
+                == len(expected_ack_route_trace_bindings)
+                and receipt.get("ack_route_trace_bound") is True
+                and all(
+                    binding.get("mtls_status") == "authenticated"
+                    and binding.get("raw_ack_route_payload_stored") is False
+                    for binding in ack_route_trace_bindings
+                    if isinstance(binding, Mapping)
+                )
+                and not raw_ack_route_payload_stored
+            )
+        if not ack_route_trace_bound:
+            errors.append("ack route trace must bind registry acknowledgements")
+        if raw_ack_route_payload_stored:
+            errors.append("raw_ack_route_payload_stored must be false")
+
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
             isinstance(registry_digest_set, list)
@@ -2402,6 +2668,7 @@ class CollectiveIdentityService:
                 receipt.get("submission_receipt_digest"),
                 receipt.get("ack_receipt_digest"),
                 receipt.get("ack_quorum_digest"),
+                receipt.get("ack_route_trace_binding_digest"),
             ]
             and receipt.get("registry_digest_set_digest")
             == sha256_text(canonical_json(registry_digest_set))
@@ -2420,6 +2687,9 @@ class CollectiveIdentityService:
                     "registry_entry_digest": receipt.get("registry_entry_digest"),
                     "ack_receipt_digest": receipt.get("ack_receipt_digest"),
                     "ack_quorum_digest": receipt.get("ack_quorum_digest"),
+                    "ack_route_trace_binding_digest": receipt.get(
+                        "ack_route_trace_binding_digest"
+                    ),
                     "registry_digest_set_digest": receipt.get(
                         "registry_digest_set_digest"
                     ),
@@ -2449,11 +2719,13 @@ class CollectiveIdentityService:
             and registry_entry_bound
             and submission_ack_bound
             and ack_quorum_bound
+            and ack_route_trace_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
             and not raw_registry_payload_stored
             and not raw_ack_payload_stored
+            and not raw_ack_route_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -2471,12 +2743,14 @@ class CollectiveIdentityService:
             "registry_entry_bound": registry_entry_bound,
             "submission_ack_bound": submission_ack_bound,
             "ack_quorum_bound": ack_quorum_bound,
+            "ack_route_trace_bound": ack_route_trace_bound,
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
             "raw_dissolution_payload_stored": raw_dissolution_payload_stored,
             "raw_registry_payload_stored": raw_registry_payload_stored,
             "raw_ack_payload_stored": raw_ack_payload_stored,
+            "raw_ack_route_payload_stored": raw_ack_route_payload_stored,
             "raw_packet_body_stored": raw_packet_body_stored,
         }
 
@@ -2824,6 +3098,173 @@ class CollectiveIdentityService:
                     "privileged_capture_digest": privileged_capture_digest,
                     "route_binding_ref": route_binding_ref,
                     "route_export_digest": route_export_digest,
+                }
+            )
+        )
+
+    def _build_collective_external_registry_ack_route_trace_bindings(
+        self,
+        *,
+        collective_id: str,
+        ack_quorum_receipts: Sequence[Mapping[str, Any]],
+        authority_route_trace: Mapping[str, Any],
+    ) -> List[Dict[str, Any]]:
+        route_bindings = authority_route_trace.get("route_bindings")
+        if not isinstance(route_bindings, list):
+            raise ValueError("registry_ack_authority_route_trace.route_bindings must be a list")
+        if len(route_bindings) < len(ack_quorum_receipts):
+            raise ValueError(
+                "registry_ack_authority_route_trace must cover every external registry ack"
+            )
+
+        used_indices: Set[int] = set()
+        bound: List[Dict[str, Any]] = []
+        for ack_receipt in ack_quorum_receipts:
+            route_binding = self._select_registry_ack_route_binding(
+                ack_receipt=ack_receipt,
+                route_bindings=route_bindings,
+                used_indices=used_indices,
+            )
+            socket_trace = route_binding.get("socket_trace")
+            if not isinstance(socket_trace, Mapping):
+                raise ValueError("ack route binding must carry socket_trace")
+            os_observer = route_binding.get("os_observer_receipt")
+            if not isinstance(os_observer, Mapping):
+                raise ValueError("ack route binding must carry os_observer_receipt")
+            if route_binding.get("mtls_status") != "authenticated":
+                raise ValueError("ack route binding must be authenticated")
+
+            ack_route_binding_digest = (
+                self._collective_external_registry_ack_route_binding_digest(
+                    collective_id=collective_id,
+                    ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                    registry_authority_ref=str(
+                        ack_receipt["registry_authority_ref"]
+                    ),
+                    registry_jurisdiction=str(
+                        ack_receipt["registry_jurisdiction"]
+                    ),
+                    authority_route_trace_digest=str(authority_route_trace["digest"]),
+                    route_binding_ref=str(route_binding["route_binding_ref"]),
+                    remote_host_ref=str(route_binding["remote_host_ref"]),
+                    remote_host_attestation_ref=str(
+                        route_binding["remote_host_attestation_ref"]
+                    ),
+                    os_observer_host_binding_digest=str(
+                        os_observer["host_binding_digest"]
+                    ),
+                    socket_response_digest=str(socket_trace["response_digest"]),
+                )
+            )
+            bound.append(
+                {
+                    "ack_receipt_ref": ack_receipt["ack_receipt_ref"],
+                    "ack_receipt_digest": ack_receipt["ack_receipt_digest"],
+                    "registry_authority_ref": ack_receipt["registry_authority_ref"],
+                    "registry_jurisdiction": ack_receipt["registry_jurisdiction"],
+                    "authority_route_trace_ref": authority_route_trace["trace_ref"],
+                    "authority_route_trace_digest": authority_route_trace["digest"],
+                    "route_binding_ref": route_binding["route_binding_ref"],
+                    "remote_host_ref": route_binding["remote_host_ref"],
+                    "remote_host_attestation_ref": route_binding[
+                        "remote_host_attestation_ref"
+                    ],
+                    "authority_cluster_ref": route_binding["authority_cluster_ref"],
+                    "remote_jurisdiction": route_binding["remote_jurisdiction"],
+                    "remote_network_zone": route_binding["remote_network_zone"],
+                    "os_observer_receipt_id": os_observer["receipt_id"],
+                    "os_observer_host_binding_digest": os_observer[
+                        "host_binding_digest"
+                    ],
+                    "socket_response_digest": socket_trace["response_digest"],
+                    "mtls_status": route_binding["mtls_status"],
+                    "ack_route_binding_digest": ack_route_binding_digest,
+                    "raw_ack_route_payload_stored": False,
+                }
+            )
+        return bound
+
+    @staticmethod
+    def _select_registry_ack_route_binding(
+        *,
+        ack_receipt: Mapping[str, Any],
+        route_bindings: Sequence[Any],
+        used_indices: Set[int],
+    ) -> Mapping[str, Any]:
+        preferred_jurisdiction = str(ack_receipt.get("registry_jurisdiction"))
+        for index, route_binding in enumerate(route_bindings):
+            if index in used_indices or not isinstance(route_binding, Mapping):
+                continue
+            if route_binding.get("remote_jurisdiction") == preferred_jurisdiction:
+                used_indices.add(index)
+                return route_binding
+        for index, route_binding in enumerate(route_bindings):
+            if index in used_indices or not isinstance(route_binding, Mapping):
+                continue
+            used_indices.add(index)
+            return route_binding
+        raise ValueError("no unused route binding available for registry acknowledgement")
+
+    @staticmethod
+    def _collective_external_registry_ack_route_binding_digest(
+        *,
+        collective_id: str,
+        ack_receipt_digest: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+        authority_route_trace_digest: str,
+        route_binding_ref: str,
+        remote_host_ref: str,
+        remote_host_attestation_ref: str,
+        os_observer_host_binding_digest: str,
+        socket_response_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
+                    ),
+                    "collective_id": collective_id,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "authority_route_trace_digest": authority_route_trace_digest,
+                    "route_binding_ref": route_binding_ref,
+                    "remote_host_ref": remote_host_ref,
+                    "remote_host_attestation_ref": remote_host_attestation_ref,
+                    "os_observer_host_binding_digest": (
+                        os_observer_host_binding_digest
+                    ),
+                    "socket_response_digest": socket_response_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_route_trace_digest(
+        *,
+        collective_id: str,
+        ack_quorum_digest: str,
+        authority_route_trace_digest: str,
+        ack_route_trace_binding_digest_set_digest: str,
+        ack_quorum_authority_refs: Sequence[str],
+        route_binding_refs: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_ROUTE_TRACE_PROFILE_ID
+                    ),
+                    "collective_id": collective_id,
+                    "ack_quorum_digest": ack_quorum_digest,
+                    "authority_route_trace_digest": authority_route_trace_digest,
+                    "ack_route_trace_binding_digest_set_digest": (
+                        ack_route_trace_binding_digest_set_digest
+                    ),
+                    "ack_quorum_authority_refs": list(ack_quorum_authority_refs),
+                    "route_binding_refs": list(route_binding_refs),
                 }
             )
         )

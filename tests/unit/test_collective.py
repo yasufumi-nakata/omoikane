@@ -297,10 +297,14 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             packet_capture,
             privileged_capture,
         )
-        registry_sync = service.sync_dissolution_external_registry(capture_binding)
+        registry_sync = service.sync_dissolution_external_registry(
+            capture_binding,
+            registry_ack_authority_route_trace=route_trace,
+        )
         registry_validation = service.validate_collective_external_registry_sync(
             registry_sync,
             capture_binding,
+            route_trace,
         )
         tampered_registry_sync = dict(registry_sync)
         tampered_registry_sync["ack_quorum_digest_set"] = [
@@ -310,6 +314,19 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         tampered_registry_validation = service.validate_collective_external_registry_sync(
             tampered_registry_sync,
             capture_binding,
+            route_trace,
+        )
+        tampered_route_trace_registry_sync = dict(registry_sync)
+        tampered_route_trace_registry_sync["ack_route_trace_binding_digest_set"] = [
+            registry_sync["ack_route_trace_binding_digest_set"][0],
+            "0" * 64,
+        ]
+        tampered_route_trace_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_route_trace_registry_sync,
+                capture_binding,
+                route_trace,
+            )
         )
 
         self.assertEqual("Collective Meridian", record["display_name"])
@@ -373,19 +390,29 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertTrue(registry_validation["capture_export_bound"])
         self.assertTrue(registry_validation["submission_ack_bound"])
         self.assertTrue(registry_validation["ack_quorum_bound"])
+        self.assertTrue(registry_validation["ack_route_trace_bound"])
         self.assertFalse(registry_validation["raw_registry_payload_stored"])
         self.assertFalse(registry_validation["raw_ack_payload_stored"])
+        self.assertFalse(registry_validation["raw_ack_route_payload_stored"])
         self.assertEqual(
             "collective-external-registry-ack-quorum-v1",
             registry_sync["ack_quorum_profile_id"],
+        )
+        self.assertEqual(
+            "collective-external-registry-ack-route-trace-v1",
+            registry_sync["ack_route_trace_profile_id"],
         )
         self.assertEqual(2, registry_sync["ack_quorum_required_authority_count"])
         self.assertEqual(2, registry_sync["ack_quorum_required_jurisdiction_count"])
         self.assertEqual(["JP-13", "FEDERATION"], registry_sync["ack_quorum_jurisdictions"])
         self.assertEqual(2, len(registry_sync["ack_quorum_receipts"]))
         self.assertEqual("complete", registry_sync["ack_quorum_status"])
+        self.assertEqual(2, registry_sync["ack_route_trace_binding_count"])
+        self.assertTrue(registry_sync["ack_route_trace_bound"])
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
+        self.assertFalse(tampered_route_trace_registry_validation["ok"])
+        self.assertFalse(tampered_route_trace_registry_validation["ack_route_trace_bound"])
 
     def test_dissolve_rejects_missing_identity_confirmation_profile(self) -> None:
         service = CollectiveIdentityService()
