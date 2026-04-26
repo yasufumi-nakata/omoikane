@@ -173,6 +173,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 "external_registry_sync_ack_live_endpoint_mtls_client_certificate_lifecycle_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
+            ]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
@@ -201,6 +206,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(
             result["validation"][
                 "external_registry_sync_raw_client_certificate_lifecycle_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["validation"][
+                "external_registry_sync_raw_client_certificate_lifecycle_chain_payload_stored"
             ]
         )
         self.assertFalse(

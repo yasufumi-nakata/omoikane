@@ -485,6 +485,24 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 privileged_capture,
             )
         )
+        tampered_client_certificate_lifecycle_chain_registry_sync = dict(registry_sync)
+        tampered_client_certificate_lifecycle_chain_registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_digests"
+        ] = [
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_digests"
+            ][0],
+            "0" * 64,
+        ]
+        tampered_client_certificate_lifecycle_chain_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_client_certificate_lifecycle_chain_registry_sync,
+                capture_binding,
+                route_trace,
+                packet_capture,
+                privileged_capture,
+            )
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -624,6 +642,17 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_profile_id"
             ],
         )
+        self.assertTrue(
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
+            ]
+        )
+        self.assertEqual(
+            "collective-external-registry-ack-client-certificate-rollover-chain-v1",
+            registry_sync[
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_profile_id"
+            ],
+        )
         self.assertEqual(
             2,
             len(registry_sync["ack_live_endpoint_mtls_client_certificate_proofs"]),
@@ -645,15 +674,61 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
+            2,
+            len(
+                registry_sync[
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proofs"
+                ]
+            ),
+        )
+        self.assertEqual(
             ["renewed", "renewed"],
             registry_sync["ack_live_endpoint_client_certificate_lifecycle_statuses"],
         )
+        self.assertEqual(
+            [3, 3],
+            registry_sync[
+                "ack_live_endpoint_client_certificate_lifecycle_chain_depths"
+            ],
+        )
+        self.assertEqual(
+            ["complete", "complete"],
+            registry_sync[
+                "ack_live_endpoint_client_certificate_lifecycle_chain_statuses"
+            ],
+        )
+        for chain_proof in registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proofs"
+        ]:
+            self.assertEqual(
+                3,
+                len(chain_proof["mtls_client_certificate_lifecycle_chain_refs"]),
+            )
+            self.assertEqual(
+                2,
+                len(
+                    chain_proof[
+                        "mtls_client_certificate_lifecycle_chain_retirement_digests"
+                    ]
+                ),
+            )
+            self.assertEqual(
+                2,
+                len(
+                    chain_proof[
+                        "mtls_client_certificate_lifecycle_chain_renewal_event_digests"
+                    ]
+                ),
+            )
         self.assertFalse(registry_sync["raw_client_certificate_payload_stored"])
         self.assertFalse(
             registry_sync["raw_client_certificate_freshness_payload_stored"]
         )
         self.assertFalse(
             registry_sync["raw_client_certificate_lifecycle_payload_stored"]
+        )
+        self.assertFalse(
+            registry_sync["raw_client_certificate_lifecycle_chain_payload_stored"]
         )
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
@@ -687,6 +762,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertFalse(
             tampered_client_certificate_lifecycle_registry_validation[
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_bound"
+            ]
+        )
+        self.assertFalse(tampered_client_certificate_lifecycle_chain_registry_validation["ok"])
+        self.assertFalse(
+            tampered_client_certificate_lifecycle_chain_registry_validation[
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound"
             ]
         )
 

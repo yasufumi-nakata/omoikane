@@ -133,7 +133,8 @@ collective_profile:
   external legal/governance registry sync、ack route capture export binding、
   live registry acknowledgement endpoint probe binding、mTLS client certificate
   proof binding、client certificate freshness/revocation proof binding、
-  client certificate lifecycle renewal proof binding を
+  client certificate lifecycle renewal proof binding、
+  3 generation client certificate rollover chain proof binding を
   1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
@@ -156,7 +157,8 @@ collective_profile:
   live acknowledgement endpoint probe binding、mTLS client certificate proof binding、
   client certificate freshness/revocation proof binding、
   client certificate lifecycle renewal proof binding、
-  raw registry / ack / ack-route / endpoint / client certificate / freshness / lifecycle payload redaction を監査する
+  client certificate rollover chain proof binding、
+  raw registry / ack / ack-route / endpoint / client certificate / freshness / lifecycle / lifecycle chain payload redaction を監査する
 
 ## 不変条件
 
