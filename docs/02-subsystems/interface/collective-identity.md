@@ -107,7 +107,10 @@ collective_profile:
 - `collective-external-registry-ack-client-certificate-freshness-revocation-v1`
   により、同じ probe を client certificate revocation registry ref、
   OCSP-style response digest、not-revoked status、24h freshness window に束縛する
-- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw endpoint payload、raw response signature payload、raw client certificate payload、raw client certificate freshness payload、raw packet body は保存しない
+- `collective-external-registry-ack-client-certificate-lifecycle-v1` により、
+  同じ probe を previous certificate ref、retirement digest、renewal event digest、
+  `renewed` status に束縛し、stale / revoked lifecycle は fail-closed にする
+- raw dissolution payload、raw registry payload、raw ack payload、raw ack-route payload、raw endpoint payload、raw response signature payload、raw client certificate payload、raw client certificate freshness payload、raw client certificate lifecycle payload、raw packet body は保存しない
 
 ## reference runtime の扱い
 
@@ -129,7 +132,8 @@ collective_profile:
   non-loopback authority-route trace binding、packet capture export binding、
   external legal/governance registry sync、ack route capture export binding、
   live registry acknowledgement endpoint probe binding、mTLS client certificate
-  proof binding、client certificate freshness/revocation proof binding を
+  proof binding、client certificate freshness/revocation proof binding、
+  client certificate lifecycle renewal proof binding を
   1 シナリオで smoke する
 - `evals/interface/collective_merge_reversibility.yaml` は
   reversible merge window と member recovery requirement を監査する
@@ -151,7 +155,8 @@ collective_profile:
   束縛、ack route trace binding、ack route capture export binding、
   live acknowledgement endpoint probe binding、mTLS client certificate proof binding、
   client certificate freshness/revocation proof binding、
-  raw registry / ack / ack-route / endpoint / client certificate / freshness payload redaction を監査する
+  client certificate lifecycle renewal proof binding、
+  raw registry / ack / ack-route / endpoint / client certificate / freshness / lifecycle payload redaction を監査する
 
 ## 不変条件
 
@@ -162,7 +167,7 @@ collective_profile:
 5. **digest-only recovery proof** ── dissolution receipt は IdentityConfirmation profile の raw body ではなく digest proof のみを持つ
 6. **packet-body redaction** ── recovery capture binding は raw packet body を保存せず digest/readback/route ref だけを持つ
 7. **remote verifier transport binding** ── recovery proof は reviewer verifier transport digest set に束縛する
-8. **external registry redaction** ── registry sync は legal/governance registry digest、acknowledgement quorum digest、ack route trace digest、ack endpoint response digest、mTLS client certificate proof digest、client certificate freshness proof digest だけを保持し、raw registry / ack / ack-route / endpoint / client certificate / freshness payload を保存しない
+8. **external registry redaction** ── registry sync は legal/governance registry digest、acknowledgement quorum digest、ack route trace digest、ack endpoint response digest、mTLS client certificate proof digest、client certificate freshness proof digest、client certificate lifecycle proof digest だけを保持し、raw registry / ack / ack-route / endpoint / client certificate / freshness / lifecycle payload を保存しない
 9. **no silent persistence** ── active merge 無しで Collective を存続させない
 
 ## 関連

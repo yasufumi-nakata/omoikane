@@ -856,13 +856,19 @@ response digest と同じ probe receipt に束縛する。
 さらに `collective-external-registry-ack-client-certificate-freshness-revocation-v1`
 により、client certificate revocation registry ref、OCSP-style response digest、
 not-revoked status、24h freshness window を同じ probe receipt に束縛する。
+続けて `collective-external-registry-ack-client-certificate-lifecycle-v1` が
+previous certificate ref、retirement digest、renewal event digest を同じ probe に束ね、
+`renewed` lifecycle だけを complete として受け入れ、`stale` / `revoked`
+相当の lifecycle drift は fail-closed にする。
 probe set digest、response signature digest set、client certificate proof set digest、
-client certificate freshness proof set digest を registry digest set に含めてから
+client certificate freshness proof set digest、client certificate lifecycle proof set digest
+を registry digest set に含めてから
 complete になる。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
 raw ack payload、raw ack-route payload、raw endpoint payload、
 raw response signature payload、raw client certificate payload、
-raw client certificate freshness payload、raw packet body は保存しない。
+raw client certificate freshness payload、raw client certificate lifecycle payload、
+raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
 (`interface.ewa.v0`) を JSON で可視化し、

@@ -97,6 +97,13 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID 
     "collective-external-registry-ack-client-certificate-freshness-digest-v1"
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_WINDOW_SECONDS = 86_400
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-lifecycle-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-lifecycle-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS = 172_800
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -196,12 +203,16 @@ class CollectiveIdentityService:
                 "external_registry_ack_client_certificate_freshness_profile": (
                     COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_PROFILE_ID
                 ),
+                "external_registry_ack_client_certificate_lifecycle_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                ),
                 "raw_identity_confirmation_profiles_stored": False,
                 "raw_external_registry_payload_stored": False,
                 "raw_external_registry_ack_endpoint_payload_stored": False,
                 "raw_external_registry_ack_response_signature_payload_stored": False,
                 "raw_external_registry_ack_client_certificate_payload_stored": False,
                 "raw_external_registry_ack_client_certificate_freshness_payload_stored": False,
+                "raw_external_registry_ack_client_certificate_lifecycle_payload_stored": False,
             },
         }
 
@@ -1732,6 +1743,100 @@ class CollectiveIdentityService:
                 revocation_status="not_revoked",
             )
         )
+        previous_client_certificate_ref = (
+            self._collective_external_registry_ack_client_certificate_previous_ref(
+                client_certificate_ref=normalized_client_certificate_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            )
+        )
+        previous_client_certificate_fingerprint = (
+            self._collective_external_registry_ack_client_certificate_previous_fingerprint(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                client_certificate_ref=normalized_client_certificate_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            )
+        )
+        previous_client_certificate_retirement_ref = (
+            self._collective_external_registry_ack_client_certificate_retirement_ref(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                client_certificate_authority_ref=normalized_client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            )
+        )
+        previous_client_certificate_retirement_digest = (
+            self._collective_external_registry_ack_client_certificate_retirement_digest(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_ref=(
+                    previous_client_certificate_retirement_ref
+                ),
+                client_certificate_ref=normalized_client_certificate_ref,
+                checked_at=str(payload["checked_at"]),
+            )
+        )
+        client_certificate_renewal_event_ref = (
+            self._collective_external_registry_ack_client_certificate_renewal_event_ref(
+                client_certificate_ref=normalized_client_certificate_ref,
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            )
+        )
+        client_certificate_renewal_event_digest = (
+            self._collective_external_registry_ack_client_certificate_renewal_event_digest(
+                client_certificate_renewal_event_ref=(
+                    client_certificate_renewal_event_ref
+                ),
+                client_certificate_ref=normalized_client_certificate_ref,
+                client_certificate_fingerprint=normalized_client_certificate_fingerprint,
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_digest=(
+                    previous_client_certificate_retirement_digest
+                ),
+                checked_at=str(payload["checked_at"]),
+            )
+        )
+        mtls_client_certificate_lifecycle_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_lifecycle_proof_digest(
+                registry_ack_endpoint_ref=normalized_endpoint,
+                ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                client_certificate_ref=normalized_client_certificate_ref,
+                client_certificate_proof_digest=mtls_client_certificate_proof_digest,
+                client_certificate_freshness_proof_digest=(
+                    mtls_client_certificate_freshness_proof_digest
+                ),
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_ref=(
+                    previous_client_certificate_retirement_ref
+                ),
+                previous_client_certificate_retirement_digest=(
+                    previous_client_certificate_retirement_digest
+                ),
+                client_certificate_renewal_event_ref=(
+                    client_certificate_renewal_event_ref
+                ),
+                client_certificate_renewal_event_digest=(
+                    client_certificate_renewal_event_digest
+                ),
+                checked_at=str(payload["checked_at"]),
+                lifecycle_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS
+                ),
+                lifecycle_status="renewed",
+                fail_closed_action="accept-renewed-client-certificate",
+            )
+        )
         mtls_client_certificate_bound = bool(
             signed_response_envelope_bound
             and normalized_client_certificate_ref.startswith("registry-client-cert://")
@@ -1754,6 +1859,20 @@ class CollectiveIdentityService:
             and len(normalized_client_certificate_ocsp_response_digest) == 64
             and len(mtls_client_certificate_freshness_proof_digest) == 64
         )
+        mtls_client_certificate_lifecycle_bound = bool(
+            mtls_client_certificate_freshness_bound
+            and previous_client_certificate_ref.startswith("registry-client-cert://")
+            and previous_client_certificate_retirement_ref.startswith(
+                "registry-client-cert-retirement://"
+            )
+            and client_certificate_renewal_event_ref.startswith(
+                "registry-client-cert-renewal://"
+            )
+            and len(previous_client_certificate_fingerprint) == 64
+            and len(previous_client_certificate_retirement_digest) == 64
+            and len(client_certificate_renewal_event_digest) == 64
+            and len(mtls_client_certificate_lifecycle_proof_digest) == 64
+        )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
             _is_live_http_endpoint(normalized_endpoint)
@@ -1765,6 +1884,7 @@ class CollectiveIdentityService:
             and signed_response_envelope_bound
             and mtls_client_certificate_bound
             and mtls_client_certificate_freshness_bound
+            and mtls_client_certificate_lifecycle_bound
         )
         receipt = {
             "kind": "collective_external_registry_ack_endpoint_probe",
@@ -1858,12 +1978,49 @@ class CollectiveIdentityService:
             "mtls_client_certificate_freshness_bound": (
                 mtls_client_certificate_freshness_bound
             ),
+            "mtls_client_certificate_lifecycle_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+            ),
+            "mtls_client_certificate_lifecycle_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_previous_ref": previous_client_certificate_ref,
+            "mtls_client_certificate_previous_fingerprint": (
+                previous_client_certificate_fingerprint
+            ),
+            "mtls_client_certificate_previous_retirement_ref": (
+                previous_client_certificate_retirement_ref
+            ),
+            "mtls_client_certificate_previous_retirement_digest": (
+                previous_client_certificate_retirement_digest
+            ),
+            "mtls_client_certificate_renewal_event_ref": (
+                client_certificate_renewal_event_ref
+            ),
+            "mtls_client_certificate_renewal_event_digest": (
+                client_certificate_renewal_event_digest
+            ),
+            "mtls_client_certificate_lifecycle_status": "renewed",
+            "mtls_client_certificate_lifecycle_window_seconds": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS
+            ),
+            "mtls_client_certificate_lifecycle_checked_at": payload["checked_at"],
+            "mtls_client_certificate_lifecycle_fail_closed_action": (
+                "accept-renewed-client-certificate"
+            ),
+            "mtls_client_certificate_lifecycle_proof_digest": (
+                mtls_client_certificate_lifecycle_proof_digest
+            ),
+            "mtls_client_certificate_lifecycle_bound": (
+                mtls_client_certificate_lifecycle_bound
+            ),
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
             "raw_response_signature_payload_stored": False,
             "raw_client_certificate_payload_stored": False,
             "raw_client_certificate_freshness_payload_stored": False,
+            "raw_client_certificate_lifecycle_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -1904,6 +2061,8 @@ class CollectiveIdentityService:
         client_certificate_proof_digests: List[str] = []
         client_certificate_freshness_proofs: List[Dict[str, Any]] = []
         client_certificate_freshness_proof_digests: List[str] = []
+        client_certificate_lifecycle_proofs: List[Dict[str, Any]] = []
+        client_certificate_lifecycle_proof_digests: List[str] = []
         client_certificate_refs: List[str] = []
         client_certificate_fingerprints: List[str] = []
         client_certificate_chain_digests: List[str] = []
@@ -1912,6 +2071,13 @@ class CollectiveIdentityService:
         client_certificate_revocation_registry_digests: List[str] = []
         client_certificate_ocsp_responder_refs: List[str] = []
         client_certificate_ocsp_response_digests: List[str] = []
+        client_certificate_previous_refs: List[str] = []
+        client_certificate_previous_fingerprints: List[str] = []
+        client_certificate_previous_retirement_refs: List[str] = []
+        client_certificate_previous_retirement_digests: List[str] = []
+        client_certificate_renewal_event_refs: List[str] = []
+        client_certificate_renewal_event_digests: List[str] = []
+        client_certificate_lifecycle_statuses: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -2011,6 +2177,62 @@ class CollectiveIdentityService:
             client_certificate_freshness_proof_digests.append(
                 str(probe_copy["mtls_client_certificate_freshness_proof_digest"])
             )
+            client_certificate_lifecycle_proof = {
+                "probe_id": probe_copy["probe_id"],
+                "ack_receipt_digest": probe_copy["ack_receipt_digest"],
+                "registry_authority_ref": probe_copy["registry_authority_ref"],
+                "registry_jurisdiction": probe_copy["registry_jurisdiction"],
+                "registry_ack_endpoint_ref": probe_copy["registry_ack_endpoint_ref"],
+                "mtls_client_certificate_ref": probe_copy[
+                    "mtls_client_certificate_ref"
+                ],
+                "mtls_client_certificate_proof_digest": probe_copy[
+                    "mtls_client_certificate_proof_digest"
+                ],
+                "mtls_client_certificate_freshness_proof_digest": probe_copy[
+                    "mtls_client_certificate_freshness_proof_digest"
+                ],
+                "mtls_client_certificate_previous_ref": probe_copy[
+                    "mtls_client_certificate_previous_ref"
+                ],
+                "mtls_client_certificate_previous_fingerprint": probe_copy[
+                    "mtls_client_certificate_previous_fingerprint"
+                ],
+                "mtls_client_certificate_previous_retirement_ref": probe_copy[
+                    "mtls_client_certificate_previous_retirement_ref"
+                ],
+                "mtls_client_certificate_previous_retirement_digest": probe_copy[
+                    "mtls_client_certificate_previous_retirement_digest"
+                ],
+                "mtls_client_certificate_renewal_event_ref": probe_copy[
+                    "mtls_client_certificate_renewal_event_ref"
+                ],
+                "mtls_client_certificate_renewal_event_digest": probe_copy[
+                    "mtls_client_certificate_renewal_event_digest"
+                ],
+                "mtls_client_certificate_lifecycle_status": probe_copy[
+                    "mtls_client_certificate_lifecycle_status"
+                ],
+                "mtls_client_certificate_lifecycle_window_seconds": probe_copy[
+                    "mtls_client_certificate_lifecycle_window_seconds"
+                ],
+                "mtls_client_certificate_lifecycle_checked_at": probe_copy[
+                    "mtls_client_certificate_lifecycle_checked_at"
+                ],
+                "mtls_client_certificate_lifecycle_fail_closed_action": probe_copy[
+                    "mtls_client_certificate_lifecycle_fail_closed_action"
+                ],
+                "mtls_client_certificate_lifecycle_proof_digest": probe_copy[
+                    "mtls_client_certificate_lifecycle_proof_digest"
+                ],
+                "raw_client_certificate_lifecycle_payload_stored": False,
+            }
+            client_certificate_lifecycle_proofs.append(
+                client_certificate_lifecycle_proof
+            )
+            client_certificate_lifecycle_proof_digests.append(
+                str(probe_copy["mtls_client_certificate_lifecycle_proof_digest"])
+            )
             client_certificate_refs.append(str(probe_copy["mtls_client_certificate_ref"]))
             client_certificate_fingerprints.append(
                 str(probe_copy["mtls_client_certificate_fingerprint"])
@@ -2033,6 +2255,27 @@ class CollectiveIdentityService:
             client_certificate_ocsp_response_digests.append(
                 str(probe_copy["mtls_client_certificate_ocsp_response_digest"])
             )
+            client_certificate_previous_refs.append(
+                str(probe_copy["mtls_client_certificate_previous_ref"])
+            )
+            client_certificate_previous_fingerprints.append(
+                str(probe_copy["mtls_client_certificate_previous_fingerprint"])
+            )
+            client_certificate_previous_retirement_refs.append(
+                str(probe_copy["mtls_client_certificate_previous_retirement_ref"])
+            )
+            client_certificate_previous_retirement_digests.append(
+                str(probe_copy["mtls_client_certificate_previous_retirement_digest"])
+            )
+            client_certificate_renewal_event_refs.append(
+                str(probe_copy["mtls_client_certificate_renewal_event_ref"])
+            )
+            client_certificate_renewal_event_digests.append(
+                str(probe_copy["mtls_client_certificate_renewal_event_digest"])
+            )
+            client_certificate_lifecycle_statuses.append(
+                str(probe_copy["mtls_client_certificate_lifecycle_status"])
+            )
 
         probe_set_digest = sha256_text(canonical_json(probe_digests))
         response_digest_set_digest = sha256_text(
@@ -2046,6 +2289,9 @@ class CollectiveIdentityService:
         )
         client_certificate_freshness_proof_set_digest = sha256_text(
             canonical_json(client_certificate_freshness_proof_digests)
+        )
+        client_certificate_lifecycle_proof_set_digest = sha256_text(
+            canonical_json(client_certificate_lifecycle_proof_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -2109,6 +2355,21 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest": (
                     client_certificate_freshness_proof_set_digest
                 ),
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_proofs": (
+                    client_certificate_lifecycle_proofs
+                ),
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_digests": (
+                    client_certificate_lifecycle_proof_digests
+                ),
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest": (
+                    client_certificate_lifecycle_proof_set_digest
+                ),
                 "ack_live_endpoint_client_certificate_refs": client_certificate_refs,
                 "ack_live_endpoint_client_certificate_fingerprints": (
                     client_certificate_fingerprints
@@ -2131,15 +2392,38 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_client_certificate_ocsp_response_digests": (
                     client_certificate_ocsp_response_digests
                 ),
+                "ack_live_endpoint_client_certificate_previous_refs": (
+                    client_certificate_previous_refs
+                ),
+                "ack_live_endpoint_client_certificate_previous_fingerprints": (
+                    client_certificate_previous_fingerprints
+                ),
+                "ack_live_endpoint_client_certificate_previous_retirement_refs": (
+                    client_certificate_previous_retirement_refs
+                ),
+                "ack_live_endpoint_client_certificate_previous_retirement_digests": (
+                    client_certificate_previous_retirement_digests
+                ),
+                "ack_live_endpoint_client_certificate_renewal_event_refs": (
+                    client_certificate_renewal_event_refs
+                ),
+                "ack_live_endpoint_client_certificate_renewal_event_digests": (
+                    client_certificate_renewal_event_digests
+                ),
+                "ack_live_endpoint_client_certificate_lifecycle_statuses": (
+                    client_certificate_lifecycle_statuses
+                ),
                 "ack_live_endpoint_probe_count": len(bound_probes),
                 "ack_live_endpoint_probe_bound": True,
                 "ack_live_endpoint_signed_response_envelope_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_freshness_bound": True,
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
                 "raw_response_signature_payload_stored": False,
                 "raw_client_certificate_payload_stored": False,
                 "raw_client_certificate_freshness_payload_stored": False,
+                "raw_client_certificate_lifecycle_payload_stored": False,
             }
         )
         receipt["registry_digest_set"] = [
@@ -2157,6 +2441,9 @@ class CollectiveIdentityService:
             receipt[
                 "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
             ],
+            receipt[
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest"
+            ],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -2167,6 +2454,7 @@ class CollectiveIdentityService:
             and receipt["ack_live_endpoint_signed_response_envelope_bound"]
             and receipt["ack_live_endpoint_mtls_client_certificate_bound"]
             and receipt["ack_live_endpoint_mtls_client_certificate_freshness_bound"]
+            and receipt["ack_live_endpoint_mtls_client_certificate_lifecycle_bound"]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -3238,6 +3526,12 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_freshness_digest_profile": (
                 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_FRESHNESS_DIGEST_PROFILE_ID
             ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_profile_id": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+            ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+            ),
         }
         for field_name, expected in expected_fields.items():
             if receipt.get(field_name) != expected:
@@ -3344,6 +3638,7 @@ class CollectiveIdentityService:
             "ack_live_endpoint_response_signature_digest_set_digest",
             "ack_live_endpoint_mtls_client_certificate_proof_set_digest",
             "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest",
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest",
             "registry_digest_set_digest",
             "digest",
         ):
@@ -3978,6 +4273,12 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_client_certificate_freshness_proof_digests: List[
             str
         ] = []
+        expected_ack_live_endpoint_client_certificate_lifecycle_proofs: List[
+            Dict[str, Any]
+        ] = []
+        expected_ack_live_endpoint_client_certificate_lifecycle_proof_digests: List[
+            str
+        ] = []
         expected_ack_live_endpoint_client_certificate_refs: List[str] = []
         expected_ack_live_endpoint_client_certificate_fingerprints: List[str] = []
         expected_ack_live_endpoint_client_certificate_chain_digests: List[str] = []
@@ -3990,10 +4291,24 @@ class CollectiveIdentityService:
         ] = []
         expected_ack_live_endpoint_client_certificate_ocsp_responder_refs: List[str] = []
         expected_ack_live_endpoint_client_certificate_ocsp_response_digests: List[str] = []
+        expected_ack_live_endpoint_client_certificate_previous_refs: List[str] = []
+        expected_ack_live_endpoint_client_certificate_previous_fingerprints: List[str] = []
+        expected_ack_live_endpoint_client_certificate_previous_retirement_refs: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_previous_retirement_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_renewal_event_refs: List[str] = []
+        expected_ack_live_endpoint_client_certificate_renewal_event_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_lifecycle_statuses: List[str] = []
         ack_live_endpoint_probe_bound = False
         ack_live_endpoint_signed_response_envelope_bound = False
         ack_live_endpoint_mtls_client_certificate_bound = False
         ack_live_endpoint_mtls_client_certificate_freshness_bound = False
+        ack_live_endpoint_mtls_client_certificate_lifecycle_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
         )
@@ -4005,6 +4320,9 @@ class CollectiveIdentityService:
         )
         raw_client_certificate_freshness_payload_stored = (
             receipt.get("raw_client_certificate_freshness_payload_stored") is True
+        )
+        raw_client_certificate_lifecycle_payload_stored = (
+            receipt.get("raw_client_certificate_lifecycle_payload_stored") is True
         )
         if not isinstance(ack_live_endpoint_probe_receipts, list):
             errors.append("ack_live_endpoint_probe_receipts must be a list")
@@ -4150,6 +4468,88 @@ class CollectiveIdentityService:
                         )
                     )
                 )
+                expected_ack_live_endpoint_client_certificate_lifecycle_proof = {
+                    "probe_id": probe_receipt.get("probe_id"),
+                    "ack_receipt_digest": probe_receipt.get("ack_receipt_digest"),
+                    "registry_authority_ref": probe_receipt.get(
+                        "registry_authority_ref"
+                    ),
+                    "registry_jurisdiction": probe_receipt.get(
+                        "registry_jurisdiction"
+                    ),
+                    "registry_ack_endpoint_ref": probe_receipt.get(
+                        "registry_ack_endpoint_ref"
+                    ),
+                    "mtls_client_certificate_ref": probe_receipt.get(
+                        "mtls_client_certificate_ref"
+                    ),
+                    "mtls_client_certificate_proof_digest": probe_receipt.get(
+                        "mtls_client_certificate_proof_digest"
+                    ),
+                    "mtls_client_certificate_freshness_proof_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_freshness_proof_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_previous_ref": probe_receipt.get(
+                        "mtls_client_certificate_previous_ref"
+                    ),
+                    "mtls_client_certificate_previous_fingerprint": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_previous_fingerprint"
+                        )
+                    ),
+                    "mtls_client_certificate_previous_retirement_ref": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_previous_retirement_ref"
+                        )
+                    ),
+                    "mtls_client_certificate_previous_retirement_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_previous_retirement_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_renewal_event_ref": probe_receipt.get(
+                        "mtls_client_certificate_renewal_event_ref"
+                    ),
+                    "mtls_client_certificate_renewal_event_digest": (
+                        probe_receipt.get("mtls_client_certificate_renewal_event_digest")
+                    ),
+                    "mtls_client_certificate_lifecycle_status": probe_receipt.get(
+                        "mtls_client_certificate_lifecycle_status"
+                    ),
+                    "mtls_client_certificate_lifecycle_window_seconds": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_window_seconds"
+                        )
+                    ),
+                    "mtls_client_certificate_lifecycle_checked_at": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_checked_at"
+                        )
+                    ),
+                    "mtls_client_certificate_lifecycle_fail_closed_action": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_fail_closed_action"
+                        )
+                    ),
+                    "mtls_client_certificate_lifecycle_proof_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_proof_digest"
+                        )
+                    ),
+                    "raw_client_certificate_lifecycle_payload_stored": False,
+                }
+                expected_ack_live_endpoint_client_certificate_lifecycle_proofs.append(
+                    expected_ack_live_endpoint_client_certificate_lifecycle_proof
+                )
+                expected_ack_live_endpoint_client_certificate_lifecycle_proof_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_lifecycle_proof_digest"
+                        )
+                    )
+                )
                 expected_ack_live_endpoint_client_certificate_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_ref"))
                 )
@@ -4182,6 +4582,35 @@ class CollectiveIdentityService:
                 expected_ack_live_endpoint_client_certificate_ocsp_response_digests.append(
                     str(probe_receipt.get("mtls_client_certificate_ocsp_response_digest"))
                 )
+                expected_ack_live_endpoint_client_certificate_previous_refs.append(
+                    str(probe_receipt.get("mtls_client_certificate_previous_ref"))
+                )
+                expected_ack_live_endpoint_client_certificate_previous_fingerprints.append(
+                    str(probe_receipt.get("mtls_client_certificate_previous_fingerprint"))
+                )
+                expected_ack_live_endpoint_client_certificate_previous_retirement_refs.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_previous_retirement_ref"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_previous_retirement_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_previous_retirement_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_renewal_event_refs.append(
+                    str(probe_receipt.get("mtls_client_certificate_renewal_event_ref"))
+                )
+                expected_ack_live_endpoint_client_certificate_renewal_event_digests.append(
+                    str(probe_receipt.get("mtls_client_certificate_renewal_event_digest"))
+                )
+                expected_ack_live_endpoint_client_certificate_lifecycle_statuses.append(
+                    str(probe_receipt.get("mtls_client_certificate_lifecycle_status"))
+                )
             expected_probe_set_digest = sha256_text(
                 canonical_json(expected_ack_live_endpoint_probe_digests)
             )
@@ -4199,6 +4628,11 @@ class CollectiveIdentityService:
             expected_client_certificate_freshness_proof_set_digest = sha256_text(
                 canonical_json(
                     expected_ack_live_endpoint_client_certificate_freshness_proof_digests
+                )
+            )
+            expected_client_certificate_lifecycle_proof_set_digest = sha256_text(
+                canonical_json(
+                    expected_ack_live_endpoint_client_certificate_lifecycle_proof_digests
                 )
             )
             ack_live_endpoint_probe_bound = (
@@ -4326,6 +4760,72 @@ class CollectiveIdentityService:
                 is True
                 and not raw_client_certificate_freshness_payload_stored
             )
+            ack_live_endpoint_mtls_client_certificate_lifecycle_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get(
+                        "mtls_client_certificate_lifecycle_bound"
+                    )
+                    is True
+                    and probe_receipt.get(
+                        "raw_client_certificate_lifecycle_payload_stored"
+                    )
+                    is False
+                    and probe_receipt.get(
+                        "mtls_client_certificate_lifecycle_status"
+                    )
+                    == "renewed"
+                    and probe_receipt.get(
+                        "mtls_client_certificate_lifecycle_fail_closed_action"
+                    )
+                    == "accept-renewed-client-certificate"
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_proofs"
+                )
+                == expected_ack_live_endpoint_client_certificate_lifecycle_proofs
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_lifecycle_proof_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest"
+                )
+                == expected_client_certificate_lifecycle_proof_set_digest
+                and receipt.get("ack_live_endpoint_client_certificate_previous_refs")
+                == expected_ack_live_endpoint_client_certificate_previous_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_previous_fingerprints"
+                )
+                == expected_ack_live_endpoint_client_certificate_previous_fingerprints
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_previous_retirement_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_previous_retirement_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_previous_retirement_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_previous_retirement_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_renewal_event_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_renewal_event_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_renewal_event_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_renewal_event_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_lifecycle_statuses"
+                )
+                == expected_ack_live_endpoint_client_certificate_lifecycle_statuses
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_bound"
+                )
+                is True
+                and not raw_client_certificate_lifecycle_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
         if not ack_live_endpoint_signed_response_envelope_bound:
@@ -4340,6 +4840,10 @@ class CollectiveIdentityService:
             errors.append(
                 "ack live endpoint probes must bind mTLS client certificate freshness proofs"
             )
+        if not ack_live_endpoint_mtls_client_certificate_lifecycle_bound:
+            errors.append(
+                "ack live endpoint probes must bind mTLS client certificate lifecycle proofs"
+            )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
         if raw_response_signature_payload_stored:
@@ -4349,6 +4853,10 @@ class CollectiveIdentityService:
         if raw_client_certificate_freshness_payload_stored:
             errors.append(
                 "raw_client_certificate_freshness_payload_stored must be false"
+            )
+        if raw_client_certificate_lifecycle_payload_stored:
+            errors.append(
+                "raw_client_certificate_lifecycle_payload_stored must be false"
             )
 
         registry_digest_set = receipt.get("registry_digest_set")
@@ -4371,6 +4879,9 @@ class CollectiveIdentityService:
                 ),
                 receipt.get(
                     "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
+                ),
+                receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest"
                 ),
             ]
             and receipt.get("registry_digest_set_digest")
@@ -4411,6 +4922,7 @@ class CollectiveIdentityService:
             and ack_live_endpoint_signed_response_envelope_bound
             and ack_live_endpoint_mtls_client_certificate_bound
             and ack_live_endpoint_mtls_client_certificate_freshness_bound
+            and ack_live_endpoint_mtls_client_certificate_lifecycle_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -4421,6 +4933,7 @@ class CollectiveIdentityService:
             and not raw_response_signature_payload_stored
             and not raw_client_certificate_payload_stored
             and not raw_client_certificate_freshness_payload_stored
+            and not raw_client_certificate_lifecycle_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -4456,6 +4969,9 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_freshness_bound": (
                 ack_live_endpoint_mtls_client_certificate_freshness_bound
             ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_bound": (
+                ack_live_endpoint_mtls_client_certificate_lifecycle_bound
+            ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -4472,6 +4988,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_freshness_payload_stored": (
                 raw_client_certificate_freshness_payload_stored
+            ),
+            "raw_client_certificate_lifecycle_payload_stored": (
+                raw_client_certificate_lifecycle_payload_stored
             ),
             "raw_packet_body_stored": raw_packet_body_stored,
         }
@@ -4544,11 +5063,27 @@ class CollectiveIdentityService:
             ),
             "mtls_client_certificate_freshness_checked_at": receipt.get("checked_at"),
             "mtls_client_certificate_freshness_bound": True,
+            "mtls_client_certificate_lifecycle_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+            ),
+            "mtls_client_certificate_lifecycle_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_lifecycle_status": "renewed",
+            "mtls_client_certificate_lifecycle_window_seconds": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS
+            ),
+            "mtls_client_certificate_lifecycle_checked_at": receipt.get("checked_at"),
+            "mtls_client_certificate_lifecycle_fail_closed_action": (
+                "accept-renewed-client-certificate"
+            ),
+            "mtls_client_certificate_lifecycle_bound": True,
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
             "raw_response_signature_payload_stored": False,
             "raw_client_certificate_payload_stored": False,
             "raw_client_certificate_freshness_payload_stored": False,
+            "raw_client_certificate_lifecycle_payload_stored": False,
         }
         expected_payload = self.external_registry_ack_endpoint_payload(
             external_registry_sync,
@@ -4708,6 +5243,132 @@ class CollectiveIdentityService:
                 revocation_status="not_revoked",
             )
         )
+        expected_previous_client_certificate_ref = (
+            self._collective_external_registry_ack_client_certificate_previous_ref(
+                client_certificate_ref=client_certificate_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        previous_client_certificate_ref = receipt.get(
+            "mtls_client_certificate_previous_ref"
+        )
+        previous_client_certificate_fingerprint = receipt.get(
+            "mtls_client_certificate_previous_fingerprint"
+        )
+        previous_client_certificate_retirement_ref = receipt.get(
+            "mtls_client_certificate_previous_retirement_ref"
+        )
+        previous_client_certificate_retirement_digest = receipt.get(
+            "mtls_client_certificate_previous_retirement_digest"
+        )
+        client_certificate_renewal_event_ref = receipt.get(
+            "mtls_client_certificate_renewal_event_ref"
+        )
+        client_certificate_renewal_event_digest = receipt.get(
+            "mtls_client_certificate_renewal_event_digest"
+        )
+        if not isinstance(previous_client_certificate_ref, str):
+            previous_client_certificate_ref = ""
+        if not isinstance(previous_client_certificate_fingerprint, str):
+            previous_client_certificate_fingerprint = ""
+        if not isinstance(previous_client_certificate_retirement_ref, str):
+            previous_client_certificate_retirement_ref = ""
+        if not isinstance(previous_client_certificate_retirement_digest, str):
+            previous_client_certificate_retirement_digest = ""
+        if not isinstance(client_certificate_renewal_event_ref, str):
+            client_certificate_renewal_event_ref = ""
+        if not isinstance(client_certificate_renewal_event_digest, str):
+            client_certificate_renewal_event_digest = ""
+        expected_previous_client_certificate_fingerprint = (
+            self._collective_external_registry_ack_client_certificate_previous_fingerprint(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                client_certificate_ref=client_certificate_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_previous_client_certificate_retirement_ref = (
+            self._collective_external_registry_ack_client_certificate_retirement_ref(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                client_certificate_authority_ref=client_certificate_authority_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_previous_client_certificate_retirement_digest = (
+            self._collective_external_registry_ack_client_certificate_retirement_digest(
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_ref=(
+                    previous_client_certificate_retirement_ref
+                ),
+                client_certificate_ref=client_certificate_ref,
+                checked_at=str(receipt.get("checked_at") or ""),
+            )
+        )
+        expected_client_certificate_renewal_event_ref = (
+            self._collective_external_registry_ack_client_certificate_renewal_event_ref(
+                client_certificate_ref=client_certificate_ref,
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_client_certificate_renewal_event_digest = (
+            self._collective_external_registry_ack_client_certificate_renewal_event_digest(
+                client_certificate_renewal_event_ref=client_certificate_renewal_event_ref,
+                client_certificate_ref=client_certificate_ref,
+                client_certificate_fingerprint=client_certificate_fingerprint,
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_digest=(
+                    previous_client_certificate_retirement_digest
+                ),
+                checked_at=str(receipt.get("checked_at") or ""),
+            )
+        )
+        expected_client_certificate_lifecycle_proof_digest = (
+            self._collective_external_registry_ack_client_certificate_lifecycle_proof_digest(
+                registry_ack_endpoint_ref=str(
+                    receipt.get("registry_ack_endpoint_ref") or ""
+                ),
+                ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
+                client_certificate_ref=client_certificate_ref,
+                client_certificate_proof_digest=(
+                    expected_client_certificate_proof_digest
+                ),
+                client_certificate_freshness_proof_digest=(
+                    expected_client_certificate_freshness_proof_digest
+                ),
+                previous_client_certificate_ref=previous_client_certificate_ref,
+                previous_client_certificate_fingerprint=(
+                    previous_client_certificate_fingerprint
+                ),
+                previous_client_certificate_retirement_ref=(
+                    previous_client_certificate_retirement_ref
+                ),
+                previous_client_certificate_retirement_digest=(
+                    previous_client_certificate_retirement_digest
+                ),
+                client_certificate_renewal_event_ref=(
+                    client_certificate_renewal_event_ref
+                ),
+                client_certificate_renewal_event_digest=(
+                    client_certificate_renewal_event_digest
+                ),
+                checked_at=str(receipt.get("checked_at") or ""),
+                lifecycle_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS
+                ),
+                lifecycle_status="renewed",
+                fail_closed_action="accept-renewed-client-certificate",
+            )
+        )
         expected_fields.update(
             {
                 "mtls_client_certificate_ref": expected_client_certificate_ref,
@@ -4738,6 +5399,27 @@ class CollectiveIdentityService:
                 "mtls_client_certificate_freshness_proof_digest": (
                     expected_client_certificate_freshness_proof_digest
                 ),
+                "mtls_client_certificate_previous_ref": (
+                    expected_previous_client_certificate_ref
+                ),
+                "mtls_client_certificate_previous_fingerprint": (
+                    expected_previous_client_certificate_fingerprint
+                ),
+                "mtls_client_certificate_previous_retirement_ref": (
+                    expected_previous_client_certificate_retirement_ref
+                ),
+                "mtls_client_certificate_previous_retirement_digest": (
+                    expected_previous_client_certificate_retirement_digest
+                ),
+                "mtls_client_certificate_renewal_event_ref": (
+                    expected_client_certificate_renewal_event_ref
+                ),
+                "mtls_client_certificate_renewal_event_digest": (
+                    expected_client_certificate_renewal_event_digest
+                ),
+                "mtls_client_certificate_lifecycle_proof_digest": (
+                    expected_client_certificate_lifecycle_proof_digest
+                ),
             }
         )
         for field_name, expected in expected_fields.items():
@@ -4760,6 +5442,10 @@ class CollectiveIdentityService:
             "mtls_client_certificate_revocation_registry_digest",
             "mtls_client_certificate_ocsp_response_digest",
             "mtls_client_certificate_freshness_proof_digest",
+            "mtls_client_certificate_previous_fingerprint",
+            "mtls_client_certificate_previous_retirement_digest",
+            "mtls_client_certificate_renewal_event_digest",
+            "mtls_client_certificate_lifecycle_proof_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
@@ -4829,6 +5515,40 @@ class CollectiveIdentityService:
             errors.append(
                 "mTLS client certificate freshness proof must bind revocation evidence"
             )
+        mtls_client_certificate_lifecycle_bound = bool(
+            receipt.get("mtls_client_certificate_lifecycle_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+            and receipt.get("mtls_client_certificate_lifecycle_digest_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+            and receipt.get("mtls_client_certificate_previous_ref")
+            == expected_previous_client_certificate_ref
+            and receipt.get("mtls_client_certificate_previous_fingerprint")
+            == expected_previous_client_certificate_fingerprint
+            and receipt.get("mtls_client_certificate_previous_retirement_ref")
+            == expected_previous_client_certificate_retirement_ref
+            and receipt.get("mtls_client_certificate_previous_retirement_digest")
+            == expected_previous_client_certificate_retirement_digest
+            and receipt.get("mtls_client_certificate_renewal_event_ref")
+            == expected_client_certificate_renewal_event_ref
+            and receipt.get("mtls_client_certificate_renewal_event_digest")
+            == expected_client_certificate_renewal_event_digest
+            and receipt.get("mtls_client_certificate_lifecycle_status") == "renewed"
+            and receipt.get("mtls_client_certificate_lifecycle_window_seconds")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_WINDOW_SECONDS
+            and receipt.get("mtls_client_certificate_lifecycle_checked_at")
+            == receipt.get("checked_at")
+            and receipt.get("mtls_client_certificate_lifecycle_fail_closed_action")
+            == "accept-renewed-client-certificate"
+            and receipt.get("mtls_client_certificate_lifecycle_proof_digest")
+            == expected_client_certificate_lifecycle_proof_digest
+            and receipt.get("mtls_client_certificate_lifecycle_bound") is True
+            and receipt.get("raw_client_certificate_lifecycle_payload_stored")
+            is False
+        )
+        if not mtls_client_certificate_lifecycle_bound:
+            errors.append(
+                "mTLS client certificate lifecycle proof must bind renewal evidence"
+            )
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -4875,6 +5595,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_freshness_bound": (
                 mtls_client_certificate_freshness_bound
             ),
+            "mtls_client_certificate_lifecycle_bound": (
+                mtls_client_certificate_lifecycle_bound
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
             is True,
@@ -4886,6 +5609,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_freshness_payload_stored": (
                 receipt.get("raw_client_certificate_freshness_payload_stored") is True
+            ),
+            "raw_client_certificate_lifecycle_payload_stored": (
+                receipt.get("raw_client_certificate_lifecycle_payload_stored") is True
             ),
         }
 
@@ -5633,6 +6359,48 @@ class CollectiveIdentityService:
             "mtls_client_certificate_freshness_bound": receipt.get(
                 "mtls_client_certificate_freshness_bound"
             ),
+            "mtls_client_certificate_lifecycle_profile": receipt.get(
+                "mtls_client_certificate_lifecycle_profile"
+            ),
+            "mtls_client_certificate_lifecycle_digest_profile": receipt.get(
+                "mtls_client_certificate_lifecycle_digest_profile"
+            ),
+            "mtls_client_certificate_previous_ref": receipt.get(
+                "mtls_client_certificate_previous_ref"
+            ),
+            "mtls_client_certificate_previous_fingerprint": receipt.get(
+                "mtls_client_certificate_previous_fingerprint"
+            ),
+            "mtls_client_certificate_previous_retirement_ref": receipt.get(
+                "mtls_client_certificate_previous_retirement_ref"
+            ),
+            "mtls_client_certificate_previous_retirement_digest": receipt.get(
+                "mtls_client_certificate_previous_retirement_digest"
+            ),
+            "mtls_client_certificate_renewal_event_ref": receipt.get(
+                "mtls_client_certificate_renewal_event_ref"
+            ),
+            "mtls_client_certificate_renewal_event_digest": receipt.get(
+                "mtls_client_certificate_renewal_event_digest"
+            ),
+            "mtls_client_certificate_lifecycle_status": receipt.get(
+                "mtls_client_certificate_lifecycle_status"
+            ),
+            "mtls_client_certificate_lifecycle_window_seconds": receipt.get(
+                "mtls_client_certificate_lifecycle_window_seconds"
+            ),
+            "mtls_client_certificate_lifecycle_checked_at": receipt.get(
+                "mtls_client_certificate_lifecycle_checked_at"
+            ),
+            "mtls_client_certificate_lifecycle_fail_closed_action": receipt.get(
+                "mtls_client_certificate_lifecycle_fail_closed_action"
+            ),
+            "mtls_client_certificate_lifecycle_proof_digest": receipt.get(
+                "mtls_client_certificate_lifecycle_proof_digest"
+            ),
+            "mtls_client_certificate_lifecycle_bound": receipt.get(
+                "mtls_client_certificate_lifecycle_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
             "raw_response_signature_payload_stored": receipt.get(
@@ -5643,6 +6411,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_freshness_payload_stored": receipt.get(
                 "raw_client_certificate_freshness_payload_stored"
+            ),
+            "raw_client_certificate_lifecycle_payload_stored": receipt.get(
+                "raw_client_certificate_lifecycle_payload_stored"
             ),
         }
 
@@ -5986,6 +6757,230 @@ class CollectiveIdentityService:
         )
 
     @staticmethod
+    def _collective_external_registry_ack_client_certificate_previous_ref(
+        *,
+        client_certificate_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        previous_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "client_certificate_ref": client_certificate_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "lifecycle_edge": "previous-to-renewed",
+                }
+            )
+        )
+        return f"registry-client-cert://collective-ack-endpoint/previous/{previous_digest[:16]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_previous_fingerprint(
+        *,
+        previous_client_certificate_ref: str,
+        client_certificate_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+                    ),
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "renewed_client_certificate_ref": client_certificate_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_retirement_ref(
+        *,
+        previous_client_certificate_ref: str,
+        client_certificate_authority_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        retirement_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "client_certificate_authority_ref": client_certificate_authority_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+        return (
+            "registry-client-cert-retirement://collective-ack-endpoint/"
+            f"{retirement_digest[:16]}"
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_retirement_digest(
+        *,
+        previous_client_certificate_ref: str,
+        previous_client_certificate_fingerprint: str,
+        previous_client_certificate_retirement_ref: str,
+        client_certificate_ref: str,
+        checked_at: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+                    ),
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "previous_client_certificate_fingerprint": (
+                        previous_client_certificate_fingerprint
+                    ),
+                    "previous_client_certificate_retirement_ref": (
+                        previous_client_certificate_retirement_ref
+                    ),
+                    "renewed_client_certificate_ref": client_certificate_ref,
+                    "checked_at": checked_at,
+                    "retirement_status": "retired-after-renewal",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_renewal_event_ref(
+        *,
+        client_certificate_ref: str,
+        previous_client_certificate_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        renewal_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "client_certificate_ref": client_certificate_ref,
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                }
+            )
+        )
+        return f"registry-client-cert-renewal://collective-ack-endpoint/{renewal_digest[:16]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_renewal_event_digest(
+        *,
+        client_certificate_renewal_event_ref: str,
+        client_certificate_ref: str,
+        client_certificate_fingerprint: str,
+        previous_client_certificate_ref: str,
+        previous_client_certificate_fingerprint: str,
+        previous_client_certificate_retirement_digest: str,
+        checked_at: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+                    ),
+                    "client_certificate_renewal_event_ref": (
+                        client_certificate_renewal_event_ref
+                    ),
+                    "renewed_client_certificate_ref": client_certificate_ref,
+                    "renewed_client_certificate_fingerprint": (
+                        client_certificate_fingerprint
+                    ),
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "previous_client_certificate_fingerprint": (
+                        previous_client_certificate_fingerprint
+                    ),
+                    "previous_client_certificate_retirement_digest": (
+                        previous_client_certificate_retirement_digest
+                    ),
+                    "checked_at": checked_at,
+                    "renewal_status": "renewed",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_lifecycle_proof_digest(
+        *,
+        registry_ack_endpoint_ref: str,
+        ack_receipt_digest: str,
+        client_certificate_ref: str,
+        client_certificate_proof_digest: str,
+        client_certificate_freshness_proof_digest: str,
+        previous_client_certificate_ref: str,
+        previous_client_certificate_fingerprint: str,
+        previous_client_certificate_retirement_ref: str,
+        previous_client_certificate_retirement_digest: str,
+        client_certificate_renewal_event_ref: str,
+        client_certificate_renewal_event_digest: str,
+        checked_at: str,
+        lifecycle_window_seconds: int,
+        lifecycle_status: str,
+        fail_closed_action: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_LIFECYCLE_DIGEST_PROFILE_ID
+                    ),
+                    "registry_ack_endpoint_ref": registry_ack_endpoint_ref,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "client_certificate_ref": client_certificate_ref,
+                    "client_certificate_proof_digest": client_certificate_proof_digest,
+                    "client_certificate_freshness_proof_digest": (
+                        client_certificate_freshness_proof_digest
+                    ),
+                    "previous_client_certificate_ref": previous_client_certificate_ref,
+                    "previous_client_certificate_fingerprint": (
+                        previous_client_certificate_fingerprint
+                    ),
+                    "previous_client_certificate_retirement_ref": (
+                        previous_client_certificate_retirement_ref
+                    ),
+                    "previous_client_certificate_retirement_digest": (
+                        previous_client_certificate_retirement_digest
+                    ),
+                    "client_certificate_renewal_event_ref": (
+                        client_certificate_renewal_event_ref
+                    ),
+                    "client_certificate_renewal_event_digest": (
+                        client_certificate_renewal_event_digest
+                    ),
+                    "checked_at": checked_at,
+                    "lifecycle_window_seconds": lifecycle_window_seconds,
+                    "lifecycle_status": lifecycle_status,
+                    "fail_closed_action": fail_closed_action,
+                }
+            )
+        )
+
+    @staticmethod
     def _collective_external_registry_sync_digest_payload(
         receipt: Mapping[str, Any],
     ) -> Dict[str, Any]:
@@ -6015,6 +7010,9 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest": receipt.get(
                 "ack_live_endpoint_mtls_client_certificate_freshness_proof_set_digest"
+            ),
+            "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest": receipt.get(
+                "ack_live_endpoint_mtls_client_certificate_lifecycle_proof_set_digest"
             ),
             "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
         }
