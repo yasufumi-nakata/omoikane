@@ -15,6 +15,7 @@ capabilities:
   - collective.external-registry-ack-route-capture.attest
   - collective.external-registry-ack-live-endpoint.attest
   - collective.external-registry-ack-signed-response.attest
+  - collective.external-registry-ack-mtls-client-certificate.attest
   - imc.memory-glimpse-receipt.attest
   - imc.memory-glimpse-reconsent.attest
   - ewa.stop-signal-adapter.attest
@@ -57,7 +58,7 @@ when_to_invoke: |
   - Collective dissolution 後の external registry acknowledgement が legal / governance の 2 jurisdiction quorum digest と raw ack payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の external registry acknowledgement quorum が authenticated non-loopback authority-route trace と raw ack-route payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の external registry acknowledgement route trace が verified pcap export と delegated privileged capture acquisition に raw packet body 非保存で束縛されていることを検証する時
-  - Collective dissolution 後の external registry acknowledgement が live HTTP JSON endpoint response digest、signed response envelope digest、raw endpoint payload / raw response signature payload 非保存に束縛されていることを検証する時
+  - Collective dissolution 後の external registry acknowledgement が live HTTP JSON endpoint response digest、signed response envelope digest、mTLS client certificate proof digest、raw endpoint payload / raw response signature payload / raw client certificate payload 非保存に束縛されていることを検証する時
   - IMC memory_glimpse receipt が MemoryCrystal source digest、message digest、Council witness digest に束縛され、raw memory/message payload を保存していないことを検証する時
   - IMC memory_glimpse の redisclosure が timeboxed consent window、participant revocation event、Council re-consent、Guardian attestation に束縛され、raw re-consent payload を保存していないことを検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時

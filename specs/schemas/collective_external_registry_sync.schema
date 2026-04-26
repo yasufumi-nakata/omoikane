@@ -6,7 +6,7 @@ description: >
   was synchronized to external legal and governance registries without storing
   raw dissolution payloads, raw registry payloads, raw acknowledgement route
   payloads, raw acknowledgement endpoint payloads, raw response signature
-  payloads, or raw packet bodies.
+  payloads, raw client certificate payloads, or raw packet bodies.
 type: object
 additionalProperties: false
 required:
@@ -113,9 +113,19 @@ required:
   - ack_live_endpoint_response_signing_key_refs
   - ack_live_endpoint_response_signature_digests
   - ack_live_endpoint_response_signature_digest_set_digest
+  - ack_live_endpoint_mtls_client_certificate_profile_id
+  - ack_live_endpoint_mtls_client_certificate_digest_profile
+  - ack_live_endpoint_mtls_client_certificate_proofs
+  - ack_live_endpoint_mtls_client_certificate_proof_digests
+  - ack_live_endpoint_mtls_client_certificate_proof_set_digest
+  - ack_live_endpoint_client_certificate_refs
+  - ack_live_endpoint_client_certificate_fingerprints
+  - ack_live_endpoint_client_certificate_chain_digests
+  - ack_live_endpoint_client_certificate_authority_refs
   - ack_live_endpoint_probe_count
   - ack_live_endpoint_probe_bound
   - ack_live_endpoint_signed_response_envelope_bound
+  - ack_live_endpoint_mtls_client_certificate_bound
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -134,6 +144,7 @@ required:
   - raw_ack_route_payload_stored
   - raw_ack_endpoint_payload_stored
   - raw_response_signature_payload_stored
+  - raw_client_certificate_payload_stored
   - raw_packet_body_stored
   - digest
 properties:
@@ -460,16 +471,62 @@ properties:
       $ref: "#/$defs/sha256"
   ack_live_endpoint_response_signature_digest_set_digest:
     $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_profile_id:
+    const: collective-external-registry-ack-mtls-client-certificate-proof-v1
+  ack_live_endpoint_mtls_client_certificate_digest_profile:
+    const: collective-external-registry-ack-client-certificate-digest-v1
+  ack_live_endpoint_mtls_client_certificate_proofs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/ack_mtls_client_certificate_proof"
+  ack_live_endpoint_mtls_client_certificate_proof_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_proof_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^registry-client-cert://"
+  ack_live_endpoint_client_certificate_fingerprints:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_chain_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_authority_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^registry-client-ca://"
   ack_live_endpoint_probe_count:
     const: 2
   ack_live_endpoint_probe_bound:
     const: true
   ack_live_endpoint_signed_response_envelope_bound:
     const: true
+  ack_live_endpoint_mtls_client_certificate_bound:
+    const: true
   registry_digest_set:
     type: array
-    minItems: 10
-    maxItems: 10
+    minItems: 11
+    maxItems: 11
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -505,6 +562,8 @@ properties:
   raw_ack_endpoint_payload_stored:
     const: false
   raw_response_signature_payload_stored:
+    const: false
+  raw_client_certificate_payload_stored:
     const: false
   raw_packet_body_stored:
     const: false
@@ -708,10 +767,19 @@ $defs:
       - response_signing_key_ref
       - response_signature_digest
       - signed_response_envelope_bound
+      - mtls_client_certificate_profile
+      - mtls_client_certificate_digest_profile
+      - mtls_client_certificate_ref
+      - mtls_client_certificate_fingerprint
+      - mtls_client_certificate_chain_digest
+      - mtls_client_certificate_authority_ref
+      - mtls_client_certificate_proof_digest
+      - mtls_client_certificate_bound
       - checked_at
       - raw_ack_payload_stored
       - raw_endpoint_payload_stored
       - raw_response_signature_payload_stored
+      - raw_client_certificate_payload_stored
       - digest
     properties:
       kind:
@@ -783,6 +851,24 @@ $defs:
         $ref: "#/$defs/sha256"
       signed_response_envelope_bound:
         const: true
+      mtls_client_certificate_profile:
+        const: collective-external-registry-ack-mtls-client-certificate-proof-v1
+      mtls_client_certificate_digest_profile:
+        const: collective-external-registry-ack-client-certificate-digest-v1
+      mtls_client_certificate_ref:
+        type: string
+        pattern: "^registry-client-cert://"
+      mtls_client_certificate_fingerprint:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_chain_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_authority_ref:
+        type: string
+        pattern: "^registry-client-ca://"
+      mtls_client_certificate_proof_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_bound:
+        const: true
       checked_at:
         type: string
         format: date-time
@@ -792,8 +878,57 @@ $defs:
         const: false
       raw_response_signature_payload_stored:
         const: false
+      raw_client_certificate_payload_stored:
+        const: false
       digest:
         $ref: "#/$defs/sha256"
+  ack_mtls_client_certificate_proof:
+    type: object
+    additionalProperties: false
+    required:
+      - probe_id
+      - ack_receipt_digest
+      - registry_authority_ref
+      - registry_jurisdiction
+      - registry_ack_endpoint_ref
+      - response_digest
+      - mtls_client_certificate_ref
+      - mtls_client_certificate_fingerprint
+      - mtls_client_certificate_chain_digest
+      - mtls_client_certificate_authority_ref
+      - mtls_client_certificate_proof_digest
+      - raw_client_certificate_payload_stored
+    properties:
+      probe_id:
+        type: string
+        pattern: "^collective-registry-ack-probe-[a-f0-9]{12}$"
+      ack_receipt_digest:
+        $ref: "#/$defs/sha256"
+      registry_authority_ref:
+        type: string
+        pattern: "^(legal-registry|governance-registry)://"
+      registry_jurisdiction:
+        type: string
+        minLength: 2
+      registry_ack_endpoint_ref:
+        type: string
+        pattern: "^https?://"
+      response_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_ref:
+        type: string
+        pattern: "^registry-client-cert://"
+      mtls_client_certificate_fingerprint:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_chain_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_authority_ref:
+        type: string
+        pattern: "^registry-client-ca://"
+      mtls_client_certificate_proof_digest:
+        $ref: "#/$defs/sha256"
+      raw_client_certificate_payload_stored:
+        const: false
   sha256:
     type: string
     pattern: "^[0-9a-f]{64}$"

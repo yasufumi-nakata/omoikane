@@ -433,6 +433,22 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
                 privileged_capture,
             )
         )
+        tampered_client_certificate_registry_sync = dict(registry_sync)
+        tampered_client_certificate_registry_sync[
+            "ack_live_endpoint_mtls_client_certificate_proof_digests"
+        ] = [
+            registry_sync["ack_live_endpoint_mtls_client_certificate_proof_digests"][0],
+            "0" * 64,
+        ]
+        tampered_client_certificate_registry_validation = (
+            service.validate_collective_external_registry_sync(
+                tampered_client_certificate_registry_sync,
+                capture_binding,
+                route_trace,
+                packet_capture,
+                privileged_capture,
+            )
+        )
 
         self.assertEqual("Collective Meridian", record["display_name"])
         self.assertEqual("completed", closed["status"])
@@ -549,6 +565,16 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
             len(registry_sync["ack_live_endpoint_response_signature_digests"]),
         )
         self.assertTrue(registry_sync["ack_live_endpoint_signed_response_envelope_bound"])
+        self.assertTrue(registry_sync["ack_live_endpoint_mtls_client_certificate_bound"])
+        self.assertEqual(
+            "collective-external-registry-ack-mtls-client-certificate-proof-v1",
+            registry_sync["ack_live_endpoint_mtls_client_certificate_profile_id"],
+        )
+        self.assertEqual(
+            2,
+            len(registry_sync["ack_live_endpoint_mtls_client_certificate_proofs"]),
+        )
+        self.assertFalse(registry_sync["raw_client_certificate_payload_stored"])
         self.assertFalse(tampered_registry_validation["ok"])
         self.assertFalse(tampered_registry_validation["ack_quorum_bound"])
         self.assertFalse(tampered_route_trace_registry_validation["ok"])
@@ -563,6 +589,12 @@ class CollectiveIdentityServiceTests(unittest.TestCase):
         self.assertFalse(
             tampered_signed_response_registry_validation[
                 "ack_live_endpoint_signed_response_envelope_bound"
+            ]
+        )
+        self.assertFalse(tampered_client_certificate_registry_validation["ok"])
+        self.assertFalse(
+            tampered_client_certificate_registry_validation[
+                "ack_live_endpoint_mtls_client_certificate_bound"
             ]
         )
 
