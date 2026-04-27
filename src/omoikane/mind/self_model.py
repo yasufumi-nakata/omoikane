@@ -19,6 +19,9 @@ SELF_MODEL_VALUE_GENERATION_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID = "self-model-future-self-acceptance-writeback-v1"
 SELF_MODEL_VALUE_ACCEPTANCE_DIGEST_PROFILE = "self-model-value-acceptance-digest-v1"
 SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_REASSESSMENT_POLICY_ID = "self-model-future-self-reevaluation-retirement-v1"
+SELF_MODEL_VALUE_REASSESSMENT_DIGEST_PROFILE = "self-model-value-reassessment-digest-v1"
+SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES = ("self", "council", "guardian")
 
 
 @dataclass
@@ -710,6 +713,248 @@ class SelfModelMonitor:
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
             "writeback_digest_bound": self._non_empty_string(
                 receipt.get("writeback_commit_digest")
+            ),
+        }
+
+    def build_value_reassessment_receipt(
+        self,
+        acceptance_receipt: Dict[str, object],
+        retired_value_refs: Sequence[str],
+        continuity_recheck_refs: Sequence[str],
+        future_self_reevaluation_ref: str,
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        retirement_writeback_ref: str,
+        post_reassessment_snapshot_ref: str,
+        archival_snapshot_ref: str,
+    ) -> Dict[str, object]:
+        """Retire accepted values from active writeback without deleting history."""
+
+        acceptance_validation = self.validate_value_acceptance_receipt(acceptance_receipt)
+        if not acceptance_validation["ok"]:
+            raise ValueError("acceptance_receipt must validate before reassessment")
+        if acceptance_receipt.get("accepted_for_writeback") is not True:
+            raise ValueError("acceptance_receipt must already be accepted for writeback")
+        accepted_value_refs = acceptance_receipt.get("accepted_value_refs")
+        if not isinstance(accepted_value_refs, list) or not accepted_value_refs:
+            raise ValueError("acceptance_receipt must contain accepted value refs")
+        if not retired_value_refs:
+            raise ValueError("retired_value_refs must not be empty")
+        if not continuity_recheck_refs:
+            raise ValueError("continuity_recheck_refs must not be empty")
+
+        accepted_ref_set = {str(ref) for ref in accepted_value_refs}
+        for ref in retired_value_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("retired_value_refs must contain non-empty strings")
+            if str(ref) not in accepted_ref_set:
+                raise ValueError("retired_value_refs must be a subset of accepted_value_refs")
+        for ref in continuity_recheck_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("continuity_recheck_refs must contain non-empty strings")
+        for field_name, value in {
+            "future_self_reevaluation_ref": future_self_reevaluation_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "retirement_writeback_ref": retirement_writeback_ref,
+            "post_reassessment_snapshot_ref": post_reassessment_snapshot_ref,
+            "archival_snapshot_ref": archival_snapshot_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        source_accepted_value_digest_set = [
+            sha256_text(str(ref)) for ref in accepted_value_refs
+        ]
+        retired_value_digest_set = [sha256_text(str(ref)) for ref in retired_value_refs]
+        continuity_recheck_digest_set = [
+            sha256_text(str(ref)) for ref in continuity_recheck_refs
+        ]
+        gate_payload = {
+            "future_self_reevaluation_ref": future_self_reevaluation_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES),
+        }
+        retirement_payload = {
+            "source_acceptance_receipt_digest": acceptance_receipt.get("receipt_digest"),
+            "retired_value_set_digest": sha256_text("|".join(retired_value_digest_set)),
+            "retirement_writeback_ref": retirement_writeback_ref,
+            "post_reassessment_snapshot_ref": post_reassessment_snapshot_ref,
+            "archival_snapshot_ref": archival_snapshot_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_reassessment_receipt",
+            "policy_id": SELF_MODEL_VALUE_REASSESSMENT_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_REASSESSMENT_DIGEST_PROFILE,
+            "reassessment_id": new_id("self-model-value-reassessment"),
+            "identity_id": str(acceptance_receipt["identity_id"]),
+            "source_acceptance_id": str(acceptance_receipt["acceptance_id"]),
+            "source_acceptance_policy_id": str(acceptance_receipt["policy_id"]),
+            "source_acceptance_receipt_digest": str(acceptance_receipt["receipt_digest"]),
+            "source_accepted_value_digest_set": source_accepted_value_digest_set,
+            "retired_value_refs": list(retired_value_refs),
+            "retired_value_digest_set": retired_value_digest_set,
+            "retired_value_set_digest": sha256_text("|".join(retired_value_digest_set)),
+            "continuity_recheck_refs": list(continuity_recheck_refs),
+            "continuity_recheck_digest_set": continuity_recheck_digest_set,
+            "continuity_recheck_set_digest": sha256_text("|".join(continuity_recheck_digest_set)),
+            "future_self_reevaluation_ref": future_self_reevaluation_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "retirement_writeback_ref": retirement_writeback_ref,
+            "post_reassessment_snapshot_ref": post_reassessment_snapshot_ref,
+            "archival_snapshot_ref": archival_snapshot_ref,
+            "retirement_commit_digest": self._digest(retirement_payload),
+            "reassessment_mode": "future-self-reevaluated-bounded-retirement",
+            "integration_status": "retired-from-active-writeback-archive-retained",
+            "future_self_reevaluation_satisfied": True,
+            "source_acceptance_required_future_self_acceptance": True,
+            "autonomy_preserved": True,
+            "boundary_only_review": True,
+            "historical_value_archived": True,
+            "external_truth_claim_allowed": False,
+            "external_veto_allowed": False,
+            "forced_stability_lock_allowed": False,
+            "active_writeback_retired": True,
+            "raw_value_payload_stored": False,
+            "raw_continuity_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_reassessment_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_reassessment_receipt":
+            errors.append("kind must equal self_model_value_reassessment_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_REASSESSMENT_POLICY_ID:
+            errors.append("policy_id must equal self-model value reassessment policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_REASSESSMENT_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model value reassessment digest profile")
+        if receipt.get("source_acceptance_policy_id") != SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID:
+            errors.append("source_acceptance_policy_id must bind the value acceptance policy")
+
+        source_accepted_digests = receipt.get("source_accepted_value_digest_set")
+        if not isinstance(source_accepted_digests, list) or not source_accepted_digests:
+            errors.append("source_accepted_value_digest_set must be non-empty")
+            source_accepted_digests = []
+
+        retired_refs = receipt.get("retired_value_refs")
+        retired_digests = receipt.get("retired_value_digest_set")
+        if not isinstance(retired_refs, list) or not retired_refs:
+            errors.append("retired_value_refs must be non-empty")
+            retired_refs = []
+        if not isinstance(retired_digests, list) or len(retired_digests) != len(retired_refs):
+            errors.append("retired_value_digest_set must match retired value refs")
+            retired_digests = []
+        elif [sha256_text(str(ref)) for ref in retired_refs] != retired_digests:
+            errors.append("retired value digest set must match retired value refs")
+        if isinstance(retired_digests, list) and retired_digests:
+            expected_value_set_digest = sha256_text("|".join(str(item) for item in retired_digests))
+            if receipt.get("retired_value_set_digest") != expected_value_set_digest:
+                errors.append("retired_value_set_digest must match digest set")
+            if not set(str(item) for item in retired_digests).issubset(
+                set(str(item) for item in source_accepted_digests)
+            ):
+                errors.append("retired values must be a subset of source accepted values")
+
+        recheck_refs = receipt.get("continuity_recheck_refs")
+        recheck_digests = receipt.get("continuity_recheck_digest_set")
+        if not isinstance(recheck_refs, list) or not recheck_refs:
+            errors.append("continuity_recheck_refs must be non-empty")
+            recheck_refs = []
+        if not isinstance(recheck_digests, list) or len(recheck_digests) != len(recheck_refs):
+            errors.append("continuity_recheck_digest_set must match continuity recheck refs")
+            recheck_digests = []
+        elif [sha256_text(str(ref)) for ref in recheck_refs] != recheck_digests:
+            errors.append("continuity recheck digest set must match continuity recheck refs")
+        if isinstance(recheck_digests, list) and recheck_digests:
+            expected_recheck_set_digest = sha256_text("|".join(str(item) for item in recheck_digests))
+            if receipt.get("continuity_recheck_set_digest") != expected_recheck_set_digest:
+                errors.append("continuity_recheck_set_digest must match digest set")
+
+        gate_payload = {
+            "future_self_reevaluation_ref": receipt.get("future_self_reevaluation_ref"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "future_self_reevaluation_ref",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "retirement_writeback_ref",
+            "post_reassessment_snapshot_ref",
+            "archival_snapshot_ref",
+            "source_acceptance_receipt_digest",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind future self reevaluation, council, and guardian refs")
+
+        retirement_payload = {
+            "source_acceptance_receipt_digest": receipt.get("source_acceptance_receipt_digest"),
+            "retired_value_set_digest": receipt.get("retired_value_set_digest"),
+            "retirement_writeback_ref": receipt.get("retirement_writeback_ref"),
+            "post_reassessment_snapshot_ref": receipt.get("post_reassessment_snapshot_ref"),
+            "archival_snapshot_ref": receipt.get("archival_snapshot_ref"),
+        }
+        if receipt.get("retirement_commit_digest") != self._digest(retirement_payload):
+            errors.append("retirement_commit_digest must bind source acceptance, retired values, writeback, and archive refs")
+
+        if receipt.get("reassessment_mode") != "future-self-reevaluated-bounded-retirement":
+            errors.append("reassessment_mode must remain future-self reevaluated bounded retirement")
+        if receipt.get("integration_status") != "retired-from-active-writeback-archive-retained":
+            errors.append("integration_status must preserve archived retirement")
+        for field_name in (
+            "future_self_reevaluation_satisfied",
+            "source_acceptance_required_future_self_acceptance",
+            "autonomy_preserved",
+            "boundary_only_review",
+            "historical_value_archived",
+            "active_writeback_retired",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "external_truth_claim_allowed",
+            "external_veto_allowed",
+            "forced_stability_lock_allowed",
+            "raw_value_payload_stored",
+            "raw_continuity_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "future_self_reevaluation_satisfied": receipt.get("future_self_reevaluation_satisfied"),
+            "active_writeback_retired": receipt.get("active_writeback_retired"),
+            "historical_value_archived": receipt.get("historical_value_archived"),
+            "autonomy_preserved": receipt.get("autonomy_preserved"),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "external_veto_allowed": receipt.get("external_veto_allowed"),
+            "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
+            "retirement_digest_bound": self._non_empty_string(
+                receipt.get("retirement_commit_digest")
             ),
         }
 

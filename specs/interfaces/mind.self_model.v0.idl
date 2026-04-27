@@ -9,6 +9,7 @@ imports:
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
+  self_model_value_reassessment_receipt: ../schemas/self_model_value_reassessment_receipt.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -241,6 +242,83 @@ operations:
           boundary_only_review:
             type: boolean
           writeback_digest_bound:
+            type: boolean
+  build_value_reassessment_receipt:
+    summary: Bind future-self reevaluation before retiring an accepted value from active writeback while retaining archived history.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - acceptance_receipt
+          - retired_value_refs
+          - continuity_recheck_refs
+          - future_self_reevaluation_ref
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - retirement_writeback_ref
+          - post_reassessment_snapshot_ref
+          - archival_snapshot_ref
+        properties:
+          acceptance_receipt:
+            schema_ref: self_model_value_acceptance_receipt
+          retired_value_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          continuity_recheck_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          future_self_reevaluation_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          retirement_writeback_ref:
+            type: string
+            minLength: 1
+          post_reassessment_snapshot_ref:
+            type: string
+            minLength: 1
+          archival_snapshot_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_reassessment_receipt
+  validate_value_reassessment_receipt:
+    summary: Fail closed unless future-self reevaluation, boundary-only review, active writeback retirement, and archived history are preserved.
+    input:
+      schema_ref: self_model_value_reassessment_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - future_self_reevaluation_satisfied
+          - active_writeback_retired
+          - historical_value_archived
+          - boundary_only_review
+          - retirement_digest_bound
+        properties:
+          ok:
+            type: boolean
+          future_self_reevaluation_satisfied:
+            type: boolean
+          active_writeback_retired:
+            type: boolean
+          historical_value_archived:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          retirement_digest_bound:
             type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.

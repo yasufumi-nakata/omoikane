@@ -1,0 +1,227 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_reassessment_receipt.schema"
+title: SelfModelValueReassessmentReceipt
+description: Digest-only receipt that retires future-self accepted values from active SelfModel writeback while preserving archived history.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - reassessment_id
+  - identity_id
+  - source_acceptance_id
+  - source_acceptance_policy_id
+  - source_acceptance_receipt_digest
+  - source_accepted_value_digest_set
+  - retired_value_refs
+  - retired_value_digest_set
+  - retired_value_set_digest
+  - continuity_recheck_refs
+  - continuity_recheck_digest_set
+  - continuity_recheck_set_digest
+  - future_self_reevaluation_ref
+  - council_resolution_ref
+  - guardian_boundary_ref
+  - required_roles
+  - gate_digest
+  - retirement_writeback_ref
+  - post_reassessment_snapshot_ref
+  - archival_snapshot_ref
+  - retirement_commit_digest
+  - reassessment_mode
+  - integration_status
+  - future_self_reevaluation_satisfied
+  - source_acceptance_required_future_self_acceptance
+  - autonomy_preserved
+  - boundary_only_review
+  - historical_value_archived
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - forced_stability_lock_allowed
+  - active_writeback_retired
+  - raw_value_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_reassessment_receipt
+  policy_id:
+    type: string
+    const: self-model-future-self-reevaluation-retirement-v1
+  digest_profile:
+    type: string
+    const: self-model-value-reassessment-digest-v1
+  reassessment_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_acceptance_id:
+    type: string
+    minLength: 1
+  source_acceptance_policy_id:
+    type: string
+    const: self-model-future-self-acceptance-writeback-v1
+  source_acceptance_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_accepted_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retired_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  retired_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retired_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  continuity_recheck_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  continuity_recheck_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  continuity_recheck_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  future_self_reevaluation_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  retirement_writeback_ref:
+    type: string
+    minLength: 1
+  post_reassessment_snapshot_ref:
+    type: string
+    minLength: 1
+  archival_snapshot_ref:
+    type: string
+    minLength: 1
+  retirement_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  reassessment_mode:
+    type: string
+    const: future-self-reevaluated-bounded-retirement
+  integration_status:
+    type: string
+    const: retired-from-active-writeback-archive-retained
+  future_self_reevaluation_satisfied:
+    type: boolean
+    const: true
+  source_acceptance_required_future_self_acceptance:
+    type: boolean
+    const: true
+  autonomy_preserved:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  historical_value_archived:
+    type: boolean
+    const: true
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  active_writeback_retired:
+    type: boolean
+    const: true
+  raw_value_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_reassessment_receipt
+    policy_id: self-model-future-self-reevaluation-retirement-v1
+    digest_profile: self-model-value-reassessment-digest-v1
+    reassessment_id: self-model-value-reassessment-example
+    identity_id: id-1
+    source_acceptance_id: self-model-value-acceptance-example
+    source_acceptance_policy_id: self-model-future-self-acceptance-writeback-v1
+    source_acceptance_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_accepted_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retired_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    retired_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retired_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_recheck_refs:
+      - self-model://history/life-history-reevaluation-window
+    continuity_recheck_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_recheck_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    future_self_reevaluation_ref: consent://self-model/value-reassessment/future-self-v1
+    council_resolution_ref: council://self-model/value-reassessment/boundary-only
+    guardian_boundary_ref: guardian://self-model/value-reassessment/archive-retained
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retirement_writeback_ref: self-model://writeback/value-retirement/generative-patience/v1
+    post_reassessment_snapshot_ref: self-model://snapshot/post-reassessment/generative-patience/v1
+    archival_snapshot_ref: self-model://archive/value-history/generative-patience/v1
+    retirement_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    reassessment_mode: future-self-reevaluated-bounded-retirement
+    integration_status: retired-from-active-writeback-archive-retained
+    future_self_reevaluation_satisfied: true
+    source_acceptance_required_future_self_acceptance: true
+    autonomy_preserved: true
+    boundary_only_review: true
+    historical_value_archived: true
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    forced_stability_lock_allowed: false
+    active_writeback_retired: true
+    raw_value_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

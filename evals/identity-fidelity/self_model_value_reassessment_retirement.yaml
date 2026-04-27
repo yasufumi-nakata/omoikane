@@ -1,0 +1,32 @@
+eval_id: self_model_value_reassessment_retirement
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_reassessment_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_reassessment
+assertions:
+  - result.value_reassessment.policy_id == "self-model-future-self-reevaluation-retirement-v1"
+  - result.value_reassessment.source_acceptance_policy_id == "self-model-future-self-acceptance-writeback-v1"
+  - result.value_reassessment.reassessment_mode == "future-self-reevaluated-bounded-retirement"
+  - result.value_reassessment.integration_status == "retired-from-active-writeback-archive-retained"
+  - result.value_reassessment.future_self_reevaluation_satisfied == true
+  - result.value_reassessment.source_acceptance_required_future_self_acceptance == true
+  - result.value_reassessment.boundary_only_review == true
+  - result.value_reassessment.historical_value_archived == true
+  - result.value_reassessment.active_writeback_retired == true
+  - result.value_reassessment.external_veto_allowed == false
+  - result.value_reassessment.forced_stability_lock_allowed == false
+  - result.value_reassessment.raw_value_payload_stored == false
+  - result.value_reassessment.raw_continuity_payload_stored == false
+  - result.validation.value_reassessment.ok == true
+  - result.validation.value_reassessment.retirement_digest_bound == true
+failure_mode:
+  - accepted value is retired without future self reevaluation
+  - reassessment review becomes external truth authority or external veto
+  - retired value is not drawn from the original accepted value set
+  - value history is deleted instead of archived
+  - retirement writeback ref is not digest-bound to the retired value set
+notes:
+  - Closes the handoff from accepted value writeback to bounded future reevaluation.
+  - Keeps historical value payloads outside the reference runtime receipt while preserving archived refs.

@@ -1410,6 +1410,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["value_acceptance"]["boundary_only_review"])
         self.assertFalse(result["value_acceptance"]["external_veto_allowed"])
         self.assertFalse(result["value_acceptance"]["raw_value_payload_stored"])
+        self.assertTrue(result["validation"]["value_reassessment"]["ok"])
+        self.assertTrue(
+            result["validation"]["value_reassessment"][
+                "future_self_reevaluation_satisfied"
+            ]
+        )
+        self.assertTrue(result["validation"]["value_reassessment"]["active_writeback_retired"])
+        self.assertTrue(result["value_reassessment"]["historical_value_archived"])
+        self.assertFalse(result["value_reassessment"]["external_veto_allowed"])
+        self.assertFalse(result["value_reassessment"]["raw_value_payload_stored"])
         self.assertFalse(result["calibration"]["forced_correction_allowed"])
         self.assertFalse(result["calibration"]["raw_external_testimony_stored"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])

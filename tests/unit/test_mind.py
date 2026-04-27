@@ -336,6 +336,106 @@ class SelfModelMonitorTests(unittest.TestCase):
                 post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/external-imposition/v1",
             )
 
+    def test_value_reassessment_receipt_retires_active_writeback_with_archive(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+
+        reassessment = monitor.build_value_reassessment_receipt(
+            acceptance,
+            retired_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=[
+                "self-model://history/life-history-reevaluation-window",
+                "council://self-model/value-reassessment/boundary-only-review",
+            ],
+            future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+            council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+            retirement_writeback_ref="self-model://writeback/value-retirement/generative-patience/v1",
+            post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/generative-patience/v1",
+            archival_snapshot_ref="self-model://archive/value-history/generative-patience/v1",
+        )
+        validation = monitor.validate_value_reassessment_receipt(reassessment)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["future_self_reevaluation_satisfied"])
+        self.assertTrue(validation["active_writeback_retired"])
+        self.assertTrue(validation["historical_value_archived"])
+        self.assertTrue(validation["retirement_digest_bound"])
+        self.assertFalse(reassessment["external_veto_allowed"])
+        self.assertFalse(reassessment["raw_value_payload_stored"])
+
+    def test_value_reassessment_rejects_non_accepted_value(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"curiosity": 0.71},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+
+        with self.assertRaises(ValueError):
+            monitor.build_value_reassessment_receipt(
+                acceptance,
+                retired_value_refs=["value-candidate://self-model/never-accepted/v1"],
+                continuity_recheck_refs=["self-model://history/life-history-reevaluation-window"],
+                future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+                council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+                guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+                retirement_writeback_ref="self-model://writeback/value-retirement/never-accepted/v1",
+                post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/never-accepted/v1",
+                archival_snapshot_ref="self-model://archive/value-history/never-accepted/v1",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

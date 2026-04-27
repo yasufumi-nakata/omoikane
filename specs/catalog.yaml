@@ -799,6 +799,17 @@ entries:
       - reference-runtime
     rationale: Required to serialize future-self acceptance receipts that move only accepted self-authored candidate refs into bounded digest-bound SelfModel writeback.
   - priority: P1
+    kind: schema
+    file: specs/schemas/self_model_value_reassessment_receipt.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_value_reassessment_retirement.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize future-self reevaluation receipts that retire only accepted value refs from active writeback while retaining archived value history.
+  - priority: P1
     kind: idl
     file: specs/interfaces/mind.self_model.v0.idl
     consumers:
@@ -808,7 +819,8 @@ entries:
       - specs/schemas/self_model_calibration_receipt.schema
       - specs/schemas/self_model_value_generation_receipt.schema
       - specs/schemas/self_model_value_acceptance_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, self-authored value-generation freedom, and future-self acceptance writeback contracts machine-readable.
+      - specs/schemas/self_model_value_reassessment_receipt.schema
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, self-authored value-generation freedom, future-self acceptance writeback, and future-self value reassessment retirement contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -2993,6 +3005,15 @@ entries:
       - specs/schemas/self_model_value_acceptance_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects future-self accepted value writeback from accepting non-candidate refs, external veto, forced stability lock, or raw payload storage.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_value_reassessment_retirement.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_value_reassessment_receipt.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects future-self value reassessment from deleting history, accepting non-accepted refs, external veto, forced stability lock, or raw payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/release_manifest.schema

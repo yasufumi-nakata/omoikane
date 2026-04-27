@@ -14518,6 +14518,26 @@ json.dump(response, sys.stdout)
             post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
         )
         value_acceptance_validation = monitor.validate_value_acceptance_receipt(value_acceptance)
+        value_reassessment = monitor.build_value_reassessment_receipt(
+            value_acceptance,
+            retired_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+            ],
+            continuity_recheck_refs=[
+                "self-model://history/life-history-reevaluation-window",
+                "memory://semantic/reflection/value-retirement-review",
+                "council://self-model/value-reassessment/boundary-only-review",
+            ],
+            future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+            council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+            retirement_writeback_ref="self-model://writeback/value-retirement/generative-patience/v1",
+            post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/generative-patience/v1",
+            archival_snapshot_ref="self-model://archive/value-history/generative-patience/v1",
+        )
+        value_reassessment_validation = monitor.validate_value_reassessment_receipt(
+            value_reassessment
+        )
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14547,6 +14567,14 @@ json.dump(response, sys.stdout)
                 "value_acceptance_writeback_bound": value_acceptance_validation[
                     "writeback_digest_bound"
                 ],
+                "value_reassessment_policy_id": value_reassessment["policy_id"],
+                "value_reassessment_receipt_digest": value_reassessment["receipt_digest"],
+                "value_reassessment_future_self_bound": value_reassessment_validation[
+                    "future_self_reevaluation_satisfied"
+                ],
+                "value_reassessment_retirement_bound": value_reassessment_validation[
+                    "retirement_digest_bound"
+                ],
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14569,6 +14597,7 @@ json.dump(response, sys.stdout)
             "calibration": calibration,
             "value_generation": value_generation,
             "value_acceptance": value_acceptance,
+            "value_reassessment": value_reassessment,
             "history": history,
             "validation": {
                 "ok": (
@@ -14581,6 +14610,7 @@ json.dump(response, sys.stdout)
                     and calibration_validation["ok"]
                     and value_generation_validation["ok"]
                     and value_acceptance_validation["ok"]
+                    and value_reassessment_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
@@ -14589,6 +14619,7 @@ json.dump(response, sys.stdout)
                 "calibration": calibration_validation,
                 "value_generation": value_generation_validation,
                 "value_acceptance": value_acceptance_validation,
+                "value_reassessment": value_reassessment_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },

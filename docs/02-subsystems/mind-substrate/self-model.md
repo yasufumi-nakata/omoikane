@@ -116,8 +116,31 @@ writeback は `writeback_commit_digest` によって source generation、
 accepted value digest、writeback ref、post-acceptance snapshot ref へ束縛し、
 raw value payload や raw continuity payload は保存しない。
 
+## reference runtime で固定した価値再評価・退役境界
+
+`self-model-future-self-reevaluation-retirement-v1` は、過去に本人受容され
+active writeback へ入った value を、後日の本人再評価が明示された場合だけ
+active SelfModel writeback から退役させる contract である。
+
+`self_model_value_reassessment_receipt` は元の value-acceptance receipt digest、
+accepted value digest set、retired value refs、continuity recheck refs、
+future self reevaluation ref、Council resolution、Guardian boundary を束ねる。
+退役対象は元の accepted value set の subset に限定し、
+`reassessment_mode=future-self-reevaluated-bounded-retirement`、
+`integration_status=retired-from-active-writeback-archive-retained`、
+`future_self_reevaluation_satisfied=true`、
+`active_writeback_retired=true`、
+`historical_value_archived=true` を固定する。
+
+これは価値履歴の削除ではなく、active writeback からの退役である。
+Council と Guardian は境界違反を監査するだけで、
+`external_veto_allowed=false`、`forced_stability_lock_allowed=false`、
+`external_truth_claim_allowed=false` を保つ。
+retirement は `retirement_commit_digest` によって source acceptance、
+retired value digest、retirement writeback ref、post-reassessment snapshot ref、
+archival snapshot ref へ束縛し、raw value payload や raw continuity payload は保存しない。
+
 ## 残る未解決
 
 - 外部 witness / Council review を長期的な本人の自由な価値生成とどう両立させるか
 - 病理的な自己評価という判断を OS 内でどこまで扱い、どこから人間社会側の医療・法制度へ委ねるか
-- 本人受容後の価値が長期の生活史でどのように再評価・再撤回されるか

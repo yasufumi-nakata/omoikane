@@ -163,6 +163,25 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_acceptance"]["external_veto_allowed"])
         self.assertFalse(result["value_acceptance"]["raw_value_payload_stored"])
 
+    def test_self_model_demo_value_reassessment_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_reassessment_receipt.schema",
+            result["value_reassessment"],
+        )
+        self.assertTrue(result["validation"]["value_reassessment"]["ok"])
+        self.assertTrue(
+            result["validation"]["value_reassessment"][
+                "future_self_reevaluation_satisfied"
+            ]
+        )
+        self.assertTrue(result["value_reassessment"]["active_writeback_retired"])
+        self.assertTrue(result["value_reassessment"]["historical_value_archived"])
+        self.assertTrue(result["value_reassessment"]["boundary_only_review"])
+        self.assertFalse(result["value_reassessment"]["external_veto_allowed"])
+        self.assertFalse(result["value_reassessment"]["raw_value_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()

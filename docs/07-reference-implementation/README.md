@@ -155,6 +155,10 @@ digest-only に残し、future self acceptance 前の writeback を拒む。
 value-acceptance branch は、後日の本人受容がある場合だけ
 元の candidate digest set の subset を `self_model_value_acceptance_receipt` へ束縛し、
 `accepted-for-bounded-writeback` と `writeback_commit_digest` を返す。
+value-reassessment branch は、後日の本人再評価がある場合だけ
+元の accepted value digest set の subset を
+`self_model_value_reassessment_receipt` へ束縛し、
+active writeback から退役させつつ `historical_value_archived=true` を返す。
 Council / Guardian review は boundary-only であり、external veto、forced stability lock、
 raw value payload 保存は引き続き false に固定される。
 
@@ -604,6 +608,14 @@ stable drift と abrupt takeover 候補の両観測、
 `requires_future_self_acceptance=true`、`external_veto_allowed=false`、
 `forced_stability_lock_allowed=false`、`accepted_for_writeback=false` を
 確認する。raw value / continuity payload は保存しない。
+さらに future self acceptance 後の value は
+`self-model-future-self-reevaluation-retirement-v1` receipt により、
+`reassessment_mode=future-self-reevaluated-bounded-retirement`、
+`integration_status=retired-from-active-writeback-archive-retained`、
+`historical_value_archived=true`、
+`active_writeback_retired=true` を満たす場合だけ active writeback から退役できる。
+retirement digest は source acceptance、retired value set、writeback ref、
+post-reassessment snapshot、archival snapshot を束縛し、raw payload は保存しない。
 
 `sandbox-demo` は L5 Sandboxer の surrogate suffering proxy
 (`surrogate-suffering-proxy-v0`) を JSON で可視化し、

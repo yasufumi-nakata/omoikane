@@ -1330,6 +1330,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["value_acceptance"]["writeback_digest_bound"])
         self.assertFalse(result["value_acceptance"]["external_veto_allowed"])
         self.assertFalse(result["value_acceptance"]["raw_value_payload_stored"])
+        self.assertEqual(
+            "self-model-future-self-reevaluation-retirement-v1",
+            result["value_reassessment"]["policy_id"],
+        )
+        self.assertTrue(
+            result["validation"]["value_reassessment"][
+                "future_self_reevaluation_satisfied"
+            ]
+        )
+        self.assertTrue(result["validation"]["value_reassessment"]["active_writeback_retired"])
+        self.assertTrue(result["validation"]["value_reassessment"]["retirement_digest_bound"])
+        self.assertTrue(result["value_reassessment"]["historical_value_archived"])
+        self.assertFalse(result["value_reassessment"]["external_veto_allowed"])
+        self.assertFalse(result["value_reassessment"]["raw_value_payload_stored"])
 
     def test_affect_demo_emits_smoothed_failover_json(self) -> None:
         stdout = io.StringIO()
