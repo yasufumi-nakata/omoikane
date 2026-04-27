@@ -37,6 +37,7 @@ operations:
       - temporary identity-key loss must produce a guardian-quorum key_succession receipt without storing raw key or shard material
       - key_succession must bind successor-key preparation to a JP-13 primary signer roster policy with identity-guardian and integrity-guardian signatures, without storing raw roster payload
       - key_succession must additionally bind JP-13 and SG-01 signer roster policies into a digest-only multi-jurisdiction quorum without storing raw jurisdiction policy payloads
+      - multi-jurisdiction key_succession quorum threshold must be bound to a digest-only policy registry and authority signature quorum before complete status is allowed
   validate_session:
     summary: Validate one replication session against the fixed quorum and reconciliation policy.
     input:
@@ -67,9 +68,13 @@ operations:
           - key_succession_threshold_ok
           - key_succession_signer_roster_policy_bound
           - key_succession_signer_roster_quorum_ok
+          - key_succession_quorum_threshold_policy_bound
+          - key_succession_quorum_threshold_policy_ok
           - raw_key_material_stored
           - raw_shard_material_stored
           - raw_signer_roster_payload_stored
+          - raw_jurisdiction_policy_payload_stored
+          - raw_quorum_threshold_policy_payload_stored
           - errors
         properties:
           ok:
@@ -116,6 +121,10 @@ operations:
             type: boolean
           key_succession_multi_jurisdiction_signer_roster_quorum_ok:
             type: boolean
+          key_succession_quorum_threshold_policy_bound:
+            type: boolean
+          key_succession_quorum_threshold_policy_ok:
+            type: boolean
           raw_key_material_stored:
             type: boolean
           raw_shard_material_stored:
@@ -123,6 +132,8 @@ operations:
           raw_signer_roster_payload_stored:
             type: boolean
           raw_jurisdiction_policy_payload_stored:
+            type: boolean
+          raw_quorum_threshold_policy_payload_stored:
             type: boolean
           errors:
             type: array

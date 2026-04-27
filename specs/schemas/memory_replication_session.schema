@@ -63,6 +63,7 @@ properties:
       - key_succession_signer_roster_quorum_policy_id
       - key_succession_signer_roster_jurisdictions
       - key_succession_signer_roster_quorum_threshold
+      - key_succession_quorum_threshold_policy_id
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -137,6 +138,9 @@ properties:
       key_succession_signer_roster_quorum_threshold:
         type: integer
         const: 2
+      key_succession_quorum_threshold_policy_id:
+        type: string
+        const: key-succession-multi-jurisdiction-quorum-threshold-policy-v1
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -625,6 +629,7 @@ $defs:
       - jurisdiction_policy_digests
       - signer_roster_digest_set
       - signature_digest_set
+      - threshold_policy_authority
       - jurisdiction_policies
       - quorum_status
       - raw_jurisdiction_policy_payload_stored
@@ -689,6 +694,8 @@ $defs:
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
+      threshold_policy_authority:
+        $ref: "#/$defs/key_succession_quorum_threshold_policy_authority"
       jurisdiction_policies:
         type: array
         minItems: 2
@@ -702,6 +709,111 @@ $defs:
         type: boolean
         const: false
       raw_signer_roster_payload_stored:
+        type: boolean
+        const: false
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  key_succession_quorum_threshold_policy_authority:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - policy_id
+      - policy_ref
+      - policy_registry_ref
+      - policy_registry_digest
+      - policy_body_digest
+      - required_jurisdictions
+      - quorum_threshold
+      - jurisdiction_policy_digests
+      - signer_roster_digest_set
+      - signature_digest_set
+      - authority_signature_digest_set
+      - verifier_quorum_digest
+      - threshold_policy_registry_bound
+      - threshold_policy_signature_bound
+      - quorum_status
+      - raw_threshold_policy_payload_stored
+      - raw_policy_registry_payload_stored
+      - digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_key_succession_quorum_threshold_policy_authority
+      policy_id:
+        type: string
+        const: key-succession-multi-jurisdiction-quorum-threshold-policy-v1
+      policy_ref:
+        type: string
+        minLength: 1
+      policy_registry_ref:
+        type: string
+        minLength: 1
+      policy_registry_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      policy_body_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      required_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      quorum_threshold:
+        type: integer
+        const: 2
+      jurisdiction_policy_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      signer_roster_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      signature_digest_set:
+        type: array
+        minItems: 4
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      authority_signature_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      verifier_quorum_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      threshold_policy_registry_bound:
+        type: boolean
+        const: true
+      threshold_policy_signature_bound:
+        type: boolean
+        const: true
+      quorum_status:
+        type: string
+        const: complete
+      raw_threshold_policy_payload_stored:
+        type: boolean
+        const: false
+      raw_policy_registry_payload_stored:
         type: boolean
         const: false
       digest:

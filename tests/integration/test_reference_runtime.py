@@ -742,10 +742,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
             ]
         )
+        self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_bound"])
+        self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_ok"])
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
         self.assertFalse(result["validation"]["raw_jurisdiction_policy_payload_stored"])
+        self.assertFalse(result["validation"]["raw_quorum_threshold_policy_payload_stored"])
         self.assertEqual(
             ["primary", "mirror"],
             result["validation"]["replication"]["immediate_target_ids"],
@@ -777,6 +780,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["memory_replication"]["session"]["key_succession"][
                 "signer_roster_quorum"
             ]["policy_id"],
+        )
+        self.assertEqual(
+            "key-succession-multi-jurisdiction-quorum-threshold-policy-v1",
+            result["memory_replication"]["session"]["key_succession"][
+                "signer_roster_quorum"
+            ]["threshold_policy_authority"]["policy_id"],
         )
         self.assertEqual(
             ["JP-13", "SG-01"],

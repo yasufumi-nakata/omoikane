@@ -2083,7 +2083,7 @@ entries:
       - docs/02-subsystems/mind-substrate/memory-model.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, council-escalated reconcile, and multi-jurisdiction threshold key succession without mutating the source manifest or storing raw key / raw jurisdiction policy material.
+    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, council-escalated reconcile, and multi-jurisdiction threshold key succession with threshold policy authority binding without mutating the source manifest or storing raw key / raw jurisdiction policy / raw threshold policy material.
   - priority: P1
     kind: idl
     file: specs/interfaces/mind.memory_replication.v0.idl
@@ -2091,14 +2091,14 @@ entries:
       - docs/03-protocols/memory-replication.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 MemoryCrystal replication quorum, reconciliation, and multi-jurisdiction signer-roster-bound key succession contract machine-readable.
+    rationale: Required to make the L2 MemoryCrystal replication quorum, reconciliation, multi-jurisdiction signer-roster-bound key succession, and quorum threshold policy authority contract machine-readable.
   - priority: P1
     kind: eval
     file: evals/continuity/memory_replication_quorum.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects four-target placement, quorum-bound Merkle audit, council-escalated reconciliation, raw-key-redacted threshold key succession, and raw-policy / raw-roster-redacted multi-jurisdiction signer roster authority.
+    rationale: Protects four-target placement, quorum-bound Merkle audit, council-escalated reconciliation, raw-key-redacted threshold key succession, raw-policy / raw-roster-redacted multi-jurisdiction signer roster authority, and raw-threshold-policy-redacted quorum authority.
   - priority: P1
     kind: schema
     file: specs/schemas/semantic_memory_snapshot.schema

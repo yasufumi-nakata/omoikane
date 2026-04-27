@@ -61,6 +61,9 @@ MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_POLICY_ID = (
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID = (
     "key-succession-multi-jurisdiction-signer-roster-quorum-v1"
 )
+MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID = (
+    "key-succession-multi-jurisdiction-quorum-threshold-policy-v1"
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION = "JP-13"
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS = (
     "JP-13",
@@ -935,6 +938,9 @@ class MemoryReplicationService:
             "key_succession_signer_roster_quorum_threshold": (
                 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
             ),
+            "key_succession_quorum_threshold_policy_id": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID
+            ),
             "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
             "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
             "minimum_consensus_targets": MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
@@ -1229,6 +1235,13 @@ class MemoryReplicationService:
             ):
                 errors.append(
                     "replication_policy.key_succession_signer_roster_quorum_threshold mismatch"
+                )
+            if (
+                policy.get("key_succession_quorum_threshold_policy_id")
+                != MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.key_succession_quorum_threshold_policy_id mismatch"
                 )
             if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
                 errors.append("replication_policy.verify_policy_id mismatch")
@@ -1546,6 +1559,12 @@ class MemoryReplicationService:
                     "multi_jurisdiction_signer_roster_quorum_ok"
                 ]
             ),
+            "key_succession_quorum_threshold_policy_bound": (
+                key_succession_validation["quorum_threshold_policy_bound"]
+            ),
+            "key_succession_quorum_threshold_policy_ok": (
+                key_succession_validation["quorum_threshold_policy_ok"]
+            ),
             "raw_key_material_stored": key_succession_validation[
                 "raw_key_material_stored"
             ],
@@ -1557,6 +1576,9 @@ class MemoryReplicationService:
             ],
             "raw_jurisdiction_policy_payload_stored": key_succession_validation[
                 "raw_jurisdiction_policy_payload_stored"
+            ],
+            "raw_quorum_threshold_policy_payload_stored": key_succession_validation[
+                "raw_quorum_threshold_policy_payload_stored"
             ],
             "errors": errors,
         }
@@ -1783,6 +1805,16 @@ class MemoryReplicationService:
             for policy in jurisdiction_policies
             for signer in policy["accepted_signers"]
         ]
+        threshold_policy_authority = (
+            self._build_key_succession_quorum_threshold_policy_authority(
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                successor_key_digest=successor_key_digest,
+                jurisdiction_policy_digests=jurisdiction_policy_digests,
+                signer_roster_digest_set=signer_roster_digest_set,
+                signature_digest_set=signature_digest_set,
+            )
+        )
         receipt = {
             "kind": "memory_replication_key_succession_signer_roster_quorum",
             "policy_id": (
@@ -1805,10 +1837,116 @@ class MemoryReplicationService:
             "jurisdiction_policy_digests": jurisdiction_policy_digests,
             "signer_roster_digest_set": signer_roster_digest_set,
             "signature_digest_set": signature_digest_set,
+            "threshold_policy_authority": threshold_policy_authority,
             "jurisdiction_policies": jurisdiction_policies,
             "quorum_status": "complete",
             "raw_jurisdiction_policy_payload_stored": False,
             "raw_signer_roster_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json({key: value for key, value in receipt.items() if key != "digest"})
+        )
+        return receipt
+
+    def _build_key_succession_quorum_threshold_policy_authority(
+        self,
+        *,
+        identity_id: str,
+        source_manifest_digest: str,
+        successor_key_digest: str,
+        jurisdiction_policy_digests: Sequence[str],
+        signer_roster_digest_set: Sequence[str],
+        signature_digest_set: Sequence[str],
+    ) -> Dict[str, Any]:
+        policy_ref = (
+            "policy://memory-replication/key-succession/"
+            "multi-jurisdiction-quorum-threshold-v1"
+        )
+        policy_registry_ref = (
+            "policy-registry://memory-replication/key-succession/"
+            "multi-jurisdiction-quorum-threshold/v1"
+        )
+        required_jurisdictions = list(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        )
+        quorum_threshold = (
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+        )
+        policy_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_ref": policy_ref,
+                    "policy_registry_ref": policy_registry_ref,
+                    "required_jurisdictions": required_jurisdictions,
+                    "quorum_threshold": quorum_threshold,
+                    "source_manifest_digest": source_manifest_digest,
+                }
+            )
+        )
+        policy_body_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "policy_id": (
+                        MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID
+                    ),
+                    "policy_ref": policy_ref,
+                    "required_jurisdictions": required_jurisdictions,
+                    "quorum_threshold": quorum_threshold,
+                    "source_manifest_digest": source_manifest_digest,
+                    "successor_key_digest": successor_key_digest,
+                }
+            )
+        )
+        authority_signature_digest_set = []
+        for signer_role in MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES:
+            authority_signature_digest_set.append(
+                sha256_text(
+                    canonical_json(
+                        {
+                            "identity_id": identity_id,
+                            "signer_role": signer_role,
+                            "policy_body_digest": policy_body_digest,
+                            "policy_registry_digest": policy_registry_digest,
+                            "source_manifest_digest": source_manifest_digest,
+                            "successor_key_digest": successor_key_digest,
+                        }
+                    )
+                )
+            )
+        verifier_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_body_digest": policy_body_digest,
+                    "policy_registry_digest": policy_registry_digest,
+                    "authority_signature_digest_set": authority_signature_digest_set,
+                    "jurisdiction_policy_digests": list(jurisdiction_policy_digests),
+                    "signer_roster_digest_set": list(signer_roster_digest_set),
+                    "signature_digest_set": list(signature_digest_set),
+                }
+            )
+        )
+        receipt = {
+            "kind": (
+                "memory_replication_key_succession_quorum_threshold_policy_authority"
+            ),
+            "policy_id": MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID,
+            "policy_ref": policy_ref,
+            "policy_registry_ref": policy_registry_ref,
+            "policy_registry_digest": policy_registry_digest,
+            "policy_body_digest": policy_body_digest,
+            "required_jurisdictions": required_jurisdictions,
+            "quorum_threshold": quorum_threshold,
+            "jurisdiction_policy_digests": list(jurisdiction_policy_digests),
+            "signer_roster_digest_set": list(signer_roster_digest_set),
+            "signature_digest_set": list(signature_digest_set),
+            "authority_signature_digest_set": authority_signature_digest_set,
+            "verifier_quorum_digest": verifier_quorum_digest,
+            "threshold_policy_registry_bound": True,
+            "threshold_policy_signature_bound": True,
+            "quorum_status": "complete",
+            "raw_threshold_policy_payload_stored": False,
+            "raw_policy_registry_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json({key: value for key, value in receipt.items() if key != "digest"})
@@ -1835,6 +1973,9 @@ class MemoryReplicationService:
         multi_jurisdiction_signer_roster_quorum_bound = False
         multi_jurisdiction_signer_roster_quorum_ok = False
         raw_jurisdiction_policy_payload_stored = False
+        quorum_threshold_policy_bound = False
+        quorum_threshold_policy_ok = False
+        raw_quorum_threshold_policy_payload_stored = False
         if not isinstance(receipt, dict):
             errors.append("key_succession must be an object")
             return {
@@ -1845,10 +1986,13 @@ class MemoryReplicationService:
                 "signer_roster_quorum_ok": False,
                 "multi_jurisdiction_signer_roster_quorum_bound": False,
                 "multi_jurisdiction_signer_roster_quorum_ok": False,
+                "quorum_threshold_policy_bound": False,
+                "quorum_threshold_policy_ok": False,
                 "raw_key_material_stored": False,
                 "raw_shard_material_stored": False,
                 "raw_signer_roster_payload_stored": False,
                 "raw_jurisdiction_policy_payload_stored": False,
+                "raw_quorum_threshold_policy_payload_stored": False,
             }
 
         if receipt.get("kind") != "memory_replication_key_succession":
@@ -2048,6 +2192,15 @@ class MemoryReplicationService:
         raw_jurisdiction_policy_payload_stored = signer_roster_quorum_validation[
             "raw_jurisdiction_policy_payload_stored"
         ]
+        quorum_threshold_policy_bound = signer_roster_quorum_validation[
+            "quorum_threshold_policy_bound"
+        ]
+        quorum_threshold_policy_ok = signer_roster_quorum_validation[
+            "quorum_threshold_policy_ok"
+        ]
+        raw_quorum_threshold_policy_payload_stored = signer_roster_quorum_validation[
+            "raw_quorum_threshold_policy_payload_stored"
+        ]
         if receipt.get("raw_key_material_stored") is not False:
             raw_key_material_stored = True
             local_errors.append("key_succession.raw_key_material_stored must be false")
@@ -2080,11 +2233,16 @@ class MemoryReplicationService:
             "multi_jurisdiction_signer_roster_quorum_ok": (
                 multi_jurisdiction_signer_roster_quorum_ok
             ),
+            "quorum_threshold_policy_bound": quorum_threshold_policy_bound,
+            "quorum_threshold_policy_ok": quorum_threshold_policy_ok,
             "raw_key_material_stored": raw_key_material_stored,
             "raw_shard_material_stored": raw_shard_material_stored,
             "raw_signer_roster_payload_stored": raw_signer_roster_payload_stored,
             "raw_jurisdiction_policy_payload_stored": (
                 raw_jurisdiction_policy_payload_stored
+            ),
+            "raw_quorum_threshold_policy_payload_stored": (
+                raw_quorum_threshold_policy_payload_stored
             ),
         }
 
@@ -2290,15 +2448,21 @@ class MemoryReplicationService:
         local_errors: List[str] = []
         raw_jurisdiction_policy_payload_stored = False
         raw_signer_roster_payload_stored = False
+        raw_quorum_threshold_policy_payload_stored = False
         nested_policies_bound = True
         nested_policy_quorums_ok = True
+        threshold_policy_bound = False
+        threshold_policy_ok = False
         if not isinstance(receipt, dict):
             errors.append("key_succession.signer_roster_quorum must be an object")
             return {
                 "bound": False,
                 "quorum_ok": False,
+                "quorum_threshold_policy_bound": False,
+                "quorum_threshold_policy_ok": False,
                 "raw_jurisdiction_policy_payload_stored": False,
                 "raw_signer_roster_payload_stored": False,
+                "raw_quorum_threshold_policy_payload_stored": False,
             }
 
         if receipt.get("kind") != "memory_replication_key_succession_signer_roster_quorum":
@@ -2460,6 +2624,24 @@ class MemoryReplicationService:
                 "key_succession.signer_roster_quorum.signature_digest_set mismatch"
             )
 
+        threshold_policy_validation = (
+            self._validate_key_succession_quorum_threshold_policy_authority(
+                receipt.get("threshold_policy_authority"),
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                successor_key_digest=successor_key_digest,
+                jurisdiction_policy_digests=expected_policy_digests,
+                signer_roster_digest_set=expected_roster_digests,
+                signature_digest_set=expected_signature_digests,
+                errors=local_errors,
+            )
+        )
+        threshold_policy_bound = threshold_policy_validation["bound"]
+        threshold_policy_ok = threshold_policy_validation["ok"]
+        raw_quorum_threshold_policy_payload_stored = threshold_policy_validation[
+            "raw_quorum_threshold_policy_payload_stored"
+        ]
+
         quorum_ok = (
             len(accepted_jurisdictions)
             >= MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
@@ -2467,6 +2649,7 @@ class MemoryReplicationService:
             .issubset(set(accepted_jurisdictions))
             and nested_policies_bound
             and nested_policy_quorums_ok
+            and threshold_policy_ok
         )
         if not quorum_ok:
             local_errors.append(
@@ -2505,10 +2688,224 @@ class MemoryReplicationService:
         return {
             "bound": not local_errors,
             "quorum_ok": quorum_ok,
+            "quorum_threshold_policy_bound": threshold_policy_bound,
+            "quorum_threshold_policy_ok": threshold_policy_ok,
             "raw_jurisdiction_policy_payload_stored": (
                 raw_jurisdiction_policy_payload_stored
             ),
             "raw_signer_roster_payload_stored": raw_signer_roster_payload_stored,
+            "raw_quorum_threshold_policy_payload_stored": (
+                raw_quorum_threshold_policy_payload_stored
+            ),
+        }
+
+    def _validate_key_succession_quorum_threshold_policy_authority(
+        self,
+        receipt: Any,
+        *,
+        identity_id: Any,
+        source_manifest_digest: Any,
+        successor_key_digest: Any,
+        jurisdiction_policy_digests: Sequence[str],
+        signer_roster_digest_set: Sequence[str],
+        signature_digest_set: Sequence[str],
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        local_errors: List[str] = []
+        raw_threshold_policy_payload_stored = False
+        raw_policy_registry_payload_stored = False
+        error_prefix = (
+            "key_succession.signer_roster_quorum.threshold_policy_authority"
+        )
+        if not isinstance(receipt, dict):
+            errors.append(f"{error_prefix} must be an object")
+            return {
+                "bound": False,
+                "ok": False,
+                "raw_quorum_threshold_policy_payload_stored": False,
+            }
+
+        if (
+            receipt.get("kind")
+            != "memory_replication_key_succession_quorum_threshold_policy_authority"
+        ):
+            local_errors.append(f"{error_prefix}.kind mismatch")
+        if (
+            receipt.get("policy_id")
+            != MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID
+        ):
+            local_errors.append(f"{error_prefix}.policy_id mismatch")
+        self._require_non_empty_string(
+            receipt.get("policy_ref"),
+            f"{error_prefix}.policy_ref",
+            local_errors,
+        )
+        self._require_non_empty_string(
+            receipt.get("policy_registry_ref"),
+            f"{error_prefix}.policy_registry_ref",
+            local_errors,
+        )
+        required_jurisdictions = self._validate_string_list(
+            receipt.get("required_jurisdictions"),
+            f"{error_prefix}.required_jurisdictions",
+            local_errors,
+            minimum=len(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS),
+            unique=True,
+        )
+        if required_jurisdictions != list(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        ):
+            local_errors.append(f"{error_prefix}.required_jurisdictions mismatch")
+        if (
+            receipt.get("quorum_threshold")
+            != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+        ):
+            local_errors.append(f"{error_prefix}.quorum_threshold mismatch")
+
+        if receipt.get("jurisdiction_policy_digests") != list(jurisdiction_policy_digests):
+            local_errors.append(f"{error_prefix}.jurisdiction_policy_digests mismatch")
+        if receipt.get("signer_roster_digest_set") != list(signer_roster_digest_set):
+            local_errors.append(f"{error_prefix}.signer_roster_digest_set mismatch")
+        if receipt.get("signature_digest_set") != list(signature_digest_set):
+            local_errors.append(f"{error_prefix}.signature_digest_set mismatch")
+
+        expected_policy_registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_ref": receipt.get("policy_ref"),
+                    "policy_registry_ref": receipt.get("policy_registry_ref"),
+                    "required_jurisdictions": list(
+                        MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+                    ),
+                    "quorum_threshold": (
+                        MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+                    ),
+                    "source_manifest_digest": source_manifest_digest,
+                }
+            )
+        )
+        self._require_digest(
+            receipt.get("policy_registry_digest"),
+            f"{error_prefix}.policy_registry_digest",
+            local_errors,
+        )
+        if receipt.get("policy_registry_digest") != expected_policy_registry_digest:
+            local_errors.append(f"{error_prefix}.policy_registry_digest mismatch")
+
+        expected_policy_body_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "policy_id": (
+                        MEMORY_REPLICATION_KEY_SUCCESSION_QUORUM_THRESHOLD_POLICY_ID
+                    ),
+                    "policy_ref": receipt.get("policy_ref"),
+                    "required_jurisdictions": list(
+                        MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+                    ),
+                    "quorum_threshold": (
+                        MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+                    ),
+                    "source_manifest_digest": source_manifest_digest,
+                    "successor_key_digest": successor_key_digest,
+                }
+            )
+        )
+        self._require_digest(
+            receipt.get("policy_body_digest"),
+            f"{error_prefix}.policy_body_digest",
+            local_errors,
+        )
+        if receipt.get("policy_body_digest") != expected_policy_body_digest:
+            local_errors.append(f"{error_prefix}.policy_body_digest mismatch")
+
+        expected_authority_signature_digest_set = []
+        for signer_role in MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES:
+            expected_authority_signature_digest_set.append(
+                sha256_text(
+                    canonical_json(
+                        {
+                            "identity_id": identity_id,
+                            "signer_role": signer_role,
+                            "policy_body_digest": expected_policy_body_digest,
+                            "policy_registry_digest": expected_policy_registry_digest,
+                            "source_manifest_digest": source_manifest_digest,
+                            "successor_key_digest": successor_key_digest,
+                        }
+                    )
+                )
+            )
+        if (
+            receipt.get("authority_signature_digest_set")
+            != expected_authority_signature_digest_set
+        ):
+            local_errors.append(
+                f"{error_prefix}.authority_signature_digest_set mismatch"
+            )
+
+        expected_verifier_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_body_digest": expected_policy_body_digest,
+                    "policy_registry_digest": expected_policy_registry_digest,
+                    "authority_signature_digest_set": (
+                        expected_authority_signature_digest_set
+                    ),
+                    "jurisdiction_policy_digests": list(jurisdiction_policy_digests),
+                    "signer_roster_digest_set": list(signer_roster_digest_set),
+                    "signature_digest_set": list(signature_digest_set),
+                }
+            )
+        )
+        self._require_digest(
+            receipt.get("verifier_quorum_digest"),
+            f"{error_prefix}.verifier_quorum_digest",
+            local_errors,
+        )
+        if receipt.get("verifier_quorum_digest") != expected_verifier_quorum_digest:
+            local_errors.append(f"{error_prefix}.verifier_quorum_digest mismatch")
+
+        if receipt.get("threshold_policy_registry_bound") is not True:
+            local_errors.append(
+                f"{error_prefix}.threshold_policy_registry_bound must be true"
+            )
+        if receipt.get("threshold_policy_signature_bound") is not True:
+            local_errors.append(
+                f"{error_prefix}.threshold_policy_signature_bound must be true"
+            )
+        if receipt.get("quorum_status") != "complete":
+            local_errors.append(f"{error_prefix}.quorum_status must equal 'complete'")
+        if receipt.get("raw_threshold_policy_payload_stored") is not False:
+            raw_threshold_policy_payload_stored = True
+            local_errors.append(
+                f"{error_prefix}.raw_threshold_policy_payload_stored must be false"
+            )
+        if receipt.get("raw_policy_registry_payload_stored") is not False:
+            raw_policy_registry_payload_stored = True
+            local_errors.append(
+                f"{error_prefix}.raw_policy_registry_payload_stored must be false"
+            )
+
+        digest = receipt.get("digest")
+        self._require_digest(digest, f"{error_prefix}.digest", local_errors)
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(
+                    {key: value for key, value in receipt.items() if key != "digest"}
+                )
+            )
+            if digest != expected_digest:
+                local_errors.append(f"{error_prefix}.digest mismatch")
+
+        errors.extend(local_errors)
+        raw_payload_stored = (
+            raw_threshold_policy_payload_stored
+            or raw_policy_registry_payload_stored
+        )
+        return {
+            "bound": not local_errors,
+            "ok": not local_errors and not raw_payload_stored,
+            "raw_quorum_threshold_policy_payload_stored": raw_payload_stored,
         }
 
     @staticmethod

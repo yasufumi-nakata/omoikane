@@ -11758,6 +11758,12 @@ json.dump(response, sys.stdout)
                 "key_succession_multi_jurisdiction_signer_roster_quorum_ok": replication_validation[
                     "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
                 ],
+                "key_succession_quorum_threshold_policy_digest": replication_session[
+                    "key_succession"
+                ]["signer_roster_quorum"]["threshold_policy_authority"]["digest"],
+                "key_succession_quorum_threshold_policy_ok": replication_validation[
+                    "key_succession_quorum_threshold_policy_ok"
+                ],
                 "session_digest": replication_session["digest"],
             },
             actor="MemoryReplicationService",
@@ -11802,11 +11808,20 @@ json.dump(response, sys.stdout)
                 "key_succession_multi_jurisdiction_signer_roster_quorum_ok": replication_validation[
                     "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
                 ],
+                "key_succession_quorum_threshold_policy_bound": replication_validation[
+                    "key_succession_quorum_threshold_policy_bound"
+                ],
+                "key_succession_quorum_threshold_policy_ok": replication_validation[
+                    "key_succession_quorum_threshold_policy_ok"
+                ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"
                 ],
                 "raw_jurisdiction_policy_payload_stored": replication_validation[
                     "raw_jurisdiction_policy_payload_stored"
+                ],
+                "raw_quorum_threshold_policy_payload_stored": replication_validation[
+                    "raw_quorum_threshold_policy_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

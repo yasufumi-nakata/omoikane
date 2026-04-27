@@ -6,6 +6,7 @@ capabilities:
   - rollback.trigger
   - memory-replication.key-succession-signer-roster.attest
   - memory-replication.key-succession-multi-jurisdiction-quorum.attest
+  - memory-replication.key-succession-quorum-threshold-policy.attest
   - continuity.public-verification.attest
   - collective.dissolution-receipt.attest
   - collective.recovery-verifier-transport.attest
@@ -63,7 +64,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
-  - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw signer roster payload を保存していないことを検証する時
+  - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest、quorum threshold policy registry digest と authority signature digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw quorum threshold policy / raw signer roster payload を保存していないことを検証する時
   - Collective dissolution receipt が全 member confirmation、schema version、IdentityConfirmation digest proof、digest-only audit ref に束縛されていることを検証する時
   - Collective dissolution 後の member recovery proof が remote reviewer verifier transport receipt と raw payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の recovery verifier transport receipt set が authenticated non-loopback authority-route trace と raw route payload 非保存に束縛されていることを検証する時

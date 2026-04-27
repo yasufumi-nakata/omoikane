@@ -739,10 +739,13 @@ class CliIntegrationTests(unittest.TestCase):
                 "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
             ]
         )
+        self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_bound"])
+        self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_ok"])
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
         self.assertFalse(result["validation"]["raw_jurisdiction_policy_payload_stored"])
+        self.assertFalse(result["validation"]["raw_quorum_threshold_policy_payload_stored"])
         self.assertEqual(
             ["coldstore", "mirror", "primary"],
             result["validation"]["replication"]["consensus_target_ids"],
@@ -770,6 +773,17 @@ class CliIntegrationTests(unittest.TestCase):
             result["memory_replication"]["session"]["key_succession"][
                 "signer_roster_quorum"
             ]["quorum_status"],
+        )
+        self.assertEqual(
+            "complete",
+            result["memory_replication"]["session"]["key_succession"][
+                "signer_roster_quorum"
+            ]["threshold_policy_authority"]["quorum_status"],
+        )
+        self.assertTrue(
+            result["memory_replication"]["session"]["key_succession"][
+                "signer_roster_quorum"
+            ]["threshold_policy_authority"]["threshold_policy_registry_bound"]
         )
         self.assertEqual(
             ["JP-13", "SG-01"],

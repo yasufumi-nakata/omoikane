@@ -3,7 +3,8 @@ target: mind.memory_replication
 summary: >
   MemoryCrystal replication が four-target placement、random-block Merkle audit、
   quorum-bound reconcile、council escalation、threshold key succession、
-  multi-jurisdiction signer roster quorum を digest-bound に返すこと
+  multi-jurisdiction signer roster quorum、quorum threshold policy authority を
+  digest-bound に返すこと
 checks:
   - name: memory replication demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
@@ -25,6 +26,8 @@ expect:
   key_succession_signer_roster_quorum_ok: true
   key_succession_multi_jurisdiction_signer_roster_quorum_bound: true
   key_succession_multi_jurisdiction_signer_roster_quorum_ok: true
+  key_succession_quorum_threshold_policy_bound: true
+  key_succession_quorum_threshold_policy_ok: true
   key_succession_signer_roster_quorum_jurisdictions:
     - JP-13
     - SG-01
@@ -32,4 +35,5 @@ expect:
   raw_shard_material_stored: false
   raw_signer_roster_payload_stored: false
   raw_jurisdiction_policy_payload_stored: false
+  raw_quorum_threshold_policy_payload_stored: false
   memory_replication_ledger_count: 1

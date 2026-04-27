@@ -667,7 +667,9 @@ bounded reconciliation、
 (`3-of-5` share + `2` Guardian attestation + successor key digest / rotation ledger ref /
 JP-13 signer roster policy digest / identity-guardian + integrity-guardian signature digest /
 JP-13 + SG-01 multi-jurisdiction signer roster quorum digest /
-raw key material, raw jurisdiction policy payload, and raw roster payload redaction)、
+quorum threshold policy registry digest / authority signature digest /
+raw key material, raw jurisdiction policy payload, raw quorum threshold policy payload,
+and raw roster payload redaction)、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

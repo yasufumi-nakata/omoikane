@@ -54,8 +54,9 @@ reference runtime ではこの protocol を
   receipt を同じ session に束縛し、3-of-5 Shamir share、2 Guardian attestation、
   successor key digest、rotation ledger ref、JP-13 signer roster policy digest、
   identity-guardian + integrity-guardian signature digest に加え、JP-13 / SG-01 の
-  multi-jurisdiction signer roster quorum digest を保存する。ただし raw key /
-  raw shard material / raw jurisdiction policy payload / raw signer roster payload は保存しない
+  multi-jurisdiction signer roster quorum digest と quorum threshold policy authority
+  digest を保存する。ただし raw key / raw shard material / raw jurisdiction policy
+  payload / raw quorum threshold policy payload / raw signer roster payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)

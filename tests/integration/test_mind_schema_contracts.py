@@ -76,6 +76,14 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertEqual(2, len(signer_roster_quorum["jurisdiction_policy_digests"]))
         self.assertEqual(4, len(signer_roster_quorum["signature_digest_set"]))
         self.assertFalse(signer_roster_quorum["raw_jurisdiction_policy_payload_stored"])
+        threshold_authority = signer_roster_quorum["threshold_policy_authority"]
+        self.assertEqual(
+            "key-succession-multi-jurisdiction-quorum-threshold-policy-v1",
+            threshold_authority["policy_id"],
+        )
+        self.assertTrue(threshold_authority["threshold_policy_registry_bound"])
+        self.assertFalse(threshold_authority["raw_threshold_policy_payload_stored"])
+        self.assertFalse(threshold_authority["raw_policy_registry_payload_stored"])
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()
