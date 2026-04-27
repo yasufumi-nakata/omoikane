@@ -58,8 +58,16 @@ MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID = (
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_POLICY_ID = (
     "key-succession-jurisdiction-signer-roster-policy-v1"
 )
+MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID = (
+    "key-succession-multi-jurisdiction-signer-roster-quorum-v1"
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION = "JP-13"
+MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS = (
+    "JP-13",
+    "SG-01",
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_THRESHOLD = 2
+MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD = 2
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES = (
     "identity-guardian",
     "integrity-guardian",
@@ -918,6 +926,15 @@ class MemoryReplicationService:
             "key_succession_signer_roster_jurisdiction": (
                 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION
             ),
+            "key_succession_signer_roster_quorum_policy_id": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID
+            ),
+            "key_succession_signer_roster_jurisdictions": list(
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+            ),
+            "key_succession_signer_roster_quorum_threshold": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+            ),
             "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
             "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
             "minimum_consensus_targets": MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
@@ -1191,6 +1208,27 @@ class MemoryReplicationService:
             ):
                 errors.append(
                     "replication_policy.key_succession_signer_roster_jurisdiction mismatch"
+                )
+            if (
+                policy.get("key_succession_signer_roster_quorum_policy_id")
+                != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.key_succession_signer_roster_quorum_policy_id mismatch"
+                )
+            if (
+                policy.get("key_succession_signer_roster_jurisdictions")
+                != list(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS)
+            ):
+                errors.append(
+                    "replication_policy.key_succession_signer_roster_jurisdictions mismatch"
+                )
+            if (
+                policy.get("key_succession_signer_roster_quorum_threshold")
+                != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+            ):
+                errors.append(
+                    "replication_policy.key_succession_signer_roster_quorum_threshold mismatch"
                 )
             if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
                 errors.append("replication_policy.verify_policy_id mismatch")
@@ -1498,6 +1536,16 @@ class MemoryReplicationService:
             "key_succession_signer_roster_quorum_ok": key_succession_validation[
                 "signer_roster_quorum_ok"
             ],
+            "key_succession_multi_jurisdiction_signer_roster_quorum_bound": (
+                key_succession_validation[
+                    "multi_jurisdiction_signer_roster_quorum_bound"
+                ]
+            ),
+            "key_succession_multi_jurisdiction_signer_roster_quorum_ok": (
+                key_succession_validation[
+                    "multi_jurisdiction_signer_roster_quorum_ok"
+                ]
+            ),
             "raw_key_material_stored": key_succession_validation[
                 "raw_key_material_stored"
             ],
@@ -1506,6 +1554,9 @@ class MemoryReplicationService:
             ],
             "raw_signer_roster_payload_stored": key_succession_validation[
                 "raw_signer_roster_payload_stored"
+            ],
+            "raw_jurisdiction_policy_payload_stored": key_succession_validation[
+                "raw_jurisdiction_policy_payload_stored"
             ],
             "errors": errors,
         }
@@ -1587,6 +1638,12 @@ class MemoryReplicationService:
             source_manifest_digest=source_manifest_digest,
             successor_key_digest=successor_key_digest,
         )
+        signer_roster_quorum = self._build_key_succession_signer_roster_quorum(
+            identity_id=identity_id,
+            source_manifest_digest=source_manifest_digest,
+            successor_key_digest=successor_key_digest,
+            primary_signer_roster_policy=signer_roster_policy,
+        )
         receipt = {
             "kind": "memory_replication_key_succession",
             "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
@@ -1611,6 +1668,7 @@ class MemoryReplicationService:
             "successor_key_digest": successor_key_digest,
             "rotation_ledger_ref": "ledger://memory-replication/key-succession-001",
             "signer_roster_policy": signer_roster_policy,
+            "signer_roster_quorum": signer_roster_quorum,
             "raw_key_material_stored": False,
             "raw_shard_material_stored": False,
             "status": "successor-key-prepared",
@@ -1626,8 +1684,8 @@ class MemoryReplicationService:
         identity_id: str,
         source_manifest_digest: str,
         successor_key_digest: str,
+        jurisdiction: str = MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION,
     ) -> Dict[str, Any]:
-        jurisdiction = MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION
         policy_ref = (
             "policy://memory-replication/key-succession/"
             f"{jurisdiction.lower()}/signer-roster-v1"
@@ -1690,6 +1748,73 @@ class MemoryReplicationService:
         )
         return receipt
 
+    def _build_key_succession_signer_roster_quorum(
+        self,
+        *,
+        identity_id: str,
+        source_manifest_digest: str,
+        successor_key_digest: str,
+        primary_signer_roster_policy: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        jurisdiction_policies = [primary_signer_roster_policy]
+        for jurisdiction in MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS:
+            if jurisdiction == primary_signer_roster_policy["jurisdiction"]:
+                continue
+            jurisdiction_policies.append(
+                self._build_key_succession_signer_roster_policy(
+                    identity_id=identity_id,
+                    source_manifest_digest=source_manifest_digest,
+                    successor_key_digest=successor_key_digest,
+                    jurisdiction=jurisdiction,
+                )
+            )
+
+        jurisdiction_policy_refs = [
+            policy["policy_ref"] for policy in jurisdiction_policies
+        ]
+        jurisdiction_policy_digests = [
+            policy["digest"] for policy in jurisdiction_policies
+        ]
+        signer_roster_digest_set = [
+            policy["signer_roster_digest"] for policy in jurisdiction_policies
+        ]
+        signature_digest_set = [
+            signer["signature_digest"]
+            for policy in jurisdiction_policies
+            for signer in policy["accepted_signers"]
+        ]
+        receipt = {
+            "kind": "memory_replication_key_succession_signer_roster_quorum",
+            "policy_id": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID
+            ),
+            "policy_ref": (
+                "policy://memory-replication/key-succession/"
+                "multi-jurisdiction-signer-roster-quorum-v1"
+            ),
+            "required_jurisdictions": list(
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+            ),
+            "accepted_jurisdictions": [
+                policy["jurisdiction"] for policy in jurisdiction_policies
+            ],
+            "quorum_threshold": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+            ),
+            "jurisdiction_policy_refs": jurisdiction_policy_refs,
+            "jurisdiction_policy_digests": jurisdiction_policy_digests,
+            "signer_roster_digest_set": signer_roster_digest_set,
+            "signature_digest_set": signature_digest_set,
+            "jurisdiction_policies": jurisdiction_policies,
+            "quorum_status": "complete",
+            "raw_jurisdiction_policy_payload_stored": False,
+            "raw_signer_roster_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json({key: value for key, value in receipt.items() if key != "digest"})
+        )
+        return receipt
+
     def _validate_key_succession(
         self,
         receipt: Any,
@@ -1707,6 +1832,9 @@ class MemoryReplicationService:
         threshold_ok = False
         signer_roster_policy_bound = False
         signer_roster_quorum_ok = False
+        multi_jurisdiction_signer_roster_quorum_bound = False
+        multi_jurisdiction_signer_roster_quorum_ok = False
+        raw_jurisdiction_policy_payload_stored = False
         if not isinstance(receipt, dict):
             errors.append("key_succession must be an object")
             return {
@@ -1715,9 +1843,12 @@ class MemoryReplicationService:
                 "threshold_ok": False,
                 "signer_roster_policy_bound": False,
                 "signer_roster_quorum_ok": False,
+                "multi_jurisdiction_signer_roster_quorum_bound": False,
+                "multi_jurisdiction_signer_roster_quorum_ok": False,
                 "raw_key_material_stored": False,
                 "raw_shard_material_stored": False,
                 "raw_signer_roster_payload_stored": False,
+                "raw_jurisdiction_policy_payload_stored": False,
             }
 
         if receipt.get("kind") != "memory_replication_key_succession":
@@ -1894,6 +2025,29 @@ class MemoryReplicationService:
         raw_signer_roster_payload_stored = signer_roster_validation[
             "raw_signer_roster_payload_stored"
         ]
+        signer_roster_quorum_validation = (
+            self._validate_key_succession_signer_roster_quorum(
+                receipt.get("signer_roster_quorum"),
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                successor_key_digest=receipt.get("successor_key_digest"),
+                primary_signer_roster_policy=receipt.get("signer_roster_policy"),
+                errors=local_errors,
+            )
+        )
+        multi_jurisdiction_signer_roster_quorum_bound = (
+            signer_roster_quorum_validation["bound"]
+        )
+        multi_jurisdiction_signer_roster_quorum_ok = (
+            signer_roster_quorum_validation["quorum_ok"]
+        )
+        raw_signer_roster_payload_stored = (
+            raw_signer_roster_payload_stored
+            or signer_roster_quorum_validation["raw_signer_roster_payload_stored"]
+        )
+        raw_jurisdiction_policy_payload_stored = signer_roster_quorum_validation[
+            "raw_jurisdiction_policy_payload_stored"
+        ]
         if receipt.get("raw_key_material_stored") is not False:
             raw_key_material_stored = True
             local_errors.append("key_succession.raw_key_material_stored must be false")
@@ -1920,9 +2074,18 @@ class MemoryReplicationService:
             "threshold_ok": threshold_ok,
             "signer_roster_policy_bound": signer_roster_policy_bound,
             "signer_roster_quorum_ok": signer_roster_quorum_ok,
+            "multi_jurisdiction_signer_roster_quorum_bound": (
+                multi_jurisdiction_signer_roster_quorum_bound
+            ),
+            "multi_jurisdiction_signer_roster_quorum_ok": (
+                multi_jurisdiction_signer_roster_quorum_ok
+            ),
             "raw_key_material_stored": raw_key_material_stored,
             "raw_shard_material_stored": raw_shard_material_stored,
             "raw_signer_roster_payload_stored": raw_signer_roster_payload_stored,
+            "raw_jurisdiction_policy_payload_stored": (
+                raw_jurisdiction_policy_payload_stored
+            ),
         }
 
     def _validate_key_succession_signer_roster_policy(
@@ -1933,13 +2096,15 @@ class MemoryReplicationService:
         source_manifest_digest: Any,
         successor_key_digest: Any,
         errors: List[str],
+        expected_jurisdiction: str = MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION,
+        error_prefix: str = "key_succession.signer_roster_policy",
     ) -> Dict[str, Any]:
         local_errors: List[str] = []
         raw_signer_roster_payload_stored = False
         signer_roster_digest_ok = False
         signature_digests_ok = True
         if not isinstance(receipt, dict):
-            errors.append("key_succession.signer_roster_policy must be an object")
+            errors.append(f"{error_prefix} must be an object")
             return {
                 "bound": False,
                 "quorum_ok": False,
@@ -1947,40 +2112,40 @@ class MemoryReplicationService:
             }
 
         if receipt.get("kind") != "memory_replication_key_succession_signer_roster_policy":
-            local_errors.append("key_succession.signer_roster_policy.kind mismatch")
+            local_errors.append(f"{error_prefix}.kind mismatch")
         if (
             receipt.get("policy_id")
             != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_POLICY_ID
         ):
-            local_errors.append("key_succession.signer_roster_policy.policy_id mismatch")
+            local_errors.append(f"{error_prefix}.policy_id mismatch")
         jurisdiction = receipt.get("jurisdiction")
-        if jurisdiction != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION:
-            local_errors.append("key_succession.signer_roster_policy.jurisdiction mismatch")
+        if jurisdiction != expected_jurisdiction:
+            local_errors.append(f"{error_prefix}.jurisdiction mismatch")
         self._require_non_empty_string(
             receipt.get("policy_ref"),
-            "key_succession.signer_roster_policy.policy_ref",
+            f"{error_prefix}.policy_ref",
             local_errors,
         )
         self._require_non_empty_string(
             receipt.get("signer_roster_ref"),
-            "key_succession.signer_roster_policy.signer_roster_ref",
+            f"{error_prefix}.signer_roster_ref",
             local_errors,
         )
         self._require_digest(
             receipt.get("signer_roster_digest"),
-            "key_succession.signer_roster_policy.signer_roster_digest",
+            f"{error_prefix}.signer_roster_digest",
             local_errors,
         )
         required_signer_roles = self._validate_string_list(
             receipt.get("required_signer_roles"),
-            "key_succession.signer_roster_policy.required_signer_roles",
+            f"{error_prefix}.required_signer_roles",
             local_errors,
             minimum=len(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES),
             unique=True,
         )
         if required_signer_roles != list(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES):
             local_errors.append(
-                "key_succession.signer_roster_policy.required_signer_roles mismatch"
+                f"{error_prefix}.required_signer_roles mismatch"
             )
         if isinstance(receipt.get("signer_roster_digest"), str):
             expected_roster_digest = sha256_text(
@@ -1997,7 +2162,7 @@ class MemoryReplicationService:
             )
             if receipt["signer_roster_digest"] != expected_roster_digest:
                 local_errors.append(
-                    "key_succession.signer_roster_policy.signer_roster_digest mismatch"
+                    f"{error_prefix}.signer_roster_digest mismatch"
                 )
             else:
                 signer_roster_digest_ok = True
@@ -2006,43 +2171,43 @@ class MemoryReplicationService:
             != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_THRESHOLD
         ):
             local_errors.append(
-                "key_succession.signer_roster_policy.quorum_threshold mismatch"
+                f"{error_prefix}.quorum_threshold mismatch"
             )
 
         accepted_signers = receipt.get("accepted_signers")
         accepted_roles: List[str] = []
         if not isinstance(accepted_signers, list):
             local_errors.append(
-                "key_succession.signer_roster_policy.accepted_signers must be a list"
+                f"{error_prefix}.accepted_signers must be a list"
             )
             accepted_signers = []
         for index, signer in enumerate(accepted_signers):
             if not isinstance(signer, dict):
                 signature_digests_ok = False
                 local_errors.append(
-                    f"key_succession.signer_roster_policy.accepted_signers[{index}] must be an object"
+                    f"{error_prefix}.accepted_signers[{index}] must be an object"
                 )
                 continue
             self._require_non_empty_string(
                 signer.get("signer_ref"),
-                f"key_succession.signer_roster_policy.accepted_signers[{index}].signer_ref",
+                f"{error_prefix}.accepted_signers[{index}].signer_ref",
                 local_errors,
             )
             signer_role = signer.get("signer_role")
             self._require_non_empty_string(
                 signer_role,
-                f"key_succession.signer_roster_policy.accepted_signers[{index}].signer_role",
+                f"{error_prefix}.accepted_signers[{index}].signer_role",
                 local_errors,
             )
             if isinstance(signer_role, str) and signer_role:
                 accepted_roles.append(signer_role)
             if signer.get("jurisdiction") != jurisdiction:
                 local_errors.append(
-                    f"key_succession.signer_roster_policy.accepted_signers[{index}].jurisdiction mismatch"
+                    f"{error_prefix}.accepted_signers[{index}].jurisdiction mismatch"
                 )
             self._require_digest(
                 signer.get("signature_digest"),
-                f"key_succession.signer_roster_policy.accepted_signers[{index}].signature_digest",
+                f"{error_prefix}.accepted_signers[{index}].signature_digest",
                 local_errors,
             )
             if not isinstance(signer.get("signature_digest"), str):
@@ -2065,7 +2230,7 @@ class MemoryReplicationService:
                 if signer["signature_digest"] != expected_signature_digest:
                     signature_digests_ok = False
                     local_errors.append(
-                        "key_succession.signer_roster_policy."
+                        f"{error_prefix}."
                         f"accepted_signers[{index}].signature_digest mismatch"
                     )
         signer_roster_quorum_ok = (
@@ -2078,22 +2243,22 @@ class MemoryReplicationService:
         )
         if not signer_roster_quorum_ok:
             local_errors.append(
-                "key_succession.signer_roster_policy.accepted_signers must satisfy signer roster quorum"
+                f"{error_prefix}.accepted_signers must satisfy signer roster quorum"
             )
 
         if receipt.get("quorum_status") != "complete":
             local_errors.append(
-                "key_succession.signer_roster_policy.quorum_status must equal 'complete'"
+                f"{error_prefix}.quorum_status must equal 'complete'"
             )
         if receipt.get("raw_signer_roster_payload_stored") is not False:
             raw_signer_roster_payload_stored = True
             local_errors.append(
-                "key_succession.signer_roster_policy.raw_signer_roster_payload_stored must be false"
+                f"{error_prefix}.raw_signer_roster_payload_stored must be false"
             )
         digest = receipt.get("digest")
         self._require_digest(
             digest,
-            "key_succession.signer_roster_policy.digest",
+            f"{error_prefix}.digest",
             local_errors,
         )
         if isinstance(digest, str):
@@ -2103,12 +2268,246 @@ class MemoryReplicationService:
                 )
             )
             if digest != expected_digest:
-                local_errors.append("key_succession.signer_roster_policy.digest mismatch")
+                local_errors.append(f"{error_prefix}.digest mismatch")
 
         errors.extend(local_errors)
         return {
             "bound": not local_errors,
             "quorum_ok": signer_roster_quorum_ok,
+            "raw_signer_roster_payload_stored": raw_signer_roster_payload_stored,
+        }
+
+    def _validate_key_succession_signer_roster_quorum(
+        self,
+        receipt: Any,
+        *,
+        identity_id: Any,
+        source_manifest_digest: Any,
+        successor_key_digest: Any,
+        primary_signer_roster_policy: Any,
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        local_errors: List[str] = []
+        raw_jurisdiction_policy_payload_stored = False
+        raw_signer_roster_payload_stored = False
+        nested_policies_bound = True
+        nested_policy_quorums_ok = True
+        if not isinstance(receipt, dict):
+            errors.append("key_succession.signer_roster_quorum must be an object")
+            return {
+                "bound": False,
+                "quorum_ok": False,
+                "raw_jurisdiction_policy_payload_stored": False,
+                "raw_signer_roster_payload_stored": False,
+            }
+
+        if receipt.get("kind") != "memory_replication_key_succession_signer_roster_quorum":
+            local_errors.append("key_succession.signer_roster_quorum.kind mismatch")
+        if (
+            receipt.get("policy_id")
+            != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_POLICY_ID
+        ):
+            local_errors.append("key_succession.signer_roster_quorum.policy_id mismatch")
+        self._require_non_empty_string(
+            receipt.get("policy_ref"),
+            "key_succession.signer_roster_quorum.policy_ref",
+            local_errors,
+        )
+        required_jurisdictions = self._validate_string_list(
+            receipt.get("required_jurisdictions"),
+            "key_succession.signer_roster_quorum.required_jurisdictions",
+            local_errors,
+            minimum=len(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS),
+            unique=True,
+        )
+        if required_jurisdictions != list(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        ):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.required_jurisdictions mismatch"
+            )
+        accepted_jurisdictions = self._validate_string_list(
+            receipt.get("accepted_jurisdictions"),
+            "key_succession.signer_roster_quorum.accepted_jurisdictions",
+            local_errors,
+            minimum=MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD,
+            unique=True,
+        )
+        if set(accepted_jurisdictions) != set(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        ):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.accepted_jurisdictions mismatch"
+            )
+        if (
+            receipt.get("quorum_threshold")
+            != MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+        ):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.quorum_threshold mismatch"
+            )
+
+        jurisdiction_policies = receipt.get("jurisdiction_policies")
+        if not isinstance(jurisdiction_policies, list):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.jurisdiction_policies must be a list"
+            )
+            jurisdiction_policies = []
+        if len(jurisdiction_policies) != len(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        ):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.jurisdiction_policies length mismatch"
+            )
+
+        policy_by_jurisdiction: Dict[str, Dict[str, Any]] = {}
+        for index, policy in enumerate(jurisdiction_policies):
+            if not isinstance(policy, dict):
+                nested_policies_bound = False
+                nested_policy_quorums_ok = False
+                local_errors.append(
+                    "key_succession.signer_roster_quorum."
+                    f"jurisdiction_policies[{index}] must be an object"
+                )
+                continue
+            jurisdiction = policy.get("jurisdiction")
+            expected_jurisdiction = (
+                jurisdiction
+                if isinstance(jurisdiction, str)
+                else f"invalid-{index}"
+            )
+            policy_validation = self._validate_key_succession_signer_roster_policy(
+                policy,
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                successor_key_digest=successor_key_digest,
+                errors=local_errors,
+                expected_jurisdiction=expected_jurisdiction,
+                error_prefix=(
+                    "key_succession.signer_roster_quorum."
+                    f"jurisdiction_policies[{index}]"
+                ),
+            )
+            nested_policies_bound = nested_policies_bound and policy_validation["bound"]
+            nested_policy_quorums_ok = (
+                nested_policy_quorums_ok and policy_validation["quorum_ok"]
+            )
+            raw_signer_roster_payload_stored = (
+                raw_signer_roster_payload_stored
+                or policy_validation["raw_signer_roster_payload_stored"]
+            )
+            if isinstance(jurisdiction, str) and jurisdiction:
+                policy_by_jurisdiction[jurisdiction] = policy
+
+        if set(policy_by_jurisdiction) != set(
+            MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS
+        ):
+            local_errors.append(
+                "key_succession.signer_roster_quorum.jurisdiction_policies jurisdiction set mismatch"
+            )
+            nested_policies_bound = False
+
+        if isinstance(primary_signer_roster_policy, dict):
+            primary_digest = primary_signer_roster_policy.get("digest")
+            jp_policy = policy_by_jurisdiction.get(
+                MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION
+            )
+            if not isinstance(jp_policy, dict) or jp_policy.get("digest") != primary_digest:
+                local_errors.append(
+                    "key_succession.signer_roster_quorum must bind primary JP-13 signer_roster_policy"
+                )
+        else:
+            local_errors.append(
+                "key_succession.signer_roster_quorum requires primary signer_roster_policy"
+            )
+
+        expected_policy_refs = [
+            policy["policy_ref"]
+            for policy in jurisdiction_policies
+            if isinstance(policy, dict) and "policy_ref" in policy
+        ]
+        expected_policy_digests = [
+            policy["digest"]
+            for policy in jurisdiction_policies
+            if isinstance(policy, dict) and "digest" in policy
+        ]
+        expected_roster_digests = [
+            policy["signer_roster_digest"]
+            for policy in jurisdiction_policies
+            if isinstance(policy, dict) and "signer_roster_digest" in policy
+        ]
+        expected_signature_digests = [
+            signer["signature_digest"]
+            for policy in jurisdiction_policies
+            if isinstance(policy, dict)
+            for signer in policy.get("accepted_signers", [])
+            if isinstance(signer, dict) and "signature_digest" in signer
+        ]
+        if receipt.get("jurisdiction_policy_refs") != expected_policy_refs:
+            local_errors.append(
+                "key_succession.signer_roster_quorum.jurisdiction_policy_refs mismatch"
+            )
+        if receipt.get("jurisdiction_policy_digests") != expected_policy_digests:
+            local_errors.append(
+                "key_succession.signer_roster_quorum.jurisdiction_policy_digests mismatch"
+            )
+        if receipt.get("signer_roster_digest_set") != expected_roster_digests:
+            local_errors.append(
+                "key_succession.signer_roster_quorum.signer_roster_digest_set mismatch"
+            )
+        if receipt.get("signature_digest_set") != expected_signature_digests:
+            local_errors.append(
+                "key_succession.signer_roster_quorum.signature_digest_set mismatch"
+            )
+
+        quorum_ok = (
+            len(accepted_jurisdictions)
+            >= MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD
+            and set(MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS)
+            .issubset(set(accepted_jurisdictions))
+            and nested_policies_bound
+            and nested_policy_quorums_ok
+        )
+        if not quorum_ok:
+            local_errors.append(
+                "key_succession.signer_roster_quorum must satisfy multi-jurisdiction signer roster quorum"
+            )
+        if receipt.get("quorum_status") != "complete":
+            local_errors.append(
+                "key_succession.signer_roster_quorum.quorum_status must equal 'complete'"
+            )
+        if receipt.get("raw_jurisdiction_policy_payload_stored") is not False:
+            raw_jurisdiction_policy_payload_stored = True
+            local_errors.append(
+                "key_succession.signer_roster_quorum.raw_jurisdiction_policy_payload_stored must be false"
+            )
+        if receipt.get("raw_signer_roster_payload_stored") is not False:
+            raw_signer_roster_payload_stored = True
+            local_errors.append(
+                "key_succession.signer_roster_quorum.raw_signer_roster_payload_stored must be false"
+            )
+        digest = receipt.get("digest")
+        self._require_digest(
+            digest,
+            "key_succession.signer_roster_quorum.digest",
+            local_errors,
+        )
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(
+                    {key: value for key, value in receipt.items() if key != "digest"}
+                )
+            )
+            if digest != expected_digest:
+                local_errors.append("key_succession.signer_roster_quorum.digest mismatch")
+
+        errors.extend(local_errors)
+        return {
+            "bound": not local_errors,
+            "quorum_ok": quorum_ok,
+            "raw_jurisdiction_policy_payload_stored": (
+                raw_jurisdiction_policy_payload_stored
+            ),
             "raw_signer_roster_payload_stored": raw_signer_roster_payload_stored,
         }
 

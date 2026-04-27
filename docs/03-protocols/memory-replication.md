@@ -53,8 +53,9 @@ reference runtime ではこの protocol を
 - 本人が一時的に identity key を失った場合の `threshold-key-succession-guarded-recovery-v1`
   receipt を同じ session に束縛し、3-of-5 Shamir share、2 Guardian attestation、
   successor key digest、rotation ledger ref、JP-13 signer roster policy digest、
-  identity-guardian + integrity-guardian signature digest を保存する。ただし raw key /
-  raw shard material / raw signer roster payload は保存しない
+  identity-guardian + integrity-guardian signature digest に加え、JP-13 / SG-01 の
+  multi-jurisdiction signer roster quorum digest を保存する。ただし raw key /
+  raw shard material / raw jurisdiction policy payload / raw signer roster payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)

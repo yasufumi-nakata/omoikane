@@ -4,8 +4,8 @@ title: MemoryReplicationSession
 description: >
   Quorum-bound MemoryCrystal replication session that fixes four-target
   placement, plaintext metadata plus encrypted payload transfer, random-block
-  Merkle audit, and council-escalated reconciliation without mutating the
-  source manifest.
+  Merkle audit, council-escalated reconciliation, and raw-payload-redacted
+  multi-jurisdiction key succession without mutating the source manifest.
 type: object
 additionalProperties: false
 required:
@@ -60,6 +60,9 @@ properties:
       - key_succession_required_guardians
       - key_succession_signer_roster_policy_id
       - key_succession_signer_roster_jurisdiction
+      - key_succession_signer_roster_quorum_policy_id
+      - key_succession_signer_roster_jurisdictions
+      - key_succession_signer_roster_quorum_threshold
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -121,6 +124,19 @@ properties:
       key_succession_signer_roster_jurisdiction:
         type: string
         const: JP-13
+      key_succession_signer_roster_quorum_policy_id:
+        type: string
+        const: key-succession-multi-jurisdiction-signer-roster-quorum-v1
+      key_succession_signer_roster_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      key_succession_signer_roster_quorum_threshold:
+        type: integer
+        const: 2
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -382,6 +398,7 @@ $defs:
       - successor_key_digest
       - rotation_ledger_ref
       - signer_roster_policy
+      - signer_roster_quorum
       - raw_key_material_stored
       - raw_shard_material_stored
       - status
@@ -458,6 +475,8 @@ $defs:
         minLength: 1
       signer_roster_policy:
         $ref: "#/$defs/key_succession_signer_roster_policy"
+      signer_roster_quorum:
+        $ref: "#/$defs/key_succession_signer_roster_quorum"
       raw_key_material_stored:
         type: boolean
         const: false
@@ -536,7 +555,7 @@ $defs:
         const: key-succession-jurisdiction-signer-roster-policy-v1
       jurisdiction:
         type: string
-        const: JP-13
+        enum: [JP-13, SG-01]
       policy_ref:
         type: string
         minLength: 1
@@ -588,7 +607,103 @@ $defs:
         enum: [identity-guardian, integrity-guardian]
       jurisdiction:
         type: string
-        const: JP-13
+        enum: [JP-13, SG-01]
       signature_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  key_succession_signer_roster_quorum:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - policy_id
+      - policy_ref
+      - required_jurisdictions
+      - accepted_jurisdictions
+      - quorum_threshold
+      - jurisdiction_policy_refs
+      - jurisdiction_policy_digests
+      - signer_roster_digest_set
+      - signature_digest_set
+      - jurisdiction_policies
+      - quorum_status
+      - raw_jurisdiction_policy_payload_stored
+      - raw_signer_roster_payload_stored
+      - digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_key_succession_signer_roster_quorum
+      policy_id:
+        type: string
+        const: key-succession-multi-jurisdiction-signer-roster-quorum-v1
+      policy_ref:
+        type: string
+        minLength: 1
+      required_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      accepted_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      quorum_threshold:
+        type: integer
+        const: 2
+      jurisdiction_policy_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      jurisdiction_policy_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      signer_roster_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      signature_digest_set:
+        type: array
+        minItems: 4
+        maxItems: 4
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      jurisdiction_policies:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/key_succession_signer_roster_policy"
+      quorum_status:
+        type: string
+        const: complete
+      raw_jurisdiction_policy_payload_stored:
+        type: boolean
+        const: false
+      raw_signer_roster_payload_stored:
+        type: boolean
+        const: false
+      digest:
         type: string
         pattern: "^[0-9a-f]{64}$"

@@ -69,6 +69,13 @@ class MindSchemaContractTests(unittest.TestCase):
                 "signer_roster_policy"
             ]["raw_signer_roster_payload_stored"]
         )
+        signer_roster_quorum = result["memory_replication"]["session"]["key_succession"][
+            "signer_roster_quorum"
+        ]
+        self.assertEqual(["JP-13", "SG-01"], signer_roster_quorum["accepted_jurisdictions"])
+        self.assertEqual(2, len(signer_roster_quorum["jurisdiction_policy_digests"]))
+        self.assertEqual(4, len(signer_roster_quorum["signature_digest_set"]))
+        self.assertFalse(signer_roster_quorum["raw_jurisdiction_policy_payload_stored"])
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()

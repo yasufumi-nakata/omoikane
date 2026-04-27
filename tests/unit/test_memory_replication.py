@@ -21,9 +21,27 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["key_succession_threshold_ok"])
         self.assertTrue(validation["key_succession_signer_roster_policy_bound"])
         self.assertTrue(validation["key_succession_signer_roster_quorum_ok"])
+        self.assertTrue(
+            validation[
+                "key_succession_multi_jurisdiction_signer_roster_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            validation[
+                "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
+            ]
+        )
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
         self.assertFalse(validation["raw_signer_roster_payload_stored"])
+        self.assertFalse(validation["raw_jurisdiction_policy_payload_stored"])
+        signer_roster_quorum = session["key_succession"]["signer_roster_quorum"]
+        self.assertEqual(
+            ["JP-13", "SG-01"],
+            signer_roster_quorum["accepted_jurisdictions"],
+        )
+        self.assertEqual(2, len(signer_roster_quorum["jurisdiction_policy_digests"]))
+        self.assertEqual(4, len(signer_roster_quorum["signature_digest_set"]))
         self.assertEqual(["primary", "mirror"], validation["immediate_target_ids"])
         self.assertEqual(["coldstore", "trustee"], validation["delayed_target_ids"])
         self.assertEqual(["coldstore", "mirror", "primary"], validation["consensus_target_ids"])
@@ -108,6 +126,64 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(validation["key_succession_signer_roster_quorum_ok"])
         self.assertTrue(
             any("signature_digest mismatch" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_missing_multi_jurisdiction_signer_quorum(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["key_succession"]["signer_roster_quorum"]["accepted_jurisdictions"] = [
+            "JP-13"
+        ]
+        session["key_succession"]["signer_roster_quorum"]["jurisdiction_policies"] = [
+            session["key_succession"]["signer_roster_quorum"]["jurisdiction_policies"][0]
+        ]
+        session["key_succession"]["signer_roster_quorum"]["digest"] = "0" * 64
+        session["key_succession"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(
+            validation[
+                "key_succession_multi_jurisdiction_signer_roster_quorum_bound"
+            ]
+        )
+        self.assertFalse(
+            validation[
+                "key_succession_multi_jurisdiction_signer_roster_quorum_ok"
+            ]
+        )
+        self.assertTrue(
+            any("multi-jurisdiction" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_raw_jurisdiction_policy_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["key_succession"]["signer_roster_quorum"][
+            "raw_jurisdiction_policy_payload_stored"
+        ] = True
+        session["key_succession"]["signer_roster_quorum"]["digest"] = "0" * 64
+        session["key_succession"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(
+            validation[
+                "key_succession_multi_jurisdiction_signer_roster_quorum_bound"
+            ]
+        )
+        self.assertTrue(validation["raw_jurisdiction_policy_payload_stored"])
+        self.assertTrue(
+            any(
+                "raw_jurisdiction_policy_payload_stored" in error
+                for error in validation["errors"]
+            )
         )
 
 
