@@ -1389,8 +1389,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["consistency_digest_bound"])
         self.assertTrue(result["validation"]["witness_registry_binding_bound"])
         self.assertTrue(result["validation"]["registry_binding_digest_bound"])
+        self.assertTrue(result["validation"]["witness_revocation_verifier_quorum_bound"])
+        self.assertTrue(result["validation"]["revocation_verifier_quorum_digest_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
         self.assertTrue(result["validation"]["revoked_witness_registry_fail_closed"])
+        self.assertTrue(result["validation"]["revocation_verifier_quorum_fail_closed"])
         self.assertEqual(
             "multidimensional-identity-confirmation-v1",
             result["confirmation_profile"]["profile_id"],
@@ -1407,12 +1410,24 @@ class CliIntegrationTests(unittest.TestCase):
             result["confirmation_profile"]["witness_registry_binding"]["policy_id"],
         )
         self.assertEqual("bound", result["confirmation_profile"]["witness_registry_binding"]["status"])
+        self.assertEqual(
+            "complete",
+            result["confirmation_profile"]["witness_registry_binding"][
+                "revocation_verifier_quorum_status"
+            ],
+        )
         self.assertFalse(
             result["confirmation_profile"]["witness_registry_binding"][
                 "raw_registry_payload_stored"
             ]
         )
+        self.assertFalse(
+            result["confirmation_profile"]["witness_registry_binding"][
+                "raw_revocation_verifier_payload_stored"
+            ]
+        )
         self.assertEqual("failed", result["revoked_witness_profile"]["result"])
+        self.assertEqual("failed", result["verifier_blocked_profile"]["result"])
 
     def test_scheduler_demo_emits_timeout_rollback_and_completion(self) -> None:
         stdout = io.StringIO()

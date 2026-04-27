@@ -252,6 +252,16 @@ properties:
       - witness_registry_status
       - witness_revocation_status
       - role_binding_status
+      - revocation_verifier_policy_id
+      - revocation_verifier_profile
+      - revocation_verifier_receipts
+      - revocation_verifier_response_digest_set
+      - revocation_verifier_response_set_digest
+      - revocation_verifier_jurisdictions
+      - revocation_verifier_quorum_threshold
+      - revocation_verifier_quorum_status
+      - revocation_verifier_quorum_digest
+      - raw_revocation_verifier_payload_stored
       - raw_registry_payload_stored
       - status
       - registry_binding_digest
@@ -315,6 +325,97 @@ properties:
       role_binding_status:
         type: string
         enum: [bound, missing]
+      revocation_verifier_policy_id:
+        type: string
+        const: identity-witness-revocation-live-verifier-quorum-v1
+      revocation_verifier_profile:
+        type: string
+        const: dual-jurisdiction-revocation-live-verifier-v1
+      revocation_verifier_receipts:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - verifier_ref
+            - jurisdiction
+            - response_ref
+            - registry_ref
+            - registry_snapshot_digest
+            - covered_revocation_refs
+            - response_status
+            - checked_at
+            - freshness_window_seconds
+            - freshness_status
+            - raw_verifier_payload_stored
+            - response_digest
+          properties:
+            verifier_ref:
+              type: string
+              minLength: 1
+            jurisdiction:
+              type: string
+              enum: [JP-13, US-CA]
+            response_ref:
+              type: string
+              minLength: 1
+            registry_ref:
+              type: string
+              minLength: 1
+            registry_snapshot_digest:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+            covered_revocation_refs:
+              type: array
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 1
+            response_status:
+              type: string
+              enum: [not-revoked, revoked, unknown]
+            checked_at:
+              type: string
+              format: date-time
+            freshness_window_seconds:
+              type: integer
+              minimum: 1
+            freshness_status:
+              type: string
+              enum: [fresh, stale]
+            raw_verifier_payload_stored:
+              type: boolean
+              const: false
+            response_digest:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+      revocation_verifier_response_digest_set:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      revocation_verifier_response_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      revocation_verifier_jurisdictions:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum: [JP-13, US-CA]
+      revocation_verifier_quorum_threshold:
+        type: integer
+        const: 2
+      revocation_verifier_quorum_status:
+        type: string
+        enum: [complete, incomplete]
+      revocation_verifier_quorum_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      raw_revocation_verifier_payload_stored:
+        type: boolean
+        const: false
       raw_registry_payload_stored:
         type: boolean
         const: false
@@ -429,6 +530,7 @@ properties:
         - third-party-witness-quorum-not-met
         - self-report-witness-consistency-not-bound
         - witness-registry-binding-not-bound
+        - witness-revocation-verifier-quorum-not-bound
         - aggregate-threshold-not-met
   confirmation_digest:
     type: string
@@ -535,6 +637,46 @@ examples:
       witness_registry_status: current
       witness_revocation_status: not-revoked
       role_binding_status: bound
+      revocation_verifier_policy_id: identity-witness-revocation-live-verifier-quorum-v1
+      revocation_verifier_profile: dual-jurisdiction-revocation-live-verifier-v1
+      revocation_verifier_receipts:
+        - verifier_ref: identity-witness-revocation-verifier://jp-13/reference-runtime
+          jurisdiction: JP-13
+          response_ref: identity-witness-revocation-verifier-response://jp13
+          registry_ref: identity-witness-registry://reference-runtime/current
+          registry_snapshot_digest: "7878787878787878787878787878787878787878787878787878787878787878"
+          covered_revocation_refs:
+            - identity-witness-revocation://clinician-primary
+            - identity-witness-revocation://guardian-observer
+          response_status: not-revoked
+          checked_at: "2026-04-24T12:00:00+00:00"
+          freshness_window_seconds: 3600
+          freshness_status: fresh
+          raw_verifier_payload_stored: false
+          response_digest: "5757575757575757575757575757575757575757575757575757575757575757"
+        - verifier_ref: identity-witness-revocation-verifier://us-ca/reference-runtime
+          jurisdiction: US-CA
+          response_ref: identity-witness-revocation-verifier-response://usca
+          registry_ref: identity-witness-registry://reference-runtime/current
+          registry_snapshot_digest: "7878787878787878787878787878787878787878787878787878787878787878"
+          covered_revocation_refs:
+            - identity-witness-revocation://clinician-primary
+            - identity-witness-revocation://guardian-observer
+          response_status: not-revoked
+          checked_at: "2026-04-24T12:00:00+00:00"
+          freshness_window_seconds: 3600
+          freshness_status: fresh
+          raw_verifier_payload_stored: false
+          response_digest: "5858585858585858585858585858585858585858585858585858585858585858"
+      revocation_verifier_response_digest_set:
+        - "5757575757575757575757575757575757575757575757575757575757575757"
+        - "5858585858585858585858585858585858585858585858585858585858585858"
+      revocation_verifier_response_set_digest: "5959595959595959595959595959595959595959595959595959595959595959"
+      revocation_verifier_jurisdictions: [JP-13, US-CA]
+      revocation_verifier_quorum_threshold: 2
+      revocation_verifier_quorum_status: complete
+      revocation_verifier_quorum_digest: "6060606060606060606060606060606060606060606060606060606060606060"
+      raw_revocation_verifier_payload_stored: false
       raw_registry_payload_stored: false
       status: bound
       registry_binding_digest: "8989898989898989898989898989898989898989898989898989898989898989"

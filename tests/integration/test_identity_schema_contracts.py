@@ -59,6 +59,10 @@ class IdentitySchemaContractTests(unittest.TestCase):
             "specs/schemas/identity_confirmation_profile.schema",
             result["revoked_witness_profile"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/identity_confirmation_profile.schema",
+            result["verifier_blocked_profile"],
+        )
 
 
 if __name__ == "__main__":

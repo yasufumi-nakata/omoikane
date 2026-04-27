@@ -97,6 +97,7 @@ operations:
       - multidimensional-identity-confirmation-v1
       - identity-self-report-witness-consistency-v1
       - identity-witness-registry-binding-v1
+      - identity-witness-revocation-live-verifier-quorum-v1
     input:
       inline_schema:
         type: object
@@ -188,6 +189,38 @@ operations:
                   type: number
                   minimum: 0
                   maximum: 1
+          witness_revocation_verifier_receipts:
+            type: array
+            items:
+              type: object
+              required:
+                - verifier_ref
+                - jurisdiction
+              properties:
+                verifier_ref:
+                  type: string
+                  minLength: 1
+                jurisdiction:
+                  type: string
+                  enum:
+                    - JP-13
+                    - US-CA
+                response_status:
+                  type: string
+                  enum:
+                    - not-revoked
+                    - revoked
+                    - unknown
+                freshness_status:
+                  type: string
+                  enum:
+                    - fresh
+                    - stale
+                covered_revocation_refs:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
           witness_registry_ref:
             type: string
             minLength: 1
@@ -225,3 +258,4 @@ compatibility:
     - confirm_active_transition uses a fixed multidimensional profile with episodic recall, self-model alignment, subjective self-report, and third-party witness quorum.
     - active transition also requires identity-self-report-witness-consistency-v1, which binds the self-report evidence digest, accepted witness digest set, required roles, and bounded score delta to the same continuity subject.
     - accepted witnesses must also bind current witness registry entries, verifier key refs, and not-revoked revocation refs via identity-witness-registry-binding-v1; raw registry payloads are not stored.
+    - identity-witness-registry-binding-v1 requires identity-witness-revocation-live-verifier-quorum-v1, a dual-jurisdiction verifier quorum over the accepted revocation refs, before Active transition can pass.

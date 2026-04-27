@@ -1563,15 +1563,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["consistency_digest_bound"])
         self.assertTrue(result["validation"]["witness_registry_binding_bound"])
         self.assertTrue(result["validation"]["registry_binding_digest_bound"])
+        self.assertTrue(result["validation"]["witness_revocation_verifier_quorum_bound"])
+        self.assertTrue(result["validation"]["revocation_verifier_receipts_bound"])
+        self.assertTrue(result["validation"]["revocation_verifier_quorum_digest_bound"])
         self.assertTrue(result["validation"]["confirmation_digest_bound"])
         self.assertTrue(result["validation"]["ledger_event_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
         self.assertTrue(result["validation"]["revoked_witness_registry_fail_closed"])
+        self.assertTrue(result["validation"]["revocation_verifier_quorum_fail_closed"])
         self.assertEqual("passed", result["confirmation_profile"]["result"])
         self.assertTrue(result["confirmation_profile"]["active_transition_allowed"])
         self.assertEqual(
             "bound",
             result["confirmation_profile"]["witness_registry_binding"]["status"],
+        )
+        self.assertEqual(
+            "complete",
+            result["confirmation_profile"]["witness_registry_binding"][
+                "revocation_verifier_quorum_status"
+            ],
         )
         self.assertEqual(
             "bound",
@@ -1581,6 +1591,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["blocked_profile"]["active_transition_allowed"])
         self.assertEqual("failed", result["revoked_witness_profile"]["result"])
         self.assertFalse(result["revoked_witness_profile"]["active_transition_allowed"])
+        self.assertEqual("failed", result["verifier_blocked_profile"]["result"])
+        self.assertFalse(result["verifier_blocked_profile"]["active_transition_allowed"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])
 
     def test_scheduler_demo_reports_timeout_rollback_and_completion(self) -> None:

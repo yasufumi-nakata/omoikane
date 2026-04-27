@@ -6,7 +6,8 @@ description: >
   subjective self-report、third-party witness alignment を同じ digest-bound
   profile に束ね、全 dimension、witness quorum、self-report / witness consistency が pass した場合だけ
   active_transition_allowed=true になること。accepted witness は role 名だけでなく、
-  current registry entry、verifier key ref、not-revoked revocation ref へ digest-bound されること。
+  current registry entry、verifier key ref、not-revoked revocation ref、dual-jurisdiction
+  live revocation verifier quorum へ digest-bound されること。
 fixtures:
   - scenario: multidimensional_profile_passes
     profile_id: multidimensional-identity-confirmation-v1
@@ -21,7 +22,9 @@ fixtures:
       witness_quorum_status: met
       self_report_witness_consistency_status: bound
       witness_registry_binding_status: bound
+      revocation_verifier_quorum_status: complete
       raw_registry_payload_stored: false
+      raw_revocation_verifier_payload_stored: false
   - scenario: low_self_report_and_missing_witness_fail_closed
     expected:
       result: failed
@@ -46,13 +49,23 @@ fixtures:
       witness_registry_binding_status: unbound
       failure_reasons:
         - witness-registry-binding-not-bound
+  - scenario: incomplete_revocation_verifier_quorum_fails_closed
+    profile_id: identity-witness-revocation-live-verifier-quorum-v1
+    expected:
+      result: failed
+      active_transition_allowed: false
+      revocation_verifier_quorum_status: incomplete
+      failure_reasons:
+        - witness-revocation-verifier-quorum-not-bound
 assertions:
   - Every confirmation profile must include exactly the four required dimensions.
   - Subjective self-report must be digest-bound to the subjective_self_report dimension.
   - Third-party witness alignment must meet a clinician + guardian quorum of two accepted receipts.
   - Accepted witness receipts must bind registry_entry_digest, verifier_key_ref, and revocation_ref from a current non-revoked witness registry without retaining raw registry payloads.
+  - Accepted witness revocation refs must be checked by a JP-13 / US-CA live verifier quorum, and only complete not-revoked fresh receipts may pass Active transition.
   - Self-report / witness consistency must bind the same self-report evidence digest, accepted witness digest set, required roles, and score delta <= 0.12 to the continuity subject.
   - Revoked, stale, or unknown witness registry entries must fail closed even when alignment_score alone is above threshold.
+  - Incomplete, stale, unknown, or non-quorum revocation verifier receipts must fail closed even when the witness registry entries themselves are current.
   - The confirmation_digest must cover the profile core excluding only confirmation_id, confirmed_at, and confirmation_digest.
   - Failed profiles must return failed-ascension-or-repeat-ascending instead of allowing Active transition.
 metric: exact-match

@@ -131,10 +131,13 @@ accepted witness digest set、required roles、score delta `<=0.12` を
 同じ continuity subject に束縛すること、さらに
 `identity-witness-registry-binding-v1` が accepted witness の current registry entry、
 verifier key ref、not-revoked revocation ref を raw registry payload なしで
-束縛することを確認する。
+束縛し、さらに `identity-witness-revocation-live-verifier-quorum-v1` が
+accepted revocation refs を JP-13 / US-CA の dual verifier quorum、
+freshness window、digest-only response set に束縛することを確認する。
 同じ demo は低い self-report と witness quorum 不足を
 `failed-ascension-or-repeat-ascending` へ fail-closed する blocked profile と、
-revoked witness を accepted witness から除外して fail-closed する profile も返す。
+revoked witness を accepted witness から除外して fail-closed する profile、
+revocation verifier quorum が incomplete の profile も返す。
 
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、

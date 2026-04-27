@@ -584,6 +584,9 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(validation["consistency_digest_bound"])
         self.assertTrue(validation["witness_registry_binding_bound"])
         self.assertTrue(validation["registry_binding_digest_bound"])
+        self.assertTrue(validation["witness_revocation_verifier_quorum_bound"])
+        self.assertTrue(validation["revocation_verifier_receipts_bound"])
+        self.assertTrue(validation["revocation_verifier_quorum_digest_bound"])
         self.assertTrue(validation["confirmation_digest_bound"])
         self.assertEqual(
             "identity-witness-registry-binding-v1",
@@ -591,6 +594,17 @@ class KernelTests(unittest.TestCase):
         )
         self.assertEqual("bound", profile["witness_registry_binding"]["status"])
         self.assertFalse(profile["witness_registry_binding"]["raw_registry_payload_stored"])
+        self.assertEqual(
+            "identity-witness-revocation-live-verifier-quorum-v1",
+            profile["witness_registry_binding"]["revocation_verifier_policy_id"],
+        )
+        self.assertEqual(
+            "complete",
+            profile["witness_registry_binding"]["revocation_verifier_quorum_status"],
+        )
+        self.assertFalse(
+            profile["witness_registry_binding"]["raw_revocation_verifier_payload_stored"]
+        )
         self.assertTrue(
             all(
                 receipt["registry_status"] == "current"
@@ -750,6 +764,74 @@ class KernelTests(unittest.TestCase):
         ]
         self.assertEqual(1, len(revoked_receipts))
         self.assertEqual("fail", revoked_receipts[0]["status"])
+
+    def test_identity_confirmation_blocks_incomplete_revocation_verifier_quorum(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-confirmation-verifier-quorum")
+
+        profile = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-verifier-quorum",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-verifier-quorum",
+            episodic_recall_ref="episodic://identity-confirmation-verifier-quorum/recall",
+            self_model_ref="self-model://identity-confirmation-verifier-quorum/stable",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-verifier-quorum/high",
+                "statement": "I confirm continuity with the pre-upload self.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation-verifier-quorum/clinician",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation-verifier-quorum/recall",
+                    "alignment_score": 0.89,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation-verifier-quorum/guardian",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation-verifier-quorum/self-model",
+                    "alignment_score": 0.9,
+                },
+            ],
+            witness_revocation_verifier_receipts=[
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://jp-13/reference-runtime"
+                    ),
+                    "jurisdiction": "JP-13",
+                    "response_status": "not-revoked",
+                },
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://us-ca/reference-runtime"
+                    ),
+                    "jurisdiction": "US-CA",
+                    "response_status": "unknown",
+                },
+            ],
+        )
+
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+
+        self.assertEqual("failed", profile["result"])
+        self.assertFalse(profile["active_transition_allowed"])
+        self.assertTrue(validation["third_party_witness_quorum_met"])
+        self.assertTrue(validation["self_report_witness_consistency_bound"])
+        self.assertFalse(validation["witness_registry_binding_bound"])
+        self.assertTrue(validation["registry_binding_digest_bound"])
+        self.assertFalse(validation["witness_revocation_verifier_quorum_bound"])
+        self.assertTrue(validation["confirmation_digest_bound"])
+        self.assertEqual(
+            "incomplete",
+            profile["witness_registry_binding"]["revocation_verifier_quorum_status"],
+        )
+        self.assertIn(
+            "witness-revocation-verifier-quorum-not-bound",
+            profile["failure_reasons"],
+        )
 
     def test_termination_gate_completes_and_releases_allocation(self) -> None:
         registry = IdentityRegistry()
