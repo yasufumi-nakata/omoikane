@@ -69,6 +69,10 @@ repo-local `agents/` から選んだ builder handoff が
 selected proposal profile の required coverage へだけ分解され、
 actual subprocess worker receipt として machine-checkable に実行されること。
 
+### Yaoyorozu Agent Source Definition Contract
+raw `agents/**/*.yaml` が non-empty substrate / schema refs / policy refs を持ち、
+registry materialization 前に schema-bound contract として reject されること。
+
 ### Yaoyorozu External Workspace Execution
 workspace discovery により選ばれた non-source candidate workspace へ
 profile-covered builder worker が束縛され、
@@ -156,6 +160,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `task_graph_complexity_guard.yaml`
 - `trust_cross_substrate_transfer.yaml`
 - `trust_score_update_guard.yaml`
+- `yaoyorozu_agent_source_definition_contract.yaml`
 - `yaoyorozu_build_request_binding.yaml`
 - `yaoyorozu_execution_chain_binding.yaml`
 - `yaoyorozu_external_workspace_execution.yaml`

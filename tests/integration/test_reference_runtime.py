@@ -671,6 +671,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["empty_eval_surface_count"])
         self.assertEqual(0, report["catalog_pending_count"])
         self.assertEqual(0, report["inventory_drift_count"])
+        self.assertEqual(0, report["catalog_coverage_gap_count"])
+        self.assertEqual([], report["catalog_coverage_gap_hits"])
         self.assertIn("decision_log_residual_count", report)
         self.assertEqual(
             report["decision_log_residual_count"],

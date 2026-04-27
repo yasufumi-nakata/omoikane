@@ -1,0 +1,14 @@
+eval_id: yaoyorozu_agent_source_definition_contract
+surface: agentic
+target: YaoyorozuRegistryService.sync_registry
+description: raw agents/**/*.yaml が registry materialization 前に schema-bound contract を満たすこと
+must:
+  - agent_source_definition.schema requires non-empty substrate_requirements
+  - agent_source_definition.schema requires non-empty input_schema_ref and output_schema_ref
+  - registry sync rejects raw source definitions with missing required fields
+  - registry entries preserve non-empty substrate and schema refs after materialization
+expected:
+  agent_source_definition_schema_bound: true
+  missing_schema_ref_rejected: true
+  empty_substrate_rejected: true
+  registry_entries_non_empty_contract: true

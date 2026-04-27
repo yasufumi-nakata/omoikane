@@ -15,6 +15,8 @@ capabilities:
   - energy-budget.shared-fabric.verify
 trust_floor: 0.99
 substrate_requirements: ['any']
+input_schema_ref: specs/schemas/ethics_query.yaml
+output_schema_ref: specs/schemas/ethics_decision.yaml
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |

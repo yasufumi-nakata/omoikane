@@ -2895,6 +2895,49 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertIn("councilor", snapshot["role_index"])
         self.assertIn("docs.propose-change", snapshot["capability_index"])
         self.assertGreaterEqual(snapshot["selection_ready_counts"]["guardian_ready"], 1)
+        for entry in snapshot["entries"]:
+            self.assertTrue(entry["substrate_requirements"], entry["agent_id"])
+            self.assertTrue(entry["input_schema_ref"], entry["agent_id"])
+            self.assertTrue(entry["output_schema_ref"], entry["agent_id"])
+
+    def test_sync_rejects_agent_source_definition_missing_schema_refs(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-agent-source-") as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "agents" / "builders").mkdir(parents=True)
+            (repo_root / "agents" / "builders" / "codex-builder.policy.md").write_text(
+                "# policy\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas").mkdir(parents=True)
+            (repo_root / "specs" / "schemas" / "build_artifact.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            self._write_workspace_agent(
+                repo_root,
+                "agents/builders/incomplete-builder.yaml",
+                (
+                    "name: incomplete-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - code.generate\n"
+                    "trust_floor: 0.5\n"
+                    "substrate_requirements: ['classical_silicon']\n"
+                    "output_schema_ref: specs/schemas/build_artifact.yaml\n"
+                    "ethics_constraints: []\n"
+                    "prompt_or_policy_ref: agents/builders/codex-builder.policy.md\n"
+                    "when_to_invoke: |\n"
+                    "  - test\n"
+                    "when_not_to_invoke: |\n"
+                    "  - never\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(ValueError, "input_schema_ref must be a non-empty string"):
+                service.sync_from_agents_directory(repo_root / "agents")
 
     def test_discover_workspace_workers_returns_bounded_cross_workspace_catalog(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]

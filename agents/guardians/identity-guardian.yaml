@@ -8,6 +8,7 @@ capabilities:
   - cognitive_audit.multi_jurisdiction_review
   - cognitive_audit.non_loopback_verifier_transport_review
 trust_floor: 0.99
+substrate_requirements: ['any']
 input_schema_ref: specs/schemas/identity_confirmation_profile.schema
 output_schema_ref: specs/schemas/identity_confirmation_profile.schema
 ethics_constraints: ['ALL']

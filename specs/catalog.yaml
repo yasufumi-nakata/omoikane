@@ -81,6 +81,18 @@ entries:
       - evals/identity-fidelity/identity_confirmation_profile.yaml
     rationale: Required to serialize the multidimensional Ascending to Active identity confirmation profile with self-report, third-party witness quorum, self-report/witness consistency binding, and digest-only witness registry / verifier key / revocation plus live verifier quorum and verifier roster policy binding.
   - priority: P1
+    kind: interface
+    file: specs/interfaces/kernel.identity.v0.idl
+    consumers:
+      - reference-runtime
+      - specs/schemas/identity_record.schema
+      - specs/schemas/identity_confirmation_profile.schema
+      - docs/02-subsystems/kernel/identity-lifecycle.md
+      - evals/identity-fidelity/identity_pause_resume_contract.yaml
+      - evals/identity-fidelity/identity_confirmation_profile.yaml
+      - agents/guardians/identity-guardian.yaml
+    rationale: Required to bind IdentityRegistry pause/resume and Ascending to Active confirmation operations to the public identity record and confirmation schemas.
+  - priority: P1
     kind: schema
     file: specs/schemas/ethics_event.schema
     consumers:
@@ -2385,6 +2397,18 @@ entries:
     rationale: Required to serialize one repo-local agent definition together with its trust-bound eligibility state.
   - priority: P1
     kind: schema
+    file: specs/schemas/agent_source_definition.schema
+    consumers:
+      - agents/README.md
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - specs/schemas/agent_registry_entry.schema
+      - specs/schemas/yaoyorozu_registry_snapshot.schema
+      - docs/07-reference-implementation/README.md
+      - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+      - reference-runtime
+    rationale: Required to validate raw repo-local agents/*.yaml definitions before Yaoyorozu registry materialization, preventing empty substrate or schema refs from being silently rounded into registry entries.
+  - priority: P1
+    kind: schema
     file: specs/schemas/yaoyorozu_workspace_discovery.schema
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
@@ -2568,6 +2592,15 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects same-host subprocess worker dispatch coverage, zero-exit execution, and receipt completeness for Yaoyorozu builder handoff.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+    consumers:
+      - specs/schemas/agent_source_definition.schema
+      - specs/schemas/agent_registry_entry.schema
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects schema-bound raw agent definition validation before registry materialization, including non-empty substrate requirements and schema refs.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_external_workspace_execution.yaml

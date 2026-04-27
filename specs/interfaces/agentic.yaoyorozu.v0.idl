@@ -4,6 +4,7 @@ namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
 summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
+  agent_source_definition: ../schemas/agent_source_definition.schema
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_workspace_guardian_preseed_gate: ../schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
   yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
@@ -75,6 +76,7 @@ operations:
       schema_ref: yaoyorozu_registry_snapshot
     guarantees:
       - synced entries must remain bound to repo-local agents/ definitions
+      - raw agent definitions must satisfy agent_source_definition before registry materialization
       - every entry must carry a trust_snapshot and trust_floor
       - role_index and capability_index must remain machine-readable
   prepare_council_convocation:

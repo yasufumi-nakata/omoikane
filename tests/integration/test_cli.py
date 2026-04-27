@@ -26,6 +26,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual([], result["missing_required_reference_files"])
         self.assertEqual(0, result["missing_expected_file_count"])
         self.assertEqual(0, result["inventory_drift_count"])
+        self.assertEqual(0, result["catalog_coverage_gap_count"])
+        self.assertEqual([], result["catalog_coverage_gap_hits"])
         self.assertIn("decision_log_residual_count", result)
         self.assertEqual(
             result["decision_log_residual_count"],

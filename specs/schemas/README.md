@@ -5,6 +5,7 @@
 - `affect_state.schema`
 - `affect_transition.schema`
 - `agent_registry_entry.schema`
+- `agent_source_definition.schema`
 - `amendment_decision.schema`
 - `amendment_proposal.schema`
 - `ascension_plan.schema`

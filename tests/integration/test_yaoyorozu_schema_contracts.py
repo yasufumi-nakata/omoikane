@@ -52,6 +52,17 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             result["registry"],
         )
 
+    def test_repo_agent_sources_match_public_schema(self) -> None:
+        schema = _load_schema("specs/schemas/agent_source_definition.schema")
+        validator = jsonschema.Draft202012Validator(schema)
+
+        for source_path in sorted((REPO_ROOT / "agents").rglob("*.yaml")):
+            payload = yaml.safe_load(source_path.read_text(encoding="utf-8"))
+            errors = sorted(validator.iter_errors(payload), key=lambda error: list(error.path))
+            if errors:
+                formatted = "\n".join(error.message for error in errors[:5])
+                self.fail(f"{source_path.relative_to(REPO_ROOT)} validation failed:\n{formatted}")
+
     def test_workspace_discovery_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
 

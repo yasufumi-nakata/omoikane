@@ -6,6 +6,9 @@ capabilities:
   - theory.compare
   - hypothesis.propose
 trust_floor: 0.4
+substrate_requirements: ['any']
+input_schema_ref: specs/schemas/council_input.yaml
+output_schema_ref: specs/schemas/council_output.yaml
 ethics_constraints: []
 prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
 when_to_invoke: |

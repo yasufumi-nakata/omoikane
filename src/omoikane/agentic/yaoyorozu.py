@@ -90,6 +90,23 @@ YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
 YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE = (
     "human-oversight-channel-preseed-attestation-v1"
 )
+AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
+AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
+AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
+AGENT_SOURCE_REQUIRED_STRING_FIELDS = (
+    "name",
+    "role",
+    "version",
+    "input_schema_ref",
+    "output_schema_ref",
+    "prompt_or_policy_ref",
+    "when_to_invoke",
+    "when_not_to_invoke",
+)
+AGENT_SOURCE_REQUIRED_LIST_FIELDS = (
+    "capabilities",
+    "substrate_requirements",
+)
 YAOYOROZU_WORKSPACE_GUARDIAN_ROLE = "integrity"
 YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
 YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
@@ -440,6 +457,52 @@ def _parse_agent_definition(path: Path) -> Dict[str, Any]:
         data[key] = value.strip().strip("'\"")
         index += 1
     return data
+
+
+def _validate_agent_source_definition(
+    data: Mapping[str, Any],
+    path: Path,
+    repo_root: Path,
+) -> List[str]:
+    errors: List[str] = []
+
+    for field_name in AGENT_SOURCE_REQUIRED_STRING_FIELDS:
+        value = data.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{field_name} must be a non-empty string")
+
+    for field_name in AGENT_SOURCE_REQUIRED_LIST_FIELDS:
+        values = _normalize_string_list(data.get(field_name, []))
+        if not values:
+            errors.append(f"{field_name} must contain at least one non-empty item")
+
+    role = str(data.get("role", "")).strip()
+    if role and role not in AGENT_SOURCE_ALLOWED_ROLES:
+        errors.append(f"role must be one of {sorted(AGENT_SOURCE_ALLOWED_ROLES)}")
+
+    version = str(data.get("version", "")).strip()
+    version_parts = version.split(".")
+    if version and (len(version_parts) != 3 or not all(part.isdigit() for part in version_parts)):
+        errors.append("version must be semver-like MAJOR.MINOR.PATCH")
+
+    try:
+        trust_floor = float(data.get("trust_floor"))
+    except (TypeError, ValueError):
+        errors.append("trust_floor must be a number between 0 and 1")
+    else:
+        if not 0.0 <= trust_floor <= 1.0:
+            errors.append("trust_floor must be between 0 and 1")
+
+    for ref_field in ("input_schema_ref", "output_schema_ref", "prompt_or_policy_ref"):
+        ref = str(data.get(ref_field, "")).strip()
+        if ref and ref.startswith(("agents/", "specs/")) and not (repo_root / ref).is_file():
+            errors.append(f"{ref_field} must reference an existing repo file: {ref}")
+
+    source_ref = str(path.relative_to(repo_root)) if path.is_relative_to(repo_root) else str(path)
+    if not source_ref.startswith("agents/"):
+        errors.append("source definition must live under agents/")
+
+    return errors
 
 
 def _dispatch_unit_digest_payload(unit: Mapping[str, Any]) -> Dict[str, Any]:
@@ -2716,6 +2779,13 @@ class YaoyorozuRegistryService:
         self._entries = {}
         for definition_path in sorted(agents_root.resolve().rglob("*.yaml")):
             parsed = _parse_agent_definition(definition_path)
+            source_errors = _validate_agent_source_definition(parsed, definition_path, repo_root)
+            if source_errors:
+                source_ref = str(definition_path.relative_to(repo_root))
+                raise ValueError(
+                    f"{source_ref} violates {AGENT_SOURCE_DEFINITION_POLICY_ID}: "
+                    + "; ".join(source_errors)
+                )
             agent_id = str(parsed.get("name") or definition_path.stem).strip()
             entry = YaoyorozuRegistryEntry(
                 agent_id=agent_id,

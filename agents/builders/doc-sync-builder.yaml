@@ -6,6 +6,7 @@ capabilities:
   - sync.docs-to-impl
   - sync.impl-to-docs
 trust_floor: 0.6
+substrate_requirements: ['classical_silicon']
 input_schema_ref: specs/schemas/design_delta_manifest.schema
 output_schema_ref: specs/schemas/build_request.yaml
 ethics_constraints: []

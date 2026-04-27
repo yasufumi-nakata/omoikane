@@ -58,6 +58,10 @@ TRUTH_SOURCE_INVENTORY_SPECS = (
     ("specs/interfaces/README.md", "specs/interfaces", (".idl",)),
     ("specs/schemas/README.md", "specs/schemas", (".schema", ".yaml")),
 )
+CATALOG_COVERAGE_SPECS = (
+    ("specs/interfaces", (".idl",)),
+    ("specs/schemas", (".schema", ".yaml")),
+)
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
 
 
@@ -73,6 +77,7 @@ class GapScanner:
         catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
+        catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
@@ -120,6 +125,14 @@ class GapScanner:
                 {
                     "priority": "high",
                     "kind": "inventory-drift",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
+        for hit in catalog_coverage_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "catalog-coverage-gap",
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
@@ -172,6 +185,7 @@ class GapScanner:
             "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
             "inventory_drift_count": len(inventory_drift_hits),
+            "catalog_coverage_gap_count": len(catalog_coverage_hits),
             "future_work_hit_count": len(future_work_hits),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
@@ -183,6 +197,7 @@ class GapScanner:
             "catalog_pending_files": catalog_pending,
             "placeholder_hits": placeholder_hits,
             "inventory_drift_hits": inventory_drift_hits,
+            "catalog_coverage_gap_hits": catalog_coverage_hits,
             "future_work_hits": future_work_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
@@ -338,6 +353,45 @@ class GapScanner:
                     }
                 )
         return hits
+
+    def _catalog_coverage_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        catalog_path = repo_root / "specs" / "catalog.yaml"
+        if not catalog_path.exists():
+            return []
+
+        catalog_files = self._catalog_declared_files(catalog_path)
+        hits: List[Dict[str, str]] = []
+        for directory_name, suffixes in CATALOG_COVERAGE_SPECS:
+            directory_path = repo_root / directory_name
+            if not directory_path.exists():
+                continue
+            for path in sorted(directory_path.iterdir()):
+                if not path.is_file() or path.suffix not in suffixes:
+                    continue
+                relative_path = str(path.relative_to(repo_root))
+                if relative_path in catalog_files:
+                    continue
+                hits.append(
+                    {
+                        "path": "specs/catalog.yaml",
+                        "line": f"`{relative_path}` is implemented but missing from catalog entries",
+                        "missing_catalog_file": relative_path,
+                    }
+                )
+        return hits
+
+    @staticmethod
+    def _catalog_declared_files(catalog_path: Path) -> set[str]:
+        files: set[str] = set()
+        for line in catalog_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("file:"):
+                continue
+            _, _, value = stripped.partition(":")
+            candidate = value.strip().strip("'\"")
+            if candidate:
+                files.add(candidate)
+        return files
 
     def _future_work_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []

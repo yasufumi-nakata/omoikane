@@ -170,6 +170,52 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_uncataloged_implemented_spec_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            interfaces_root = repo_root / "specs" / "interfaces"
+            schemas_root = repo_root / "specs" / "schemas"
+            (interfaces_root / "README.md").write_text(
+                "# Interfaces\n\n- `kernel.identity.v0.idl`\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "README.md").write_text(
+                "# Schemas\n\n- `identity_record.schema`\n",
+                encoding="utf-8",
+            )
+            (interfaces_root / "kernel.identity.v0.idl").write_text(
+                "idl_version: 1\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "identity_record.schema").write_text(
+                "{\n  \"type\": \"object\"\n}\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "catalog.yaml").write_text(
+                "catalog_version: 1\n"
+                "entries:\n"
+                "  - priority: P1\n"
+                "    kind: schema\n"
+                "    file: specs/schemas/identity_record.schema\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["catalog_coverage_gap_count"])
+            self.assertEqual(
+                "specs/catalog.yaml",
+                report["catalog_coverage_gap_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "specs/interfaces/kernel.identity.v0.idl",
+                report["catalog_coverage_gap_hits"][0]["missing_catalog_file"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "catalog-coverage-gap" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_ignores_cross_surface_eval_references(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

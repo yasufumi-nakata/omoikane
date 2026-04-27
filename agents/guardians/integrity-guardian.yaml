@@ -58,6 +58,9 @@ capabilities:
   - cognitive-audit.distributed-verdict-signature.attest
   - cognitive-audit.verifier-transport-trace.attest
 trust_floor: 0.99
+substrate_requirements: ['any']
+input_schema_ref: specs/schemas/build_artifact.yaml
+output_schema_ref: specs/schemas/guardian_oversight_event.schema
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |

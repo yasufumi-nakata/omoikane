@@ -6,6 +6,8 @@ capabilities:
   - decision-log.append
 trust_floor: 0.6
 substrate_requirements: ['any']
+input_schema_ref: specs/schemas/council_output.yaml
+output_schema_ref: specs/schemas/continuity_log_entry.schema
 ethics_constraints: []
 prompt_or_policy_ref: agents/councilors/memory-archivist.policy.md
 when_to_invoke: |

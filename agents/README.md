@@ -15,6 +15,10 @@ agents/
 
 ## 役割定義のフォーマット
 
+各 `agents/**/*.yaml` は
+[`specs/schemas/agent_source_definition.schema`](../specs/schemas/agent_source_definition.schema)
+に従い、Yaoyorozu registry materialization 前に必須 field と repo-local ref が検証される。
+
 ```yaml
 name: <unique>
 role: councilor|builder|researcher|guardian
