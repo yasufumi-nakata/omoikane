@@ -1399,6 +1399,29 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(
             result["value_archive_retention_proof"]["raw_archive_payload_stored"]
         )
+        self.assertEqual(
+            "self-model-value-archive-retention-refresh-window-v1",
+            result["value_archive_retention_refresh"]["policy_id"],
+        )
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"][
+                "refresh_commit_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"][
+                "revocation_check_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"]["expiry_fail_closed"]
+        )
+        self.assertFalse(
+            result["value_archive_retention_refresh"]["source_proof_revoked"]
+        )
+        self.assertFalse(
+            result["value_archive_retention_refresh"]["raw_revocation_payload_stored"]
+        )
 
     def test_affect_demo_emits_smoothed_failover_json(self) -> None:
         stdout = io.StringIO()

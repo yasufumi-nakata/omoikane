@@ -1107,6 +1107,134 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("archive_deletion_allowed must be false", validation["errors"])
 
+    def test_value_archive_retention_refresh_binds_expiry_and_revocation(self) -> None:
+        monitor, timeline = self._build_value_timeline_for_archive_retention()
+        proof = monitor.build_value_archive_retention_proof_receipt(
+            timeline,
+            trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/v1",
+            ],
+            retention_policy_refs=[
+                "retention-policy://jp-13/self-model/value-history/minimum-retention/v1",
+            ],
+            retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            continuity_audit_ref="self-model://history/value-archive-retention/audit/v1",
+            council_resolution_ref="council://self-model/value-archive-retention/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-archive-retention/external-proof-bound",
+        )
+
+        refresh = monitor.build_value_archive_retention_refresh_receipt(
+            proof,
+            refreshed_trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+            ],
+            refreshed_long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/refresh-2026q2",
+            ],
+            refreshed_retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+            ],
+            revocation_registry_refs=[
+                "revocation-registry://jp-13/self-model/value-archive/not-revoked/refresh-2026q2",
+            ],
+            proof_window_started_at_ref=(
+                "time-window://self-model/value-archive-retention/2026q2/start"
+            ),
+            proof_window_expires_at_ref=(
+                "time-window://self-model/value-archive-retention/2026q2/expires"
+            ),
+            refresh_deadline_ref=(
+                "schedule://self-model/value-archive-retention/refresh-before-90d"
+            ),
+            refreshed_at_ref="timestamp://self-model/value-archive-retention/refresh-2026q2",
+            continuity_audit_ref="self-model://history/value-archive-retention/refresh-audit/v1",
+            council_resolution_ref=(
+                "council://self-model/value-archive-retention-refresh/boundary-only"
+            ),
+            guardian_archive_ref=(
+                "guardian://self-model/value-archive-retention-refresh/not-revoked"
+            ),
+        )
+        validation = monitor.validate_value_archive_retention_refresh_receipt(refresh)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["refresh_window_bound"])
+        self.assertTrue(validation["revocation_check_bound"])
+        self.assertTrue(validation["retention_policy_still_bound"])
+        self.assertTrue(validation["expiry_fail_closed"])
+        self.assertTrue(validation["refresh_commit_digest_bound"])
+        self.assertEqual(90, refresh["freshness_window_days"])
+        self.assertEqual(proof["receipt_digest"], refresh["source_proof_receipt_digest"])
+        self.assertFalse(refresh["source_proof_revoked"])
+        self.assertFalse(refresh["expired_source_proof_accepted"])
+        self.assertFalse(refresh["archive_deletion_allowed"])
+        self.assertFalse(refresh["raw_revocation_payload_stored"])
+
+    def test_value_archive_retention_refresh_rejects_revoked_source_proof(self) -> None:
+        monitor, timeline = self._build_value_timeline_for_archive_retention()
+        proof = monitor.build_value_archive_retention_proof_receipt(
+            timeline,
+            trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/v1",
+            ],
+            retention_policy_refs=[
+                "retention-policy://jp-13/self-model/value-history/minimum-retention/v1",
+            ],
+            retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            continuity_audit_ref="self-model://history/value-archive-retention/audit/v1",
+            council_resolution_ref="council://self-model/value-archive-retention/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-archive-retention/external-proof-bound",
+        )
+        refresh = monitor.build_value_archive_retention_refresh_receipt(
+            proof,
+            refreshed_trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+            ],
+            refreshed_long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/refresh-2026q2",
+            ],
+            refreshed_retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+            ],
+            revocation_registry_refs=[
+                "revocation-registry://jp-13/self-model/value-archive/not-revoked/refresh-2026q2",
+            ],
+            proof_window_started_at_ref=(
+                "time-window://self-model/value-archive-retention/2026q2/start"
+            ),
+            proof_window_expires_at_ref=(
+                "time-window://self-model/value-archive-retention/2026q2/expires"
+            ),
+            refresh_deadline_ref=(
+                "schedule://self-model/value-archive-retention/refresh-before-90d"
+            ),
+            refreshed_at_ref="timestamp://self-model/value-archive-retention/refresh-2026q2",
+            continuity_audit_ref="self-model://history/value-archive-retention/refresh-audit/v1",
+            council_resolution_ref=(
+                "council://self-model/value-archive-retention-refresh/boundary-only"
+            ),
+            guardian_archive_ref=(
+                "guardian://self-model/value-archive-retention-refresh/not-revoked"
+            ),
+        )
+        tampered = copy.deepcopy(refresh)
+        tampered["source_proof_revoked"] = True
+
+        validation = monitor.validate_value_archive_retention_refresh_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("source_proof_revoked must be false", validation["errors"])
+
     def test_value_timeline_rejects_reassessment_without_timeline_acceptance(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(

@@ -33,6 +33,14 @@ SELF_MODEL_VALUE_ARCHIVE_RETENTION_DIGEST_PROFILE = (
     "self-model-value-archive-retention-proof-digest-v1"
 )
 SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_ARCHIVE_REFRESH_POLICY_ID = (
+    "self-model-value-archive-retention-refresh-window-v1"
+)
+SELF_MODEL_VALUE_ARCHIVE_REFRESH_DIGEST_PROFILE = (
+    "self-model-value-archive-retention-refresh-digest-v1"
+)
+SELF_MODEL_VALUE_ARCHIVE_REFRESH_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_ARCHIVE_REFRESH_WINDOW_DAYS = 90
 SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID = "self-model-pathology-escalation-boundary-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE = "self-model-pathology-escalation-digest-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES = ("self", "council", "guardian")
@@ -124,6 +132,21 @@ class SelfModelMonitor:
     @staticmethod
     def _digest(data: Dict[str, object]) -> str:
         return sha256_text(canonical_json(data))
+
+    def _digest_refs(
+        self,
+        refs: Sequence[str],
+        field_name: str,
+    ) -> tuple[List[str], List[str], str]:
+        if not refs:
+            raise ValueError(f"{field_name} must not be empty")
+        normalized: List[str] = []
+        for ref in refs:
+            if not self._non_empty_string(ref):
+                raise ValueError(f"{field_name} must contain non-empty strings")
+            normalized.append(str(ref))
+        digest_set = [sha256_text(ref) for ref in normalized]
+        return normalized, digest_set, sha256_text("|".join(digest_set))
 
     def build_advisory_calibration_receipt(
         self,
@@ -1649,38 +1672,27 @@ class SelfModelMonitor:
         if not isinstance(retired_value_refs, list) or not retired_value_refs:
             raise ValueError("timeline_receipt must contain retired value refs")
 
-        def digest_refs(refs: Sequence[str], field_name: str) -> tuple[List[str], List[str], str]:
-            if not refs:
-                raise ValueError(f"{field_name} must not be empty")
-            normalized: List[str] = []
-            for ref in refs:
-                if not self._non_empty_string(ref):
-                    raise ValueError(f"{field_name} must contain non-empty strings")
-                normalized.append(str(ref))
-            digest_set = [sha256_text(ref) for ref in normalized]
-            return normalized, digest_set, sha256_text("|".join(digest_set))
-
-        archive_refs, archive_digest_set, archive_set_digest = digest_refs(
+        archive_refs, archive_digest_set, archive_set_digest = self._digest_refs(
             [str(ref) for ref in archive_snapshot_refs],
             "source_archive_snapshot_refs",
         )
-        retired_refs, retired_digest_set, retired_set_digest = digest_refs(
+        retired_refs, retired_digest_set, retired_set_digest = self._digest_refs(
             [str(ref) for ref in retired_value_refs],
             "source_retired_value_refs",
         )
-        trustee_refs, trustee_digest_set, trustee_set_digest = digest_refs(
+        trustee_refs, trustee_digest_set, trustee_set_digest = self._digest_refs(
             trustee_proof_refs,
             "trustee_proof_refs",
         )
-        storage_refs, storage_digest_set, storage_set_digest = digest_refs(
+        storage_refs, storage_digest_set, storage_set_digest = self._digest_refs(
             long_term_storage_proof_refs,
             "long_term_storage_proof_refs",
         )
-        policy_refs, policy_digest_set, policy_set_digest = digest_refs(
+        policy_refs, policy_digest_set, policy_set_digest = self._digest_refs(
             retention_policy_refs,
             "retention_policy_refs",
         )
-        retrieval_refs, retrieval_digest_set, retrieval_set_digest = digest_refs(
+        retrieval_refs, retrieval_digest_set, retrieval_set_digest = self._digest_refs(
             retrieval_test_refs,
             "retrieval_test_refs",
         )
@@ -1937,6 +1949,330 @@ class SelfModelMonitor:
             "raw_trustee_payload_stored": receipt.get("raw_trustee_payload_stored"),
             "retention_commit_digest_bound": self._non_empty_string(
                 receipt.get("retention_commit_digest")
+            ),
+        }
+
+    def build_value_archive_retention_refresh_receipt(
+        self,
+        archive_retention_proof: Dict[str, object],
+        refreshed_trustee_proof_refs: Sequence[str],
+        refreshed_long_term_storage_proof_refs: Sequence[str],
+        refreshed_retrieval_test_refs: Sequence[str],
+        revocation_registry_refs: Sequence[str],
+        proof_window_started_at_ref: str,
+        proof_window_expires_at_ref: str,
+        refresh_deadline_ref: str,
+        refreshed_at_ref: str,
+        continuity_audit_ref: str,
+        council_resolution_ref: str,
+        guardian_archive_ref: str,
+    ) -> Dict[str, object]:
+        """Refresh archive-retention proof refs and bind expiry/revocation checks."""
+
+        proof_validation = self.validate_value_archive_retention_proof_receipt(
+            archive_retention_proof
+        )
+        if not proof_validation["ok"]:
+            raise ValueError("archive_retention_proof must validate before refresh")
+        if archive_retention_proof.get("archive_deletion_allowed") is not False:
+            raise ValueError("archive_retention_proof must not allow archive deletion")
+        if archive_retention_proof.get("retention_status") != "external-proof-bound-archive-retained":
+            raise ValueError("archive_retention_proof must be retained before refresh")
+
+        refreshed_trustee_refs, refreshed_trustee_digests, refreshed_trustee_set = (
+            self._digest_refs(
+                refreshed_trustee_proof_refs,
+                "refreshed_trustee_proof_refs",
+            )
+        )
+        refreshed_storage_refs, refreshed_storage_digests, refreshed_storage_set = (
+            self._digest_refs(
+                refreshed_long_term_storage_proof_refs,
+                "refreshed_long_term_storage_proof_refs",
+            )
+        )
+        refreshed_retrieval_refs, refreshed_retrieval_digests, refreshed_retrieval_set = (
+            self._digest_refs(
+                refreshed_retrieval_test_refs,
+                "refreshed_retrieval_test_refs",
+            )
+        )
+        revocation_refs, revocation_digests, revocation_set = self._digest_refs(
+            revocation_registry_refs,
+            "revocation_registry_refs",
+        )
+        for field_name, value in {
+            "proof_window_started_at_ref": proof_window_started_at_ref,
+            "proof_window_expires_at_ref": proof_window_expires_at_ref,
+            "refresh_deadline_ref": refresh_deadline_ref,
+            "refreshed_at_ref": refreshed_at_ref,
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        gate_payload = {
+            "source_proof_receipt_digest": archive_retention_proof.get("receipt_digest"),
+            "refresh_deadline_ref": refresh_deadline_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_REFRESH_REQUIRED_ROLES),
+        }
+        refresh_payload = {
+            "source_proof_receipt_digest": archive_retention_proof.get("receipt_digest"),
+            "source_retention_commit_digest": archive_retention_proof.get(
+                "retention_commit_digest"
+            ),
+            "source_archive_snapshot_set_digest": archive_retention_proof.get(
+                "source_archive_snapshot_set_digest"
+            ),
+            "source_retention_policy_set_digest": archive_retention_proof.get(
+                "retention_policy_set_digest"
+            ),
+            "refreshed_trustee_proof_set_digest": refreshed_trustee_set,
+            "refreshed_long_term_storage_proof_set_digest": refreshed_storage_set,
+            "refreshed_retrieval_test_set_digest": refreshed_retrieval_set,
+            "revocation_registry_set_digest": revocation_set,
+            "proof_window_expires_at_ref": proof_window_expires_at_ref,
+            "refreshed_at_ref": refreshed_at_ref,
+            "continuity_audit_ref": continuity_audit_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_archive_retention_refresh_receipt",
+            "policy_id": SELF_MODEL_VALUE_ARCHIVE_REFRESH_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_ARCHIVE_REFRESH_DIGEST_PROFILE,
+            "refresh_id": new_id("self-model-value-archive-retention-refresh"),
+            "identity_id": str(archive_retention_proof["identity_id"]),
+            "source_proof_id": str(archive_retention_proof["proof_id"]),
+            "source_proof_policy_id": str(archive_retention_proof["policy_id"]),
+            "source_proof_receipt_digest": str(archive_retention_proof["receipt_digest"]),
+            "source_retention_commit_digest": str(
+                archive_retention_proof["retention_commit_digest"]
+            ),
+            "source_archive_snapshot_set_digest": str(
+                archive_retention_proof["source_archive_snapshot_set_digest"]
+            ),
+            "source_retention_policy_set_digest": str(
+                archive_retention_proof["retention_policy_set_digest"]
+            ),
+            "freshness_window_days": SELF_MODEL_VALUE_ARCHIVE_REFRESH_WINDOW_DAYS,
+            "proof_window_started_at_ref": proof_window_started_at_ref,
+            "proof_window_expires_at_ref": proof_window_expires_at_ref,
+            "refresh_deadline_ref": refresh_deadline_ref,
+            "refreshed_at_ref": refreshed_at_ref,
+            "refreshed_trustee_proof_refs": refreshed_trustee_refs,
+            "refreshed_trustee_proof_digest_set": refreshed_trustee_digests,
+            "refreshed_trustee_proof_set_digest": refreshed_trustee_set,
+            "refreshed_long_term_storage_proof_refs": refreshed_storage_refs,
+            "refreshed_long_term_storage_proof_digest_set": refreshed_storage_digests,
+            "refreshed_long_term_storage_proof_set_digest": refreshed_storage_set,
+            "refreshed_retrieval_test_refs": refreshed_retrieval_refs,
+            "refreshed_retrieval_test_digest_set": refreshed_retrieval_digests,
+            "refreshed_retrieval_test_set_digest": refreshed_retrieval_set,
+            "revocation_registry_refs": revocation_refs,
+            "revocation_registry_digest_set": revocation_digests,
+            "revocation_registry_set_digest": revocation_set,
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_REFRESH_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "refresh_commit_digest": self._digest(refresh_payload),
+            "refresh_mode": "digest-only-retention-proof-refresh",
+            "source_proof_status": "current-not-revoked",
+            "refresh_status": "refreshed-before-expiry",
+            "refresh_window_bound": True,
+            "revocation_check_bound": True,
+            "retention_policy_still_bound": True,
+            "expiry_fail_closed": True,
+            "timeline_archive_retention_verified": True,
+            "source_proof_revoked": False,
+            "expired_source_proof_accepted": False,
+            "archive_deletion_allowed": False,
+            "external_veto_allowed": False,
+            "raw_refresh_payload_stored": False,
+            "raw_revocation_payload_stored": False,
+            "raw_archive_payload_stored": False,
+            "raw_storage_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_archive_retention_refresh_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_archive_retention_refresh_receipt":
+            errors.append("kind must equal self_model_value_archive_retention_refresh_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_ARCHIVE_REFRESH_POLICY_ID:
+            errors.append("policy_id must equal self-model archive retention refresh policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_ARCHIVE_REFRESH_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model archive retention refresh digest profile")
+        if receipt.get("source_proof_policy_id") != SELF_MODEL_VALUE_ARCHIVE_RETENTION_POLICY_ID:
+            errors.append("source_proof_policy_id must bind archive retention proof policy")
+
+        def validate_ref_set(
+            refs_field: str,
+            digests_field: str,
+            set_digest_field: str,
+            label: str,
+        ) -> List[object]:
+            refs = receipt.get(refs_field)
+            digests = receipt.get(digests_field)
+            if not isinstance(refs, list) or not refs:
+                errors.append(f"{refs_field} must be non-empty")
+                refs = []
+            if not isinstance(digests, list) or len(digests) != len(refs):
+                errors.append(f"{digests_field} must match {label} refs")
+                digests = []
+            elif [sha256_text(str(ref)) for ref in refs] != digests:
+                errors.append(f"{label} digest set must match {label} refs")
+            expected_set_digest = sha256_text("|".join(str(item) for item in digests))
+            if receipt.get(set_digest_field) != expected_set_digest:
+                errors.append(f"{set_digest_field} must match digest set")
+            return refs
+
+        validate_ref_set(
+            "refreshed_trustee_proof_refs",
+            "refreshed_trustee_proof_digest_set",
+            "refreshed_trustee_proof_set_digest",
+            "refreshed trustee proof",
+        )
+        validate_ref_set(
+            "refreshed_long_term_storage_proof_refs",
+            "refreshed_long_term_storage_proof_digest_set",
+            "refreshed_long_term_storage_proof_set_digest",
+            "refreshed long term storage proof",
+        )
+        validate_ref_set(
+            "refreshed_retrieval_test_refs",
+            "refreshed_retrieval_test_digest_set",
+            "refreshed_retrieval_test_set_digest",
+            "refreshed retrieval test",
+        )
+        validate_ref_set(
+            "revocation_registry_refs",
+            "revocation_registry_digest_set",
+            "revocation_registry_set_digest",
+            "revocation registry",
+        )
+
+        gate_payload = {
+            "source_proof_receipt_digest": receipt.get("source_proof_receipt_digest"),
+            "refresh_deadline_ref": receipt.get("refresh_deadline_ref"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_REFRESH_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "identity_id",
+            "source_proof_id",
+            "source_proof_receipt_digest",
+            "source_retention_commit_digest",
+            "source_archive_snapshot_set_digest",
+            "source_retention_policy_set_digest",
+            "proof_window_started_at_ref",
+            "proof_window_expires_at_ref",
+            "refresh_deadline_ref",
+            "refreshed_at_ref",
+            "continuity_audit_ref",
+            "council_resolution_ref",
+            "guardian_archive_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_ARCHIVE_REFRESH_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind source proof, refresh deadline, council, and guardian refs")
+
+        refresh_payload = {
+            "source_proof_receipt_digest": receipt.get("source_proof_receipt_digest"),
+            "source_retention_commit_digest": receipt.get("source_retention_commit_digest"),
+            "source_archive_snapshot_set_digest": receipt.get(
+                "source_archive_snapshot_set_digest"
+            ),
+            "source_retention_policy_set_digest": receipt.get(
+                "source_retention_policy_set_digest"
+            ),
+            "refreshed_trustee_proof_set_digest": receipt.get(
+                "refreshed_trustee_proof_set_digest"
+            ),
+            "refreshed_long_term_storage_proof_set_digest": receipt.get(
+                "refreshed_long_term_storage_proof_set_digest"
+            ),
+            "refreshed_retrieval_test_set_digest": receipt.get(
+                "refreshed_retrieval_test_set_digest"
+            ),
+            "revocation_registry_set_digest": receipt.get("revocation_registry_set_digest"),
+            "proof_window_expires_at_ref": receipt.get("proof_window_expires_at_ref"),
+            "refreshed_at_ref": receipt.get("refreshed_at_ref"),
+            "continuity_audit_ref": receipt.get("continuity_audit_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+        }
+        if receipt.get("refresh_commit_digest") != self._digest(refresh_payload):
+            errors.append("refresh_commit_digest must bind source proof, refreshed proof refs, revocation registry, and expiry window")
+
+        expected_strings = {
+            "refresh_mode": "digest-only-retention-proof-refresh",
+            "source_proof_status": "current-not-revoked",
+            "refresh_status": "refreshed-before-expiry",
+        }
+        for field_name, expected_value in expected_strings.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must equal {expected_value}")
+        if receipt.get("freshness_window_days") != SELF_MODEL_VALUE_ARCHIVE_REFRESH_WINDOW_DAYS:
+            errors.append("freshness_window_days must equal fixed archive refresh window")
+        for field_name in (
+            "refresh_window_bound",
+            "revocation_check_bound",
+            "retention_policy_still_bound",
+            "expiry_fail_closed",
+            "timeline_archive_retention_verified",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "source_proof_revoked",
+            "expired_source_proof_accepted",
+            "archive_deletion_allowed",
+            "external_veto_allowed",
+            "raw_refresh_payload_stored",
+            "raw_revocation_payload_stored",
+            "raw_archive_payload_stored",
+            "raw_storage_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "refresh_window_bound": receipt.get("refresh_window_bound"),
+            "revocation_check_bound": receipt.get("revocation_check_bound"),
+            "retention_policy_still_bound": receipt.get("retention_policy_still_bound"),
+            "expiry_fail_closed": receipt.get("expiry_fail_closed"),
+            "source_proof_revoked": receipt.get("source_proof_revoked"),
+            "expired_source_proof_accepted": receipt.get(
+                "expired_source_proof_accepted"
+            ),
+            "archive_deletion_allowed": receipt.get("archive_deletion_allowed"),
+            "raw_revocation_payload_stored": receipt.get("raw_revocation_payload_stored"),
+            "refresh_commit_digest_bound": self._non_empty_string(
+                receipt.get("refresh_commit_digest")
             ),
         }
 

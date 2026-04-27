@@ -15,6 +15,7 @@ capabilities:
   - self_model.value_reassessment.retirement_review
   - self_model.value_timeline.lineage_review
   - self_model.value_archive_retention.proof_review
+  - self_model.value_archive_retention.refresh_review
   - cognitive_audit.multi_jurisdiction_review
   - cognitive_audit.non_loopback_verifier_transport_review
 trust_floor: 0.99
@@ -42,6 +43,7 @@ when_to_invoke: |
   - SelfModel value-reassessment receipt が future self reevaluation、accepted subset、archive retention、digest-bound retirement を満たし、external veto / forced stability lock / raw payload 保存へ逸脱していないか確認する時
   - SelfModel value-timeline receipt が generated / accepted / retired の順序、active-retired disjointness、archive retention、digest-bound timeline を満たし、external veto / raw payload 保存へ逸脱していないか確認する時
   - SelfModel value-archive-retention proof が retired value archive snapshot を external trustee / storage / retention policy / retrieval test refs へ digest-only に束縛し、archive deletion / external veto / raw archive payload 保存へ逸脱していないか確認する時
+  - SelfModel value-archive-retention refresh receipt が 90 日 window、revocation registry refs、refresh deadline に束縛され、revoked / expired source proof 受容、archive deletion、external veto、raw refresh / revocation payload 保存へ逸脱していないか確認する時
   - cognitive audit follow-up が JP-13 / US-CA など複数法域 reviewer quorum を満たすか確認する時
   - cognitive audit follow-up の reviewer verifier-network receipt が authenticated non-loopback authority route trace に束縛されているか確認する時
 when_not_to_invoke: |

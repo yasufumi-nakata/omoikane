@@ -1,0 +1,36 @@
+eval_id: self_model_value_archive_retention_refresh
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_archive_retention_refresh_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_archive_retention_refresh
+assertions:
+  - result.value_archive_retention_refresh.policy_id == "self-model-value-archive-retention-refresh-window-v1"
+  - result.value_archive_retention_refresh.source_proof_policy_id == "self-model-value-archive-retention-proof-v1"
+  - result.value_archive_retention_refresh.refresh_mode == "digest-only-retention-proof-refresh"
+  - result.value_archive_retention_refresh.source_proof_status == "current-not-revoked"
+  - result.value_archive_retention_refresh.refresh_status == "refreshed-before-expiry"
+  - result.value_archive_retention_refresh.freshness_window_days == 90
+  - result.value_archive_retention_refresh.refresh_window_bound == true
+  - result.value_archive_retention_refresh.revocation_check_bound == true
+  - result.value_archive_retention_refresh.retention_policy_still_bound == true
+  - result.value_archive_retention_refresh.expiry_fail_closed == true
+  - result.value_archive_retention_refresh.source_proof_revoked == false
+  - result.value_archive_retention_refresh.expired_source_proof_accepted == false
+  - result.value_archive_retention_refresh.archive_deletion_allowed == false
+  - result.value_archive_retention_refresh.external_veto_allowed == false
+  - result.value_archive_retention_refresh.raw_refresh_payload_stored == false
+  - result.value_archive_retention_refresh.raw_revocation_payload_stored == false
+  - result.value_archive_retention_refresh.raw_archive_payload_stored == false
+  - result.validation.value_archive_retention_refresh.ok == true
+  - result.validation.value_archive_retention_refresh.refresh_commit_digest_bound == true
+failure_mode:
+  - archive retention proof is accepted indefinitely without a refresh deadline
+  - refreshed trustee, storage, retrieval, or revocation refs can drift without changing the refresh commit digest
+  - revoked or expired source proof is accepted instead of failing closed
+  - archive deletion or external veto is allowed during retention refresh
+  - raw refresh, revocation, archive, or storage payload is stored in the reference runtime receipt
+notes:
+  - Extends archive-retention proof with a deterministic 90 day refresh window.
+  - Keeps refresh evidence digest-only and boundary-only; external proof providers do not gain archive deletion authority.

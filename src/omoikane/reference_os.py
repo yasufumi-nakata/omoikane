@@ -14672,6 +14672,52 @@ json.dump(response, sys.stdout)
                 value_archive_retention_proof
             )
         )
+        value_archive_retention_refresh = (
+            monitor.build_value_archive_retention_refresh_receipt(
+                value_archive_retention_proof,
+                refreshed_trustee_proof_refs=[
+                    "trustee-proof://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+                    "trustee-proof://jp-13/self-model/value-archive/review-board-attestation/refresh-2026q2",
+                ],
+                refreshed_long_term_storage_proof_refs=[
+                    "storage-proof://jp-13/self-model/value-archive/cold-ledger/refresh-2026q2",
+                    "storage-proof://jp-13/self-model/value-archive/replica-audit/refresh-2026q2",
+                ],
+                refreshed_retrieval_test_refs=[
+                    "retrieval-test://jp-13/self-model/value-archive/generative-patience/refresh-2026q2",
+                ],
+                revocation_registry_refs=[
+                    "revocation-registry://jp-13/self-model/value-archive/not-revoked/refresh-2026q2",
+                    "revocation-registry://omoikane/value-history/no-deletion-authority/refresh-2026q2",
+                ],
+                proof_window_started_at_ref=(
+                    "time-window://self-model/value-archive-retention/2026q2/start"
+                ),
+                proof_window_expires_at_ref=(
+                    "time-window://self-model/value-archive-retention/2026q2/expires"
+                ),
+                refresh_deadline_ref=(
+                    "schedule://self-model/value-archive-retention/refresh-before-90d"
+                ),
+                refreshed_at_ref=(
+                    "timestamp://self-model/value-archive-retention/refresh-2026q2"
+                ),
+                continuity_audit_ref=(
+                    "self-model://history/value-archive-retention/refresh-audit/v1"
+                ),
+                council_resolution_ref=(
+                    "council://self-model/value-archive-retention-refresh/boundary-only"
+                ),
+                guardian_archive_ref=(
+                    "guardian://self-model/value-archive-retention-refresh/not-revoked"
+                ),
+            )
+        )
+        value_archive_retention_refresh_validation = (
+            monitor.validate_value_archive_retention_refresh_receipt(
+                value_archive_retention_refresh
+            )
+        )
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14779,6 +14825,26 @@ json.dump(response, sys.stdout)
                 "value_archive_retention_no_archive_deletion": not (
                     value_archive_retention_proof_validation["archive_deletion_allowed"]
                 ),
+                "value_archive_retention_refresh_policy_id": (
+                    value_archive_retention_refresh["policy_id"]
+                ),
+                "value_archive_retention_refresh_receipt_digest": (
+                    value_archive_retention_refresh["receipt_digest"]
+                ),
+                "value_archive_retention_refresh_commit_bound": (
+                    value_archive_retention_refresh_validation[
+                        "refresh_commit_digest_bound"
+                    ]
+                ),
+                "value_archive_retention_refresh_window_bound": (
+                    value_archive_retention_refresh_validation["refresh_window_bound"]
+                ),
+                "value_archive_retention_revocation_check_bound": (
+                    value_archive_retention_refresh_validation["revocation_check_bound"]
+                ),
+                "value_archive_retention_expiry_fail_closed": (
+                    value_archive_retention_refresh_validation["expiry_fail_closed"]
+                ),
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14808,6 +14874,7 @@ json.dump(response, sys.stdout)
             "value_reassessment": value_reassessment,
             "value_timeline": value_timeline,
             "value_archive_retention_proof": value_archive_retention_proof,
+            "value_archive_retention_refresh": value_archive_retention_refresh,
             "history": history,
             "validation": {
                 "ok": (
@@ -14827,6 +14894,7 @@ json.dump(response, sys.stdout)
                     and value_reassessment_validation["ok"]
                     and value_timeline_validation["ok"]
                     and value_archive_retention_proof_validation["ok"]
+                    and value_archive_retention_refresh_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
@@ -14842,6 +14910,9 @@ json.dump(response, sys.stdout)
                 "value_reassessment": value_reassessment_validation,
                 "value_timeline": value_timeline_validation,
                 "value_archive_retention_proof": value_archive_retention_proof_validation,
+                "value_archive_retention_refresh": (
+                    value_archive_retention_refresh_validation
+                ),
                 "threshold": threshold,
                 "history_length": len(history),
             },

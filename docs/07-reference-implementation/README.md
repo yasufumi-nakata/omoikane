@@ -178,8 +178,11 @@ value-timeline branch は generation / acceptance / reassessment の receipt dig
 value-archive-retention-proof branch は retired value の archive snapshot ref を
 external trustee proof、long-term storage proof、retention policy、retrieval test refs へ
 digest-only に束縛し、`retention_commit_digest` で固定する。
+value-archive-retention-refresh branch は、その proof を 90 日の freshness window、
+revocation registry refs、refresh deadline へ束縛し、revoked / expired source proof を
+fail-closed にしつつ `refresh_commit_digest` で固定する。
 Council / Guardian review は boundary-only であり、external veto、forced stability lock、
-archive deletion、raw value / archive / trustee / storage payload 保存は
+archive deletion、raw value / archive / trustee / storage / revocation payload 保存は
 引き続き false に固定される。
 
 `broker-demo` は L1 SubstrateBroker の reference contract

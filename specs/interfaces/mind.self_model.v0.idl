@@ -16,6 +16,7 @@ imports:
   self_model_value_reassessment_receipt: ../schemas/self_model_value_reassessment_receipt.schema
   self_model_value_timeline_receipt: ../schemas/self_model_value_timeline_receipt.schema
   self_model_value_archive_retention_proof: ../schemas/self_model_value_archive_retention_proof.schema
+  self_model_value_archive_retention_refresh_receipt: ../schemas/self_model_value_archive_retention_refresh_receipt.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -788,6 +789,110 @@ operations:
             type: boolean
           retention_commit_digest_bound:
             type: boolean
+  build_value_archive_retention_refresh_receipt:
+    summary: Refresh archive-retention proof refs before expiry while binding revocation registry refs and keeping archived retired values fail-closed.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - archive_retention_proof
+          - refreshed_trustee_proof_refs
+          - refreshed_long_term_storage_proof_refs
+          - refreshed_retrieval_test_refs
+          - revocation_registry_refs
+          - proof_window_started_at_ref
+          - proof_window_expires_at_ref
+          - refresh_deadline_ref
+          - refreshed_at_ref
+          - continuity_audit_ref
+          - council_resolution_ref
+          - guardian_archive_ref
+        properties:
+          archive_retention_proof:
+            schema_ref: self_model_value_archive_retention_proof
+          refreshed_trustee_proof_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          refreshed_long_term_storage_proof_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          refreshed_retrieval_test_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          revocation_registry_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          proof_window_started_at_ref:
+            type: string
+            minLength: 1
+          proof_window_expires_at_ref:
+            type: string
+            minLength: 1
+          refresh_deadline_ref:
+            type: string
+            minLength: 1
+          refreshed_at_ref:
+            type: string
+            minLength: 1
+          continuity_audit_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_archive_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_archive_retention_refresh_receipt
+  validate_value_archive_retention_refresh_receipt:
+    summary: Fail closed unless refreshed archive proofs remain current, not revoked, expiry-bound, digest-only, and unable to delete archived history.
+    input:
+      schema_ref: self_model_value_archive_retention_refresh_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - refresh_window_bound
+          - revocation_check_bound
+          - retention_policy_still_bound
+          - expiry_fail_closed
+          - source_proof_revoked
+          - expired_source_proof_accepted
+          - archive_deletion_allowed
+          - refresh_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          refresh_window_bound:
+            type: boolean
+          revocation_check_bound:
+            type: boolean
+          retention_policy_still_bound:
+            type: boolean
+          expiry_fail_closed:
+            type: boolean
+          source_proof_revoked:
+            type: boolean
+          expired_source_proof_accepted:
+            type: boolean
+          archive_deletion_allowed:
+            type: boolean
+          refresh_commit_digest_bound:
+            type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.
     input:
@@ -817,3 +922,4 @@ invariants:
   - value reassessment receipts retire only accepted value refs while retaining archived history
   - value timeline receipts keep generated, accepted, and retired value events append-only and digest-bound without raw value payload storage
   - value archive retention proof receipts bind retired value archives to external trustee/storage/policy/retrieval refs while preserving boundary-only review and disallowing archive deletion
+  - value archive retention refresh receipts bind a 90 day freshness window and revocation registry refs, fail closed on expiry or revocation, and never create archive deletion authority

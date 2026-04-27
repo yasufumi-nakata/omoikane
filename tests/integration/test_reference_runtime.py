@@ -1471,6 +1471,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(
             result["value_archive_retention_proof"]["raw_archive_payload_stored"]
         )
+        self.assertTrue(result["validation"]["value_archive_retention_refresh"]["ok"])
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"][
+                "refresh_commit_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"][
+                "revocation_check_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["value_archive_retention_refresh"]["expiry_fail_closed"]
+        )
+        self.assertFalse(
+            result["value_archive_retention_refresh"]["source_proof_revoked"]
+        )
+        self.assertFalse(
+            result["value_archive_retention_refresh"]["raw_revocation_payload_stored"]
+        )
         self.assertFalse(result["calibration"]["forced_correction_allowed"])
         self.assertFalse(result["calibration"]["raw_external_testimony_stored"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])

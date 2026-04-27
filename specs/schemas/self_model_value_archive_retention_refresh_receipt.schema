@@ -1,0 +1,304 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_archive_retention_refresh_receipt.schema"
+title: SelfModelValueArchiveRetentionRefreshReceipt
+description: Digest-only receipt that refreshes retired SelfModel value archive-retention proof refs, binds a freshness window and revocation registry refs, and fails closed on expiry or revocation without storing raw archive payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - refresh_id
+  - identity_id
+  - source_proof_id
+  - source_proof_policy_id
+  - source_proof_receipt_digest
+  - source_retention_commit_digest
+  - source_archive_snapshot_set_digest
+  - source_retention_policy_set_digest
+  - freshness_window_days
+  - proof_window_started_at_ref
+  - proof_window_expires_at_ref
+  - refresh_deadline_ref
+  - refreshed_at_ref
+  - refreshed_trustee_proof_refs
+  - refreshed_trustee_proof_digest_set
+  - refreshed_trustee_proof_set_digest
+  - refreshed_long_term_storage_proof_refs
+  - refreshed_long_term_storage_proof_digest_set
+  - refreshed_long_term_storage_proof_set_digest
+  - refreshed_retrieval_test_refs
+  - refreshed_retrieval_test_digest_set
+  - refreshed_retrieval_test_set_digest
+  - revocation_registry_refs
+  - revocation_registry_digest_set
+  - revocation_registry_set_digest
+  - continuity_audit_ref
+  - council_resolution_ref
+  - guardian_archive_ref
+  - required_roles
+  - gate_digest
+  - refresh_commit_digest
+  - refresh_mode
+  - source_proof_status
+  - refresh_status
+  - refresh_window_bound
+  - revocation_check_bound
+  - retention_policy_still_bound
+  - expiry_fail_closed
+  - timeline_archive_retention_verified
+  - source_proof_revoked
+  - expired_source_proof_accepted
+  - archive_deletion_allowed
+  - external_veto_allowed
+  - raw_refresh_payload_stored
+  - raw_revocation_payload_stored
+  - raw_archive_payload_stored
+  - raw_storage_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_archive_retention_refresh_receipt
+  policy_id:
+    type: string
+    const: self-model-value-archive-retention-refresh-window-v1
+  digest_profile:
+    type: string
+    const: self-model-value-archive-retention-refresh-digest-v1
+  refresh_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_proof_id:
+    type: string
+    minLength: 1
+  source_proof_policy_id:
+    type: string
+    const: self-model-value-archive-retention-proof-v1
+  source_proof_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_retention_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_archive_snapshot_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_retention_policy_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  freshness_window_days:
+    type: integer
+    const: 90
+  proof_window_started_at_ref:
+    type: string
+    minLength: 1
+  proof_window_expires_at_ref:
+    type: string
+    minLength: 1
+  refresh_deadline_ref:
+    type: string
+    minLength: 1
+  refreshed_at_ref:
+    type: string
+    minLength: 1
+  refreshed_trustee_proof_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  refreshed_trustee_proof_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  refreshed_trustee_proof_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  refreshed_long_term_storage_proof_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  refreshed_long_term_storage_proof_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  refreshed_long_term_storage_proof_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  refreshed_retrieval_test_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  refreshed_retrieval_test_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  refreshed_retrieval_test_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  revocation_registry_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  revocation_registry_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  revocation_registry_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  continuity_audit_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_archive_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  refresh_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  refresh_mode:
+    type: string
+    const: digest-only-retention-proof-refresh
+  source_proof_status:
+    type: string
+    const: current-not-revoked
+  refresh_status:
+    type: string
+    const: refreshed-before-expiry
+  refresh_window_bound:
+    type: boolean
+    const: true
+  revocation_check_bound:
+    type: boolean
+    const: true
+  retention_policy_still_bound:
+    type: boolean
+    const: true
+  expiry_fail_closed:
+    type: boolean
+    const: true
+  timeline_archive_retention_verified:
+    type: boolean
+    const: true
+  source_proof_revoked:
+    type: boolean
+    const: false
+  expired_source_proof_accepted:
+    type: boolean
+    const: false
+  archive_deletion_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  raw_refresh_payload_stored:
+    type: boolean
+    const: false
+  raw_revocation_payload_stored:
+    type: boolean
+    const: false
+  raw_archive_payload_stored:
+    type: boolean
+    const: false
+  raw_storage_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_archive_retention_refresh_receipt
+    policy_id: self-model-value-archive-retention-refresh-window-v1
+    digest_profile: self-model-value-archive-retention-refresh-digest-v1
+    refresh_id: self-model-value-archive-retention-refresh-example
+    identity_id: id-1
+    source_proof_id: self-model-value-archive-retention-proof-example
+    source_proof_policy_id: self-model-value-archive-retention-proof-v1
+    source_proof_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_retention_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_archive_snapshot_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_retention_policy_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    freshness_window_days: 90
+    proof_window_started_at_ref: time-window://self-model/value-archive-retention/2026q2/start
+    proof_window_expires_at_ref: time-window://self-model/value-archive-retention/2026q2/expires
+    refresh_deadline_ref: schedule://self-model/value-archive-retention/refresh-before-90d
+    refreshed_at_ref: timestamp://self-model/value-archive-retention/refresh-2026q2
+    refreshed_trustee_proof_refs:
+      - trustee-proof://jp-13/self-model/value-archive/generative-patience/refresh-2026q2
+    refreshed_trustee_proof_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refreshed_trustee_proof_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refreshed_long_term_storage_proof_refs:
+      - storage-proof://jp-13/self-model/value-archive/cold-ledger/refresh-2026q2
+    refreshed_long_term_storage_proof_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refreshed_long_term_storage_proof_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refreshed_retrieval_test_refs:
+      - retrieval-test://jp-13/self-model/value-archive/generative-patience/refresh-2026q2
+    refreshed_retrieval_test_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refreshed_retrieval_test_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    revocation_registry_refs:
+      - revocation-registry://jp-13/self-model/value-archive/not-revoked/refresh-2026q2
+    revocation_registry_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    revocation_registry_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_audit_ref: self-model://history/value-archive-retention/refresh-audit/v1
+    council_resolution_ref: council://self-model/value-archive-retention-refresh/boundary-only
+    guardian_archive_ref: guardian://self-model/value-archive-retention-refresh/not-revoked
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refresh_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refresh_mode: digest-only-retention-proof-refresh
+    source_proof_status: current-not-revoked
+    refresh_status: refreshed-before-expiry
+    refresh_window_bound: true
+    revocation_check_bound: true
+    retention_policy_still_bound: true
+    expiry_fail_closed: true
+    timeline_archive_retention_verified: true
+    source_proof_revoked: false
+    expired_source_proof_accepted: false
+    archive_deletion_allowed: false
+    external_veto_allowed: false
+    raw_refresh_payload_stored: false
+    raw_revocation_payload_stored: false
+    raw_archive_payload_stored: false
+    raw_storage_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

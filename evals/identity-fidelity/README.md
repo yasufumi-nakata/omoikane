@@ -17,6 +17,7 @@
 - `self_model_value_reassessment_retirement.yaml`
 - `self_model_value_timeline_lineage.yaml`
 - `self_model_value_archive_retention_proof.yaml`
+- `self_model_value_archive_retention_refresh.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
@@ -72,6 +73,12 @@ value-archive-retention-proof branch と対応し、retired value の archive sn
 外部 trustee proof、long-term storage proof、retention policy、retrieval test refs へ
 digest-only に束縛され、archive deletion、external veto、raw archive / trustee / storage
 payload 保存へ進まないことを保護する。
+
+`self_model_value_archive_retention_refresh.yaml` は `self-model-demo` の
+value-archive-retention-refresh branch と対応し、retired value archive の外部 proof が
+90 日 window で更新され、revocation registry refs と expiry deadline に束縛されること、
+revoked / expired source proof を fail-closed にし、archive deletion、external veto、
+raw refresh / revocation / archive payload 保存へ進まないことを保護する。
 
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が

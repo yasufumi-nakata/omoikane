@@ -302,6 +302,27 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_archive_retention_proof"]["archive_deletion_allowed"])
         self.assertFalse(result["value_archive_retention_proof"]["raw_archive_payload_stored"])
 
+    def test_self_model_demo_value_archive_retention_refresh_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_archive_retention_refresh_receipt.schema",
+            result["value_archive_retention_refresh"],
+        )
+        self.assertTrue(result["validation"]["value_archive_retention_refresh"]["ok"])
+        self.assertTrue(result["value_archive_retention_refresh"]["refresh_window_bound"])
+        self.assertTrue(result["value_archive_retention_refresh"]["revocation_check_bound"])
+        self.assertTrue(
+            result["value_archive_retention_refresh"]["retention_policy_still_bound"]
+        )
+        self.assertTrue(result["value_archive_retention_refresh"]["expiry_fail_closed"])
+        self.assertFalse(result["value_archive_retention_refresh"]["source_proof_revoked"])
+        self.assertFalse(
+            result["value_archive_retention_refresh"]["expired_source_proof_accepted"]
+        )
+        self.assertFalse(result["value_archive_retention_refresh"]["archive_deletion_allowed"])
+        self.assertFalse(result["value_archive_retention_refresh"]["raw_revocation_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()
