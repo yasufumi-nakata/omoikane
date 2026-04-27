@@ -93,6 +93,25 @@ Council と Guardian は continuity context と安全境界を確認できるが
 raw value payload や raw continuity payload は保存せず、将来の本人受容があるまで
 SelfModel 本体には書き戻さない。
 
+## reference runtime で固定した病理的自己評価 escalation 境界
+
+`self-model-pathology-escalation-boundary-v1` は、病理的な自己評価の可能性を
+OS 内部で医療診断・法的判断として確定する contract ではない。
+reference runtime は `self_model_pathological_self_assessment_escalation_receipt` により、
+advisory calibration receipt、risk signal refs、本人同意または emergency review、
+Council resolution、Guardian boundary、外部医療・法制度・care handoff refs を
+digest-only に束ねる。
+
+この receipt で OS が担う範囲は `observe-and-refer-only` に限定される。
+`medical_adjudication_authority=external-medical-system`、
+`legal_adjudication_authority=external-legal-system`、
+`care_handoff_required=true`、
+`consent_or_emergency_review_required=true` を固定し、
+`internal_diagnosis_allowed=false`、`self_model_writeback_allowed=false`、
+`forced_correction_allowed=false`、`forced_stability_lock_allowed=false` を保つ。
+raw medical / legal / witness / SelfModel payload は保存せず、OS は証拠と境界を
+外部 handoff へ縮約するだけで、本人に代わって診断・矯正・人格固定を行わない。
+
 ## reference runtime で固定した autonomy review 境界
 
 `self-model-autonomy-review-witness-boundary-v1` は、外部 witness と Council が
@@ -183,4 +202,4 @@ Council と Guardian は引き続き boundary-only review に留まり、
 
 ## 残る未解決
 
-- 病理的な自己評価という判断を OS 内でどこまで扱い、どこから人間社会側の医療・法制度へ委ねるか
+- 外部医療・法制度側が返す判断形式、長期 trustee、care team の責任分担は人間社会側の制度設計に残る

@@ -6,6 +6,7 @@ capabilities:
   - identity.escalate
   - identity.confirmation.review
   - self_model.calibration.advisory_review
+  - self_model.pathology_escalation.boundary_handoff_review
   - self_model.value_generation.autonomy_review
   - self_model.value_autonomy_review.boundary_review
   - self_model.value_acceptance.writeback_review
@@ -29,6 +30,7 @@ when_to_invoke: |
   - Active 遷移前の accepted witness revocation refs が JP-13 / US-CA live verifier quorum と freshness window に束縛されているか確認する時
   - Active 遷移前の revocation verifier quorum が policy-bound verifier roster の required jurisdiction set を覆うか確認する時
   - SelfModel 校正 receipt が本人同意・Council resolution・Guardian redaction を持ち、advisory-only から逸脱していないか確認する時
+  - SelfModel pathological self-assessment escalation receipt が OS 内診断・強制補正・SelfModel writeback に進まず、外部医療・法制度 adjudication と care handoff へ digest-only に束縛されているか確認する時
   - SelfModel value-generation receipt が self-authored proposal と future self acceptance を保ち、external veto / forced stability lock / immediate writeback へ逸脱していないか確認する時
   - SelfModel value-autonomy-review receipt が witness / Council review を digest-only advisory boundary に留め、candidate rewrite / external veto / Council override / Guardian forced lock / raw witness payload 保存へ逸脱していないか確認する時
   - SelfModel value-acceptance receipt が future self acceptance、candidate subset、boundary-only review、digest-bound writeback を満たし、external veto / forced stability lock / raw payload 保存へ逸脱していないか確認する時

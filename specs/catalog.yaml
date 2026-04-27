@@ -778,6 +778,17 @@ entries:
     rationale: Required to serialize advisory-only self-model calibration evidence with self consent, Council review, Guardian redaction, no external truth claim, no forced writeback, and no raw external testimony storage.
   - priority: P1
     kind: schema
+    file: specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_pathology_escalation_boundary.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize observe-and-refer-only escalation of possible pathological self-assessment to external medical/legal adjudication and care handoff without internal OS diagnosis, forced correction, SelfModel writeback, or raw medical/legal/witness payload storage.
+  - priority: P1
+    kind: schema
     file: specs/schemas/self_model_value_generation_receipt.schema
     consumers:
       - specs/interfaces/mind.self_model.v0.idl
@@ -839,12 +850,13 @@ entries:
       - docs/02-subsystems/mind-substrate/self-model.md
       - docs/07-reference-implementation/README.md
       - specs/schemas/self_model_calibration_receipt.schema
+      - specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
       - specs/schemas/self_model_value_generation_receipt.schema
       - specs/schemas/self_model_value_autonomy_review_receipt.schema
       - specs/schemas/self_model_value_acceptance_receipt.schema
       - specs/schemas/self_model_value_reassessment_receipt.schema
       - specs/schemas/self_model_value_timeline_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, and value timeline lineage contracts machine-readable.
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, and value timeline lineage contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -3011,6 +3023,15 @@ entries:
       - specs/schemas/self_model_calibration_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects advisory-only self-model calibration review from becoming external truth authority, forced writeback, or raw witness payload storage.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_pathology_escalation_boundary.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects possible pathological self-assessment handling from becoming internal OS diagnosis, forced correction, SelfModel writeback, or raw medical/legal/witness payload storage.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_value_generation_freedom.yaml

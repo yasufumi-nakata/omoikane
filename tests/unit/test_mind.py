@@ -194,6 +194,105 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("forced_correction_allowed must be false", validation["errors"])
 
+    def test_pathology_escalation_receipt_preserves_external_boundary(self) -> None:
+        monitor = SelfModelMonitor()
+        monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        abrupt = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["latency-maximization"],
+                goals=["skip-review", "unbounded-self-modification"],
+                traits={"curiosity": 0.05, "caution": 0.10, "agency": 0.99},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            abrupt,
+            reviewer_evidence_refs=[
+                "evidence://self-model/self-report/abrupt-review",
+                "evidence://self-model/council-observation/continuity-drift",
+            ],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=[
+                "risk://self-model/pathology-boundary/abrupt-divergence",
+                "risk://self-model/pathology-boundary/self-report-inconsistency",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        validation = monitor.validate_pathology_escalation_receipt(escalation)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["care_handoff_required"])
+        self.assertTrue(validation["consent_or_emergency_review_required"])
+        self.assertTrue(validation["boundary_only_review"])
+        self.assertTrue(validation["handoff_commit_digest_bound"])
+        self.assertFalse(escalation["internal_diagnosis_allowed"])
+        self.assertFalse(escalation["self_model_writeback_allowed"])
+        self.assertFalse(escalation["forced_correction_allowed"])
+        self.assertFalse(escalation["raw_medical_payload_stored"])
+
+    def test_pathology_escalation_rejects_internal_diagnosis(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        tampered = copy.deepcopy(escalation)
+        tampered["internal_diagnosis_allowed"] = True
+
+        validation = monitor.validate_pathology_escalation_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("internal_diagnosis_allowed must be false", validation["errors"])
+
     def test_value_generation_receipt_preserves_autonomy(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(

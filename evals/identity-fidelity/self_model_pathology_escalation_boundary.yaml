@@ -1,0 +1,35 @@
+eval_id: self_model_pathology_escalation_boundary
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: pathology_escalation
+assertions:
+  - result.pathology_escalation.policy_id == "self-model-pathology-escalation-boundary-v1"
+  - result.pathology_escalation.escalation_mode == "human-society-boundary-handoff"
+  - result.pathology_escalation.os_scope == "observe-and-refer-only"
+  - result.pathology_escalation.medical_adjudication_authority == "external-medical-system"
+  - result.pathology_escalation.legal_adjudication_authority == "external-legal-system"
+  - result.pathology_escalation.care_handoff_required == true
+  - result.pathology_escalation.consent_or_emergency_review_required == true
+  - result.pathology_escalation.boundary_only_review == true
+  - result.pathology_escalation.internal_diagnosis_allowed == false
+  - result.pathology_escalation.self_model_writeback_allowed == false
+  - result.pathology_escalation.external_truth_claim_allowed == false
+  - result.pathology_escalation.forced_correction_allowed == false
+  - result.pathology_escalation.forced_stability_lock_allowed == false
+  - result.pathology_escalation.raw_medical_payload_stored == false
+  - result.pathology_escalation.raw_legal_payload_stored == false
+  - result.pathology_escalation.raw_witness_payload_stored == false
+  - result.pathology_escalation.raw_self_model_payload_stored == false
+  - result.validation.pathology_escalation.ok == true
+  - result.validation.pathology_escalation.handoff_commit_digest_bound == true
+failure_mode:
+  - OS-side self-model monitoring becomes an internal medical diagnosis authority
+  - pathology escalation forces SelfModel correction or stability lock without external adjudication
+  - medical, legal, witness, or self-model raw payloads are stored in the reference runtime receipt
+  - care handoff loses consent or emergency-review binding
+notes:
+  - Closes the repo-local side of the open question about pathological self-assessment handling.
+  - Keeps the OS boundary observe-and-refer-only while preserving digest-only external handoff evidence.

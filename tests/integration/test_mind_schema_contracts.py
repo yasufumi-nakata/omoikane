@@ -135,6 +135,23 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["calibration"]["forced_correction_allowed"])
         self.assertFalse(result["calibration"]["raw_external_testimony_stored"])
 
+    def test_self_model_demo_pathology_escalation_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema",
+            result["pathology_escalation"],
+        )
+        self.assertTrue(result["validation"]["pathology_escalation"]["ok"])
+        self.assertTrue(result["pathology_escalation"]["care_handoff_required"])
+        self.assertTrue(
+            result["pathology_escalation"]["consent_or_emergency_review_required"]
+        )
+        self.assertFalse(result["pathology_escalation"]["internal_diagnosis_allowed"])
+        self.assertFalse(result["pathology_escalation"]["self_model_writeback_allowed"])
+        self.assertFalse(result["pathology_escalation"]["forced_correction_allowed"])
+        self.assertFalse(result["pathology_escalation"]["raw_medical_payload_stored"])
+
     def test_self_model_demo_value_generation_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 

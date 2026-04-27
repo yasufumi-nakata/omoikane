@@ -609,6 +609,17 @@ stable drift と abrupt takeover 候補の両観測、
 `correction_mode=advisory-only`、`forced_correction_allowed=false`、
 `accepted_for_writeback=false`、`raw_external_testimony_stored=false` を
 維持することを確認する。
+同じ abrupt observation 由来の calibration receipt から
+`self-model-pathology-escalation-boundary-v1` receipt も返し、
+病理的な自己評価の可能性を OS 内診断や強制補正へ昇格させず、
+外部医療・法制度の adjudication と care handoff refs へ digest-only に束縛する。
+この branch は `os_scope=observe-and-refer-only`、
+`care_handoff_required=true`、
+`consent_or_emergency_review_required=true`、
+`internal_diagnosis_allowed=false`、
+`self_model_writeback_allowed=false`、
+`forced_correction_allowed=false`、
+`raw_medical_payload_stored=false` を確認する。
 同じ demo は stable drift から生じた新しい価値候補を
 `self-model-self-authored-value-generation-v1` receipt に束縛し、
 `generation_mode=self-authored-bounded-experiment`、

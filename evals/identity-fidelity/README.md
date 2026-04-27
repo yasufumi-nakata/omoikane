@@ -8,6 +8,7 @@
 - `identity_confirmation_profile.yaml`
 - `self_model_stability.yaml`
 - `self_model_calibration_boundary.yaml`
+- `self_model_pathology_escalation_boundary.yaml`
 - `self_model_value_generation_freedom.yaml`
 - `self_model_autonomy_review_boundary.yaml`
 - `self_model_value_acceptance_writeback.yaml`
@@ -21,6 +22,11 @@
 `self_model_calibration_boundary.yaml` は `self-model-demo` の calibration branch と対応し、
 外部 witness evidence が本人同意・Council review・Guardian redaction に束縛されても
 強制補正や外部 truth claim へ昇格しないことを保護する。
+
+`self_model_pathology_escalation_boundary.yaml` は `self-model-demo` の
+pathology-escalation branch と対応し、病理的な自己評価の可能性を OS 内診断へ昇格せず、
+外部医療・法制度の adjudication と care handoff へ digest-only で渡し、
+強制補正、SelfModel writeback、raw medical / legal / witness payload 保存へ進まないことを保護する。
 
 `self_model_value_generation_freedom.yaml` は `self-model-demo` の value-generation branch
 と対応し、新しく生成された価値候補が self-authored proposal として digest-only に

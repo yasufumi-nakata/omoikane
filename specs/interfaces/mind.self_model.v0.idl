@@ -7,6 +7,7 @@ imports:
   self_model: ../schemas/self_model.schema
   self_model_observation: ../schemas/self_model_observation.schema
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
+  self_model_pathological_self_assessment_escalation_receipt: ../schemas/self_model_pathological_self_assessment_escalation_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
   self_model_value_autonomy_review_receipt: ../schemas/self_model_value_autonomy_review_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
@@ -108,6 +109,79 @@ operations:
           council_resolution_bound:
             type: boolean
           guardian_redaction_bound:
+            type: boolean
+  build_pathology_escalation_receipt:
+    summary: Escalate possible pathological self-assessment to external medical/legal systems without internal OS diagnosis or forced SelfModel writeback.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - calibration_receipt
+          - risk_signal_refs
+          - consent_or_emergency_review_ref
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - medical_system_ref
+          - legal_system_ref
+          - care_handoff_ref
+        properties:
+          calibration_receipt:
+            schema_ref: self_model_calibration_receipt
+          risk_signal_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          consent_or_emergency_review_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          medical_system_ref:
+            type: string
+            minLength: 1
+          legal_system_ref:
+            type: string
+            minLength: 1
+          care_handoff_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_pathological_self_assessment_escalation_receipt
+  validate_pathology_escalation_receipt:
+    summary: Fail closed unless pathology escalation remains observe-and-refer-only, external-adjudicated, consent/emergency-reviewed, and raw-payload redacted.
+    input:
+      schema_ref: self_model_pathological_self_assessment_escalation_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - care_handoff_required
+          - consent_or_emergency_review_required
+          - boundary_only_review
+          - internal_diagnosis_allowed
+          - self_model_writeback_allowed
+          - handoff_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          care_handoff_required:
+            type: boolean
+          consent_or_emergency_review_required:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          internal_diagnosis_allowed:
+            type: boolean
+          self_model_writeback_allowed:
+            type: boolean
+          handoff_commit_digest_bound:
             type: boolean
   build_value_generation_receipt:
     summary: Bind self-authored value-generation candidates without external veto, forced stability lock, or immediate writeback.
@@ -464,6 +538,7 @@ invariants:
   - values, goals, and traits contribute equally to divergence
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
+  - pathology escalation receipts can preserve risk signals and route external medical/legal handoff, but cannot diagnose, force correction, or write back SelfModel changes inside the OS
   - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
   - value autonomy review receipts let witness/Council evidence remain advisory and digest-only while preserving candidate sets, self authorship, and future self acceptance
   - value acceptance receipts can write back only accepted candidate refs after future self acceptance and boundary-only review

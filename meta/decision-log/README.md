@@ -66,6 +66,7 @@ status: decided | superseded
 - [2026-04-19_language-disclosure-floor.md](2026-04-19_language-disclosure-floor.md)
 - [2026-04-19_metacognition-self-monitor-loop.md](2026-04-19_metacognition-self-monitor-loop.md)
 - [2026-04-19_self-model-threshold-profile.md](2026-04-19_self-model-threshold-profile.md)
+- [2026-04-28_self-model-pathology-escalation-boundary.md](2026-04-28_self-model-pathology-escalation-boundary.md)
 - [2026-04-19_scheduler-artifact-sync-gate.md](2026-04-19_scheduler-artifact-sync-gate.md)
 - [2026-04-19_scheduler-verifier-root-rotation.md](2026-04-19_scheduler-verifier-root-rotation.md)
 - [2026-04-19_distributed-council-resolution.md](2026-04-19_distributed-council-resolution.md)

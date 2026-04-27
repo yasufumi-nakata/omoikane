@@ -28,6 +28,9 @@ SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_TIMELINE_POLICY_ID = "self-model-value-lineage-timeline-v1"
 SELF_MODEL_VALUE_TIMELINE_DIGEST_PROFILE = "self-model-value-timeline-digest-v1"
 SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID = "self-model-pathology-escalation-boundary-v1"
+SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE = "self-model-pathology-escalation-digest-v1"
+SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES = ("self", "council", "guardian")
 
 
 @dataclass
@@ -1604,6 +1607,234 @@ class SelfModelMonitor:
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
             "timeline_commit_digest_bound": self._non_empty_string(
                 receipt.get("timeline_commit_digest")
+            ),
+        }
+
+    def build_pathology_escalation_receipt(
+        self,
+        calibration_receipt: Dict[str, object],
+        risk_signal_refs: Sequence[str],
+        consent_or_emergency_review_ref: str,
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        medical_system_ref: str,
+        legal_system_ref: str,
+        care_handoff_ref: str,
+    ) -> Dict[str, object]:
+        """Escalate possible pathological self-assessment outside the OS boundary.
+
+        The reference runtime can preserve evidence and route a bounded handoff,
+        but it must not diagnose, coerce, or rewrite the SelfModel on its own.
+        """
+
+        calibration_validation = self.validate_advisory_calibration_receipt(calibration_receipt)
+        if not calibration_validation["ok"]:
+            raise ValueError("calibration_receipt must validate before pathology escalation")
+        if calibration_receipt.get("correction_mode") != "advisory-only":
+            raise ValueError("calibration_receipt must remain advisory-only")
+        if calibration_receipt.get("forced_correction_allowed") is not False:
+            raise ValueError("calibration_receipt must not allow forced correction")
+        if not risk_signal_refs:
+            raise ValueError("risk_signal_refs must not be empty")
+        for ref in risk_signal_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("risk_signal_refs must contain non-empty strings")
+        for field_name, value in {
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "medical_system_ref": medical_system_ref,
+            "legal_system_ref": legal_system_ref,
+            "care_handoff_ref": care_handoff_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        risk_signal_digest_set = [sha256_text(str(ref)) for ref in risk_signal_refs]
+        gate_payload = {
+            "source_calibration_receipt_digest": calibration_receipt.get("receipt_digest"),
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES),
+        }
+        handoff_payload = {
+            "source_observation_digest": calibration_receipt.get("source_observation_digest"),
+            "source_calibration_receipt_digest": calibration_receipt.get("receipt_digest"),
+            "risk_signal_set_digest": sha256_text("|".join(risk_signal_digest_set)),
+            "medical_system_ref": medical_system_ref,
+            "legal_system_ref": legal_system_ref,
+            "care_handoff_ref": care_handoff_ref,
+            "os_scope": "observe-and-refer-only",
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_pathological_self_assessment_escalation_receipt",
+            "policy_id": SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID,
+            "digest_profile": SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE,
+            "escalation_id": new_id("self-model-pathology-escalation"),
+            "identity_id": str(calibration_receipt["identity_id"]),
+            "source_observation_digest": str(calibration_receipt["source_observation_digest"]),
+            "source_calibration_policy_id": str(calibration_receipt["policy_id"]),
+            "source_calibration_receipt_digest": str(calibration_receipt["receipt_digest"]),
+            "risk_signal_refs": [str(ref) for ref in risk_signal_refs],
+            "risk_signal_digest_set": risk_signal_digest_set,
+            "risk_signal_set_digest": sha256_text("|".join(risk_signal_digest_set)),
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "medical_system_ref": medical_system_ref,
+            "legal_system_ref": legal_system_ref,
+            "care_handoff_ref": care_handoff_ref,
+            "required_roles": list(SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "handoff_commit_digest": self._digest(handoff_payload),
+            "escalation_mode": "human-society-boundary-handoff",
+            "os_scope": "observe-and-refer-only",
+            "medical_adjudication_authority": "external-medical-system",
+            "legal_adjudication_authority": "external-legal-system",
+            "care_handoff_required": True,
+            "consent_or_emergency_review_required": True,
+            "boundary_only_review": True,
+            "internal_diagnosis_allowed": False,
+            "self_model_writeback_allowed": False,
+            "external_truth_claim_allowed": False,
+            "forced_correction_allowed": False,
+            "forced_stability_lock_allowed": False,
+            "raw_medical_payload_stored": False,
+            "raw_legal_payload_stored": False,
+            "raw_witness_payload_stored": False,
+            "raw_self_model_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_pathology_escalation_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_pathological_self_assessment_escalation_receipt":
+            errors.append(
+                "kind must equal self_model_pathological_self_assessment_escalation_receipt"
+            )
+        if receipt.get("policy_id") != SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID:
+            errors.append("policy_id must equal self-model pathology escalation policy")
+        if receipt.get("digest_profile") != SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model pathology escalation digest profile")
+        if receipt.get("source_calibration_policy_id") != SELF_MODEL_CALIBRATION_POLICY_ID:
+            errors.append("source_calibration_policy_id must bind the advisory calibration policy")
+
+        risk_refs = receipt.get("risk_signal_refs")
+        risk_digests = receipt.get("risk_signal_digest_set")
+        if not isinstance(risk_refs, list) or not risk_refs:
+            errors.append("risk_signal_refs must be non-empty")
+            risk_refs = []
+        if not isinstance(risk_digests, list) or len(risk_digests) != len(risk_refs):
+            errors.append("risk_signal_digest_set must match risk signal refs")
+            risk_digests = []
+        elif [sha256_text(str(ref)) for ref in risk_refs] != risk_digests:
+            errors.append("risk signal digest set must match risk signal refs")
+        if isinstance(risk_digests, list) and risk_digests:
+            expected_risk_set_digest = sha256_text("|".join(str(item) for item in risk_digests))
+            if receipt.get("risk_signal_set_digest") != expected_risk_set_digest:
+                errors.append("risk_signal_set_digest must match digest set")
+
+        gate_payload = {
+            "source_calibration_receipt_digest": receipt.get(
+                "source_calibration_receipt_digest"
+            ),
+            "consent_or_emergency_review_ref": receipt.get(
+                "consent_or_emergency_review_ref"
+            ),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "required_roles": list(SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "identity_id",
+            "source_observation_digest",
+            "source_calibration_receipt_digest",
+            "consent_or_emergency_review_ref",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "medical_system_ref",
+            "legal_system_ref",
+            "care_handoff_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind calibration, consent/emergency review, council, and guardian refs")
+
+        handoff_payload = {
+            "source_observation_digest": receipt.get("source_observation_digest"),
+            "source_calibration_receipt_digest": receipt.get(
+                "source_calibration_receipt_digest"
+            ),
+            "risk_signal_set_digest": receipt.get("risk_signal_set_digest"),
+            "medical_system_ref": receipt.get("medical_system_ref"),
+            "legal_system_ref": receipt.get("legal_system_ref"),
+            "care_handoff_ref": receipt.get("care_handoff_ref"),
+            "os_scope": "observe-and-refer-only",
+        }
+        if receipt.get("handoff_commit_digest") != self._digest(handoff_payload):
+            errors.append("handoff_commit_digest must bind observation, calibration, risk signals, and external handoff refs")
+
+        expected_strings = {
+            "escalation_mode": "human-society-boundary-handoff",
+            "os_scope": "observe-and-refer-only",
+            "medical_adjudication_authority": "external-medical-system",
+            "legal_adjudication_authority": "external-legal-system",
+        }
+        for field_name, expected_value in expected_strings.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must equal {expected_value}")
+        for field_name in (
+            "care_handoff_required",
+            "consent_or_emergency_review_required",
+            "boundary_only_review",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "internal_diagnosis_allowed",
+            "self_model_writeback_allowed",
+            "external_truth_claim_allowed",
+            "forced_correction_allowed",
+            "forced_stability_lock_allowed",
+            "raw_medical_payload_stored",
+            "raw_legal_payload_stored",
+            "raw_witness_payload_stored",
+            "raw_self_model_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "care_handoff_required": receipt.get("care_handoff_required"),
+            "consent_or_emergency_review_required": receipt.get(
+                "consent_or_emergency_review_required"
+            ),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "internal_diagnosis_allowed": receipt.get("internal_diagnosis_allowed"),
+            "self_model_writeback_allowed": receipt.get("self_model_writeback_allowed"),
+            "forced_correction_allowed": receipt.get("forced_correction_allowed"),
+            "raw_medical_payload_stored": receipt.get("raw_medical_payload_stored"),
+            "handoff_commit_digest_bound": self._non_empty_string(
+                receipt.get("handoff_commit_digest")
             ),
         }
 

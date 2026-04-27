@@ -14484,6 +14484,25 @@ json.dump(response, sys.stdout)
             ],
         )
         calibration_validation = monitor.validate_advisory_calibration_receipt(calibration)
+        pathology_escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=[
+                "risk://self-model/pathology-boundary/abrupt-divergence",
+                "risk://self-model/pathology-boundary/self-report-inconsistency",
+                "risk://self-model/pathology-boundary/council-medical-handoff",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        pathology_escalation_validation = monitor.validate_pathology_escalation_receipt(
+            pathology_escalation
+        )
         value_generation = monitor.build_value_generation_receipt(
             stable,
             candidate_value_refs=[
@@ -14577,6 +14596,16 @@ json.dump(response, sys.stdout)
                 "calibration_policy_id": calibration["policy_id"],
                 "calibration_receipt_digest": calibration["receipt_digest"],
                 "calibration_advisory_only": calibration_validation["advisory_only"],
+                "pathology_escalation_policy_id": pathology_escalation["policy_id"],
+                "pathology_escalation_receipt_digest": pathology_escalation[
+                    "receipt_digest"
+                ],
+                "pathology_escalation_care_handoff_required": pathology_escalation_validation[
+                    "care_handoff_required"
+                ],
+                "pathology_escalation_no_internal_diagnosis": not pathology_escalation_validation[
+                    "internal_diagnosis_allowed"
+                ],
                 "value_generation_policy_id": value_generation["policy_id"],
                 "value_generation_receipt_digest": value_generation["receipt_digest"],
                 "value_generation_self_authored": value_generation_validation["self_authored"],
@@ -14637,6 +14666,7 @@ json.dump(response, sys.stdout)
                 "abrupt": abrupt,
             },
             "calibration": calibration,
+            "pathology_escalation": pathology_escalation,
             "value_generation": value_generation,
             "value_autonomy_review": value_autonomy_review,
             "value_acceptance": value_acceptance,
@@ -14652,6 +14682,7 @@ json.dump(response, sys.stdout)
                     and float(abrupt["divergence"]) >= threshold
                     and len(history) == 3
                     and calibration_validation["ok"]
+                    and pathology_escalation_validation["ok"]
                     and value_generation_validation["ok"]
                     and value_autonomy_review_validation["ok"]
                     and value_acceptance_validation["ok"]
@@ -14663,6 +14694,7 @@ json.dump(response, sys.stdout)
                 "abrupt_flagged": abrupt["abrupt_change"]
                 and float(abrupt["divergence"]) >= threshold,
                 "calibration": calibration_validation,
+                "pathology_escalation": pathology_escalation_validation,
                 "value_generation": value_generation_validation,
                 "value_autonomy_review": value_autonomy_review_validation,
                 "value_acceptance": value_acceptance_validation,
