@@ -258,6 +258,84 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("external_veto_allowed must be false", validation["errors"])
 
+    def test_value_acceptance_receipt_binds_future_self_writeback(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+
+        acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=[
+                "self-model://history/future-self-acceptance-window",
+                "council://self-model/value-acceptance/boundary-only-review",
+            ],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+        validation = monitor.validate_value_acceptance_receipt(acceptance)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["future_self_acceptance_satisfied"])
+        self.assertTrue(validation["accepted_for_writeback"])
+        self.assertTrue(validation["boundary_only_review"])
+        self.assertTrue(validation["writeback_digest_bound"])
+        self.assertFalse(acceptance["external_veto_allowed"])
+        self.assertFalse(acceptance["raw_value_payload_stored"])
+
+    def test_value_acceptance_rejects_external_candidate(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"curiosity": 0.71},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+
+        with self.assertRaises(ValueError):
+            monitor.build_value_acceptance_receipt(
+                generation,
+                accepted_value_refs=["value-candidate://self-model/external-imposition/v1"],
+                continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+                future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+                council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+                guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+                writeback_ref="self-model://writeback/value-generation/external-imposition/v1",
+                post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/external-imposition/v1",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,9 @@ SELF_MODEL_CALIBRATION_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_GENERATION_POLICY_ID = "self-model-self-authored-value-generation-v1"
 SELF_MODEL_VALUE_GENERATION_DIGEST_PROFILE = "self-model-value-generation-digest-v1"
 SELF_MODEL_VALUE_GENERATION_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID = "self-model-future-self-acceptance-writeback-v1"
+SELF_MODEL_VALUE_ACCEPTANCE_DIGEST_PROFILE = "self-model-value-acceptance-digest-v1"
+SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES = ("self", "council", "guardian")
 
 
 @dataclass
@@ -473,6 +476,241 @@ class SelfModelMonitor:
             "external_veto_allowed": receipt.get("external_veto_allowed"),
             "accepted_for_writeback": receipt.get("accepted_for_writeback"),
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
+        }
+
+    def build_value_acceptance_receipt(
+        self,
+        generation_receipt: Dict[str, object],
+        accepted_value_refs: Sequence[str],
+        continuity_recheck_refs: Sequence[str],
+        future_self_acceptance_ref: str,
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        writeback_ref: str,
+        post_acceptance_snapshot_ref: str,
+    ) -> Dict[str, object]:
+        """Bind future-self acceptance before bounded value writeback."""
+
+        generation_validation = self.validate_value_generation_receipt(generation_receipt)
+        if not generation_validation["ok"]:
+            raise ValueError("generation_receipt must validate before acceptance")
+        if generation_receipt.get("requires_future_self_acceptance") is not True:
+            raise ValueError("generation_receipt must require future self acceptance")
+        if generation_receipt.get("accepted_for_writeback") is not False:
+            raise ValueError("generation_receipt must not already be written back")
+        candidate_value_refs = generation_receipt.get("candidate_value_refs")
+        if not isinstance(candidate_value_refs, list) or not candidate_value_refs:
+            raise ValueError("generation_receipt must contain candidate value refs")
+        if not accepted_value_refs:
+            raise ValueError("accepted_value_refs must not be empty")
+        if not continuity_recheck_refs:
+            raise ValueError("continuity_recheck_refs must not be empty")
+
+        candidate_ref_set = {str(ref) for ref in candidate_value_refs}
+        for ref in accepted_value_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("accepted_value_refs must contain non-empty strings")
+            if str(ref) not in candidate_ref_set:
+                raise ValueError("accepted_value_refs must be a subset of candidate_value_refs")
+        for ref in continuity_recheck_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("continuity_recheck_refs must contain non-empty strings")
+        for field_name, value in {
+            "future_self_acceptance_ref": future_self_acceptance_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "writeback_ref": writeback_ref,
+            "post_acceptance_snapshot_ref": post_acceptance_snapshot_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        source_candidate_value_digest_set = [
+            sha256_text(str(ref)) for ref in candidate_value_refs
+        ]
+        accepted_value_digest_set = [sha256_text(str(ref)) for ref in accepted_value_refs]
+        continuity_recheck_digest_set = [
+            sha256_text(str(ref)) for ref in continuity_recheck_refs
+        ]
+        gate_payload = {
+            "future_self_acceptance_ref": future_self_acceptance_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES),
+        }
+        writeback_payload = {
+            "source_generation_receipt_digest": generation_receipt.get("receipt_digest"),
+            "accepted_value_set_digest": sha256_text("|".join(accepted_value_digest_set)),
+            "writeback_ref": writeback_ref,
+            "post_acceptance_snapshot_ref": post_acceptance_snapshot_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_acceptance_receipt",
+            "policy_id": SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_ACCEPTANCE_DIGEST_PROFILE,
+            "acceptance_id": new_id("self-model-value-acceptance"),
+            "identity_id": str(generation_receipt["identity_id"]),
+            "source_generation_id": str(generation_receipt["generation_id"]),
+            "source_generation_policy_id": str(generation_receipt["policy_id"]),
+            "source_generation_receipt_digest": str(generation_receipt["receipt_digest"]),
+            "source_candidate_value_digest_set": source_candidate_value_digest_set,
+            "accepted_value_refs": list(accepted_value_refs),
+            "accepted_value_digest_set": accepted_value_digest_set,
+            "accepted_value_set_digest": sha256_text("|".join(accepted_value_digest_set)),
+            "continuity_recheck_refs": list(continuity_recheck_refs),
+            "continuity_recheck_digest_set": continuity_recheck_digest_set,
+            "continuity_recheck_set_digest": sha256_text("|".join(continuity_recheck_digest_set)),
+            "future_self_acceptance_ref": future_self_acceptance_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "writeback_ref": writeback_ref,
+            "post_acceptance_snapshot_ref": post_acceptance_snapshot_ref,
+            "writeback_commit_digest": self._digest(writeback_payload),
+            "acceptance_mode": "future-self-accepted-bounded-writeback",
+            "integration_status": "accepted-for-bounded-writeback",
+            "future_self_acceptance_satisfied": True,
+            "generation_receipt_required_future_self_acceptance": True,
+            "autonomy_preserved": True,
+            "boundary_only_review": True,
+            "external_truth_claim_allowed": False,
+            "external_veto_allowed": False,
+            "forced_stability_lock_allowed": False,
+            "accepted_for_writeback": True,
+            "raw_value_payload_stored": False,
+            "raw_continuity_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_acceptance_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_acceptance_receipt":
+            errors.append("kind must equal self_model_value_acceptance_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID:
+            errors.append("policy_id must equal self-model value acceptance policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_ACCEPTANCE_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model value acceptance digest profile")
+        if receipt.get("source_generation_policy_id") != SELF_MODEL_VALUE_GENERATION_POLICY_ID:
+            errors.append("source_generation_policy_id must bind the value generation policy")
+
+        source_candidate_digests = receipt.get("source_candidate_value_digest_set")
+        if not isinstance(source_candidate_digests, list) or not source_candidate_digests:
+            errors.append("source_candidate_value_digest_set must be non-empty")
+            source_candidate_digests = []
+
+        accepted_refs = receipt.get("accepted_value_refs")
+        accepted_digests = receipt.get("accepted_value_digest_set")
+        if not isinstance(accepted_refs, list) or not accepted_refs:
+            errors.append("accepted_value_refs must be non-empty")
+            accepted_refs = []
+        if not isinstance(accepted_digests, list) or len(accepted_digests) != len(accepted_refs):
+            errors.append("accepted_value_digest_set must match accepted value refs")
+            accepted_digests = []
+        elif [sha256_text(str(ref)) for ref in accepted_refs] != accepted_digests:
+            errors.append("accepted value digest set must match accepted value refs")
+        if isinstance(accepted_digests, list) and accepted_digests:
+            expected_value_set_digest = sha256_text("|".join(str(item) for item in accepted_digests))
+            if receipt.get("accepted_value_set_digest") != expected_value_set_digest:
+                errors.append("accepted_value_set_digest must match digest set")
+            if not set(str(item) for item in accepted_digests).issubset(
+                set(str(item) for item in source_candidate_digests)
+            ):
+                errors.append("accepted values must be a subset of source candidate values")
+
+        recheck_refs = receipt.get("continuity_recheck_refs")
+        recheck_digests = receipt.get("continuity_recheck_digest_set")
+        if not isinstance(recheck_refs, list) or not recheck_refs:
+            errors.append("continuity_recheck_refs must be non-empty")
+            recheck_refs = []
+        if not isinstance(recheck_digests, list) or len(recheck_digests) != len(recheck_refs):
+            errors.append("continuity_recheck_digest_set must match continuity recheck refs")
+            recheck_digests = []
+        elif [sha256_text(str(ref)) for ref in recheck_refs] != recheck_digests:
+            errors.append("continuity recheck digest set must match continuity recheck refs")
+        if isinstance(recheck_digests, list) and recheck_digests:
+            expected_recheck_set_digest = sha256_text("|".join(str(item) for item in recheck_digests))
+            if receipt.get("continuity_recheck_set_digest") != expected_recheck_set_digest:
+                errors.append("continuity_recheck_set_digest must match digest set")
+
+        gate_payload = {
+            "future_self_acceptance_ref": receipt.get("future_self_acceptance_ref"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "future_self_acceptance_ref",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "writeback_ref",
+            "post_acceptance_snapshot_ref",
+            "source_generation_receipt_digest",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind future self acceptance, council, and guardian refs")
+
+        writeback_payload = {
+            "source_generation_receipt_digest": receipt.get("source_generation_receipt_digest"),
+            "accepted_value_set_digest": receipt.get("accepted_value_set_digest"),
+            "writeback_ref": receipt.get("writeback_ref"),
+            "post_acceptance_snapshot_ref": receipt.get("post_acceptance_snapshot_ref"),
+        }
+        if receipt.get("writeback_commit_digest") != self._digest(writeback_payload):
+            errors.append("writeback_commit_digest must bind source generation, accepted values, and writeback refs")
+
+        if receipt.get("acceptance_mode") != "future-self-accepted-bounded-writeback":
+            errors.append("acceptance_mode must remain future-self accepted bounded writeback")
+        if receipt.get("integration_status") != "accepted-for-bounded-writeback":
+            errors.append("integration_status must remain accepted-for-bounded-writeback")
+        for field_name in (
+            "future_self_acceptance_satisfied",
+            "generation_receipt_required_future_self_acceptance",
+            "autonomy_preserved",
+            "boundary_only_review",
+            "accepted_for_writeback",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "external_truth_claim_allowed",
+            "external_veto_allowed",
+            "forced_stability_lock_allowed",
+            "raw_value_payload_stored",
+            "raw_continuity_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "future_self_acceptance_satisfied": receipt.get("future_self_acceptance_satisfied"),
+            "accepted_for_writeback": receipt.get("accepted_for_writeback"),
+            "autonomy_preserved": receipt.get("autonomy_preserved"),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "external_veto_allowed": receipt.get("external_veto_allowed"),
+            "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
+            "writeback_digest_bound": self._non_empty_string(
+                receipt.get("writeback_commit_digest")
+            ),
         }
 
     def history(self) -> List[Dict[str, object]]:

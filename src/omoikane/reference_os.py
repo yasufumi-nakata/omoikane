@@ -14501,6 +14501,23 @@ json.dump(response, sys.stdout)
             guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
         )
         value_generation_validation = monitor.validate_value_generation_receipt(value_generation)
+        value_acceptance = monitor.build_value_acceptance_receipt(
+            value_generation,
+            accepted_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+            ],
+            continuity_recheck_refs=[
+                "self-model://history/future-self-acceptance-window",
+                "memory://semantic/reflection/future-self-accepted-values",
+                "council://self-model/value-acceptance/boundary-only-review",
+            ],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+        value_acceptance_validation = monitor.validate_value_acceptance_receipt(value_acceptance)
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14521,6 +14538,14 @@ json.dump(response, sys.stdout)
                 "value_generation_self_authored": value_generation_validation["self_authored"],
                 "value_generation_autonomy_preserved": value_generation_validation[
                     "autonomy_preserved"
+                ],
+                "value_acceptance_policy_id": value_acceptance["policy_id"],
+                "value_acceptance_receipt_digest": value_acceptance["receipt_digest"],
+                "value_acceptance_future_self_bound": value_acceptance_validation[
+                    "future_self_acceptance_satisfied"
+                ],
+                "value_acceptance_writeback_bound": value_acceptance_validation[
+                    "writeback_digest_bound"
                 ],
             },
             actor="SelfModelMonitorService",
@@ -14543,6 +14568,7 @@ json.dump(response, sys.stdout)
             },
             "calibration": calibration,
             "value_generation": value_generation,
+            "value_acceptance": value_acceptance,
             "history": history,
             "validation": {
                 "ok": (
@@ -14554,6 +14580,7 @@ json.dump(response, sys.stdout)
                     and len(history) == 3
                     and calibration_validation["ok"]
                     and value_generation_validation["ok"]
+                    and value_acceptance_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
@@ -14561,6 +14588,7 @@ json.dump(response, sys.stdout)
                 and float(abrupt["divergence"]) >= threshold,
                 "calibration": calibration_validation,
                 "value_generation": value_generation_validation,
+                "value_acceptance": value_acceptance_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },

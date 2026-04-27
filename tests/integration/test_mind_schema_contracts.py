@@ -149,6 +149,20 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_generation"]["accepted_for_writeback"])
         self.assertFalse(result["value_generation"]["raw_value_payload_stored"])
 
+    def test_self_model_demo_value_acceptance_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_acceptance_receipt.schema",
+            result["value_acceptance"],
+        )
+        self.assertTrue(result["validation"]["value_acceptance"]["ok"])
+        self.assertTrue(result["value_acceptance"]["future_self_acceptance_satisfied"])
+        self.assertTrue(result["value_acceptance"]["accepted_for_writeback"])
+        self.assertTrue(result["value_acceptance"]["boundary_only_review"])
+        self.assertFalse(result["value_acceptance"]["external_veto_allowed"])
+        self.assertFalse(result["value_acceptance"]["raw_value_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()

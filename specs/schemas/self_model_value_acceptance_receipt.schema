@@ -1,0 +1,217 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_acceptance_receipt.schema"
+title: SelfModelValueAcceptanceReceipt
+description: Digest-only receipt that binds future-self acceptance before bounded SelfModel value writeback.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - acceptance_id
+  - identity_id
+  - source_generation_id
+  - source_generation_policy_id
+  - source_generation_receipt_digest
+  - source_candidate_value_digest_set
+  - accepted_value_refs
+  - accepted_value_digest_set
+  - accepted_value_set_digest
+  - continuity_recheck_refs
+  - continuity_recheck_digest_set
+  - continuity_recheck_set_digest
+  - future_self_acceptance_ref
+  - council_resolution_ref
+  - guardian_boundary_ref
+  - required_roles
+  - gate_digest
+  - writeback_ref
+  - post_acceptance_snapshot_ref
+  - writeback_commit_digest
+  - acceptance_mode
+  - integration_status
+  - future_self_acceptance_satisfied
+  - generation_receipt_required_future_self_acceptance
+  - autonomy_preserved
+  - boundary_only_review
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - forced_stability_lock_allowed
+  - accepted_for_writeback
+  - raw_value_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_acceptance_receipt
+  policy_id:
+    type: string
+    const: self-model-future-self-acceptance-writeback-v1
+  digest_profile:
+    type: string
+    const: self-model-value-acceptance-digest-v1
+  acceptance_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_generation_id:
+    type: string
+    minLength: 1
+  source_generation_policy_id:
+    type: string
+    const: self-model-self-authored-value-generation-v1
+  source_generation_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_candidate_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  accepted_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  accepted_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  accepted_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  continuity_recheck_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  continuity_recheck_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  continuity_recheck_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  future_self_acceptance_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  writeback_ref:
+    type: string
+    minLength: 1
+  post_acceptance_snapshot_ref:
+    type: string
+    minLength: 1
+  writeback_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  acceptance_mode:
+    type: string
+    const: future-self-accepted-bounded-writeback
+  integration_status:
+    type: string
+    const: accepted-for-bounded-writeback
+  future_self_acceptance_satisfied:
+    type: boolean
+    const: true
+  generation_receipt_required_future_self_acceptance:
+    type: boolean
+    const: true
+  autonomy_preserved:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  accepted_for_writeback:
+    type: boolean
+    const: true
+  raw_value_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_acceptance_receipt
+    policy_id: self-model-future-self-acceptance-writeback-v1
+    digest_profile: self-model-value-acceptance-digest-v1
+    acceptance_id: self-model-value-acceptance-example
+    identity_id: id-1
+    source_generation_id: self-model-value-generation-example
+    source_generation_policy_id: self-model-self-authored-value-generation-v1
+    source_generation_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_candidate_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    accepted_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    accepted_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    accepted_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_recheck_refs:
+      - self-model://history/future-self-acceptance-window
+    continuity_recheck_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_recheck_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    future_self_acceptance_ref: consent://self-model/value-acceptance/future-self-v1
+    council_resolution_ref: council://self-model/value-acceptance/boundary-only
+    guardian_boundary_ref: guardian://self-model/value-acceptance/no-external-veto
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    writeback_ref: self-model://writeback/value-generation/generative-patience/v1
+    post_acceptance_snapshot_ref: self-model://snapshot/post-acceptance/generative-patience/v1
+    writeback_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    acceptance_mode: future-self-accepted-bounded-writeback
+    integration_status: accepted-for-bounded-writeback
+    future_self_acceptance_satisfied: true
+    generation_receipt_required_future_self_acceptance: true
+    autonomy_preserved: true
+    boundary_only_review: true
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    forced_stability_lock_allowed: false
+    accepted_for_writeback: true
+    raw_value_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

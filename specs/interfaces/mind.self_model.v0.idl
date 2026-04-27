@@ -8,6 +8,7 @@ imports:
   self_model_observation: ../schemas/self_model_observation.schema
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
+  self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -171,6 +172,76 @@ operations:
             type: boolean
           accepted_for_writeback:
             type: boolean
+  build_value_acceptance_receipt:
+    summary: Bind future-self acceptance before moving a self-authored value candidate into bounded writeback.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - generation_receipt
+          - accepted_value_refs
+          - continuity_recheck_refs
+          - future_self_acceptance_ref
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - writeback_ref
+          - post_acceptance_snapshot_ref
+        properties:
+          generation_receipt:
+            schema_ref: self_model_value_generation_receipt
+          accepted_value_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          continuity_recheck_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          future_self_acceptance_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          writeback_ref:
+            type: string
+            minLength: 1
+          post_acceptance_snapshot_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_acceptance_receipt
+  validate_value_acceptance_receipt:
+    summary: Fail closed unless future-self acceptance, boundary-only review, and digest-bound writeback are preserved.
+    input:
+      schema_ref: self_model_value_acceptance_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - future_self_acceptance_satisfied
+          - accepted_for_writeback
+          - boundary_only_review
+          - writeback_digest_bound
+        properties:
+          ok:
+            type: boolean
+          future_self_acceptance_satisfied:
+            type: boolean
+          accepted_for_writeback:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          writeback_digest_bound:
+            type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.
     input:
@@ -193,3 +264,4 @@ invariants:
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
   - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
+  - value acceptance receipts can write back only accepted candidate refs after future self acceptance and boundary-only review

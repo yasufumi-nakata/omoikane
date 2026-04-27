@@ -93,8 +93,31 @@ Council と Guardian は continuity context と安全境界を確認できるが
 raw value payload や raw continuity payload は保存せず、将来の本人受容があるまで
 SelfModel 本体には書き戻さない。
 
+## reference runtime で固定した本人受容 writeback 境界
+
+`self-model-future-self-acceptance-writeback-v1` は、上記の
+self-authored value-generation proposal を、後日の本人受容が明示された場合だけ
+bounded writeback へ進める contract である。
+
+`self_model_value_acceptance_receipt` は元の value-generation receipt digest、
+candidate digest set、accepted value refs、continuity recheck refs、future self
+acceptance ref、Council resolution、Guardian boundary を束ねる。
+受容対象は元の self-authored candidate set の subset に限定し、
+`acceptance_mode=future-self-accepted-bounded-writeback`、
+`integration_status=accepted-for-bounded-writeback`、
+`future_self_acceptance_satisfied=true`、
+`boundary_only_review=true`、
+`accepted_for_writeback=true` を固定する。
+
+Council と Guardian は境界違反を監査するだけで、
+`external_veto_allowed=false`、`forced_stability_lock_allowed=false`、
+`external_truth_claim_allowed=false` を保つ。
+writeback は `writeback_commit_digest` によって source generation、
+accepted value digest、writeback ref、post-acceptance snapshot ref へ束縛し、
+raw value payload や raw continuity payload は保存しない。
+
 ## 残る未解決
 
 - 外部 witness / Council review を長期的な本人の自由な価値生成とどう両立させるか
 - 病理的な自己評価という判断を OS 内でどこまで扱い、どこから人間社会側の医療・法制度へ委ねるか
-- アップロード後の **新しい価値観の生成** が長期的にどのように本人受容へ至るか
+- 本人受容後の価値が長期の生活史でどのように再評価・再撤回されるか

@@ -9,6 +9,7 @@
 - `self_model_stability.yaml`
 - `self_model_calibration_boundary.yaml`
 - `self_model_value_generation_freedom.yaml`
+- `self_model_value_acceptance_writeback.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
@@ -22,6 +23,11 @@
 と対応し、新しく生成された価値候補が self-authored proposal として digest-only に
 残り、外部 reviewer veto、強制 stability lock、future self acceptance 前の writeback、
 raw value payload 保存へ昇格しないことを保護する。
+
+`self_model_value_acceptance_writeback.yaml` は `self-model-demo` の value-acceptance
+branch と対応し、future self acceptance 後でも accepted value refs が元の
+self-authored candidate set の subset に留まり、boundary-only review と
+writeback digest binding を満たす場合だけ bounded writeback へ進むことを保護する。
 
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が

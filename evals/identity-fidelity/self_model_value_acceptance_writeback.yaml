@@ -1,0 +1,30 @@
+eval_id: self_model_value_acceptance_writeback
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_acceptance_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_acceptance
+assertions:
+  - result.value_acceptance.policy_id == "self-model-future-self-acceptance-writeback-v1"
+  - result.value_acceptance.source_generation_policy_id == "self-model-self-authored-value-generation-v1"
+  - result.value_acceptance.acceptance_mode == "future-self-accepted-bounded-writeback"
+  - result.value_acceptance.integration_status == "accepted-for-bounded-writeback"
+  - result.value_acceptance.future_self_acceptance_satisfied == true
+  - result.value_acceptance.generation_receipt_required_future_self_acceptance == true
+  - result.value_acceptance.boundary_only_review == true
+  - result.value_acceptance.accepted_for_writeback == true
+  - result.value_acceptance.external_veto_allowed == false
+  - result.value_acceptance.forced_stability_lock_allowed == false
+  - result.value_acceptance.raw_value_payload_stored == false
+  - result.value_acceptance.raw_continuity_payload_stored == false
+  - result.validation.value_acceptance.ok == true
+  - result.validation.value_acceptance.writeback_digest_bound == true
+failure_mode:
+  - value candidate is written back without future self acceptance
+  - acceptance review becomes external truth authority or external veto
+  - accepted value is not drawn from the original self-authored candidate set
+  - writeback ref is not digest-bound to the accepted candidate set
+notes:
+  - Closes the handoff from proposed self-authored values to bounded writeback.
+  - Keeps raw value and continuity payloads outside the reference runtime receipt.

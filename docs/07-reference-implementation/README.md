@@ -144,6 +144,20 @@ revoked witness を accepted witness から除外して fail-closed する profi
 revocation verifier quorum が incomplete の profile、quorum は complete だが
 verifier roster jurisdiction set が不一致の profile も返す。
 
+`self-model-demo` は L2 SelfModelMonitor の abrupt-change / advisory calibration /
+self-authored value-generation / future-self acceptance writeback contract
+(`mind.self_model.v0`) を JSON で可視化し、stable drift が `0.35` threshold 未満に留まり、
+abrupt drift が Council review へ回ることを確認する。
+calibration branch は外部 evidence を advisory-only receipt に束ねるが
+forced correction や external truth claim を許さない。
+value-generation branch は新しい価値候補を self-authored proposal として
+digest-only に残し、future self acceptance 前の writeback を拒む。
+value-acceptance branch は、後日の本人受容がある場合だけ
+元の candidate digest set の subset を `self_model_value_acceptance_receipt` へ束縛し、
+`accepted-for-bounded-writeback` と `writeback_commit_digest` を返す。
+Council / Guardian review は boundary-only であり、external veto、forced stability lock、
+raw value payload 保存は引き続き false に固定される。
+
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、
 Method B candidate selection が
