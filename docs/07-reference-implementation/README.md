@@ -154,6 +154,10 @@ care-trustee-handoff branch は pathology escalation 後の長期 trustee、
 care team、legal guardian の責任分担を外部制度 refs と boundary refs へ
 digest-only に束縛し、OS 自身が trustee、医療 authority、legal guardian へ
 昇格しないことを確認する。
+external-adjudication branch は外部医療・法制度・trustee 側の adjudication result、
+jurisdiction policy、appeal/review path を digest-only refs として束縛し、
+OS 自身が adjudicator、医療 authority、legal authority、trustee、SelfModel writeback
+authority へ昇格しないことを確認する。
 value-generation branch は新しい価値候補を self-authored proposal として
 digest-only に残し、future self acceptance 前の writeback を拒む。
 value-autonomy-review branch は、外部 witness と Council review を
@@ -633,6 +637,18 @@ legal guardian / responsibility boundary refs を digest-only に束ねる。
 `os_legal_guardianship_allowed=false`、`self_model_writeback_allowed=false`、
 `forced_correction_allowed=false`、`raw_trustee_payload_stored=false` を確認し、
 OS が長期 trustee や医療・法的 authority にならない境界を固定する。
+さらに `self-model-external-adjudication-result-boundary-v1` receipt は、
+care trustee handoff の digest を前提に、外部 medical / legal / trustee の
+adjudication result refs、jurisdiction policy refs、appeal / review refs、
+continuity review ref を digest-only に束ねる。
+この branch は `os_scope=digest-only-result-routing`、
+`external_adjudication_result_bound=true`、`jurisdiction_policy_bound=true`、
+`appeal_or_review_path_required=true`、
+`os_adjudication_authority_allowed=false`、
+`os_medical_authority_allowed=false`、`os_legal_authority_allowed=false`、
+`os_trustee_role_allowed=false`、`self_model_writeback_allowed=false`、
+`raw_medical_result_payload_stored=false` を確認し、OS が外部判断結果の保管・監査経路を
+持っても判断主体へ昇格しない境界を固定する。
 同じ demo は stable drift から生じた新しい価値候補を
 `self-model-self-authored-value-generation-v1` receipt に束縛し、
 `generation_mode=self-authored-bounded-experiment`、

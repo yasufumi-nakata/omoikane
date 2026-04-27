@@ -9,6 +9,7 @@ imports:
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_pathological_self_assessment_escalation_receipt: ../schemas/self_model_pathological_self_assessment_escalation_receipt.schema
   self_model_care_trustee_handoff_receipt: ../schemas/self_model_care_trustee_handoff_receipt.schema
+  self_model_external_adjudication_result_receipt: ../schemas/self_model_external_adjudication_result_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
   self_model_value_autonomy_review_receipt: ../schemas/self_model_value_autonomy_review_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
@@ -270,6 +271,99 @@ operations:
           os_trustee_role_allowed:
             type: boolean
           responsibility_commit_digest_bound:
+            type: boolean
+  build_external_adjudication_result_receipt:
+    summary: Bind external medical/legal/trustee adjudication result refs after care trustee handoff without importing adjudication authority into the OS.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - care_trustee_handoff_receipt
+          - medical_adjudication_result_refs
+          - legal_adjudication_result_refs
+          - trustee_adjudication_result_refs
+          - jurisdiction_policy_refs
+          - appeal_or_review_refs
+          - consent_or_emergency_review_ref
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - continuity_review_ref
+        properties:
+          care_trustee_handoff_receipt:
+            schema_ref: self_model_care_trustee_handoff_receipt
+          medical_adjudication_result_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          legal_adjudication_result_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          trustee_adjudication_result_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          jurisdiction_policy_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          appeal_or_review_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          consent_or_emergency_review_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          continuity_review_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_external_adjudication_result_receipt
+  validate_external_adjudication_result_receipt:
+    summary: Fail closed unless external adjudication results remain digest-only, appeal/review-bound, and outside OS medical, legal, trustee, or writeback authority.
+    input:
+      schema_ref: self_model_external_adjudication_result_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - external_adjudication_result_bound
+          - jurisdiction_policy_bound
+          - appeal_or_review_path_required
+          - boundary_only_review
+          - os_adjudication_authority_allowed
+          - adjudication_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          external_adjudication_result_bound:
+            type: boolean
+          jurisdiction_policy_bound:
+            type: boolean
+          appeal_or_review_path_required:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          os_adjudication_authority_allowed:
+            type: boolean
+          adjudication_commit_digest_bound:
             type: boolean
   build_value_generation_receipt:
     summary: Bind self-authored value-generation candidates without external veto, forced stability lock, or immediate writeback.
@@ -627,6 +721,7 @@ invariants:
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
   - pathology escalation receipts can preserve risk signals and route external medical/legal handoff, but cannot diagnose, force correction, or write back SelfModel changes inside the OS
+  - external adjudication result receipts can bind medical, legal, trustee, jurisdiction policy, and appeal/review refs, but cannot make the OS an adjudicator, medical authority, legal authority, trustee, or SelfModel writeback authority
   - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
   - value autonomy review receipts let witness/Council evidence remain advisory and digest-only while preserving candidate sets, self authorship, and future self acceptance
   - value acceptance receipts can write back only accepted candidate refs after future self acceptance and boundary-only review

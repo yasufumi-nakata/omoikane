@@ -415,6 +415,181 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("os_trustee_role_allowed must be false", validation["errors"])
 
+    def test_external_adjudication_result_keeps_authority_outside_os(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        handoff = monitor.build_care_trustee_handoff_receipt(
+            escalation,
+            trustee_refs=["trustee://jp-13/self-model/long-term-trustee/v1"],
+            care_team_refs=["care-team://jp-13/self-model/care-board/v1"],
+            legal_guardian_refs=["legal-guardian://jp-13/self-model/capacity-review/v1"],
+            responsibility_boundary_refs=[
+                "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+                "boundary://self-model/care-trustee/external-adjudication-required/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/care-trustee/review-v1"
+            ),
+            council_resolution_ref="council://self-model/care-trustee/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+            long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+            escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+        )
+
+        adjudication = monitor.build_external_adjudication_result_receipt(
+            handoff,
+            medical_adjudication_result_refs=[
+                "external-medical-result://jp-13/self-model/no-os-diagnosis/v1"
+            ],
+            legal_adjudication_result_refs=[
+                "external-legal-result://jp-13/self-model/capacity-boundary/v1"
+            ],
+            trustee_adjudication_result_refs=[
+                "external-trustee-result://jp-13/self-model/trustee-appointment/v1"
+            ],
+            jurisdiction_policy_refs=[
+                "jurisdiction-policy://jp-13/self-model/medical-review/v1"
+            ],
+            appeal_or_review_refs=[
+                "appeal-review://jp-13/self-model/adjudication/periodic-review/v1"
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/external-adjudication/result-review-v1"
+            ),
+            council_resolution_ref="council://self-model/external-adjudication/boundary-only",
+            guardian_boundary_ref="guardian://self-model/external-adjudication/no-os-authority",
+            continuity_review_ref="continuity://self-model/external-adjudication/result-chain/v1",
+        )
+        validation = monitor.validate_external_adjudication_result_receipt(adjudication)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["external_adjudication_result_bound"])
+        self.assertTrue(validation["jurisdiction_policy_bound"])
+        self.assertTrue(validation["appeal_or_review_path_required"])
+        self.assertTrue(validation["adjudication_commit_digest_bound"])
+        self.assertEqual(
+            handoff["receipt_digest"],
+            adjudication["source_handoff_receipt_digest"],
+        )
+        self.assertFalse(adjudication["os_adjudication_authority_allowed"])
+        self.assertFalse(adjudication["os_medical_authority_allowed"])
+        self.assertFalse(adjudication["os_legal_authority_allowed"])
+        self.assertFalse(adjudication["os_trustee_role_allowed"])
+        self.assertFalse(adjudication["self_model_writeback_allowed"])
+        self.assertFalse(adjudication["raw_medical_result_payload_stored"])
+
+    def test_external_adjudication_result_rejects_os_adjudication_authority(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        handoff = monitor.build_care_trustee_handoff_receipt(
+            escalation,
+            trustee_refs=["trustee://jp-13/self-model/long-term-trustee/v1"],
+            care_team_refs=["care-team://jp-13/self-model/care-board/v1"],
+            legal_guardian_refs=["legal-guardian://jp-13/self-model/capacity-review/v1"],
+            responsibility_boundary_refs=[
+                "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/care-trustee/review-v1"
+            ),
+            council_resolution_ref="council://self-model/care-trustee/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+            long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+            escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+        )
+        adjudication = monitor.build_external_adjudication_result_receipt(
+            handoff,
+            medical_adjudication_result_refs=[
+                "external-medical-result://jp-13/self-model/no-os-diagnosis/v1"
+            ],
+            legal_adjudication_result_refs=[
+                "external-legal-result://jp-13/self-model/capacity-boundary/v1"
+            ],
+            trustee_adjudication_result_refs=[
+                "external-trustee-result://jp-13/self-model/trustee-appointment/v1"
+            ],
+            jurisdiction_policy_refs=[
+                "jurisdiction-policy://jp-13/self-model/medical-review/v1"
+            ],
+            appeal_or_review_refs=[
+                "appeal-review://jp-13/self-model/adjudication/periodic-review/v1"
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/external-adjudication/result-review-v1"
+            ),
+            council_resolution_ref="council://self-model/external-adjudication/boundary-only",
+            guardian_boundary_ref="guardian://self-model/external-adjudication/no-os-authority",
+            continuity_review_ref="continuity://self-model/external-adjudication/result-chain/v1",
+        )
+        tampered = copy.deepcopy(adjudication)
+        tampered["os_adjudication_authority_allowed"] = True
+
+        validation = monitor.validate_external_adjudication_result_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "os_adjudication_authority_allowed must be false",
+            validation["errors"],
+        )
+
     def test_value_generation_receipt_preserves_autonomy(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(

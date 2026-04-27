@@ -172,6 +172,36 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["care_trustee_handoff"]["self_model_writeback_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
 
+    def test_self_model_demo_external_adjudication_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_external_adjudication_result_receipt.schema",
+            result["external_adjudication"],
+        )
+        self.assertTrue(result["validation"]["external_adjudication"]["ok"])
+        self.assertTrue(
+            result["external_adjudication"]["external_adjudication_result_bound"]
+        )
+        self.assertTrue(result["external_adjudication"]["jurisdiction_policy_bound"])
+        self.assertTrue(
+            result["external_adjudication"]["appeal_or_review_path_required"]
+        )
+        self.assertEqual(
+            result["care_trustee_handoff"]["receipt_digest"],
+            result["external_adjudication"]["source_handoff_receipt_digest"],
+        )
+        self.assertFalse(
+            result["external_adjudication"]["os_adjudication_authority_allowed"]
+        )
+        self.assertFalse(result["external_adjudication"]["os_medical_authority_allowed"])
+        self.assertFalse(result["external_adjudication"]["os_legal_authority_allowed"])
+        self.assertFalse(result["external_adjudication"]["os_trustee_role_allowed"])
+        self.assertFalse(result["external_adjudication"]["self_model_writeback_allowed"])
+        self.assertFalse(
+            result["external_adjudication"]["raw_medical_result_payload_stored"]
+        )
+
     def test_self_model_demo_value_generation_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 

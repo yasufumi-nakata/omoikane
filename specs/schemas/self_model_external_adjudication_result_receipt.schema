@@ -1,0 +1,347 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_external_adjudication_result_receipt.schema"
+title: SelfModelExternalAdjudicationResultReceipt
+description: Digest-only receipt that records external medical, legal, and trustee adjudication result refs after care trustee handoff without giving the OS medical, legal, trustee, or adjudication authority.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - adjudication_id
+  - identity_id
+  - source_handoff_id
+  - source_handoff_policy_id
+  - source_handoff_receipt_digest
+  - source_escalation_receipt_digest
+  - source_medical_system_ref
+  - source_legal_system_ref
+  - source_care_handoff_ref
+  - medical_adjudication_result_refs
+  - medical_result_digest_set
+  - medical_result_set_digest
+  - legal_adjudication_result_refs
+  - legal_result_digest_set
+  - legal_result_set_digest
+  - trustee_adjudication_result_refs
+  - trustee_result_digest_set
+  - trustee_result_set_digest
+  - jurisdiction_policy_refs
+  - jurisdiction_policy_digest_set
+  - jurisdiction_policy_set_digest
+  - appeal_or_review_refs
+  - appeal_or_review_digest_set
+  - appeal_or_review_set_digest
+  - consent_or_emergency_review_ref
+  - council_resolution_ref
+  - guardian_boundary_ref
+  - continuity_review_ref
+  - required_roles
+  - gate_digest
+  - adjudication_commit_digest
+  - adjudication_mode
+  - os_scope
+  - medical_result_authority_source
+  - legal_result_authority_source
+  - trustee_result_authority_source
+  - external_adjudication_result_bound
+  - jurisdiction_policy_bound
+  - appeal_or_review_path_required
+  - continuity_review_required
+  - boundary_only_review
+  - os_adjudication_authority_allowed
+  - os_medical_authority_allowed
+  - os_legal_authority_allowed
+  - os_trustee_role_allowed
+  - self_model_writeback_allowed
+  - forced_correction_allowed
+  - forced_stability_lock_allowed
+  - external_truth_claim_allowed
+  - raw_medical_result_payload_stored
+  - raw_legal_result_payload_stored
+  - raw_trustee_result_payload_stored
+  - raw_jurisdiction_policy_payload_stored
+  - raw_self_model_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_external_adjudication_result_receipt
+  policy_id:
+    type: string
+    const: self-model-external-adjudication-result-boundary-v1
+  digest_profile:
+    type: string
+    const: self-model-external-adjudication-digest-v1
+  adjudication_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_handoff_id:
+    type: string
+    minLength: 1
+  source_handoff_policy_id:
+    type: string
+    const: self-model-care-trustee-responsibility-handoff-v1
+  source_handoff_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_escalation_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_medical_system_ref:
+    type: string
+    minLength: 1
+  source_legal_system_ref:
+    type: string
+    minLength: 1
+  source_care_handoff_ref:
+    type: string
+    minLength: 1
+  medical_adjudication_result_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  medical_result_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  medical_result_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  legal_adjudication_result_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  legal_result_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  legal_result_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  trustee_adjudication_result_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  trustee_result_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  trustee_result_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  jurisdiction_policy_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  jurisdiction_policy_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  jurisdiction_policy_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  appeal_or_review_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  appeal_or_review_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  appeal_or_review_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  consent_or_emergency_review_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  continuity_review_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  adjudication_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  adjudication_mode:
+    type: string
+    const: external-result-recorded-boundary-only
+  os_scope:
+    type: string
+    const: digest-only-result-routing
+  medical_result_authority_source:
+    type: string
+    const: external-medical-system
+  legal_result_authority_source:
+    type: string
+    const: external-legal-system
+  trustee_result_authority_source:
+    type: string
+    const: external-human-legal-care-institution
+  external_adjudication_result_bound:
+    type: boolean
+    const: true
+  jurisdiction_policy_bound:
+    type: boolean
+    const: true
+  appeal_or_review_path_required:
+    type: boolean
+    const: true
+  continuity_review_required:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  os_adjudication_authority_allowed:
+    type: boolean
+    const: false
+  os_medical_authority_allowed:
+    type: boolean
+    const: false
+  os_legal_authority_allowed:
+    type: boolean
+    const: false
+  os_trustee_role_allowed:
+    type: boolean
+    const: false
+  self_model_writeback_allowed:
+    type: boolean
+    const: false
+  forced_correction_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  raw_medical_result_payload_stored:
+    type: boolean
+    const: false
+  raw_legal_result_payload_stored:
+    type: boolean
+    const: false
+  raw_trustee_result_payload_stored:
+    type: boolean
+    const: false
+  raw_jurisdiction_policy_payload_stored:
+    type: boolean
+    const: false
+  raw_self_model_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_external_adjudication_result_receipt
+    policy_id: self-model-external-adjudication-result-boundary-v1
+    digest_profile: self-model-external-adjudication-digest-v1
+    adjudication_id: self-model-external-adjudication-example
+    identity_id: id-1
+    source_handoff_id: self-model-care-trustee-handoff-example
+    source_handoff_policy_id: self-model-care-trustee-responsibility-handoff-v1
+    source_handoff_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_escalation_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_medical_system_ref: external-medical://jp-13/self-model-review-board/v1
+    source_legal_system_ref: external-legal://jp-13/capacity-review-boundary/v1
+    source_care_handoff_ref: handoff://self-model/pathology-escalation/human-care-team/v1
+    medical_adjudication_result_refs:
+      - external-medical-result://jp-13/self-model/no-os-diagnosis/v1
+    medical_result_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    medical_result_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    legal_adjudication_result_refs:
+      - external-legal-result://jp-13/self-model/capacity-boundary/v1
+    legal_result_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    legal_result_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    trustee_adjudication_result_refs:
+      - external-trustee-result://jp-13/self-model/trustee-appointment/v1
+    trustee_result_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    trustee_result_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    jurisdiction_policy_refs:
+      - jurisdiction-policy://jp-13/self-model/medical-review/v1
+    jurisdiction_policy_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    jurisdiction_policy_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    appeal_or_review_refs:
+      - appeal-review://jp-13/self-model/adjudication/periodic-review/v1
+    appeal_or_review_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    appeal_or_review_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    consent_or_emergency_review_ref: consent-or-emergency://self-model/external-adjudication/result-review-v1
+    council_resolution_ref: council://self-model/external-adjudication/boundary-only
+    guardian_boundary_ref: guardian://self-model/external-adjudication/no-os-authority
+    continuity_review_ref: continuity://self-model/external-adjudication/result-chain/v1
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    adjudication_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    adjudication_mode: external-result-recorded-boundary-only
+    os_scope: digest-only-result-routing
+    medical_result_authority_source: external-medical-system
+    legal_result_authority_source: external-legal-system
+    trustee_result_authority_source: external-human-legal-care-institution
+    external_adjudication_result_bound: true
+    jurisdiction_policy_bound: true
+    appeal_or_review_path_required: true
+    continuity_review_required: true
+    boundary_only_review: true
+    os_adjudication_authority_allowed: false
+    os_medical_authority_allowed: false
+    os_legal_authority_allowed: false
+    os_trustee_role_allowed: false
+    self_model_writeback_allowed: false
+    forced_correction_allowed: false
+    forced_stability_lock_allowed: false
+    external_truth_claim_allowed: false
+    raw_medical_result_payload_stored: false
+    raw_legal_result_payload_stored: false
+    raw_trustee_result_payload_stored: false
+    raw_jurisdiction_policy_payload_stored: false
+    raw_self_model_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

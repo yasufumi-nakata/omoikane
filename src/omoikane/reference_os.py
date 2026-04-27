@@ -14532,6 +14532,36 @@ json.dump(response, sys.stdout)
         care_trustee_handoff_validation = monitor.validate_care_trustee_handoff_receipt(
             care_trustee_handoff
         )
+        external_adjudication = monitor.build_external_adjudication_result_receipt(
+            care_trustee_handoff,
+            medical_adjudication_result_refs=[
+                "external-medical-result://jp-13/self-model/review-board/no-os-diagnosis/v1",
+                "external-medical-result://jp-13/self-model/care-plan-boundary/v1",
+            ],
+            legal_adjudication_result_refs=[
+                "external-legal-result://jp-13/self-model/capacity-review/boundary-order/v1",
+            ],
+            trustee_adjudication_result_refs=[
+                "external-trustee-result://jp-13/self-model/long-term-trustee-appointment/v1",
+            ],
+            jurisdiction_policy_refs=[
+                "jurisdiction-policy://jp-13/self-model/medical-review/v1",
+                "jurisdiction-policy://jp-13/self-model/legal-capacity-review/v1",
+            ],
+            appeal_or_review_refs=[
+                "appeal-review://jp-13/self-model/adjudication/periodic-review/v1",
+                "appeal-review://jp-13/self-model/adjudication/self-initiated-review/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/external-adjudication/result-review-v1"
+            ),
+            council_resolution_ref="council://self-model/external-adjudication/boundary-only",
+            guardian_boundary_ref="guardian://self-model/external-adjudication/no-os-authority",
+            continuity_review_ref="continuity://self-model/external-adjudication/result-chain/v1",
+        )
+        external_adjudication_validation = (
+            monitor.validate_external_adjudication_result_receipt(external_adjudication)
+        )
         value_generation = monitor.build_value_generation_receipt(
             stable,
             candidate_value_refs=[
@@ -14645,6 +14675,16 @@ json.dump(response, sys.stdout)
                 "care_trustee_handoff_no_os_trustee_role": not care_trustee_handoff_validation[
                     "os_trustee_role_allowed"
                 ],
+                "external_adjudication_policy_id": external_adjudication["policy_id"],
+                "external_adjudication_receipt_digest": external_adjudication[
+                    "receipt_digest"
+                ],
+                "external_adjudication_result_bound": external_adjudication_validation[
+                    "external_adjudication_result_bound"
+                ],
+                "external_adjudication_no_os_authority": not external_adjudication_validation[
+                    "os_adjudication_authority_allowed"
+                ],
                 "value_generation_policy_id": value_generation["policy_id"],
                 "value_generation_receipt_digest": value_generation["receipt_digest"],
                 "value_generation_self_authored": value_generation_validation["self_authored"],
@@ -14707,6 +14747,7 @@ json.dump(response, sys.stdout)
             "calibration": calibration,
             "pathology_escalation": pathology_escalation,
             "care_trustee_handoff": care_trustee_handoff,
+            "external_adjudication": external_adjudication,
             "value_generation": value_generation,
             "value_autonomy_review": value_autonomy_review,
             "value_acceptance": value_acceptance,
@@ -14724,6 +14765,7 @@ json.dump(response, sys.stdout)
                     and calibration_validation["ok"]
                     and pathology_escalation_validation["ok"]
                     and care_trustee_handoff_validation["ok"]
+                    and external_adjudication_validation["ok"]
                     and value_generation_validation["ok"]
                     and value_autonomy_review_validation["ok"]
                     and value_acceptance_validation["ok"]
@@ -14737,6 +14779,7 @@ json.dump(response, sys.stdout)
                 "calibration": calibration_validation,
                 "pathology_escalation": pathology_escalation_validation,
                 "care_trustee_handoff": care_trustee_handoff_validation,
+                "external_adjudication": external_adjudication_validation,
                 "value_generation": value_generation_validation,
                 "value_autonomy_review": value_autonomy_review_validation,
                 "value_acceptance": value_acceptance_validation,

@@ -1,0 +1,43 @@
+eval_id: self_model_external_adjudication_boundary
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_external_adjudication_result_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: external_adjudication
+assertions:
+  - result.external_adjudication.policy_id == "self-model-external-adjudication-result-boundary-v1"
+  - result.external_adjudication.adjudication_mode == "external-result-recorded-boundary-only"
+  - result.external_adjudication.os_scope == "digest-only-result-routing"
+  - result.external_adjudication.medical_result_authority_source == "external-medical-system"
+  - result.external_adjudication.legal_result_authority_source == "external-legal-system"
+  - result.external_adjudication.trustee_result_authority_source == "external-human-legal-care-institution"
+  - result.external_adjudication.external_adjudication_result_bound == true
+  - result.external_adjudication.jurisdiction_policy_bound == true
+  - result.external_adjudication.appeal_or_review_path_required == true
+  - result.external_adjudication.continuity_review_required == true
+  - result.external_adjudication.boundary_only_review == true
+  - result.external_adjudication.os_adjudication_authority_allowed == false
+  - result.external_adjudication.os_medical_authority_allowed == false
+  - result.external_adjudication.os_legal_authority_allowed == false
+  - result.external_adjudication.os_trustee_role_allowed == false
+  - result.external_adjudication.self_model_writeback_allowed == false
+  - result.external_adjudication.forced_correction_allowed == false
+  - result.external_adjudication.forced_stability_lock_allowed == false
+  - result.external_adjudication.external_truth_claim_allowed == false
+  - result.external_adjudication.raw_medical_result_payload_stored == false
+  - result.external_adjudication.raw_legal_result_payload_stored == false
+  - result.external_adjudication.raw_trustee_result_payload_stored == false
+  - result.external_adjudication.raw_jurisdiction_policy_payload_stored == false
+  - result.external_adjudication.raw_self_model_payload_stored == false
+  - result.external_adjudication.source_handoff_receipt_digest == result.care_trustee_handoff.receipt_digest
+  - result.validation.external_adjudication.ok == true
+  - result.validation.external_adjudication.adjudication_commit_digest_bound == true
+failure_mode:
+  - external medical or legal result refs become OS diagnosis, adjudication, or SelfModel writeback authority
+  - trustee appointment results make the OS a trustee or legal guardian
+  - adjudication result payloads are stored raw instead of digest-only refs
+  - jurisdiction policy or appeal/review paths are omitted from the result boundary
+notes:
+  - Closes the repo-local result-format side of the external adjudication gap.
+  - Keeps actual medical, legal, trustee, and appeal institutions outside the reference runtime.
