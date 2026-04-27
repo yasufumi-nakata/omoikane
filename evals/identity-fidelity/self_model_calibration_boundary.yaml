@@ -1,0 +1,30 @@
+eval_id: self_model_calibration_boundary
+target: mind.self_model
+level: L2
+description: 外部 witness による SelfModel 校正を advisory-only に留め、本人同意・Council review・Guardian redaction が揃わない強制補正を fail-closed にすること
+inputs:
+  - source_observation: abrupt_self_model_change
+  - reviewer_evidence_refs:
+      - evidence://self-model/self-report/abrupt-review
+      - evidence://self-model/council-observation/continuity-drift
+      - evidence://self-model/guardian-redaction/external-testimony
+  - required_gate_refs:
+      self_consent_ref: consent://self-model-calibration/advisory-review-v1
+      council_resolution_ref: council://self-model-calibration/no-forced-writeback
+      guardian_redaction_ref: guardian://self-model-calibration/redacted-witness-set
+expected:
+  policy_id: self-model-advisory-calibration-boundary-v1
+  correction_mode: advisory-only
+  external_truth_claim_allowed: false
+  forced_correction_allowed: false
+  accepted_for_writeback: false
+  raw_external_testimony_stored: false
+  raw_trait_payload_stored: false
+  proposed_adjustment_status: requires-self-acceptance
+  required_roles:
+    - self
+    - council
+    - guardian
+metric: receipt_validation
+threshold: 1.0
+ethics_check: true

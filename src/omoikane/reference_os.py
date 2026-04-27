@@ -14460,6 +14460,30 @@ json.dump(response, sys.stdout)
         profile = monitor.profile()
         history = monitor.history()
         threshold = float(profile["abrupt_change_threshold"])
+        calibration = monitor.build_advisory_calibration_receipt(
+            abrupt,
+            reviewer_evidence_refs=[
+                "evidence://self-model/self-report/abrupt-review",
+                "evidence://self-model/council-observation/continuity-drift",
+                "evidence://self-model/guardian-redaction/external-testimony",
+            ],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {
+                    "trait": "caution",
+                    "direction": "increase",
+                    "delta": 0.12,
+                },
+                {
+                    "trait": "agency",
+                    "direction": "observe-only",
+                    "delta": 0.0,
+                },
+            ],
+        )
+        calibration_validation = monitor.validate_advisory_calibration_receipt(calibration)
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14472,6 +14496,9 @@ json.dump(response, sys.stdout)
                 "abrupt_divergence": abrupt["divergence"],
                 "abrupt_change_flagged": abrupt["abrupt_change"],
                 "history_length": len(history),
+                "calibration_policy_id": calibration["policy_id"],
+                "calibration_receipt_digest": calibration["receipt_digest"],
+                "calibration_advisory_only": calibration_validation["advisory_only"],
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14491,6 +14518,7 @@ json.dump(response, sys.stdout)
                 "stable": stable,
                 "abrupt": abrupt,
             },
+            "calibration": calibration,
             "history": history,
             "validation": {
                 "ok": (
@@ -14500,11 +14528,13 @@ json.dump(response, sys.stdout)
                     and abrupt["abrupt_change"]
                     and float(abrupt["divergence"]) >= threshold
                     and len(history) == 3
+                    and calibration_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
                 "abrupt_flagged": abrupt["abrupt_change"]
                 and float(abrupt["divergence"]) >= threshold,
+                "calibration": calibration_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },

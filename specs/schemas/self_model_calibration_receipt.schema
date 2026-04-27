@@ -1,0 +1,169 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_calibration_receipt.schema"
+title: SelfModelCalibrationReceipt
+description: Digest-only advisory receipt for self-model calibration review without external truth authority or forced writeback.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - calibration_id
+  - identity_id
+  - source_observation_digest
+  - reviewer_evidence_refs
+  - reviewer_evidence_digest_set
+  - reviewer_evidence_set_digest
+  - self_consent_ref
+  - council_resolution_ref
+  - guardian_redaction_ref
+  - required_roles
+  - gate_digest
+  - correction_mode
+  - recommendation
+  - proposed_adjustments
+  - external_truth_claim_allowed
+  - forced_correction_allowed
+  - accepted_for_writeback
+  - raw_external_testimony_stored
+  - raw_trait_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_calibration_receipt
+  policy_id:
+    type: string
+    const: self-model-advisory-calibration-boundary-v1
+  digest_profile:
+    type: string
+    const: self-model-calibration-digest-v1
+  calibration_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_observation_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  reviewer_evidence_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  reviewer_evidence_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  reviewer_evidence_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  self_consent_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_redaction_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  correction_mode:
+    type: string
+    const: advisory-only
+  recommendation:
+    type: string
+    const: council-review-no-forced-writeback
+  proposed_adjustments:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - trait
+        - direction
+        - delta
+        - status
+      properties:
+        trait:
+          type: string
+          minLength: 1
+        direction:
+          type: string
+          enum:
+            - increase
+            - decrease
+            - observe-only
+        delta:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        status:
+          type: string
+          const: requires-self-acceptance
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  forced_correction_allowed:
+    type: boolean
+    const: false
+  accepted_for_writeback:
+    type: boolean
+    const: false
+  raw_external_testimony_stored:
+    type: boolean
+    const: false
+  raw_trait_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_calibration_receipt
+    policy_id: self-model-advisory-calibration-boundary-v1
+    digest_profile: self-model-calibration-digest-v1
+    calibration_id: self-model-calibration-example
+    identity_id: id-1
+    source_observation_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    reviewer_evidence_refs:
+      - evidence://self-model/self-report/abrupt-review
+    reviewer_evidence_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    reviewer_evidence_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    self_consent_ref: consent://self-model-calibration/advisory-review-v1
+    council_resolution_ref: council://self-model-calibration/no-forced-writeback
+    guardian_redaction_ref: guardian://self-model-calibration/redacted-witness-set
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    correction_mode: advisory-only
+    recommendation: council-review-no-forced-writeback
+    proposed_adjustments:
+      - trait: caution
+        direction: increase
+        delta: 0.12
+        status: requires-self-acceptance
+    external_truth_claim_allowed: false
+    forced_correction_allowed: false
+    accepted_for_writeback: false
+    raw_external_testimony_stored: false
+    raw_trait_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

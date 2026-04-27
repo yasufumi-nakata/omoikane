@@ -576,6 +576,13 @@ checkpoint ledger event まで含めて確認する。
 values / goals / traits の equal-weight divergence、
 stable drift と abrupt takeover 候補の両観測、
 `mind.self_model.observed` ledger event を確認する。
+さらに abrupt observation に対する
+`self-model-advisory-calibration-boundary-v1` receipt を返し、
+外部 witness evidence を digest-only に束ねつつ、
+本人同意、Council resolution、Guardian redaction が揃っても
+`correction_mode=advisory-only`、`forced_correction_allowed=false`、
+`accepted_for_writeback=false`、`raw_external_testimony_stored=false` を
+維持することを確認する。
 
 `sandbox-demo` は L5 Sandboxer の surrogate suffering proxy
 (`surrogate-suffering-proxy-v0`) を JSON で可視化し、

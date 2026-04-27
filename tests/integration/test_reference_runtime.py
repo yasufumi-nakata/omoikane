@@ -1397,6 +1397,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["stable_within_threshold"])
         self.assertTrue(result["validation"]["abrupt_flagged"])
         self.assertEqual(3, result["validation"]["history_length"])
+        self.assertTrue(result["validation"]["calibration"]["ok"])
+        self.assertTrue(result["validation"]["calibration"]["advisory_only"])
+        self.assertFalse(result["calibration"]["forced_correction_allowed"])
+        self.assertFalse(result["calibration"]["raw_external_testimony_stored"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["identity-fidelity"])
 
     def test_sandbox_demo_freezes_on_surrogate_signal(self) -> None:

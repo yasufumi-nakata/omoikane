@@ -1308,6 +1308,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["stable_within_threshold"])
         self.assertTrue(result["validation"]["abrupt_flagged"])
         self.assertEqual(3, result["validation"]["history_length"])
+        self.assertTrue(result["validation"]["calibration"]["ok"])
+        self.assertEqual(
+            "self-model-advisory-calibration-boundary-v1",
+            result["calibration"]["policy_id"],
+        )
+        self.assertFalse(result["calibration"]["accepted_for_writeback"])
 
     def test_affect_demo_emits_smoothed_failover_json(self) -> None:
         stdout = io.StringIO()

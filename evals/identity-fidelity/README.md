@@ -7,10 +7,15 @@
 - `identity_pause_resume_contract.yaml`
 - `identity_confirmation_profile.yaml`
 - `self_model_stability.yaml`
+- `self_model_calibration_boundary.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
 軽微な trait drift が abrupt takeover 判定に誤爆しないことを保護する。
+
+`self_model_calibration_boundary.yaml` は `self-model-demo` の calibration branch と対応し、
+外部 witness evidence が本人同意・Council review・Guardian redaction に束縛されても
+強制補正や外部 truth claim へ昇格しないことを保護する。
 
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が

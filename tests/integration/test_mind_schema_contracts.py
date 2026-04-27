@@ -123,6 +123,18 @@ class MindSchemaContractTests(unittest.TestCase):
             result["procedural"]["actuation_bridge_session"],
         )
 
+    def test_self_model_demo_calibration_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_calibration_receipt.schema",
+            result["calibration"],
+        )
+        self.assertTrue(result["validation"]["calibration"]["ok"])
+        self.assertFalse(result["calibration"]["external_truth_claim_allowed"])
+        self.assertFalse(result["calibration"]["forced_correction_allowed"])
+        self.assertFalse(result["calibration"]["raw_external_testimony_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()

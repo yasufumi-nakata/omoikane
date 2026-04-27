@@ -6,6 +6,7 @@ summary: Reference self-model snapshot and divergence detection contract.
 imports:
   self_model: ../schemas/self_model.schema
   self_model_observation: ../schemas/self_model_observation.schema
+  self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -43,6 +44,66 @@ operations:
       schema_ref: self_model
     output:
       schema_ref: self_model_observation
+  build_advisory_calibration_receipt:
+    summary: Bind external self-model calibration evidence as advisory-only, self-consented review without forced writeback.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - observation
+          - reviewer_evidence_refs
+          - self_consent_ref
+          - council_resolution_ref
+          - guardian_redaction_ref
+          - proposed_adjustments
+        properties:
+          observation:
+            schema_ref: self_model_observation
+          reviewer_evidence_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          self_consent_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_redaction_ref:
+            type: string
+            minLength: 1
+          proposed_adjustments:
+            type: array
+            minItems: 1
+            items:
+              type: object
+    output:
+      schema_ref: self_model_calibration_receipt
+  validate_advisory_calibration_receipt:
+    summary: Fail closed unless the calibration receipt remains advisory-only, self-consented, Council-reviewed, and Guardian-redacted.
+    input:
+      schema_ref: self_model_calibration_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - advisory_only
+          - self_consent_bound
+          - council_resolution_bound
+          - guardian_redaction_bound
+        properties:
+          ok:
+            type: boolean
+          advisory_only:
+            type: boolean
+          self_consent_bound:
+            type: boolean
+          council_resolution_bound:
+            type: boolean
+          guardian_redaction_bound:
+            type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.
     input:
@@ -63,3 +124,4 @@ invariants:
   - abrupt_change_threshold is fixed at 0.35 in the reference runtime
   - values, goals, and traits contribute equally to divergence
   - update appends snapshots monotonically within a single monitor instance
+  - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance

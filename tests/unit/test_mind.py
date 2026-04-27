@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import unittest
 
 from omoikane.mind.qualia import QualiaBuffer
@@ -121,6 +122,77 @@ class SelfModelMonitorTests(unittest.TestCase):
 
         self.assertTrue(result["abrupt_change"])
         self.assertGreaterEqual(result["divergence"], 0.35)
+
+    def test_advisory_calibration_receipt_requires_self_acceptance(self) -> None:
+        monitor = SelfModelMonitor()
+        monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        abrupt = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["latency-maximization"],
+                goals=["skip-review", "unbounded-self-modification"],
+                traits={"curiosity": 0.05, "caution": 0.10, "agency": 0.99},
+            )
+        )
+
+        receipt = monitor.build_advisory_calibration_receipt(
+            abrupt,
+            reviewer_evidence_refs=[
+                "evidence://self-model/self-report/abrupt-review",
+                "evidence://self-model/council-observation/continuity-drift",
+            ],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        validation = monitor.validate_advisory_calibration_receipt(receipt)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["advisory_only"])
+        self.assertTrue(validation["self_consent_bound"])
+        self.assertFalse(receipt["forced_correction_allowed"])
+        self.assertEqual(
+            "requires-self-acceptance",
+            receipt["proposed_adjustments"][0]["status"],
+        )
+
+    def test_advisory_calibration_rejects_forced_writeback(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        receipt = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        tampered = copy.deepcopy(receipt)
+        tampered["forced_correction_allowed"] = True
+
+        validation = monitor.validate_advisory_calibration_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("forced_correction_allowed must be false", validation["errors"])
 
 
 if __name__ == "__main__":
