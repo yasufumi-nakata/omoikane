@@ -1,0 +1,178 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_generation_receipt.schema"
+title: SelfModelValueGenerationReceipt
+description: Digest-only receipt that preserves self-authored value generation without external veto or forced writeback.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - generation_id
+  - identity_id
+  - source_observation_digest
+  - candidate_value_refs
+  - candidate_value_digest_set
+  - candidate_value_set_digest
+  - continuity_context_refs
+  - continuity_context_digest_set
+  - continuity_context_set_digest
+  - self_authorship_ref
+  - self_consent_ref
+  - council_review_ref
+  - guardian_boundary_ref
+  - required_roles
+  - gate_digest
+  - generation_mode
+  - integration_status
+  - requires_future_self_acceptance
+  - autonomy_preserved
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - forced_stability_lock_allowed
+  - accepted_for_writeback
+  - raw_value_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_generation_receipt
+  policy_id:
+    type: string
+    const: self-model-self-authored-value-generation-v1
+  digest_profile:
+    type: string
+    const: self-model-value-generation-digest-v1
+  generation_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_observation_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  candidate_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  candidate_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  candidate_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  continuity_context_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  continuity_context_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  continuity_context_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  self_authorship_ref:
+    type: string
+    minLength: 1
+  self_consent_ref:
+    type: string
+    minLength: 1
+  council_review_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  generation_mode:
+    type: string
+    const: self-authored-bounded-experiment
+  integration_status:
+    type: string
+    const: proposed-not-written-back
+  requires_future_self_acceptance:
+    type: boolean
+    const: true
+  autonomy_preserved:
+    type: boolean
+    const: true
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  accepted_for_writeback:
+    type: boolean
+    const: false
+  raw_value_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_generation_receipt
+    policy_id: self-model-self-authored-value-generation-v1
+    digest_profile: self-model-value-generation-digest-v1
+    generation_id: self-model-value-generation-example
+    identity_id: id-1
+    source_observation_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    candidate_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    candidate_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    candidate_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_context_refs:
+      - self-model://history/stable-drift-window
+    continuity_context_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_context_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    self_authorship_ref: authorship://self-model/value-generation/self-authored-v1
+    self_consent_ref: consent://self-model/value-generation/proposal-v1
+    council_review_ref: council://self-model/value-generation/advisory-only
+    guardian_boundary_ref: guardian://self-model/value-generation/no-external-veto
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    generation_mode: self-authored-bounded-experiment
+    integration_status: proposed-not-written-back
+    requires_future_self_acceptance: true
+    autonomy_preserved: true
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    forced_stability_lock_allowed: false
+    accepted_for_writeback: false
+    raw_value_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

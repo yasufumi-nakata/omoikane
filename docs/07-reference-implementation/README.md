@@ -583,6 +583,13 @@ stable drift と abrupt takeover 候補の両観測、
 `correction_mode=advisory-only`、`forced_correction_allowed=false`、
 `accepted_for_writeback=false`、`raw_external_testimony_stored=false` を
 維持することを確認する。
+同じ demo は stable drift から生じた新しい価値候補を
+`self-model-self-authored-value-generation-v1` receipt に束縛し、
+`generation_mode=self-authored-bounded-experiment`、
+`integration_status=proposed-not-written-back`、
+`requires_future_self_acceptance=true`、`external_veto_allowed=false`、
+`forced_stability_lock_allowed=false`、`accepted_for_writeback=false` を
+確認する。raw value / continuity payload は保存しない。
 
 `sandbox-demo` は L5 Sandboxer の surrogate suffering proxy
 (`surrogate-suffering-proxy-v0`) を JSON で可視化し、

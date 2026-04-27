@@ -14484,6 +14484,23 @@ json.dump(response, sys.stdout)
             ],
         )
         calibration_validation = monitor.validate_advisory_calibration_receipt(calibration)
+        value_generation = monitor.build_value_generation_receipt(
+            stable,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=[
+                "self-model://history/stable-drift-window",
+                "memory://semantic/reflection/generative-values",
+                "council://self-model/value-generation/advisory-review",
+            ],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        value_generation_validation = monitor.validate_value_generation_receipt(value_generation)
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14499,6 +14516,12 @@ json.dump(response, sys.stdout)
                 "calibration_policy_id": calibration["policy_id"],
                 "calibration_receipt_digest": calibration["receipt_digest"],
                 "calibration_advisory_only": calibration_validation["advisory_only"],
+                "value_generation_policy_id": value_generation["policy_id"],
+                "value_generation_receipt_digest": value_generation["receipt_digest"],
+                "value_generation_self_authored": value_generation_validation["self_authored"],
+                "value_generation_autonomy_preserved": value_generation_validation[
+                    "autonomy_preserved"
+                ],
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14519,6 +14542,7 @@ json.dump(response, sys.stdout)
                 "abrupt": abrupt,
             },
             "calibration": calibration,
+            "value_generation": value_generation,
             "history": history,
             "validation": {
                 "ok": (
@@ -14529,12 +14553,14 @@ json.dump(response, sys.stdout)
                     and float(abrupt["divergence"]) >= threshold
                     and len(history) == 3
                     and calibration_validation["ok"]
+                    and value_generation_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
                 "abrupt_flagged": abrupt["abrupt_change"]
                 and float(abrupt["divergence"]) >= threshold,
                 "calibration": calibration_validation,
+                "value_generation": value_generation_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },

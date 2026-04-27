@@ -1,0 +1,26 @@
+eval_id: self_model_value_generation_freedom
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_generation_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_generation
+assertions:
+  - result.value_generation.policy_id == "self-model-self-authored-value-generation-v1"
+  - result.value_generation.generation_mode == "self-authored-bounded-experiment"
+  - result.value_generation.integration_status == "proposed-not-written-back"
+  - result.value_generation.requires_future_self_acceptance == true
+  - result.value_generation.autonomy_preserved == true
+  - result.value_generation.external_veto_allowed == false
+  - result.value_generation.forced_stability_lock_allowed == false
+  - result.value_generation.accepted_for_writeback == false
+  - result.value_generation.raw_value_payload_stored == false
+  - result.value_generation.raw_continuity_payload_stored == false
+  - result.validation.value_generation.ok == true
+failure_mode:
+  - external reviewer can veto newly generated values
+  - generated values are written back before future self acceptance
+  - raw candidate value payload or continuity context payload is stored
+notes:
+  - Keeps the reference runtime on the autonomy-preserving side of SelfModel evolution.
+  - Does not claim that uploaded values are conscious or medically authoritative.

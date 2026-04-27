@@ -8,6 +8,7 @@
 - `identity_confirmation_profile.yaml`
 - `self_model_stability.yaml`
 - `self_model_calibration_boundary.yaml`
+- `self_model_value_generation_freedom.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
@@ -16,6 +17,11 @@
 `self_model_calibration_boundary.yaml` は `self-model-demo` の calibration branch と対応し、
 外部 witness evidence が本人同意・Council review・Guardian redaction に束縛されても
 強制補正や外部 truth claim へ昇格しないことを保護する。
+
+`self_model_value_generation_freedom.yaml` は `self-model-demo` の value-generation branch
+と対応し、新しく生成された価値候補が self-authored proposal として digest-only に
+残り、外部 reviewer veto、強制 stability lock、future self acceptance 前の writeback、
+raw value payload 保存へ昇格しないことを保護する。
 
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が

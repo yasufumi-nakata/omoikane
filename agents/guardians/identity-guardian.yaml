@@ -6,6 +6,7 @@ capabilities:
   - identity.escalate
   - identity.confirmation.review
   - self_model.calibration.advisory_review
+  - self_model.value_generation.autonomy_review
   - cognitive_audit.multi_jurisdiction_review
   - cognitive_audit.non_loopback_verifier_transport_review
 trust_floor: 0.99
@@ -24,6 +25,7 @@ when_to_invoke: |
   - Active 遷移前の accepted witness revocation refs が JP-13 / US-CA live verifier quorum と freshness window に束縛されているか確認する時
   - Active 遷移前の revocation verifier quorum が policy-bound verifier roster の required jurisdiction set を覆うか確認する時
   - SelfModel 校正 receipt が本人同意・Council resolution・Guardian redaction を持ち、advisory-only から逸脱していないか確認する時
+  - SelfModel value-generation receipt が self-authored proposal と future self acceptance を保ち、external veto / forced stability lock / immediate writeback へ逸脱していないか確認する時
   - cognitive audit follow-up が JP-13 / US-CA など複数法域 reviewer quorum を満たすか確認する時
   - cognitive audit follow-up の reviewer verifier-network receipt が authenticated non-loopback authority route trace に束縛されているか確認する時
 when_not_to_invoke: |

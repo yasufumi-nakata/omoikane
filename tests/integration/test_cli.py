@@ -1314,6 +1314,13 @@ class CliIntegrationTests(unittest.TestCase):
             result["calibration"]["policy_id"],
         )
         self.assertFalse(result["calibration"]["accepted_for_writeback"])
+        self.assertEqual(
+            "self-model-self-authored-value-generation-v1",
+            result["value_generation"]["policy_id"],
+        )
+        self.assertTrue(result["validation"]["value_generation"]["self_authored"])
+        self.assertFalse(result["value_generation"]["external_veto_allowed"])
+        self.assertFalse(result["value_generation"]["accepted_for_writeback"])
 
     def test_affect_demo_emits_smoothed_failover_json(self) -> None:
         stdout = io.StringIO()

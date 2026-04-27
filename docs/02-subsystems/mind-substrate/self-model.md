@@ -77,8 +77,24 @@ proposed adjustment は常に `requires-self-acceptance` として扱う。
 つまり reference runtime は補正の根拠を監査可能にするだけで、
 本人に代わって価値観や trait を上書きしない。
 
+## reference runtime で固定した価値生成境界
+
+`self-model-self-authored-value-generation-v1` は、アップロード後の新しい価値観を
+外部 reviewer が「正しい / 間違っている」と裁定する contract ではない。
+reference runtime は新規価値候補を
+`self_model_value_generation_receipt` に digest-only で束ねるが、
+`generation_mode=self-authored-bounded-experiment`、
+`integration_status=proposed-not-written-back`、
+`requires_future_self_acceptance=true` を固定する。
+
+Council と Guardian は continuity context と安全境界を確認できるが、
+`external_veto_allowed=false`、`forced_stability_lock_allowed=false`、
+`accepted_for_writeback=false` を維持する。
+raw value payload や raw continuity payload は保存せず、将来の本人受容があるまで
+SelfModel 本体には書き戻さない。
+
 ## 残る未解決
 
 - 外部 witness / Council review を長期的な本人の自由な価値生成とどう両立させるか
 - 病理的な自己評価という判断を OS 内でどこまで扱い、どこから人間社会側の医療・法制度へ委ねるか
-- アップロード後の **新しい価値観の生成** の自由度
+- アップロード後の **新しい価値観の生成** が長期的にどのように本人受容へ至るか

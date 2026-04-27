@@ -7,6 +7,7 @@ imports:
   self_model: ../schemas/self_model.schema
   self_model_observation: ../schemas/self_model_observation.schema
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
+  self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -104,6 +105,72 @@ operations:
             type: boolean
           guardian_redaction_bound:
             type: boolean
+  build_value_generation_receipt:
+    summary: Bind self-authored value-generation candidates without external veto, forced stability lock, or immediate writeback.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - observation
+          - candidate_value_refs
+          - continuity_context_refs
+          - self_authorship_ref
+          - self_consent_ref
+          - council_review_ref
+          - guardian_boundary_ref
+        properties:
+          observation:
+            schema_ref: self_model_observation
+          candidate_value_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          continuity_context_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          self_authorship_ref:
+            type: string
+            minLength: 1
+          self_consent_ref:
+            type: string
+            minLength: 1
+          council_review_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_generation_receipt
+  validate_value_generation_receipt:
+    summary: Fail closed unless new value candidates remain self-authored, autonomy-preserving, and not written back.
+    input:
+      schema_ref: self_model_value_generation_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - self_authored
+          - autonomy_preserved
+          - requires_future_self_acceptance
+          - accepted_for_writeback
+        properties:
+          ok:
+            type: boolean
+          self_authored:
+            type: boolean
+          autonomy_preserved:
+            type: boolean
+          requires_future_self_acceptance:
+            type: boolean
+          accepted_for_writeback:
+            type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.
     input:
@@ -125,3 +192,4 @@ invariants:
   - values, goals, and traits contribute equally to divergence
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
+  - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
