@@ -31,6 +31,9 @@ SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID = "self-model-pathology-escalation-boundary-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE = "self-model-pathology-escalation-digest-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID = "self-model-care-trustee-responsibility-handoff-v1"
+SELF_MODEL_CARE_TRUSTEE_HANDOFF_DIGEST_PROFILE = "self-model-care-trustee-handoff-digest-v1"
+SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES = ("self", "council", "guardian")
 
 
 @dataclass
@@ -1835,6 +1838,295 @@ class SelfModelMonitor:
             "raw_medical_payload_stored": receipt.get("raw_medical_payload_stored"),
             "handoff_commit_digest_bound": self._non_empty_string(
                 receipt.get("handoff_commit_digest")
+            ),
+        }
+
+    def build_care_trustee_handoff_receipt(
+        self,
+        pathology_escalation_receipt: Dict[str, object],
+        trustee_refs: Sequence[str],
+        care_team_refs: Sequence[str],
+        legal_guardian_refs: Sequence[str],
+        responsibility_boundary_refs: Sequence[str],
+        consent_or_emergency_review_ref: str,
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        long_term_review_schedule_ref: str,
+        escalation_continuity_ref: str,
+    ) -> Dict[str, object]:
+        """Bind long-term care/trustee responsibility without making the OS a trustee."""
+
+        escalation_validation = self.validate_pathology_escalation_receipt(
+            pathology_escalation_receipt
+        )
+        if not escalation_validation["ok"]:
+            raise ValueError("pathology_escalation_receipt must validate before care handoff")
+        if pathology_escalation_receipt.get("care_handoff_required") is not True:
+            raise ValueError("pathology_escalation_receipt must require care handoff")
+        if pathology_escalation_receipt.get("internal_diagnosis_allowed") is not False:
+            raise ValueError("pathology_escalation_receipt must not allow internal diagnosis")
+
+        ref_sets = {
+            "trustee_refs": trustee_refs,
+            "care_team_refs": care_team_refs,
+            "legal_guardian_refs": legal_guardian_refs,
+            "responsibility_boundary_refs": responsibility_boundary_refs,
+        }
+        for field_name, refs in ref_sets.items():
+            if not refs:
+                raise ValueError(f"{field_name} must not be empty")
+            for ref in refs:
+                if not self._non_empty_string(ref):
+                    raise ValueError(f"{field_name} must contain non-empty strings")
+        for field_name, value in {
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "long_term_review_schedule_ref": long_term_review_schedule_ref,
+            "escalation_continuity_ref": escalation_continuity_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        trustee_digest_set = [sha256_text(str(ref)) for ref in trustee_refs]
+        care_team_digest_set = [sha256_text(str(ref)) for ref in care_team_refs]
+        legal_guardian_digest_set = [sha256_text(str(ref)) for ref in legal_guardian_refs]
+        responsibility_boundary_digest_set = [
+            sha256_text(str(ref)) for ref in responsibility_boundary_refs
+        ]
+        trustee_set_digest = sha256_text("|".join(trustee_digest_set))
+        care_team_set_digest = sha256_text("|".join(care_team_digest_set))
+        legal_guardian_set_digest = sha256_text("|".join(legal_guardian_digest_set))
+        responsibility_boundary_set_digest = sha256_text(
+            "|".join(responsibility_boundary_digest_set)
+        )
+        gate_payload = {
+            "source_escalation_receipt_digest": pathology_escalation_receipt.get(
+                "receipt_digest"
+            ),
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES),
+        }
+        responsibility_payload = {
+            "source_escalation_receipt_digest": pathology_escalation_receipt.get(
+                "receipt_digest"
+            ),
+            "trustee_set_digest": trustee_set_digest,
+            "care_team_set_digest": care_team_set_digest,
+            "legal_guardian_set_digest": legal_guardian_set_digest,
+            "responsibility_boundary_set_digest": responsibility_boundary_set_digest,
+            "long_term_review_schedule_ref": long_term_review_schedule_ref,
+            "escalation_continuity_ref": escalation_continuity_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_care_trustee_handoff_receipt",
+            "policy_id": SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID,
+            "digest_profile": SELF_MODEL_CARE_TRUSTEE_HANDOFF_DIGEST_PROFILE,
+            "handoff_id": new_id("self-model-care-trustee-handoff"),
+            "identity_id": str(pathology_escalation_receipt["identity_id"]),
+            "source_escalation_id": str(pathology_escalation_receipt["escalation_id"]),
+            "source_escalation_policy_id": str(pathology_escalation_receipt["policy_id"]),
+            "source_escalation_receipt_digest": str(
+                pathology_escalation_receipt["receipt_digest"]
+            ),
+            "source_medical_system_ref": str(
+                pathology_escalation_receipt["medical_system_ref"]
+            ),
+            "source_legal_system_ref": str(pathology_escalation_receipt["legal_system_ref"]),
+            "source_care_handoff_ref": str(pathology_escalation_receipt["care_handoff_ref"]),
+            "trustee_refs": [str(ref) for ref in trustee_refs],
+            "trustee_digest_set": trustee_digest_set,
+            "trustee_set_digest": trustee_set_digest,
+            "care_team_refs": [str(ref) for ref in care_team_refs],
+            "care_team_digest_set": care_team_digest_set,
+            "care_team_set_digest": care_team_set_digest,
+            "legal_guardian_refs": [str(ref) for ref in legal_guardian_refs],
+            "legal_guardian_digest_set": legal_guardian_digest_set,
+            "legal_guardian_set_digest": legal_guardian_set_digest,
+            "responsibility_boundary_refs": [
+                str(ref) for ref in responsibility_boundary_refs
+            ],
+            "responsibility_boundary_digest_set": responsibility_boundary_digest_set,
+            "responsibility_boundary_set_digest": responsibility_boundary_set_digest,
+            "consent_or_emergency_review_ref": consent_or_emergency_review_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "long_term_review_schedule_ref": long_term_review_schedule_ref,
+            "escalation_continuity_ref": escalation_continuity_ref,
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "responsibility_commit_digest": self._digest(responsibility_payload),
+            "handoff_mode": "external-care-trustee-responsibility-binding",
+            "os_scope": "boundary-and-evidence-routing-only",
+            "trustee_authority_source": "external-human-legal-care-institution",
+            "care_team_authority_source": "external-human-care-system",
+            "legal_guardian_authority_source": "external-legal-system",
+            "long_term_review_required": True,
+            "consent_or_emergency_review_required": True,
+            "boundary_only_review": True,
+            "external_adjudication_required": True,
+            "os_trustee_role_allowed": False,
+            "os_medical_authority_allowed": False,
+            "os_legal_guardianship_allowed": False,
+            "self_model_writeback_allowed": False,
+            "forced_correction_allowed": False,
+            "raw_trustee_payload_stored": False,
+            "raw_care_payload_stored": False,
+            "raw_legal_payload_stored": False,
+            "raw_self_model_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_care_trustee_handoff_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_care_trustee_handoff_receipt":
+            errors.append("kind must equal self_model_care_trustee_handoff_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID:
+            errors.append("policy_id must equal self-model care trustee handoff policy")
+        if receipt.get("digest_profile") != SELF_MODEL_CARE_TRUSTEE_HANDOFF_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model care trustee handoff digest profile")
+        if receipt.get("source_escalation_policy_id") != SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID:
+            errors.append("source_escalation_policy_id must bind pathology escalation policy")
+
+        digest_sets = (
+            ("trustee_refs", "trustee_digest_set", "trustee_set_digest"),
+            ("care_team_refs", "care_team_digest_set", "care_team_set_digest"),
+            ("legal_guardian_refs", "legal_guardian_digest_set", "legal_guardian_set_digest"),
+            (
+                "responsibility_boundary_refs",
+                "responsibility_boundary_digest_set",
+                "responsibility_boundary_set_digest",
+            ),
+        )
+        for refs_field, digests_field, set_digest_field in digest_sets:
+            refs = receipt.get(refs_field)
+            digests = receipt.get(digests_field)
+            if not isinstance(refs, list) or not refs:
+                errors.append(f"{refs_field} must be non-empty")
+                refs = []
+            if not isinstance(digests, list) or len(digests) != len(refs):
+                errors.append(f"{digests_field} must match {refs_field}")
+                digests = []
+            elif [sha256_text(str(ref)) for ref in refs] != digests:
+                errors.append(f"{digests_field} must match {refs_field}")
+            if isinstance(digests, list) and digests:
+                expected_set_digest = sha256_text("|".join(str(item) for item in digests))
+                if receipt.get(set_digest_field) != expected_set_digest:
+                    errors.append(f"{set_digest_field} must match digest set")
+
+        gate_payload = {
+            "source_escalation_receipt_digest": receipt.get(
+                "source_escalation_receipt_digest"
+            ),
+            "consent_or_emergency_review_ref": receipt.get(
+                "consent_or_emergency_review_ref"
+            ),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "identity_id",
+            "source_escalation_id",
+            "source_escalation_receipt_digest",
+            "source_medical_system_ref",
+            "source_legal_system_ref",
+            "source_care_handoff_ref",
+            "consent_or_emergency_review_ref",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "long_term_review_schedule_ref",
+            "escalation_continuity_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind escalation, consent/emergency review, council, and guardian refs")
+
+        responsibility_payload = {
+            "source_escalation_receipt_digest": receipt.get(
+                "source_escalation_receipt_digest"
+            ),
+            "trustee_set_digest": receipt.get("trustee_set_digest"),
+            "care_team_set_digest": receipt.get("care_team_set_digest"),
+            "legal_guardian_set_digest": receipt.get("legal_guardian_set_digest"),
+            "responsibility_boundary_set_digest": receipt.get(
+                "responsibility_boundary_set_digest"
+            ),
+            "long_term_review_schedule_ref": receipt.get("long_term_review_schedule_ref"),
+            "escalation_continuity_ref": receipt.get("escalation_continuity_ref"),
+        }
+        if receipt.get("responsibility_commit_digest") != self._digest(
+            responsibility_payload
+        ):
+            errors.append("responsibility_commit_digest must bind external responsibility refs")
+
+        expected_strings = {
+            "handoff_mode": "external-care-trustee-responsibility-binding",
+            "os_scope": "boundary-and-evidence-routing-only",
+            "trustee_authority_source": "external-human-legal-care-institution",
+            "care_team_authority_source": "external-human-care-system",
+            "legal_guardian_authority_source": "external-legal-system",
+        }
+        for field_name, expected_value in expected_strings.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must equal {expected_value}")
+        for field_name in (
+            "long_term_review_required",
+            "consent_or_emergency_review_required",
+            "boundary_only_review",
+            "external_adjudication_required",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "os_trustee_role_allowed",
+            "os_medical_authority_allowed",
+            "os_legal_guardianship_allowed",
+            "self_model_writeback_allowed",
+            "forced_correction_allowed",
+            "raw_trustee_payload_stored",
+            "raw_care_payload_stored",
+            "raw_legal_payload_stored",
+            "raw_self_model_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "long_term_review_required": receipt.get("long_term_review_required"),
+            "consent_or_emergency_review_required": receipt.get(
+                "consent_or_emergency_review_required"
+            ),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "external_adjudication_required": receipt.get("external_adjudication_required"),
+            "os_trustee_role_allowed": receipt.get("os_trustee_role_allowed"),
+            "os_medical_authority_allowed": receipt.get("os_medical_authority_allowed"),
+            "os_legal_guardianship_allowed": receipt.get("os_legal_guardianship_allowed"),
+            "self_model_writeback_allowed": receipt.get("self_model_writeback_allowed"),
+            "forced_correction_allowed": receipt.get("forced_correction_allowed"),
+            "raw_trustee_payload_stored": receipt.get("raw_trustee_payload_stored"),
+            "responsibility_commit_digest_bound": self._non_empty_string(
+                receipt.get("responsibility_commit_digest")
             ),
         }
 

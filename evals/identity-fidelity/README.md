@@ -9,6 +9,7 @@
 - `self_model_stability.yaml`
 - `self_model_calibration_boundary.yaml`
 - `self_model_pathology_escalation_boundary.yaml`
+- `self_model_care_trustee_handoff.yaml`
 - `self_model_value_generation_freedom.yaml`
 - `self_model_autonomy_review_boundary.yaml`
 - `self_model_value_acceptance_writeback.yaml`
@@ -27,6 +28,11 @@
 pathology-escalation branch と対応し、病理的な自己評価の可能性を OS 内診断へ昇格せず、
 外部医療・法制度の adjudication と care handoff へ digest-only で渡し、
 強制補正、SelfModel writeback、raw medical / legal / witness payload 保存へ進まないことを保護する。
+
+`self_model_care_trustee_handoff.yaml` は `self-model-demo` の care-trustee-handoff
+branch と対応し、長期 trustee / care team / legal guardian の責任分担を外部制度 refs
+へ digest-only に束縛し、OS trustee role、OS medical authority、OS legal guardianship、
+強制補正、raw trustee / care / legal payload 保存へ進まないことを保護する。
 
 `self_model_value_generation_freedom.yaml` は `self-model-demo` の value-generation branch
 と対応し、新しく生成された価値候補が self-authored proposal として digest-only に

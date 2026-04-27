@@ -150,6 +150,10 @@ self-authored value-generation / future-self acceptance writeback contract
 abrupt drift が Council review へ回ることを確認する。
 calibration branch は外部 evidence を advisory-only receipt に束ねるが
 forced correction や external truth claim を許さない。
+care-trustee-handoff branch は pathology escalation 後の長期 trustee、
+care team、legal guardian の責任分担を外部制度 refs と boundary refs へ
+digest-only に束縛し、OS 自身が trustee、医療 authority、legal guardian へ
+昇格しないことを確認する。
 value-generation branch は新しい価値候補を self-authored proposal として
 digest-only に残し、future self acceptance 前の writeback を拒む。
 value-autonomy-review branch は、外部 witness と Council review を
@@ -620,6 +624,15 @@ stable drift と abrupt takeover 候補の両観測、
 `self_model_writeback_allowed=false`、
 `forced_correction_allowed=false`、
 `raw_medical_payload_stored=false` を確認する。
+さらに `self-model-care-trustee-responsibility-handoff-v1` receipt は、
+pathology escalation の external handoff refs を前提に、trustee / care team /
+legal guardian / responsibility boundary refs を digest-only に束ねる。
+この branch は `os_scope=boundary-and-evidence-routing-only`、
+`long_term_review_required=true`、`external_adjudication_required=true`、
+`os_trustee_role_allowed=false`、`os_medical_authority_allowed=false`、
+`os_legal_guardianship_allowed=false`、`self_model_writeback_allowed=false`、
+`forced_correction_allowed=false`、`raw_trustee_payload_stored=false` を確認し、
+OS が長期 trustee や医療・法的 authority にならない境界を固定する。
 同じ demo は stable drift から生じた新しい価値候補を
 `self-model-self-authored-value-generation-v1` receipt に束縛し、
 `generation_mode=self-authored-bounded-experiment`、

@@ -112,6 +112,29 @@ digest-only に束ねる。
 raw medical / legal / witness / SelfModel payload は保存せず、OS は証拠と境界を
 外部 handoff へ縮約するだけで、本人に代わって診断・矯正・人格固定を行わない。
 
+## reference runtime で固定した care trustee handoff 境界
+
+`self-model-care-trustee-responsibility-handoff-v1` は、pathology escalation 後の
+長期 trustee、care team、legal guardian の責任分担を OS 内 authority へ取り込まず、
+外部制度側の refs と boundary refs へ digest-only に束縛する contract である。
+
+`self_model_care_trustee_handoff_receipt` は元の pathology escalation receipt digest、
+外部 trustee refs、care team refs、legal guardian refs、responsibility boundary refs、
+本人同意または emergency review、Council resolution、Guardian boundary、
+長期 review schedule、continuity ref を `responsibility_commit_digest` へ束ねる。
+
+この receipt で OS が担う範囲は `boundary-and-evidence-routing-only` に限定される。
+trustee / care team / legal guardian の authority source はすべて外部制度側に置き、
+`long_term_review_required=true`、
+`external_adjudication_required=true`、
+`os_trustee_role_allowed=false`、
+`os_medical_authority_allowed=false`、
+`os_legal_guardianship_allowed=false`、
+`self_model_writeback_allowed=false`、
+`forced_correction_allowed=false` を固定する。
+raw trustee / care / legal / SelfModel payload は保存せず、OS は長期責任の存在と境界だけを
+監査可能な digest に縮約する。
+
 ## reference runtime で固定した autonomy review 境界
 
 `self-model-autonomy-review-witness-boundary-v1` は、外部 witness と Council が
@@ -202,4 +225,4 @@ Council と Guardian は引き続き boundary-only review に留まり、
 
 ## 残る未解決
 
-- 外部医療・法制度側が返す判断形式、長期 trustee、care team の責任分担は人間社会側の制度設計に残る
+- 外部医療・法制度側が返す判断形式と、実世界の trustee / care team / legal guardian 制度そのものは人間社会側の制度設計に残る

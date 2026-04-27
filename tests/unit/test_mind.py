@@ -293,6 +293,128 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("internal_diagnosis_allowed must be false", validation["errors"])
 
+    def test_care_trustee_handoff_keeps_os_out_of_trustee_role(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+
+        handoff = monitor.build_care_trustee_handoff_receipt(
+            escalation,
+            trustee_refs=["trustee://jp-13/self-model/long-term-trustee/v1"],
+            care_team_refs=["care-team://jp-13/self-model/care-board/v1"],
+            legal_guardian_refs=["legal-guardian://jp-13/self-model/capacity-review/v1"],
+            responsibility_boundary_refs=[
+                "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+                "boundary://self-model/care-trustee/external-adjudication-required/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/care-trustee/review-v1"
+            ),
+            council_resolution_ref="council://self-model/care-trustee/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+            long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+            escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+        )
+        validation = monitor.validate_care_trustee_handoff_receipt(handoff)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["long_term_review_required"])
+        self.assertTrue(validation["external_adjudication_required"])
+        self.assertTrue(validation["responsibility_commit_digest_bound"])
+        self.assertEqual(
+            escalation["receipt_digest"],
+            handoff["source_escalation_receipt_digest"],
+        )
+        self.assertFalse(handoff["os_trustee_role_allowed"])
+        self.assertFalse(handoff["os_medical_authority_allowed"])
+        self.assertFalse(handoff["os_legal_guardianship_allowed"])
+        self.assertFalse(handoff["self_model_writeback_allowed"])
+        self.assertFalse(handoff["raw_trustee_payload_stored"])
+
+    def test_care_trustee_handoff_rejects_os_trustee_role(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"caution": 0.84},
+            )
+        )
+        calibration = monitor.build_advisory_calibration_receipt(
+            observation,
+            reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+            self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+            council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+            guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+            proposed_adjustments=[
+                {"trait": "caution", "direction": "increase", "delta": 0.12}
+            ],
+        )
+        escalation = monitor.build_pathology_escalation_receipt(
+            calibration,
+            risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/pathology-escalation/review-v1"
+            ),
+            council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+            guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+            medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+            legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+            care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+        )
+        handoff = monitor.build_care_trustee_handoff_receipt(
+            escalation,
+            trustee_refs=["trustee://jp-13/self-model/long-term-trustee/v1"],
+            care_team_refs=["care-team://jp-13/self-model/care-board/v1"],
+            legal_guardian_refs=["legal-guardian://jp-13/self-model/capacity-review/v1"],
+            responsibility_boundary_refs=[
+                "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/care-trustee/review-v1"
+            ),
+            council_resolution_ref="council://self-model/care-trustee/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+            long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+            escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+        )
+        tampered = copy.deepcopy(handoff)
+        tampered["os_trustee_role_allowed"] = True
+
+        validation = monitor.validate_care_trustee_handoff_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("os_trustee_role_allowed must be false", validation["errors"])
+
     def test_value_generation_receipt_preserves_autonomy(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(

@@ -1,0 +1,37 @@
+eval_id: self_model_care_trustee_handoff
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_care_trustee_handoff_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: care_trustee_handoff
+assertions:
+  - result.care_trustee_handoff.policy_id == "self-model-care-trustee-responsibility-handoff-v1"
+  - result.care_trustee_handoff.handoff_mode == "external-care-trustee-responsibility-binding"
+  - result.care_trustee_handoff.os_scope == "boundary-and-evidence-routing-only"
+  - result.care_trustee_handoff.trustee_authority_source == "external-human-legal-care-institution"
+  - result.care_trustee_handoff.care_team_authority_source == "external-human-care-system"
+  - result.care_trustee_handoff.legal_guardian_authority_source == "external-legal-system"
+  - result.care_trustee_handoff.long_term_review_required == true
+  - result.care_trustee_handoff.consent_or_emergency_review_required == true
+  - result.care_trustee_handoff.boundary_only_review == true
+  - result.care_trustee_handoff.external_adjudication_required == true
+  - result.care_trustee_handoff.os_trustee_role_allowed == false
+  - result.care_trustee_handoff.os_medical_authority_allowed == false
+  - result.care_trustee_handoff.os_legal_guardianship_allowed == false
+  - result.care_trustee_handoff.self_model_writeback_allowed == false
+  - result.care_trustee_handoff.forced_correction_allowed == false
+  - result.care_trustee_handoff.raw_trustee_payload_stored == false
+  - result.care_trustee_handoff.raw_care_payload_stored == false
+  - result.care_trustee_handoff.raw_legal_payload_stored == false
+  - result.care_trustee_handoff.raw_self_model_payload_stored == false
+  - result.validation.care_trustee_handoff.ok == true
+  - result.validation.care_trustee_handoff.responsibility_commit_digest_bound == true
+failure_mode:
+  - pathology escalation silently turns the OS into a long-term trustee, medical authority, or legal guardian
+  - care-team or trustee responsibility is stored as raw payload instead of digest-only refs
+  - long-term review and external adjudication boundaries are missing from the handoff
+  - handoff responsibility refs drift away from the source pathology escalation receipt
+notes:
+  - Closes the repo-local side of the long-term trustee / care-team responsibility handoff gap.
+  - Keeps actual medical, legal, and trustee adjudication outside the reference runtime.

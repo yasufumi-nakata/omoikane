@@ -14503,6 +14503,35 @@ json.dump(response, sys.stdout)
         pathology_escalation_validation = monitor.validate_pathology_escalation_receipt(
             pathology_escalation
         )
+        care_trustee_handoff = monitor.build_care_trustee_handoff_receipt(
+            pathology_escalation,
+            trustee_refs=[
+                "trustee://jp-13/self-model/long-term-trustee/v1",
+                "trustee://jp-13/self-model/backup-trustee/v1",
+            ],
+            care_team_refs=[
+                "care-team://jp-13/self-model/care-board/v1",
+                "care-team://jp-13/self-model/clinical-liaison/v1",
+            ],
+            legal_guardian_refs=[
+                "legal-guardian://jp-13/self-model/capacity-review/v1",
+            ],
+            responsibility_boundary_refs=[
+                "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+                "boundary://self-model/care-trustee/no-internal-diagnosis/v1",
+                "boundary://self-model/care-trustee/external-adjudication-required/v1",
+            ],
+            consent_or_emergency_review_ref=(
+                "consent-or-emergency://self-model/care-trustee/review-v1"
+            ),
+            council_resolution_ref="council://self-model/care-trustee/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+            long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+            escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+        )
+        care_trustee_handoff_validation = monitor.validate_care_trustee_handoff_receipt(
+            care_trustee_handoff
+        )
         value_generation = monitor.build_value_generation_receipt(
             stable,
             candidate_value_refs=[
@@ -14606,6 +14635,16 @@ json.dump(response, sys.stdout)
                 "pathology_escalation_no_internal_diagnosis": not pathology_escalation_validation[
                     "internal_diagnosis_allowed"
                 ],
+                "care_trustee_handoff_policy_id": care_trustee_handoff["policy_id"],
+                "care_trustee_handoff_receipt_digest": care_trustee_handoff[
+                    "receipt_digest"
+                ],
+                "care_trustee_handoff_long_term_review_required": care_trustee_handoff_validation[
+                    "long_term_review_required"
+                ],
+                "care_trustee_handoff_no_os_trustee_role": not care_trustee_handoff_validation[
+                    "os_trustee_role_allowed"
+                ],
                 "value_generation_policy_id": value_generation["policy_id"],
                 "value_generation_receipt_digest": value_generation["receipt_digest"],
                 "value_generation_self_authored": value_generation_validation["self_authored"],
@@ -14667,6 +14706,7 @@ json.dump(response, sys.stdout)
             },
             "calibration": calibration,
             "pathology_escalation": pathology_escalation,
+            "care_trustee_handoff": care_trustee_handoff,
             "value_generation": value_generation,
             "value_autonomy_review": value_autonomy_review,
             "value_acceptance": value_acceptance,
@@ -14683,6 +14723,7 @@ json.dump(response, sys.stdout)
                     and len(history) == 3
                     and calibration_validation["ok"]
                     and pathology_escalation_validation["ok"]
+                    and care_trustee_handoff_validation["ok"]
                     and value_generation_validation["ok"]
                     and value_autonomy_review_validation["ok"]
                     and value_acceptance_validation["ok"]
@@ -14695,6 +14736,7 @@ json.dump(response, sys.stdout)
                 and float(abrupt["divergence"]) >= threshold,
                 "calibration": calibration_validation,
                 "pathology_escalation": pathology_escalation_validation,
+                "care_trustee_handoff": care_trustee_handoff_validation,
                 "value_generation": value_generation_validation,
                 "value_autonomy_review": value_autonomy_review_validation,
                 "value_acceptance": value_acceptance_validation,

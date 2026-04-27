@@ -1321,6 +1321,23 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertFalse(result["calibration"]["accepted_for_writeback"])
         self.assertEqual(
+            "self-model-pathology-escalation-boundary-v1",
+            result["pathology_escalation"]["policy_id"],
+        )
+        self.assertTrue(result["validation"]["pathology_escalation"]["care_handoff_required"])
+        self.assertEqual(
+            "self-model-care-trustee-responsibility-handoff-v1",
+            result["care_trustee_handoff"]["policy_id"],
+        )
+        self.assertTrue(result["validation"]["care_trustee_handoff"]["long_term_review_required"])
+        self.assertTrue(
+            result["validation"]["care_trustee_handoff"][
+                "responsibility_commit_digest_bound"
+            ]
+        )
+        self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
+        self.assertEqual(
             "self-model-self-authored-value-generation-v1",
             result["value_generation"]["policy_id"],
         )

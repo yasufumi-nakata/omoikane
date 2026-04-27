@@ -1410,6 +1410,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["validation"]["history_length"])
         self.assertTrue(result["validation"]["calibration"]["ok"])
         self.assertTrue(result["validation"]["calibration"]["advisory_only"])
+        self.assertTrue(result["validation"]["pathology_escalation"]["ok"])
+        self.assertTrue(result["validation"]["pathology_escalation"]["care_handoff_required"])
+        self.assertTrue(result["validation"]["care_trustee_handoff"]["ok"])
+        self.assertTrue(
+            result["validation"]["care_trustee_handoff"][
+                "responsibility_commit_digest_bound"
+            ]
+        )
+        self.assertTrue(result["care_trustee_handoff"]["long_term_review_required"])
+        self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["os_medical_authority_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["os_legal_guardianship_allowed"])
         self.assertTrue(result["validation"]["value_generation"]["ok"])
         self.assertTrue(result["validation"]["value_generation"]["self_authored"])
         self.assertTrue(result["value_generation"]["autonomy_preserved"])

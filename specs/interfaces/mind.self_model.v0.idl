@@ -8,6 +8,7 @@ imports:
   self_model_observation: ../schemas/self_model_observation.schema
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_pathological_self_assessment_escalation_receipt: ../schemas/self_model_pathological_self_assessment_escalation_receipt.schema
+  self_model_care_trustee_handoff_receipt: ../schemas/self_model_care_trustee_handoff_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
   self_model_value_autonomy_review_receipt: ../schemas/self_model_value_autonomy_review_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
@@ -182,6 +183,93 @@ operations:
           self_model_writeback_allowed:
             type: boolean
           handoff_commit_digest_bound:
+            type: boolean
+  build_care_trustee_handoff_receipt:
+    summary: Bind long-term external care-team, trustee, and legal-guardian responsibility refs after pathology escalation without making the OS a trustee, medical authority, or legal guardian.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - pathology_escalation_receipt
+          - trustee_refs
+          - care_team_refs
+          - legal_guardian_refs
+          - responsibility_boundary_refs
+          - consent_or_emergency_review_ref
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - long_term_review_schedule_ref
+          - escalation_continuity_ref
+        properties:
+          pathology_escalation_receipt:
+            schema_ref: self_model_pathological_self_assessment_escalation_receipt
+          trustee_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          care_team_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          legal_guardian_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          responsibility_boundary_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          consent_or_emergency_review_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          long_term_review_schedule_ref:
+            type: string
+            minLength: 1
+          escalation_continuity_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_care_trustee_handoff_receipt
+  validate_care_trustee_handoff_receipt:
+    summary: Fail closed unless external care/trustee handoff remains digest-only, boundary-and-evidence-routing-only, long-term review bound, and raw-payload redacted.
+    input:
+      schema_ref: self_model_care_trustee_handoff_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - long_term_review_required
+          - boundary_only_review
+          - external_adjudication_required
+          - os_trustee_role_allowed
+          - responsibility_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          long_term_review_required:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          external_adjudication_required:
+            type: boolean
+          os_trustee_role_allowed:
+            type: boolean
+          responsibility_commit_digest_bound:
             type: boolean
   build_value_generation_receipt:
     summary: Bind self-authored value-generation candidates without external veto, forced stability lock, or immediate writeback.

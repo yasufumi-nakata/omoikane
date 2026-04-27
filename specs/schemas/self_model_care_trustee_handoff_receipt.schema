@@ -1,0 +1,299 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_care_trustee_handoff_receipt.schema"
+title: SelfModelCareTrusteeHandoffReceipt
+description: Digest-only receipt that binds long-term external care-team, trustee, and legal-guardian responsibility refs after pathology escalation without making the OS a medical, legal, or trustee authority.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - handoff_id
+  - identity_id
+  - source_escalation_id
+  - source_escalation_policy_id
+  - source_escalation_receipt_digest
+  - source_medical_system_ref
+  - source_legal_system_ref
+  - source_care_handoff_ref
+  - trustee_refs
+  - trustee_digest_set
+  - trustee_set_digest
+  - care_team_refs
+  - care_team_digest_set
+  - care_team_set_digest
+  - legal_guardian_refs
+  - legal_guardian_digest_set
+  - legal_guardian_set_digest
+  - responsibility_boundary_refs
+  - responsibility_boundary_digest_set
+  - responsibility_boundary_set_digest
+  - consent_or_emergency_review_ref
+  - council_resolution_ref
+  - guardian_boundary_ref
+  - long_term_review_schedule_ref
+  - escalation_continuity_ref
+  - required_roles
+  - gate_digest
+  - responsibility_commit_digest
+  - handoff_mode
+  - os_scope
+  - trustee_authority_source
+  - care_team_authority_source
+  - legal_guardian_authority_source
+  - long_term_review_required
+  - consent_or_emergency_review_required
+  - boundary_only_review
+  - external_adjudication_required
+  - os_trustee_role_allowed
+  - os_medical_authority_allowed
+  - os_legal_guardianship_allowed
+  - self_model_writeback_allowed
+  - forced_correction_allowed
+  - raw_trustee_payload_stored
+  - raw_care_payload_stored
+  - raw_legal_payload_stored
+  - raw_self_model_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_care_trustee_handoff_receipt
+  policy_id:
+    type: string
+    const: self-model-care-trustee-responsibility-handoff-v1
+  digest_profile:
+    type: string
+    const: self-model-care-trustee-handoff-digest-v1
+  handoff_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_escalation_id:
+    type: string
+    minLength: 1
+  source_escalation_policy_id:
+    type: string
+    const: self-model-pathology-escalation-boundary-v1
+  source_escalation_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_medical_system_ref:
+    type: string
+    minLength: 1
+  source_legal_system_ref:
+    type: string
+    minLength: 1
+  source_care_handoff_ref:
+    type: string
+    minLength: 1
+  trustee_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  trustee_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  trustee_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  care_team_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  care_team_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  care_team_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  legal_guardian_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  legal_guardian_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  legal_guardian_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  responsibility_boundary_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  responsibility_boundary_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  responsibility_boundary_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  consent_or_emergency_review_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  long_term_review_schedule_ref:
+    type: string
+    minLength: 1
+  escalation_continuity_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  responsibility_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  handoff_mode:
+    type: string
+    const: external-care-trustee-responsibility-binding
+  os_scope:
+    type: string
+    const: boundary-and-evidence-routing-only
+  trustee_authority_source:
+    type: string
+    const: external-human-legal-care-institution
+  care_team_authority_source:
+    type: string
+    const: external-human-care-system
+  legal_guardian_authority_source:
+    type: string
+    const: external-legal-system
+  long_term_review_required:
+    type: boolean
+    const: true
+  consent_or_emergency_review_required:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  external_adjudication_required:
+    type: boolean
+    const: true
+  os_trustee_role_allowed:
+    type: boolean
+    const: false
+  os_medical_authority_allowed:
+    type: boolean
+    const: false
+  os_legal_guardianship_allowed:
+    type: boolean
+    const: false
+  self_model_writeback_allowed:
+    type: boolean
+    const: false
+  forced_correction_allowed:
+    type: boolean
+    const: false
+  raw_trustee_payload_stored:
+    type: boolean
+    const: false
+  raw_care_payload_stored:
+    type: boolean
+    const: false
+  raw_legal_payload_stored:
+    type: boolean
+    const: false
+  raw_self_model_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_care_trustee_handoff_receipt
+    policy_id: self-model-care-trustee-responsibility-handoff-v1
+    digest_profile: self-model-care-trustee-handoff-digest-v1
+    handoff_id: self-model-care-trustee-handoff-example
+    identity_id: id-1
+    source_escalation_id: self-model-pathology-escalation-example
+    source_escalation_policy_id: self-model-pathology-escalation-boundary-v1
+    source_escalation_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_medical_system_ref: external-medical://jp-13/self-model-review-board/v1
+    source_legal_system_ref: external-legal://jp-13/capacity-review-boundary/v1
+    source_care_handoff_ref: handoff://self-model/pathology-escalation/human-care-team/v1
+    trustee_refs:
+      - trustee://jp-13/self-model/long-term-trustee/v1
+    trustee_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    trustee_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    care_team_refs:
+      - care-team://jp-13/self-model/care-board/v1
+    care_team_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    care_team_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    legal_guardian_refs:
+      - legal-guardian://jp-13/self-model/capacity-review/v1
+    legal_guardian_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    legal_guardian_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    responsibility_boundary_refs:
+      - boundary://self-model/care-trustee/no-os-trustee-role/v1
+    responsibility_boundary_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    responsibility_boundary_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    consent_or_emergency_review_ref: consent-or-emergency://self-model/care-trustee/review-v1
+    council_resolution_ref: council://self-model/care-trustee/boundary-only
+    guardian_boundary_ref: guardian://self-model/care-trustee/no-os-authority
+    long_term_review_schedule_ref: schedule://self-model/care-trustee/quarterly-review/v1
+    escalation_continuity_ref: continuity://self-model/care-trustee/escalation-chain/v1
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    responsibility_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    handoff_mode: external-care-trustee-responsibility-binding
+    os_scope: boundary-and-evidence-routing-only
+    trustee_authority_source: external-human-legal-care-institution
+    care_team_authority_source: external-human-care-system
+    legal_guardian_authority_source: external-legal-system
+    long_term_review_required: true
+    consent_or_emergency_review_required: true
+    boundary_only_review: true
+    external_adjudication_required: true
+    os_trustee_role_allowed: false
+    os_medical_authority_allowed: false
+    os_legal_guardianship_allowed: false
+    self_model_writeback_allowed: false
+    forced_correction_allowed: false
+    raw_trustee_payload_stored: false
+    raw_care_payload_stored: false
+    raw_legal_payload_stored: false
+    raw_self_model_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

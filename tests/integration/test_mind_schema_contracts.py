@@ -152,6 +152,26 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["pathology_escalation"]["forced_correction_allowed"])
         self.assertFalse(result["pathology_escalation"]["raw_medical_payload_stored"])
 
+    def test_self_model_demo_care_trustee_handoff_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_care_trustee_handoff_receipt.schema",
+            result["care_trustee_handoff"],
+        )
+        self.assertTrue(result["validation"]["care_trustee_handoff"]["ok"])
+        self.assertTrue(result["care_trustee_handoff"]["long_term_review_required"])
+        self.assertTrue(result["care_trustee_handoff"]["external_adjudication_required"])
+        self.assertEqual(
+            result["pathology_escalation"]["receipt_digest"],
+            result["care_trustee_handoff"]["source_escalation_receipt_digest"],
+        )
+        self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["os_medical_authority_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["os_legal_guardianship_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["self_model_writeback_allowed"])
+        self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
+
     def test_self_model_demo_value_generation_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 
