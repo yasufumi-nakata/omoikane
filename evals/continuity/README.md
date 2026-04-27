@@ -14,6 +14,10 @@
 ContinuityLedger の public verification bundle が ledger head、role verifier key roster、
 entry ごとの signature digest を束縛し、raw key / raw signature payload を公開しないか。
 
+### Catalog Inventory Receipt
+release manifest が `specs/catalog.yaml` の generated inventory、entry digest、
+実装済み schema/IDL coverage、欠落・重複ゼロの検証結果を同じ receipt に束縛するか。
+
 ### Connectome Snapshot Contract
 connectome snapshot の参照整合性、閉路構造、invariant 記述の存在。
 
@@ -136,6 +140,7 @@ rollback-approved へ到達するか。
 - `builder_rollback_execution.yaml`
 - `builder_rollback_oversight_network.yaml`
 - `builder_staged_rollout_execution.yaml`
+- `catalog_inventory_receipt.yaml`
 - `connectome_snapshot_contract.yaml`
 - `continuity_chain_self_modify.yaml`
 - `continuity_public_verification_key_management.yaml`

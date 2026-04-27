@@ -1130,6 +1130,9 @@ integration test が demo payload を public schema に直接通す。
 `version-demo` は hybrid versioning policy を JSON で可視化し、
 runtime semver、IDL/schema の `bootstrap` stability、governance calver、
 `specs/catalog.yaml` の sha256 snapshot を 1 つの manifest に集約して確認する。
+同じ manifest は `catalog_inventory_receipt` を返し、
+`specs-catalog-generated-inventory-v1` profile で catalog entries、priority/kind counts、
+実装済み schema/IDL coverage、欠落・重複ゼロの検証結果を digest-bound に固定する。
 
 `naming-demo` は naming policy を JSON で可視化し、
 project branding の英字表記を `Omoikane` に固定し、

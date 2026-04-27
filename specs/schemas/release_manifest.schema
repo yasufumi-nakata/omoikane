@@ -15,6 +15,7 @@ required:
   - idl_versions
   - schema_versions
   - catalog_snapshot
+  - catalog_inventory_receipt
   - notes
 properties:
   kind:
@@ -91,6 +92,8 @@ properties:
       sha256:
         type: string
         pattern: "^[a-f0-9]{64}$"
+  catalog_inventory_receipt:
+    $ref: "catalog_inventory_receipt.schema"
   notes:
     type: array
     items:
@@ -121,5 +124,48 @@ examples:
     catalog_snapshot:
       calver: "2026.04"
       sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    catalog_inventory_receipt:
+      kind: catalog_inventory_receipt
+      schema_version: 1.0.0
+      receipt_id: catalog-inventory-0123456789ab
+      generated_at: "2026-04-18T17:00:00Z"
+      profile: specs-catalog-generated-inventory-v1
+      source_ref: specs/catalog.yaml
+      source_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      source_byte_count: 1234
+      catalog_calver: "2026.04"
+      entry_count: 1
+      priority_counts:
+        P1: 1
+      kind_counts:
+        schema: 1
+      declared_file_count: 1
+      implemented_contract_file_count: 1
+      missing_file_count: 0
+      duplicate_file_count: 0
+      catalog_coverage_gap_count: 0
+      missing_files: []
+      duplicate_files: []
+      catalog_coverage_gap_files: []
+      entries:
+        - entry_index: 1
+          priority: P1
+          kind: schema
+          file: specs/schemas/release_manifest.schema
+          file_exists: true
+          file_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          rationale: Required to serialize the hybrid release manifest.
+          consumer_count: 2
+          consumers_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          rationale_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      inventory_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      validation:
+        ok: true
+        all_declared_files_exist: true
+        no_duplicate_declared_files: true
+        all_implemented_contract_files_declared: true
+        entry_count_matches: true
+        catalog_digest_bound: true
+        inventory_digest_bound: true
     notes:
       - bootstrap release; all contracts subject to MAJOR change

@@ -3044,12 +3044,29 @@ entries:
       - reference-runtime
     rationale: Required to serialize the hybrid semver/calver release manifest used by the reference runtime.
   - priority: P1
+    kind: schema
+    file: specs/schemas/catalog_inventory_receipt.schema
+    consumers:
+      - specs/schemas/release_manifest.schema
+      - docs/06-roadmap/versioning.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to serialize generated catalog entry inventory, implemented contract coverage, and digest-bound no-missing/no-duplicate validation inside the release manifest.
+  - priority: P1
     kind: eval
     file: evals/continuity/release_manifest_contract.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
     rationale: Protects runtime semver, contract stability tables, and catalog snapshot hash consistency.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/catalog_inventory_receipt.yaml
+    consumers:
+      - reference-runtime
+      - specs/schemas/catalog_inventory_receipt.schema
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects generated catalog inventory receipts from missing files, duplicate catalog entries, unregistered schema/IDL contracts, and unbound inventory digests.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_floor_receipt.schema

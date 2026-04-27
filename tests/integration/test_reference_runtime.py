@@ -23,6 +23,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
         self.assertEqual(64, len(result["release_digest"]))
+        self.assertTrue(result["validation"]["catalog_inventory_valid"])
+        self.assertEqual(
+            "specs-catalog-generated-inventory-v1",
+            result["manifest"]["catalog_inventory_receipt"]["profile"],
+        )
+        self.assertTrue(result["manifest"]["catalog_inventory_receipt"]["validation"]["ok"])
+        self.assertEqual(0, result["manifest"]["catalog_inventory_receipt"]["missing_file_count"])
+        self.assertEqual(
+            0,
+            result["manifest"]["catalog_inventory_receipt"]["catalog_coverage_gap_count"],
+        )
 
     def test_amendment_demo_reports_constitutional_freeze(self) -> None:
         runtime = OmoikaneReferenceOS()

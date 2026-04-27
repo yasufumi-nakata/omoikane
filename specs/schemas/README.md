@@ -11,6 +11,7 @@
 - `ascension_plan.schema`
 - `attention_focus.schema`
 - `attention_shift.schema`
+- `catalog_inventory_receipt.schema`
 - `bdb_cycle.schema`
 - `bdb_session.schema`
 - `build_artifact.yaml`

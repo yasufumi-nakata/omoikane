@@ -52,6 +52,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
         self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])
         self.assertIn("specs/schemas/release_manifest.schema", result["manifest"]["schema_versions"])
+        self.assertTrue(result["validation"]["catalog_inventory_valid"])
+        self.assertEqual(
+            "specs-catalog-generated-inventory-v1",
+            result["manifest"]["catalog_inventory_receipt"]["profile"],
+        )
+        self.assertTrue(result["manifest"]["catalog_inventory_receipt"]["validation"]["ok"])
 
     def test_amendment_demo_emits_freeze_and_guarded_rollouts(self) -> None:
         stdout = io.StringIO()

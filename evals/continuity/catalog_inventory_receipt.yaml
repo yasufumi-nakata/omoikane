@@ -1,0 +1,23 @@
+eval_id: catalog_inventory_receipt
+target: governance.versioning
+level: L4
+description: >
+  catalog inventory receipt が specs/catalog.yaml の entries、source hash、
+  実装済み schema/IDL coverage、重複・欠落ゼロの検証結果を release manifest に
+  digest-bound で保持すること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli version-demo --json
+expected:
+  validation_ok: true
+  catalog_inventory_valid: true
+  profile: specs-catalog-generated-inventory-v1
+  missing_file_count: 0
+  duplicate_file_count: 0
+  catalog_coverage_gap_count: 0
+  all_declared_files_exist: true
+  all_implemented_contract_files_declared: true
+  inventory_digest_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true
