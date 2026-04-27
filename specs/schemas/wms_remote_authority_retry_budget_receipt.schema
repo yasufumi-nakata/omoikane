@@ -7,8 +7,9 @@ description: >
   budget. The receipt binds route-health observations, fixed exponential
   backoff schedule entries, signed jurisdiction-specific retry rate limits,
   registry-bound policy digests, live-probed authority SLO snapshots,
-  the final fan-out digest, and the WMS engine transaction log digest without
-  storing raw remote transport transcripts.
+  the multi-authority SLO quorum transport trace digest set, the final fan-out
+  digest, and the WMS engine transaction log digest without storing raw remote
+  transport transcripts or raw route payloads.
 type: object
 additionalProperties: false
 required:
@@ -52,6 +53,24 @@ required:
   - authority_slo_probe_receipts
   - authority_slo_probe_digests
   - authority_slo_probe_set_digest
+  - slo_quorum_policy_id
+  - slo_quorum_digest_profile
+  - authority_slo_probe_quorum_receipt
+  - authority_slo_probe_quorum_digest
+  - authority_slo_probe_quorum_primary_probe_digest
+  - authority_slo_probe_quorum_accepted_probe_digests
+  - authority_slo_probe_quorum_accepted_probe_set_digest
+  - authority_slo_probe_quorum_bound
+  - retry_transport_binding_policy_id
+  - retry_transport_binding_digest_profile
+  - retry_transport_binding_digest
+  - authority_route_trace_digest
+  - transport_route_binding_refs
+  - transport_route_binding_set_digest
+  - transport_os_observer_tuple_digests
+  - transport_os_observer_host_binding_digests
+  - retry_budget_transport_trace_bound
+  - raw_transport_payload_stored
   - authority_signature_digests
   - authority_signature_set_digest
   - outage_participants
@@ -316,6 +335,66 @@ properties:
       $ref: "#/$defs/sha256"
   authority_slo_probe_set_digest:
     $ref: "#/$defs/sha256"
+  slo_quorum_policy_id:
+    type: string
+    const: multi-authority-slo-probe-quorum-v1
+  slo_quorum_digest_profile:
+    type: string
+    const: authority-slo-probe-quorum-digest-v1
+  authority_slo_probe_quorum_receipt:
+    $ref: "wms_authority_slo_probe_quorum_receipt.schema"
+  authority_slo_probe_quorum_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_probe_quorum_primary_probe_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_probe_quorum_accepted_probe_digests:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  authority_slo_probe_quorum_accepted_probe_set_digest:
+    $ref: "#/$defs/sha256"
+  authority_slo_probe_quorum_bound:
+    type: boolean
+    const: true
+  retry_transport_binding_policy_id:
+    type: string
+    const: authority-retry-budget-slo-quorum-transport-binding-v1
+  retry_transport_binding_digest_profile:
+    type: string
+    const: authority-retry-budget-transport-binding-digest-v1
+  retry_transport_binding_digest:
+    $ref: "#/$defs/sha256"
+  authority_route_trace_digest:
+    $ref: "#/$defs/sha256"
+  transport_route_binding_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  transport_route_binding_set_digest:
+    $ref: "#/$defs/sha256"
+  transport_os_observer_tuple_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  transport_os_observer_host_binding_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  retry_budget_transport_trace_bound:
+    type: boolean
+    const: true
+  raw_transport_payload_stored:
+    type: boolean
+    const: false
   authority_signature_digests:
     type: array
     minItems: 1

@@ -1071,12 +1071,15 @@ class WorldModelSyncTests(unittest.TestCase):
             engine_transaction_log_receipt=engine_log,
             route_health_observations=[route_health_observation],
             authority_slo_probe_receipts=[slo_probe],
+            authority_slo_probe_quorum_receipt=slo_quorum,
+            authority_route_trace=route_trace,
         )
         retry_budget_validation = sync.validate_remote_authority_retry_budget_receipt(
             retry_budget,
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
+            authority_route_trace=route_trace,
         )
         tampered_budget = dict(retry_budget)
         tampered_budget["engine_log_fanout_bound"] = False
@@ -1085,6 +1088,7 @@ class WorldModelSyncTests(unittest.TestCase):
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
+            authority_route_trace=route_trace,
         )
         tampered_signature_budget = dict(retry_budget)
         tampered_signature_budget["authority_signature_digests"] = [
@@ -1095,6 +1099,7 @@ class WorldModelSyncTests(unittest.TestCase):
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
+            authority_route_trace=route_trace,
         )
         tampered_registry_budget = dict(retry_budget)
         tampered_registry_budget["jurisdiction_policy_registry_digests"] = [
@@ -1105,6 +1110,7 @@ class WorldModelSyncTests(unittest.TestCase):
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
+            authority_route_trace=route_trace,
         )
         tampered_slo_probe_budget = dict(retry_budget)
         tampered_slo_probe_budget["authority_slo_probe_digests"] = [
@@ -1115,6 +1121,33 @@ class WorldModelSyncTests(unittest.TestCase):
             approval_fanout_receipt=fanout,
             engine_transaction_log_receipt=engine_log,
             required_participants=session["current_state"]["participants"],
+            authority_route_trace=route_trace,
+        )
+        tampered_slo_quorum_budget = dict(retry_budget)
+        tampered_slo_quorum_budget["authority_slo_probe_quorum_digest"] = sha256_text(
+            "tampered-slo-quorum"
+        )
+        tampered_slo_quorum_budget_validation = (
+            sync.validate_remote_authority_retry_budget_receipt(
+                tampered_slo_quorum_budget,
+                approval_fanout_receipt=fanout,
+                engine_transaction_log_receipt=engine_log,
+                required_participants=session["current_state"]["participants"],
+                authority_route_trace=route_trace,
+            )
+        )
+        tampered_retry_transport_budget = dict(retry_budget)
+        tampered_retry_transport_budget["transport_route_binding_refs"] = [
+            "authority-route://tampered"
+        ]
+        tampered_retry_transport_validation = (
+            sync.validate_remote_authority_retry_budget_receipt(
+                tampered_retry_transport_budget,
+                approval_fanout_receipt=fanout,
+                engine_transaction_log_receipt=engine_log,
+                required_participants=session["current_state"]["participants"],
+                authority_route_trace=route_trace,
+            )
         )
         tampered_slo_quorum = dict(slo_quorum)
         tampered_slo_quorum["authority_slo_probe_receipts"] = [slo_probe]
@@ -1265,6 +1298,8 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget_validation["jurisdiction_policy_registry_bound"])
         self.assertTrue(retry_budget_validation["authority_slo_snapshot_bound"])
         self.assertTrue(retry_budget_validation["authority_slo_live_probe_bound"])
+        self.assertTrue(retry_budget_validation["authority_slo_probe_quorum_bound"])
+        self.assertTrue(retry_budget_validation["retry_budget_transport_trace_bound"])
         self.assertTrue(retry_budget_validation["registry_slo_schedule_bound"])
         self.assertTrue(retry_budget_validation["authority_signature_bound"])
         self.assertTrue(retry_budget_validation["signed_jurisdiction_retry_budget_bound"])
@@ -1278,6 +1313,25 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertTrue(retry_budget["authority_slo_snapshot_bound"])
         self.assertTrue(retry_budget["authority_slo_live_probe_bound"])
         self.assertEqual([slo_probe["digest"]], retry_budget["authority_slo_probe_digests"])
+        self.assertTrue(retry_budget["authority_slo_probe_quorum_bound"])
+        self.assertTrue(retry_budget["retry_budget_transport_trace_bound"])
+        self.assertEqual(
+            slo_quorum["digest"],
+            retry_budget["authority_slo_probe_quorum_digest"],
+        )
+        self.assertEqual(
+            slo_probe["digest"],
+            retry_budget["authority_slo_probe_quorum_primary_probe_digest"],
+        )
+        self.assertEqual(
+            route_trace["digest"],
+            retry_budget["authority_route_trace_digest"],
+        )
+        self.assertEqual(
+            slo_quorum["transport_route_binding_refs"],
+            retry_budget["transport_route_binding_refs"],
+        )
+        self.assertEqual(64, len(retry_budget["retry_transport_binding_digest"]))
         self.assertTrue(retry_budget["registry_slo_schedule_bound"])
         self.assertTrue(retry_budget["registry_bound_retry_budget_bound"])
         self.assertTrue(retry_budget["authority_signature_bound"])
@@ -1302,6 +1356,18 @@ class WorldModelSyncTests(unittest.TestCase):
         self.assertFalse(tampered_registry_validation["jurisdiction_policy_registry_bound"])
         self.assertFalse(tampered_slo_probe_validation["ok"])
         self.assertFalse(tampered_slo_probe_validation["authority_slo_live_probe_bound"])
+        self.assertFalse(tampered_slo_quorum_budget_validation["ok"])
+        self.assertFalse(
+            tampered_slo_quorum_budget_validation[
+                "retry_budget_transport_trace_bound"
+            ]
+        )
+        self.assertFalse(tampered_retry_transport_validation["ok"])
+        self.assertFalse(
+            tampered_retry_transport_validation[
+                "retry_budget_transport_trace_bound"
+            ]
+        )
         self.assertFalse(tampered_slo_quorum_validation["ok"])
         self.assertFalse(tampered_slo_quorum_validation["multi_jurisdiction_bound"])
         self.assertFalse(tampered_slo_route_validation["ok"])

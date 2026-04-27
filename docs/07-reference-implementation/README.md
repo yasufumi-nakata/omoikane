@@ -1010,6 +1010,8 @@ remote authority route-health observation と
 `authority-slo-quorum-threshold-signer-roster-v1` の signer roster digest、
 `authority-slo-threshold-signer-roster-live-verifier-quorum-v1` の verifier response set digest、
 `authority-slo-quorum-threshold-revocation-registry-v1` の revocation registry digest、
+	`authority-retry-budget-slo-quorum-transport-binding-v1` の
+	retry-budget 側 route trace digest / route binding refs / OS observer digest set、
 `fixed-exponential-backoff-with-health-cap-v1` schedule entry へ束ね、
 engine transaction log の `approval_fanout_bound` entry と同じ fan-out digest を共有し、
 	raw remote authority transcript と raw threshold policy / signer roster / revocation registry /

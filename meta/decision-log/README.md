@@ -117,5 +117,6 @@ status: decided | superseded
 - [2026-04-27_identity-confirmation-witness-registry-binding.md](2026-04-27_identity-confirmation-witness-registry-binding.md)
 - [2026-04-27_wms-slo-threshold-authority-binding.md](2026-04-27_wms-slo-threshold-authority-binding.md)
 - [2026-04-27_wms-slo-quorum-transport-plane-binding.md](2026-04-27_wms-slo-quorum-transport-plane-binding.md)
+- [2026-04-27_wms-retry-budget-transport-binding.md](2026-04-27_wms-retry-budget-transport-binding.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

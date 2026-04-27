@@ -363,6 +363,21 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 "authority_slo_live_probe_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "authority_slo_probe_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["remote_authority_retry_budget"][
+                "retry_budget_transport_trace_bound"
+            ]
+        )
+        self.assertFalse(
+            result["scenarios"]["remote_authority_retry_budget"][
+                "raw_transport_payload_stored"
+            ]
+        )
         self.assertTrue(result["validation"]["remote_authority_slo_probe_quorum_bound"])
         self.assertTrue(
             result["validation"]["remote_authority_slo_probe_quorum"][

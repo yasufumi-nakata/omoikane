@@ -374,6 +374,8 @@ operations:
           - engine_transaction_log_receipt
           - route_health_observations
           - authority_slo_probe_receipts
+          - authority_slo_probe_quorum_receipt
+          - authority_route_trace
         properties:
           session_id:
             type: string
@@ -393,6 +395,10 @@ operations:
             type: array
             items:
               schema_ref: wms_authority_slo_probe_receipt
+          authority_slo_probe_quorum_receipt:
+            schema_ref: wms_authority_slo_probe_quorum_receipt
+          authority_route_trace:
+            schema_ref: distributed_transport_authority_route_trace
     output:
       schema_ref: wms_remote_authority_retry_budget_receipt
     guarantees:
@@ -402,6 +408,8 @@ operations:
       - every route-health observation must carry remote_jurisdiction, jurisdiction_rate_limit_ref, jurisdiction_retry_limit_ms, signer_key_ref, jurisdiction_rate_limit_digest, and authority_signature_digest
       - every route-health observation must bind jurisdiction_policy_registry_ref/digest and authority_slo_snapshot_ref/digest under registry-bound-authority-retry-slo-v1
       - every authority_slo_snapshot_digest must be covered by a live-authority-slo-snapshot-probe-v1 receipt fetched from a bounded HTTP JSON endpoint
+      - the covered primary SLO probe must be included in multi-authority-slo-probe-quorum-v1, and that quorum must be bound to authority-slo-quorum-non-loopback-transport-binding-v1 before the retry budget can become complete
+      - retry budget transport binding must mirror authority route trace digest, route binding refs, OS observer tuple digests, and OS observer host-binding digests without storing raw route payloads
       - every schedule entry must copy the signed jurisdiction rate-limit evidence, registry digest, SLO snapshot digest, and stay within fixed exponential backoff, jurisdiction_retry_limit_ms, and registry_slo_retry_limit_ms
       - the engine transaction log must contain approval_fanout_bound with the same approval_fanout_digest
       - raw remote authority transcripts must not be stored in the retry budget receipt

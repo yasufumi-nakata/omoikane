@@ -112,6 +112,12 @@ WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE = (
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE = (
     "registry-slo-derived-retry-schedule-v1"
 )
+WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_POLICY_ID = (
+    "authority-retry-budget-slo-quorum-transport-binding-v1"
+)
+WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_DIGEST_PROFILE = (
+    "authority-retry-budget-transport-binding-digest-v1"
+)
 WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE = (
     "fixed-exponential-backoff-with-health-cap-v1"
 )
@@ -219,6 +225,39 @@ def _remote_authority_retry_budget_digest_payload(
     receipt: Mapping[str, Any],
 ) -> Dict[str, Any]:
     return {key: deepcopy(value) for key, value in receipt.items() if key != "digest"}
+
+
+def _remote_authority_retry_transport_binding_digest_payload(
+    receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "retry_transport_binding_policy_id": receipt.get(
+            "retry_transport_binding_policy_id"
+        ),
+        "retry_transport_binding_digest_profile": receipt.get(
+            "retry_transport_binding_digest_profile"
+        ),
+        "approval_fanout_digest": receipt.get("approval_fanout_digest"),
+        "authority_slo_probe_digests": deepcopy(
+            receipt.get("authority_slo_probe_digests", [])
+        ),
+        "authority_slo_probe_quorum_digest": receipt.get(
+            "authority_slo_probe_quorum_digest"
+        ),
+        "authority_slo_probe_quorum_primary_probe_digest": receipt.get(
+            "authority_slo_probe_quorum_primary_probe_digest"
+        ),
+        "authority_route_trace_digest": receipt.get("authority_route_trace_digest"),
+        "transport_route_binding_refs": deepcopy(
+            receipt.get("transport_route_binding_refs", [])
+        ),
+        "transport_os_observer_tuple_digests": deepcopy(
+            receipt.get("transport_os_observer_tuple_digests", [])
+        ),
+        "transport_os_observer_host_binding_digests": deepcopy(
+            receipt.get("transport_os_observer_host_binding_digests", [])
+        ),
+    }
 
 
 def _remote_authority_slo_probe_receipt_digest_payload(
@@ -451,6 +490,8 @@ class WorldModelSync:
                 "remote_authority_slo_quorum_threshold_revocation_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_PROFILE,
                 "remote_authority_slo_quorum_threshold_revocation_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_THRESHOLD_REVOCATION_DIGEST_PROFILE,
                 "remote_authority_retry_schedule_derivation_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE,
+                "remote_authority_retry_transport_binding_policy_id": WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_POLICY_ID,
+                "remote_authority_retry_transport_binding_digest_profile": WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_DIGEST_PROFILE,
                 "remote_authority_retry_schedule_profile": WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_PROFILE,
                 "remote_authority_retry_base_delay_ms": WMS_REMOTE_AUTHORITY_RETRY_BASE_DELAY_MS,
                 "remote_authority_retry_multiplier": WMS_REMOTE_AUTHORITY_RETRY_MULTIPLIER,
@@ -2591,6 +2632,8 @@ class WorldModelSync:
         engine_transaction_log_receipt: Mapping[str, Any],
         route_health_observations: Sequence[Mapping[str, Any]],
         authority_slo_probe_receipts: Sequence[Mapping[str, Any]] | None = None,
+        authority_slo_probe_quorum_receipt: Mapping[str, Any] | None = None,
+        authority_route_trace: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         authority_ref = self._normalize_non_empty_string(
@@ -2832,6 +2875,48 @@ class WorldModelSync:
         authority_slo_live_probe_bound = bool(observations) and len(
             ordered_slo_probe_receipts
         ) == len(observations)
+        if not isinstance(authority_slo_probe_quorum_receipt, Mapping):
+            raise ValueError("authority_slo_probe_quorum_receipt must be a mapping")
+        if not isinstance(authority_route_trace, Mapping):
+            raise ValueError("authority_route_trace must be a mapping")
+        slo_quorum_receipt = deepcopy(authority_slo_probe_quorum_receipt)
+        slo_quorum_validation = self.validate_authority_slo_probe_quorum_receipt(
+            slo_quorum_receipt,
+            authority_route_trace=authority_route_trace,
+        )
+        if not slo_quorum_validation["ok"]:
+            raise ValueError("authority_slo_probe_quorum_receipt must validate")
+        slo_quorum_accepted_probe_digests = [
+            str(digest)
+            for digest in slo_quorum_receipt.get("accepted_probe_digests", [])
+            if isinstance(digest, str)
+        ]
+        route_health_route_refs = _dedupe_preserve_order(
+            [observation["route_ref"] for observation in observations]
+        )
+        transport_route_binding_refs = list(
+            slo_quorum_receipt.get("transport_route_binding_refs", [])
+        )
+        transport_route_binding_set_digest = sha256_text(
+            canonical_json(transport_route_binding_refs)
+        )
+        transport_os_observer_tuple_digests = list(
+            slo_quorum_receipt.get("transport_os_observer_tuple_digests", [])
+        )
+        transport_os_observer_host_binding_digests = list(
+            slo_quorum_receipt.get("transport_os_observer_host_binding_digests", [])
+        )
+        authority_slo_probe_quorum_bound = bool(
+            slo_quorum_validation["quorum_bound"]
+            and slo_quorum_validation["authority_slo_transport_trace_bound"]
+            and slo_quorum_validation["authority_slo_transport_cross_host_bound"]
+            and slo_quorum_receipt.get("quorum_status") == "complete"
+            and set(authority_slo_probe_digests).issubset(
+                set(slo_quorum_accepted_probe_digests)
+            )
+            and set(route_health_route_refs).issubset(set(transport_route_binding_refs))
+            and slo_quorum_receipt.get("raw_transport_payload_stored") is False
+        )
         authority_signature_digests = [
             observation["authority_signature_digest"] for observation in observations
         ]
@@ -2865,6 +2950,7 @@ class WorldModelSync:
             and bool(jurisdiction_policy_registry_digests)
             and bool(authority_slo_snapshot_digests)
             and authority_slo_live_probe_bound
+            and authority_slo_probe_quorum_bound
             and bool(authority_signature_digests)
             and total_scheduled_delay_ms <= WMS_REMOTE_AUTHORITY_RETRY_TOTAL_BUDGET_MS
             and fanout_receipt.get("partial_outage_status") in {"not-required", "recovered"}
@@ -2924,6 +3010,39 @@ class WorldModelSync:
             "authority_slo_probe_set_digest": sha256_text(
                 canonical_json(authority_slo_probe_digests)
             ),
+            "slo_quorum_policy_id": WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID,
+            "slo_quorum_digest_profile": WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE,
+            "authority_slo_probe_quorum_receipt": slo_quorum_receipt,
+            "authority_slo_probe_quorum_digest": slo_quorum_receipt["digest"],
+            "authority_slo_probe_quorum_primary_probe_digest": slo_quorum_receipt[
+                "primary_probe_digest"
+            ],
+            "authority_slo_probe_quorum_accepted_probe_digests": (
+                slo_quorum_accepted_probe_digests
+            ),
+            "authority_slo_probe_quorum_accepted_probe_set_digest": (
+                slo_quorum_receipt["accepted_probe_set_digest"]
+            ),
+            "authority_slo_probe_quorum_bound": authority_slo_probe_quorum_bound,
+            "retry_transport_binding_policy_id": (
+                WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_POLICY_ID
+            ),
+            "retry_transport_binding_digest_profile": (
+                WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_DIGEST_PROFILE
+            ),
+            "authority_route_trace_digest": slo_quorum_receipt[
+                "authority_route_trace_digest"
+            ],
+            "transport_route_binding_refs": transport_route_binding_refs,
+            "transport_route_binding_set_digest": transport_route_binding_set_digest,
+            "transport_os_observer_tuple_digests": (
+                transport_os_observer_tuple_digests
+            ),
+            "transport_os_observer_host_binding_digests": (
+                transport_os_observer_host_binding_digests
+            ),
+            "retry_budget_transport_trace_bound": authority_slo_probe_quorum_bound,
+            "raw_transport_payload_stored": False,
             "authority_signature_digests": authority_signature_digests,
             "authority_signature_set_digest": sha256_text(
                 canonical_json(authority_signature_digests)
@@ -2957,6 +3076,9 @@ class WorldModelSync:
             "budget_status": "complete" if adaptive_budget_bound else "incomplete",
             "raw_remote_transcript_stored": False,
         }
+        receipt["retry_transport_binding_digest"] = sha256_text(
+            canonical_json(_remote_authority_retry_transport_binding_digest_payload(receipt))
+        )
         receipt["digest"] = sha256_text(
             canonical_json(_remote_authority_retry_budget_digest_payload(receipt))
         )
@@ -5056,6 +5178,7 @@ class WorldModelSync:
         approval_fanout_receipt: Mapping[str, Any] | None = None,
         engine_transaction_log_receipt: Mapping[str, Any] | None = None,
         required_participants: Sequence[str] | None = None,
+        authority_route_trace: Mapping[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         if not isinstance(receipt, Mapping):
@@ -5090,6 +5213,20 @@ class WorldModelSync:
             errors.append("slo_probe_policy_id mismatch")
         if receipt.get("slo_probe_digest_profile") != WMS_REMOTE_AUTHORITY_SLO_PROBE_DIGEST_PROFILE:
             errors.append("slo_probe_digest_profile mismatch")
+        if receipt.get("slo_quorum_policy_id") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_POLICY_ID:
+            errors.append("slo_quorum_policy_id mismatch")
+        if receipt.get("slo_quorum_digest_profile") != WMS_REMOTE_AUTHORITY_SLO_QUORUM_DIGEST_PROFILE:
+            errors.append("slo_quorum_digest_profile mismatch")
+        if (
+            receipt.get("retry_transport_binding_policy_id")
+            != WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_POLICY_ID
+        ):
+            errors.append("retry_transport_binding_policy_id mismatch")
+        if (
+            receipt.get("retry_transport_binding_digest_profile")
+            != WMS_REMOTE_AUTHORITY_RETRY_TRANSPORT_BINDING_DIGEST_PROFILE
+        ):
+            errors.append("retry_transport_binding_digest_profile mismatch")
         if (
             receipt.get("schedule_derivation_profile")
             != WMS_REMOTE_AUTHORITY_RETRY_SCHEDULE_DERIVATION_PROFILE
@@ -5530,6 +5667,182 @@ class WorldModelSync:
         )
         if receipt.get("authority_slo_live_probe_bound") is not authority_slo_live_probe_bound:
             errors.append("authority_slo_live_probe_bound must reflect live SLO probe coverage")
+
+        slo_quorum_receipt = receipt.get("authority_slo_probe_quorum_receipt")
+        slo_quorum_validation = {
+            "ok": False,
+            "quorum_bound": False,
+            "authority_slo_transport_trace_bound": False,
+            "authority_slo_transport_cross_host_bound": False,
+        }
+        slo_quorum_accepted_probe_digests: List[str] = []
+        transport_route_binding_refs: List[str] = []
+        transport_os_observer_tuple_digests: List[str] = []
+        transport_os_observer_host_binding_digests: List[str] = []
+        authority_slo_probe_quorum_bound = False
+        if not isinstance(slo_quorum_receipt, Mapping):
+            errors.append("authority_slo_probe_quorum_receipt must be an object")
+        else:
+            if authority_route_trace is not None:
+                slo_quorum_validation = self.validate_authority_slo_probe_quorum_receipt(
+                    slo_quorum_receipt,
+                    authority_route_trace=authority_route_trace,
+                )
+                errors.extend(
+                    f"authority_slo_probe_quorum_receipt.{error}"
+                    for error in slo_quorum_validation["errors"]
+                )
+            else:
+                expected_quorum_digest = sha256_text(
+                    canonical_json(
+                        _remote_authority_slo_probe_quorum_receipt_digest_payload(
+                            slo_quorum_receipt
+                        )
+                    )
+                )
+                slo_quorum_validation = {
+                    "ok": slo_quorum_receipt.get("digest") == expected_quorum_digest,
+                    "quorum_bound": slo_quorum_receipt.get("quorum_bound") is True,
+                    "authority_slo_transport_trace_bound": (
+                        slo_quorum_receipt.get("authority_slo_transport_trace_bound")
+                        is True
+                    ),
+                    "authority_slo_transport_cross_host_bound": (
+                        slo_quorum_receipt.get(
+                            "authority_slo_transport_cross_host_bound"
+                        )
+                        is True
+                    ),
+                }
+                if not slo_quorum_validation["ok"]:
+                    errors.append(
+                        "authority_slo_probe_quorum_receipt digest must bind quorum payload"
+                    )
+            if receipt.get("authority_slo_probe_quorum_digest") != slo_quorum_receipt.get(
+                "digest"
+            ):
+                errors.append(
+                    "authority_slo_probe_quorum_digest must match quorum receipt"
+                )
+            if (
+                receipt.get("authority_slo_probe_quorum_primary_probe_digest")
+                != slo_quorum_receipt.get("primary_probe_digest")
+            ):
+                errors.append(
+                    "authority_slo_probe_quorum_primary_probe_digest must match quorum receipt"
+                )
+            slo_quorum_accepted_probe_digests = [
+                str(digest)
+                for digest in slo_quorum_receipt.get("accepted_probe_digests", [])
+                if isinstance(digest, str)
+            ]
+            if (
+                receipt.get("authority_slo_probe_quorum_accepted_probe_digests")
+                != slo_quorum_accepted_probe_digests
+            ):
+                errors.append(
+                    "authority_slo_probe_quorum_accepted_probe_digests must match quorum receipt"
+                )
+            if (
+                receipt.get("authority_slo_probe_quorum_accepted_probe_set_digest")
+                != slo_quorum_receipt.get("accepted_probe_set_digest")
+            ):
+                errors.append(
+                    "authority_slo_probe_quorum_accepted_probe_set_digest must match quorum receipt"
+                )
+            transport_route_binding_refs = [
+                str(route_ref)
+                for route_ref in slo_quorum_receipt.get(
+                    "transport_route_binding_refs", []
+                )
+                if isinstance(route_ref, str)
+            ]
+            transport_os_observer_tuple_digests = [
+                str(digest)
+                for digest in slo_quorum_receipt.get(
+                    "transport_os_observer_tuple_digests", []
+                )
+                if isinstance(digest, str)
+            ]
+            transport_os_observer_host_binding_digests = [
+                str(digest)
+                for digest in slo_quorum_receipt.get(
+                    "transport_os_observer_host_binding_digests", []
+                )
+                if isinstance(digest, str)
+            ]
+            expected_transport_route_binding_set_digest = sha256_text(
+                canonical_json(transport_route_binding_refs)
+            )
+            transport_expected_values = {
+                "authority_route_trace_digest": slo_quorum_receipt.get(
+                    "authority_route_trace_digest"
+                ),
+                "transport_route_binding_refs": transport_route_binding_refs,
+                "transport_route_binding_set_digest": expected_transport_route_binding_set_digest,
+                "transport_os_observer_tuple_digests": (
+                    transport_os_observer_tuple_digests
+                ),
+                "transport_os_observer_host_binding_digests": (
+                    transport_os_observer_host_binding_digests
+                ),
+            }
+            for field_name, expected_value in transport_expected_values.items():
+                if receipt.get(field_name) != expected_value:
+                    errors.append(
+                        f"{field_name} must match authority SLO quorum transport binding"
+                    )
+            route_health_route_refs = _dedupe_preserve_order(
+                [
+                    str(observation.get("route_ref"))
+                    for observation in observations
+                    if isinstance(observation, Mapping)
+                    and isinstance(observation.get("route_ref"), str)
+                ]
+            )
+            authority_slo_probe_quorum_bound = bool(
+                slo_quorum_validation["ok"]
+                and slo_quorum_validation["quorum_bound"]
+                and slo_quorum_validation["authority_slo_transport_trace_bound"]
+                and slo_quorum_validation["authority_slo_transport_cross_host_bound"]
+                and set(expected_probe_digests).issubset(
+                    set(slo_quorum_accepted_probe_digests)
+                )
+                and set(route_health_route_refs).issubset(
+                    set(transport_route_binding_refs)
+                )
+                and slo_quorum_receipt.get("raw_transport_payload_stored") is False
+            )
+        expected_retry_transport_binding_digest = sha256_text(
+            canonical_json(
+                _remote_authority_retry_transport_binding_digest_payload(receipt)
+            )
+        )
+        retry_budget_transport_trace_bound = bool(
+            authority_slo_probe_quorum_bound
+            and receipt.get("authority_slo_probe_quorum_bound") is True
+            and receipt.get("retry_budget_transport_trace_bound") is True
+            and receipt.get("retry_transport_binding_digest")
+            == expected_retry_transport_binding_digest
+            and receipt.get("raw_transport_payload_stored") is False
+        )
+        if receipt.get("authority_slo_probe_quorum_bound") is not authority_slo_probe_quorum_bound:
+            errors.append(
+                "authority_slo_probe_quorum_bound must reflect quorum and transport coverage"
+            )
+        if receipt.get("retry_budget_transport_trace_bound") is not retry_budget_transport_trace_bound:
+            errors.append(
+                "retry_budget_transport_trace_bound must reflect retry transport binding digest"
+            )
+        if (
+            receipt.get("retry_transport_binding_digest")
+            != expected_retry_transport_binding_digest
+        ):
+            errors.append(
+                "retry_transport_binding_digest must bind quorum and transport digest set"
+            )
+        if receipt.get("raw_transport_payload_stored") is not False:
+            errors.append("raw_transport_payload_stored must be false")
         if receipt.get("authority_signature_digests") != expected_signature_digests:
             errors.append("authority_signature_digests must follow observation order")
             authority_signature_bound = False
@@ -5743,6 +6056,7 @@ class WorldModelSync:
             and jurisdiction_policy_registry_bound
             and authority_slo_snapshot_bound
             and authority_slo_live_probe_bound
+            and retry_budget_transport_trace_bound
             and authority_signature_bound
             and schedule_bound
             and all_outages_budgeted
@@ -5804,6 +6118,8 @@ class WorldModelSync:
             "jurisdiction_policy_registry_bound": jurisdiction_policy_registry_bound,
             "authority_slo_snapshot_bound": authority_slo_snapshot_bound,
             "authority_slo_live_probe_bound": authority_slo_live_probe_bound,
+            "authority_slo_probe_quorum_bound": authority_slo_probe_quorum_bound,
+            "retry_budget_transport_trace_bound": retry_budget_transport_trace_bound,
             "registry_slo_schedule_bound": registry_slo_schedule_bound,
             "authority_signature_bound": authority_signature_bound,
             "signed_jurisdiction_retry_budget_bound": adaptive_retry_budget_bound,

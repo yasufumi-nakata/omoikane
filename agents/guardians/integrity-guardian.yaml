@@ -38,6 +38,7 @@ capabilities:
   - wms.engine-route-binding.attest
   - wms.engine-capture-binding.attest
   - wms.remote-authority-retry-budget.attest
+  - wms.remote-authority-retry-transport-binding.attest
   - wms.remote-authority-registry-slo-retry.attest
   - wms.remote-authority-slo-live-probe.attest
   - wms.remote-authority-slo-probe-quorum.attest
@@ -82,6 +83,7 @@ when_to_invoke: |
   - WMS shared reality の completed engine transaction log が authenticated cross-host distributed transport authority-route trace に raw payload 無しで束縛されていることを検証する時
   - WMS shared reality の completed engine route binding が packet capture export と delegated privileged capture acquisition に raw packet body 無しで束縛されていることを検証する時
   - WMS shared reality の remote authority retry budget が signed jurisdiction-specific rate limit、authority signature digest、route-health observation、fixed exponential schedule、engine transaction log の fan-out entry に束縛されていることを検証する時
+  - WMS shared reality の remote authority retry budget が SLO quorum receipt の non-loopback route trace digest、route binding refs、OS observer digest set に raw route payload 無しで直接束縛されていることを検証する時
   - WMS shared reality の remote authority retry schedule が jurisdiction policy registry digest と authority SLO snapshot digest から導出され、registry/SLO limit を超えていないことを検証する時
   - WMS shared reality の authority SLO snapshot が live HTTP probe receipt の endpoint response digest に raw SLO payload 無しで束縛されていることを検証する時
   - WMS shared reality の authority SLO live probe set が 2 authority / 2 remote jurisdiction quorum receipt に束縛され、primary retry probe を含むことを検証する時

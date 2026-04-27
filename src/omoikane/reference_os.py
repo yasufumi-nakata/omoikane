@@ -10371,6 +10371,10 @@ json.dump(response, sys.stdout)
             engine_transaction_log_receipt=engine_transaction_log,
             route_health_observations=[route_health_observation],
             authority_slo_probe_receipts=[remote_authority_slo_probe_receipt],
+            authority_slo_probe_quorum_receipt=(
+                remote_authority_slo_probe_quorum_receipt
+            ),
+            authority_route_trace=engine_authority_route_trace,
         )
         remote_authority_retry_budget_validation = (
             self.wms.validate_remote_authority_retry_budget_receipt(
@@ -10378,6 +10382,7 @@ json.dump(response, sys.stdout)
                 approval_fanout_receipt=approval_fanout_retry_receipt,
                 engine_transaction_log_receipt=engine_transaction_log,
                 required_participants=session["current_state"]["participants"],
+                authority_route_trace=engine_authority_route_trace,
             )
         )
         self.ledger.append(
@@ -10737,6 +10742,12 @@ json.dump(response, sys.stdout)
                         "authority_slo_live_probe_bound"
                     ]
                     and remote_authority_retry_budget_validation[
+                        "authority_slo_probe_quorum_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
+                        "retry_budget_transport_trace_bound"
+                    ]
+                    and remote_authority_retry_budget_validation[
                         "registry_slo_schedule_bound"
                     ]
                     and remote_authority_retry_budget_validation[
@@ -10753,6 +10764,28 @@ json.dump(response, sys.stdout)
                     and remote_authority_retry_budget[
                         "authority_slo_live_probe_bound"
                     ]
+                    and remote_authority_retry_budget[
+                        "authority_slo_probe_quorum_bound"
+                    ]
+                    and remote_authority_retry_budget[
+                        "retry_budget_transport_trace_bound"
+                    ]
+                    and remote_authority_retry_budget[
+                        "authority_slo_probe_quorum_digest"
+                    ]
+                    == remote_authority_slo_probe_quorum_receipt["digest"]
+                    and remote_authority_retry_budget[
+                        "authority_route_trace_digest"
+                    ]
+                    == engine_authority_route_trace["digest"]
+                    and remote_authority_retry_budget[
+                        "transport_route_binding_refs"
+                    ]
+                    == remote_authority_slo_probe_quorum_receipt[
+                        "transport_route_binding_refs"
+                    ]
+                    and remote_authority_retry_budget["raw_transport_payload_stored"]
+                    is False
                     and remote_authority_retry_budget["total_scheduled_delay_ms"] == 250
                     and remote_authority_retry_budget["remote_jurisdictions"]
                     == ["JP-13"]

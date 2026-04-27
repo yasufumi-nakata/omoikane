@@ -106,7 +106,11 @@ reference runtime では `objects` と `spatial_layout` は不透明 hash とし
   signer roster digest、live verifier response digest set、revocation registry digest も
   同じ threshold policy receipt に束縛してから取り込み、
   reviewer 側の固定値だけでは `quorum_status=complete` にしない。
-  raw threshold policy / signer roster / revocation registry / authority verifier payload は保存しない。
+  retry budget は同じ quorum receipt から route trace digest、route binding refs、
+  OS observer tuple / host-binding digest set を mirror し、
+  `authority-retry-budget-slo-quorum-transport-binding-v1` が成立しない限り
+  complete にしない。raw threshold policy / signer roster / revocation registry /
+  authority verifier payload / route trace payload は保存しない。
   さらに `base_retry_after_ms=250` /
   `exponential_multiplier=2` / `total_retry_budget_ms=1500` の schedule entry、
   engine transaction log の `approval_fanout_bound` entry を同じ fan-out digest に束縛し、
@@ -123,6 +127,7 @@ wms.bind_engine_transaction_log(session_id, entries, engine_adapter_key_ref) →
 wms.bind_engine_route_trace(session_id, engine_log, authority_route_trace) → EngineRouteBindingReceipt
 wms.probe_remote_authority_slo_snapshot_endpoint(endpoint, route_health) → WMSAuthoritySLOProbeReceipt
 wms.build_authority_slo_probe_quorum(slo_probes, primary_probe_digest, authority_route_trace, threshold_policy_receipt) → WMSAuthoritySLOProbeQuorumReceipt
+wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health, slo_probes, slo_quorum, authority_route_trace) → WMSRemoteAuthorityRetryBudgetReceipt
 wms.bind_remote_authority_retry_budget(session_id, fanout, engine_log, route_health, slo_probes) → RemoteAuthorityRetryBudgetReceipt
 wms.switch_mode(session_id, mode) → WorldState     # private_reality 退避を含む
 wms.propose_physics_rules_change(session_id, change) → PhysicsRulesChangeReceipt

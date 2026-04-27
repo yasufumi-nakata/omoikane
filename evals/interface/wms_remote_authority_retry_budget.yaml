@@ -44,6 +44,10 @@ expected:
   authority_slo_probe_count: 1
   authority_slo_probe_quorum_bound: true
   authority_slo_probe_quorum_count: 2
+  retry_transport_binding_policy_id: authority-retry-budget-slo-quorum-transport-binding-v1
+  retry_transport_binding_digest_profile: authority-retry-budget-transport-binding-digest-v1
+  retry_budget_transport_trace_bound: true
+  raw_transport_payload_stored: false
   authority_slo_quorum_threshold_policy_bound: true
   authority_slo_quorum_threshold_policy_id: signed-authority-slo-quorum-threshold-policy-v1
   authority_slo_quorum_threshold_signature_bound: true
