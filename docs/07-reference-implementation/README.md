@@ -831,8 +831,8 @@ raw thought payload と raw message payload を保存しないことを
 `imc_merge_thought_ethics_receipt.schema` と integration test で検証する。
 同じ risk boundary は `merge-thought-window-policy-authority-v1` として
 10 秒 cap を policy registry digest、signer roster digest、2 live HTTP verifier
-receipt の quorum digest、verifier network response digest set、policy body digest、
-policy signature digest に束縛し、raw policy / verifier / response-signature
+receipt の quorum digest、250ms request timeout budget、verifier network response
+digest set、policy body digest、policy signature digest に束縛し、raw policy / verifier / response-signature
 payload を保存しない。
 
 `collective-demo` は L6 Collective Identity の reference contract

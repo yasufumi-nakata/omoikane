@@ -4,7 +4,8 @@ objective: >
   Bind a merge_thought IMC session to a Federation Council, EthicsCommittee,
   Guardian gate, and live window-policy verifier receipt quorum before it can
   proceed into a bounded collective merge, without storing raw thought,
-  message, policy, verifier, or response-signature payloads.
+  message, policy, verifier, or response-signature payloads. Live verifier
+  request timeouts are capped at 250ms and bound into the same authority digest.
 fixtures:
   - name: bounded_merge_thought_ethics_gate
     command: PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
@@ -14,7 +15,9 @@ assertions:
   - merge_thought ethics receipt conforms to imc_merge_thought_ethics_receipt.schema
   - receipt binds Federation Council, EthicsCommittee, and Guardian refs before collective merge handoff
   - receipt binds distinct collective target, 10 second max merge window, emergency disconnect, private recovery, and post-disconnect identity confirmation requirements
-  - 10 second max merge window is backed by merge-thought-window-policy-authority-v1 registry digest, signer roster digest, live verifier receipt quorum digest, verifier network response digest set, and policy signature digest
+  - 10 second max merge window is backed by merge-thought-window-policy-authority-v1 registry digest, signer roster digest, live verifier receipt quorum digest, 250ms request timeout budget, verifier network response digest set, and policy signature digest
+  - every live verifier receipt conforms to imc_merge_thought_window_policy_verifier_receipt.schema with request_timeout_ms <= 250
+  - merge_window_policy_authority sets live_verifier_request_timeout_budget_bound to true
   - delivered fields exclude sealed_fields and summary_only_ledger remains true
   - raw_policy_payload_stored remains false
   - raw_verifier_payload_stored remains false

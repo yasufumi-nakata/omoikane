@@ -9,6 +9,7 @@ imports:
   imc_message: ../schemas/imc_message.schema
   imc_memory_glimpse_receipt: ../schemas/imc_memory_glimpse_receipt.schema
   imc_memory_glimpse_reconsent_receipt: ../schemas/imc_memory_glimpse_reconsent_receipt.schema
+  imc_merge_thought_window_policy_verifier_receipt: ../schemas/imc_merge_thought_window_policy_verifier_receipt.schema
   imc_merge_thought_ethics_receipt: ../schemas/imc_merge_thought_ethics_receipt.schema
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
 operations:
@@ -174,6 +175,40 @@ operations:
       - participant withdrawal must bind to an emergency-disconnect-compatible revocation event
       - consent window must be timeboxed to at most 86400 seconds and require Council re-consent before redisclosure
       - receipt must not store raw MemoryCrystal payloads, raw message payloads, or raw re-consent payloads
+  probe_merge_thought_window_policy_verifier_endpoint:
+    summary: Probe one live HTTP merge_thought window-policy verifier and return a timeout-budget-bound digest-only receipt.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - verifier_endpoint
+          - verifier_ref
+          - verifier_authority_ref
+          - jurisdiction
+        properties:
+          verifier_endpoint:
+            type: string
+            pattern: "^https?://"
+          verifier_ref:
+            type: string
+            minLength: 1
+          verifier_authority_ref:
+            type: string
+            minLength: 1
+          jurisdiction:
+            type: string
+            minLength: 1
+          timeout_ms:
+            type: integer
+            minimum: 1
+            maximum: 250
+            default: 250
+    output:
+      schema_ref: imc_merge_thought_window_policy_verifier_receipt
+    guarantees:
+      - request_timeout_ms must be at most 250 and bound into the verifier receipt digest
+      - endpoint response must match the expected policy registry, signer roster, verifier ref, authority ref, jurisdiction, and signature digest
+      - raw policy, verifier, and response-signature payloads must not be stored
   seal_merge_thought_ethics_receipt:
     summary: Seal one Federation Council, EthicsCommittee, and Guardian gate receipt before a merge_thought session can proceed into a collective merge.
     input:
@@ -223,7 +258,7 @@ operations:
       - operation only applies to merge_thought sessions that already require and received Council witness
       - receipt must bind Federation Council, EthicsCommittee, and Guardian refs before the session can be treated as a collective merge
       - receipt must bind the distinct collective target, 10 second max merge window, emergency disconnect requirement, private recovery requirement, and post-disconnect identity confirmation requirement
-      - 10 second merge window must be derived from merge-thought-window-policy-authority-v1 policy registry digest, signer roster digest, live HTTP verifier receipt quorum digest, verifier network response digest set, and policy signature digest
+      - 10 second merge window must be derived from merge-thought-window-policy-authority-v1 policy registry digest, signer roster digest, live HTTP verifier receipt quorum digest, 250ms-bounded verifier request timeout evidence, verifier network response digest set, and policy signature digest
       - receipt must not store raw thought payloads, raw message payloads, raw window policy payloads, raw verifier payloads, or raw response signature payloads
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.

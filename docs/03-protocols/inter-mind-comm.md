@@ -65,9 +65,10 @@ reference runtime では IMC を bounded contract として扱い、
   post-disconnect identity confirmation を digest-only に束縛する。
   10 秒 cap は `merge-thought-window-policy-authority-v1` の policy registry digest、
   signer roster digest、live HTTP verifier receipt quorum digest、
-  verifier network response digest set、policy signature digest に由来することも
-  同じ receipt の `merge_window_policy_authority` で検証し、raw policy /
-  verifier / response-signature payload は保存しない
+  250ms request timeout budget、verifier network response digest set、
+  policy signature digest に由来することも同じ receipt の
+  `merge_window_policy_authority` で検証し、raw policy / verifier /
+  response-signature payload は保存しない
 - disclosure template は双方のうち **より狭い側** に揃え、
   `sealed_fields` は常に redaction される
 - ContinuityLedger には生メッセージを書かず、summary と payload digest だけを記録する

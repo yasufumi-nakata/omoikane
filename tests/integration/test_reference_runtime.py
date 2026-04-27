@@ -83,6 +83,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["merge_thought_ethics_window_policy_live_verifier_bound"]
         )
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_timeout_bound"]
+        )
         self.assertTrue(result["validation"]["merge_thought_ethics_collective_bound"])
         self.assertTrue(result["validation"]["merge_thought_ethics_gate_bound"])
         self.assertFalse(

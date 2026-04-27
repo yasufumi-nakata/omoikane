@@ -34,8 +34,8 @@ emergency disconnect、private recovery、post-disconnect identity confirmation 
 raw thought payload 無しで束縛する。
 10 秒 cap は `merge-thought-window-policy-authority-v1` の policy registry digest、
 signer roster digest、live HTTP verifier receipt quorum digest、verifier network
-response digest set、policy signature digest に束縛し、raw policy / verifier /
-response-signature payload は保存しない。
+response digest set、250ms request timeout budget、policy signature digest に束縛し、
+raw policy / verifier / response-signature payload は保存しない。
 
 ## Handshake 5 step
 
@@ -134,8 +134,8 @@ on emergency_disconnect(session_id, reason):
   timeboxed re-consent receipt → merge_thought ethics gate receipt → audit までを
   1 シナリオで実行。merge_thought の 10 秒 cap は
   `merge-thought-window-policy-authority-v1` の policy registry digest、
-  signer roster digest、live HTTP verifier receipt quorum digest、verifier network
-  response digest set、policy signature digest に束縛する
+  signer roster digest、live HTTP verifier receipt quorum digest、250ms request
+  timeout budget、verifier network response digest set、policy signature digest に束縛する
 - `evals/interface/imc_disclosure_floor.yaml` と
   `evals/interface/imc_memory_glimpse_council_witness.yaml` と
   `evals/interface/imc_memory_glimpse_reconsent.yaml` と

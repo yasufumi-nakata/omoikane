@@ -1,0 +1,161 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCMergeThoughtWindowPolicyVerifierReceipt
+description: >
+  Digest-only live HTTP verifier receipt for the IMC merge_thought window
+  policy. The receipt binds the verifier endpoint response, signed response
+  digest, request timeout budget, and latency budget without storing raw
+  verifier, policy, or response-signature payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - receipt_id
+  - profile_id
+  - digest_profile
+  - transport_profile
+  - verifier_ref
+  - verifier_endpoint_ref
+  - verifier_authority_ref
+  - jurisdiction
+  - policy_profile
+  - policy_registry_ref
+  - policy_registry_digest
+  - policy_body_digest
+  - policy_signature_digest
+  - signer_roster_ref
+  - signer_roster_digest
+  - signer_key_refs
+  - max_merge_window_seconds
+  - http_status
+  - request_timeout_ms
+  - request_timeout_budget_ms
+  - request_timeout_budget_bound
+  - observed_latency_ms
+  - latency_budget_ms
+  - network_response_digest
+  - network_probe_status
+  - network_probe_bound
+  - response_status
+  - response_signature_profile
+  - response_signature_digest
+  - response_digest
+  - policy_payload_bound
+  - signed_response_bound
+  - raw_policy_payload_stored
+  - raw_verifier_payload_stored
+  - raw_response_signature_payload_stored
+  - digest
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    minLength: 8
+  profile_id:
+    type: string
+    const: merge-thought-window-live-verifier-receipt-v1
+  digest_profile:
+    type: string
+    const: merge-thought-window-live-verifier-digest-v1
+  transport_profile:
+    type: string
+    const: live-http-json-merge-thought-window-policy-v1
+  verifier_ref:
+    type: string
+    minLength: 1
+  verifier_endpoint_ref:
+    type: string
+    pattern: "^https?://"
+  verifier_authority_ref:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  policy_profile:
+    type: string
+    const: merge-thought-window-policy-authority-v1
+  policy_registry_ref:
+    type: string
+    minLength: 1
+  policy_registry_digest:
+    $ref: "#/$defs/sha256"
+  policy_body_digest:
+    $ref: "#/$defs/sha256"
+  policy_signature_digest:
+    $ref: "#/$defs/sha256"
+  signer_roster_ref:
+    type: string
+    minLength: 1
+  signer_roster_digest:
+    $ref: "#/$defs/sha256"
+  signer_key_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  max_merge_window_seconds:
+    type: integer
+    const: 10
+  http_status:
+    type: integer
+    const: 200
+  request_timeout_ms:
+    type: integer
+    minimum: 1
+    maximum: 250
+  request_timeout_budget_ms:
+    type: integer
+    const: 250
+  request_timeout_budget_bound:
+    type: boolean
+    const: true
+  observed_latency_ms:
+    type: number
+    minimum: 0
+    maximum: 250
+  latency_budget_ms:
+    type: number
+    const: 250
+  network_response_digest:
+    $ref: "#/$defs/sha256"
+  network_probe_status:
+    type: string
+    const: verified
+  network_probe_bound:
+    type: boolean
+    const: true
+  response_status:
+    type: string
+    const: verified
+  response_signature_profile:
+    type: string
+    const: digest-only-merge-thought-window-policy-response-signature-v1
+  response_signature_digest:
+    $ref: "#/$defs/sha256"
+  response_digest:
+    $ref: "#/$defs/sha256"
+  policy_payload_bound:
+    type: boolean
+    const: true
+  signed_response_bound:
+    type: boolean
+    const: true
+  raw_policy_payload_stored:
+    type: boolean
+    const: false
+  raw_verifier_payload_stored:
+    type: boolean
+    const: false
+  raw_response_signature_payload_stored:
+    type: boolean
+    const: false
+  digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

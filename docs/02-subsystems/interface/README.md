@@ -20,7 +20,8 @@
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli imc-demo --json`
   で fail-closed handshake、narrow disclosure floor、summary+digest-only audit、
   Council-witnessed memory_glimpse receipt、emergency disconnect、
-  timeboxed re-consent receipt、live-verifier-backed merge_thought window authority を
+  timeboxed re-consent receipt、250ms timeout-bound live-verifier-backed
+  merge_thought window authority を
   まとめて検証する
 
 ### Collective Identity

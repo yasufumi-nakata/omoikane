@@ -103,6 +103,8 @@ IMC_MERGE_THOUGHT_WINDOW_LIVE_RESPONSE_SIGNATURE_PROFILE = (
     "digest-only-merge-thought-window-policy-response-signature-v1"
 )
 IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS = 250.0
+IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS = 250
+IMC_MERGE_THOUGHT_WINDOW_LIVE_MAX_PROBE_ATTEMPTS = 3
 IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES = [
     "FederationCouncil",
     "EthicsCommittee",
@@ -182,6 +184,9 @@ class InterMindChannel:
                 ),
                 "live_verifier_transport_profile": (
                     IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE
+                ),
+                "live_verifier_request_timeout_ms": (
+                    IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
                 ),
                 "required_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
                 "raw_payload_policy": "digest-only",
@@ -999,6 +1004,7 @@ class InterMindChannel:
         risk_bound = False
         window_policy_authority_bound = False
         window_policy_live_verifier_bound = False
+        window_policy_timeout_bound = False
         raw_window_policy_payload_stored = True
         raw_window_policy_verifier_payload_stored = True
         raw_window_policy_response_signature_payload_stored = True
@@ -1024,6 +1030,11 @@ class InterMindChannel:
                     )
                     window_policy_live_verifier_bound = bool(
                         expected_policy_authority.get("live_verifier_quorum_bound")
+                    )
+                    window_policy_timeout_bound = bool(
+                        expected_policy_authority.get(
+                            "live_verifier_request_timeout_budget_bound"
+                        )
                     )
                     raw_window_policy_payload_stored = (
                         expected_policy_authority.get("raw_policy_payload_stored")
@@ -1054,6 +1065,7 @@ class InterMindChannel:
                         )
                         is False
                         and window_policy_live_verifier_bound
+                        and window_policy_timeout_bound
                     )
                 except ValueError as exc:
                     errors.append(str(exc))
@@ -1072,6 +1084,7 @@ class InterMindChannel:
                 <= IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
                 and window_policy_authority_bound
                 and window_policy_live_verifier_bound
+                and window_policy_timeout_bound
                 and risk.get("post_disconnect_identity_confirmation_required") is True
                 and risk.get("emergency_disconnect_required") is True
                 and risk.get("private_recovery_mode_required") is True
@@ -1206,6 +1219,7 @@ class InterMindChannel:
             "risk_bound": risk_bound,
             "window_policy_authority_bound": window_policy_authority_bound,
             "window_policy_live_verifier_bound": window_policy_live_verifier_bound,
+            "window_policy_timeout_bound": window_policy_timeout_bound,
             "collective_bound": collective_bound,
             "disclosure_bound": disclosure_bound,
             "gate_bound": gate_bound,
@@ -1283,7 +1297,7 @@ class InterMindChannel:
         verifier_ref: str,
         verifier_authority_ref: str,
         jurisdiction: str,
-        timeout_ms: int = 1000,
+        timeout_ms: int = IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS,
     ) -> Dict[str, Any]:
         normalized_endpoint = self._normalize_non_empty_string(
             verifier_endpoint,
@@ -1291,48 +1305,61 @@ class InterMindChannel:
         )
         if not _is_live_http_endpoint(normalized_endpoint):
             raise ValueError("verifier_endpoint must be http:// or https://")
-        if timeout_ms <= 0:
-            raise ValueError("timeout_ms must be positive")
-
-        request_started = time.monotonic()
-        try:
-            with request.urlopen(  # noqa: S310 - bounded reference verifier probe
-                normalized_endpoint,
-                timeout=timeout_ms / 1000.0,
-            ) as response:
-                http_status = int(getattr(response, "status", response.getcode()))
-                raw_body = response.read()
-        except (OSError, urlerror.URLError) as exc:
-            raise ValueError(
-                f"merge_thought window policy verifier endpoint unreachable: {normalized_endpoint}"
-            ) from exc
-        observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 3)
-        if http_status != 200:
-            raise ValueError(
-                "merge_thought window policy verifier endpoint returned "
-                f"unexpected status {http_status}"
-            )
-        try:
-            payload = json.loads(raw_body.decode("utf-8"))
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                "merge_thought window policy verifier endpoint must return JSON"
-            ) from exc
-        if not isinstance(payload, Mapping):
-            raise ValueError(
-                "merge_thought window policy verifier endpoint payload must be an object"
-            )
+        normalized_timeout_ms = self._normalize_live_verifier_request_timeout(timeout_ms)
 
         expected_payload = self.build_merge_thought_window_policy_verifier_payload(
             verifier_ref=verifier_ref,
             verifier_authority_ref=verifier_authority_ref,
             jurisdiction=jurisdiction,
         )
-        for field_name, expected_value in expected_payload.items():
-            if payload.get(field_name) != expected_value:
+        payload: Mapping[str, Any] = {}
+        http_status = 0
+        observed_latency_ms = 0.0
+        for attempt in range(1, IMC_MERGE_THOUGHT_WINDOW_LIVE_MAX_PROBE_ATTEMPTS + 1):
+            request_started = time.monotonic()
+            try:
+                with request.urlopen(  # noqa: S310 - bounded reference verifier probe
+                    normalized_endpoint,
+                    timeout=normalized_timeout_ms / 1000.0,
+                ) as response:
+                    http_status = int(getattr(response, "status", response.getcode()))
+                    raw_body = response.read()
+            except (OSError, urlerror.URLError) as exc:
+                if attempt == IMC_MERGE_THOUGHT_WINDOW_LIVE_MAX_PROBE_ATTEMPTS:
+                    raise ValueError(
+                        "merge_thought window policy verifier endpoint unreachable: "
+                        f"{normalized_endpoint}"
+                    ) from exc
+                continue
+            observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 3)
+            if http_status != 200:
                 raise ValueError(
-                    "merge_thought window policy verifier endpoint field mismatch: "
-                    f"{field_name}"
+                    "merge_thought window policy verifier endpoint returned "
+                    f"unexpected status {http_status}"
+                )
+            try:
+                parsed_payload = json.loads(raw_body.decode("utf-8"))
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "merge_thought window policy verifier endpoint must return JSON"
+                ) from exc
+            if not isinstance(parsed_payload, Mapping):
+                raise ValueError(
+                    "merge_thought window policy verifier endpoint payload must be an object"
+                )
+            for field_name, expected_value in expected_payload.items():
+                if parsed_payload.get(field_name) != expected_value:
+                    raise ValueError(
+                        "merge_thought window policy verifier endpoint field mismatch: "
+                        f"{field_name}"
+                    )
+            payload = parsed_payload
+            if observed_latency_ms <= IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS:
+                break
+            if attempt == IMC_MERGE_THOUGHT_WINDOW_LIVE_MAX_PROBE_ATTEMPTS:
+                raise ValueError(
+                    "merge_thought window policy verifier endpoint observed_latency_ms "
+                    "exceeds budget"
                 )
 
         network_response_digest = sha256_text(canonical_json(dict(payload)))
@@ -1346,6 +1373,7 @@ class InterMindChannel:
             policy_signature_digest=expected_payload["policy_signature_digest"],
             signer_roster_digest=expected_payload["signer_roster_digest"],
             max_merge_window_seconds=expected_payload["max_merge_window_seconds"],
+            request_timeout_ms=normalized_timeout_ms,
             network_response_digest=network_response_digest,
             response_signature_digest=expected_payload["response_signature_digest"],
         )
@@ -1369,7 +1397,11 @@ class InterMindChannel:
             "signer_key_refs": list(expected_payload["signer_key_refs"]),
             "max_merge_window_seconds": expected_payload["max_merge_window_seconds"],
             "http_status": http_status,
-            "request_timeout_ms": timeout_ms,
+            "request_timeout_ms": normalized_timeout_ms,
+            "request_timeout_budget_ms": (
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+            ),
+            "request_timeout_budget_bound": True,
             "observed_latency_ms": observed_latency_ms,
             "latency_budget_ms": IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS,
             "network_response_digest": network_response_digest,
@@ -1639,6 +1671,17 @@ class InterMindChannel:
             )
         return value
 
+    @staticmethod
+    def _normalize_live_verifier_request_timeout(value: Any) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError("timeout_ms must be an integer")
+        if value <= 0 or value > IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS:
+            raise ValueError(
+                "timeout_ms must be between 1 and "
+                f"{IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS}"
+            )
+        return value
+
     def _build_merge_thought_window_policy_authority(
         self,
         *,
@@ -1670,6 +1713,9 @@ class InterMindChannel:
         live_verifier_authority_refs = [
             str(receipt["verifier_authority_ref"]) for receipt in normalized_receipts
         ]
+        live_verifier_request_timeouts_ms = [
+            int(receipt["request_timeout_ms"]) for receipt in normalized_receipts
+        ]
         live_verifier_quorum_bound = bool(
             len(normalized_receipts) >= 2
             and len(set(receipt["verifier_ref"] for receipt in normalized_receipts))
@@ -1677,6 +1723,13 @@ class InterMindChannel:
             and set(receipt["verifier_ref"] for receipt in normalized_receipts)
             == set(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS)
             and len(set(live_verifier_jurisdictions)) == len(normalized_receipts)
+        )
+        live_verifier_timeout_budget_bound = bool(
+            live_verifier_request_timeouts_ms
+            and all(
+                0 < timeout_ms <= IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+                for timeout_ms in live_verifier_request_timeouts_ms
+            )
         )
         live_verifier_quorum_digest = sha256_text(
             canonical_json(
@@ -1691,6 +1744,10 @@ class InterMindChannel:
                     "network_response_digests": live_verifier_network_response_digests,
                     "response_signature_digests": (
                         live_verifier_response_signature_digests
+                    ),
+                    "request_timeouts_ms": live_verifier_request_timeouts_ms,
+                    "request_timeout_budget_ms": (
+                        IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
                     ),
                     "required_verifier_count": len(
                         IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
@@ -1745,6 +1802,13 @@ class InterMindChannel:
             ),
             "live_verifier_authority_refs": live_verifier_authority_refs,
             "live_verifier_jurisdictions": live_verifier_jurisdictions,
+            "live_verifier_request_timeouts_ms": live_verifier_request_timeouts_ms,
+            "live_verifier_request_timeout_budget_ms": (
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+            ),
+            "live_verifier_request_timeout_budget_bound": (
+                live_verifier_timeout_budget_bound
+            ),
             "live_verifier_quorum_digest": live_verifier_quorum_digest,
             "live_verifier_quorum_bound": live_verifier_quorum_bound,
             "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
@@ -1840,6 +1904,9 @@ class InterMindChannel:
             "signer_key_refs",
             "max_merge_window_seconds",
             "http_status",
+            "request_timeout_ms",
+            "request_timeout_budget_ms",
+            "request_timeout_budget_bound",
             "observed_latency_ms",
             "latency_budget_ms",
             "network_response_digest",
@@ -1902,6 +1969,18 @@ class InterMindChannel:
             raise ValueError(f"{field_name}.max_merge_window_seconds mismatch")
         if receipt.get("http_status") != 200:
             raise ValueError(f"{field_name}.http_status must be 200")
+        request_timeout_ms = self._normalize_live_verifier_request_timeout(
+            receipt.get("request_timeout_ms")
+        )
+        if (
+            receipt.get("request_timeout_budget_ms")
+            != IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+        ):
+            raise ValueError(f"{field_name}.request_timeout_budget_ms mismatch")
+        if receipt.get("request_timeout_budget_bound") is not True:
+            raise ValueError(
+                f"{field_name}.request_timeout_budget_bound must be true"
+            )
         try:
             observed_latency_ms = float(receipt.get("observed_latency_ms"))
             latency_budget_ms = float(receipt.get("latency_budget_ms"))
@@ -1950,6 +2029,7 @@ class InterMindChannel:
             policy_signature_digest=policy_material["policy_signature_digest"],
             signer_roster_digest=policy_material["signer_roster_digest"],
             max_merge_window_seconds=IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            request_timeout_ms=request_timeout_ms,
             network_response_digest=str(receipt.get("network_response_digest")),
             response_signature_digest=expected_response_signature_digest,
         )
@@ -2015,6 +2095,7 @@ class InterMindChannel:
         policy_signature_digest: str,
         signer_roster_digest: str,
         max_merge_window_seconds: int,
+        request_timeout_ms: int,
         network_response_digest: str,
         response_signature_digest: str,
     ) -> str:
@@ -2034,6 +2115,10 @@ class InterMindChannel:
                     "policy_signature_digest": policy_signature_digest,
                     "signer_roster_digest": signer_roster_digest,
                     "max_merge_window_seconds": max_merge_window_seconds,
+                    "request_timeout_ms": request_timeout_ms,
+                    "request_timeout_budget_ms": (
+                        IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+                    ),
                     "network_response_digest": network_response_digest,
                     "response_signature_digest": response_signature_digest,
                 }

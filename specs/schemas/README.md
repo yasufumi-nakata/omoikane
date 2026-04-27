@@ -103,6 +103,8 @@
 - `imc_memory_glimpse_reconsent_receipt.schema`
 - `imc_merge_thought_ethics_receipt.schema`
   - includes live HTTP merge-thought window policy verifier receipt quorum and raw verifier / response-signature payload redaction
+- `imc_merge_thought_window_policy_verifier_receipt.schema`
+  - includes 250ms request timeout budget binding for live HTTP merge-thought window policy verifier probes
 - `imc_message.schema`
 - `imc_session.schema`
 - `language_render.schema`

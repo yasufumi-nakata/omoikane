@@ -260,6 +260,13 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/imc_merge_thought_ethics_receipt.schema",
             result["merge_thought_ethics_receipt"],
         )
+        for receipt in result["merge_thought_ethics_receipt"]["risk_boundary"][
+            "merge_window_policy_authority"
+        ]["live_verifier_receipts"]:
+            self._assert_schema_valid(
+                "specs/schemas/imc_merge_thought_window_policy_verifier_receipt.schema",
+                receipt,
+            )
         self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
         self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_disclosure_bound"])
@@ -282,6 +289,9 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"]["merge_thought_ethics_window_policy_live_verifier_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_timeout_bound"]
         )
         self.assertFalse(
             result["merge_thought_ethics_receipt"]["risk_boundary"][

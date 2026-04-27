@@ -26,7 +26,8 @@ participant withdrawal revocation event に束縛し、Council / Guardian の re
 ### IMC Merge Thought Ethics Gate
 `merge_thought` を Federation Council / EthicsCommittee / Guardian gate receipt に
 束縛し、distinct collective target、10 秒 cap、emergency disconnect、private recovery、
-post-disconnect identity confirmation、live window-policy verifier receipt quorum を
+post-disconnect identity confirmation、live window-policy verifier receipt quorum、
+250ms request timeout budget を
 raw thought / policy / verifier payload 無しで確認する。
 
 ### Collective Recovery Verifier Transport

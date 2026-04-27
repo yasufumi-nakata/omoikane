@@ -9,6 +9,7 @@ import unittest
 
 from omoikane.common import sha256_text
 from omoikane.interface.imc import (
+    IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS,
     IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS,
     InterMindChannel,
 )
@@ -425,6 +426,20 @@ class InterMindChannelTests(unittest.TestCase):
                 "live_verifier_quorum_bound"
             ]
         )
+        self.assertTrue(
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "live_verifier_request_timeout_budget_bound"
+            ]
+        )
+        self.assertEqual(
+            [
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS,
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS,
+            ],
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "live_verifier_request_timeouts_ms"
+            ],
+        )
         self.assertEqual(
             2,
             len(
@@ -461,6 +476,7 @@ class InterMindChannelTests(unittest.TestCase):
         self.assertTrue(receipt_validation["risk_bound"])
         self.assertTrue(receipt_validation["window_policy_authority_bound"])
         self.assertTrue(receipt_validation["window_policy_live_verifier_bound"])
+        self.assertTrue(receipt_validation["window_policy_timeout_bound"])
         self.assertTrue(receipt_validation["collective_bound"])
         self.assertTrue(receipt_validation["disclosure_bound"])
         self.assertTrue(receipt_validation["gate_bound"])
@@ -491,6 +507,38 @@ class InterMindChannelTests(unittest.TestCase):
         )
         self.assertFalse(tampered_live_validation["ok"])
         self.assertFalse(tampered_live_validation["window_policy_live_verifier_bound"])
+
+        tampered_timeout = deepcopy(receipt)
+        tampered_timeout["risk_boundary"]["merge_window_policy_authority"][
+            "live_verifier_receipts"
+        ][0]["request_timeout_ms"] = (
+            IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS + 1
+        )
+        tampered_timeout_validation = imc.validate_merge_thought_ethics_receipt(
+            tampered_timeout
+        )
+        self.assertFalse(tampered_timeout_validation["ok"])
+        self.assertFalse(tampered_timeout_validation["window_policy_timeout_bound"])
+
+    def test_merge_thought_window_policy_verifier_rejects_unbounded_timeout(self) -> None:
+        imc = InterMindChannel()
+        payload = imc.build_merge_thought_window_policy_verifier_payload(
+            verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+            verifier_authority_ref="authority://imc-window-policy/jp-13/live-verifier",
+            jurisdiction="JP-13",
+        )
+
+        with live_window_policy_endpoint({"/jp-13": payload}) as base_url:
+            with self.assertRaisesRegex(ValueError, "timeout_ms"):
+                imc.probe_merge_thought_window_policy_verifier_endpoint(
+                    verifier_endpoint=f"{base_url}/jp-13",
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/jp-13/live-verifier"
+                    ),
+                    jurisdiction="JP-13",
+                    timeout_ms=IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS + 1,
+                )
 
     def test_merge_thought_ethics_receipt_rejects_unbounded_window(self) -> None:
         imc = InterMindChannel()

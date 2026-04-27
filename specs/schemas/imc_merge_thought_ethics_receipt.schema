@@ -109,6 +109,9 @@ properties:
           - live_verifier_response_signature_digests
           - live_verifier_authority_refs
           - live_verifier_jurisdictions
+          - live_verifier_request_timeouts_ms
+          - live_verifier_request_timeout_budget_ms
+          - live_verifier_request_timeout_budget_bound
           - live_verifier_quorum_digest
           - live_verifier_quorum_bound
           - max_merge_window_seconds
@@ -200,6 +203,8 @@ properties:
                 - max_merge_window_seconds
                 - http_status
                 - request_timeout_ms
+                - request_timeout_budget_ms
+                - request_timeout_budget_bound
                 - observed_latency_ms
                 - latency_budget_ms
                 - network_response_digest
@@ -280,6 +285,13 @@ properties:
                 request_timeout_ms:
                   type: integer
                   minimum: 1
+                  maximum: 250
+                request_timeout_budget_ms:
+                  type: integer
+                  const: 250
+                request_timeout_budget_bound:
+                  type: boolean
+                  const: true
                 observed_latency_ms:
                   type: number
                   minimum: 0
@@ -361,6 +373,19 @@ properties:
             items:
               type: string
               minLength: 1
+          live_verifier_request_timeouts_ms:
+            type: array
+            minItems: 2
+            items:
+              type: integer
+              minimum: 1
+              maximum: 250
+          live_verifier_request_timeout_budget_ms:
+            type: integer
+            const: 250
+          live_verifier_request_timeout_budget_bound:
+            type: boolean
+            const: true
           live_verifier_quorum_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"

@@ -88,6 +88,7 @@ from .interface.bdb import BiologicalDigitalBridge
 from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import (
+    IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS,
     IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS,
     InterMindChannel,
 )
@@ -7623,6 +7624,9 @@ json.dump(response, sys.stdout)
             "merge_thought_ethics_window_policy_live_verifier_bound": (
                 merge_thought_ethics_validation["window_policy_live_verifier_bound"]
             ),
+            "merge_thought_ethics_window_policy_timeout_bound": (
+                merge_thought_ethics_validation["window_policy_timeout_bound"]
+            ),
             "merge_thought_ethics_collective_bound": merge_thought_ethics_validation[
                 "collective_bound"
             ],
@@ -7802,6 +7806,19 @@ json.dump(response, sys.stdout)
                     merge_thought_ethics_receipt["risk_boundary"][
                         "merge_window_policy_authority"
                     ]["live_verifier_network_response_digests"]
+                ),
+                "window_policy_live_verifier_request_timeouts_ms": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["live_verifier_request_timeouts_ms"]
+                ),
+                "window_policy_live_verifier_request_timeout_budget_ms": (
+                    IMC_MERGE_THOUGHT_WINDOW_LIVE_REQUEST_TIMEOUT_MS
+                ),
+                "window_policy_live_verifier_request_timeout_budget_bound": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["live_verifier_request_timeout_budget_bound"]
                 ),
                 "raw_policy_payload_stored": merge_thought_ethics_receipt[
                     "risk_boundary"

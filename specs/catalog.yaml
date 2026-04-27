@@ -1541,7 +1541,17 @@ entries:
       - evals/interface/imc_merge_thought_ethics_gate.yaml
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/imc-protocol.md
-    rationale: Required to serialize one Federation Council, EthicsCommittee, and Guardian merge_thought ethics gate receipt that binds distinct collective target, live-verifier-backed policy-authority merge window, recovery requirements, and digest-only disclosure before collective merge handoff.
+    rationale: Required to serialize one Federation Council, EthicsCommittee, and Guardian merge_thought ethics gate receipt that binds distinct collective target, live-verifier-backed policy-authority merge window, 250ms verifier timeout budget, recovery requirements, and digest-only disclosure before collective merge handoff.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/imc_merge_thought_window_policy_verifier_receipt.schema
+    consumers:
+      - specs/interfaces/interface.imc.v0.idl
+      - specs/schemas/imc_merge_thought_ethics_receipt.schema
+      - reference-runtime
+      - evals/interface/imc_merge_thought_ethics_gate.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize one live HTTP merge_thought window-policy verifier receipt with request_timeout_ms capped at 250ms and bound into the authority digest without storing raw policy, verifier, or response-signature payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/imc_session.schema
@@ -1678,7 +1688,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects merge_thought handoff by requiring Federation Council, EthicsCommittee, Guardian attestation, distinct collective binding, live window-policy verifier receipt quorum, recovery requirements, and raw thought/message/policy/verifier payload redaction before bounded collective merge.
+    rationale: Protects merge_thought handoff by requiring Federation Council, EthicsCommittee, Guardian attestation, distinct collective binding, live window-policy verifier receipt quorum, 250ms verifier timeout budget, recovery requirements, and raw thought/message/policy/verifier payload redaction before bounded collective merge.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_irreversible_veto.yaml
