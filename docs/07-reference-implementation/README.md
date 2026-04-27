@@ -152,6 +152,10 @@ calibration branch は外部 evidence を advisory-only receipt に束ねるが
 forced correction や external truth claim を許さない。
 value-generation branch は新しい価値候補を self-authored proposal として
 digest-only に残し、future self acceptance 前の writeback を拒む。
+value-autonomy-review branch は、外部 witness と Council review を
+digest-only / advisory-only / boundary-only に留め、source candidate set と
+self authorship を保ったまま external veto、Council override、Guardian forced lock、
+candidate rewrite、raw witness payload 保存を拒む。
 value-acceptance branch は、後日の本人受容がある場合だけ
 元の candidate digest set の subset を `self_model_value_acceptance_receipt` へ束縛し、
 `accepted-for-bounded-writeback` と `writeback_commit_digest` を返す。

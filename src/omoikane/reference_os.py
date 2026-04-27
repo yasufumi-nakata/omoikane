@@ -14501,6 +14501,20 @@ json.dump(response, sys.stdout)
             guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
         )
         value_generation_validation = monitor.validate_value_generation_receipt(value_generation)
+        value_autonomy_review = monitor.build_value_autonomy_review_receipt(
+            value_generation,
+            witness_evidence_refs=[
+                "evidence://self-model/value-generation/self-report-context/v1",
+                "evidence://self-model/value-generation/council-boundary-note/v1",
+                "evidence://self-model/value-generation/guardian-no-lock-attestation/v1",
+            ],
+            self_authorship_continuation_ref="authorship://self-model/value-generation/continuation-v1",
+            council_review_ref="council://self-model/value-generation/advisory-boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-lock-no-veto",
+        )
+        value_autonomy_review_validation = monitor.validate_value_autonomy_review_receipt(
+            value_autonomy_review
+        )
         value_acceptance = monitor.build_value_acceptance_receipt(
             value_generation,
             accepted_value_refs=[
@@ -14510,6 +14524,7 @@ json.dump(response, sys.stdout)
                 "self-model://history/future-self-acceptance-window",
                 "memory://semantic/reflection/future-self-accepted-values",
                 "council://self-model/value-acceptance/boundary-only-review",
+                f"receipt://self-model/value-autonomy-review/{value_autonomy_review['receipt_digest']}",
             ],
             future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
             council_resolution_ref="council://self-model/value-acceptance/boundary-only",
@@ -14568,6 +14583,16 @@ json.dump(response, sys.stdout)
                 "value_generation_autonomy_preserved": value_generation_validation[
                     "autonomy_preserved"
                 ],
+                "value_autonomy_review_policy_id": value_autonomy_review["policy_id"],
+                "value_autonomy_review_receipt_digest": value_autonomy_review[
+                    "receipt_digest"
+                ],
+                "value_autonomy_review_candidate_set_unchanged": value_autonomy_review_validation[
+                    "candidate_set_unchanged"
+                ],
+                "value_autonomy_review_no_external_veto": not value_autonomy_review_validation[
+                    "external_veto_allowed"
+                ],
                 "value_acceptance_policy_id": value_acceptance["policy_id"],
                 "value_acceptance_receipt_digest": value_acceptance["receipt_digest"],
                 "value_acceptance_future_self_bound": value_acceptance_validation[
@@ -14613,6 +14638,7 @@ json.dump(response, sys.stdout)
             },
             "calibration": calibration,
             "value_generation": value_generation,
+            "value_autonomy_review": value_autonomy_review,
             "value_acceptance": value_acceptance,
             "value_reassessment": value_reassessment,
             "value_timeline": value_timeline,
@@ -14627,6 +14653,7 @@ json.dump(response, sys.stdout)
                     and len(history) == 3
                     and calibration_validation["ok"]
                     and value_generation_validation["ok"]
+                    and value_autonomy_review_validation["ok"]
                     and value_acceptance_validation["ok"]
                     and value_reassessment_validation["ok"]
                     and value_timeline_validation["ok"]
@@ -14637,6 +14664,7 @@ json.dump(response, sys.stdout)
                 and float(abrupt["divergence"]) >= threshold,
                 "calibration": calibration_validation,
                 "value_generation": value_generation_validation,
+                "value_autonomy_review": value_autonomy_review_validation,
                 "value_acceptance": value_acceptance_validation,
                 "value_reassessment": value_reassessment_validation,
                 "value_timeline": value_timeline_validation,

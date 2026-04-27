@@ -1,0 +1,242 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_autonomy_review_receipt.schema"
+title: SelfModelValueAutonomyReviewReceipt
+description: Digest-only receipt that binds witness and Council review to self-authored value generation without granting external veto, candidate rewrite, forced stability lock, or immediate writeback.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - review_id
+  - identity_id
+  - source_generation_id
+  - source_generation_policy_id
+  - source_generation_receipt_digest
+  - source_candidate_value_digest_set
+  - candidate_value_refs
+  - candidate_value_digest_set
+  - candidate_value_set_digest
+  - witness_evidence_refs
+  - witness_evidence_digest_set
+  - witness_evidence_set_digest
+  - self_authorship_continuation_ref
+  - council_review_ref
+  - guardian_boundary_ref
+  - required_roles
+  - gate_digest
+  - review_commit_digest
+  - review_mode
+  - review_scope
+  - witness_authority
+  - council_review_authority
+  - guardian_authority
+  - candidate_set_unchanged
+  - self_authorship_preserved
+  - autonomy_preserved
+  - future_self_acceptance_remains_required
+  - accepted_for_writeback
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - council_override_allowed
+  - guardian_forced_lock_allowed
+  - forced_stability_lock_allowed
+  - candidate_rewrite_allowed
+  - raw_witness_payload_stored
+  - raw_value_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_autonomy_review_receipt
+  policy_id:
+    type: string
+    const: self-model-autonomy-review-witness-boundary-v1
+  digest_profile:
+    type: string
+    const: self-model-value-autonomy-review-digest-v1
+  review_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_generation_id:
+    type: string
+    minLength: 1
+  source_generation_policy_id:
+    type: string
+    const: self-model-self-authored-value-generation-v1
+  source_generation_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_candidate_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  candidate_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  candidate_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  candidate_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  witness_evidence_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  witness_evidence_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  witness_evidence_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  self_authorship_continuation_ref:
+    type: string
+    minLength: 1
+  council_review_ref:
+    type: string
+    minLength: 1
+  guardian_boundary_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  review_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  review_mode:
+    type: string
+    const: advisory-witness-council-boundary-review
+  review_scope:
+    type: string
+    const: witness-context-boundary-only
+  witness_authority:
+    type: string
+    const: digest-only-context
+  council_review_authority:
+    type: string
+    const: advisory-boundary-only
+  guardian_authority:
+    type: string
+    const: boundary-attestation-no-lock
+  candidate_set_unchanged:
+    type: boolean
+    const: true
+  self_authorship_preserved:
+    type: boolean
+    const: true
+  autonomy_preserved:
+    type: boolean
+    const: true
+  future_self_acceptance_remains_required:
+    type: boolean
+    const: true
+  accepted_for_writeback:
+    type: boolean
+    const: false
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  council_override_allowed:
+    type: boolean
+    const: false
+  guardian_forced_lock_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  candidate_rewrite_allowed:
+    type: boolean
+    const: false
+  raw_witness_payload_stored:
+    type: boolean
+    const: false
+  raw_value_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_autonomy_review_receipt
+    policy_id: self-model-autonomy-review-witness-boundary-v1
+    digest_profile: self-model-value-autonomy-review-digest-v1
+    review_id: self-model-value-autonomy-review-example
+    identity_id: id-1
+    source_generation_id: self-model-value-generation-example
+    source_generation_policy_id: self-model-self-authored-value-generation-v1
+    source_generation_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_candidate_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    candidate_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    candidate_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    candidate_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    witness_evidence_refs:
+      - evidence://self-model/value-generation/self-report-context/v1
+    witness_evidence_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    witness_evidence_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    self_authorship_continuation_ref: authorship://self-model/value-generation/continuation-v1
+    council_review_ref: council://self-model/value-generation/advisory-boundary-only
+    guardian_boundary_ref: guardian://self-model/value-generation/no-lock-no-veto
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    review_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    review_mode: advisory-witness-council-boundary-review
+    review_scope: witness-context-boundary-only
+    witness_authority: digest-only-context
+    council_review_authority: advisory-boundary-only
+    guardian_authority: boundary-attestation-no-lock
+    candidate_set_unchanged: true
+    self_authorship_preserved: true
+    autonomy_preserved: true
+    future_self_acceptance_remains_required: true
+    accepted_for_writeback: false
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    council_override_allowed: false
+    guardian_forced_lock_allowed: false
+    forced_stability_lock_allowed: false
+    candidate_rewrite_allowed: false
+    raw_witness_payload_stored: false
+    raw_value_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

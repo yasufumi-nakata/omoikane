@@ -137,6 +137,7 @@
 - `scheduler_method_b_handoff_receipt.schema`
 - `self_model.schema`
 - `self_model_calibration_receipt.schema`
+- `self_model_value_autonomy_review_receipt.schema`
 - `self_model_value_acceptance_receipt.schema`
 - `self_model_value_generation_receipt.schema`
 - `self_model_value_reassessment_receipt.schema`

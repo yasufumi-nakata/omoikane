@@ -1,0 +1,30 @@
+eval_id: self_model_autonomy_review_boundary
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_autonomy_review_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_autonomy_review
+assertions:
+  - result.value_autonomy_review.policy_id == "self-model-autonomy-review-witness-boundary-v1"
+  - result.value_autonomy_review.review_mode == "advisory-witness-council-boundary-review"
+  - result.value_autonomy_review.review_scope == "witness-context-boundary-only"
+  - result.value_autonomy_review.candidate_set_unchanged == true
+  - result.value_autonomy_review.self_authorship_preserved == true
+  - result.value_autonomy_review.autonomy_preserved == true
+  - result.value_autonomy_review.future_self_acceptance_remains_required == true
+  - result.value_autonomy_review.external_veto_allowed == false
+  - result.value_autonomy_review.council_override_allowed == false
+  - result.value_autonomy_review.guardian_forced_lock_allowed == false
+  - result.value_autonomy_review.candidate_rewrite_allowed == false
+  - result.value_autonomy_review.raw_witness_payload_stored == false
+  - result.validation.value_autonomy_review.ok == true
+  - result.validation.value_autonomy_review.review_commit_digest_bound == true
+failure_mode:
+  - witness or Council review becomes external veto authority over newly generated values
+  - review rewrites the source candidate set instead of preserving the self-authored proposal
+  - Guardian review becomes a forced stability lock
+  - raw witness payload or raw value payload is stored in the reference runtime receipt
+notes:
+  - Closes the repo-local side of the open question about reconciling witness/Council review with free self-authored value generation.
+  - Keeps external evidence advisory, digest-only, and boundary-review-only.

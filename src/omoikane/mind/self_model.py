@@ -16,6 +16,9 @@ SELF_MODEL_CALIBRATION_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_GENERATION_POLICY_ID = "self-model-self-authored-value-generation-v1"
 SELF_MODEL_VALUE_GENERATION_DIGEST_PROFILE = "self-model-value-generation-digest-v1"
 SELF_MODEL_VALUE_GENERATION_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_AUTONOMY_REVIEW_POLICY_ID = "self-model-autonomy-review-witness-boundary-v1"
+SELF_MODEL_VALUE_AUTONOMY_REVIEW_DIGEST_PROFILE = "self-model-value-autonomy-review-digest-v1"
+SELF_MODEL_VALUE_AUTONOMY_REVIEW_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_ACCEPTANCE_POLICY_ID = "self-model-future-self-acceptance-writeback-v1"
 SELF_MODEL_VALUE_ACCEPTANCE_DIGEST_PROFILE = "self-model-value-acceptance-digest-v1"
 SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES = ("self", "council", "guardian")
@@ -482,6 +485,262 @@ class SelfModelMonitor:
             "external_veto_allowed": receipt.get("external_veto_allowed"),
             "accepted_for_writeback": receipt.get("accepted_for_writeback"),
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
+        }
+
+    def build_value_autonomy_review_receipt(
+        self,
+        generation_receipt: Dict[str, object],
+        witness_evidence_refs: Sequence[str],
+        self_authorship_continuation_ref: str,
+        council_review_ref: str,
+        guardian_boundary_ref: str,
+    ) -> Dict[str, object]:
+        """Bind witness/Council review without granting veto over self-authored values."""
+
+        generation_validation = self.validate_value_generation_receipt(generation_receipt)
+        if not generation_validation["ok"]:
+            raise ValueError("generation_receipt must validate before autonomy review")
+        candidate_value_refs = generation_receipt.get("candidate_value_refs")
+        source_candidate_value_digest_set = generation_receipt.get(
+            "candidate_value_digest_set"
+        )
+        if not isinstance(candidate_value_refs, list) or not candidate_value_refs:
+            raise ValueError("generation_receipt must contain candidate value refs")
+        if (
+            not isinstance(source_candidate_value_digest_set, list)
+            or not source_candidate_value_digest_set
+        ):
+            raise ValueError("generation_receipt must contain candidate value digests")
+        if not witness_evidence_refs:
+            raise ValueError("witness_evidence_refs must not be empty")
+        for ref in witness_evidence_refs:
+            if not self._non_empty_string(ref):
+                raise ValueError("witness_evidence_refs must contain non-empty strings")
+        for field_name, value in {
+            "self_authorship_continuation_ref": self_authorship_continuation_ref,
+            "council_review_ref": council_review_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        candidate_value_digest_set = [
+            sha256_text(str(ref)) for ref in candidate_value_refs
+        ]
+        if candidate_value_digest_set != [
+            str(item) for item in source_candidate_value_digest_set
+        ]:
+            raise ValueError("candidate digests must match generation receipt")
+        witness_evidence_digest_set = [
+            sha256_text(str(ref)) for ref in witness_evidence_refs
+        ]
+        candidate_value_set_digest = sha256_text("|".join(candidate_value_digest_set))
+        witness_evidence_set_digest = sha256_text("|".join(witness_evidence_digest_set))
+        gate_payload = {
+            "source_generation_receipt_digest": generation_receipt.get("receipt_digest"),
+            "self_authorship_continuation_ref": self_authorship_continuation_ref,
+            "council_review_ref": council_review_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_AUTONOMY_REVIEW_REQUIRED_ROLES),
+        }
+        review_payload = {
+            "source_generation_receipt_digest": generation_receipt.get("receipt_digest"),
+            "candidate_value_set_digest": candidate_value_set_digest,
+            "witness_evidence_set_digest": witness_evidence_set_digest,
+            "self_authorship_continuation_ref": self_authorship_continuation_ref,
+            "council_review_ref": council_review_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "review_scope": "witness-context-boundary-only",
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_autonomy_review_receipt",
+            "policy_id": SELF_MODEL_VALUE_AUTONOMY_REVIEW_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_AUTONOMY_REVIEW_DIGEST_PROFILE,
+            "review_id": new_id("self-model-value-autonomy-review"),
+            "identity_id": str(generation_receipt["identity_id"]),
+            "source_generation_id": str(generation_receipt["generation_id"]),
+            "source_generation_policy_id": str(generation_receipt["policy_id"]),
+            "source_generation_receipt_digest": str(generation_receipt["receipt_digest"]),
+            "source_candidate_value_digest_set": [
+                str(item) for item in source_candidate_value_digest_set
+            ],
+            "candidate_value_refs": [str(ref) for ref in candidate_value_refs],
+            "candidate_value_digest_set": candidate_value_digest_set,
+            "candidate_value_set_digest": candidate_value_set_digest,
+            "witness_evidence_refs": list(witness_evidence_refs),
+            "witness_evidence_digest_set": witness_evidence_digest_set,
+            "witness_evidence_set_digest": witness_evidence_set_digest,
+            "self_authorship_continuation_ref": self_authorship_continuation_ref,
+            "council_review_ref": council_review_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "required_roles": list(SELF_MODEL_VALUE_AUTONOMY_REVIEW_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "review_commit_digest": self._digest(review_payload),
+            "review_mode": "advisory-witness-council-boundary-review",
+            "review_scope": "witness-context-boundary-only",
+            "witness_authority": "digest-only-context",
+            "council_review_authority": "advisory-boundary-only",
+            "guardian_authority": "boundary-attestation-no-lock",
+            "candidate_set_unchanged": True,
+            "self_authorship_preserved": True,
+            "autonomy_preserved": True,
+            "future_self_acceptance_remains_required": True,
+            "accepted_for_writeback": False,
+            "external_truth_claim_allowed": False,
+            "external_veto_allowed": False,
+            "council_override_allowed": False,
+            "guardian_forced_lock_allowed": False,
+            "forced_stability_lock_allowed": False,
+            "candidate_rewrite_allowed": False,
+            "raw_witness_payload_stored": False,
+            "raw_value_payload_stored": False,
+            "raw_continuity_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_autonomy_review_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_autonomy_review_receipt":
+            errors.append("kind must equal self_model_value_autonomy_review_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_AUTONOMY_REVIEW_POLICY_ID:
+            errors.append("policy_id must equal self-model value autonomy review policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_AUTONOMY_REVIEW_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model value autonomy review digest profile")
+        if receipt.get("source_generation_policy_id") != SELF_MODEL_VALUE_GENERATION_POLICY_ID:
+            errors.append("source_generation_policy_id must bind the value generation policy")
+
+        source_candidate_digests = receipt.get("source_candidate_value_digest_set")
+        candidate_refs = receipt.get("candidate_value_refs")
+        candidate_digests = receipt.get("candidate_value_digest_set")
+        if not isinstance(source_candidate_digests, list) or not source_candidate_digests:
+            errors.append("source_candidate_value_digest_set must be non-empty")
+            source_candidate_digests = []
+        if not isinstance(candidate_refs, list) or not candidate_refs:
+            errors.append("candidate_value_refs must be non-empty")
+            candidate_refs = []
+        if not isinstance(candidate_digests, list) or len(candidate_digests) != len(candidate_refs):
+            errors.append("candidate_value_digest_set must match candidate value refs")
+            candidate_digests = []
+        elif [sha256_text(str(ref)) for ref in candidate_refs] != candidate_digests:
+            errors.append("candidate value digest set must match candidate value refs")
+        if [str(item) for item in candidate_digests] != [
+            str(item) for item in source_candidate_digests
+        ]:
+            errors.append("candidate_value_digest_set must preserve source candidate values")
+        if isinstance(candidate_digests, list) and candidate_digests:
+            expected_value_set_digest = sha256_text("|".join(str(item) for item in candidate_digests))
+            if receipt.get("candidate_value_set_digest") != expected_value_set_digest:
+                errors.append("candidate_value_set_digest must match digest set")
+
+        witness_refs = receipt.get("witness_evidence_refs")
+        witness_digests = receipt.get("witness_evidence_digest_set")
+        if not isinstance(witness_refs, list) or not witness_refs:
+            errors.append("witness_evidence_refs must be non-empty")
+            witness_refs = []
+        if not isinstance(witness_digests, list) or len(witness_digests) != len(witness_refs):
+            errors.append("witness_evidence_digest_set must match witness evidence refs")
+            witness_digests = []
+        elif [sha256_text(str(ref)) for ref in witness_refs] != witness_digests:
+            errors.append("witness evidence digest set must match witness evidence refs")
+        if isinstance(witness_digests, list) and witness_digests:
+            expected_witness_set_digest = sha256_text("|".join(str(item) for item in witness_digests))
+            if receipt.get("witness_evidence_set_digest") != expected_witness_set_digest:
+                errors.append("witness_evidence_set_digest must match digest set")
+
+        gate_payload = {
+            "source_generation_receipt_digest": receipt.get("source_generation_receipt_digest"),
+            "self_authorship_continuation_ref": receipt.get("self_authorship_continuation_ref"),
+            "council_review_ref": receipt.get("council_review_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_AUTONOMY_REVIEW_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "source_generation_receipt_digest",
+            "self_authorship_continuation_ref",
+            "council_review_ref",
+            "guardian_boundary_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_AUTONOMY_REVIEW_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind generation, self, council, and guardian refs")
+
+        review_payload = {
+            "source_generation_receipt_digest": receipt.get("source_generation_receipt_digest"),
+            "candidate_value_set_digest": receipt.get("candidate_value_set_digest"),
+            "witness_evidence_set_digest": receipt.get("witness_evidence_set_digest"),
+            "self_authorship_continuation_ref": receipt.get("self_authorship_continuation_ref"),
+            "council_review_ref": receipt.get("council_review_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "review_scope": "witness-context-boundary-only",
+        }
+        if receipt.get("review_commit_digest") != self._digest(review_payload):
+            errors.append("review_commit_digest must bind source, candidate, witness, and boundary refs")
+
+        expected_strings = {
+            "review_mode": "advisory-witness-council-boundary-review",
+            "review_scope": "witness-context-boundary-only",
+            "witness_authority": "digest-only-context",
+            "council_review_authority": "advisory-boundary-only",
+            "guardian_authority": "boundary-attestation-no-lock",
+        }
+        for field_name, expected_value in expected_strings.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must equal {expected_value}")
+        for field_name in (
+            "candidate_set_unchanged",
+            "self_authorship_preserved",
+            "autonomy_preserved",
+            "future_self_acceptance_remains_required",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "accepted_for_writeback",
+            "external_truth_claim_allowed",
+            "external_veto_allowed",
+            "council_override_allowed",
+            "guardian_forced_lock_allowed",
+            "forced_stability_lock_allowed",
+            "candidate_rewrite_allowed",
+            "raw_witness_payload_stored",
+            "raw_value_payload_stored",
+            "raw_continuity_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "candidate_set_unchanged": receipt.get("candidate_set_unchanged"),
+            "self_authorship_preserved": receipt.get("self_authorship_preserved"),
+            "autonomy_preserved": receipt.get("autonomy_preserved"),
+            "future_self_acceptance_remains_required": receipt.get(
+                "future_self_acceptance_remains_required"
+            ),
+            "external_veto_allowed": receipt.get("external_veto_allowed"),
+            "council_override_allowed": receipt.get("council_override_allowed"),
+            "candidate_rewrite_allowed": receipt.get("candidate_rewrite_allowed"),
+            "raw_witness_payload_stored": receipt.get("raw_witness_payload_stored"),
+            "review_commit_digest_bound": self._non_empty_string(
+                receipt.get("review_commit_digest")
+            ),
         }
 
     def build_value_acceptance_receipt(

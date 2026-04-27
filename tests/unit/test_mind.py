@@ -258,6 +258,89 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn("external_veto_allowed must be false", validation["errors"])
 
+    def test_value_autonomy_review_preserves_candidate_set_without_veto(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+
+        review = monitor.build_value_autonomy_review_receipt(
+            generation,
+            witness_evidence_refs=[
+                "evidence://self-model/value-generation/self-report-context/v1",
+                "evidence://self-model/value-generation/council-boundary-note/v1",
+            ],
+            self_authorship_continuation_ref="authorship://self-model/value-generation/continuation-v1",
+            council_review_ref="council://self-model/value-generation/advisory-boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-lock-no-veto",
+        )
+        validation = monitor.validate_value_autonomy_review_receipt(review)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["candidate_set_unchanged"])
+        self.assertEqual(
+            generation["candidate_value_digest_set"],
+            review["source_candidate_value_digest_set"],
+        )
+        self.assertTrue(review["future_self_acceptance_remains_required"])
+        self.assertFalse(review["external_veto_allowed"])
+        self.assertFalse(review["council_override_allowed"])
+        self.assertFalse(review["candidate_rewrite_allowed"])
+        self.assertFalse(review["raw_witness_payload_stored"])
+
+    def test_value_autonomy_review_rejects_candidate_rewrite(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"curiosity": 0.71},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        review = monitor.build_value_autonomy_review_receipt(
+            generation,
+            witness_evidence_refs=[
+                "evidence://self-model/value-generation/self-report-context/v1",
+            ],
+            self_authorship_continuation_ref="authorship://self-model/value-generation/continuation-v1",
+            council_review_ref="council://self-model/value-generation/advisory-boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-lock-no-veto",
+        )
+        tampered = copy.deepcopy(review)
+        tampered["candidate_rewrite_allowed"] = True
+
+        validation = monitor.validate_value_autonomy_review_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("candidate_rewrite_allowed must be false", validation["errors"])
+
     def test_value_acceptance_receipt_binds_future_self_writeback(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(

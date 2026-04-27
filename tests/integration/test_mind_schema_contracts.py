@@ -149,6 +149,24 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_generation"]["accepted_for_writeback"])
         self.assertFalse(result["value_generation"]["raw_value_payload_stored"])
 
+    def test_self_model_demo_value_autonomy_review_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_autonomy_review_receipt.schema",
+            result["value_autonomy_review"],
+        )
+        self.assertTrue(result["validation"]["value_autonomy_review"]["ok"])
+        self.assertTrue(result["value_autonomy_review"]["candidate_set_unchanged"])
+        self.assertTrue(result["value_autonomy_review"]["autonomy_preserved"])
+        self.assertTrue(
+            result["value_autonomy_review"]["future_self_acceptance_remains_required"]
+        )
+        self.assertFalse(result["value_autonomy_review"]["external_veto_allowed"])
+        self.assertFalse(result["value_autonomy_review"]["council_override_allowed"])
+        self.assertFalse(result["value_autonomy_review"]["candidate_rewrite_allowed"])
+        self.assertFalse(result["value_autonomy_review"]["raw_witness_payload_stored"])
+
     def test_self_model_demo_value_acceptance_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 

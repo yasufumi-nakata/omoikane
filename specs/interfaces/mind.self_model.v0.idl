@@ -8,6 +8,7 @@ imports:
   self_model_observation: ../schemas/self_model_observation.schema
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
+  self_model_value_autonomy_review_receipt: ../schemas/self_model_value_autonomy_review_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
   self_model_value_reassessment_receipt: ../schemas/self_model_value_reassessment_receipt.schema
   self_model_value_timeline_receipt: ../schemas/self_model_value_timeline_receipt.schema
@@ -173,6 +174,64 @@ operations:
           requires_future_self_acceptance:
             type: boolean
           accepted_for_writeback:
+            type: boolean
+  build_value_autonomy_review_receipt:
+    summary: Bind witness and Council review to self-authored value generation while preserving candidate autonomy and future self acceptance.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - generation_receipt
+          - witness_evidence_refs
+          - self_authorship_continuation_ref
+          - council_review_ref
+          - guardian_boundary_ref
+        properties:
+          generation_receipt:
+            schema_ref: self_model_value_generation_receipt
+          witness_evidence_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          self_authorship_continuation_ref:
+            type: string
+            minLength: 1
+          council_review_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_autonomy_review_receipt
+  validate_value_autonomy_review_receipt:
+    summary: Fail closed unless witness/Council review remains advisory, digest-only, non-vetoing, and candidate-preserving.
+    input:
+      schema_ref: self_model_value_autonomy_review_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - candidate_set_unchanged
+          - self_authorship_preserved
+          - autonomy_preserved
+          - future_self_acceptance_remains_required
+          - review_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          candidate_set_unchanged:
+            type: boolean
+          self_authorship_preserved:
+            type: boolean
+          autonomy_preserved:
+            type: boolean
+          future_self_acceptance_remains_required:
+            type: boolean
+          review_commit_digest_bound:
             type: boolean
   build_value_acceptance_receipt:
     summary: Bind future-self acceptance before moving a self-authored value candidate into bounded writeback.
@@ -406,6 +465,7 @@ invariants:
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
   - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
+  - value autonomy review receipts let witness/Council evidence remain advisory and digest-only while preserving candidate sets, self authorship, and future self acceptance
   - value acceptance receipts can write back only accepted candidate refs after future self acceptance and boundary-only review
   - value reassessment receipts retire only accepted value refs while retaining archived history
   - value timeline receipts keep generated, accepted, and retired value events append-only and digest-bound without raw value payload storage

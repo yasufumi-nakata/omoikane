@@ -789,6 +789,17 @@ entries:
     rationale: Required to serialize self-authored value-generation candidate receipts with future self acceptance, autonomy preservation, no external veto, no forced stability lock, and no immediate writeback.
   - priority: P1
     kind: schema
+    file: specs/schemas/self_model_value_autonomy_review_receipt.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_autonomy_review_boundary.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize witness and Council review of self-authored value generation while preserving candidate autonomy, future self acceptance, no external veto, no forced lock, and no raw witness payload storage.
+  - priority: P1
+    kind: schema
     file: specs/schemas/self_model_value_acceptance_receipt.schema
     consumers:
       - specs/interfaces/mind.self_model.v0.idl
@@ -829,10 +840,11 @@ entries:
       - docs/07-reference-implementation/README.md
       - specs/schemas/self_model_calibration_receipt.schema
       - specs/schemas/self_model_value_generation_receipt.schema
+      - specs/schemas/self_model_value_autonomy_review_receipt.schema
       - specs/schemas/self_model_value_acceptance_receipt.schema
       - specs/schemas/self_model_value_reassessment_receipt.schema
       - specs/schemas/self_model_value_timeline_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, self-authored value-generation freedom, future-self acceptance writeback, future-self value reassessment retirement, and value timeline lineage contracts machine-readable.
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, and value timeline lineage contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -3008,6 +3020,15 @@ entries:
       - specs/schemas/self_model_value_generation_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects self-authored value-generation proposals from becoming externally vetoed, forcibly locked, or written back before future self acceptance.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_autonomy_review_boundary.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_value_autonomy_review_receipt.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects witness and Council review from rewriting self-authored value candidates, becoming external veto authority, forcing stability locks, or storing raw witness payloads.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_value_acceptance_writeback.yaml

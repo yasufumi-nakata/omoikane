@@ -9,6 +9,7 @@
 - `self_model_stability.yaml`
 - `self_model_calibration_boundary.yaml`
 - `self_model_value_generation_freedom.yaml`
+- `self_model_autonomy_review_boundary.yaml`
 - `self_model_value_acceptance_writeback.yaml`
 - `self_model_value_reassessment_retirement.yaml`
 - `self_model_value_timeline_lineage.yaml`
@@ -25,6 +26,12 @@
 と対応し、新しく生成された価値候補が self-authored proposal として digest-only に
 残り、外部 reviewer veto、強制 stability lock、future self acceptance 前の writeback、
 raw value payload 保存へ昇格しないことを保護する。
+
+`self_model_autonomy_review_boundary.yaml` は `self-model-demo` の
+value-autonomy-review branch と対応し、外部 witness と Council の review が
+advisory / digest-only / boundary-only に留まり、self-authored candidate set を
+書き換えず、外部 veto、Council override、Guardian forced lock、raw witness payload
+保存へ昇格しないことを保護する。
 
 `self_model_value_acceptance_writeback.yaml` は `self-model-demo` の value-acceptance
 branch と対応し、future self acceptance 後でも accepted value refs が元の

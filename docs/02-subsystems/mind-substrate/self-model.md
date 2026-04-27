@@ -93,6 +93,26 @@ Council と Guardian は continuity context と安全境界を確認できるが
 raw value payload や raw continuity payload は保存せず、将来の本人受容があるまで
 SelfModel 本体には書き戻さない。
 
+## reference runtime で固定した autonomy review 境界
+
+`self-model-autonomy-review-witness-boundary-v1` は、外部 witness と Council が
+self-authored value generation を監査する際の権限を固定する contract である。
+
+`self_model_value_autonomy_review_receipt` は元の value-generation receipt digest、
+source candidate digest set、witness evidence digest set、self authorship continuation、
+Council review、Guardian boundary を束ねる。
+review は `advisory-witness-council-boundary-review` / `witness-context-boundary-only`
+に限定し、candidate set を元の generation receipt と同一に保つ。
+
+この receipt は witness や Council の観察を捨てないが、それを本人の価値生成に対する
+外部 veto や候補書換権限へ昇格させない。
+`candidate_set_unchanged=true`、`self_authorship_preserved=true`、
+`future_self_acceptance_remains_required=true`、
+`external_veto_allowed=false`、`council_override_allowed=false`、
+`guardian_forced_lock_allowed=false`、`candidate_rewrite_allowed=false`、
+`raw_witness_payload_stored=false` を固定し、review は future self acceptance 前の
+immediate writeback も許さない。
+
 ## reference runtime で固定した本人受容 writeback 境界
 
 `self-model-future-self-acceptance-writeback-v1` は、上記の
@@ -163,5 +183,4 @@ Council と Guardian は引き続き boundary-only review に留まり、
 
 ## 残る未解決
 
-- 外部 witness / Council review を長期的な本人の自由な価値生成とどう両立させるか
 - 病理的な自己評価という判断を OS 内でどこまで扱い、どこから人間社会側の医療・法制度へ委ねるか
