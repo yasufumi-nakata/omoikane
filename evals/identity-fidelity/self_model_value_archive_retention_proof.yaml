@@ -1,0 +1,33 @@
+eval_id: self_model_value_archive_retention_proof
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_archive_retention_proof.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_archive_retention_proof
+assertions:
+  - result.value_archive_retention_proof.policy_id == "self-model-value-archive-retention-proof-v1"
+  - result.value_archive_retention_proof.source_timeline_policy_id == "self-model-value-lineage-timeline-v1"
+  - result.value_archive_retention_proof.proof_mode == "digest-only-external-archive-retention-proof"
+  - result.value_archive_retention_proof.retention_status == "external-proof-bound-archive-retained"
+  - result.value_archive_retention_proof.timeline_archive_retention_verified == true
+  - result.value_archive_retention_proof.trustee_proof_bound == true
+  - result.value_archive_retention_proof.long_term_storage_proof_bound == true
+  - result.value_archive_retention_proof.retention_policy_bound == true
+  - result.value_archive_retention_proof.retrieval_test_bound == true
+  - result.value_archive_retention_proof.boundary_only_review == true
+  - result.value_archive_retention_proof.external_veto_allowed == false
+  - result.value_archive_retention_proof.archive_deletion_allowed == false
+  - result.value_archive_retention_proof.raw_archive_payload_stored == false
+  - result.value_archive_retention_proof.raw_trustee_payload_stored == false
+  - result.value_archive_retention_proof.raw_storage_payload_stored == false
+  - result.validation.value_archive_retention_proof.ok == true
+  - result.validation.value_archive_retention_proof.retention_commit_digest_bound == true
+failure_mode:
+  - retired value archive snapshots are only mentioned inside the timeline receipt and lack external retention proof refs
+  - trustee, storage, retention-policy, or retrieval-test refs can drift without changing the retention commit digest
+  - archive deletion or external veto is allowed after value retirement
+  - raw archive, trustee, storage, or continuity payload is stored in the reference runtime receipt
+notes:
+  - Extends value timeline lineage with digest-only external archive-retention evidence.
+  - Keeps Council and Guardian authority boundary-only after the value has left active writeback.

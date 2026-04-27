@@ -175,8 +175,12 @@ value-timeline branch は generation / acceptance / reassessment の receipt dig
 `self_model_value_timeline_receipt` の append-only event chain に束ね、
 最終 active / retired value set と archive snapshot ref を
 `timeline_commit_digest` で固定する。
+value-archive-retention-proof branch は retired value の archive snapshot ref を
+external trustee proof、long-term storage proof、retention policy、retrieval test refs へ
+digest-only に束縛し、`retention_commit_digest` で固定する。
 Council / Guardian review は boundary-only であり、external veto、forced stability lock、
-raw value payload 保存は引き続き false に固定される。
+archive deletion、raw value / archive / trustee / storage payload 保存は
+引き続き false に固定される。
 
 `broker-demo` は L1 SubstrateBroker の reference contract
 (`kernel.broker.v0`) を JSON で可視化し、
@@ -662,6 +666,12 @@ value lifecycle を `self-model-value-lineage-timeline-v1` receipt に束ね、
 active / retired set の disjointness、archive retention、
 `timeline_commit_digest` を確認する。timeline でも raw value / continuity payload は保存せず、
 Council / Guardian は boundary-only review に留まる。
+退役後の archive retention は
+`self-model-value-archive-retention-proof-v1` receipt により、
+archive snapshot refs と external trustee / long-term storage / retention policy /
+retrieval test refs を digest-only に束縛し、`retention_commit_digest`、
+`trustee_proof_bound=true`、`long_term_storage_proof_bound=true`、
+`archive_deletion_allowed=false`、`raw_archive_payload_stored=false` を確認する。
 さらに future self acceptance 後の value は
 `self-model-future-self-reevaluation-retirement-v1` receipt により、
 `reassessment_mode=future-self-reevaluated-bounded-retirement`、

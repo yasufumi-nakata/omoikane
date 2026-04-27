@@ -14640,6 +14640,38 @@ json.dump(response, sys.stdout)
             guardian_archive_ref="guardian://self-model/value-timeline/archive-retained",
         )
         value_timeline_validation = monitor.validate_value_timeline_receipt(value_timeline)
+        value_archive_retention_proof = (
+            monitor.build_value_archive_retention_proof_receipt(
+                value_timeline,
+                trustee_proof_refs=[
+                    "trustee-proof://jp-13/self-model/value-archive/generative-patience/v1",
+                    "trustee-proof://jp-13/self-model/value-archive/review-board-attestation/v1",
+                ],
+                long_term_storage_proof_refs=[
+                    "storage-proof://jp-13/self-model/value-archive/cold-ledger/v1",
+                    "storage-proof://jp-13/self-model/value-archive/replica-audit/v1",
+                ],
+                retention_policy_refs=[
+                    "retention-policy://jp-13/self-model/value-history/minimum-retention/v1",
+                    "retention-policy://omoikane/value-history/no-raw-payload/v1",
+                ],
+                retrieval_test_refs=[
+                    "retrieval-test://jp-13/self-model/value-archive/generative-patience/v1",
+                ],
+                continuity_audit_ref="self-model://history/value-archive-retention/audit/v1",
+                council_resolution_ref=(
+                    "council://self-model/value-archive-retention/boundary-only"
+                ),
+                guardian_archive_ref=(
+                    "guardian://self-model/value-archive-retention/external-proof-bound"
+                ),
+            )
+        )
+        value_archive_retention_proof_validation = (
+            monitor.validate_value_archive_retention_proof_receipt(
+                value_archive_retention_proof
+            )
+        )
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14725,6 +14757,28 @@ json.dump(response, sys.stdout)
                 "value_timeline_active_retired_disjoint": value_timeline_validation[
                     "active_retired_disjoint"
                 ],
+                "value_archive_retention_policy_id": value_archive_retention_proof[
+                    "policy_id"
+                ],
+                "value_archive_retention_receipt_digest": value_archive_retention_proof[
+                    "receipt_digest"
+                ],
+                "value_archive_retention_commit_bound": (
+                    value_archive_retention_proof_validation[
+                        "retention_commit_digest_bound"
+                    ]
+                ),
+                "value_archive_retention_trustee_proof_bound": (
+                    value_archive_retention_proof_validation["trustee_proof_bound"]
+                ),
+                "value_archive_retention_storage_proof_bound": (
+                    value_archive_retention_proof_validation[
+                        "long_term_storage_proof_bound"
+                    ]
+                ),
+                "value_archive_retention_no_archive_deletion": not (
+                    value_archive_retention_proof_validation["archive_deletion_allowed"]
+                ),
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14753,6 +14807,7 @@ json.dump(response, sys.stdout)
             "value_acceptance": value_acceptance,
             "value_reassessment": value_reassessment,
             "value_timeline": value_timeline,
+            "value_archive_retention_proof": value_archive_retention_proof,
             "history": history,
             "validation": {
                 "ok": (
@@ -14771,6 +14826,7 @@ json.dump(response, sys.stdout)
                     and value_acceptance_validation["ok"]
                     and value_reassessment_validation["ok"]
                     and value_timeline_validation["ok"]
+                    and value_archive_retention_proof_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
@@ -14785,6 +14841,7 @@ json.dump(response, sys.stdout)
                 "value_acceptance": value_acceptance_validation,
                 "value_reassessment": value_reassessment_validation,
                 "value_timeline": value_timeline_validation,
+                "value_archive_retention_proof": value_archive_retention_proof_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },

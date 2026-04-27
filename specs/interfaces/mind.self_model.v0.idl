@@ -15,6 +15,7 @@ imports:
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
   self_model_value_reassessment_receipt: ../schemas/self_model_value_reassessment_receipt.schema
   self_model_value_timeline_receipt: ../schemas/self_model_value_timeline_receipt.schema
+  self_model_value_archive_retention_proof: ../schemas/self_model_value_archive_retention_proof.schema
 operations:
   profile:
     summary: Return the fixed divergence policy used by the reference runtime.
@@ -699,6 +700,94 @@ operations:
             type: boolean
           timeline_commit_digest_bound:
             type: boolean
+  build_value_archive_retention_proof_receipt:
+    summary: Bind retired value archive snapshots to external trustee, long-term storage, policy, and retrieval proof refs without storing raw archive payloads.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - timeline_receipt
+          - trustee_proof_refs
+          - long_term_storage_proof_refs
+          - retention_policy_refs
+          - retrieval_test_refs
+          - continuity_audit_ref
+          - council_resolution_ref
+          - guardian_archive_ref
+        properties:
+          timeline_receipt:
+            schema_ref: self_model_value_timeline_receipt
+          trustee_proof_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          long_term_storage_proof_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          retention_policy_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          retrieval_test_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          continuity_audit_ref:
+            type: string
+            minLength: 1
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_archive_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_value_archive_retention_proof
+  validate_value_archive_retention_proof_receipt:
+    summary: Fail closed unless external archive-retention proofs are digest-bound, boundary-only, and cannot delete archived retired value history.
+    input:
+      schema_ref: self_model_value_archive_retention_proof
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - timeline_archive_retention_verified
+          - trustee_proof_bound
+          - long_term_storage_proof_bound
+          - retention_policy_bound
+          - retrieval_test_bound
+          - boundary_only_review
+          - archive_deletion_allowed
+          - retention_commit_digest_bound
+        properties:
+          ok:
+            type: boolean
+          timeline_archive_retention_verified:
+            type: boolean
+          trustee_proof_bound:
+            type: boolean
+          long_term_storage_proof_bound:
+            type: boolean
+          retention_policy_bound:
+            type: boolean
+          retrieval_test_bound:
+            type: boolean
+          boundary_only_review:
+            type: boolean
+          archive_deletion_allowed:
+            type: boolean
+          retention_commit_digest_bound:
+            type: boolean
   history:
     summary: Return the most recent self-model snapshots for one monitor instance.
     input:
@@ -727,3 +816,4 @@ invariants:
   - value acceptance receipts can write back only accepted candidate refs after future self acceptance and boundary-only review
   - value reassessment receipts retire only accepted value refs while retaining archived history
   - value timeline receipts keep generated, accepted, and retired value events append-only and digest-bound without raw value payload storage
+  - value archive retention proof receipts bind retired value archives to external trustee/storage/policy/retrieval refs while preserving boundary-only review and disallowing archive deletion

@@ -282,6 +282,26 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_timeline"]["external_veto_allowed"])
         self.assertFalse(result["value_timeline"]["raw_value_payload_stored"])
 
+    def test_self_model_demo_value_archive_retention_proof_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_archive_retention_proof.schema",
+            result["value_archive_retention_proof"],
+        )
+        self.assertTrue(result["validation"]["value_archive_retention_proof"]["ok"])
+        self.assertTrue(
+            result["value_archive_retention_proof"]["timeline_archive_retention_verified"]
+        )
+        self.assertTrue(result["value_archive_retention_proof"]["trustee_proof_bound"])
+        self.assertTrue(
+            result["value_archive_retention_proof"]["long_term_storage_proof_bound"]
+        )
+        self.assertTrue(result["value_archive_retention_proof"]["retention_policy_bound"])
+        self.assertTrue(result["value_archive_retention_proof"]["retrieval_test_bound"])
+        self.assertFalse(result["value_archive_retention_proof"]["archive_deletion_allowed"])
+        self.assertFalse(result["value_archive_retention_proof"]["raw_archive_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()

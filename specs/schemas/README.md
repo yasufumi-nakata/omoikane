@@ -143,6 +143,7 @@
 - `self_model_value_acceptance_receipt.schema`
 - `self_model_value_generation_receipt.schema`
 - `self_model_pathological_self_assessment_escalation_receipt.schema`
+- `self_model_value_archive_retention_proof.schema`
 - `self_model_value_reassessment_receipt.schema`
 - `self_model_value_timeline_receipt.schema`
 - `self_model_observation.schema`

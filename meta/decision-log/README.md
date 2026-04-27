@@ -127,6 +127,7 @@ status: decided | superseded
 - [2026-04-28_catalog-inventory-receipt.md](2026-04-28_catalog-inventory-receipt.md)
 - [2026-04-28_self-model-value-reassessment-retirement.md](2026-04-28_self-model-value-reassessment-retirement.md)
 - [2026-04-28_self-model-value-timeline-lineage.md](2026-04-28_self-model-value-timeline-lineage.md)
+- [2026-04-28_self-model-value-archive-retention-proof.md](2026-04-28_self-model-value-archive-retention-proof.md)
 - [2026-04-28_self-model-autonomy-review-boundary.md](2026-04-28_self-model-autonomy-review-boundary.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

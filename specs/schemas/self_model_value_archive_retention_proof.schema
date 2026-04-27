@@ -1,0 +1,310 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_archive_retention_proof.schema"
+title: SelfModelValueArchiveRetentionProof
+description: Digest-only receipt that binds retired SelfModel value archive snapshots to external trustee, long-term storage, retention-policy, and retrieval-test proof refs without storing raw archive payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - proof_id
+  - identity_id
+  - source_timeline_id
+  - source_timeline_policy_id
+  - source_timeline_receipt_digest
+  - source_timeline_commit_digest
+  - source_archive_snapshot_refs
+  - source_archive_snapshot_digest_set
+  - source_archive_snapshot_set_digest
+  - source_retired_value_refs
+  - source_retired_value_digest_set
+  - source_retired_value_set_digest
+  - trustee_proof_refs
+  - trustee_proof_digest_set
+  - trustee_proof_set_digest
+  - long_term_storage_proof_refs
+  - long_term_storage_proof_digest_set
+  - long_term_storage_proof_set_digest
+  - retention_policy_refs
+  - retention_policy_digest_set
+  - retention_policy_set_digest
+  - retrieval_test_refs
+  - retrieval_test_digest_set
+  - retrieval_test_set_digest
+  - continuity_audit_ref
+  - council_resolution_ref
+  - guardian_archive_ref
+  - required_roles
+  - gate_digest
+  - retention_commit_digest
+  - proof_mode
+  - retention_status
+  - timeline_archive_retention_verified
+  - trustee_proof_bound
+  - long_term_storage_proof_bound
+  - retention_policy_bound
+  - retrieval_test_bound
+  - boundary_only_review
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - archive_deletion_allowed
+  - raw_archive_payload_stored
+  - raw_trustee_payload_stored
+  - raw_storage_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_archive_retention_proof_receipt
+  policy_id:
+    type: string
+    const: self-model-value-archive-retention-proof-v1
+  digest_profile:
+    type: string
+    const: self-model-value-archive-retention-proof-digest-v1
+  proof_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_timeline_id:
+    type: string
+    minLength: 1
+  source_timeline_policy_id:
+    type: string
+    const: self-model-value-lineage-timeline-v1
+  source_timeline_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_timeline_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_archive_snapshot_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  source_archive_snapshot_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  source_archive_snapshot_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  source_retired_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  source_retired_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  source_retired_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  trustee_proof_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  trustee_proof_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  trustee_proof_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  long_term_storage_proof_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  long_term_storage_proof_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  long_term_storage_proof_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  retention_policy_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  retention_policy_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retention_policy_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  retrieval_test_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  retrieval_test_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retrieval_test_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  continuity_audit_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_archive_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  retention_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  proof_mode:
+    type: string
+    const: digest-only-external-archive-retention-proof
+  retention_status:
+    type: string
+    const: external-proof-bound-archive-retained
+  timeline_archive_retention_verified:
+    type: boolean
+    const: true
+  trustee_proof_bound:
+    type: boolean
+    const: true
+  long_term_storage_proof_bound:
+    type: boolean
+    const: true
+  retention_policy_bound:
+    type: boolean
+    const: true
+  retrieval_test_bound:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  archive_deletion_allowed:
+    type: boolean
+    const: false
+  raw_archive_payload_stored:
+    type: boolean
+    const: false
+  raw_trustee_payload_stored:
+    type: boolean
+    const: false
+  raw_storage_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_archive_retention_proof_receipt
+    policy_id: self-model-value-archive-retention-proof-v1
+    digest_profile: self-model-value-archive-retention-proof-digest-v1
+    proof_id: self-model-value-archive-retention-proof-example
+    identity_id: id-1
+    source_timeline_id: self-model-value-timeline-example
+    source_timeline_policy_id: self-model-value-lineage-timeline-v1
+    source_timeline_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_timeline_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_archive_snapshot_refs:
+      - self-model://archive/value-history/generative-patience/v1
+    source_archive_snapshot_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_archive_snapshot_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_retired_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    source_retired_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_retired_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    trustee_proof_refs:
+      - trustee-proof://jp-13/self-model/value-archive/generative-patience/v1
+    trustee_proof_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    trustee_proof_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    long_term_storage_proof_refs:
+      - storage-proof://jp-13/self-model/value-archive/cold-ledger/v1
+    long_term_storage_proof_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    long_term_storage_proof_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retention_policy_refs:
+      - retention-policy://jp-13/self-model/value-history/minimum-retention/v1
+    retention_policy_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retention_policy_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retrieval_test_refs:
+      - retrieval-test://jp-13/self-model/value-archive/generative-patience/v1
+    retrieval_test_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retrieval_test_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    continuity_audit_ref: self-model://history/value-archive-retention/audit/v1
+    council_resolution_ref: council://self-model/value-archive-retention/boundary-only
+    guardian_archive_ref: guardian://self-model/value-archive-retention/external-proof-bound
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retention_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    proof_mode: digest-only-external-archive-retention-proof
+    retention_status: external-proof-bound-archive-retained
+    timeline_archive_retention_verified: true
+    trustee_proof_bound: true
+    long_term_storage_proof_bound: true
+    retention_policy_bound: true
+    retrieval_test_bound: true
+    boundary_only_review: true
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    archive_deletion_allowed: false
+    raw_archive_payload_stored: false
+    raw_trustee_payload_stored: false
+    raw_storage_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

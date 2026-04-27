@@ -915,6 +915,59 @@ class SelfModelMonitorTests(unittest.TestCase):
                 archival_snapshot_ref="self-model://archive/value-history/never-accepted/v1",
             )
 
+    def _build_value_timeline_for_archive_retention(self):
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+        reassessment = monitor.build_value_reassessment_receipt(
+            acceptance,
+            retired_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/life-history-reevaluation-window"],
+            future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+            council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+            retirement_writeback_ref="self-model://writeback/value-retirement/generative-patience/v1",
+            post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/generative-patience/v1",
+            archival_snapshot_ref="self-model://archive/value-history/generative-patience/v1",
+        )
+        timeline = monitor.build_value_timeline_receipt(
+            generation,
+            acceptance_receipts=[acceptance],
+            reassessment_receipts=[reassessment],
+            continuity_audit_ref="self-model://history/value-lineage/audit/v1",
+            council_resolution_ref="council://self-model/value-timeline/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-timeline/archive-retained",
+        )
+        return monitor, timeline
+
     def test_value_timeline_receipt_binds_lineage_and_archive_retention(self) -> None:
         monitor = SelfModelMonitor()
         observation = monitor.update(
@@ -983,6 +1036,76 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertTrue(validation["timeline_commit_digest_bound"])
         self.assertFalse(timeline["external_veto_allowed"])
         self.assertFalse(timeline["raw_value_payload_stored"])
+
+    def test_value_archive_retention_proof_binds_external_proofs(self) -> None:
+        monitor, timeline = self._build_value_timeline_for_archive_retention()
+
+        proof = monitor.build_value_archive_retention_proof_receipt(
+            timeline,
+            trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/v1",
+            ],
+            retention_policy_refs=[
+                "retention-policy://jp-13/self-model/value-history/minimum-retention/v1",
+            ],
+            retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            continuity_audit_ref="self-model://history/value-archive-retention/audit/v1",
+            council_resolution_ref="council://self-model/value-archive-retention/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-archive-retention/external-proof-bound",
+        )
+        validation = monitor.validate_value_archive_retention_proof_receipt(proof)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["timeline_archive_retention_verified"])
+        self.assertTrue(validation["trustee_proof_bound"])
+        self.assertTrue(validation["long_term_storage_proof_bound"])
+        self.assertTrue(validation["retention_policy_bound"])
+        self.assertTrue(validation["retrieval_test_bound"])
+        self.assertTrue(validation["retention_commit_digest_bound"])
+        self.assertEqual(
+            timeline["receipt_digest"],
+            proof["source_timeline_receipt_digest"],
+        )
+        self.assertEqual(
+            timeline["archive_snapshot_refs"],
+            proof["source_archive_snapshot_refs"],
+        )
+        self.assertFalse(proof["archive_deletion_allowed"])
+        self.assertFalse(proof["raw_archive_payload_stored"])
+        self.assertFalse(proof["raw_trustee_payload_stored"])
+
+    def test_value_archive_retention_proof_rejects_archive_deletion(self) -> None:
+        monitor, timeline = self._build_value_timeline_for_archive_retention()
+        proof = monitor.build_value_archive_retention_proof_receipt(
+            timeline,
+            trustee_proof_refs=[
+                "trustee-proof://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            long_term_storage_proof_refs=[
+                "storage-proof://jp-13/self-model/value-archive/cold-ledger/v1",
+            ],
+            retention_policy_refs=[
+                "retention-policy://jp-13/self-model/value-history/minimum-retention/v1",
+            ],
+            retrieval_test_refs=[
+                "retrieval-test://jp-13/self-model/value-archive/generative-patience/v1",
+            ],
+            continuity_audit_ref="self-model://history/value-archive-retention/audit/v1",
+            council_resolution_ref="council://self-model/value-archive-retention/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-archive-retention/external-proof-bound",
+        )
+        tampered = copy.deepcopy(proof)
+        tampered["archive_deletion_allowed"] = True
+
+        validation = monitor.validate_value_archive_retention_proof_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("archive_deletion_allowed must be false", validation["errors"])
 
     def test_value_timeline_rejects_reassessment_without_timeline_acceptance(self) -> None:
         monitor = SelfModelMonitor()

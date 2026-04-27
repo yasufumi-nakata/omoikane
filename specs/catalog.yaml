@@ -865,6 +865,17 @@ entries:
       - reference-runtime
     rationale: Required to serialize the append-only self-authored value lineage that binds generation, future-self acceptance, retirement, final active/retired sets, and archive retention without raw value payload storage.
   - priority: P1
+    kind: schema
+    file: specs/schemas/self_model_value_archive_retention_proof.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_value_archive_retention_proof.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize digest-only external trustee, storage, retention-policy, and retrieval-test proof refs for retired value archive snapshots without raw archive payload storage or archive deletion authority.
+  - priority: P1
     kind: idl
     file: specs/interfaces/mind.self_model.v0.idl
     consumers:
@@ -880,7 +891,8 @@ entries:
       - specs/schemas/self_model_value_acceptance_receipt.schema
       - specs/schemas/self_model_value_reassessment_receipt.schema
       - specs/schemas/self_model_value_timeline_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff boundary, external adjudication result boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, and value timeline lineage contracts machine-readable.
+      - specs/schemas/self_model_value_archive_retention_proof.schema
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff boundary, external adjudication result boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, value timeline lineage, and value archive retention proof contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -3119,6 +3131,15 @@ entries:
       - specs/schemas/self_model_value_timeline_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects self-authored value lineage from unordered receipt chains, active/retired set overlap, missing archive retention, external veto, or raw payload storage.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_value_archive_retention_proof.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_value_archive_retention_proof.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects retired value archives from unbound external trustee/storage proof refs, archive deletion authority, external veto, or raw archive/trustee/storage payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/release_manifest.schema

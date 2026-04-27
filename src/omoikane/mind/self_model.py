@@ -28,6 +28,11 @@ SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_TIMELINE_POLICY_ID = "self-model-value-lineage-timeline-v1"
 SELF_MODEL_VALUE_TIMELINE_DIGEST_PROFILE = "self-model-value-timeline-digest-v1"
 SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_ARCHIVE_RETENTION_POLICY_ID = "self-model-value-archive-retention-proof-v1"
+SELF_MODEL_VALUE_ARCHIVE_RETENTION_DIGEST_PROFILE = (
+    "self-model-value-archive-retention-proof-digest-v1"
+)
+SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_PATHOLOGY_ESCALATION_POLICY_ID = "self-model-pathology-escalation-boundary-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_DIGEST_PROFILE = "self-model-pathology-escalation-digest-v1"
 SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES = ("self", "council", "guardian")
@@ -1613,6 +1618,325 @@ class SelfModelMonitor:
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
             "timeline_commit_digest_bound": self._non_empty_string(
                 receipt.get("timeline_commit_digest")
+            ),
+        }
+
+    def build_value_archive_retention_proof_receipt(
+        self,
+        timeline_receipt: Dict[str, object],
+        trustee_proof_refs: Sequence[str],
+        long_term_storage_proof_refs: Sequence[str],
+        retention_policy_refs: Sequence[str],
+        retrieval_test_refs: Sequence[str],
+        continuity_audit_ref: str,
+        council_resolution_ref: str,
+        guardian_archive_ref: str,
+    ) -> Dict[str, object]:
+        """Bind external archive-retention proof without importing raw archive data."""
+
+        timeline_validation = self.validate_value_timeline_receipt(timeline_receipt)
+        if not timeline_validation["ok"]:
+            raise ValueError("timeline_receipt must validate before archive retention proof")
+        if timeline_receipt.get("archive_retention_required") is not True:
+            raise ValueError("timeline_receipt must require archive retention")
+        if timeline_receipt.get("raw_value_payload_stored") is not False:
+            raise ValueError("timeline_receipt must not store raw value payload")
+
+        archive_snapshot_refs = timeline_receipt.get("archive_snapshot_refs")
+        retired_value_refs = timeline_receipt.get("retired_value_refs")
+        if not isinstance(archive_snapshot_refs, list) or not archive_snapshot_refs:
+            raise ValueError("timeline_receipt must contain archive snapshot refs")
+        if not isinstance(retired_value_refs, list) or not retired_value_refs:
+            raise ValueError("timeline_receipt must contain retired value refs")
+
+        def digest_refs(refs: Sequence[str], field_name: str) -> tuple[List[str], List[str], str]:
+            if not refs:
+                raise ValueError(f"{field_name} must not be empty")
+            normalized: List[str] = []
+            for ref in refs:
+                if not self._non_empty_string(ref):
+                    raise ValueError(f"{field_name} must contain non-empty strings")
+                normalized.append(str(ref))
+            digest_set = [sha256_text(ref) for ref in normalized]
+            return normalized, digest_set, sha256_text("|".join(digest_set))
+
+        archive_refs, archive_digest_set, archive_set_digest = digest_refs(
+            [str(ref) for ref in archive_snapshot_refs],
+            "source_archive_snapshot_refs",
+        )
+        retired_refs, retired_digest_set, retired_set_digest = digest_refs(
+            [str(ref) for ref in retired_value_refs],
+            "source_retired_value_refs",
+        )
+        trustee_refs, trustee_digest_set, trustee_set_digest = digest_refs(
+            trustee_proof_refs,
+            "trustee_proof_refs",
+        )
+        storage_refs, storage_digest_set, storage_set_digest = digest_refs(
+            long_term_storage_proof_refs,
+            "long_term_storage_proof_refs",
+        )
+        policy_refs, policy_digest_set, policy_set_digest = digest_refs(
+            retention_policy_refs,
+            "retention_policy_refs",
+        )
+        retrieval_refs, retrieval_digest_set, retrieval_set_digest = digest_refs(
+            retrieval_test_refs,
+            "retrieval_test_refs",
+        )
+        for field_name, value in {
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        gate_payload = {
+            "source_timeline_receipt_digest": timeline_receipt.get("receipt_digest"),
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES),
+        }
+        retention_payload = {
+            "source_timeline_receipt_digest": timeline_receipt.get("receipt_digest"),
+            "source_timeline_commit_digest": timeline_receipt.get("timeline_commit_digest"),
+            "source_archive_snapshot_set_digest": archive_set_digest,
+            "source_retired_value_set_digest": retired_set_digest,
+            "trustee_proof_set_digest": trustee_set_digest,
+            "long_term_storage_proof_set_digest": storage_set_digest,
+            "retention_policy_set_digest": policy_set_digest,
+            "retrieval_test_set_digest": retrieval_set_digest,
+            "continuity_audit_ref": continuity_audit_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_archive_retention_proof_receipt",
+            "policy_id": SELF_MODEL_VALUE_ARCHIVE_RETENTION_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_ARCHIVE_RETENTION_DIGEST_PROFILE,
+            "proof_id": new_id("self-model-value-archive-retention-proof"),
+            "identity_id": str(timeline_receipt["identity_id"]),
+            "source_timeline_id": str(timeline_receipt["timeline_id"]),
+            "source_timeline_policy_id": str(timeline_receipt["policy_id"]),
+            "source_timeline_receipt_digest": str(timeline_receipt["receipt_digest"]),
+            "source_timeline_commit_digest": str(timeline_receipt["timeline_commit_digest"]),
+            "source_archive_snapshot_refs": archive_refs,
+            "source_archive_snapshot_digest_set": archive_digest_set,
+            "source_archive_snapshot_set_digest": archive_set_digest,
+            "source_retired_value_refs": retired_refs,
+            "source_retired_value_digest_set": retired_digest_set,
+            "source_retired_value_set_digest": retired_set_digest,
+            "trustee_proof_refs": trustee_refs,
+            "trustee_proof_digest_set": trustee_digest_set,
+            "trustee_proof_set_digest": trustee_set_digest,
+            "long_term_storage_proof_refs": storage_refs,
+            "long_term_storage_proof_digest_set": storage_digest_set,
+            "long_term_storage_proof_set_digest": storage_set_digest,
+            "retention_policy_refs": policy_refs,
+            "retention_policy_digest_set": policy_digest_set,
+            "retention_policy_set_digest": policy_set_digest,
+            "retrieval_test_refs": retrieval_refs,
+            "retrieval_test_digest_set": retrieval_digest_set,
+            "retrieval_test_set_digest": retrieval_set_digest,
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "retention_commit_digest": self._digest(retention_payload),
+            "proof_mode": "digest-only-external-archive-retention-proof",
+            "retention_status": "external-proof-bound-archive-retained",
+            "timeline_archive_retention_verified": True,
+            "trustee_proof_bound": True,
+            "long_term_storage_proof_bound": True,
+            "retention_policy_bound": True,
+            "retrieval_test_bound": True,
+            "boundary_only_review": True,
+            "external_truth_claim_allowed": False,
+            "external_veto_allowed": False,
+            "archive_deletion_allowed": False,
+            "raw_archive_payload_stored": False,
+            "raw_trustee_payload_stored": False,
+            "raw_storage_payload_stored": False,
+            "raw_continuity_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_archive_retention_proof_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_archive_retention_proof_receipt":
+            errors.append("kind must equal self_model_value_archive_retention_proof_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_ARCHIVE_RETENTION_POLICY_ID:
+            errors.append("policy_id must equal self-model value archive retention proof policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_ARCHIVE_RETENTION_DIGEST_PROFILE:
+            errors.append(
+                "digest_profile must equal self-model value archive retention proof digest profile"
+            )
+        if receipt.get("source_timeline_policy_id") != SELF_MODEL_VALUE_TIMELINE_POLICY_ID:
+            errors.append("source_timeline_policy_id must bind the value timeline policy")
+
+        def validate_ref_set(
+            refs_field: str,
+            digests_field: str,
+            set_digest_field: str,
+            label: str,
+        ) -> tuple[List[object], List[object]]:
+            refs = receipt.get(refs_field)
+            digests = receipt.get(digests_field)
+            if not isinstance(refs, list) or not refs:
+                errors.append(f"{refs_field} must be non-empty")
+                refs = []
+            if not isinstance(digests, list) or len(digests) != len(refs):
+                errors.append(f"{digests_field} must match {label} refs")
+                digests = []
+            elif [sha256_text(str(ref)) for ref in refs] != digests:
+                errors.append(f"{label} digest set must match {label} refs")
+            if isinstance(digests, list):
+                expected_set_digest = sha256_text("|".join(str(item) for item in digests))
+                if receipt.get(set_digest_field) != expected_set_digest:
+                    errors.append(f"{set_digest_field} must match digest set")
+            return refs, digests
+
+        archive_refs, archive_digests = validate_ref_set(
+            "source_archive_snapshot_refs",
+            "source_archive_snapshot_digest_set",
+            "source_archive_snapshot_set_digest",
+            "archive snapshot",
+        )
+        retired_refs, retired_digests = validate_ref_set(
+            "source_retired_value_refs",
+            "source_retired_value_digest_set",
+            "source_retired_value_set_digest",
+            "retired value",
+        )
+        validate_ref_set(
+            "trustee_proof_refs",
+            "trustee_proof_digest_set",
+            "trustee_proof_set_digest",
+            "trustee proof",
+        )
+        validate_ref_set(
+            "long_term_storage_proof_refs",
+            "long_term_storage_proof_digest_set",
+            "long_term_storage_proof_set_digest",
+            "long term storage proof",
+        )
+        validate_ref_set(
+            "retention_policy_refs",
+            "retention_policy_digest_set",
+            "retention_policy_set_digest",
+            "retention policy",
+        )
+        validate_ref_set(
+            "retrieval_test_refs",
+            "retrieval_test_digest_set",
+            "retrieval_test_set_digest",
+            "retrieval test",
+        )
+        if not archive_digests:
+            errors.append("source archive snapshot digest set must be non-empty")
+        if not retired_digests:
+            errors.append("source retired value digest set must be non-empty")
+
+        gate_payload = {
+            "source_timeline_receipt_digest": receipt.get("source_timeline_receipt_digest"),
+            "continuity_audit_ref": receipt.get("continuity_audit_ref"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "source_timeline_receipt_digest",
+            "source_timeline_commit_digest",
+            "continuity_audit_ref",
+            "council_resolution_ref",
+            "guardian_archive_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_ARCHIVE_RETENTION_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind timeline, continuity audit, council, and guardian refs")
+
+        retention_payload = {
+            "source_timeline_receipt_digest": receipt.get("source_timeline_receipt_digest"),
+            "source_timeline_commit_digest": receipt.get("source_timeline_commit_digest"),
+            "source_archive_snapshot_set_digest": receipt.get(
+                "source_archive_snapshot_set_digest"
+            ),
+            "source_retired_value_set_digest": receipt.get("source_retired_value_set_digest"),
+            "trustee_proof_set_digest": receipt.get("trustee_proof_set_digest"),
+            "long_term_storage_proof_set_digest": receipt.get(
+                "long_term_storage_proof_set_digest"
+            ),
+            "retention_policy_set_digest": receipt.get("retention_policy_set_digest"),
+            "retrieval_test_set_digest": receipt.get("retrieval_test_set_digest"),
+            "continuity_audit_ref": receipt.get("continuity_audit_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+        }
+        if receipt.get("retention_commit_digest") != self._digest(retention_payload):
+            errors.append("retention_commit_digest must bind timeline, archive, proof, and policy refs")
+
+        expected_strings = {
+            "proof_mode": "digest-only-external-archive-retention-proof",
+            "retention_status": "external-proof-bound-archive-retained",
+        }
+        for field_name, expected_value in expected_strings.items():
+            if receipt.get(field_name) != expected_value:
+                errors.append(f"{field_name} must equal {expected_value}")
+        for field_name in (
+            "timeline_archive_retention_verified",
+            "trustee_proof_bound",
+            "long_term_storage_proof_bound",
+            "retention_policy_bound",
+            "retrieval_test_bound",
+            "boundary_only_review",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "external_truth_claim_allowed",
+            "external_veto_allowed",
+            "archive_deletion_allowed",
+            "raw_archive_payload_stored",
+            "raw_trustee_payload_stored",
+            "raw_storage_payload_stored",
+            "raw_continuity_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "timeline_archive_retention_verified": receipt.get(
+                "timeline_archive_retention_verified"
+            ),
+            "trustee_proof_bound": receipt.get("trustee_proof_bound"),
+            "long_term_storage_proof_bound": receipt.get("long_term_storage_proof_bound"),
+            "retention_policy_bound": receipt.get("retention_policy_bound"),
+            "retrieval_test_bound": receipt.get("retrieval_test_bound"),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "archive_deletion_allowed": receipt.get("archive_deletion_allowed"),
+            "raw_archive_payload_stored": receipt.get("raw_archive_payload_stored"),
+            "raw_trustee_payload_stored": receipt.get("raw_trustee_payload_stored"),
+            "retention_commit_digest_bound": self._non_empty_string(
+                receipt.get("retention_commit_digest")
             ),
         }
 

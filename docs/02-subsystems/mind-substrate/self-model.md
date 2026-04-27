@@ -250,6 +250,26 @@ Council と Guardian は引き続き boundary-only review に留まり、
 `external_veto_allowed=false`、`forced_stability_lock_allowed=false`、
 `raw_value_payload_stored=false`、`raw_continuity_payload_stored=false` を固定する。
 
+## reference runtime で固定した価値 archive retention proof 境界
+
+`self-model-value-archive-retention-proof-v1` は、value timeline で retired になった
+value の archive snapshot refs を、外部 trustee proof、long-term storage proof、
+retention policy、retrieval test refs へ digest-only に束縛する contract である。
+
+`self_model_value_archive_retention_proof` は元の value timeline receipt digest と
+`timeline_commit_digest`、archive snapshot digest set、retired value digest set、
+trustee / storage / retention policy / retrieval test の digest set、continuity audit ref、
+Council resolution、Guardian archive ref を `retention_commit_digest` へ束ねる。
+
+この proof は archive の存在と保持経路を監査可能にするためのものであり、
+retired value を active writeback へ戻す権限や、外部 proof provider による価値履歴 veto を
+作らない。`timeline_archive_retention_verified=true`、
+`trustee_proof_bound=true`、`long_term_storage_proof_bound=true`、
+`retention_policy_bound=true`、`retrieval_test_bound=true` を固定し、
+`archive_deletion_allowed=false`、`external_veto_allowed=false`、
+`raw_archive_payload_stored=false`、`raw_trustee_payload_stored=false`、
+`raw_storage_payload_stored=false`、`raw_continuity_payload_stored=false` を保つ。
+
 ## 残る未解決
 
 - 実世界の trustee / care team / legal guardian 制度そのもの、および外部 adjudication の実運用・不服申立て制度は人間社会側の制度設計に残る
