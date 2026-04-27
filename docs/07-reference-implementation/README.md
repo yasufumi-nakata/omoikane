@@ -665,7 +665,8 @@ random-block Merkle audit、
 bounded reconciliation、
 本人が一時的に key を失った場合の threshold key succession receipt
 (`3-of-5` share + `2` Guardian attestation + successor key digest / rotation ledger ref /
-raw key material redaction)、
+JP-13 signer roster policy digest / identity-guardian + integrity-guardian signature digest /
+raw key material and raw roster payload redaction)、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

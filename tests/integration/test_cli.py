@@ -722,8 +722,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["key_succession_bound"])
         self.assertTrue(result["validation"]["key_succession_guardian_quorum_ok"])
         self.assertTrue(result["validation"]["key_succession_threshold_ok"])
+        self.assertTrue(
+            result["validation"]["key_succession_signer_roster_policy_bound"]
+        )
+        self.assertTrue(result["validation"]["key_succession_signer_roster_quorum_ok"])
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
+        self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
         self.assertEqual(
             ["coldstore", "mirror", "primary"],
             result["validation"]["replication"]["consensus_target_ids"],
@@ -739,6 +744,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(
             "successor-key-prepared",
             result["memory_replication"]["session"]["key_succession"]["status"],
+        )
+        self.assertEqual(
+            "complete",
+            result["memory_replication"]["session"]["key_succession"][
+                "signer_roster_policy"
+            ]["quorum_status"],
         )
 
     def test_memory_edit_demo_emits_reversible_buffer_json(self) -> None:

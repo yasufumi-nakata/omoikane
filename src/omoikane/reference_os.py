@@ -11729,6 +11729,12 @@ json.dump(response, sys.stdout)
                 "key_succession_threshold_ok": replication_validation[
                     "key_succession_threshold_ok"
                 ],
+                "key_succession_signer_roster_digest": replication_session[
+                    "key_succession"
+                ]["signer_roster_policy"]["digest"],
+                "key_succession_signer_roster_quorum_ok": replication_validation[
+                    "key_succession_signer_roster_quorum_ok"
+                ],
                 "session_digest": replication_session["digest"],
             },
             actor="MemoryReplicationService",
@@ -11760,6 +11766,15 @@ json.dump(response, sys.stdout)
                 ],
                 "key_succession_threshold_ok": replication_validation[
                     "key_succession_threshold_ok"
+                ],
+                "key_succession_signer_roster_policy_bound": replication_validation[
+                    "key_succession_signer_roster_policy_bound"
+                ],
+                "key_succession_signer_roster_quorum_ok": replication_validation[
+                    "key_succession_signer_roster_quorum_ok"
+                ],
+                "raw_signer_roster_payload_stored": replication_validation[
+                    "raw_signer_roster_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

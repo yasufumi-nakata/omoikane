@@ -19,8 +19,11 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["key_succession_bound"])
         self.assertTrue(validation["key_succession_guardian_quorum_ok"])
         self.assertTrue(validation["key_succession_threshold_ok"])
+        self.assertTrue(validation["key_succession_signer_roster_policy_bound"])
+        self.assertTrue(validation["key_succession_signer_roster_quorum_ok"])
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
+        self.assertFalse(validation["raw_signer_roster_payload_stored"])
         self.assertEqual(["primary", "mirror"], validation["immediate_target_ids"])
         self.assertEqual(["coldstore", "trustee"], validation["delayed_target_ids"])
         self.assertEqual(["coldstore", "mirror", "primary"], validation["consensus_target_ids"])
@@ -62,6 +65,49 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["raw_key_material_stored"])
         self.assertTrue(
             any("raw_key_material_stored" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_raw_signer_roster_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["key_succession"]["signer_roster_policy"][
+            "raw_signer_roster_payload_stored"
+        ] = True
+        session["key_succession"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["key_succession_bound"])
+        self.assertFalse(validation["key_succession_signer_roster_policy_bound"])
+        self.assertTrue(validation["raw_signer_roster_payload_stored"])
+        self.assertTrue(
+            any(
+                "raw_signer_roster_payload_stored" in error
+                for error in validation["errors"]
+            )
+        )
+
+    def test_validate_session_rejects_signer_roster_signature_drift(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["key_succession"]["signer_roster_policy"]["accepted_signers"][0][
+            "signature_digest"
+        ] = "f" * 64
+        session["key_succession"]["signer_roster_policy"]["digest"] = "0" * 64
+        session["key_succession"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["key_succession_signer_roster_policy_bound"])
+        self.assertFalse(validation["key_succession_signer_roster_quorum_ok"])
+        self.assertTrue(
+            any("signature_digest mismatch" in error for error in validation["errors"])
         )
 
 
