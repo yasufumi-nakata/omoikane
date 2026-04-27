@@ -128,6 +128,13 @@ COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID = (
     "collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1"
 )
 COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS = 300
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-sct-policy-authority-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID = (
+    "collective-external-registry-ack-client-certificate-sct-policy-authority-digest-v1"
+)
+COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_SIGNER_QUORUM_REQUIRED = 2
 COLLECTIVE_PACKET_CAPTURE_PROFILE = "trace-bound-pcap-export-v1"
 COLLECTIVE_PACKET_CAPTURE_FORMAT = "pcap"
 COLLECTIVE_PRIVILEGED_CAPTURE_PROFILE = "bounded-live-interface-capture-acquisition-v1"
@@ -2077,6 +2084,76 @@ class CollectiveIdentityService:
                 quorum_status="quorum-met",
             )
         )
+        sct_policy_registry_ref = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_registry_ref(
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+            )
+        )
+        sct_policy_registry_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_registry_digest(
+                policy_registry_ref=sct_policy_registry_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+                registry_jurisdiction=str(ack_receipt["registry_jurisdiction"]),
+                timestamp_policy=COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID,
+                timestamp_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                ),
+            )
+        )
+        sct_signer_roster_ref = (
+            self._collective_external_registry_ack_client_certificate_sct_signer_roster_ref(
+                policy_registry_ref=sct_policy_registry_ref,
+                registry_authority_ref=str(ack_receipt["registry_authority_ref"]),
+            )
+        )
+        sct_signer_key_refs = [
+            f"sct-signer-key://{str(ack_receipt['registry_jurisdiction']).lower()}/primary",
+            f"sct-signer-key://{str(ack_receipt['registry_jurisdiction']).lower()}/witness",
+        ]
+        sct_signer_jurisdictions = [
+            str(ack_receipt["registry_jurisdiction"]),
+            f"{str(ack_receipt['registry_jurisdiction'])}-witness",
+        ]
+        sct_signer_roster_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_signer_roster_digest(
+                signer_roster_ref=sct_signer_roster_ref,
+                policy_registry_digest=sct_policy_registry_digest,
+                signer_key_refs=sct_signer_key_refs,
+                signer_jurisdictions=sct_signer_jurisdictions,
+            )
+        )
+        sct_signer_verifier_refs = [
+            f"sct-signer-verifier://{str(ack_receipt['registry_jurisdiction']).lower()}/primary",
+            f"sct-signer-verifier://{str(ack_receipt['registry_jurisdiction']).lower()}/witness",
+        ]
+        sct_signer_verifier_response_digests = [
+            self._collective_external_registry_ack_client_certificate_sct_verifier_response_digest(
+                verifier_ref=verifier_ref,
+                policy_registry_digest=sct_policy_registry_digest,
+                signer_roster_digest=sct_signer_roster_digest,
+                checked_at=str(payload["checked_at"]),
+            )
+            for verifier_ref in sct_signer_verifier_refs
+        ]
+        sct_signer_verifier_quorum_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_verifier_quorum_digest(
+                verifier_refs=sct_signer_verifier_refs,
+                verifier_response_digests=sct_signer_verifier_response_digests,
+                signer_roster_digest=sct_signer_roster_digest,
+            )
+        )
+        sct_policy_authority_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_authority_digest(
+                registry_ack_endpoint_ref=normalized_endpoint,
+                ack_receipt_digest=str(ack_receipt["ack_receipt_digest"]),
+                sct_timestamp_digest=sct_timestamp_digest,
+                policy_registry_digest=sct_policy_registry_digest,
+                signer_roster_digest=sct_signer_roster_digest,
+                verifier_quorum_digest=sct_signer_verifier_quorum_digest,
+                authority_status="verified",
+            )
+        )
         mtls_client_certificate_bound = bool(
             signed_response_envelope_bound
             and normalized_client_certificate_ref.startswith("registry-client-cert://")
@@ -2149,6 +2226,21 @@ class CollectiveIdentityService:
             and len(sct_timestamp_digest) == 64
             and len(ct_log_quorum_digest) == 64
         )
+        mtls_client_certificate_sct_policy_authority_bound = bool(
+            mtls_client_certificate_ct_log_quorum_bound
+            and sct_policy_registry_ref.startswith("sct-policy-registry://")
+            and sct_signer_roster_ref.startswith("sct-signer-roster://")
+            and len(sct_signer_key_refs)
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_SIGNER_QUORUM_REQUIRED
+            and len(sct_signer_verifier_refs)
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_SIGNER_QUORUM_REQUIRED
+            and len(set(sct_signer_key_refs)) == len(sct_signer_key_refs)
+            and len(set(sct_signer_verifier_refs)) == len(sct_signer_verifier_refs)
+            and len(sct_policy_registry_digest) == 64
+            and len(sct_signer_roster_digest) == 64
+            and len(sct_signer_verifier_quorum_digest) == 64
+            and len(sct_policy_authority_digest) == 64
+        )
         network_response_digest = sha256_text(canonical_json(payload))
         network_probe_bound = (
             _is_live_http_endpoint(normalized_endpoint)
@@ -2163,6 +2255,8 @@ class CollectiveIdentityService:
             and mtls_client_certificate_lifecycle_bound
             and mtls_client_certificate_lifecycle_chain_bound
             and mtls_client_certificate_ct_log_bound
+            and mtls_client_certificate_ct_log_quorum_bound
+            and mtls_client_certificate_sct_policy_authority_bound
         )
         receipt = {
             "kind": "collective_external_registry_ack_endpoint_probe",
@@ -2372,6 +2466,42 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_quorum_bound": (
                 mtls_client_certificate_ct_log_quorum_bound
             ),
+            "mtls_client_certificate_sct_policy_authority_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+            ),
+            "mtls_client_certificate_sct_policy_authority_digest_profile": (
+                COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+            ),
+            "mtls_client_certificate_sct_policy_registry_ref": (
+                sct_policy_registry_ref
+            ),
+            "mtls_client_certificate_sct_policy_registry_digest": (
+                sct_policy_registry_digest
+            ),
+            "mtls_client_certificate_sct_signer_roster_ref": sct_signer_roster_ref,
+            "mtls_client_certificate_sct_signer_roster_digest": (
+                sct_signer_roster_digest
+            ),
+            "mtls_client_certificate_sct_signer_key_refs": sct_signer_key_refs,
+            "mtls_client_certificate_sct_signer_jurisdictions": (
+                sct_signer_jurisdictions
+            ),
+            "mtls_client_certificate_sct_signer_verifier_refs": (
+                sct_signer_verifier_refs
+            ),
+            "mtls_client_certificate_sct_signer_verifier_response_digests": (
+                sct_signer_verifier_response_digests
+            ),
+            "mtls_client_certificate_sct_signer_verifier_quorum_digest": (
+                sct_signer_verifier_quorum_digest
+            ),
+            "mtls_client_certificate_sct_policy_authority_status": "verified",
+            "mtls_client_certificate_sct_policy_authority_digest": (
+                sct_policy_authority_digest
+            ),
+            "mtls_client_certificate_sct_policy_authority_bound": (
+                mtls_client_certificate_sct_policy_authority_bound
+            ),
             "checked_at": payload["checked_at"],
             "raw_ack_payload_stored": False,
             "raw_endpoint_payload_stored": False,
@@ -2381,6 +2511,7 @@ class CollectiveIdentityService:
             "raw_client_certificate_lifecycle_payload_stored": False,
             "raw_client_certificate_lifecycle_chain_payload_stored": False,
             "raw_client_certificate_ct_log_payload_stored": False,
+            "raw_sct_policy_authority_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -2452,6 +2583,13 @@ class CollectiveIdentityService:
         client_certificate_ct_log_quorum_set_digests: List[str] = []
         client_certificate_sct_timestamp_digests: List[str] = []
         client_certificate_sct_timestamp_statuses: List[str] = []
+        client_certificate_sct_policy_authority_proofs: List[Dict[str, Any]] = []
+        client_certificate_sct_policy_authority_digests: List[str] = []
+        client_certificate_sct_policy_registry_refs: List[str] = []
+        client_certificate_sct_policy_registry_digests: List[str] = []
+        client_certificate_sct_signer_roster_refs: List[str] = []
+        client_certificate_sct_signer_roster_digests: List[str] = []
+        client_certificate_sct_signer_verifier_quorum_digests: List[str] = []
         for probe_receipt, ack_receipt in zip(
             ack_endpoint_probe_receipts,
             ack_quorum_receipts,
@@ -2739,6 +2877,68 @@ class CollectiveIdentityService:
             client_certificate_ct_log_readback_digests.append(
                 str(probe_copy["mtls_client_certificate_ct_log_readback_digest"])
             )
+            client_certificate_sct_policy_authority_proof = {
+                "probe_id": probe_copy["probe_id"],
+                "ack_receipt_digest": probe_copy["ack_receipt_digest"],
+                "registry_authority_ref": probe_copy["registry_authority_ref"],
+                "registry_jurisdiction": probe_copy["registry_jurisdiction"],
+                "registry_ack_endpoint_ref": probe_copy["registry_ack_endpoint_ref"],
+                "mtls_client_certificate_sct_timestamp_digest": probe_copy[
+                    "mtls_client_certificate_sct_timestamp_digest"
+                ],
+                "mtls_client_certificate_sct_policy_registry_ref": probe_copy[
+                    "mtls_client_certificate_sct_policy_registry_ref"
+                ],
+                "mtls_client_certificate_sct_policy_registry_digest": probe_copy[
+                    "mtls_client_certificate_sct_policy_registry_digest"
+                ],
+                "mtls_client_certificate_sct_signer_roster_ref": probe_copy[
+                    "mtls_client_certificate_sct_signer_roster_ref"
+                ],
+                "mtls_client_certificate_sct_signer_roster_digest": probe_copy[
+                    "mtls_client_certificate_sct_signer_roster_digest"
+                ],
+                "mtls_client_certificate_sct_signer_verifier_quorum_digest": (
+                    probe_copy[
+                        "mtls_client_certificate_sct_signer_verifier_quorum_digest"
+                    ]
+                ),
+                "mtls_client_certificate_sct_policy_authority_status": probe_copy[
+                    "mtls_client_certificate_sct_policy_authority_status"
+                ],
+                "mtls_client_certificate_sct_policy_authority_digest": probe_copy[
+                    "mtls_client_certificate_sct_policy_authority_digest"
+                ],
+                "mtls_client_certificate_sct_policy_authority_bound": probe_copy[
+                    "mtls_client_certificate_sct_policy_authority_bound"
+                ],
+                "raw_sct_policy_authority_payload_stored": False,
+            }
+            client_certificate_sct_policy_authority_proofs.append(
+                client_certificate_sct_policy_authority_proof
+            )
+            client_certificate_sct_policy_authority_digests.append(
+                str(probe_copy["mtls_client_certificate_sct_policy_authority_digest"])
+            )
+            client_certificate_sct_policy_registry_refs.append(
+                str(probe_copy["mtls_client_certificate_sct_policy_registry_ref"])
+            )
+            client_certificate_sct_policy_registry_digests.append(
+                str(probe_copy["mtls_client_certificate_sct_policy_registry_digest"])
+            )
+            client_certificate_sct_signer_roster_refs.append(
+                str(probe_copy["mtls_client_certificate_sct_signer_roster_ref"])
+            )
+            client_certificate_sct_signer_roster_digests.append(
+                str(probe_copy["mtls_client_certificate_sct_signer_roster_digest"])
+            )
+            client_certificate_sct_signer_verifier_quorum_digests.append(
+                str(
+                    probe_copy[
+                        "mtls_client_certificate_sct_signer_verifier_quorum_digest"
+                    ]
+                )
+            )
             client_certificate_refs.append(str(probe_copy["mtls_client_certificate_ref"]))
             client_certificate_fingerprints.append(
                 str(probe_copy["mtls_client_certificate_fingerprint"])
@@ -2837,6 +3037,9 @@ class CollectiveIdentityService:
         )
         client_certificate_ct_log_quorum_digest_set_digest = sha256_text(
             canonical_json(client_certificate_ct_log_quorum_digests)
+        )
+        client_certificate_sct_policy_authority_digest_set_digest = sha256_text(
+            canonical_json(client_certificate_sct_policy_authority_digests)
         )
         receipt = dict(external_registry_sync)
         receipt.update(
@@ -2969,6 +3172,36 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest": (
                     client_certificate_ct_log_quorum_digest_set_digest
                 ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_profile_id": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+                ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_proofs": (
+                    client_certificate_sct_policy_authority_proofs
+                ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digests": (
+                    client_certificate_sct_policy_authority_digests
+                ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest": (
+                    client_certificate_sct_policy_authority_digest_set_digest
+                ),
+                "ack_live_endpoint_client_certificate_sct_policy_registry_refs": (
+                    client_certificate_sct_policy_registry_refs
+                ),
+                "ack_live_endpoint_client_certificate_sct_policy_registry_digests": (
+                    client_certificate_sct_policy_registry_digests
+                ),
+                "ack_live_endpoint_client_certificate_sct_signer_roster_refs": (
+                    client_certificate_sct_signer_roster_refs
+                ),
+                "ack_live_endpoint_client_certificate_sct_signer_roster_digests": (
+                    client_certificate_sct_signer_roster_digests
+                ),
+                "ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests": (
+                    client_certificate_sct_signer_verifier_quorum_digests
+                ),
                 "ack_live_endpoint_client_certificate_refs": client_certificate_refs,
                 "ack_live_endpoint_client_certificate_fingerprints": (
                     client_certificate_fingerprints
@@ -3039,6 +3272,7 @@ class CollectiveIdentityService:
                 "ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_ct_log_bound": True,
                 "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound": True,
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound": True,
                 "raw_ack_endpoint_payload_stored": False,
                 "raw_response_signature_payload_stored": False,
                 "raw_client_certificate_payload_stored": False,
@@ -3046,6 +3280,7 @@ class CollectiveIdentityService:
                 "raw_client_certificate_lifecycle_payload_stored": False,
                 "raw_client_certificate_lifecycle_chain_payload_stored": False,
                 "raw_client_certificate_ct_log_payload_stored": False,
+                "raw_sct_policy_authority_payload_stored": False,
             }
         )
         receipt["registry_digest_set"] = [
@@ -3075,6 +3310,9 @@ class CollectiveIdentityService:
             receipt[
                 "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
             ],
+            receipt[
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest"
+            ],
         ]
         receipt["registry_digest_set_digest"] = sha256_text(
             canonical_json(receipt["registry_digest_set"])
@@ -3091,6 +3329,9 @@ class CollectiveIdentityService:
             ]
             and receipt["ack_live_endpoint_mtls_client_certificate_ct_log_bound"]
             and receipt["ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"]
+            and receipt[
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+            ]
         )
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -5002,6 +5243,27 @@ class CollectiveIdentityService:
         expected_ack_live_endpoint_client_certificate_sct_timestamp_statuses: List[
             str
         ] = []
+        expected_ack_live_endpoint_client_certificate_sct_policy_authority_proofs: List[
+            Dict[str, Any]
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_policy_authority_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_policy_registry_refs: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_policy_registry_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_signer_roster_refs: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_signer_roster_digests: List[
+            str
+        ] = []
+        expected_ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests: List[
+            str
+        ] = []
         ack_live_endpoint_probe_bound = False
         ack_live_endpoint_signed_response_envelope_bound = False
         ack_live_endpoint_mtls_client_certificate_bound = False
@@ -5010,6 +5272,7 @@ class CollectiveIdentityService:
         ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound = False
         ack_live_endpoint_mtls_client_certificate_ct_log_bound = False
         ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound = False
+        ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound = False
         raw_ack_endpoint_payload_stored = (
             receipt.get("raw_ack_endpoint_payload_stored") is True
         )
@@ -5031,6 +5294,9 @@ class CollectiveIdentityService:
         )
         raw_client_certificate_ct_log_payload_stored = (
             receipt.get("raw_client_certificate_ct_log_payload_stored") is True
+        )
+        raw_sct_policy_authority_payload_stored = (
+            receipt.get("raw_sct_policy_authority_payload_stored") is True
         )
         if not isinstance(ack_live_endpoint_probe_receipts, list):
             errors.append("ack_live_endpoint_probe_receipts must be a list")
@@ -5474,6 +5740,110 @@ class CollectiveIdentityService:
                 expected_ack_live_endpoint_client_certificate_sct_timestamp_statuses.append(
                     str(probe_receipt.get("mtls_client_certificate_sct_timestamp_status"))
                 )
+                expected_sct_policy_authority_proof = {
+                    "probe_id": probe_receipt.get("probe_id"),
+                    "ack_receipt_digest": probe_receipt.get("ack_receipt_digest"),
+                    "registry_authority_ref": probe_receipt.get(
+                        "registry_authority_ref"
+                    ),
+                    "registry_jurisdiction": probe_receipt.get(
+                        "registry_jurisdiction"
+                    ),
+                    "registry_ack_endpoint_ref": probe_receipt.get(
+                        "registry_ack_endpoint_ref"
+                    ),
+                    "mtls_client_certificate_sct_timestamp_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_timestamp_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_policy_registry_ref": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_registry_ref"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_policy_registry_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_registry_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_signer_roster_ref": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_roster_ref"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_signer_roster_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_roster_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_signer_verifier_quorum_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_verifier_quorum_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_policy_authority_status": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_authority_status"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_policy_authority_digest": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_authority_digest"
+                        )
+                    ),
+                    "mtls_client_certificate_sct_policy_authority_bound": (
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_authority_bound"
+                        )
+                    ),
+                    "raw_sct_policy_authority_payload_stored": False,
+                }
+                expected_ack_live_endpoint_client_certificate_sct_policy_authority_proofs.append(
+                    expected_sct_policy_authority_proof
+                )
+                expected_ack_live_endpoint_client_certificate_sct_policy_authority_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_authority_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_policy_registry_refs.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_registry_ref"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_policy_registry_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_policy_registry_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_signer_roster_refs.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_roster_ref"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_signer_roster_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_roster_digest"
+                        )
+                    )
+                )
+                expected_ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests.append(
+                    str(
+                        probe_receipt.get(
+                            "mtls_client_certificate_sct_signer_verifier_quorum_digest"
+                        )
+                    )
+                )
                 expected_ack_live_endpoint_client_certificate_refs.append(
                     str(probe_receipt.get("mtls_client_certificate_ref"))
                 )
@@ -5609,6 +5979,11 @@ class CollectiveIdentityService:
             expected_client_certificate_ct_log_quorum_digest_set_digest = sha256_text(
                 canonical_json(
                     expected_ack_live_endpoint_client_certificate_ct_log_quorum_digests
+                )
+            )
+            expected_client_certificate_sct_policy_authority_digest_set_digest = sha256_text(
+                canonical_json(
+                    expected_ack_live_endpoint_client_certificate_sct_policy_authority_digests
                 )
             )
             ack_live_endpoint_probe_bound = (
@@ -5943,6 +6318,62 @@ class CollectiveIdentityService:
                 is True
                 and not raw_client_certificate_ct_log_payload_stored
             )
+            ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound = (
+                probe_receipts_valid
+                and all(
+                    isinstance(probe_receipt, Mapping)
+                    and probe_receipt.get(
+                        "mtls_client_certificate_sct_policy_authority_bound"
+                    )
+                    is True
+                    and probe_receipt.get(
+                        "raw_sct_policy_authority_payload_stored"
+                    )
+                    is False
+                    and probe_receipt.get(
+                        "mtls_client_certificate_sct_policy_authority_status"
+                    )
+                    == "verified"
+                    for probe_receipt in ack_live_endpoint_probe_receipts
+                )
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_proofs"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_policy_authority_proofs
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_policy_authority_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest"
+                )
+                == expected_client_certificate_sct_policy_authority_digest_set_digest
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_policy_registry_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_policy_registry_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_policy_registry_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_policy_registry_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_signer_roster_refs"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_signer_roster_refs
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_signer_roster_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_signer_roster_digests
+                and receipt.get(
+                    "ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests"
+                )
+                == expected_ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests
+                and receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+                )
+                is True
+                and not raw_sct_policy_authority_payload_stored
+            )
         if not ack_live_endpoint_probe_bound:
             errors.append("ack live endpoint probes must bind every registry acknowledgement")
         if not ack_live_endpoint_signed_response_envelope_bound:
@@ -5973,6 +6404,10 @@ class CollectiveIdentityService:
             errors.append(
                 "ack live endpoint probes must bind mTLS client certificate CT log quorum proofs"
             )
+        if not ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound:
+            errors.append(
+                "ack live endpoint probes must bind SCT policy authority proofs"
+            )
         if raw_ack_endpoint_payload_stored:
             errors.append("raw_ack_endpoint_payload_stored must be false")
         if raw_response_signature_payload_stored:
@@ -5993,6 +6428,8 @@ class CollectiveIdentityService:
             )
         if raw_client_certificate_ct_log_payload_stored:
             errors.append("raw_client_certificate_ct_log_payload_stored must be false")
+        if raw_sct_policy_authority_payload_stored:
+            errors.append("raw_sct_policy_authority_payload_stored must be false")
 
         registry_digest_set = receipt.get("registry_digest_set")
         registry_digest_set_bound = (
@@ -6026,6 +6463,9 @@ class CollectiveIdentityService:
                 ),
                 receipt.get(
                     "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+                ),
+                receipt.get(
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest"
                 ),
             ]
             and receipt.get("registry_digest_set_digest")
@@ -6070,6 +6510,7 @@ class CollectiveIdentityService:
             and ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
             and ack_live_endpoint_mtls_client_certificate_ct_log_bound
             and ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
+            and ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound
             and registry_digest_set_bound
             and digest_bound
             and not raw_dissolution_payload_stored
@@ -6083,6 +6524,7 @@ class CollectiveIdentityService:
             and not raw_client_certificate_lifecycle_payload_stored
             and not raw_client_certificate_lifecycle_chain_payload_stored
             and not raw_client_certificate_ct_log_payload_stored
+            and not raw_sct_policy_authority_payload_stored
             and not raw_packet_body_stored
         )
         if receipt.get("external_registry_sync_complete") is not complete:
@@ -6130,6 +6572,9 @@ class CollectiveIdentityService:
             "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound": (
                 ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
             ),
+            "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound": (
+                ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound
+            ),
             "registry_digest_set_bound": registry_digest_set_bound,
             "external_registry_sync_complete": complete,
             "digest_bound": digest_bound,
@@ -6155,6 +6600,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_ct_log_payload_stored": (
                 raw_client_certificate_ct_log_payload_stored
+            ),
+            "raw_sct_policy_authority_payload_stored": (
+                raw_sct_policy_authority_payload_stored
             ),
             "raw_packet_body_stored": raw_packet_body_stored,
         }
@@ -6761,6 +7209,78 @@ class CollectiveIdentityService:
                 quorum_status="quorum-met",
             )
         )
+        expected_sct_policy_registry_ref = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_registry_ref(
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+            )
+        )
+        expected_sct_policy_registry_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_registry_digest(
+                policy_registry_ref=expected_sct_policy_registry_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+                registry_jurisdiction=str(ack_receipt.get("registry_jurisdiction")),
+                timestamp_policy=COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_POLICY_ID,
+                timestamp_window_seconds=(
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                ),
+            )
+        )
+        expected_sct_signer_roster_ref = (
+            self._collective_external_registry_ack_client_certificate_sct_signer_roster_ref(
+                policy_registry_ref=expected_sct_policy_registry_ref,
+                registry_authority_ref=str(ack_receipt.get("registry_authority_ref")),
+            )
+        )
+        expected_sct_signer_key_refs = [
+            f"sct-signer-key://{str(ack_receipt.get('registry_jurisdiction')).lower()}/primary",
+            f"sct-signer-key://{str(ack_receipt.get('registry_jurisdiction')).lower()}/witness",
+        ]
+        expected_sct_signer_jurisdictions = [
+            str(ack_receipt.get("registry_jurisdiction")),
+            f"{str(ack_receipt.get('registry_jurisdiction'))}-witness",
+        ]
+        expected_sct_signer_roster_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_signer_roster_digest(
+                signer_roster_ref=expected_sct_signer_roster_ref,
+                policy_registry_digest=expected_sct_policy_registry_digest,
+                signer_key_refs=expected_sct_signer_key_refs,
+                signer_jurisdictions=expected_sct_signer_jurisdictions,
+            )
+        )
+        expected_sct_signer_verifier_refs = [
+            f"sct-signer-verifier://{str(ack_receipt.get('registry_jurisdiction')).lower()}/primary",
+            f"sct-signer-verifier://{str(ack_receipt.get('registry_jurisdiction')).lower()}/witness",
+        ]
+        expected_sct_signer_verifier_response_digests = [
+            self._collective_external_registry_ack_client_certificate_sct_verifier_response_digest(
+                verifier_ref=verifier_ref,
+                policy_registry_digest=expected_sct_policy_registry_digest,
+                signer_roster_digest=expected_sct_signer_roster_digest,
+                checked_at=str(receipt.get("checked_at") or ""),
+            )
+            for verifier_ref in expected_sct_signer_verifier_refs
+        ]
+        expected_sct_signer_verifier_quorum_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_verifier_quorum_digest(
+                verifier_refs=expected_sct_signer_verifier_refs,
+                verifier_response_digests=expected_sct_signer_verifier_response_digests,
+                signer_roster_digest=expected_sct_signer_roster_digest,
+            )
+        )
+        expected_sct_policy_authority_digest = (
+            self._collective_external_registry_ack_client_certificate_sct_policy_authority_digest(
+                registry_ack_endpoint_ref=str(
+                    receipt.get("registry_ack_endpoint_ref") or ""
+                ),
+                ack_receipt_digest=str(ack_receipt.get("ack_receipt_digest")),
+                sct_timestamp_digest=expected_sct_timestamp_digest,
+                policy_registry_digest=expected_sct_policy_registry_digest,
+                signer_roster_digest=expected_sct_signer_roster_digest,
+                verifier_quorum_digest=expected_sct_signer_verifier_quorum_digest,
+                authority_status="verified",
+            )
+        )
         expected_fields.update(
             {
                 "mtls_client_certificate_ref": expected_client_certificate_ref,
@@ -6900,6 +7420,44 @@ class CollectiveIdentityService:
                     expected_ct_log_quorum_digest
                 ),
                 "mtls_client_certificate_ct_log_quorum_bound": True,
+                "mtls_client_certificate_sct_policy_authority_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                ),
+                "mtls_client_certificate_sct_policy_authority_digest_profile": (
+                    COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+                ),
+                "mtls_client_certificate_sct_policy_registry_ref": (
+                    expected_sct_policy_registry_ref
+                ),
+                "mtls_client_certificate_sct_policy_registry_digest": (
+                    expected_sct_policy_registry_digest
+                ),
+                "mtls_client_certificate_sct_signer_roster_ref": (
+                    expected_sct_signer_roster_ref
+                ),
+                "mtls_client_certificate_sct_signer_roster_digest": (
+                    expected_sct_signer_roster_digest
+                ),
+                "mtls_client_certificate_sct_signer_key_refs": (
+                    expected_sct_signer_key_refs
+                ),
+                "mtls_client_certificate_sct_signer_jurisdictions": (
+                    expected_sct_signer_jurisdictions
+                ),
+                "mtls_client_certificate_sct_signer_verifier_refs": (
+                    expected_sct_signer_verifier_refs
+                ),
+                "mtls_client_certificate_sct_signer_verifier_response_digests": (
+                    expected_sct_signer_verifier_response_digests
+                ),
+                "mtls_client_certificate_sct_signer_verifier_quorum_digest": (
+                    expected_sct_signer_verifier_quorum_digest
+                ),
+                "mtls_client_certificate_sct_policy_authority_status": "verified",
+                "mtls_client_certificate_sct_policy_authority_digest": (
+                    expected_sct_policy_authority_digest
+                ),
+                "mtls_client_certificate_sct_policy_authority_bound": True,
             }
         )
         for field_name, expected in expected_fields.items():
@@ -6934,6 +7492,10 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_quorum_set_digest",
             "mtls_client_certificate_sct_timestamp_digest",
             "mtls_client_certificate_ct_log_quorum_digest",
+            "mtls_client_certificate_sct_policy_registry_digest",
+            "mtls_client_certificate_sct_signer_roster_digest",
+            "mtls_client_certificate_sct_signer_verifier_quorum_digest",
+            "mtls_client_certificate_sct_policy_authority_digest",
             "digest",
         ):
             if not self._looks_like_digest(receipt.get(field_name)):
@@ -7138,6 +7700,46 @@ class CollectiveIdentityService:
             errors.append(
                 "mTLS client certificate CT log quorum must bind multi-log SCT evidence"
             )
+        mtls_client_certificate_sct_policy_authority_bound = bool(
+            mtls_client_certificate_ct_log_quorum_bound
+            and receipt.get("mtls_client_certificate_sct_policy_authority_profile")
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+            and receipt.get(
+                "mtls_client_certificate_sct_policy_authority_digest_profile"
+            )
+            == COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+            and receipt.get("mtls_client_certificate_sct_policy_registry_ref")
+            == expected_sct_policy_registry_ref
+            and receipt.get("mtls_client_certificate_sct_policy_registry_digest")
+            == expected_sct_policy_registry_digest
+            and receipt.get("mtls_client_certificate_sct_signer_roster_ref")
+            == expected_sct_signer_roster_ref
+            and receipt.get("mtls_client_certificate_sct_signer_roster_digest")
+            == expected_sct_signer_roster_digest
+            and receipt.get("mtls_client_certificate_sct_signer_key_refs")
+            == expected_sct_signer_key_refs
+            and receipt.get("mtls_client_certificate_sct_signer_jurisdictions")
+            == expected_sct_signer_jurisdictions
+            and receipt.get("mtls_client_certificate_sct_signer_verifier_refs")
+            == expected_sct_signer_verifier_refs
+            and receipt.get(
+                "mtls_client_certificate_sct_signer_verifier_response_digests"
+            )
+            == expected_sct_signer_verifier_response_digests
+            and receipt.get("mtls_client_certificate_sct_signer_verifier_quorum_digest")
+            == expected_sct_signer_verifier_quorum_digest
+            and receipt.get("mtls_client_certificate_sct_policy_authority_status")
+            == "verified"
+            and receipt.get("mtls_client_certificate_sct_policy_authority_digest")
+            == expected_sct_policy_authority_digest
+            and receipt.get("mtls_client_certificate_sct_policy_authority_bound")
+            is True
+            and receipt.get("raw_sct_policy_authority_payload_stored") is False
+        )
+        if not mtls_client_certificate_sct_policy_authority_bound:
+            errors.append(
+                "mTLS client certificate SCT policy authority must bind policy registry and signer quorum"
+            )
         endpoint = receipt.get("registry_ack_endpoint_ref")
         if not isinstance(endpoint, str) or not _is_live_http_endpoint(endpoint):
             errors.append("registry_ack_endpoint_ref must be a live http(s) endpoint")
@@ -7196,6 +7798,9 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_quorum_bound": (
                 mtls_client_certificate_ct_log_quorum_bound
             ),
+            "mtls_client_certificate_sct_policy_authority_bound": (
+                mtls_client_certificate_sct_policy_authority_bound
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored") is True,
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored")
             is True,
@@ -7217,6 +7822,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_ct_log_payload_stored": (
                 receipt.get("raw_client_certificate_ct_log_payload_stored") is True
+            ),
+            "raw_sct_policy_authority_payload_stored": (
+                receipt.get("raw_sct_policy_authority_payload_stored") is True
             ),
         }
 
@@ -8114,6 +8722,48 @@ class CollectiveIdentityService:
             "mtls_client_certificate_ct_log_quorum_bound": receipt.get(
                 "mtls_client_certificate_ct_log_quorum_bound"
             ),
+            "mtls_client_certificate_sct_policy_authority_profile": receipt.get(
+                "mtls_client_certificate_sct_policy_authority_profile"
+            ),
+            "mtls_client_certificate_sct_policy_authority_digest_profile": receipt.get(
+                "mtls_client_certificate_sct_policy_authority_digest_profile"
+            ),
+            "mtls_client_certificate_sct_policy_registry_ref": receipt.get(
+                "mtls_client_certificate_sct_policy_registry_ref"
+            ),
+            "mtls_client_certificate_sct_policy_registry_digest": receipt.get(
+                "mtls_client_certificate_sct_policy_registry_digest"
+            ),
+            "mtls_client_certificate_sct_signer_roster_ref": receipt.get(
+                "mtls_client_certificate_sct_signer_roster_ref"
+            ),
+            "mtls_client_certificate_sct_signer_roster_digest": receipt.get(
+                "mtls_client_certificate_sct_signer_roster_digest"
+            ),
+            "mtls_client_certificate_sct_signer_key_refs": receipt.get(
+                "mtls_client_certificate_sct_signer_key_refs"
+            ),
+            "mtls_client_certificate_sct_signer_jurisdictions": receipt.get(
+                "mtls_client_certificate_sct_signer_jurisdictions"
+            ),
+            "mtls_client_certificate_sct_signer_verifier_refs": receipt.get(
+                "mtls_client_certificate_sct_signer_verifier_refs"
+            ),
+            "mtls_client_certificate_sct_signer_verifier_response_digests": receipt.get(
+                "mtls_client_certificate_sct_signer_verifier_response_digests"
+            ),
+            "mtls_client_certificate_sct_signer_verifier_quorum_digest": receipt.get(
+                "mtls_client_certificate_sct_signer_verifier_quorum_digest"
+            ),
+            "mtls_client_certificate_sct_policy_authority_status": receipt.get(
+                "mtls_client_certificate_sct_policy_authority_status"
+            ),
+            "mtls_client_certificate_sct_policy_authority_digest": receipt.get(
+                "mtls_client_certificate_sct_policy_authority_digest"
+            ),
+            "mtls_client_certificate_sct_policy_authority_bound": receipt.get(
+                "mtls_client_certificate_sct_policy_authority_bound"
+            ),
             "raw_ack_payload_stored": receipt.get("raw_ack_payload_stored"),
             "raw_endpoint_payload_stored": receipt.get("raw_endpoint_payload_stored"),
             "raw_response_signature_payload_stored": receipt.get(
@@ -8133,6 +8783,9 @@ class CollectiveIdentityService:
             ),
             "raw_client_certificate_ct_log_payload_stored": receipt.get(
                 "raw_client_certificate_ct_log_payload_stored"
+            ),
+            "raw_sct_policy_authority_payload_stored": receipt.get(
+                "raw_sct_policy_authority_payload_stored"
             ),
         }
 
@@ -8943,6 +9596,177 @@ class CollectiveIdentityService:
         )
 
     @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_policy_registry_ref(
+        *,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+    ) -> str:
+        registry_digest = sha256_text(
+            canonical_json(
+                {
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                }
+            )
+        )
+        return f"sct-policy-registry://{registry_digest[:24]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_policy_registry_digest(
+        *,
+        policy_registry_ref: str,
+        registry_authority_ref: str,
+        registry_jurisdiction: str,
+        timestamp_policy: str,
+        timestamp_window_seconds: int,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+                    ),
+                    "policy_registry_ref": policy_registry_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "registry_jurisdiction": registry_jurisdiction,
+                    "timestamp_policy": timestamp_policy,
+                    "timestamp_window_seconds": timestamp_window_seconds,
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_signer_roster_ref(
+        *,
+        policy_registry_ref: str,
+        registry_authority_ref: str,
+    ) -> str:
+        roster_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_registry_ref": policy_registry_ref,
+                    "registry_authority_ref": registry_authority_ref,
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                }
+            )
+        )
+        return f"sct-signer-roster://{roster_digest[:24]}"
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_signer_roster_digest(
+        *,
+        signer_roster_ref: str,
+        policy_registry_digest: str,
+        signer_key_refs: Sequence[str],
+        signer_jurisdictions: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+                    ),
+                    "signer_roster_ref": signer_roster_ref,
+                    "policy_registry_digest": policy_registry_digest,
+                    "signer_key_refs": list(signer_key_refs),
+                    "signer_jurisdictions": list(signer_jurisdictions),
+                    "required_signer_quorum": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_SIGNER_QUORUM_REQUIRED
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_verifier_response_digest(
+        *,
+        verifier_ref: str,
+        policy_registry_digest: str,
+        signer_roster_digest: str,
+        checked_at: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                    "verifier_ref": verifier_ref,
+                    "policy_registry_digest": policy_registry_digest,
+                    "signer_roster_digest": signer_roster_digest,
+                    "checked_at": checked_at,
+                    "verifier_status": "accepted",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_verifier_quorum_digest(
+        *,
+        verifier_refs: Sequence[str],
+        verifier_response_digests: Sequence[str],
+        signer_roster_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                    "required_signer_quorum": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_SIGNER_QUORUM_REQUIRED
+                    ),
+                    "verifier_refs": list(verifier_refs),
+                    "verifier_response_digests": list(verifier_response_digests),
+                    "signer_roster_digest": signer_roster_digest,
+                    "quorum_status": "complete",
+                }
+            )
+        )
+
+    @staticmethod
+    def _collective_external_registry_ack_client_certificate_sct_policy_authority_digest(
+        *,
+        registry_ack_endpoint_ref: str,
+        ack_receipt_digest: str,
+        sct_timestamp_digest: str,
+        policy_registry_digest: str,
+        signer_roster_digest: str,
+        verifier_quorum_digest: str,
+        authority_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_PROFILE_ID
+                    ),
+                    "digest_profile": (
+                        COLLECTIVE_EXTERNAL_REGISTRY_ACK_CLIENT_CERTIFICATE_SCT_POLICY_AUTHORITY_DIGEST_PROFILE_ID
+                    ),
+                    "registry_ack_endpoint_ref": registry_ack_endpoint_ref,
+                    "ack_receipt_digest": ack_receipt_digest,
+                    "sct_timestamp_digest": sct_timestamp_digest,
+                    "policy_registry_digest": policy_registry_digest,
+                    "signer_roster_digest": signer_roster_digest,
+                    "verifier_quorum_digest": verifier_quorum_digest,
+                    "authority_status": authority_status,
+                }
+            )
+        )
+
+    @staticmethod
     def _collective_external_registry_ack_client_certificate_ct_log_quorum_digest(
         *,
         registry_ack_endpoint_ref: str,
@@ -9015,6 +9839,9 @@ class CollectiveIdentityService:
             ),
             "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest": receipt.get(
                 "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
+            ),
+            "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest": receipt.get(
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest"
             ),
             "registry_digest_set_digest": receipt.get("registry_digest_set_digest"),
         }

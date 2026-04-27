@@ -7442,6 +7442,56 @@ json.dump(response, sys.stdout)
                 memory_glimpse_reconsent_receipt
             )
         )
+        merge_session = self.imc.open_session(
+            initiator_id=identity.identity_id,
+            peer_id=peer.identity_id,
+            mode="merge_thought",
+            initiator_template={
+                "public_fields": ["display_name", "shared_focus", "presence_state"],
+                "intimate_fields": ["affect_summary", "intent_vector"],
+                "sealed_fields": ["memory_index", "identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state", "memory_index"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        merge_message = self.imc.send(
+            merge_session["session_id"],
+            sender_id=identity.identity_id,
+            summary="merge_thought は Federation Council / Ethics / Guardian gate 後にだけ collective merge へ進める",
+            payload={
+                "display_name": "IMC Origin",
+                "shared_focus": "merge-thought-ethics-boundary",
+                "affect_summary": "careful trust",
+                "intent_vector": "synthesize shared plan",
+                "memory_index": "crystal://merge-thought/segment-1",
+                "identity_axiom_state": "sealed-core",
+            },
+        )
+        merge_thought_ethics_receipt = self.imc.seal_merge_thought_ethics_receipt(
+            merge_session["session_id"],
+            message=merge_message,
+            collective_ref=f"collective://imc-merge-thought/{merge_session['session_id']}",
+            council_session_ref=f"council://imc-merge-thought/{merge_session['session_id']}",
+            federation_council_ref=(
+                f"federation-council://imc-merge-thought/{merge_session['session_id']}"
+            ),
+            ethics_decision_ref="ethics://imc-merge-thought/approved-digest-only-v1",
+            guardian_attestation_ref=(
+                "guardian://integrity/imc-merge-thought-ethics-gate-v1"
+            ),
+            requested_merge_window_seconds=10,
+        )
+        merge_thought_ethics_validation = (
+            self.imc.validate_merge_thought_ethics_receipt(
+                merge_thought_ethics_receipt
+            )
+        )
         final_session = self.imc.snapshot(session["session_id"])
         session_validation = self.imc.validate_session(final_session)
         validation = {
@@ -7479,6 +7529,29 @@ json.dump(response, sys.stdout)
             ),
             "memory_glimpse_reconsent_raw_payload_stored": (
                 memory_glimpse_reconsent_validation["raw_reconsent_payload_stored"]
+            ),
+            "merge_thought_ethics_receipt": merge_thought_ethics_validation,
+            "merge_thought_ethics_receipt_ok": merge_thought_ethics_validation["ok"],
+            "merge_thought_ethics_risk_bound": merge_thought_ethics_validation[
+                "risk_bound"
+            ],
+            "merge_thought_ethics_collective_bound": merge_thought_ethics_validation[
+                "collective_bound"
+            ],
+            "merge_thought_ethics_disclosure_bound": merge_thought_ethics_validation[
+                "disclosure_bound"
+            ],
+            "merge_thought_ethics_gate_bound": merge_thought_ethics_validation[
+                "gate_bound"
+            ],
+            "merge_thought_ethics_digest_bound": merge_thought_ethics_validation[
+                "digest_bound"
+            ],
+            "merge_thought_ethics_raw_thought_payload_stored": (
+                merge_thought_ethics_validation["raw_thought_payload_stored"]
+            ),
+            "merge_thought_ethics_raw_message_payload_stored": (
+                merge_thought_ethics_validation["raw_message_payload_stored"]
             ),
         }
 
@@ -7594,6 +7667,36 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian", "council"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="imc.merge_thought.ethics_gate.sealed",
+            payload={
+                "receipt_id": merge_thought_ethics_receipt["receipt_id"],
+                "session_id": merge_thought_ethics_receipt["session_id"],
+                "message_id": merge_thought_ethics_receipt["message_id"],
+                "collective_ref": merge_thought_ethics_receipt["collective_binding"][
+                    "collective_ref"
+                ],
+                "gate_digest": merge_thought_ethics_receipt["council_guardian_gate"][
+                    "gate_digest"
+                ],
+                "receipt_digest": merge_thought_ethics_receipt["digest"],
+                "max_merge_window_seconds": merge_thought_ethics_receipt[
+                    "risk_boundary"
+                ]["max_merge_window_seconds"],
+                "raw_thought_payload_stored": merge_thought_ethics_receipt[
+                    "disclosure_binding"
+                ]["raw_thought_payload_stored"],
+                "raw_message_payload_stored": merge_thought_ethics_receipt[
+                    "disclosure_binding"
+                ]["raw_message_payload_stored"],
+            },
+            actor="InterMindChannel",
+            category="interface-imc",
+            layer="L6",
+            signature_roles=["self", "guardian", "council", "third_party"],
+            substrate="classical-silicon",
+        )
 
         return {
             "identity": {
@@ -7606,6 +7709,11 @@ json.dump(response, sys.stdout)
             "message": message,
             "memory_glimpse_receipt": memory_glimpse_receipt,
             "memory_glimpse_reconsent_receipt": memory_glimpse_reconsent_receipt,
+            "merge_thought": {
+                "session": self.imc.snapshot(merge_session["session_id"]),
+                "message": merge_message,
+            },
+            "merge_thought_ethics_receipt": merge_thought_ethics_receipt,
             "disconnect": disconnect,
             "session": final_session,
             "validation": validation,
@@ -8192,6 +8300,11 @@ json.dump(response, sys.stdout)
                         "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest"
                     ]
                 ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest": (
+                    external_registry_sync[
+                        "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest"
+                    ]
+                ),
                 "ack_live_endpoint_probe_bound": external_registry_sync[
                     "ack_live_endpoint_probe_bound"
                 ],
@@ -8230,6 +8343,11 @@ json.dump(response, sys.stdout)
                         "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
                     ]
                 ),
+                "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound": (
+                    external_registry_sync[
+                        "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+                    ]
+                ),
                 "raw_registry_payload_stored": external_registry_sync[
                     "raw_registry_payload_stored"
                 ],
@@ -8266,6 +8384,11 @@ json.dump(response, sys.stdout)
                 "raw_client_certificate_ct_log_payload_stored": (
                     external_registry_sync[
                         "raw_client_certificate_ct_log_payload_stored"
+                    ]
+                ),
+                "raw_sct_policy_authority_payload_stored": (
+                    external_registry_sync[
+                        "raw_sct_policy_authority_payload_stored"
                     ]
                 ),
                 "raw_packet_body_stored": external_registry_sync[
@@ -8486,6 +8609,11 @@ json.dump(response, sys.stdout)
                     "ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
                 ]
             ),
+            "external_registry_sync_ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound": (
+                external_registry_sync_validation[
+                    "ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+                ]
+            ),
             "external_registry_sync_complete": (
                 external_registry_sync_validation["external_registry_sync_complete"]
             ),
@@ -8529,6 +8657,11 @@ json.dump(response, sys.stdout)
             "external_registry_sync_raw_client_certificate_ct_log_payload_stored": (
                 external_registry_sync_validation[
                     "raw_client_certificate_ct_log_payload_stored"
+                ]
+            ),
+            "external_registry_sync_raw_sct_policy_authority_payload_stored": (
+                external_registry_sync_validation[
+                    "raw_sct_policy_authority_payload_stored"
                 ]
             ),
             "external_registry_sync_raw_packet_body_stored": (

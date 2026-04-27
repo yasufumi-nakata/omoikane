@@ -62,6 +62,20 @@ IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE = (
     "participant-withdrawal-memory-glimpse-revocation-v1"
 )
 IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS = 86_400
+IMC_MERGE_THOUGHT_ETHICS_RECEIPT_PROFILE = (
+    "federation-council-merge-thought-ethics-gate-v1"
+)
+IMC_MERGE_THOUGHT_RISK_PROFILE = "identity-confusion-bounded-merge-thought-v1"
+IMC_MERGE_THOUGHT_GATE_PROFILE = "federation-council-guardian-ethics-gate-v1"
+IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE = (
+    "distinct-collective-merge-thought-binding-v1"
+)
+IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS = 10
+IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES = [
+    "FederationCouncil",
+    "EthicsCommittee",
+    "GuardianLiaison",
+]
 
 
 def _dedupe_preserve_order(values: Sequence[str]) -> List[str]:
@@ -79,6 +93,12 @@ def _memory_glimpse_receipt_digest_payload(receipt: Dict[str, Any]) -> Dict[str,
 
 
 def _memory_glimpse_reconsent_receipt_digest_payload(
+    receipt: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _merge_thought_ethics_receipt_digest_payload(
     receipt: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
@@ -110,6 +130,14 @@ class InterMindChannel:
                 "profile_id": IMC_MEMORY_GLIMPSE_RECONSENT_PROFILE,
                 "max_window_seconds": IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS,
                 "revocation_profile": IMC_MEMORY_GLIMPSE_REVOCATION_PROFILE,
+                "raw_payload_policy": "digest-only",
+            },
+            "merge_thought_ethics_gate": {
+                "profile_id": IMC_MERGE_THOUGHT_ETHICS_RECEIPT_PROFILE,
+                "risk_profile": IMC_MERGE_THOUGHT_RISK_PROFILE,
+                "gate_profile": IMC_MERGE_THOUGHT_GATE_PROFILE,
+                "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+                "required_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
                 "raw_payload_policy": "digest-only",
             },
         }
@@ -750,6 +778,313 @@ class InterMindChannel:
             "summary_only_ledger": summary_only_ledger,
         }
 
+    def seal_merge_thought_ethics_receipt(
+        self,
+        session_id: str,
+        *,
+        message: Mapping[str, Any],
+        collective_ref: str,
+        council_session_ref: str,
+        federation_council_ref: str,
+        ethics_decision_ref: str,
+        guardian_attestation_ref: str,
+        requested_merge_window_seconds: int = IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        if session["mode"] != "merge_thought":
+            raise ValueError("merge_thought ethics receipt requires a merge_thought IMC session")
+        handshake = session["handshake"]
+        if (
+            handshake.get("council_witness_required") is not True
+            or handshake.get("council_witnessed") is not True
+        ):
+            raise PermissionError("merge_thought ethics receipt requires witnessed Council session")
+        if not isinstance(message, Mapping):
+            raise ValueError("message must be a mapping")
+        if message.get("session_id") != session_id or message.get("mode") != "merge_thought":
+            raise ValueError("message must belong to the merge_thought IMC session")
+        self._check_required_message_field(message, "message_id")
+        self._check_required_message_field(message, "payload_digest")
+        merge_window = self._normalize_merge_window(requested_merge_window_seconds)
+        collective = self._normalize_non_empty_string(collective_ref, "collective_ref")
+        council_session = self._normalize_non_empty_string(
+            council_session_ref,
+            "council_session_ref",
+        )
+        federation_council = self._normalize_non_empty_string(
+            federation_council_ref,
+            "federation_council_ref",
+        )
+        ethics_decision = self._normalize_non_empty_string(
+            ethics_decision_ref,
+            "ethics_decision_ref",
+        )
+        guardian_attestation = self._normalize_non_empty_string(
+            guardian_attestation_ref,
+            "guardian_attestation_ref",
+        )
+        delivered_fields = message.get("delivered_fields", {})
+        if not isinstance(delivered_fields, Mapping):
+            raise ValueError("message.delivered_fields must be a mapping")
+        delivered_field_names = sorted(delivered_fields)
+        redacted_fields = self._normalize_field_list(
+            message.get("redacted_fields", []),
+            "message.redacted_fields",
+        )
+        sealed_fields = self._normalize_field_list(
+            handshake["disclosure_profile"].get("sealed_fields", []),
+            "handshake.disclosure_profile.sealed_fields",
+        )
+        if any(field in delivered_field_names for field in sealed_fields):
+            raise ValueError("merge_thought ethics receipt cannot bind delivered sealed fields")
+        collective_binding_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE,
+                    "session_id": session_id,
+                    "collective_ref": collective,
+                    "participants": list(session["participants"]),
+                    "merge_mode": "merge_thought",
+                    "distinct_collective_required": True,
+                }
+            )
+        )
+        gate_digest = sha256_text(
+            canonical_json(
+                {
+                    "gate_profile": IMC_MERGE_THOUGHT_GATE_PROFILE,
+                    "session_id": session_id,
+                    "message_id": message["message_id"],
+                    "collective_ref": collective,
+                    "council_session_ref": council_session,
+                    "federation_council_ref": federation_council,
+                    "ethics_decision_ref": ethics_decision,
+                    "guardian_attestation_ref": guardian_attestation,
+                    "requested_merge_window_seconds": merge_window,
+                    "message_payload_digest": message["payload_digest"],
+                    "collective_binding_digest": collective_binding_digest,
+                }
+            )
+        )
+        recorded_at = utc_now_iso()
+        receipt = {
+            "schema_version": IMC_SCHEMA_VERSION,
+            "receipt_id": new_id("imc-merge-ethics"),
+            "profile_id": IMC_MERGE_THOUGHT_ETHICS_RECEIPT_PROFILE,
+            "session_id": session_id,
+            "handshake_id": handshake["handshake_id"],
+            "message_id": message["message_id"],
+            "route_mode": "merge_thought",
+            "participants": list(session["participants"]),
+            "issued_at": recorded_at,
+            "risk_boundary": {
+                "risk_profile": IMC_MERGE_THOUGHT_RISK_PROFILE,
+                "identity_confusion_risk": "high",
+                "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+                "requested_merge_window_seconds": merge_window,
+                "post_disconnect_identity_confirmation_required": True,
+                "emergency_disconnect_required": True,
+                "private_recovery_mode_required": True,
+            },
+            "collective_binding": {
+                "binding_profile": IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE,
+                "collective_ref": collective,
+                "merge_mode": "merge_thought",
+                "distinct_collective_required": True,
+                "participants": list(session["participants"]),
+                "collective_binding_digest": collective_binding_digest,
+            },
+            "disclosure_binding": {
+                "message_payload_digest": message["payload_digest"],
+                "delivered_field_names": delivered_field_names,
+                "redacted_fields": redacted_fields,
+                "sealed_fields": sealed_fields,
+                "summary_only_ledger": True,
+                "raw_thought_payload_stored": False,
+                "raw_message_payload_stored": False,
+            },
+            "council_guardian_gate": {
+                "gate_profile": IMC_MERGE_THOUGHT_GATE_PROFILE,
+                "gate_status": "approved",
+                "council_session_ref": council_session,
+                "federation_council_ref": federation_council,
+                "ethics_decision_ref": ethics_decision,
+                "guardian_attestation_ref": guardian_attestation,
+                "required_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
+                "accepted_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
+                "gate_before_collective_merge": True,
+                "gate_digest": gate_digest,
+            },
+            "continuity_event_ref": f"ledger://imc-merge-thought-ethics/{session_id}",
+            "status": "approved",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_merge_thought_ethics_receipt_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_merge_thought_ethics_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+        errors: List[str] = []
+        if receipt.get("schema_version") != IMC_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {IMC_SCHEMA_VERSION}")
+        if receipt.get("profile_id") != IMC_MERGE_THOUGHT_ETHICS_RECEIPT_PROFILE:
+            errors.append(f"profile_id must be {IMC_MERGE_THOUGHT_ETHICS_RECEIPT_PROFILE}")
+        if receipt.get("route_mode") != "merge_thought":
+            errors.append("route_mode must be merge_thought")
+        if receipt.get("status") != "approved":
+            errors.append("status must be approved")
+
+        risk = receipt.get("risk_boundary")
+        risk_bound = False
+        if not isinstance(risk, Mapping):
+            errors.append("risk_boundary must be an object")
+        else:
+            risk_bound = (
+                risk.get("risk_profile") == IMC_MERGE_THOUGHT_RISK_PROFILE
+                and risk.get("identity_confusion_risk") == "high"
+                and risk.get("max_merge_window_seconds")
+                == IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
+                and isinstance(risk.get("requested_merge_window_seconds"), int)
+                and 0
+                < risk.get("requested_merge_window_seconds")
+                <= IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
+                and risk.get("post_disconnect_identity_confirmation_required") is True
+                and risk.get("emergency_disconnect_required") is True
+                and risk.get("private_recovery_mode_required") is True
+            )
+            if not risk_bound:
+                errors.append("risk_boundary must bind bounded merge-thought recovery policy")
+
+        collective = receipt.get("collective_binding")
+        collective_bound = False
+        if not isinstance(collective, Mapping):
+            errors.append("collective_binding must be an object")
+        else:
+            collective_core = {
+                "profile_id": IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE,
+                "session_id": receipt.get("session_id"),
+                "collective_ref": collective.get("collective_ref"),
+                "participants": collective.get("participants"),
+                "merge_mode": "merge_thought",
+                "distinct_collective_required": True,
+            }
+            collective_bound = (
+                collective.get("binding_profile")
+                == IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE
+                and collective.get("merge_mode") == "merge_thought"
+                and collective.get("distinct_collective_required") is True
+                and collective.get("participants") == receipt.get("participants")
+                and isinstance(collective.get("collective_ref"), str)
+                and collective.get("collective_binding_digest")
+                == sha256_text(canonical_json(collective_core))
+            )
+            if not collective_bound:
+                errors.append("collective_binding must bind a distinct collective merge target")
+
+        disclosure = receipt.get("disclosure_binding")
+        disclosure_bound = False
+        raw_thought_payload_stored = True
+        raw_message_payload_stored = True
+        if not isinstance(disclosure, Mapping):
+            errors.append("disclosure_binding must be an object")
+        else:
+            delivered_fields = disclosure.get("delivered_field_names")
+            redacted_fields = disclosure.get("redacted_fields")
+            sealed_fields = disclosure.get("sealed_fields")
+            disclosure_bound = (
+                isinstance(disclosure.get("message_payload_digest"), str)
+                and isinstance(delivered_fields, list)
+                and isinstance(redacted_fields, list)
+                and isinstance(sealed_fields, list)
+                and set(sealed_fields).isdisjoint(set(delivered_fields))
+                and bool(set(sealed_fields).intersection(set(redacted_fields)))
+                and disclosure.get("summary_only_ledger") is True
+            )
+            raw_thought_payload_stored = (
+                disclosure.get("raw_thought_payload_stored") is not False
+            )
+            raw_message_payload_stored = (
+                disclosure.get("raw_message_payload_stored") is not False
+            )
+            if not disclosure_bound:
+                errors.append("disclosure_binding must bind digest-only redaction evidence")
+            if raw_thought_payload_stored:
+                errors.append("disclosure_binding.raw_thought_payload_stored must be false")
+            if raw_message_payload_stored:
+                errors.append("disclosure_binding.raw_message_payload_stored must be false")
+
+        gate = receipt.get("council_guardian_gate")
+        gate_bound = False
+        if not isinstance(gate, Mapping):
+            errors.append("council_guardian_gate must be an object")
+        else:
+            gate_core = {
+                "gate_profile": IMC_MERGE_THOUGHT_GATE_PROFILE,
+                "session_id": receipt.get("session_id"),
+                "message_id": receipt.get("message_id"),
+                "collective_ref": (
+                    collective.get("collective_ref")
+                    if isinstance(collective, Mapping)
+                    else None
+                ),
+                "council_session_ref": gate.get("council_session_ref"),
+                "federation_council_ref": gate.get("federation_council_ref"),
+                "ethics_decision_ref": gate.get("ethics_decision_ref"),
+                "guardian_attestation_ref": gate.get("guardian_attestation_ref"),
+                "requested_merge_window_seconds": (
+                    risk.get("requested_merge_window_seconds")
+                    if isinstance(risk, Mapping)
+                    else None
+                ),
+                "message_payload_digest": (
+                    disclosure.get("message_payload_digest")
+                    if isinstance(disclosure, Mapping)
+                    else None
+                ),
+                "collective_binding_digest": (
+                    collective.get("collective_binding_digest")
+                    if isinstance(collective, Mapping)
+                    else None
+                ),
+            }
+            gate_bound = (
+                gate.get("gate_profile") == IMC_MERGE_THOUGHT_GATE_PROFILE
+                and gate.get("gate_status") == "approved"
+                and gate.get("accepted_roles") == IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES
+                and gate.get("required_roles") == IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES
+                and gate.get("gate_before_collective_merge") is True
+                and gate.get("gate_digest") == sha256_text(canonical_json(gate_core))
+            )
+            if not gate_bound:
+                errors.append("council_guardian_gate must bind Federation Council, Ethics, and Guardian approval")
+
+        digest_bound = False
+        digest = receipt.get("digest")
+        if isinstance(digest, str):
+            digest_bound = digest == sha256_text(
+                canonical_json(_merge_thought_ethics_receipt_digest_payload(dict(receipt)))
+            )
+        if not digest_bound:
+            errors.append("receipt digest must match canonical payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": receipt.get("profile_id"),
+            "risk_bound": risk_bound,
+            "collective_bound": collective_bound,
+            "disclosure_bound": disclosure_bound,
+            "gate_bound": gate_bound,
+            "digest_bound": digest_bound,
+            "raw_thought_payload_stored": raw_thought_payload_stored,
+            "raw_message_payload_stored": raw_message_payload_stored,
+        }
+
     def emergency_disconnect(
         self,
         session_id: str,
@@ -983,6 +1318,17 @@ class InterMindChannel:
             raise ValueError(
                 "expires_after_seconds must be between 1 and "
                 f"{IMC_MEMORY_GLIMPSE_MAX_RECONSENT_WINDOW_SECONDS}"
+            )
+        return value
+
+    @staticmethod
+    def _normalize_merge_window(value: Any) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError("requested_merge_window_seconds must be an integer")
+        if value <= 0 or value > IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS:
+            raise ValueError(
+                "requested_merge_window_seconds must be between 1 and "
+                f"{IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS}"
             )
         return value
 

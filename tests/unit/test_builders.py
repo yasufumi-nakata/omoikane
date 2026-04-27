@@ -17,6 +17,10 @@ from omoikane.self_construction import (
     RolloutPlannerService,
     SandboxApplyService,
 )
+from omoikane.self_construction.builders import (
+    _git_worktree_observer_has_worktree,
+    _normalized_git_worktree_observer_stdout,
+)
 
 
 @contextmanager
@@ -603,6 +607,84 @@ class RolloutPlannerServiceTests(unittest.TestCase):
 
 
 class RollbackEngineServiceTests(unittest.TestCase):
+    def test_worktree_observer_digest_drops_prunable_stanzas(self) -> None:
+        stdout = "\n".join(
+            [
+                "worktree /repo",
+                "HEAD 1111111111111111111111111111111111111111",
+                "branch refs/heads/main",
+                "",
+                "worktree /var/folders/stale",
+                "HEAD 2222222222222222222222222222222222222222",
+                "detached",
+                "prunable gitdir file points to non-existent location",
+                "",
+                "worktree /var/folders/current",
+                "HEAD 3333333333333333333333333333333333333333",
+                "detached",
+            ]
+        )
+
+        self.assertEqual(
+            "\n".join(
+                [
+                    "worktree /repo",
+                    "HEAD 1111111111111111111111111111111111111111",
+                    "branch refs/heads/main",
+                    "",
+                    "worktree /var/folders/current",
+                    "HEAD 3333333333333333333333333333333333333333",
+                    "detached",
+                    "",
+                ]
+            ),
+            _normalized_git_worktree_observer_stdout(stdout),
+        )
+        self.assertTrue(
+            _git_worktree_observer_has_worktree(stdout, "/var/folders/current")
+        )
+        self.assertFalse(
+            _git_worktree_observer_has_worktree(stdout, "/var/folders/missing")
+        )
+        self.assertTrue(
+            _git_worktree_observer_has_worktree(stdout, "/private/var/folders/current")
+        )
+
+    def test_reverse_apply_journal_uses_stable_source_snapshot(self) -> None:
+        service = RollbackEngineService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            target = repo_root / "tests/unit/test_builders.py"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("baseline\n", encoding="utf-8")
+
+            session = {
+                "workspace_snapshot_refs": {
+                    "pre_apply": "mirage://build-test/snapshot/live-pre-apply"
+                },
+                "materialized_files": [
+                    {
+                        "path": "tests/unit/test_builders.py",
+                        "patch_id": "patch-test",
+                        "source_state": "copied",
+                        "marker": "# workspace-enacted: patch-test target=tests/unit/test_builders.py",
+                    }
+                ],
+            }
+            journal, cleanup_status = service._build_reverse_apply_journal(
+                build_request={"request_id": "build-test"},
+                live_enactment_session=session,
+                repo_root=repo_root,
+            )
+
+            target.write_text("changed after journal\n", encoding="utf-8")
+
+            self.assertEqual("removed", cleanup_status)
+            self.assertEqual(1, len(journal))
+            self.assertEqual("pass", journal[0]["verification_status"])
+            self.assertEqual("restored", journal[0]["result_state"])
+            self.assertEqual(64, len(journal[0]["repo_source_digest"]))
+
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
         repo_root = Path(__file__).resolve().parents[2]

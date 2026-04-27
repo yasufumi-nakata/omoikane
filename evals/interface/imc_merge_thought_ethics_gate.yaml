@@ -1,0 +1,18 @@
+title: IMC Merge Thought Ethics Gate
+layer: L6
+objective: >
+  Bind a merge_thought IMC session to a Federation Council, EthicsCommittee,
+  and Guardian gate receipt before it can proceed into a bounded collective
+  merge, without storing raw thought or raw message payloads.
+fixtures:
+  - name: bounded_merge_thought_ethics_gate
+    command: PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
+    mode: merge_thought
+    receipt_profile: federation-council-merge-thought-ethics-gate-v1
+assertions:
+  - merge_thought ethics receipt conforms to imc_merge_thought_ethics_receipt.schema
+  - receipt binds Federation Council, EthicsCommittee, and Guardian refs before collective merge handoff
+  - receipt binds distinct collective target, 10 second max merge window, emergency disconnect, private recovery, and post-disconnect identity confirmation requirements
+  - delivered fields exclude sealed_fields and summary_only_ledger remains true
+  - raw_thought_payload_stored remains false
+  - raw_message_payload_stored remains false

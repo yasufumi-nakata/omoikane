@@ -842,7 +842,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - evals/interface/collective_external_registry_sync.yaml
       - reference-runtime
-    rationale: Required to synchronize collective dissolution recovery evidence to external legal and governance registries as digest-only entry, submission, acknowledgement, acknowledgement-quorum, ack route-trace, ack route capture-export, live acknowledgement endpoint probe, signed response envelope, mTLS client certificate proof, certificate freshness/revocation, certificate lifecycle, 3 generation certificate rollover chain, CT-style readback, and CT quorum / SCT timestamp receipts without storing raw registry, acknowledgement, route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, CT log, or packet payloads.
+    rationale: Required to synchronize collective dissolution recovery evidence to external legal and governance registries as digest-only entry, submission, acknowledgement, acknowledgement-quorum, ack route-trace, ack route capture-export, live acknowledgement endpoint probe, signed response envelope, mTLS client certificate proof, certificate freshness/revocation, certificate lifecycle, 3 generation certificate rollover chain, CT-style readback, CT quorum / SCT timestamp, and SCT policy authority receipts without storing raw registry, acknowledgement, route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, CT log, SCT authority, or packet payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/reasoning_trace.schema
@@ -1161,7 +1161,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects digest-only external legal/governance registry synchronization, two-jurisdiction acknowledgement quorum, authenticated ack route-trace binding, ack route packet-capture export binding, live acknowledgement endpoint probes, signed response envelopes, mTLS client certificate proofs, certificate freshness/revocation proofs, renewed certificate lifecycle proofs, 3 generation rollover chain proofs, and CT quorum / SCT timestamp proofs for collective dissolution recovery evidence without storing raw dissolution, registry, acknowledgement, ack-route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, CT log, or packet payloads.
+    rationale: Protects digest-only external legal/governance registry synchronization, two-jurisdiction acknowledgement quorum, authenticated ack route-trace binding, ack route packet-capture export binding, live acknowledgement endpoint probes, signed response envelopes, mTLS client certificate proofs, certificate freshness/revocation proofs, renewed certificate lifecycle proofs, 3 generation rollover chain proofs, CT quorum / SCT timestamp proofs, and SCT policy authority proofs for collective dissolution recovery evidence without storing raw dissolution, registry, acknowledgement, ack-route, endpoint, response signature, client certificate, freshness, lifecycle, lifecycle chain, CT log, SCT authority, or packet payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/perception_frame.schema
@@ -1534,6 +1534,16 @@ entries:
     rationale: Required to serialize one timeboxed memory_glimpse revoke/re-consent receipt that binds the original glimpse receipt, participant withdrawal event, Council re-consent, and Guardian attestation without storing raw memory, message, or re-consent payloads.
   - priority: P1
     kind: schema
+    file: specs/schemas/imc_merge_thought_ethics_receipt.schema
+    consumers:
+      - specs/interfaces/interface.imc.v0.idl
+      - reference-runtime
+      - evals/interface/imc_merge_thought_ethics_gate.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/interface/imc-protocol.md
+    rationale: Required to serialize one Federation Council, EthicsCommittee, and Guardian merge_thought ethics gate receipt that binds distinct collective target, recovery requirements, and digest-only disclosure before collective merge handoff.
+  - priority: P1
+    kind: schema
     file: specs/schemas/imc_session.schema
     consumers:
       - specs/interfaces/interface.imc.v0.idl
@@ -1661,6 +1671,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects memory_glimpse redisclosure by requiring a timeboxed consent window, participant withdrawal revocation binding, Council re-consent, Guardian attestation, and digest-only payload policy.
+  - priority: P1
+    kind: eval
+    file: evals/interface/imc_merge_thought_ethics_gate.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects merge_thought handoff by requiring Federation Council, EthicsCommittee, Guardian attestation, distinct collective binding, recovery requirements, and raw thought/message payload redaction before bounded collective merge.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_irreversible_veto.yaml

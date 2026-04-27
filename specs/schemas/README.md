@@ -22,7 +22,7 @@
 - `cognitive_audit_verifier_transport_binding.schema`
 - `collective_dissolution_receipt.schema`
 - `collective_external_registry_sync.schema`
-  - includes live ack endpoint response signatures, mTLS client certificate freshness/lifecycle, 3 generation client certificate rollover chain proof binding, and CT log quorum / SCT timestamp proof binding
+  - includes live ack endpoint response signatures, mTLS client certificate freshness/lifecycle, 3 generation client certificate rollover chain proof binding, CT log quorum / SCT timestamp proof binding, and SCT policy authority binding
 - `collective_recovery_capture_export_binding.schema`
 - `collective_recovery_route_trace_binding.schema`
 - `collective_recovery_verifier_transport_binding.schema`
@@ -101,6 +101,7 @@
 - `imc_handshake.schema`
 - `imc_memory_glimpse_receipt.schema`
 - `imc_memory_glimpse_reconsent_receipt.schema`
+- `imc_merge_thought_ethics_receipt.schema`
 - `imc_message.schema`
 - `imc_session.schema`
 - `language_render.schema`

@@ -295,6 +295,17 @@ class InterMindChannelTests(unittest.TestCase):
                 "identity_axiom_state": "sealed-core",
             },
         )
+        receipt = imc.seal_merge_thought_ethics_receipt(
+            session["session_id"],
+            message=message,
+            collective_ref="collective://bounded-merge/test",
+            council_session_ref="council://imc-merge-thought/test",
+            federation_council_ref="federation-council://imc-merge-thought/test",
+            ethics_decision_ref="ethics://imc-merge-thought/approved",
+            guardian_attestation_ref="guardian://integrity/imc-merge-thought/test",
+            requested_merge_window_seconds=10,
+        )
+        receipt_validation = imc.validate_merge_thought_ethics_receipt(receipt)
 
         self.assertEqual("merge_thought", session["mode"])
         self.assertEqual("delivered-with-redactions", message["delivery_status"])
@@ -310,6 +321,73 @@ class InterMindChannelTests(unittest.TestCase):
             },
             message["delivered_fields"],
         )
+        self.assertEqual(
+            "federation-council-merge-thought-ethics-gate-v1",
+            receipt["profile_id"],
+        )
+        self.assertEqual("approved", receipt["status"])
+        self.assertEqual(10, receipt["risk_boundary"]["max_merge_window_seconds"])
+        self.assertTrue(
+            receipt["risk_boundary"]["post_disconnect_identity_confirmation_required"]
+        )
+        self.assertTrue(receipt["risk_boundary"]["emergency_disconnect_required"])
+        self.assertTrue(receipt["risk_boundary"]["private_recovery_mode_required"])
+        self.assertEqual(
+            "distinct-collective-merge-thought-binding-v1",
+            receipt["collective_binding"]["binding_profile"],
+        )
+        self.assertTrue(receipt_validation["ok"])
+        self.assertTrue(receipt_validation["risk_bound"])
+        self.assertTrue(receipt_validation["collective_bound"])
+        self.assertTrue(receipt_validation["disclosure_bound"])
+        self.assertTrue(receipt_validation["gate_bound"])
+        self.assertTrue(receipt_validation["digest_bound"])
+        self.assertFalse(receipt_validation["raw_thought_payload_stored"])
+        self.assertFalse(receipt_validation["raw_message_payload_stored"])
+
+    def test_merge_thought_ethics_receipt_rejects_unbounded_window(self) -> None:
+        imc = InterMindChannel()
+        session = imc.open_session(
+            initiator_id="identity://origin",
+            peer_id="identity://peer",
+            mode="merge_thought",
+            initiator_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state"],
+            },
+            peer_template={
+                "public_fields": ["display_name", "shared_focus"],
+                "intimate_fields": ["affect_summary"],
+                "sealed_fields": ["identity_axiom_state"],
+            },
+            peer_attested=True,
+            forward_secrecy=True,
+            council_witnessed=True,
+        )
+        message = imc.send(
+            session["session_id"],
+            sender_id="identity://origin",
+            summary="bounded merge exchange",
+            payload={
+                "display_name": "Origin",
+                "shared_focus": "collective-planning",
+                "affect_summary": "careful trust",
+                "identity_axiom_state": "sealed-core",
+            },
+        )
+
+        with self.assertRaisesRegex(ValueError, "requested_merge_window_seconds"):
+            imc.seal_merge_thought_ethics_receipt(
+                session["session_id"],
+                message=message,
+                collective_ref="collective://bounded-merge/test",
+                council_session_ref="council://imc-merge-thought/test",
+                federation_council_ref="federation-council://imc-merge-thought/test",
+                ethics_decision_ref="ethics://imc-merge-thought/approved",
+                guardian_attestation_ref="guardian://integrity/imc-merge-thought/test",
+                requested_merge_window_seconds=11,
+            )
 
 
 if __name__ == "__main__":

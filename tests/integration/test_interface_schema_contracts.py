@@ -188,6 +188,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+            ]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
@@ -229,6 +234,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertFalse(
+            result["validation"][
+                "external_registry_sync_raw_sct_policy_authority_payload_stored"
+            ]
+        )
+        self.assertFalse(
             result["validation"]["external_registry_sync_raw_packet_body_stored"]
         )
 
@@ -246,10 +256,15 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/imc_memory_glimpse_reconsent_receipt.schema",
             result["memory_glimpse_reconsent_receipt"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/imc_merge_thought_ethics_receipt.schema",
+            result["merge_thought_ethics_receipt"],
+        )
         self.assertTrue(result["validation"]["memory_glimpse_receipt_ok"])
         self.assertTrue(result["validation"]["memory_glimpse_source_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_disclosure_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_witness_bound"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_receipt_ok"])
         self.assertFalse(result["validation"]["memory_glimpse_raw_memory_payload_stored"])
         self.assertFalse(result["validation"]["memory_glimpse_raw_message_payload_stored"])
         self.assertTrue(result["validation"]["memory_glimpse_reconsent_receipt_ok"])

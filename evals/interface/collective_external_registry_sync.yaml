@@ -2,8 +2,9 @@ name: collective_external_registry_sync
 description: >
   Ensure post-dissolution collective recovery evidence is synchronized to
   external legal and governance registries as digest-only entry, submission, and
-  acknowledgement receipts, live endpoint CT quorum, and SCT timestamp proofs
-  without storing raw dissolution, registry, CT log, or packet payloads.
+  acknowledgement receipts, live endpoint CT quorum, SCT timestamp proofs, and
+  SCT policy authority proofs without storing raw dissolution, registry, CT log,
+  SCT authority, or packet payloads.
 target:
   command: PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
   binding_profile: collective-dissolution-external-registry-sync-v1
@@ -24,6 +25,7 @@ assertions:
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_proof_set_digest binds a 3 generation certificate rollover chain for every acknowledgement endpoint response
   - ack_live_endpoint_mtls_client_certificate_ct_log_readback_set_digest binds certificate transparency-style readback proof for every lifecycle chain without storing raw CT log payloads
   - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest binds two CT logs and an SCT timestamp window for every lifecycle chain without storing raw CT log payloads
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest binds the SCT timestamp policy to jurisdiction policy registry and signer roster verifier quorum evidence without storing raw SCT authority payloads
   - raw_dissolution_payload_stored is false
   - raw_registry_payload_stored is false
   - raw_ack_payload_stored is false
@@ -35,4 +37,5 @@ assertions:
   - raw_client_certificate_lifecycle_payload_stored is false
   - raw_client_certificate_lifecycle_chain_payload_stored is false
   - raw_client_certificate_ct_log_payload_stored is false
+  - raw_sct_policy_authority_payload_stored is false
   - raw_packet_body_stored is false

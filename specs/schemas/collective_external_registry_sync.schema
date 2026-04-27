@@ -9,7 +9,7 @@ description: >
   payloads, raw client certificate payloads, raw client certificate freshness
   payloads, raw client certificate lifecycle payloads, raw client certificate
   lifecycle chain payloads, raw client certificate transparency readback
-  payloads, or raw packet bodies.
+  payloads, raw SCT policy authority payloads, or raw packet bodies.
 type: object
 additionalProperties: false
 required:
@@ -170,6 +170,16 @@ required:
   - ack_live_endpoint_client_certificate_ct_log_quorum_set_digests
   - ack_live_endpoint_client_certificate_sct_timestamp_digests
   - ack_live_endpoint_client_certificate_sct_timestamp_statuses
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_profile_id
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_profile
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_proofs
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digests
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest
+  - ack_live_endpoint_client_certificate_sct_policy_registry_refs
+  - ack_live_endpoint_client_certificate_sct_policy_registry_digests
+  - ack_live_endpoint_client_certificate_sct_signer_roster_refs
+  - ack_live_endpoint_client_certificate_sct_signer_roster_digests
+  - ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests
   - ack_live_endpoint_probe_count
   - ack_live_endpoint_probe_bound
   - ack_live_endpoint_signed_response_envelope_bound
@@ -179,6 +189,7 @@ required:
   - ack_live_endpoint_mtls_client_certificate_lifecycle_chain_bound
   - ack_live_endpoint_mtls_client_certificate_ct_log_bound
   - ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound
+  - ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound
   - registry_digest_set
   - registry_digest_set_digest
   - capture_export_bound
@@ -202,6 +213,7 @@ required:
   - raw_client_certificate_lifecycle_payload_stored
   - raw_client_certificate_lifecycle_chain_payload_stored
   - raw_client_certificate_ct_log_payload_stored
+  - raw_sct_policy_authority_payload_stored
   - raw_packet_body_stored
   - digest
 properties:
@@ -782,6 +794,56 @@ properties:
     maxItems: 2
     items:
       const: within-window
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_profile_id:
+    const: collective-external-registry-ack-client-certificate-sct-policy-authority-v1
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_profile:
+    const: collective-external-registry-ack-client-certificate-sct-policy-authority-digest-v1
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_proofs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/ack_mtls_client_certificate_sct_policy_authority_proof"
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_sct_policy_registry_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^sct-policy-registry://"
+  ack_live_endpoint_client_certificate_sct_policy_registry_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_sct_signer_roster_refs:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      type: string
+      pattern: "^sct-signer-roster://"
+  ack_live_endpoint_client_certificate_sct_signer_roster_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  ack_live_endpoint_client_certificate_sct_signer_verifier_quorum_digests:
+    type: array
+    minItems: 2
+    maxItems: 2
+    items:
+      $ref: "#/$defs/sha256"
   ack_live_endpoint_mtls_client_certificate_ct_log_quorum_digest_set_digest:
     $ref: "#/$defs/sha256"
   ack_live_endpoint_probe_count:
@@ -802,10 +864,12 @@ properties:
     const: true
   ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound:
     const: true
+  ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound:
+    const: true
   registry_digest_set:
     type: array
-    minItems: 16
-    maxItems: 16
+    minItems: 17
+    maxItems: 17
     items:
       $ref: "#/$defs/sha256"
   registry_digest_set_digest:
@@ -851,6 +915,8 @@ properties:
   raw_client_certificate_lifecycle_chain_payload_stored:
     const: false
   raw_client_certificate_ct_log_payload_stored:
+    const: false
+  raw_sct_policy_authority_payload_stored:
     const: false
   raw_packet_body_stored:
     const: false
@@ -1123,6 +1189,20 @@ $defs:
       - mtls_client_certificate_ct_log_quorum_status
       - mtls_client_certificate_ct_log_quorum_digest
       - mtls_client_certificate_ct_log_quorum_bound
+      - mtls_client_certificate_sct_policy_authority_profile
+      - mtls_client_certificate_sct_policy_authority_digest_profile
+      - mtls_client_certificate_sct_policy_registry_ref
+      - mtls_client_certificate_sct_policy_registry_digest
+      - mtls_client_certificate_sct_signer_roster_ref
+      - mtls_client_certificate_sct_signer_roster_digest
+      - mtls_client_certificate_sct_signer_key_refs
+      - mtls_client_certificate_sct_signer_jurisdictions
+      - mtls_client_certificate_sct_signer_verifier_refs
+      - mtls_client_certificate_sct_signer_verifier_response_digests
+      - mtls_client_certificate_sct_signer_verifier_quorum_digest
+      - mtls_client_certificate_sct_policy_authority_status
+      - mtls_client_certificate_sct_policy_authority_digest
+      - mtls_client_certificate_sct_policy_authority_bound
       - checked_at
       - raw_ack_payload_stored
       - raw_endpoint_payload_stored
@@ -1132,6 +1212,7 @@ $defs:
       - raw_client_certificate_lifecycle_payload_stored
       - raw_client_certificate_lifecycle_chain_payload_stored
       - raw_client_certificate_ct_log_payload_stored
+      - raw_sct_policy_authority_payload_stored
       - digest
     properties:
       kind:
@@ -1387,6 +1468,55 @@ $defs:
         $ref: "#/$defs/sha256"
       mtls_client_certificate_ct_log_quorum_bound:
         const: true
+      mtls_client_certificate_sct_policy_authority_profile:
+        const: collective-external-registry-ack-client-certificate-sct-policy-authority-v1
+      mtls_client_certificate_sct_policy_authority_digest_profile:
+        const: collective-external-registry-ack-client-certificate-sct-policy-authority-digest-v1
+      mtls_client_certificate_sct_policy_registry_ref:
+        type: string
+        pattern: "^sct-policy-registry://"
+      mtls_client_certificate_sct_policy_registry_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_signer_roster_ref:
+        type: string
+        pattern: "^sct-signer-roster://"
+      mtls_client_certificate_sct_signer_roster_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_signer_key_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          pattern: "^sct-signer-key://"
+      mtls_client_certificate_sct_signer_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          minLength: 2
+      mtls_client_certificate_sct_signer_verifier_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+          pattern: "^sct-signer-verifier://"
+      mtls_client_certificate_sct_signer_verifier_response_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_signer_verifier_quorum_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_policy_authority_status:
+        const: verified
+      mtls_client_certificate_sct_policy_authority_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_policy_authority_bound:
+        const: true
       checked_at:
         type: string
         format: date-time
@@ -1405,6 +1535,8 @@ $defs:
       raw_client_certificate_lifecycle_chain_payload_stored:
         const: false
       raw_client_certificate_ct_log_payload_stored:
+        const: false
+      raw_sct_policy_authority_payload_stored:
         const: false
       digest:
         $ref: "#/$defs/sha256"
@@ -1786,6 +1918,62 @@ $defs:
       mtls_client_certificate_ct_log_quorum_digest:
         $ref: "#/$defs/sha256"
       raw_client_certificate_ct_log_payload_stored:
+        const: false
+  ack_mtls_client_certificate_sct_policy_authority_proof:
+    type: object
+    additionalProperties: false
+    required:
+      - probe_id
+      - ack_receipt_digest
+      - registry_authority_ref
+      - registry_jurisdiction
+      - registry_ack_endpoint_ref
+      - mtls_client_certificate_sct_timestamp_digest
+      - mtls_client_certificate_sct_policy_registry_ref
+      - mtls_client_certificate_sct_policy_registry_digest
+      - mtls_client_certificate_sct_signer_roster_ref
+      - mtls_client_certificate_sct_signer_roster_digest
+      - mtls_client_certificate_sct_signer_verifier_quorum_digest
+      - mtls_client_certificate_sct_policy_authority_status
+      - mtls_client_certificate_sct_policy_authority_digest
+      - mtls_client_certificate_sct_policy_authority_bound
+      - raw_sct_policy_authority_payload_stored
+    properties:
+      probe_id:
+        type: string
+        pattern: "^collective-registry-ack-probe-[a-f0-9]{12}$"
+      ack_receipt_digest:
+        $ref: "#/$defs/sha256"
+      registry_authority_ref:
+        type: string
+        pattern: "^(legal-registry|governance-registry)://"
+      registry_jurisdiction:
+        type: string
+        minLength: 2
+      registry_ack_endpoint_ref:
+        type: string
+        pattern: "^https?://"
+      mtls_client_certificate_sct_timestamp_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_policy_registry_ref:
+        type: string
+        pattern: "^sct-policy-registry://"
+      mtls_client_certificate_sct_policy_registry_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_signer_roster_ref:
+        type: string
+        pattern: "^sct-signer-roster://"
+      mtls_client_certificate_sct_signer_roster_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_signer_verifier_quorum_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_policy_authority_status:
+        const: verified
+      mtls_client_certificate_sct_policy_authority_digest:
+        $ref: "#/$defs/sha256"
+      mtls_client_certificate_sct_policy_authority_bound:
+        const: true
+      raw_sct_policy_authority_payload_stored:
         const: false
   sha256:
     type: string

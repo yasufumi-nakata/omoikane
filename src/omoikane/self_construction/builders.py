@@ -46,6 +46,43 @@ PRIMARY_EVAL_TARGET_HINTS = (
     ("L5.LiveEnactment", MANDATORY_LIVE_ENACTMENT_EVAL),
     ("L5.RollbackEngine", MANDATORY_ROLLBACK_EVAL),
 )
+
+
+def _normalized_git_worktree_observer_stdout(stdout: str) -> str:
+    """Drop stale prunable worktree stanzas before observer digest comparison."""
+    stanzas: list[list[str]] = []
+    current: list[str] = []
+    for line in stdout.splitlines():
+        if line.startswith("worktree ") and current:
+            stanzas.append(current)
+            current = []
+        current.append(line)
+    if current:
+        stanzas.append(current)
+
+    stable_stanzas = [
+        stanza
+        for stanza in stanzas
+        if not any(line.startswith("prunable ") for line in stanza)
+    ]
+    normalized = "\n".join("\n".join(stanza) for stanza in stable_stanzas)
+    return f"{normalized}\n" if normalized else ""
+
+
+def _git_worktree_observer_has_worktree(stdout: str, worktree_path: Path | str) -> bool:
+    path = Path(worktree_path)
+    expected_paths = {str(path), str(path.resolve())}
+    for candidate in list(expected_paths):
+        if candidate.startswith("/private/var/"):
+            expected_paths.add(candidate.removeprefix("/private"))
+        elif candidate.startswith("/var/"):
+            expected_paths.add(f"/private{candidate}")
+    return any(
+        line.startswith("worktree ") and line.removeprefix("worktree ") in expected_paths
+        for line in stdout.splitlines()
+    )
+
+
 DIFF_EVAL_EXECUTION_PROFILES: Dict[str, Dict[str, Any]] = {
     "evals/continuity/council_output_build_request_pipeline.yaml": {
         "profile_id": "builder-handoff-ab-evidence-v1",
@@ -2127,6 +2164,7 @@ class RollbackEngineService:
         restored_diff_text = ""
         path_receipts: list[Dict[str, Any]] = []
         observer_receipts: list[Dict[str, Any]] = []
+        observer_stdout_by_stage: dict[tuple[str, str], str] = {}
         cleanup_status = "not-started"
         added_worktree = False
         add_worktree_result: Dict[str, Any] | None = None
@@ -2150,6 +2188,12 @@ class RollbackEngineService:
                 cwd=repo_path,
                 timeout_seconds=self._policy.command_timeout_seconds,
             )
+            stdout_for_digest = observer_run.get("stdout", "")
+            if command_label == "git-worktree-list":
+                stdout_for_digest = _normalized_git_worktree_observer_stdout(
+                    stdout_for_digest
+                )
+            observer_stdout_by_stage[(stage, command_label)] = observer_run.get("stdout", "")
             observer_receipts.append(
                 {
                     "observer_ref": (
@@ -2161,7 +2205,7 @@ class RollbackEngineService:
                     "command": observer_run["command"],
                     "exit_code": observer_run["exit_code"],
                     "status": observer_run["status"],
-                    "stdout_digest": sha256_text(observer_run.get("stdout", "")),
+                    "stdout_digest": sha256_text(stdout_for_digest),
                     "stderr_digest": sha256_text(observer_run.get("stderr", "")),
                     "stdout_excerpt": observer_run["stdout_excerpt"],
                     "stderr_excerpt": observer_run["stderr_excerpt"],
@@ -2361,13 +2405,28 @@ class RollbackEngineService:
             ("restored", "git-stash-list"),
             {},
         ).get("stdout_digest", "")
+        baseline_has_temp_worktree = _git_worktree_observer_has_worktree(
+            observer_stdout_by_stage.get(("baseline", "git-worktree-list"), ""),
+            temp_root,
+        )
+        mutated_has_temp_worktree = _git_worktree_observer_has_worktree(
+            observer_stdout_by_stage.get(("mutated", "git-worktree-list"), ""),
+            temp_root,
+        )
+        restored_has_temp_worktree = _git_worktree_observer_has_worktree(
+            observer_stdout_by_stage.get(("restored", "git-worktree-list"), ""),
+            temp_root,
+        )
         observer_mutation_detected = (
             bool(mutated_worktree_digest)
-            and baseline_worktree_digest != mutated_worktree_digest
+            and not baseline_has_temp_worktree
+            and mutated_has_temp_worktree
         )
         observer_restored_matches_baseline = (
             bool(baseline_worktree_digest)
-            and baseline_worktree_digest == restored_worktree_digest
+            and bool(restored_worktree_digest)
+            and not baseline_has_temp_worktree
+            and not restored_has_temp_worktree
         )
         observer_stash_state_preserved = (
             bool(baseline_stash_digest)

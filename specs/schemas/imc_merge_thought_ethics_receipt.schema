@@ -1,0 +1,240 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: IMCMergeThoughtEthicsReceipt
+description: >
+  Digest-only Federation Council, EthicsCommittee, and Guardian gate receipt
+  for one bounded IMC merge_thought session. The receipt binds the route,
+  disclosure floor, distinct collective target, recovery limits, and approval
+  refs without storing raw thought or message payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - receipt_id
+  - profile_id
+  - session_id
+  - handshake_id
+  - message_id
+  - route_mode
+  - participants
+  - issued_at
+  - risk_boundary
+  - collective_binding
+  - disclosure_binding
+  - council_guardian_gate
+  - continuity_event_ref
+  - status
+  - digest
+properties:
+  schema_version:
+    type: string
+    const: "1.0"
+  receipt_id:
+    type: string
+    minLength: 8
+  profile_id:
+    type: string
+    const: federation-council-merge-thought-ethics-gate-v1
+  session_id:
+    type: string
+    minLength: 8
+  handshake_id:
+    type: string
+    minLength: 8
+  message_id:
+    type: string
+    minLength: 8
+  route_mode:
+    type: string
+    const: merge_thought
+  participants:
+    type: array
+    minItems: 2
+    maxItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  issued_at:
+    type: string
+    format: date-time
+  risk_boundary:
+    type: object
+    additionalProperties: false
+    required:
+      - risk_profile
+      - identity_confusion_risk
+      - max_merge_window_seconds
+      - requested_merge_window_seconds
+      - post_disconnect_identity_confirmation_required
+      - emergency_disconnect_required
+      - private_recovery_mode_required
+    properties:
+      risk_profile:
+        type: string
+        const: identity-confusion-bounded-merge-thought-v1
+      identity_confusion_risk:
+        type: string
+        const: high
+      max_merge_window_seconds:
+        type: integer
+        const: 10
+      requested_merge_window_seconds:
+        type: integer
+        minimum: 1
+        maximum: 10
+      post_disconnect_identity_confirmation_required:
+        type: boolean
+        const: true
+      emergency_disconnect_required:
+        type: boolean
+        const: true
+      private_recovery_mode_required:
+        type: boolean
+        const: true
+  collective_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - binding_profile
+      - collective_ref
+      - merge_mode
+      - distinct_collective_required
+      - participants
+      - collective_binding_digest
+    properties:
+      binding_profile:
+        type: string
+        const: distinct-collective-merge-thought-binding-v1
+      collective_ref:
+        type: string
+        minLength: 1
+      merge_mode:
+        type: string
+        const: merge_thought
+      distinct_collective_required:
+        type: boolean
+        const: true
+      participants:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      collective_binding_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  disclosure_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - message_payload_digest
+      - delivered_field_names
+      - redacted_fields
+      - sealed_fields
+      - summary_only_ledger
+      - raw_thought_payload_stored
+      - raw_message_payload_stored
+    properties:
+      message_payload_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      delivered_field_names:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      redacted_fields:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      sealed_fields:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      summary_only_ledger:
+        type: boolean
+        const: true
+      raw_thought_payload_stored:
+        type: boolean
+        const: false
+      raw_message_payload_stored:
+        type: boolean
+        const: false
+  council_guardian_gate:
+    type: object
+    additionalProperties: false
+    required:
+      - gate_profile
+      - gate_status
+      - council_session_ref
+      - federation_council_ref
+      - ethics_decision_ref
+      - guardian_attestation_ref
+      - required_roles
+      - accepted_roles
+      - gate_before_collective_merge
+      - gate_digest
+    properties:
+      gate_profile:
+        type: string
+        const: federation-council-guardian-ethics-gate-v1
+      gate_status:
+        type: string
+        const: approved
+      council_session_ref:
+        type: string
+        minLength: 1
+      federation_council_ref:
+        type: string
+        minLength: 1
+      ethics_decision_ref:
+        type: string
+        minLength: 1
+      guardian_attestation_ref:
+        type: string
+        minLength: 1
+      required_roles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - FederationCouncil
+            - EthicsCommittee
+            - GuardianLiaison
+      accepted_roles:
+        type: array
+        minItems: 3
+        maxItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+            - FederationCouncil
+            - EthicsCommittee
+            - GuardianLiaison
+      gate_before_collective_merge:
+        type: boolean
+        const: true
+      gate_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  continuity_event_ref:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    const: approved
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

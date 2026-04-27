@@ -59,6 +59,10 @@ reference runtime では IMC を bounded contract として扱い、
 - `memory_glimpse` の再共有は元 receipt digest、revocation event、
   `expires_after_seconds<=86400` の consent window、Council re-consent、
   Guardian attestation を持つ digest-only receipt に束縛する
+- `merge_thought` は Federation Council / EthicsCommittee / Guardian の
+  `federation-council-merge-thought-ethics-gate-v1` receipt により、
+  distinct collective target、10 秒 cap、emergency disconnect、private recovery、
+  post-disconnect identity confirmation を digest-only に束縛する
 - disclosure template は双方のうち **より狭い側** に揃え、
   `sealed_fields` は常に redaction される
 - ContinuityLedger には生メッセージを書かず、summary と payload digest だけを記録する
@@ -66,6 +70,6 @@ reference runtime では IMC を bounded contract として扱い、
 
 ## 未解決
 
-- merge_thought の倫理基準
+- merge_thought の長期的な社会・法的倫理基準
 - Collective の終了時の構成員への影響
 - 同期通信時の主観時間調整（substrate 間で速度が違う場合）

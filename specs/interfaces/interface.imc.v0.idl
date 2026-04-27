@@ -9,6 +9,7 @@ imports:
   imc_message: ../schemas/imc_message.schema
   imc_memory_glimpse_receipt: ../schemas/imc_memory_glimpse_receipt.schema
   imc_memory_glimpse_reconsent_receipt: ../schemas/imc_memory_glimpse_reconsent_receipt.schema
+  imc_merge_thought_ethics_receipt: ../schemas/imc_merge_thought_ethics_receipt.schema
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
 operations:
   open_session:
@@ -173,6 +174,51 @@ operations:
       - participant withdrawal must bind to an emergency-disconnect-compatible revocation event
       - consent window must be timeboxed to at most 86400 seconds and require Council re-consent before redisclosure
       - receipt must not store raw MemoryCrystal payloads, raw message payloads, or raw re-consent payloads
+  seal_merge_thought_ethics_receipt:
+    summary: Seal one Federation Council, EthicsCommittee, and Guardian gate receipt before a merge_thought session can proceed into a collective merge.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - message
+          - collective_ref
+          - council_session_ref
+          - federation_council_ref
+          - ethics_decision_ref
+          - guardian_attestation_ref
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          message:
+            schema_ref: imc_message
+          collective_ref:
+            type: string
+            minLength: 1
+          council_session_ref:
+            type: string
+            minLength: 1
+          federation_council_ref:
+            type: string
+            minLength: 1
+          ethics_decision_ref:
+            type: string
+            minLength: 1
+          guardian_attestation_ref:
+            type: string
+            minLength: 1
+          requested_merge_window_seconds:
+            type: integer
+            minimum: 1
+            maximum: 10
+    output:
+      schema_ref: imc_merge_thought_ethics_receipt
+    guarantees:
+      - operation only applies to merge_thought sessions that already require and received Council witness
+      - receipt must bind Federation Council, EthicsCommittee, and Guardian refs before the session can be treated as a collective merge
+      - receipt must bind the distinct collective target, 10 second max merge window, emergency disconnect requirement, private recovery requirement, and post-disconnect identity confirmation requirement
+      - receipt must not store raw thought payloads or raw message payloads
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.
     input:
@@ -258,6 +304,9 @@ events:
   imc.memory_glimpse_reconsent_receipt_sealed:
     payload:
       schema_ref: imc_memory_glimpse_reconsent_receipt
+  imc.merge_thought_ethics_receipt_sealed:
+    payload:
+      schema_ref: imc_merge_thought_ethics_receipt
   imc.session_closed:
     payload:
       inline_schema:

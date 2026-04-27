@@ -75,8 +75,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["memory_glimpse_reconsent_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_reconsent_digest_bound"])
         self.assertFalse(result["validation"]["memory_glimpse_reconsent_raw_payload_stored"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_receipt_ok"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_risk_bound"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_collective_bound"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_gate_bound"])
+        self.assertFalse(
+            result["validation"]["merge_thought_ethics_raw_thought_payload_stored"]
+        )
+        self.assertFalse(
+            result["validation"]["merge_thought_ethics_raw_message_payload_stored"]
+        )
         self.assertEqual("closed", result["session"]["status"])
-        self.assertEqual(5, result["ledger_verification"]["category_counts"]["interface-imc"])
+        self.assertEqual(6, result["ledger_verification"]["category_counts"]["interface-imc"])
 
     def test_collective_demo_reports_bounded_merge_and_dissolution(self) -> None:
         runtime = OmoikaneReferenceOS()
@@ -202,6 +212,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["external_registry_sync_complete"])
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
@@ -241,6 +256,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(
             result["validation"][
                 "external_registry_sync_raw_client_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["validation"][
+                "external_registry_sync_raw_sct_policy_authority_payload_stored"
             ]
         )
         self.assertFalse(

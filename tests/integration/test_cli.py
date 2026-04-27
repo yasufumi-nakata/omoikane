@@ -210,6 +210,13 @@ class CliIntegrationTests(unittest.TestCase):
                 "raw_message_payload_stored"
             ]
         )
+        self.assertTrue(result["validation"]["merge_thought_ethics_receipt_ok"])
+        self.assertTrue(result["validation"]["merge_thought_ethics_gate_bound"])
+        self.assertFalse(
+            result["merge_thought_ethics_receipt"]["disclosure_binding"][
+                "raw_thought_payload_stored"
+            ]
+        )
         self.assertEqual("closed", result["disconnect"]["status"])
 
     def test_collective_demo_emits_bounded_merge_and_recovery_json(self) -> None:
@@ -299,6 +306,16 @@ class CliIntegrationTests(unittest.TestCase):
                 "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_ct_log_quorum_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "external_registry_sync_ack_live_endpoint_mtls_client_certificate_sct_policy_authority_bound"
+            ]
+        )
         self.assertFalse(
             result["validation"]["external_registry_sync_raw_registry_payload_stored"]
         )
@@ -337,6 +354,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(
             result["validation"][
                 "external_registry_sync_raw_client_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["validation"][
+                "external_registry_sync_raw_sct_policy_authority_payload_stored"
             ]
         )
         self.assertFalse(

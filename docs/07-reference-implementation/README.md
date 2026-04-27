@@ -815,6 +815,12 @@ raw memory payload と raw message payload を保存しないことを
 `expires_after_seconds<=86400` の consent window、Council re-consent ref、
 Guardian attestation ref を束縛し、raw re-consent payload を保存しないことを
 `imc_memory_glimpse_reconsent_receipt.schema` と integration test で検証する。
+さらに `merge_thought` は `federation-council-merge-thought-ethics-gate-v1`
+receipt により、Federation Council、EthicsCommittee、Guardian attestation、
+distinct collective target、10 秒 cap、emergency disconnect、private recovery、
+post-disconnect identity confirmation requirement を digest-only に束縛し、
+raw thought payload と raw message payload を保存しないことを
+`imc_merge_thought_ethics_receipt.schema` と integration test で検証する。
 
 `collective-demo` は L6 Collective Identity の reference contract
 (`interface.collective.v0`) を JSON で可視化し、
@@ -878,11 +884,16 @@ CT-style log ref、certificate leaf digest、inclusion proof digest、chain proo
 が primary / witness の 2 log readback を quorum set digest に束縛し、
 `collective-external-registry-ack-client-certificate-sct-timestamp-policy-v1`
 が 300 秒 SCT timestamp window を同じ endpoint probe に固定する。
+同じ probe は
+`collective-external-registry-ack-client-certificate-sct-policy-authority-v1`
+として jurisdiction policy registry digest、signer roster digest、2 signer verifier
+quorum digest を SCT timestamp digest に束縛する。
 probe set digest、response signature digest set、client certificate proof set digest、
 client certificate freshness proof set digest、client certificate lifecycle proof set digest、
 client certificate lifecycle chain proof set digest、
 client certificate CT log readback set digest、
-client certificate CT log quorum digest set digest
+client certificate CT log quorum digest set digest、
+client certificate SCT policy authority digest set digest
 を registry digest set に含めてから
 complete になる。
 raw verifier payload、raw route payload、raw dissolution payload、raw registry payload、
@@ -891,6 +902,7 @@ raw response signature payload、raw client certificate payload、
 raw client certificate freshness payload、raw client certificate lifecycle payload、
 raw client certificate lifecycle chain payload、
 raw client certificate CT log payload、
+raw SCT policy authority payload、
 raw packet body は保存しない。
 
 `ewa-demo` は L6 External World Agents の reference contract
