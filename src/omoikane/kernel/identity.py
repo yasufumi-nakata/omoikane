@@ -17,15 +17,29 @@ IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_POLICY_ID = (
 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_PROFILE = (
     "dual-jurisdiction-revocation-live-verifier-v1"
 )
+IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID = (
+    "identity-witness-revocation-verifier-roster-policy-v1"
+)
+IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE = (
+    "policy-bound-dual-jurisdiction-revocation-roster-v1"
+)
 IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD = 0.85
 IDENTITY_CONFIRMATION_WITNESS_QUORUM = 2
 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_QUORUM = 2
 IDENTITY_CONFIRMATION_REQUIRED_WITNESS_ROLES = ("clinician", "guardian")
+IDENTITY_CONFIRMATION_ALLOWED_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS = (
+    "EU-DE",
+    "JP-13",
+    "US-CA",
+)
 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS = ("JP-13", "US-CA")
 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_FRESHNESS_SECONDS = 3600
 IDENTITY_CONFIRMATION_MAX_SELF_WITNESS_SCORE_DELTA = 0.12
 IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REGISTRY_REF = (
     "identity-witness-registry://reference-runtime/current"
+)
+IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REVOCATION_VERIFIER_ROSTER_REF = (
+    "identity-witness-revocation-verifier-roster://reference-runtime/current"
 )
 IDENTITY_CONFIRMATION_DIMENSION_THRESHOLDS = {
     "episodic_recall": 0.85,
@@ -264,6 +278,7 @@ class IdentityRegistry:
         self_model_alignment_score: float,
         witness_registry_ref: str = IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REGISTRY_REF,
         witness_revocation_verifier_receipts: Optional[List[Dict[str, Any]]] = None,
+        witness_revocation_verifier_roster: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         record = self.get(identity_id)
         normalized_consent_ref = self._non_empty_string(consent_ref, "consent_ref")
@@ -284,6 +299,11 @@ class IdentityRegistry:
         normalized_witnesses = [
             self._normalize_witness_receipt(receipt) for receipt in witness_receipts
         ]
+        normalized_revocation_verifier_roster = (
+            self._normalize_witness_revocation_verifier_roster(
+                witness_revocation_verifier_roster
+            )
+        )
 
         accepted_witnesses = [
             receipt
@@ -360,6 +380,7 @@ class IdentityRegistry:
             accepted_roles=accepted_roles,
             witness_quorum_met=witness_quorum_met,
             revocation_verifier_receipts=witness_revocation_verifier_receipts,
+            revocation_verifier_roster=normalized_revocation_verifier_roster,
         )
         witness_registry_binding_bound = witness_registry_binding["status"] == "bound"
         active_transition_allowed = (
@@ -384,6 +405,8 @@ class IdentityRegistry:
             failure_reasons.append("witness-registry-binding-not-bound")
         if witness_registry_binding.get("revocation_verifier_quorum_status") != "complete":
             failure_reasons.append("witness-revocation-verifier-quorum-not-bound")
+        if witness_registry_binding.get("revocation_verifier_roster_status") != "bound":
+            failure_reasons.append("witness-revocation-verifier-roster-not-bound")
         if aggregate_score < IDENTITY_CONFIRMATION_AGGREGATE_THRESHOLD:
             failure_reasons.append("aggregate-threshold-not-met")
 
@@ -603,10 +626,24 @@ class IdentityRegistry:
             registry_snapshot_digest=registry_snapshot_digest,
             accepted_witness_revocation_refs=accepted_witness_revocation_refs,
         )
+        revocation_verifier_roster_validation = (
+            cls._validate_witness_revocation_verifier_roster(
+                witness_registry_binding=witness_registry_binding,
+                observed_jurisdictions=revocation_verifier_validation[
+                    "revocation_verifier_jurisdictions"
+                ],
+                quorum_status=revocation_verifier_validation[
+                    "revocation_verifier_quorum_status"
+                ],
+            )
+        )
         registry_binding_status = (
             "bound"
             if registry_binding_status == "bound"
             and revocation_verifier_validation["witness_revocation_verifier_quorum_bound"]
+            and revocation_verifier_roster_validation[
+                "witness_revocation_verifier_roster_bound"
+            ]
             else "unbound"
         )
         registry_binding_core = (
@@ -657,6 +694,20 @@ class IdentityRegistry:
             == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_POLICY_ID
             and witness_registry_binding.get("revocation_verifier_profile")
             == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_PROFILE
+            and witness_registry_binding.get("revocation_verifier_roster_policy_id")
+            == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+            and witness_registry_binding.get("revocation_verifier_roster_profile")
+            == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+            and witness_registry_binding.get("revocation_verifier_roster_ref")
+            == revocation_verifier_roster_validation["revocation_verifier_roster_ref"]
+            and witness_registry_binding.get("required_revocation_verifier_jurisdictions")
+            == revocation_verifier_roster_validation[
+                "required_revocation_verifier_jurisdictions"
+            ]
+            and witness_registry_binding.get("revocation_verifier_roster_digest")
+            == revocation_verifier_roster_validation["revocation_verifier_roster_digest"]
+            and witness_registry_binding.get("revocation_verifier_roster_status")
+            == revocation_verifier_roster_validation["revocation_verifier_roster_status"]
             and witness_registry_binding.get("revocation_verifier_response_digest_set")
             == revocation_verifier_validation["revocation_verifier_response_digest_set"]
             and witness_registry_binding.get("revocation_verifier_response_set_digest")
@@ -670,8 +721,16 @@ class IdentityRegistry:
             and witness_registry_binding.get("revocation_verifier_quorum_digest")
             == revocation_verifier_validation["revocation_verifier_quorum_digest"]
             and witness_registry_binding.get("raw_revocation_verifier_payload_stored") is False
+            and witness_registry_binding.get("raw_revocation_verifier_roster_payload_stored")
+            is False
             and revocation_verifier_validation["revocation_verifier_receipts_bound"]
             and revocation_verifier_validation["revocation_verifier_quorum_digest_bound"]
+            and revocation_verifier_roster_validation[
+                "revocation_verifier_roster_digest_bound"
+            ]
+            and revocation_verifier_roster_validation[
+                "witness_revocation_verifier_roster_bound"
+            ]
             and witness_registry_binding.get("raw_registry_payload_stored") is False
             and witness_registry_binding.get("status") == registry_binding_status
             and witness_registry_binding.get("status") == "bound"
@@ -749,12 +808,22 @@ class IdentityRegistry:
             "witness_revocation_verifier_quorum_bound": revocation_verifier_validation[
                 "witness_revocation_verifier_quorum_bound"
             ],
+            "witness_revocation_verifier_roster_bound": (
+                revocation_verifier_roster_validation[
+                    "witness_revocation_verifier_roster_bound"
+                ]
+            ),
             "revocation_verifier_receipts_bound": revocation_verifier_validation[
                 "revocation_verifier_receipts_bound"
             ],
             "revocation_verifier_quorum_digest_bound": revocation_verifier_validation[
                 "revocation_verifier_quorum_digest_bound"
             ],
+            "revocation_verifier_roster_digest_bound": (
+                revocation_verifier_roster_validation[
+                    "revocation_verifier_roster_digest_bound"
+                ]
+            ),
             "aggregate_threshold_met": aggregate_threshold_met,
             "active_transition_allowed": active_transition_allowed,
             "confirmation_digest_bound": confirmation_digest_bound,
@@ -796,6 +865,56 @@ class IdentityRegistry:
         if len(set(normalized)) != len(normalized):
             raise ValueError(f"{field_name} must not contain duplicates")
         return sorted(normalized)
+
+    @classmethod
+    def _normalize_witness_revocation_verifier_roster(
+        cls,
+        roster: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        source = roster or {}
+        if not isinstance(source, dict):
+            raise ValueError("witness_revocation_verifier_roster must be an object")
+        roster_ref = cls._non_empty_string(
+            source.get("roster_ref")
+            or IDENTITY_CONFIRMATION_DEFAULT_WITNESS_REVOCATION_VERIFIER_ROSTER_REF,
+            "witness_revocation_verifier_roster.roster_ref",
+        )
+        required_jurisdictions = cls._normalize_string_list(
+            source.get(
+                "required_jurisdictions",
+                list(IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS),
+            ),
+            "witness_revocation_verifier_roster.required_jurisdictions",
+        )
+        for jurisdiction in required_jurisdictions:
+            cls._bounded_enum(
+                jurisdiction,
+                "witness_revocation_verifier_roster.required_jurisdictions",
+                set(
+                    IDENTITY_CONFIRMATION_ALLOWED_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS
+                ),
+            )
+        if len(required_jurisdictions) < IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_QUORUM:
+            raise ValueError(
+                "witness_revocation_verifier_roster.required_jurisdictions "
+                "must meet the verifier quorum"
+            )
+        roster_core = {
+            "roster_policy_id": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+            ),
+            "roster_profile": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+            ),
+            "roster_ref": roster_ref,
+            "required_jurisdictions": required_jurisdictions,
+            "quorum_threshold": IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_QUORUM,
+            "raw_roster_payload_stored": False,
+        }
+        return {
+            **roster_core,
+            "roster_digest": sha256_text(canonical_json(roster_core)),
+        }
 
     @classmethod
     def _normalize_self_report(cls, self_report: Dict[str, Any]) -> Dict[str, Any]:
@@ -944,6 +1063,7 @@ class IdentityRegistry:
         accepted_roles: List[str],
         witness_quorum_met: bool,
         revocation_verifier_receipts: Optional[List[Dict[str, Any]]],
+        revocation_verifier_roster: Dict[str, Any],
     ) -> Dict[str, Any]:
         accepted_witness_registry_digest_set = sorted(
             receipt.registry_entry_digest for receipt in accepted_witnesses
@@ -985,6 +1105,7 @@ class IdentityRegistry:
             registry_snapshot_digest=registry_snapshot_digest,
             accepted_witness_revocation_refs=accepted_witness_revocation_refs,
             verifier_receipts=revocation_verifier_receipts,
+            verifier_roster=revocation_verifier_roster,
         )
         status = (
             "bound"
@@ -992,6 +1113,7 @@ class IdentityRegistry:
             and witness_registry_status == "current"
             and witness_revocation_status == "not-revoked"
             and revocation_verifier_quorum["revocation_verifier_quorum_status"] == "complete"
+            and revocation_verifier_quorum["revocation_verifier_roster_status"] == "bound"
             else "unbound"
         )
         continuity_subject_ref = f"identity://{identity_id}/ascending-to-active"
@@ -1037,23 +1159,21 @@ class IdentityRegistry:
         registry_snapshot_digest: str,
         accepted_witness_revocation_refs: List[str],
         verifier_receipts: Optional[List[Dict[str, Any]]],
+        verifier_roster: Dict[str, Any],
     ) -> Dict[str, Any]:
+        required_jurisdictions = list(verifier_roster["required_jurisdictions"])
         source_receipts = (
             verifier_receipts
             if verifier_receipts is not None
             else [
                 {
                     "verifier_ref": (
-                        "identity-witness-revocation-verifier://jp-13/reference-runtime"
+                        "identity-witness-revocation-verifier://"
+                        f"{jurisdiction.lower()}/reference-runtime"
                     ),
-                    "jurisdiction": "JP-13",
-                },
-                {
-                    "verifier_ref": (
-                        "identity-witness-revocation-verifier://us-ca/reference-runtime"
-                    ),
-                    "jurisdiction": "US-CA",
-                },
+                    "jurisdiction": jurisdiction,
+                }
+                for jurisdiction in required_jurisdictions
             ]
         )
         normalized_receipts = [
@@ -1073,6 +1193,25 @@ class IdentityRegistry:
             registry_snapshot_digest=registry_snapshot_digest,
             accepted_witness_revocation_refs=accepted_witness_revocation_refs,
         )
+        roster_validation = cls._validate_witness_revocation_verifier_roster(
+            witness_registry_binding={
+                "revocation_verifier_roster_policy_id": (
+                    IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+                ),
+                "revocation_verifier_roster_profile": (
+                    IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+                ),
+                "revocation_verifier_roster_ref": verifier_roster["roster_ref"],
+                "required_revocation_verifier_jurisdictions": required_jurisdictions,
+                "revocation_verifier_roster_digest": verifier_roster["roster_digest"],
+                "revocation_verifier_jurisdictions": validation[
+                    "revocation_verifier_jurisdictions"
+                ],
+                "raw_revocation_verifier_roster_payload_stored": False,
+            },
+            observed_jurisdictions=validation["revocation_verifier_jurisdictions"],
+            quorum_status=validation["revocation_verifier_quorum_status"],
+        )
         return {
             "revocation_verifier_policy_id": (
                 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_POLICY_ID
@@ -1080,6 +1219,18 @@ class IdentityRegistry:
             "revocation_verifier_profile": (
                 IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_PROFILE
             ),
+            "revocation_verifier_roster_policy_id": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+            ),
+            "revocation_verifier_roster_profile": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+            ),
+            "revocation_verifier_roster_ref": verifier_roster["roster_ref"],
+            "required_revocation_verifier_jurisdictions": required_jurisdictions,
+            "revocation_verifier_roster_digest": verifier_roster["roster_digest"],
+            "revocation_verifier_roster_status": roster_validation[
+                "revocation_verifier_roster_status"
+            ],
             "revocation_verifier_receipts": normalized_receipts,
             "revocation_verifier_response_digest_set": validation[
                 "revocation_verifier_response_digest_set"
@@ -1100,6 +1251,7 @@ class IdentityRegistry:
                 "revocation_verifier_quorum_digest"
             ],
             "raw_revocation_verifier_payload_stored": False,
+            "raw_revocation_verifier_roster_payload_stored": False,
         }
 
     @classmethod
@@ -1120,7 +1272,7 @@ class IdentityRegistry:
         jurisdiction = cls._bounded_enum(
             receipt.get("jurisdiction"),
             "witness_revocation_verifier_receipt.jurisdiction",
-            set(IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS),
+            set(IDENTITY_CONFIRMATION_ALLOWED_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS),
         )
         covered_revocation_refs = cls._normalize_string_list(
             receipt.get("covered_revocation_refs", accepted_witness_revocation_refs),
@@ -1171,6 +1323,83 @@ class IdentityRegistry:
         return {
             **response_core,
             "response_digest": sha256_text(canonical_json(response_core)),
+        }
+
+    @classmethod
+    def _validate_witness_revocation_verifier_roster(
+        cls,
+        *,
+        witness_registry_binding: Dict[str, Any],
+        observed_jurisdictions: List[str],
+        quorum_status: str,
+    ) -> Dict[str, Any]:
+        if not isinstance(witness_registry_binding, dict):
+            witness_registry_binding = {}
+        required_jurisdictions = witness_registry_binding.get(
+            "required_revocation_verifier_jurisdictions",
+            [],
+        )
+        if not isinstance(required_jurisdictions, list):
+            required_jurisdictions = []
+        normalized_required = sorted(
+            item
+            for item in required_jurisdictions
+            if isinstance(item, str)
+            and item
+            in IDENTITY_CONFIRMATION_ALLOWED_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS
+        )
+        observed_set = sorted(
+            {
+                item
+                for item in observed_jurisdictions
+                if isinstance(item, str)
+                and item
+                in IDENTITY_CONFIRMATION_ALLOWED_WITNESS_REVOCATION_VERIFIER_JURISDICTIONS
+            }
+        )
+        roster_ref = witness_registry_binding.get("revocation_verifier_roster_ref")
+        roster_core = {
+            "roster_policy_id": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+            ),
+            "roster_profile": (
+                IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+            ),
+            "roster_ref": roster_ref,
+            "required_jurisdictions": normalized_required,
+            "quorum_threshold": IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_QUORUM,
+            "raw_roster_payload_stored": False,
+        }
+        expected_digest = sha256_text(canonical_json(roster_core))
+        roster_digest_bound = (
+            witness_registry_binding.get("revocation_verifier_roster_digest")
+            == expected_digest
+        )
+        roster_status = (
+            "bound"
+            if witness_registry_binding.get("revocation_verifier_roster_policy_id")
+            == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_POLICY_ID
+            and witness_registry_binding.get("revocation_verifier_roster_profile")
+            == IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_ROSTER_PROFILE
+            and isinstance(roster_ref, str)
+            and bool(roster_ref)
+            and len(normalized_required)
+            >= IDENTITY_CONFIRMATION_WITNESS_REVOCATION_VERIFIER_QUORUM
+            and normalized_required == required_jurisdictions
+            and all(jurisdiction in observed_set for jurisdiction in normalized_required)
+            and quorum_status == "complete"
+            and roster_digest_bound
+            and witness_registry_binding.get("raw_revocation_verifier_roster_payload_stored")
+            is False
+            else "unbound"
+        )
+        return {
+            "revocation_verifier_roster_ref": roster_ref,
+            "required_revocation_verifier_jurisdictions": normalized_required,
+            "revocation_verifier_roster_digest": expected_digest,
+            "revocation_verifier_roster_status": roster_status,
+            "revocation_verifier_roster_digest_bound": roster_digest_bound,
+            "witness_revocation_verifier_roster_bound": roster_status == "bound",
         }
 
     @classmethod

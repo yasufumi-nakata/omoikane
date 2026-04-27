@@ -63,15 +63,19 @@
   `identity-witness-registry-binding-v1` が accepted witness の current registry entry、
   verifier key ref、not-revoked revocation ref を digest-only に束縛し、
   `identity-witness-revocation-live-verifier-quorum-v1` が accepted revocation refs を
-  JP-13 / US-CA の dual verifier quorum に束縛した場合のみ許可する
+  JP-13 / US-CA の dual verifier quorum と
+  `identity-witness-revocation-verifier-roster-policy-v1` の verifier roster に束縛した場合のみ許可する
 - witness registry の raw roster / raw revocation payload は保存せず、
   `registry_entry_digest`、`registry_snapshot_digest`、revocation verifier response digest set、
-  `revocation_verifier_quorum_digest`、`registry_binding_digest` のみを
+  `revocation_verifier_quorum_digest`、`revocation_verifier_roster_digest`、
+  `registry_binding_digest` のみを
   continuity subject に束縛する
 - witness が stale / unknown / revoked の場合は alignment score が閾値を超えていても
   accepted witness から除外し、`witness-registry-binding-not-bound` で fail-closed する
 - accepted witness が current / not-revoked でも revocation verifier quorum が incomplete の場合は
   `witness-revocation-verifier-quorum-not-bound` で fail-closed する
+- revocation verifier quorum が complete でも policy-bound verifier roster の required jurisdiction set
+  を覆わない場合は `witness-revocation-verifier-roster-not-bound` で fail-closed する
 - 失敗時は `active_transition_allowed=false` と
   `failure_action=failed-ascension-or-repeat-ascending` を返し、Active へ進めない
 
@@ -91,6 +95,7 @@ machine-readable に固定する。生の主観報告文や第三者観察本文
 `self_report.statement_digest`、各 dimension の `evidence_digest`、
 `witness_registry_binding.registry_binding_digest`、
 `witness_registry_binding.revocation_verifier_quorum_digest`、
+`witness_registry_binding.revocation_verifier_roster_digest`、
 `self_report_witness_consistency.consistency_digest`、`confirmation_digest` を
 ContinuityLedger の `identity-fidelity` event へ束縛する。
 

@@ -16462,6 +16462,12 @@ json.dump(response, sys.stdout)
                 "witness_revocation_verifier_quorum_digest": profile[
                     "witness_registry_binding"
                 ]["revocation_verifier_quorum_digest"],
+                "witness_revocation_verifier_roster_status": profile[
+                    "witness_registry_binding"
+                ]["revocation_verifier_roster_status"],
+                "witness_revocation_verifier_roster_digest": profile[
+                    "witness_registry_binding"
+                ]["revocation_verifier_roster_digest"],
                 "self_report_witness_consistency_status": profile[
                     "self_report_witness_consistency"
                 ]["status"],
@@ -16578,6 +16584,59 @@ json.dump(response, sys.stdout)
         verifier_blocked_validation = IdentityRegistry.validate_identity_confirmation(
             verifier_blocked_profile
         )
+        roster_blocked_profile = self.identity.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-demo/roster-blocked",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-roster-blocked",
+            episodic_recall_ref="episodic://identity-confirmation-demo/roster-recall",
+            self_model_ref="self-model://identity-confirmation-demo/roster-snapshot",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-demo/roster-blocked",
+                "statement": "I confirm continuity, but the verifier roster is not covered.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation/clinician-roster-current",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation/roster-recall",
+                    "alignment_score": 0.89,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation/guardian-roster-current",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation/roster-self-model",
+                    "alignment_score": 0.9,
+                },
+            ],
+            witness_revocation_verifier_roster={
+                "roster_ref": (
+                    "identity-witness-revocation-verifier-roster://policy/jp-eu/v1"
+                ),
+                "required_jurisdictions": ["JP-13", "EU-DE"],
+            },
+            witness_revocation_verifier_receipts=[
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://jp-13/reference-runtime"
+                    ),
+                    "jurisdiction": "JP-13",
+                    "response_status": "not-revoked",
+                },
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://us-ca/reference-runtime"
+                    ),
+                    "jurisdiction": "US-CA",
+                    "response_status": "not-revoked",
+                },
+            ],
+        )
+        roster_blocked_validation = IdentityRegistry.validate_identity_confirmation(
+            roster_blocked_profile
+        )
 
         return {
             "identity": {
@@ -16597,12 +16656,16 @@ json.dump(response, sys.stdout)
                 "witness_revocation_verifier_policy": profile["witness_registry_binding"][
                     "revocation_verifier_policy_id"
                 ],
+                "witness_revocation_verifier_roster_policy": profile[
+                    "witness_registry_binding"
+                ]["revocation_verifier_roster_policy_id"],
                 "failure_action": "failed-ascension-or-repeat-ascending",
             },
             "confirmation_profile": profile,
             "blocked_profile": blocked_profile,
             "revoked_witness_profile": revoked_witness_profile,
             "verifier_blocked_profile": verifier_blocked_profile,
+            "roster_blocked_profile": roster_blocked_profile,
             "validation": {
                 **validation,
                 "blocked_profile_fail_closed": (
@@ -16637,6 +16700,22 @@ json.dump(response, sys.stdout)
                     ]
                     is False
                 ),
+                "revocation_verifier_roster_fail_closed": (
+                    roster_blocked_profile["result"] == "failed"
+                    and roster_blocked_profile["active_transition_allowed"] is False
+                    and "witness-revocation-verifier-roster-not-bound"
+                    in roster_blocked_profile["failure_reasons"]
+                    and roster_blocked_validation["ok"] is False
+                    and roster_blocked_validation["confirmation_digest_bound"] is True
+                    and roster_blocked_validation[
+                        "witness_revocation_verifier_quorum_bound"
+                    ]
+                    is True
+                    and roster_blocked_validation[
+                        "witness_revocation_verifier_roster_bound"
+                    ]
+                    is False
+                ),
                 "ledger_event_bound": (
                     ledger_event.payload["confirmation_digest"]
                     == profile["confirmation_digest"]
@@ -16649,6 +16728,12 @@ json.dump(response, sys.stdout)
                     ]
                     == profile["witness_registry_binding"][
                         "revocation_verifier_quorum_digest"
+                    ]
+                    and ledger_event.payload[
+                        "witness_revocation_verifier_roster_digest"
+                    ]
+                    == profile["witness_registry_binding"][
+                        "revocation_verifier_roster_digest"
                     ]
                 ),
             },

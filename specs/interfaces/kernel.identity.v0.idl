@@ -98,6 +98,7 @@ operations:
       - identity-self-report-witness-consistency-v1
       - identity-witness-registry-binding-v1
       - identity-witness-revocation-live-verifier-quorum-v1
+      - identity-witness-revocation-verifier-roster-policy-v1
     input:
       inline_schema:
         type: object
@@ -203,6 +204,7 @@ operations:
                 jurisdiction:
                   type: string
                   enum:
+                    - EU-DE
                     - JP-13
                     - US-CA
                 response_status:
@@ -221,6 +223,25 @@ operations:
                   items:
                     type: string
                     minLength: 1
+          witness_revocation_verifier_roster:
+            type: object
+            required:
+              - roster_ref
+              - required_jurisdictions
+            properties:
+              roster_ref:
+                type: string
+                minLength: 1
+              required_jurisdictions:
+                type: array
+                minItems: 2
+                uniqueItems: true
+                items:
+                  type: string
+                  enum:
+                    - EU-DE
+                    - JP-13
+                    - US-CA
           witness_registry_ref:
             type: string
             minLength: 1

@@ -585,8 +585,10 @@ class KernelTests(unittest.TestCase):
         self.assertTrue(validation["witness_registry_binding_bound"])
         self.assertTrue(validation["registry_binding_digest_bound"])
         self.assertTrue(validation["witness_revocation_verifier_quorum_bound"])
+        self.assertTrue(validation["witness_revocation_verifier_roster_bound"])
         self.assertTrue(validation["revocation_verifier_receipts_bound"])
         self.assertTrue(validation["revocation_verifier_quorum_digest_bound"])
+        self.assertTrue(validation["revocation_verifier_roster_digest_bound"])
         self.assertTrue(validation["confirmation_digest_bound"])
         self.assertEqual(
             "identity-witness-registry-binding-v1",
@@ -599,11 +601,30 @@ class KernelTests(unittest.TestCase):
             profile["witness_registry_binding"]["revocation_verifier_policy_id"],
         )
         self.assertEqual(
+            "identity-witness-revocation-verifier-roster-policy-v1",
+            profile["witness_registry_binding"]["revocation_verifier_roster_policy_id"],
+        )
+        self.assertEqual(
+            ["JP-13", "US-CA"],
+            profile["witness_registry_binding"][
+                "required_revocation_verifier_jurisdictions"
+            ],
+        )
+        self.assertEqual(
             "complete",
             profile["witness_registry_binding"]["revocation_verifier_quorum_status"],
         )
+        self.assertEqual(
+            "bound",
+            profile["witness_registry_binding"]["revocation_verifier_roster_status"],
+        )
         self.assertFalse(
             profile["witness_registry_binding"]["raw_revocation_verifier_payload_stored"]
+        )
+        self.assertFalse(
+            profile["witness_registry_binding"][
+                "raw_revocation_verifier_roster_payload_stored"
+            ]
         )
         self.assertTrue(
             all(
@@ -830,6 +851,90 @@ class KernelTests(unittest.TestCase):
         )
         self.assertIn(
             "witness-revocation-verifier-quorum-not-bound",
+            profile["failure_reasons"],
+        )
+
+    def test_identity_confirmation_blocks_revocation_verifier_roster_mismatch(self) -> None:
+        registry = IdentityRegistry()
+        identity = registry.create("consent://identity-confirmation-verifier-roster")
+
+        profile = registry.confirm_identity(
+            identity.identity_id,
+            consent_ref="consent://identity-confirmation-verifier-roster",
+            scheduler_stage_ref="scheduler://method-a/identity-confirmation-verifier-roster",
+            episodic_recall_ref="episodic://identity-confirmation-verifier-roster/recall",
+            self_model_ref="self-model://identity-confirmation-verifier-roster/stable",
+            episodic_recall_score=0.93,
+            self_model_alignment_score=0.89,
+            self_report={
+                "report_ref": "self-report://identity-confirmation-verifier-roster/high",
+                "statement": "I confirm continuity with a policy-bound verifier roster.",
+                "continuity_score": 0.91,
+            },
+            witness_receipts=[
+                {
+                    "witness_id": "witness://identity-confirmation-verifier-roster/clinician",
+                    "witness_role": "clinician",
+                    "observation_ref": "observation://identity-confirmation-verifier-roster/recall",
+                    "alignment_score": 0.89,
+                },
+                {
+                    "witness_id": "witness://identity-confirmation-verifier-roster/guardian",
+                    "witness_role": "guardian",
+                    "observation_ref": "observation://identity-confirmation-verifier-roster/self-model",
+                    "alignment_score": 0.9,
+                },
+            ],
+            witness_revocation_verifier_roster={
+                "roster_ref": (
+                    "identity-witness-revocation-verifier-roster://policy/jp-eu/v1"
+                ),
+                "required_jurisdictions": ["JP-13", "EU-DE"],
+            },
+            witness_revocation_verifier_receipts=[
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://jp-13/reference-runtime"
+                    ),
+                    "jurisdiction": "JP-13",
+                    "response_status": "not-revoked",
+                },
+                {
+                    "verifier_ref": (
+                        "identity-witness-revocation-verifier://us-ca/reference-runtime"
+                    ),
+                    "jurisdiction": "US-CA",
+                    "response_status": "not-revoked",
+                },
+            ],
+        )
+
+        validation = IdentityRegistry.validate_identity_confirmation(profile)
+
+        self.assertEqual("failed", profile["result"])
+        self.assertFalse(profile["active_transition_allowed"])
+        self.assertTrue(validation["third_party_witness_quorum_met"])
+        self.assertTrue(validation["witness_revocation_verifier_quorum_bound"])
+        self.assertFalse(validation["witness_registry_binding_bound"])
+        self.assertFalse(validation["witness_revocation_verifier_roster_bound"])
+        self.assertTrue(validation["revocation_verifier_roster_digest_bound"])
+        self.assertEqual(
+            "complete",
+            profile["witness_registry_binding"]["revocation_verifier_quorum_status"],
+        )
+        self.assertEqual(
+            "unbound",
+            profile["witness_registry_binding"]["revocation_verifier_roster_status"],
+        )
+        self.assertEqual(
+            ["EU-DE", "JP-13"],
+            profile["witness_registry_binding"][
+                "required_revocation_verifier_jurisdictions"
+            ],
+        )
+        self.assertIn("witness-registry-binding-not-bound", profile["failure_reasons"])
+        self.assertIn(
+            "witness-revocation-verifier-roster-not-bound",
             profile["failure_reasons"],
         )
 

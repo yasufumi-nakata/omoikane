@@ -23,7 +23,8 @@ Active 遷移を許可することに加えて、self-report と accepted witnes
 `identity-self-report-witness-consistency-v1` の score delta / role binding に
 収まることを保護する。加えて `identity-witness-registry-binding-v1` により、
 accepted witness が current registry entry、verifier key ref、not-revoked revocation ref へ
-digest-bound され、raw registry payload を保持しないことを保護する。
+digest-bound され、live revocation verifier quorum と policy-bound verifier roster を満たし、
+raw registry / verifier roster payload を保持しないことを保護する。
 
 ## 評価項目（暫定）
 

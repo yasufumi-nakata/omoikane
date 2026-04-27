@@ -1413,9 +1413,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["registry_binding_digest_bound"])
         self.assertTrue(result["validation"]["witness_revocation_verifier_quorum_bound"])
         self.assertTrue(result["validation"]["revocation_verifier_quorum_digest_bound"])
+        self.assertTrue(result["validation"]["witness_revocation_verifier_roster_bound"])
+        self.assertTrue(result["validation"]["revocation_verifier_roster_digest_bound"])
         self.assertTrue(result["validation"]["blocked_profile_fail_closed"])
         self.assertTrue(result["validation"]["revoked_witness_registry_fail_closed"])
         self.assertTrue(result["validation"]["revocation_verifier_quorum_fail_closed"])
+        self.assertTrue(result["validation"]["revocation_verifier_roster_fail_closed"])
         self.assertEqual(
             "multidimensional-identity-confirmation-v1",
             result["confirmation_profile"]["profile_id"],

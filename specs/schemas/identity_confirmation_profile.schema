@@ -254,6 +254,12 @@ properties:
       - role_binding_status
       - revocation_verifier_policy_id
       - revocation_verifier_profile
+      - revocation_verifier_roster_policy_id
+      - revocation_verifier_roster_profile
+      - revocation_verifier_roster_ref
+      - required_revocation_verifier_jurisdictions
+      - revocation_verifier_roster_digest
+      - revocation_verifier_roster_status
       - revocation_verifier_receipts
       - revocation_verifier_response_digest_set
       - revocation_verifier_response_set_digest
@@ -262,6 +268,7 @@ properties:
       - revocation_verifier_quorum_status
       - revocation_verifier_quorum_digest
       - raw_revocation_verifier_payload_stored
+      - raw_revocation_verifier_roster_payload_stored
       - raw_registry_payload_stored
       - status
       - registry_binding_digest
@@ -331,6 +338,28 @@ properties:
       revocation_verifier_profile:
         type: string
         const: dual-jurisdiction-revocation-live-verifier-v1
+      revocation_verifier_roster_policy_id:
+        type: string
+        const: identity-witness-revocation-verifier-roster-policy-v1
+      revocation_verifier_roster_profile:
+        type: string
+        const: policy-bound-dual-jurisdiction-revocation-roster-v1
+      revocation_verifier_roster_ref:
+        type: string
+        minLength: 1
+      required_revocation_verifier_jurisdictions:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          enum: [EU-DE, JP-13, US-CA]
+      revocation_verifier_roster_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      revocation_verifier_roster_status:
+        type: string
+        enum: [bound, unbound]
       revocation_verifier_receipts:
         type: array
         items:
@@ -355,7 +384,7 @@ properties:
               minLength: 1
             jurisdiction:
               type: string
-              enum: [JP-13, US-CA]
+              enum: [EU-DE, JP-13, US-CA]
             response_ref:
               type: string
               minLength: 1
@@ -403,7 +432,7 @@ properties:
         uniqueItems: true
         items:
           type: string
-          enum: [JP-13, US-CA]
+          enum: [EU-DE, JP-13, US-CA]
       revocation_verifier_quorum_threshold:
         type: integer
         const: 2
@@ -414,6 +443,9 @@ properties:
         type: string
         pattern: "^[0-9a-f]{64}$"
       raw_revocation_verifier_payload_stored:
+        type: boolean
+        const: false
+      raw_revocation_verifier_roster_payload_stored:
         type: boolean
         const: false
       raw_registry_payload_stored:
@@ -531,6 +563,7 @@ properties:
         - self-report-witness-consistency-not-bound
         - witness-registry-binding-not-bound
         - witness-revocation-verifier-quorum-not-bound
+        - witness-revocation-verifier-roster-not-bound
         - aggregate-threshold-not-met
   confirmation_digest:
     type: string
@@ -639,6 +672,12 @@ examples:
       role_binding_status: bound
       revocation_verifier_policy_id: identity-witness-revocation-live-verifier-quorum-v1
       revocation_verifier_profile: dual-jurisdiction-revocation-live-verifier-v1
+      revocation_verifier_roster_policy_id: identity-witness-revocation-verifier-roster-policy-v1
+      revocation_verifier_roster_profile: policy-bound-dual-jurisdiction-revocation-roster-v1
+      revocation_verifier_roster_ref: identity-witness-revocation-verifier-roster://reference-runtime/current
+      required_revocation_verifier_jurisdictions: [JP-13, US-CA]
+      revocation_verifier_roster_digest: "6161616161616161616161616161616161616161616161616161616161616161"
+      revocation_verifier_roster_status: bound
       revocation_verifier_receipts:
         - verifier_ref: identity-witness-revocation-verifier://jp-13/reference-runtime
           jurisdiction: JP-13
@@ -677,6 +716,7 @@ examples:
       revocation_verifier_quorum_status: complete
       revocation_verifier_quorum_digest: "6060606060606060606060606060606060606060606060606060606060606060"
       raw_revocation_verifier_payload_stored: false
+      raw_revocation_verifier_roster_payload_stored: false
       raw_registry_payload_stored: false
       status: bound
       registry_binding_digest: "8989898989898989898989898989898989898989898989898989898989898989"
