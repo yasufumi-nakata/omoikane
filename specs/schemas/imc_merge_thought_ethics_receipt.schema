@@ -3,9 +3,10 @@ title: IMCMergeThoughtEthicsReceipt
 description: >
   Digest-only Federation Council, EthicsCommittee, and Guardian gate receipt
   for one bounded IMC merge_thought session. The receipt binds the route,
-  disclosure floor, distinct collective target, policy-authority-backed merge
-  window, recovery limits, and approval refs without storing raw thought,
-  message, or window policy payloads.
+  disclosure floor, distinct collective target, live-verifier-backed
+  policy-authority merge window, recovery limits, and approval refs without
+  storing raw thought, message, window policy, verifier, or response-signature
+  payloads.
 type: object
 additionalProperties: false
 required:
@@ -100,10 +101,22 @@ properties:
           - verifier_refs
           - verifier_response_digests
           - verifier_quorum_digest
+          - live_verifier_profile
+          - live_verifier_transport_profile
+          - live_verifier_receipts
+          - live_verifier_receipt_digests
+          - live_verifier_network_response_digests
+          - live_verifier_response_signature_digests
+          - live_verifier_authority_refs
+          - live_verifier_jurisdictions
+          - live_verifier_quorum_digest
+          - live_verifier_quorum_bound
           - max_merge_window_seconds
           - requested_merge_window_seconds
           - policy_authority_status
           - raw_policy_payload_stored
+          - raw_verifier_payload_stored
+          - raw_response_signature_payload_stored
           - policy_authority_digest
         properties:
           policy_profile:
@@ -154,6 +167,206 @@ properties:
           verifier_quorum_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          live_verifier_profile:
+            type: string
+            const: merge-thought-window-live-verifier-receipt-v1
+          live_verifier_transport_profile:
+            type: string
+            const: live-http-json-merge-thought-window-policy-v1
+          live_verifier_receipts:
+            type: array
+            minItems: 2
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - schema_version
+                - receipt_id
+                - profile_id
+                - digest_profile
+                - transport_profile
+                - verifier_ref
+                - verifier_endpoint_ref
+                - verifier_authority_ref
+                - jurisdiction
+                - policy_profile
+                - policy_registry_ref
+                - policy_registry_digest
+                - policy_body_digest
+                - policy_signature_digest
+                - signer_roster_ref
+                - signer_roster_digest
+                - signer_key_refs
+                - max_merge_window_seconds
+                - http_status
+                - request_timeout_ms
+                - observed_latency_ms
+                - latency_budget_ms
+                - network_response_digest
+                - network_probe_status
+                - network_probe_bound
+                - response_status
+                - response_signature_profile
+                - response_signature_digest
+                - response_digest
+                - policy_payload_bound
+                - signed_response_bound
+                - raw_policy_payload_stored
+                - raw_verifier_payload_stored
+                - raw_response_signature_payload_stored
+                - digest
+              properties:
+                schema_version:
+                  type: string
+                  const: "1.0"
+                receipt_id:
+                  type: string
+                  minLength: 8
+                profile_id:
+                  type: string
+                  const: merge-thought-window-live-verifier-receipt-v1
+                digest_profile:
+                  type: string
+                  const: merge-thought-window-live-verifier-digest-v1
+                transport_profile:
+                  type: string
+                  const: live-http-json-merge-thought-window-policy-v1
+                verifier_ref:
+                  type: string
+                  minLength: 1
+                verifier_endpoint_ref:
+                  type: string
+                  pattern: "^https?://"
+                verifier_authority_ref:
+                  type: string
+                  minLength: 1
+                jurisdiction:
+                  type: string
+                  minLength: 1
+                policy_profile:
+                  type: string
+                  const: merge-thought-window-policy-authority-v1
+                policy_registry_ref:
+                  type: string
+                  minLength: 1
+                policy_registry_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                policy_body_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                policy_signature_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                signer_roster_ref:
+                  type: string
+                  minLength: 1
+                signer_roster_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                signer_key_refs:
+                  type: array
+                  minItems: 2
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                max_merge_window_seconds:
+                  type: integer
+                  const: 10
+                http_status:
+                  type: integer
+                  const: 200
+                request_timeout_ms:
+                  type: integer
+                  minimum: 1
+                observed_latency_ms:
+                  type: number
+                  minimum: 0
+                  maximum: 250
+                latency_budget_ms:
+                  type: number
+                  const: 250
+                network_response_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                network_probe_status:
+                  type: string
+                  const: verified
+                network_probe_bound:
+                  type: boolean
+                  const: true
+                response_status:
+                  type: string
+                  const: verified
+                response_signature_profile:
+                  type: string
+                  const: digest-only-merge-thought-window-policy-response-signature-v1
+                response_signature_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                response_digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                policy_payload_bound:
+                  type: boolean
+                  const: true
+                signed_response_bound:
+                  type: boolean
+                  const: true
+                raw_policy_payload_stored:
+                  type: boolean
+                  const: false
+                raw_verifier_payload_stored:
+                  type: boolean
+                  const: false
+                raw_response_signature_payload_stored:
+                  type: boolean
+                  const: false
+                digest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+          live_verifier_receipt_digests:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+          live_verifier_network_response_digests:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+          live_verifier_response_signature_digests:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+          live_verifier_authority_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          live_verifier_jurisdictions:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          live_verifier_quorum_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          live_verifier_quorum_bound:
+            type: boolean
+            const: true
           max_merge_window_seconds:
             type: integer
             const: 10
@@ -165,6 +378,12 @@ properties:
             type: string
             const: verified
           raw_policy_payload_stored:
+            type: boolean
+            const: false
+          raw_verifier_payload_stored:
+            type: boolean
+            const: false
+          raw_response_signature_payload_stored:
             type: boolean
             const: false
           policy_authority_digest:

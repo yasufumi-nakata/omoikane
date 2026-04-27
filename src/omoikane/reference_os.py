@@ -87,7 +87,10 @@ from .governance import (
 from .interface.bdb import BiologicalDigitalBridge
 from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
-from .interface.imc import InterMindChannel
+from .interface.imc import (
+    IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS,
+    InterMindChannel,
+)
 from .interface.sensory_loopback import (
     SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
     SensoryLoopbackService,
@@ -7362,6 +7365,43 @@ json.dump(response, sys.stdout)
         }
 
     def run_imc_demo(self) -> Dict[str, Any]:
+        @contextmanager
+        def live_window_policy_verifier_bridge(payloads: Dict[str, Dict[str, Any]]):
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.0"
+
+                def do_GET(self) -> None:  # noqa: N802
+                    payload = payloads.get(self.path)
+                    if payload is None:
+                        self.send_response(404)
+                        self.send_header("Connection", "close")
+                        self.end_headers()
+                        self.close_connection = True
+                        return
+                    body = json.dumps(payload).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.wfile.flush()
+                    self.close_connection = True
+
+                def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+                    return
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            try:
+                yield base_url
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=1.0)
+
         identity = self.identity.create(
             human_consent_proof="consent://imc-demo/v1",
             metadata={"display_name": "IMC Origin"},
@@ -7473,6 +7513,47 @@ json.dump(response, sys.stdout)
                 "identity_axiom_state": "sealed-core",
             },
         )
+        window_policy_verifier_payloads = {
+            "/window-policy/jp-13": (
+                self.imc.build_merge_thought_window_policy_verifier_payload(
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/jp-13/live-verifier"
+                    ),
+                    jurisdiction="JP-13",
+                )
+            ),
+            "/window-policy/us-ca": (
+                self.imc.build_merge_thought_window_policy_verifier_payload(
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[1],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/us-ca/live-verifier"
+                    ),
+                    jurisdiction="US-CA",
+                )
+            ),
+        }
+        with live_window_policy_verifier_bridge(
+            window_policy_verifier_payloads
+        ) as window_policy_base_url:
+            window_policy_verifier_receipts = [
+                self.imc.probe_merge_thought_window_policy_verifier_endpoint(
+                    verifier_endpoint=f"{window_policy_base_url}/window-policy/jp-13",
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/jp-13/live-verifier"
+                    ),
+                    jurisdiction="JP-13",
+                ),
+                self.imc.probe_merge_thought_window_policy_verifier_endpoint(
+                    verifier_endpoint=f"{window_policy_base_url}/window-policy/us-ca",
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[1],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/us-ca/live-verifier"
+                    ),
+                    jurisdiction="US-CA",
+                ),
+            ]
         merge_thought_ethics_receipt = self.imc.seal_merge_thought_ethics_receipt(
             merge_session["session_id"],
             message=merge_message,
@@ -7486,6 +7567,7 @@ json.dump(response, sys.stdout)
                 "guardian://integrity/imc-merge-thought-ethics-gate-v1"
             ),
             requested_merge_window_seconds=10,
+            window_policy_verifier_receipts=window_policy_verifier_receipts,
         )
         merge_thought_ethics_validation = (
             self.imc.validate_merge_thought_ethics_receipt(
@@ -7538,6 +7620,9 @@ json.dump(response, sys.stdout)
             "merge_thought_ethics_window_policy_authority_bound": (
                 merge_thought_ethics_validation["window_policy_authority_bound"]
             ),
+            "merge_thought_ethics_window_policy_live_verifier_bound": (
+                merge_thought_ethics_validation["window_policy_live_verifier_bound"]
+            ),
             "merge_thought_ethics_collective_bound": merge_thought_ethics_validation[
                 "collective_bound"
             ],
@@ -7555,6 +7640,19 @@ json.dump(response, sys.stdout)
             ),
             "merge_thought_ethics_raw_message_payload_stored": (
                 merge_thought_ethics_validation["raw_message_payload_stored"]
+            ),
+            "merge_thought_ethics_raw_window_policy_payload_stored": (
+                merge_thought_ethics_validation["raw_window_policy_payload_stored"]
+            ),
+            "merge_thought_ethics_raw_window_policy_verifier_payload_stored": (
+                merge_thought_ethics_validation[
+                    "raw_window_policy_verifier_payload_stored"
+                ]
+            ),
+            "merge_thought_ethics_raw_window_policy_response_signature_payload_stored": (
+                merge_thought_ethics_validation[
+                    "raw_window_policy_response_signature_payload_stored"
+                ]
             ),
         }
 
@@ -7690,9 +7788,32 @@ json.dump(response, sys.stdout)
                 "window_policy_authority_digest": merge_thought_ethics_receipt[
                     "risk_boundary"
                 ]["merge_window_policy_authority"]["policy_authority_digest"],
+                "window_policy_live_verifier_quorum_digest": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["live_verifier_quorum_digest"]
+                ),
+                "window_policy_live_verifier_receipt_digests": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["live_verifier_receipt_digests"]
+                ),
+                "window_policy_live_verifier_network_response_digests": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["live_verifier_network_response_digests"]
+                ),
                 "raw_policy_payload_stored": merge_thought_ethics_receipt[
                     "risk_boundary"
                 ]["merge_window_policy_authority"]["raw_policy_payload_stored"],
+                "raw_verifier_payload_stored": merge_thought_ethics_receipt[
+                    "risk_boundary"
+                ]["merge_window_policy_authority"]["raw_verifier_payload_stored"],
+                "raw_response_signature_payload_stored": (
+                    merge_thought_ethics_receipt["risk_boundary"][
+                        "merge_window_policy_authority"
+                    ]["raw_response_signature_payload_stored"]
+                ),
                 "raw_thought_payload_stored": merge_thought_ethics_receipt[
                     "disclosure_binding"
                 ]["raw_thought_payload_stored"],

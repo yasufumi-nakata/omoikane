@@ -1,10 +1,54 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 import unittest
 
 from omoikane.common import sha256_text
-from omoikane.interface.imc import InterMindChannel
+from omoikane.interface.imc import (
+    IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS,
+    InterMindChannel,
+)
+
+
+@contextmanager
+def live_window_policy_endpoint(payloads: dict[str, dict[str, object]]):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self) -> None:  # noqa: N802
+            payload = payloads.get(self.path)
+            if payload is None:
+                self.send_response(404)
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.close_connection = True
+                return
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+            self.close_connection = True
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1.0)
 
 
 class InterMindChannelTests(unittest.TestCase):
@@ -296,6 +340,41 @@ class InterMindChannelTests(unittest.TestCase):
                 "identity_axiom_state": "sealed-core",
             },
         )
+        window_policy_payloads = {
+            "/jp-13": imc.build_merge_thought_window_policy_verifier_payload(
+                verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+                verifier_authority_ref=(
+                    "authority://imc-window-policy/jp-13/live-verifier"
+                ),
+                jurisdiction="JP-13",
+            ),
+            "/us-ca": imc.build_merge_thought_window_policy_verifier_payload(
+                verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[1],
+                verifier_authority_ref=(
+                    "authority://imc-window-policy/us-ca/live-verifier"
+                ),
+                jurisdiction="US-CA",
+            ),
+        }
+        with live_window_policy_endpoint(window_policy_payloads) as base_url:
+            window_policy_verifier_receipts = [
+                imc.probe_merge_thought_window_policy_verifier_endpoint(
+                    verifier_endpoint=f"{base_url}/jp-13",
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[0],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/jp-13/live-verifier"
+                    ),
+                    jurisdiction="JP-13",
+                ),
+                imc.probe_merge_thought_window_policy_verifier_endpoint(
+                    verifier_endpoint=f"{base_url}/us-ca",
+                    verifier_ref=IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS[1],
+                    verifier_authority_ref=(
+                        "authority://imc-window-policy/us-ca/live-verifier"
+                    ),
+                    jurisdiction="US-CA",
+                ),
+            ]
         receipt = imc.seal_merge_thought_ethics_receipt(
             session["session_id"],
             message=message,
@@ -305,6 +384,7 @@ class InterMindChannelTests(unittest.TestCase):
             ethics_decision_ref="ethics://imc-merge-thought/approved",
             guardian_attestation_ref="guardian://integrity/imc-merge-thought/test",
             requested_merge_window_seconds=10,
+            window_policy_verifier_receipts=window_policy_verifier_receipts,
         )
         receipt_validation = imc.validate_merge_thought_ethics_receipt(receipt)
 
@@ -340,9 +420,32 @@ class InterMindChannelTests(unittest.TestCase):
                 "policy_authority_status"
             ],
         )
+        self.assertTrue(
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "live_verifier_quorum_bound"
+            ]
+        )
+        self.assertEqual(
+            2,
+            len(
+                receipt["risk_boundary"]["merge_window_policy_authority"][
+                    "live_verifier_receipts"
+                ]
+            ),
+        )
         self.assertFalse(
             receipt["risk_boundary"]["merge_window_policy_authority"][
                 "raw_policy_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "raw_verifier_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "raw_response_signature_payload_stored"
             ]
         )
         self.assertTrue(
@@ -357,10 +460,16 @@ class InterMindChannelTests(unittest.TestCase):
         self.assertTrue(receipt_validation["ok"])
         self.assertTrue(receipt_validation["risk_bound"])
         self.assertTrue(receipt_validation["window_policy_authority_bound"])
+        self.assertTrue(receipt_validation["window_policy_live_verifier_bound"])
         self.assertTrue(receipt_validation["collective_bound"])
         self.assertTrue(receipt_validation["disclosure_bound"])
         self.assertTrue(receipt_validation["gate_bound"])
         self.assertTrue(receipt_validation["digest_bound"])
+        self.assertFalse(receipt_validation["raw_window_policy_payload_stored"])
+        self.assertFalse(receipt_validation["raw_window_policy_verifier_payload_stored"])
+        self.assertFalse(
+            receipt_validation["raw_window_policy_response_signature_payload_stored"]
+        )
         self.assertFalse(receipt_validation["raw_thought_payload_stored"])
         self.assertFalse(receipt_validation["raw_message_payload_stored"])
 
@@ -372,6 +481,16 @@ class InterMindChannelTests(unittest.TestCase):
         self.assertFalse(tampered_validation["ok"])
         self.assertFalse(tampered_validation["risk_bound"])
         self.assertFalse(tampered_validation["window_policy_authority_bound"])
+
+        tampered_live = deepcopy(receipt)
+        tampered_live["risk_boundary"]["merge_window_policy_authority"][
+            "live_verifier_receipts"
+        ][0]["network_response_digest"] = "0" * 64
+        tampered_live_validation = imc.validate_merge_thought_ethics_receipt(
+            tampered_live
+        )
+        self.assertFalse(tampered_live_validation["ok"])
+        self.assertFalse(tampered_live_validation["window_policy_live_verifier_bound"])
 
     def test_merge_thought_ethics_receipt_rejects_unbounded_window(self) -> None:
         imc = InterMindChannel()

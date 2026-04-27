@@ -25,6 +25,7 @@ capabilities:
   - imc.memory-glimpse-reconsent.attest
   - imc.merge-thought-ethics-gate.attest
   - imc.merge-thought-window-policy-authority.attest
+  - imc.merge-thought-window-live-verifier.attest
   - ewa.stop-signal-adapter.attest
   - ewa.production-connector.attest
   - workspace.preseed.attest
@@ -70,7 +71,7 @@ when_to_invoke: |
   - Collective dissolution 後の external registry acknowledgement が live HTTP JSON endpoint response digest、signed response envelope digest、mTLS client certificate proof digest、client certificate freshness/revocation proof digest、client certificate renewal lifecycle proof digest、3 generation client certificate rollover chain proof digest、CT-style readback digest、2 log CT quorum digest、SCT timestamp digest、SCT policy authority digest、raw endpoint payload / raw response signature payload / raw client certificate payload / raw freshness payload / raw lifecycle payload / raw lifecycle chain payload / raw CT log payload / raw SCT policy authority payload 非保存に束縛されていることを検証する時
   - IMC memory_glimpse receipt が MemoryCrystal source digest、message digest、Council witness digest に束縛され、raw memory/message payload を保存していないことを検証する時
   - IMC memory_glimpse の redisclosure が timeboxed consent window、participant revocation event、Council re-consent、Guardian attestation に束縛され、raw re-consent payload を保存していないことを検証する時
-  - IMC merge_thought が Federation Council / EthicsCommittee / Guardian gate、distinct collective target、10 秒 cap、policy registry / signer roster / verifier quorum 由来の window authority、emergency disconnect、private recovery、post-disconnect identity confirmation requirement に raw thought / raw policy payload 無しで束縛されていることを検証する時
+  - IMC merge_thought が Federation Council / EthicsCommittee / Guardian gate、distinct collective target、10 秒 cap、policy registry / signer roster / live HTTP verifier receipt quorum / verifier network response digest set 由来の window authority、emergency disconnect、private recovery、post-disconnect identity confirmation requirement に raw thought / raw policy / raw verifier payload 無しで束縛されていることを検証する時
   - EWA authorization 前に PLC / firmware stop-signal adapter receipt の digest と armed bus readiness を検証する時
   - EWA authorization 前に vendor API connector certificate / installation proof / safety PLC installation digest が stop-signal adapter receipt に束縛されていることを検証する時
   - builder staged rollout の regression を rollback 実行へ落とす時

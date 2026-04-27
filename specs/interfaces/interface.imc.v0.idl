@@ -212,14 +212,19 @@ operations:
             type: integer
             minimum: 1
             maximum: 10
+          window_policy_verifier_receipts:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: imc_merge_thought_window_policy_verifier_receipt
     output:
       schema_ref: imc_merge_thought_ethics_receipt
     guarantees:
       - operation only applies to merge_thought sessions that already require and received Council witness
       - receipt must bind Federation Council, EthicsCommittee, and Guardian refs before the session can be treated as a collective merge
       - receipt must bind the distinct collective target, 10 second max merge window, emergency disconnect requirement, private recovery requirement, and post-disconnect identity confirmation requirement
-      - 10 second merge window must be derived from merge-thought-window-policy-authority-v1 policy registry digest, signer roster digest, verifier quorum digest, and policy signature digest
-      - receipt must not store raw thought payloads or raw message payloads
+      - 10 second merge window must be derived from merge-thought-window-policy-authority-v1 policy registry digest, signer roster digest, live HTTP verifier receipt quorum digest, verifier network response digest set, and policy signature digest
+      - receipt must not store raw thought payloads, raw message payloads, raw window policy payloads, raw verifier payloads, or raw response signature payloads
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.
     input:

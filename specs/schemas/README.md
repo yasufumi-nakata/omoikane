@@ -102,6 +102,7 @@
 - `imc_memory_glimpse_receipt.schema`
 - `imc_memory_glimpse_reconsent_receipt.schema`
 - `imc_merge_thought_ethics_receipt.schema`
+  - includes live HTTP merge-thought window policy verifier receipt quorum and raw verifier / response-signature payload redaction
 - `imc_message.schema`
 - `imc_session.schema`
 - `language_render.schema`

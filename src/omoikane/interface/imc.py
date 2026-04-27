@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, List, Mapping, Sequence, Set
+import json
+import time
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
+from urllib import error as urlerror
+from urllib import request
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
@@ -86,6 +90,19 @@ IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS = [
     "verifier://imc-window-policy/jp-13-live",
     "verifier://imc-window-policy/us-ca-live",
 ]
+IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE = (
+    "merge-thought-window-live-verifier-receipt-v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_DIGEST_PROFILE = (
+    "merge-thought-window-live-verifier-digest-v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE = (
+    "live-http-json-merge-thought-window-policy-v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_LIVE_RESPONSE_SIGNATURE_PROFILE = (
+    "digest-only-merge-thought-window-policy-response-signature-v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS = 250.0
 IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES = [
     "FederationCouncil",
     "EthicsCommittee",
@@ -117,6 +134,10 @@ def _merge_thought_ethics_receipt_digest_payload(
     receipt: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "digest"}
+
+
+def _is_live_http_endpoint(endpoint_ref: str) -> bool:
+    return endpoint_ref.startswith("http://") or endpoint_ref.startswith("https://")
 
 
 class InterMindChannel:
@@ -155,6 +176,12 @@ class InterMindChannel:
                 "window_policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
                 "window_policy_registry_ref": (
                     IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF
+                ),
+                "live_verifier_profile": (
+                    IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE
+                ),
+                "live_verifier_transport_profile": (
+                    IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE
                 ),
                 "required_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
                 "raw_payload_policy": "digest-only",
@@ -808,6 +835,7 @@ class InterMindChannel:
         ethics_decision_ref: str,
         guardian_attestation_ref: str,
         requested_merge_window_seconds: int = IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+        window_policy_verifier_receipts: Optional[Sequence[Mapping[str, Any]]] = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if session["mode"] != "merge_thought":
@@ -871,6 +899,7 @@ class InterMindChannel:
         window_policy_authority = self._build_merge_thought_window_policy_authority(
             session_id=session_id,
             requested_merge_window_seconds=merge_window,
+            live_verifier_receipts=window_policy_verifier_receipts,
         )
         gate_digest = sha256_text(
             canonical_json(
@@ -969,6 +998,10 @@ class InterMindChannel:
         risk = receipt.get("risk_boundary")
         risk_bound = False
         window_policy_authority_bound = False
+        window_policy_live_verifier_bound = False
+        raw_window_policy_payload_stored = True
+        raw_window_policy_verifier_payload_stored = True
+        raw_window_policy_response_signature_payload_stored = True
         if not isinstance(risk, Mapping):
             errors.append("risk_boundary must be an object")
         else:
@@ -976,19 +1009,54 @@ class InterMindChannel:
             if not isinstance(policy_authority, Mapping):
                 errors.append("risk_boundary.merge_window_policy_authority must be an object")
             elif isinstance(risk.get("requested_merge_window_seconds"), int):
-                expected_policy_authority = self._build_merge_thought_window_policy_authority(
-                    session_id=str(receipt.get("session_id")),
-                    requested_merge_window_seconds=risk["requested_merge_window_seconds"],
-                )
-                window_policy_authority_bound = (
-                    dict(policy_authority) == expected_policy_authority
-                    and policy_authority.get("max_merge_window_seconds")
-                    == risk.get("max_merge_window_seconds")
-                    and policy_authority.get("requested_merge_window_seconds")
-                    == risk.get("requested_merge_window_seconds")
-                    and policy_authority.get("policy_authority_status") == "verified"
-                    and policy_authority.get("raw_policy_payload_stored") is False
-                )
+                try:
+                    expected_policy_authority = (
+                        self._build_merge_thought_window_policy_authority(
+                            session_id=str(receipt.get("session_id")),
+                            requested_merge_window_seconds=risk[
+                                "requested_merge_window_seconds"
+                            ],
+                            live_verifier_receipts=policy_authority.get(
+                                "live_verifier_receipts",
+                                [],
+                            ),
+                        )
+                    )
+                    window_policy_live_verifier_bound = bool(
+                        expected_policy_authority.get("live_verifier_quorum_bound")
+                    )
+                    raw_window_policy_payload_stored = (
+                        expected_policy_authority.get("raw_policy_payload_stored")
+                        is not False
+                    )
+                    raw_window_policy_verifier_payload_stored = (
+                        expected_policy_authority.get("raw_verifier_payload_stored")
+                        is not False
+                    )
+                    raw_window_policy_response_signature_payload_stored = (
+                        expected_policy_authority.get(
+                            "raw_response_signature_payload_stored"
+                        )
+                        is not False
+                    )
+                    window_policy_authority_bound = (
+                        dict(policy_authority) == expected_policy_authority
+                        and policy_authority.get("max_merge_window_seconds")
+                        == risk.get("max_merge_window_seconds")
+                        and policy_authority.get("requested_merge_window_seconds")
+                        == risk.get("requested_merge_window_seconds")
+                        and policy_authority.get("policy_authority_status")
+                        == "verified"
+                        and policy_authority.get("raw_policy_payload_stored") is False
+                        and policy_authority.get("raw_verifier_payload_stored") is False
+                        and policy_authority.get(
+                            "raw_response_signature_payload_stored"
+                        )
+                        is False
+                        and window_policy_live_verifier_bound
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
                 if not window_policy_authority_bound:
                     errors.append(
                         "risk_boundary.merge_window_policy_authority must bind signed policy authority"
@@ -1003,6 +1071,7 @@ class InterMindChannel:
                 < risk.get("requested_merge_window_seconds")
                 <= IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
                 and window_policy_authority_bound
+                and window_policy_live_verifier_bound
                 and risk.get("post_disconnect_identity_confirmation_required") is True
                 and risk.get("emergency_disconnect_required") is True
                 and risk.get("private_recovery_mode_required") is True
@@ -1136,13 +1205,192 @@ class InterMindChannel:
             "profile_id": receipt.get("profile_id"),
             "risk_bound": risk_bound,
             "window_policy_authority_bound": window_policy_authority_bound,
+            "window_policy_live_verifier_bound": window_policy_live_verifier_bound,
             "collective_bound": collective_bound,
             "disclosure_bound": disclosure_bound,
             "gate_bound": gate_bound,
             "digest_bound": digest_bound,
+            "raw_window_policy_payload_stored": raw_window_policy_payload_stored,
+            "raw_window_policy_verifier_payload_stored": (
+                raw_window_policy_verifier_payload_stored
+            ),
+            "raw_window_policy_response_signature_payload_stored": (
+                raw_window_policy_response_signature_payload_stored
+            ),
             "raw_thought_payload_stored": raw_thought_payload_stored,
             "raw_message_payload_stored": raw_message_payload_stored,
         }
+
+    def build_merge_thought_window_policy_verifier_payload(
+        self,
+        *,
+        verifier_ref: str,
+        verifier_authority_ref: str,
+        jurisdiction: str,
+    ) -> Dict[str, Any]:
+        normalized_verifier_ref = self._normalize_non_empty_string(
+            verifier_ref,
+            "verifier_ref",
+        )
+        normalized_authority_ref = self._normalize_non_empty_string(
+            verifier_authority_ref,
+            "verifier_authority_ref",
+        )
+        normalized_jurisdiction = self._normalize_non_empty_string(
+            jurisdiction,
+            "jurisdiction",
+        )
+        policy_material = self._merge_thought_window_policy_material()
+        response_signature_digest = (
+            self._merge_thought_window_live_response_signature_digest(
+                verifier_ref=normalized_verifier_ref,
+                verifier_authority_ref=normalized_authority_ref,
+                jurisdiction=normalized_jurisdiction,
+                policy_registry_digest=policy_material["policy_registry_digest"],
+                policy_body_digest=policy_material["policy_body_digest"],
+                policy_signature_digest=policy_material["policy_signature_digest"],
+                signer_roster_digest=policy_material["signer_roster_digest"],
+                max_merge_window_seconds=IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            )
+        )
+        return {
+            "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
+            "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
+            "policy_registry_digest": policy_material["policy_registry_digest"],
+            "policy_body_digest": policy_material["policy_body_digest"],
+            "policy_signature_digest": policy_material["policy_signature_digest"],
+            "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
+            "signer_roster_digest": policy_material["signer_roster_digest"],
+            "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
+            "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            "verifier_ref": normalized_verifier_ref,
+            "verifier_authority_ref": normalized_authority_ref,
+            "jurisdiction": normalized_jurisdiction,
+            "response_status": "verified",
+            "response_signature_profile": (
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_RESPONSE_SIGNATURE_PROFILE
+            ),
+            "response_signature_digest": response_signature_digest,
+            "raw_policy_payload_stored": False,
+            "raw_verifier_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
+        }
+
+    def probe_merge_thought_window_policy_verifier_endpoint(
+        self,
+        *,
+        verifier_endpoint: str,
+        verifier_ref: str,
+        verifier_authority_ref: str,
+        jurisdiction: str,
+        timeout_ms: int = 1000,
+    ) -> Dict[str, Any]:
+        normalized_endpoint = self._normalize_non_empty_string(
+            verifier_endpoint,
+            "verifier_endpoint",
+        )
+        if not _is_live_http_endpoint(normalized_endpoint):
+            raise ValueError("verifier_endpoint must be http:// or https://")
+        if timeout_ms <= 0:
+            raise ValueError("timeout_ms must be positive")
+
+        request_started = time.monotonic()
+        try:
+            with request.urlopen(  # noqa: S310 - bounded reference verifier probe
+                normalized_endpoint,
+                timeout=timeout_ms / 1000.0,
+            ) as response:
+                http_status = int(getattr(response, "status", response.getcode()))
+                raw_body = response.read()
+        except (OSError, urlerror.URLError) as exc:
+            raise ValueError(
+                f"merge_thought window policy verifier endpoint unreachable: {normalized_endpoint}"
+            ) from exc
+        observed_latency_ms = round((time.monotonic() - request_started) * 1000.0, 3)
+        if http_status != 200:
+            raise ValueError(
+                "merge_thought window policy verifier endpoint returned "
+                f"unexpected status {http_status}"
+            )
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "merge_thought window policy verifier endpoint must return JSON"
+            ) from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError(
+                "merge_thought window policy verifier endpoint payload must be an object"
+            )
+
+        expected_payload = self.build_merge_thought_window_policy_verifier_payload(
+            verifier_ref=verifier_ref,
+            verifier_authority_ref=verifier_authority_ref,
+            jurisdiction=jurisdiction,
+        )
+        for field_name, expected_value in expected_payload.items():
+            if payload.get(field_name) != expected_value:
+                raise ValueError(
+                    "merge_thought window policy verifier endpoint field mismatch: "
+                    f"{field_name}"
+                )
+
+        network_response_digest = sha256_text(canonical_json(dict(payload)))
+        response_digest = self._merge_thought_window_live_response_digest(
+            verifier_ref=expected_payload["verifier_ref"],
+            verifier_endpoint_ref=normalized_endpoint,
+            verifier_authority_ref=expected_payload["verifier_authority_ref"],
+            jurisdiction=expected_payload["jurisdiction"],
+            policy_registry_digest=expected_payload["policy_registry_digest"],
+            policy_body_digest=expected_payload["policy_body_digest"],
+            policy_signature_digest=expected_payload["policy_signature_digest"],
+            signer_roster_digest=expected_payload["signer_roster_digest"],
+            max_merge_window_seconds=expected_payload["max_merge_window_seconds"],
+            network_response_digest=network_response_digest,
+            response_signature_digest=expected_payload["response_signature_digest"],
+        )
+        receipt = {
+            "schema_version": IMC_SCHEMA_VERSION,
+            "receipt_id": new_id("imc-window-verifier"),
+            "profile_id": IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE,
+            "digest_profile": IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_DIGEST_PROFILE,
+            "transport_profile": IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE,
+            "verifier_ref": expected_payload["verifier_ref"],
+            "verifier_endpoint_ref": normalized_endpoint,
+            "verifier_authority_ref": expected_payload["verifier_authority_ref"],
+            "jurisdiction": expected_payload["jurisdiction"],
+            "policy_profile": expected_payload["policy_profile"],
+            "policy_registry_ref": expected_payload["policy_registry_ref"],
+            "policy_registry_digest": expected_payload["policy_registry_digest"],
+            "policy_body_digest": expected_payload["policy_body_digest"],
+            "policy_signature_digest": expected_payload["policy_signature_digest"],
+            "signer_roster_ref": expected_payload["signer_roster_ref"],
+            "signer_roster_digest": expected_payload["signer_roster_digest"],
+            "signer_key_refs": list(expected_payload["signer_key_refs"]),
+            "max_merge_window_seconds": expected_payload["max_merge_window_seconds"],
+            "http_status": http_status,
+            "request_timeout_ms": timeout_ms,
+            "observed_latency_ms": observed_latency_ms,
+            "latency_budget_ms": IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS,
+            "network_response_digest": network_response_digest,
+            "network_probe_status": "verified",
+            "network_probe_bound": True,
+            "response_status": expected_payload["response_status"],
+            "response_signature_profile": expected_payload[
+                "response_signature_profile"
+            ],
+            "response_signature_digest": expected_payload[
+                "response_signature_digest"
+            ],
+            "response_digest": response_digest,
+            "policy_payload_bound": True,
+            "signed_response_bound": True,
+            "raw_policy_payload_stored": False,
+            "raw_verifier_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(canonical_json(receipt))
+        return receipt
 
     def emergency_disconnect(
         self,
@@ -1391,12 +1639,128 @@ class InterMindChannel:
             )
         return value
 
-    @staticmethod
     def _build_merge_thought_window_policy_authority(
+        self,
         *,
         session_id: str,
         requested_merge_window_seconds: int,
+        live_verifier_receipts: Optional[Sequence[Mapping[str, Any]]] = None,
     ) -> Dict[str, Any]:
+        normalized_receipts = (
+            self._normalize_merge_thought_window_policy_live_verifier_receipts(
+                live_verifier_receipts or []
+            )
+        )
+        policy_material = self._merge_thought_window_policy_material()
+        verifier_response_digests = [
+            str(receipt["response_digest"]) for receipt in normalized_receipts
+        ]
+        live_verifier_receipt_digests = [
+            str(receipt["digest"]) for receipt in normalized_receipts
+        ]
+        live_verifier_network_response_digests = [
+            str(receipt["network_response_digest"]) for receipt in normalized_receipts
+        ]
+        live_verifier_response_signature_digests = [
+            str(receipt["response_signature_digest"]) for receipt in normalized_receipts
+        ]
+        live_verifier_jurisdictions = [
+            str(receipt["jurisdiction"]) for receipt in normalized_receipts
+        ]
+        live_verifier_authority_refs = [
+            str(receipt["verifier_authority_ref"]) for receipt in normalized_receipts
+        ]
+        live_verifier_quorum_bound = bool(
+            len(normalized_receipts) >= 2
+            and len(set(receipt["verifier_ref"] for receipt in normalized_receipts))
+            == len(normalized_receipts)
+            and set(receipt["verifier_ref"] for receipt in normalized_receipts)
+            == set(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS)
+            and len(set(live_verifier_jurisdictions)) == len(normalized_receipts)
+        )
+        live_verifier_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE,
+                    "verifier_refs": [
+                        str(receipt["verifier_ref"]) for receipt in normalized_receipts
+                    ],
+                    "verifier_authority_refs": live_verifier_authority_refs,
+                    "jurisdictions": live_verifier_jurisdictions,
+                    "receipt_digests": live_verifier_receipt_digests,
+                    "network_response_digests": live_verifier_network_response_digests,
+                    "response_signature_digests": (
+                        live_verifier_response_signature_digests
+                    ),
+                    "required_verifier_count": len(
+                        IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
+                    ),
+                    "max_merge_window_seconds": (
+                        IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
+                    ),
+                }
+            )
+        )
+        verifier_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "verifier_refs": [
+                        str(receipt["verifier_ref"]) for receipt in normalized_receipts
+                    ],
+                    "verifier_response_digests": verifier_response_digests,
+                    "live_verifier_receipt_digests": live_verifier_receipt_digests,
+                    "live_verifier_quorum_digest": live_verifier_quorum_digest,
+                    "required_verifier_count": len(
+                        IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
+                    ),
+                }
+            )
+        )
+        authority_core = {
+            "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
+            "session_id": session_id,
+            "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
+            "policy_registry_digest": policy_material["policy_registry_digest"],
+            "policy_body_digest": policy_material["policy_body_digest"],
+            "policy_signature_digest": policy_material["policy_signature_digest"],
+            "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
+            "signer_roster_digest": policy_material["signer_roster_digest"],
+            "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
+            "verifier_refs": [
+                str(receipt["verifier_ref"]) for receipt in normalized_receipts
+            ],
+            "verifier_response_digests": verifier_response_digests,
+            "verifier_quorum_digest": verifier_quorum_digest,
+            "live_verifier_profile": IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE,
+            "live_verifier_transport_profile": (
+                IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE
+            ),
+            "live_verifier_receipts": normalized_receipts,
+            "live_verifier_receipt_digests": live_verifier_receipt_digests,
+            "live_verifier_network_response_digests": (
+                live_verifier_network_response_digests
+            ),
+            "live_verifier_response_signature_digests": (
+                live_verifier_response_signature_digests
+            ),
+            "live_verifier_authority_refs": live_verifier_authority_refs,
+            "live_verifier_jurisdictions": live_verifier_jurisdictions,
+            "live_verifier_quorum_digest": live_verifier_quorum_digest,
+            "live_verifier_quorum_bound": live_verifier_quorum_bound,
+            "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            "requested_merge_window_seconds": requested_merge_window_seconds,
+            "policy_authority_status": "verified",
+            "raw_policy_payload_stored": False,
+            "raw_verifier_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
+        }
+        return {
+            **authority_core,
+            "policy_authority_digest": sha256_text(canonical_json(authority_core)),
+        }
+
+    @staticmethod
+    def _merge_thought_window_policy_material() -> Dict[str, Any]:
         policy_body = {
             "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
             "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
@@ -1405,38 +1769,13 @@ class InterMindChannel:
             "required_gate_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
         }
         policy_registry_digest = sha256_text(canonical_json(policy_body))
+        policy_body_digest = sha256_text(canonical_json(policy_body))
         signer_roster = {
             "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
             "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
             "policy_registry_digest": policy_registry_digest,
         }
         signer_roster_digest = sha256_text(canonical_json(signer_roster))
-        verifier_response_digests = [
-            sha256_text(
-                canonical_json(
-                    {
-                        "verifier_ref": verifier_ref,
-                        "policy_registry_digest": policy_registry_digest,
-                        "signer_roster_digest": signer_roster_digest,
-                        "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
-                        "response_status": "verified",
-                    }
-                )
-            )
-            for verifier_ref in IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
-        ]
-        verifier_quorum_digest = sha256_text(
-            canonical_json(
-                {
-                    "verifier_refs": list(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS),
-                    "verifier_response_digests": verifier_response_digests,
-                    "required_verifier_count": len(
-                        IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
-                    ),
-                }
-            )
-        )
-        policy_body_digest = sha256_text(canonical_json(policy_body))
         policy_signature_digest = sha256_text(
             canonical_json(
                 {
@@ -1446,28 +1785,260 @@ class InterMindChannel:
                 }
             )
         )
-        authority_core = {
-            "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
-            "session_id": session_id,
-            "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
+        return {
+            "policy_body": policy_body,
             "policy_registry_digest": policy_registry_digest,
             "policy_body_digest": policy_body_digest,
-            "policy_signature_digest": policy_signature_digest,
-            "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
             "signer_roster_digest": signer_roster_digest,
-            "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
-            "verifier_refs": list(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS),
-            "verifier_response_digests": verifier_response_digests,
-            "verifier_quorum_digest": verifier_quorum_digest,
-            "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
-            "requested_merge_window_seconds": requested_merge_window_seconds,
-            "policy_authority_status": "verified",
-            "raw_policy_payload_stored": False,
+            "policy_signature_digest": policy_signature_digest,
         }
-        return {
-            **authority_core,
-            "policy_authority_digest": sha256_text(canonical_json(authority_core)),
+
+    def _normalize_merge_thought_window_policy_live_verifier_receipts(
+        self,
+        receipts: Sequence[Mapping[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(receipts, Sequence) or isinstance(receipts, (str, bytes)):
+            raise ValueError("live_verifier_receipts must be a sequence")
+        if len(receipts) < 2:
+            raise ValueError("live_verifier_receipts must include at least two receipts")
+        normalized: List[Dict[str, Any]] = []
+        for index, receipt in enumerate(receipts):
+            if not isinstance(receipt, Mapping):
+                raise ValueError(f"live_verifier_receipts[{index}] must be an object")
+            normalized_receipt = dict(receipt)
+            self._validate_merge_thought_window_policy_live_verifier_receipt(
+                normalized_receipt,
+                field_name=f"live_verifier_receipts[{index}]",
+            )
+            normalized.append(normalized_receipt)
+        return normalized
+
+    def _validate_merge_thought_window_policy_live_verifier_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        field_name: str,
+    ) -> None:
+        policy_material = self._merge_thought_window_policy_material()
+        required_fields = [
+            "schema_version",
+            "receipt_id",
+            "profile_id",
+            "digest_profile",
+            "transport_profile",
+            "verifier_ref",
+            "verifier_endpoint_ref",
+            "verifier_authority_ref",
+            "jurisdiction",
+            "policy_profile",
+            "policy_registry_ref",
+            "policy_registry_digest",
+            "policy_body_digest",
+            "policy_signature_digest",
+            "signer_roster_ref",
+            "signer_roster_digest",
+            "signer_key_refs",
+            "max_merge_window_seconds",
+            "http_status",
+            "observed_latency_ms",
+            "latency_budget_ms",
+            "network_response_digest",
+            "network_probe_status",
+            "network_probe_bound",
+            "response_status",
+            "response_signature_profile",
+            "response_signature_digest",
+            "response_digest",
+            "policy_payload_bound",
+            "signed_response_bound",
+            "raw_policy_payload_stored",
+            "raw_verifier_payload_stored",
+            "raw_response_signature_payload_stored",
+            "digest",
+        ]
+        missing = [key for key in required_fields if key not in receipt]
+        if missing:
+            raise ValueError(f"{field_name} missing fields: {missing}")
+        if receipt.get("schema_version") != IMC_SCHEMA_VERSION:
+            raise ValueError(f"{field_name}.schema_version mismatch")
+        if receipt.get("profile_id") != IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE:
+            raise ValueError(f"{field_name}.profile_id mismatch")
+        if (
+            receipt.get("digest_profile")
+            != IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_DIGEST_PROFILE
+        ):
+            raise ValueError(f"{field_name}.digest_profile mismatch")
+        if (
+            receipt.get("transport_profile")
+            != IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE
+        ):
+            raise ValueError(f"{field_name}.transport_profile mismatch")
+        endpoint_ref = self._normalize_non_empty_string(
+            receipt.get("verifier_endpoint_ref"),
+            f"{field_name}.verifier_endpoint_ref",
+        )
+        if not _is_live_http_endpoint(endpoint_ref):
+            raise ValueError(f"{field_name}.verifier_endpoint_ref must be http(s)")
+        if receipt.get("policy_profile") != IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE:
+            raise ValueError(f"{field_name}.policy_profile mismatch")
+        if (
+            receipt.get("policy_registry_ref")
+            != IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF
+        ):
+            raise ValueError(f"{field_name}.policy_registry_ref mismatch")
+        for digest_field in (
+            "policy_registry_digest",
+            "policy_body_digest",
+            "policy_signature_digest",
+            "signer_roster_digest",
+        ):
+            if receipt.get(digest_field) != policy_material[digest_field]:
+                raise ValueError(f"{field_name}.{digest_field} mismatch")
+        if receipt.get("signer_roster_ref") != IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF:
+            raise ValueError(f"{field_name}.signer_roster_ref mismatch")
+        if receipt.get("signer_key_refs") != IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS:
+            raise ValueError(f"{field_name}.signer_key_refs mismatch")
+        if receipt.get("max_merge_window_seconds") != IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS:
+            raise ValueError(f"{field_name}.max_merge_window_seconds mismatch")
+        if receipt.get("http_status") != 200:
+            raise ValueError(f"{field_name}.http_status must be 200")
+        try:
+            observed_latency_ms = float(receipt.get("observed_latency_ms"))
+            latency_budget_ms = float(receipt.get("latency_budget_ms"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name}.latency fields must be numeric") from exc
+        if latency_budget_ms != IMC_MERGE_THOUGHT_WINDOW_LIVE_LATENCY_BUDGET_MS:
+            raise ValueError(f"{field_name}.latency_budget_ms mismatch")
+        if observed_latency_ms < 0 or observed_latency_ms > latency_budget_ms:
+            raise ValueError(f"{field_name}.observed_latency_ms exceeds budget")
+        if not isinstance(receipt.get("network_response_digest"), str) or len(
+            str(receipt.get("network_response_digest"))
+        ) != 64:
+            raise ValueError(f"{field_name}.network_response_digest must be sha256")
+        if receipt.get("network_probe_status") != "verified":
+            raise ValueError(f"{field_name}.network_probe_status mismatch")
+        if receipt.get("network_probe_bound") is not True:
+            raise ValueError(f"{field_name}.network_probe_bound must be true")
+        if receipt.get("response_status") != "verified":
+            raise ValueError(f"{field_name}.response_status mismatch")
+        if (
+            receipt.get("response_signature_profile")
+            != IMC_MERGE_THOUGHT_WINDOW_LIVE_RESPONSE_SIGNATURE_PROFILE
+        ):
+            raise ValueError(f"{field_name}.response_signature_profile mismatch")
+        expected_response_signature_digest = (
+            self._merge_thought_window_live_response_signature_digest(
+                verifier_ref=str(receipt.get("verifier_ref")),
+                verifier_authority_ref=str(receipt.get("verifier_authority_ref")),
+                jurisdiction=str(receipt.get("jurisdiction")),
+                policy_registry_digest=policy_material["policy_registry_digest"],
+                policy_body_digest=policy_material["policy_body_digest"],
+                policy_signature_digest=policy_material["policy_signature_digest"],
+                signer_roster_digest=policy_material["signer_roster_digest"],
+                max_merge_window_seconds=IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            )
+        )
+        if receipt.get("response_signature_digest") != expected_response_signature_digest:
+            raise ValueError(f"{field_name}.response_signature_digest mismatch")
+        expected_response_digest = self._merge_thought_window_live_response_digest(
+            verifier_ref=str(receipt.get("verifier_ref")),
+            verifier_endpoint_ref=endpoint_ref,
+            verifier_authority_ref=str(receipt.get("verifier_authority_ref")),
+            jurisdiction=str(receipt.get("jurisdiction")),
+            policy_registry_digest=policy_material["policy_registry_digest"],
+            policy_body_digest=policy_material["policy_body_digest"],
+            policy_signature_digest=policy_material["policy_signature_digest"],
+            signer_roster_digest=policy_material["signer_roster_digest"],
+            max_merge_window_seconds=IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            network_response_digest=str(receipt.get("network_response_digest")),
+            response_signature_digest=expected_response_signature_digest,
+        )
+        if receipt.get("response_digest") != expected_response_digest:
+            raise ValueError(f"{field_name}.response_digest mismatch")
+        if receipt.get("policy_payload_bound") is not True:
+            raise ValueError(f"{field_name}.policy_payload_bound must be true")
+        if receipt.get("signed_response_bound") is not True:
+            raise ValueError(f"{field_name}.signed_response_bound must be true")
+        if receipt.get("raw_policy_payload_stored") is not False:
+            raise ValueError(f"{field_name}.raw_policy_payload_stored must be false")
+        if receipt.get("raw_verifier_payload_stored") is not False:
+            raise ValueError(f"{field_name}.raw_verifier_payload_stored must be false")
+        if receipt.get("raw_response_signature_payload_stored") is not False:
+            raise ValueError(
+                f"{field_name}.raw_response_signature_payload_stored must be false"
+            )
+        receipt_without_digest = {
+            key: value for key, value in dict(receipt).items() if key != "digest"
         }
+        if receipt.get("digest") != sha256_text(canonical_json(receipt_without_digest)):
+            raise ValueError(f"{field_name}.digest mismatch")
+
+    @staticmethod
+    def _merge_thought_window_live_response_signature_digest(
+        *,
+        verifier_ref: str,
+        verifier_authority_ref: str,
+        jurisdiction: str,
+        policy_registry_digest: str,
+        policy_body_digest: str,
+        policy_signature_digest: str,
+        signer_roster_digest: str,
+        max_merge_window_seconds: int,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "response_signature_profile": (
+                        IMC_MERGE_THOUGHT_WINDOW_LIVE_RESPONSE_SIGNATURE_PROFILE
+                    ),
+                    "verifier_ref": verifier_ref,
+                    "verifier_authority_ref": verifier_authority_ref,
+                    "jurisdiction": jurisdiction,
+                    "policy_registry_digest": policy_registry_digest,
+                    "policy_body_digest": policy_body_digest,
+                    "policy_signature_digest": policy_signature_digest,
+                    "signer_roster_digest": signer_roster_digest,
+                    "max_merge_window_seconds": max_merge_window_seconds,
+                }
+            )
+        )
+
+    @staticmethod
+    def _merge_thought_window_live_response_digest(
+        *,
+        verifier_ref: str,
+        verifier_endpoint_ref: str,
+        verifier_authority_ref: str,
+        jurisdiction: str,
+        policy_registry_digest: str,
+        policy_body_digest: str,
+        policy_signature_digest: str,
+        signer_roster_digest: str,
+        max_merge_window_seconds: int,
+        network_response_digest: str,
+        response_signature_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": IMC_MERGE_THOUGHT_WINDOW_LIVE_VERIFIER_PROFILE,
+                    "transport_profile": (
+                        IMC_MERGE_THOUGHT_WINDOW_LIVE_TRANSPORT_PROFILE
+                    ),
+                    "verifier_ref": verifier_ref,
+                    "verifier_endpoint_ref": verifier_endpoint_ref,
+                    "verifier_authority_ref": verifier_authority_ref,
+                    "jurisdiction": jurisdiction,
+                    "policy_registry_digest": policy_registry_digest,
+                    "policy_body_digest": policy_body_digest,
+                    "policy_signature_digest": policy_signature_digest,
+                    "signer_roster_digest": signer_roster_digest,
+                    "max_merge_window_seconds": max_merge_window_seconds,
+                    "network_response_digest": network_response_digest,
+                    "response_signature_digest": response_signature_digest,
+                }
+            )
+        )
 
     def _select_memory_segments(
         self,

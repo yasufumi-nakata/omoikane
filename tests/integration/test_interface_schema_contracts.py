@@ -280,10 +280,18 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["merge_thought_ethics_window_policy_authority_bound"]
         )
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_live_verifier_bound"]
+        )
         self.assertFalse(
             result["merge_thought_ethics_receipt"]["risk_boundary"][
                 "merge_window_policy_authority"
             ]["raw_policy_payload_stored"]
+        )
+        self.assertFalse(
+            result["merge_thought_ethics_receipt"]["risk_boundary"][
+                "merge_window_policy_authority"
+            ]["raw_verifier_payload_stored"]
         )
 
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
