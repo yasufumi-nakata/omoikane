@@ -62,7 +62,10 @@ reference runtime では IMC を bounded contract として扱い、
 - `merge_thought` は Federation Council / EthicsCommittee / Guardian の
   `federation-council-merge-thought-ethics-gate-v1` receipt により、
   distinct collective target、10 秒 cap、emergency disconnect、private recovery、
-  post-disconnect identity confirmation を digest-only に束縛する
+  post-disconnect identity confirmation を digest-only に束縛する。
+  10 秒 cap は `merge-thought-window-policy-authority-v1` の policy registry digest、
+  signer roster digest、verifier quorum digest、policy signature digest に由来することも
+  同じ receipt の `merge_window_policy_authority` で検証する
 - disclosure template は双方のうち **より狭い側** に揃え、
   `sealed_fields` は常に redaction される
 - ContinuityLedger には生メッセージを書かず、summary と payload digest だけを記録する

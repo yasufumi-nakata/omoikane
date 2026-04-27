@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import unittest
 
 from omoikane.common import sha256_text
@@ -327,6 +328,23 @@ class InterMindChannelTests(unittest.TestCase):
         )
         self.assertEqual("approved", receipt["status"])
         self.assertEqual(10, receipt["risk_boundary"]["max_merge_window_seconds"])
+        self.assertEqual(
+            "merge-thought-window-policy-authority-v1",
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "policy_profile"
+            ],
+        )
+        self.assertEqual(
+            "verified",
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "policy_authority_status"
+            ],
+        )
+        self.assertFalse(
+            receipt["risk_boundary"]["merge_window_policy_authority"][
+                "raw_policy_payload_stored"
+            ]
+        )
         self.assertTrue(
             receipt["risk_boundary"]["post_disconnect_identity_confirmation_required"]
         )
@@ -338,12 +356,22 @@ class InterMindChannelTests(unittest.TestCase):
         )
         self.assertTrue(receipt_validation["ok"])
         self.assertTrue(receipt_validation["risk_bound"])
+        self.assertTrue(receipt_validation["window_policy_authority_bound"])
         self.assertTrue(receipt_validation["collective_bound"])
         self.assertTrue(receipt_validation["disclosure_bound"])
         self.assertTrue(receipt_validation["gate_bound"])
         self.assertTrue(receipt_validation["digest_bound"])
         self.assertFalse(receipt_validation["raw_thought_payload_stored"])
         self.assertFalse(receipt_validation["raw_message_payload_stored"])
+
+        tampered = deepcopy(receipt)
+        tampered["risk_boundary"]["merge_window_policy_authority"][
+            "policy_authority_digest"
+        ] = "0" * 64
+        tampered_validation = imc.validate_merge_thought_ethics_receipt(tampered)
+        self.assertFalse(tampered_validation["ok"])
+        self.assertFalse(tampered_validation["risk_bound"])
+        self.assertFalse(tampered_validation["window_policy_authority_bound"])
 
     def test_merge_thought_ethics_receipt_rejects_unbounded_window(self) -> None:
         imc = InterMindChannel()

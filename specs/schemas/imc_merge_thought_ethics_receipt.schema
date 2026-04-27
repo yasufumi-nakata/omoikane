@@ -3,8 +3,9 @@ title: IMCMergeThoughtEthicsReceipt
 description: >
   Digest-only Federation Council, EthicsCommittee, and Guardian gate receipt
   for one bounded IMC merge_thought session. The receipt binds the route,
-  disclosure floor, distinct collective target, recovery limits, and approval
-  refs without storing raw thought or message payloads.
+  disclosure floor, distinct collective target, policy-authority-backed merge
+  window, recovery limits, and approval refs without storing raw thought,
+  message, or window policy payloads.
 type: object
 additionalProperties: false
 required:
@@ -65,6 +66,7 @@ properties:
       - identity_confusion_risk
       - max_merge_window_seconds
       - requested_merge_window_seconds
+      - merge_window_policy_authority
       - post_disconnect_identity_confirmation_required
       - emergency_disconnect_required
       - private_recovery_mode_required
@@ -82,6 +84,92 @@ properties:
         type: integer
         minimum: 1
         maximum: 10
+      merge_window_policy_authority:
+        type: object
+        additionalProperties: false
+        required:
+          - policy_profile
+          - session_id
+          - policy_registry_ref
+          - policy_registry_digest
+          - policy_body_digest
+          - policy_signature_digest
+          - signer_roster_ref
+          - signer_roster_digest
+          - signer_key_refs
+          - verifier_refs
+          - verifier_response_digests
+          - verifier_quorum_digest
+          - max_merge_window_seconds
+          - requested_merge_window_seconds
+          - policy_authority_status
+          - raw_policy_payload_stored
+          - policy_authority_digest
+        properties:
+          policy_profile:
+            type: string
+            const: merge-thought-window-policy-authority-v1
+          session_id:
+            type: string
+            minLength: 8
+          policy_registry_ref:
+            type: string
+            minLength: 1
+          policy_registry_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          policy_body_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          policy_signature_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          signer_roster_ref:
+            type: string
+            minLength: 1
+          signer_roster_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          signer_key_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          verifier_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          verifier_response_digests:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+          verifier_quorum_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          max_merge_window_seconds:
+            type: integer
+            const: 10
+          requested_merge_window_seconds:
+            type: integer
+            minimum: 1
+            maximum: 10
+          policy_authority_status:
+            type: string
+            const: verified
+          raw_policy_payload_stored:
+            type: boolean
+            const: false
+          policy_authority_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
       post_disconnect_identity_confirmation_required:
         type: boolean
         const: true

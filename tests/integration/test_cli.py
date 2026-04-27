@@ -212,6 +212,9 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["merge_thought_ethics_receipt_ok"])
         self.assertTrue(result["validation"]["merge_thought_ethics_gate_bound"])
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_authority_bound"]
+        )
         self.assertFalse(
             result["merge_thought_ethics_receipt"]["disclosure_binding"][
                 "raw_thought_payload_stored"

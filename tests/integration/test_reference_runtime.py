@@ -77,6 +77,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["validation"]["memory_glimpse_reconsent_raw_payload_stored"])
         self.assertTrue(result["validation"]["merge_thought_ethics_receipt_ok"])
         self.assertTrue(result["validation"]["merge_thought_ethics_risk_bound"])
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_authority_bound"]
+        )
         self.assertTrue(result["validation"]["merge_thought_ethics_collective_bound"])
         self.assertTrue(result["validation"]["merge_thought_ethics_gate_bound"])
         self.assertFalse(

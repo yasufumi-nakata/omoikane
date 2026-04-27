@@ -824,6 +824,10 @@ distinct collective target、10 秒 cap、emergency disconnect、private recover
 post-disconnect identity confirmation requirement を digest-only に束縛し、
 raw thought payload と raw message payload を保存しないことを
 `imc_merge_thought_ethics_receipt.schema` と integration test で検証する。
+同じ risk boundary は `merge-thought-window-policy-authority-v1` として
+10 秒 cap を policy registry digest、signer roster digest、2 verifier response の
+quorum digest、policy body digest、policy signature digest に束縛し、
+raw policy payload を保存しない。
 
 `collective-demo` は L6 Collective Identity の reference contract
 (`interface.collective.v0`) を JSON で可視化し、

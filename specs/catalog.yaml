@@ -1541,7 +1541,7 @@ entries:
       - evals/interface/imc_merge_thought_ethics_gate.yaml
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/imc-protocol.md
-    rationale: Required to serialize one Federation Council, EthicsCommittee, and Guardian merge_thought ethics gate receipt that binds distinct collective target, recovery requirements, and digest-only disclosure before collective merge handoff.
+    rationale: Required to serialize one Federation Council, EthicsCommittee, and Guardian merge_thought ethics gate receipt that binds distinct collective target, policy-authority-backed merge window, recovery requirements, and digest-only disclosure before collective merge handoff.
   - priority: P1
     kind: schema
     file: specs/schemas/imc_session.schema

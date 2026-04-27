@@ -7535,6 +7535,9 @@ json.dump(response, sys.stdout)
             "merge_thought_ethics_risk_bound": merge_thought_ethics_validation[
                 "risk_bound"
             ],
+            "merge_thought_ethics_window_policy_authority_bound": (
+                merge_thought_ethics_validation["window_policy_authority_bound"]
+            ),
             "merge_thought_ethics_collective_bound": merge_thought_ethics_validation[
                 "collective_bound"
             ],
@@ -7684,6 +7687,12 @@ json.dump(response, sys.stdout)
                 "max_merge_window_seconds": merge_thought_ethics_receipt[
                     "risk_boundary"
                 ]["max_merge_window_seconds"],
+                "window_policy_authority_digest": merge_thought_ethics_receipt[
+                    "risk_boundary"
+                ]["merge_window_policy_authority"]["policy_authority_digest"],
+                "raw_policy_payload_stored": merge_thought_ethics_receipt[
+                    "risk_boundary"
+                ]["merge_window_policy_authority"]["raw_policy_payload_stored"],
                 "raw_thought_payload_stored": merge_thought_ethics_receipt[
                     "disclosure_binding"
                 ]["raw_thought_payload_stored"],

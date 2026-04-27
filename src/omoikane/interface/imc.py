@@ -71,6 +71,21 @@ IMC_MERGE_THOUGHT_COLLECTIVE_BINDING_PROFILE = (
     "distinct-collective-merge-thought-binding-v1"
 )
 IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS = 10
+IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE = "merge-thought-window-policy-authority-v1"
+IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF = (
+    "policy-registry://imc/merge-thought-window/v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF = (
+    "signer-roster://imc/merge-thought-window/v1"
+)
+IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS = [
+    "signer-key://imc-window-policy/jp-13-primary",
+    "signer-key://imc-window-policy/us-ca-witness",
+]
+IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS = [
+    "verifier://imc-window-policy/jp-13-live",
+    "verifier://imc-window-policy/us-ca-live",
+]
 IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES = [
     "FederationCouncil",
     "EthicsCommittee",
@@ -137,6 +152,10 @@ class InterMindChannel:
                 "risk_profile": IMC_MERGE_THOUGHT_RISK_PROFILE,
                 "gate_profile": IMC_MERGE_THOUGHT_GATE_PROFILE,
                 "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+                "window_policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
+                "window_policy_registry_ref": (
+                    IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF
+                ),
                 "required_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
                 "raw_payload_policy": "digest-only",
             },
@@ -849,6 +868,10 @@ class InterMindChannel:
                 }
             )
         )
+        window_policy_authority = self._build_merge_thought_window_policy_authority(
+            session_id=session_id,
+            requested_merge_window_seconds=merge_window,
+        )
         gate_digest = sha256_text(
             canonical_json(
                 {
@@ -861,6 +884,9 @@ class InterMindChannel:
                     "ethics_decision_ref": ethics_decision,
                     "guardian_attestation_ref": guardian_attestation,
                     "requested_merge_window_seconds": merge_window,
+                    "window_policy_authority_digest": window_policy_authority[
+                        "policy_authority_digest"
+                    ],
                     "message_payload_digest": message["payload_digest"],
                     "collective_binding_digest": collective_binding_digest,
                 }
@@ -882,6 +908,7 @@ class InterMindChannel:
                 "identity_confusion_risk": "high",
                 "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
                 "requested_merge_window_seconds": merge_window,
+                "merge_window_policy_authority": window_policy_authority,
                 "post_disconnect_identity_confirmation_required": True,
                 "emergency_disconnect_required": True,
                 "private_recovery_mode_required": True,
@@ -941,9 +968,31 @@ class InterMindChannel:
 
         risk = receipt.get("risk_boundary")
         risk_bound = False
+        window_policy_authority_bound = False
         if not isinstance(risk, Mapping):
             errors.append("risk_boundary must be an object")
         else:
+            policy_authority = risk.get("merge_window_policy_authority")
+            if not isinstance(policy_authority, Mapping):
+                errors.append("risk_boundary.merge_window_policy_authority must be an object")
+            elif isinstance(risk.get("requested_merge_window_seconds"), int):
+                expected_policy_authority = self._build_merge_thought_window_policy_authority(
+                    session_id=str(receipt.get("session_id")),
+                    requested_merge_window_seconds=risk["requested_merge_window_seconds"],
+                )
+                window_policy_authority_bound = (
+                    dict(policy_authority) == expected_policy_authority
+                    and policy_authority.get("max_merge_window_seconds")
+                    == risk.get("max_merge_window_seconds")
+                    and policy_authority.get("requested_merge_window_seconds")
+                    == risk.get("requested_merge_window_seconds")
+                    and policy_authority.get("policy_authority_status") == "verified"
+                    and policy_authority.get("raw_policy_payload_stored") is False
+                )
+                if not window_policy_authority_bound:
+                    errors.append(
+                        "risk_boundary.merge_window_policy_authority must bind signed policy authority"
+                    )
             risk_bound = (
                 risk.get("risk_profile") == IMC_MERGE_THOUGHT_RISK_PROFILE
                 and risk.get("identity_confusion_risk") == "high"
@@ -953,6 +1002,7 @@ class InterMindChannel:
                 and 0
                 < risk.get("requested_merge_window_seconds")
                 <= IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS
+                and window_policy_authority_bound
                 and risk.get("post_disconnect_identity_confirmation_required") is True
                 and risk.get("emergency_disconnect_required") is True
                 and risk.get("private_recovery_mode_required") is True
@@ -1041,6 +1091,14 @@ class InterMindChannel:
                     if isinstance(risk, Mapping)
                     else None
                 ),
+                "window_policy_authority_digest": (
+                    risk.get("merge_window_policy_authority", {}).get(
+                        "policy_authority_digest"
+                    )
+                    if isinstance(risk, Mapping)
+                    and isinstance(risk.get("merge_window_policy_authority"), Mapping)
+                    else None
+                ),
                 "message_payload_digest": (
                     disclosure.get("message_payload_digest")
                     if isinstance(disclosure, Mapping)
@@ -1077,6 +1135,7 @@ class InterMindChannel:
             "errors": errors,
             "profile_id": receipt.get("profile_id"),
             "risk_bound": risk_bound,
+            "window_policy_authority_bound": window_policy_authority_bound,
             "collective_bound": collective_bound,
             "disclosure_bound": disclosure_bound,
             "gate_bound": gate_bound,
@@ -1331,6 +1390,84 @@ class InterMindChannel:
                 f"{IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS}"
             )
         return value
+
+    @staticmethod
+    def _build_merge_thought_window_policy_authority(
+        *,
+        session_id: str,
+        requested_merge_window_seconds: int,
+    ) -> Dict[str, Any]:
+        policy_body = {
+            "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
+            "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
+            "risk_profile": IMC_MERGE_THOUGHT_RISK_PROFILE,
+            "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            "required_gate_roles": list(IMC_MERGE_THOUGHT_REQUIRED_GATE_ROLES),
+        }
+        policy_registry_digest = sha256_text(canonical_json(policy_body))
+        signer_roster = {
+            "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
+            "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
+            "policy_registry_digest": policy_registry_digest,
+        }
+        signer_roster_digest = sha256_text(canonical_json(signer_roster))
+        verifier_response_digests = [
+            sha256_text(
+                canonical_json(
+                    {
+                        "verifier_ref": verifier_ref,
+                        "policy_registry_digest": policy_registry_digest,
+                        "signer_roster_digest": signer_roster_digest,
+                        "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+                        "response_status": "verified",
+                    }
+                )
+            )
+            for verifier_ref in IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
+        ]
+        verifier_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "verifier_refs": list(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS),
+                    "verifier_response_digests": verifier_response_digests,
+                    "required_verifier_count": len(
+                        IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS
+                    ),
+                }
+            )
+        )
+        policy_body_digest = sha256_text(canonical_json(policy_body))
+        policy_signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_body_digest": policy_body_digest,
+                    "signer_roster_digest": signer_roster_digest,
+                    "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
+                }
+            )
+        )
+        authority_core = {
+            "policy_profile": IMC_MERGE_THOUGHT_WINDOW_POLICY_PROFILE,
+            "session_id": session_id,
+            "policy_registry_ref": IMC_MERGE_THOUGHT_WINDOW_POLICY_REGISTRY_REF,
+            "policy_registry_digest": policy_registry_digest,
+            "policy_body_digest": policy_body_digest,
+            "policy_signature_digest": policy_signature_digest,
+            "signer_roster_ref": IMC_MERGE_THOUGHT_WINDOW_SIGNER_ROSTER_REF,
+            "signer_roster_digest": signer_roster_digest,
+            "signer_key_refs": list(IMC_MERGE_THOUGHT_WINDOW_SIGNER_KEY_REFS),
+            "verifier_refs": list(IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS),
+            "verifier_response_digests": verifier_response_digests,
+            "verifier_quorum_digest": verifier_quorum_digest,
+            "max_merge_window_seconds": IMC_MERGE_THOUGHT_MAX_WINDOW_SECONDS,
+            "requested_merge_window_seconds": requested_merge_window_seconds,
+            "policy_authority_status": "verified",
+            "raw_policy_payload_stored": False,
+        }
+        return {
+            **authority_core,
+            "policy_authority_digest": sha256_text(canonical_json(authority_core)),
+        }
 
     def _select_memory_segments(
         self,

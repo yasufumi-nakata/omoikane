@@ -218,6 +218,7 @@ operations:
       - operation only applies to merge_thought sessions that already require and received Council witness
       - receipt must bind Federation Council, EthicsCommittee, and Guardian refs before the session can be treated as a collective merge
       - receipt must bind the distinct collective target, 10 second max merge window, emergency disconnect requirement, private recovery requirement, and post-disconnect identity confirmation requirement
+      - 10 second merge window must be derived from merge-thought-window-policy-authority-v1 policy registry digest, signer roster digest, verifier quorum digest, and policy signature digest
       - receipt must not store raw thought payloads or raw message payloads
   emergency_disconnect:
     summary: Let either participant close the session unilaterally before any downstream notice is attempted.

@@ -128,7 +128,9 @@ on emergency_disconnect(session_id, reason):
 - `imc-demo` を CLI に追加し、handshake → memory_glimpse 送信 →
   Council-witnessed digest-only receipt → emergency disconnect →
   timeboxed re-consent receipt → merge_thought ethics gate receipt → audit までを
-  1 シナリオで実行
+  1 シナリオで実行。merge_thought の 10 秒 cap は
+  `merge-thought-window-policy-authority-v1` の policy registry digest、
+  signer roster digest、verifier quorum digest、policy signature digest に束縛する
 - `evals/interface/imc_disclosure_floor.yaml` と
   `evals/interface/imc_memory_glimpse_council_witness.yaml` と
   `evals/interface/imc_memory_glimpse_reconsent.yaml` と

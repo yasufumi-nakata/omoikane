@@ -13,6 +13,8 @@ assertions:
   - merge_thought ethics receipt conforms to imc_merge_thought_ethics_receipt.schema
   - receipt binds Federation Council, EthicsCommittee, and Guardian refs before collective merge handoff
   - receipt binds distinct collective target, 10 second max merge window, emergency disconnect, private recovery, and post-disconnect identity confirmation requirements
+  - 10 second max merge window is backed by merge-thought-window-policy-authority-v1 registry digest, signer roster digest, verifier quorum digest, and policy signature digest
   - delivered fields exclude sealed_fields and summary_only_ledger remains true
+  - raw_policy_payload_stored remains false
   - raw_thought_payload_stored remains false
   - raw_message_payload_stored remains false

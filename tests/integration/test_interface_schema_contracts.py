@@ -277,6 +277,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["memory_glimpse_reconsent_revocation_bound"])
         self.assertTrue(result["validation"]["memory_glimpse_reconsent_bound"])
         self.assertFalse(result["validation"]["memory_glimpse_reconsent_raw_payload_stored"])
+        self.assertTrue(
+            result["validation"]["merge_thought_ethics_window_policy_authority_bound"]
+        )
+        self.assertFalse(
+            result["merge_thought_ethics_receipt"]["risk_boundary"][
+                "merge_window_policy_authority"
+            ]["raw_policy_payload_stored"]
+        )
 
     def test_wms_physics_rules_receipts_match_public_schema(self) -> None:
         result = self.runtime.run_wms_demo()
