@@ -1344,6 +1344,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["value_reassessment"]["historical_value_archived"])
         self.assertFalse(result["value_reassessment"]["external_veto_allowed"])
         self.assertFalse(result["value_reassessment"]["raw_value_payload_stored"])
+        self.assertEqual(
+            "self-model-value-lineage-timeline-v1",
+            result["value_timeline"]["policy_id"],
+        )
+        self.assertTrue(result["validation"]["value_timeline"]["active_retired_disjoint"])
+        self.assertTrue(result["validation"]["value_timeline"]["archive_retention_required"])
+        self.assertTrue(result["validation"]["value_timeline"]["timeline_commit_digest_bound"])
+        self.assertFalse(result["value_timeline"]["external_veto_allowed"])
+        self.assertFalse(result["value_timeline"]["raw_value_payload_stored"])
 
     def test_affect_demo_emits_smoothed_failover_json(self) -> None:
         stdout = io.StringIO()

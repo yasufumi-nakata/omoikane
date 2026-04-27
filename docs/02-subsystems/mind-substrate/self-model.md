@@ -140,6 +140,27 @@ retirement は `retirement_commit_digest` によって source acceptance、
 retired value digest、retirement writeback ref、post-reassessment snapshot ref、
 archival snapshot ref へ束縛し、raw value payload や raw continuity payload は保存しない。
 
+## reference runtime で固定した価値 timeline 境界
+
+`self-model-value-lineage-timeline-v1` は、self-authored value の生成、本人受容、
+後日の再評価・退役を個別 receipt の寄せ集めではなく 1 つの append-only lineage として
+監査する contract である。
+
+`self_model_value_timeline_receipt` は generation receipt digest、
+acceptance receipt digest、reassessment receipt digest を `value_events` に順序付きで束ね、
+各 event の `event_digest`、最終的な `active_value_refs` / `retired_value_refs`、
+`archive_snapshot_refs`、continuity audit ref、Council resolution、Guardian archive ref を
+`timeline_commit_digest` へ束縛する。
+
+timeline は `generated -> accepted -> retired` の順序を守り、
+active set と retired set の交差を許さず、
+retired value には archive snapshot ref を必須にする。
+これは本人の価値変化を凍結するものではなく、後日の本人再評価で退役した value が
+active writeback から外れた後も、履歴として削除されず残ることを確認するための境界である。
+Council と Guardian は引き続き boundary-only review に留まり、
+`external_veto_allowed=false`、`forced_stability_lock_allowed=false`、
+`raw_value_payload_stored=false`、`raw_continuity_payload_stored=false` を固定する。
+
 ## 残る未解決
 
 - 外部 witness / Council review を長期的な本人の自由な価値生成とどう両立させるか

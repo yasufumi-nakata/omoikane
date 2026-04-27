@@ -159,6 +159,10 @@ value-reassessment branch は、後日の本人再評価がある場合だけ
 元の accepted value digest set の subset を
 `self_model_value_reassessment_receipt` へ束縛し、
 active writeback から退役させつつ `historical_value_archived=true` を返す。
+value-timeline branch は generation / acceptance / reassessment の receipt digest を
+`self_model_value_timeline_receipt` の append-only event chain に束ね、
+最終 active / retired value set と archive snapshot ref を
+`timeline_commit_digest` で固定する。
 Council / Guardian review は boundary-only であり、external veto、forced stability lock、
 raw value payload 保存は引き続き false に固定される。
 
@@ -608,6 +612,12 @@ stable drift と abrupt takeover 候補の両観測、
 `requires_future_self_acceptance=true`、`external_veto_allowed=false`、
 `forced_stability_lock_allowed=false`、`accepted_for_writeback=false` を
 確認する。raw value / continuity payload は保存しない。
+さらに同じ demo は future self acceptance と future self reevaluation を経た
+value lifecycle を `self-model-value-lineage-timeline-v1` receipt に束ね、
+`generated -> accepted -> retired` の chronological event order、
+active / retired set の disjointness、archive retention、
+`timeline_commit_digest` を確認する。timeline でも raw value / continuity payload は保存せず、
+Council / Guardian は boundary-only review に留まる。
 さらに future self acceptance 後の value は
 `self-model-future-self-reevaluation-retirement-v1` receipt により、
 `reassessment_mode=future-self-reevaluated-bounded-retirement`、

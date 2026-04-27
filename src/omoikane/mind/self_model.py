@@ -22,6 +22,9 @@ SELF_MODEL_VALUE_ACCEPTANCE_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_VALUE_REASSESSMENT_POLICY_ID = "self-model-future-self-reevaluation-retirement-v1"
 SELF_MODEL_VALUE_REASSESSMENT_DIGEST_PROFILE = "self-model-value-reassessment-digest-v1"
 SELF_MODEL_VALUE_REASSESSMENT_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_VALUE_TIMELINE_POLICY_ID = "self-model-value-lineage-timeline-v1"
+SELF_MODEL_VALUE_TIMELINE_DIGEST_PROFILE = "self-model-value-timeline-digest-v1"
+SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES = ("self", "council", "guardian")
 
 
 @dataclass
@@ -955,6 +958,393 @@ class SelfModelMonitor:
             "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
             "retirement_digest_bound": self._non_empty_string(
                 receipt.get("retirement_commit_digest")
+            ),
+        }
+
+    def _value_timeline_event_digest(self, event: Dict[str, object]) -> str:
+        return self._digest(
+            {key: value for key, value in event.items() if key != "event_digest"}
+        )
+
+    def build_value_timeline_receipt(
+        self,
+        generation_receipt: Dict[str, object],
+        acceptance_receipts: Sequence[Dict[str, object]],
+        reassessment_receipts: Sequence[Dict[str, object]],
+        continuity_audit_ref: str,
+        council_resolution_ref: str,
+        guardian_archive_ref: str,
+    ) -> Dict[str, object]:
+        """Bind the self-authored value lifecycle as an ordered timeline."""
+
+        generation_validation = self.validate_value_generation_receipt(generation_receipt)
+        if not generation_validation["ok"]:
+            raise ValueError("generation_receipt must validate before timeline")
+        if not acceptance_receipts:
+            raise ValueError("acceptance_receipts must not be empty")
+        if not reassessment_receipts:
+            raise ValueError("reassessment_receipts must not be empty")
+        for field_name, value in {
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        accepted_by_digest: Dict[str, Dict[str, object]] = {}
+        active_value_refs: List[str] = []
+        retired_value_refs: List[str] = []
+        archive_snapshot_refs: List[str] = []
+        events: List[Dict[str, object]] = []
+
+        def append_event(
+            *,
+            event_type: str,
+            source_receipt_digest: str,
+            value_refs: Sequence[str],
+            integration_status: str,
+            archive_refs: Sequence[str] | None = None,
+        ) -> None:
+            value_digest_set = [sha256_text(str(ref)) for ref in value_refs]
+            event: Dict[str, object] = {
+                "event_type": event_type,
+                "ordinal": len(events) + 1,
+                "source_receipt_digest": source_receipt_digest,
+                "value_refs": list(value_refs),
+                "value_digest_set": value_digest_set,
+                "value_set_digest": sha256_text("|".join(value_digest_set)),
+                "active_after_event": list(active_value_refs),
+                "retired_after_event": list(retired_value_refs),
+                "archive_snapshot_refs": list(archive_refs or []),
+                "integration_status": integration_status,
+            }
+            event["event_digest"] = self._value_timeline_event_digest(event)
+            events.append(event)
+
+        candidate_value_refs = generation_receipt.get("candidate_value_refs")
+        if not isinstance(candidate_value_refs, list) or not candidate_value_refs:
+            raise ValueError("generation_receipt must contain candidate value refs")
+        append_event(
+            event_type="generated",
+            source_receipt_digest=str(generation_receipt["receipt_digest"]),
+            value_refs=[str(ref) for ref in candidate_value_refs],
+            integration_status=str(generation_receipt["integration_status"]),
+        )
+
+        for acceptance_receipt in acceptance_receipts:
+            acceptance_validation = self.validate_value_acceptance_receipt(acceptance_receipt)
+            if not acceptance_validation["ok"]:
+                raise ValueError("acceptance_receipts must validate before timeline")
+            if acceptance_receipt.get("source_generation_receipt_digest") != generation_receipt.get(
+                "receipt_digest"
+            ):
+                raise ValueError("acceptance_receipts must originate from generation_receipt")
+            accepted_by_digest[str(acceptance_receipt["receipt_digest"])] = acceptance_receipt
+            accepted_value_refs = acceptance_receipt.get("accepted_value_refs")
+            if not isinstance(accepted_value_refs, list) or not accepted_value_refs:
+                raise ValueError("acceptance_receipts must contain accepted value refs")
+            for ref in accepted_value_refs:
+                ref_string = str(ref)
+                if ref_string not in active_value_refs and ref_string not in retired_value_refs:
+                    active_value_refs.append(ref_string)
+            append_event(
+                event_type="accepted",
+                source_receipt_digest=str(acceptance_receipt["receipt_digest"]),
+                value_refs=[str(ref) for ref in accepted_value_refs],
+                integration_status=str(acceptance_receipt["integration_status"]),
+            )
+
+        for reassessment_receipt in reassessment_receipts:
+            reassessment_validation = self.validate_value_reassessment_receipt(
+                reassessment_receipt
+            )
+            if not reassessment_validation["ok"]:
+                raise ValueError("reassessment_receipts must validate before timeline")
+            source_acceptance_digest = str(
+                reassessment_receipt.get("source_acceptance_receipt_digest")
+            )
+            if source_acceptance_digest not in accepted_by_digest:
+                raise ValueError("reassessment_receipts must target timeline acceptances")
+            retired_refs = reassessment_receipt.get("retired_value_refs")
+            if not isinstance(retired_refs, list) or not retired_refs:
+                raise ValueError("reassessment_receipts must contain retired value refs")
+            for ref in retired_refs:
+                ref_string = str(ref)
+                if ref_string not in active_value_refs:
+                    raise ValueError("retired values must currently be active")
+                active_value_refs.remove(ref_string)
+                if ref_string not in retired_value_refs:
+                    retired_value_refs.append(ref_string)
+            archive_ref = str(reassessment_receipt["archival_snapshot_ref"])
+            archive_snapshot_refs.append(archive_ref)
+            append_event(
+                event_type="retired",
+                source_receipt_digest=str(reassessment_receipt["receipt_digest"]),
+                value_refs=[str(ref) for ref in retired_refs],
+                integration_status=str(reassessment_receipt["integration_status"]),
+                archive_refs=[archive_ref],
+            )
+
+        active_value_digest_set = [sha256_text(ref) for ref in active_value_refs]
+        retired_value_digest_set = [sha256_text(ref) for ref in retired_value_refs]
+        event_digest_set = [str(event["event_digest"]) for event in events]
+        gate_payload = {
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES),
+        }
+        timeline_payload = {
+            "source_generation_receipt_digest": generation_receipt.get("receipt_digest"),
+            "value_event_digest_set": event_digest_set,
+            "active_value_set_digest": sha256_text("|".join(active_value_digest_set)),
+            "retired_value_set_digest": sha256_text("|".join(retired_value_digest_set)),
+            "archive_snapshot_refs": archive_snapshot_refs,
+            "continuity_audit_ref": continuity_audit_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_value_timeline_receipt",
+            "policy_id": SELF_MODEL_VALUE_TIMELINE_POLICY_ID,
+            "digest_profile": SELF_MODEL_VALUE_TIMELINE_DIGEST_PROFILE,
+            "timeline_id": new_id("self-model-value-timeline"),
+            "identity_id": str(generation_receipt["identity_id"]),
+            "source_generation_id": str(generation_receipt["generation_id"]),
+            "source_generation_receipt_digest": str(generation_receipt["receipt_digest"]),
+            "value_events": events,
+            "value_event_digest_set": event_digest_set,
+            "active_value_refs": active_value_refs,
+            "active_value_digest_set": active_value_digest_set,
+            "active_value_set_digest": sha256_text("|".join(active_value_digest_set)),
+            "retired_value_refs": retired_value_refs,
+            "retired_value_digest_set": retired_value_digest_set,
+            "retired_value_set_digest": sha256_text("|".join(retired_value_digest_set)),
+            "archive_snapshot_refs": archive_snapshot_refs,
+            "continuity_audit_ref": continuity_audit_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_archive_ref": guardian_archive_ref,
+            "required_roles": list(SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "timeline_commit_digest": self._digest(timeline_payload),
+            "timeline_mode": "self-authored-value-lineage-append-only",
+            "chronological_event_order_enforced": True,
+            "active_retired_disjoint": True,
+            "archive_retention_required": True,
+            "boundary_only_review": True,
+            "external_truth_claim_allowed": False,
+            "external_veto_allowed": False,
+            "forced_stability_lock_allowed": False,
+            "raw_value_payload_stored": False,
+            "raw_continuity_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_value_timeline_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_value_timeline_receipt":
+            errors.append("kind must equal self_model_value_timeline_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_VALUE_TIMELINE_POLICY_ID:
+            errors.append("policy_id must equal self-model value timeline policy")
+        if receipt.get("digest_profile") != SELF_MODEL_VALUE_TIMELINE_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model value timeline digest profile")
+
+        events = receipt.get("value_events")
+        if not isinstance(events, list) or len(events) < 3:
+            errors.append("value_events must contain generation, acceptance, and retirement events")
+            events = []
+        event_digest_set = receipt.get("value_event_digest_set")
+        if not isinstance(event_digest_set, list) or len(event_digest_set) != len(events):
+            errors.append("value_event_digest_set must match value_events")
+            event_digest_set = []
+
+        expected_event_digests: List[str] = []
+        event_types: List[str] = []
+        replayed_active_refs: List[str] = []
+        replayed_retired_refs: List[str] = []
+        for index, event in enumerate(events):
+            if not isinstance(event, dict):
+                errors.append("value_events entries must be objects")
+                continue
+            if event.get("ordinal") != index + 1:
+                errors.append("value_events ordinals must be consecutive")
+            value_refs = event.get("value_refs")
+            value_digests = event.get("value_digest_set")
+            if not isinstance(value_refs, list) or not value_refs:
+                errors.append("value event value_refs must be non-empty")
+                value_refs = []
+            if not isinstance(value_digests, list) or len(value_digests) != len(value_refs):
+                errors.append("value event digest set must match value refs")
+                value_digests = []
+            elif [sha256_text(str(ref)) for ref in value_refs] != value_digests:
+                errors.append("value event digest set must match value refs")
+            if isinstance(value_digests, list):
+                expected_value_set_digest = sha256_text("|".join(str(item) for item in value_digests))
+                if event.get("value_set_digest") != expected_value_set_digest:
+                    errors.append("value event set digest must match digest set")
+            if not self._non_empty_string(event.get("source_receipt_digest")):
+                errors.append("value event source_receipt_digest must be non-empty")
+            if not self._non_empty_string(event.get("integration_status")):
+                errors.append("value event integration_status must be non-empty")
+            event_type = str(event.get("event_type"))
+            event_types.append(event_type)
+            if event_type == "accepted":
+                for ref in value_refs:
+                    ref_string = str(ref)
+                    if ref_string not in replayed_active_refs and ref_string not in replayed_retired_refs:
+                        replayed_active_refs.append(ref_string)
+            elif event_type == "retired":
+                archive_refs = event.get("archive_snapshot_refs")
+                if not isinstance(archive_refs, list) or not archive_refs:
+                    errors.append("retired events must bind archive snapshot refs")
+                for ref in value_refs:
+                    ref_string = str(ref)
+                    if ref_string not in replayed_active_refs:
+                        errors.append("retired event values must be active before retirement")
+                    else:
+                        replayed_active_refs.remove(ref_string)
+                    if ref_string not in replayed_retired_refs:
+                        replayed_retired_refs.append(ref_string)
+            elif event_type != "generated":
+                errors.append("value event type must be generated, accepted, or retired")
+            if event.get("active_after_event") != replayed_active_refs:
+                errors.append("value event active_after_event must match replayed active set")
+            if event.get("retired_after_event") != replayed_retired_refs:
+                errors.append("value event retired_after_event must match replayed retired set")
+            expected_event_digest = self._value_timeline_event_digest(event)
+            expected_event_digests.append(expected_event_digest)
+            if event.get("event_digest") != expected_event_digest:
+                errors.append("value event digest must match event payload")
+
+        if event_types[:1] != ["generated"]:
+            errors.append("timeline must start with a generated event")
+        if "accepted" not in event_types:
+            errors.append("timeline must include an accepted event")
+        if "retired" not in event_types:
+            errors.append("timeline must include a retired event")
+        if event_digest_set and event_digest_set != expected_event_digests:
+            errors.append("value_event_digest_set must match event digests")
+
+        active_refs = receipt.get("active_value_refs")
+        retired_refs = receipt.get("retired_value_refs")
+        active_digests = receipt.get("active_value_digest_set")
+        retired_digests = receipt.get("retired_value_digest_set")
+        if not isinstance(active_refs, list):
+            errors.append("active_value_refs must be an array")
+            active_refs = []
+        if not isinstance(retired_refs, list) or not retired_refs:
+            errors.append("retired_value_refs must be non-empty")
+            retired_refs = []
+        if not isinstance(active_digests, list) or len(active_digests) != len(active_refs):
+            errors.append("active_value_digest_set must match active value refs")
+            active_digests = []
+        elif [sha256_text(str(ref)) for ref in active_refs] != active_digests:
+            errors.append("active value digest set must match active value refs")
+        if not isinstance(retired_digests, list) or len(retired_digests) != len(retired_refs):
+            errors.append("retired_value_digest_set must match retired value refs")
+            retired_digests = []
+        elif [sha256_text(str(ref)) for ref in retired_refs] != retired_digests:
+            errors.append("retired value digest set must match retired value refs")
+        if set(str(ref) for ref in active_refs) & set(str(ref) for ref in retired_refs):
+            errors.append("active and retired value refs must be disjoint")
+        if active_refs != replayed_active_refs:
+            errors.append("active_value_refs must match replayed active set")
+        if retired_refs != replayed_retired_refs:
+            errors.append("retired_value_refs must match replayed retired set")
+        if receipt.get("active_value_set_digest") != sha256_text(
+            "|".join(str(item) for item in active_digests)
+        ):
+            errors.append("active_value_set_digest must match active digest set")
+        if receipt.get("retired_value_set_digest") != sha256_text(
+            "|".join(str(item) for item in retired_digests)
+        ):
+            errors.append("retired_value_set_digest must match retired digest set")
+
+        archive_snapshot_refs = receipt.get("archive_snapshot_refs")
+        if not isinstance(archive_snapshot_refs, list) or not archive_snapshot_refs:
+            errors.append("archive_snapshot_refs must be non-empty")
+            archive_snapshot_refs = []
+        for ref in archive_snapshot_refs:
+            if not self._non_empty_string(ref):
+                errors.append("archive_snapshot_refs must contain non-empty strings")
+
+        gate_payload = {
+            "continuity_audit_ref": receipt.get("continuity_audit_ref"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+            "required_roles": list(SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "source_generation_receipt_digest",
+            "continuity_audit_ref",
+            "council_resolution_ref",
+            "guardian_archive_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_VALUE_TIMELINE_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind continuity audit, council, and guardian refs")
+
+        timeline_payload = {
+            "source_generation_receipt_digest": receipt.get("source_generation_receipt_digest"),
+            "value_event_digest_set": event_digest_set,
+            "active_value_set_digest": receipt.get("active_value_set_digest"),
+            "retired_value_set_digest": receipt.get("retired_value_set_digest"),
+            "archive_snapshot_refs": archive_snapshot_refs,
+            "continuity_audit_ref": receipt.get("continuity_audit_ref"),
+            "guardian_archive_ref": receipt.get("guardian_archive_ref"),
+        }
+        if receipt.get("timeline_commit_digest") != self._digest(timeline_payload):
+            errors.append("timeline_commit_digest must bind events, final value sets, and archive refs")
+
+        if receipt.get("timeline_mode") != "self-authored-value-lineage-append-only":
+            errors.append("timeline_mode must remain self-authored append-only")
+        for field_name in (
+            "chronological_event_order_enforced",
+            "active_retired_disjoint",
+            "archive_retention_required",
+            "boundary_only_review",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "external_truth_claim_allowed",
+            "external_veto_allowed",
+            "forced_stability_lock_allowed",
+            "raw_value_payload_stored",
+            "raw_continuity_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "chronological_event_order_enforced": receipt.get(
+                "chronological_event_order_enforced"
+            ),
+            "active_retired_disjoint": receipt.get("active_retired_disjoint"),
+            "archive_retention_required": receipt.get("archive_retention_required"),
+            "boundary_only_review": receipt.get("boundary_only_review"),
+            "external_veto_allowed": receipt.get("external_veto_allowed"),
+            "raw_value_payload_stored": receipt.get("raw_value_payload_stored"),
+            "timeline_commit_digest_bound": self._non_empty_string(
+                receipt.get("timeline_commit_digest")
             ),
         }
 

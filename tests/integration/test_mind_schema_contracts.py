@@ -182,6 +182,21 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["value_reassessment"]["external_veto_allowed"])
         self.assertFalse(result["value_reassessment"]["raw_value_payload_stored"])
 
+    def test_self_model_demo_value_timeline_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_value_timeline_receipt.schema",
+            result["value_timeline"],
+        )
+        self.assertTrue(result["validation"]["value_timeline"]["ok"])
+        self.assertTrue(result["value_timeline"]["chronological_event_order_enforced"])
+        self.assertTrue(result["value_timeline"]["active_retired_disjoint"])
+        self.assertTrue(result["value_timeline"]["archive_retention_required"])
+        self.assertTrue(result["value_timeline"]["boundary_only_review"])
+        self.assertFalse(result["value_timeline"]["external_veto_allowed"])
+        self.assertFalse(result["value_timeline"]["raw_value_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()

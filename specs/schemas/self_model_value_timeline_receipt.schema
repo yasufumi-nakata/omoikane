@@ -1,0 +1,310 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/self_model_value_timeline_receipt.schema"
+title: SelfModelValueTimelineReceipt
+description: Digest-only receipt that binds self-authored value generation, future-self acceptance, and later retirement into one append-only timeline.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - policy_id
+  - digest_profile
+  - timeline_id
+  - identity_id
+  - source_generation_id
+  - source_generation_receipt_digest
+  - value_events
+  - value_event_digest_set
+  - active_value_refs
+  - active_value_digest_set
+  - active_value_set_digest
+  - retired_value_refs
+  - retired_value_digest_set
+  - retired_value_set_digest
+  - archive_snapshot_refs
+  - continuity_audit_ref
+  - council_resolution_ref
+  - guardian_archive_ref
+  - required_roles
+  - gate_digest
+  - timeline_commit_digest
+  - timeline_mode
+  - chronological_event_order_enforced
+  - active_retired_disjoint
+  - archive_retention_required
+  - boundary_only_review
+  - external_truth_claim_allowed
+  - external_veto_allowed
+  - forced_stability_lock_allowed
+  - raw_value_payload_stored
+  - raw_continuity_payload_stored
+  - receipt_digest
+properties:
+  kind:
+    type: string
+    const: self_model_value_timeline_receipt
+  policy_id:
+    type: string
+    const: self-model-value-lineage-timeline-v1
+  digest_profile:
+    type: string
+    const: self-model-value-timeline-digest-v1
+  timeline_id:
+    type: string
+    minLength: 1
+  identity_id:
+    type: string
+    minLength: 1
+  source_generation_id:
+    type: string
+    minLength: 1
+  source_generation_receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  value_events:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - event_type
+        - ordinal
+        - source_receipt_digest
+        - value_refs
+        - value_digest_set
+        - value_set_digest
+        - active_after_event
+        - retired_after_event
+        - archive_snapshot_refs
+        - integration_status
+        - event_digest
+      properties:
+        event_type:
+          type: string
+          enum:
+            - generated
+            - accepted
+            - retired
+        ordinal:
+          type: integer
+          minimum: 1
+        source_receipt_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        value_refs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        value_digest_set:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+        value_set_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        active_after_event:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        retired_after_event:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        archive_snapshot_refs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        integration_status:
+          type: string
+          minLength: 1
+        event_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+  value_event_digest_set:
+    type: array
+    minItems: 3
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  active_value_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  active_value_digest_set:
+    type: array
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  active_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  retired_value_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  retired_value_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  retired_value_set_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  archive_snapshot_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  continuity_audit_ref:
+    type: string
+    minLength: 1
+  council_resolution_ref:
+    type: string
+    minLength: 1
+  guardian_archive_ref:
+    type: string
+    minLength: 1
+  required_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    prefixItems:
+      - type: string
+        const: self
+      - type: string
+        const: council
+      - type: string
+        const: guardian
+  gate_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  timeline_commit_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+  timeline_mode:
+    type: string
+    const: self-authored-value-lineage-append-only
+  chronological_event_order_enforced:
+    type: boolean
+    const: true
+  active_retired_disjoint:
+    type: boolean
+    const: true
+  archive_retention_required:
+    type: boolean
+    const: true
+  boundary_only_review:
+    type: boolean
+    const: true
+  external_truth_claim_allowed:
+    type: boolean
+    const: false
+  external_veto_allowed:
+    type: boolean
+    const: false
+  forced_stability_lock_allowed:
+    type: boolean
+    const: false
+  raw_value_payload_stored:
+    type: boolean
+    const: false
+  raw_continuity_payload_stored:
+    type: boolean
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
+examples:
+  - kind: self_model_value_timeline_receipt
+    policy_id: self-model-value-lineage-timeline-v1
+    digest_profile: self-model-value-timeline-digest-v1
+    timeline_id: self-model-value-timeline-example
+    identity_id: id-1
+    source_generation_id: self-model-value-generation-example
+    source_generation_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    value_events:
+      - event_type: generated
+        ordinal: 1
+        source_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_refs:
+          - value-candidate://self-model/generative-patience/v1
+        value_digest_set:
+          - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        active_after_event: []
+        retired_after_event: []
+        archive_snapshot_refs: []
+        integration_status: proposed-not-written-back
+        event_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - event_type: accepted
+        ordinal: 2
+        source_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_refs:
+          - value-candidate://self-model/generative-patience/v1
+        value_digest_set:
+          - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        active_after_event:
+          - value-candidate://self-model/generative-patience/v1
+        retired_after_event: []
+        archive_snapshot_refs: []
+        integration_status: accepted-for-bounded-writeback
+        event_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - event_type: retired
+        ordinal: 3
+        source_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_refs:
+          - value-candidate://self-model/generative-patience/v1
+        value_digest_set:
+          - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        active_after_event: []
+        retired_after_event:
+          - value-candidate://self-model/generative-patience/v1
+        archive_snapshot_refs:
+          - self-model://archive/value-history/generative-patience/v1
+        integration_status: retired-from-active-writeback-archive-retained
+        event_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    value_event_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    active_value_refs: []
+    active_value_digest_set: []
+    active_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retired_value_refs:
+      - value-candidate://self-model/generative-patience/v1
+    retired_value_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    retired_value_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    archive_snapshot_refs:
+      - self-model://archive/value-history/generative-patience/v1
+    continuity_audit_ref: self-model://history/value-lineage/audit/v1
+    council_resolution_ref: council://self-model/value-timeline/boundary-only
+    guardian_archive_ref: guardian://self-model/value-timeline/archive-retained
+    required_roles: [self, council, guardian]
+    gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    timeline_commit_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    timeline_mode: self-authored-value-lineage-append-only
+    chronological_event_order_enforced: true
+    active_retired_disjoint: true
+    archive_retention_required: true
+    boundary_only_review: true
+    external_truth_claim_allowed: false
+    external_veto_allowed: false
+    forced_stability_lock_allowed: false
+    raw_value_payload_stored: false
+    raw_continuity_payload_stored: false
+    receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

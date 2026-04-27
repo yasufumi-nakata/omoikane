@@ -11,6 +11,7 @@
 - `self_model_value_generation_freedom.yaml`
 - `self_model_value_acceptance_writeback.yaml`
 - `self_model_value_reassessment_retirement.yaml`
+- `self_model_value_timeline_lineage.yaml`
 - `naming_policy_contract.yaml`
 
 `self_model_stability.yaml` は `self-model-demo` の stable branch と対応し、
@@ -34,6 +35,10 @@ writeback digest binding を満たす場合だけ bounded writeback へ進むこ
 value-reassessment branch と対応し、future self reevaluation 後でも retired value refs が
 元の accepted value set の subset に留まり、active writeback からは退役しつつ
 historical archive を保持する場合だけ bounded retirement へ進むことを保護する。
+
+`self_model_value_timeline_lineage.yaml` は `self-model-demo` の value-timeline branch と対応し、
+generation / acceptance / reassessment の receipt digest を chronological event chain に束ね、
+final active / retired set が交差せず、retired value に archive retention が残ることを保護する。
 
 `identity_pause_resume_contract.yaml` は `identity-demo` の council pause / self resume /
 self pause roundtrip と対応し、最新 pause cycle の audit metadata が

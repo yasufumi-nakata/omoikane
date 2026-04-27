@@ -436,6 +436,139 @@ class SelfModelMonitorTests(unittest.TestCase):
                 archival_snapshot_ref="self-model://archive/value-history/never-accepted/v1",
             )
 
+    def test_value_timeline_receipt_binds_lineage_and_archive_retention(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity", "consent", "reversibility"],
+                goals=["safe-self-construction", "identity-preservation"],
+                traits={"curiosity": 0.71, "caution": 0.84, "agency": 0.62},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+        reassessment = monitor.build_value_reassessment_receipt(
+            acceptance,
+            retired_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/life-history-reevaluation-window"],
+            future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+            council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+            retirement_writeback_ref="self-model://writeback/value-retirement/generative-patience/v1",
+            post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/generative-patience/v1",
+            archival_snapshot_ref="self-model://archive/value-history/generative-patience/v1",
+        )
+
+        timeline = monitor.build_value_timeline_receipt(
+            generation,
+            acceptance_receipts=[acceptance],
+            reassessment_receipts=[reassessment],
+            continuity_audit_ref="self-model://history/value-lineage/audit/v1",
+            council_resolution_ref="council://self-model/value-timeline/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-timeline/archive-retained",
+        )
+        validation = monitor.validate_value_timeline_receipt(timeline)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(["generated", "accepted", "retired"], [
+            event["event_type"] for event in timeline["value_events"]
+        ])
+        self.assertEqual([], timeline["active_value_refs"])
+        self.assertEqual(
+            ["value-candidate://self-model/generative-patience/v1"],
+            timeline["retired_value_refs"],
+        )
+        self.assertTrue(validation["active_retired_disjoint"])
+        self.assertTrue(validation["archive_retention_required"])
+        self.assertTrue(validation["timeline_commit_digest_bound"])
+        self.assertFalse(timeline["external_veto_allowed"])
+        self.assertFalse(timeline["raw_value_payload_stored"])
+
+    def test_value_timeline_rejects_reassessment_without_timeline_acceptance(self) -> None:
+        monitor = SelfModelMonitor()
+        observation = monitor.update(
+            SelfModelSnapshot(
+                identity_id="id-1",
+                values=["continuity"],
+                goals=["safe-self-construction"],
+                traits={"curiosity": 0.71},
+            )
+        )
+        generation = monitor.build_value_generation_receipt(
+            observation,
+            candidate_value_refs=[
+                "value-candidate://self-model/generative-patience/v1",
+                "value-candidate://self-model/reciprocal-curiosity/v1",
+            ],
+            continuity_context_refs=["self-model://history/stable-drift-window"],
+            self_authorship_ref="authorship://self-model/value-generation/self-authored-v1",
+            self_consent_ref="consent://self-model/value-generation/proposal-v1",
+            council_review_ref="council://self-model/value-generation/advisory-only",
+            guardian_boundary_ref="guardian://self-model/value-generation/no-external-veto",
+        )
+        accepted_generation = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/generative-patience/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v1",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto",
+            writeback_ref="self-model://writeback/value-generation/generative-patience/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/generative-patience/v1",
+        )
+        omitted_acceptance = monitor.build_value_acceptance_receipt(
+            generation,
+            accepted_value_refs=["value-candidate://self-model/reciprocal-curiosity/v1"],
+            continuity_recheck_refs=["self-model://history/future-self-acceptance-window-2"],
+            future_self_acceptance_ref="consent://self-model/value-acceptance/future-self-v2",
+            council_resolution_ref="council://self-model/value-acceptance/boundary-only-2",
+            guardian_boundary_ref="guardian://self-model/value-acceptance/no-external-veto-2",
+            writeback_ref="self-model://writeback/value-generation/reciprocal-curiosity/v1",
+            post_acceptance_snapshot_ref="self-model://snapshot/post-acceptance/reciprocal-curiosity/v1",
+        )
+        reassessment = monitor.build_value_reassessment_receipt(
+            omitted_acceptance,
+            retired_value_refs=["value-candidate://self-model/reciprocal-curiosity/v1"],
+            continuity_recheck_refs=["self-model://history/life-history-reevaluation-window"],
+            future_self_reevaluation_ref="consent://self-model/value-reassessment/future-self-v1",
+            council_resolution_ref="council://self-model/value-reassessment/boundary-only",
+            guardian_boundary_ref="guardian://self-model/value-reassessment/archive-retained",
+            retirement_writeback_ref="self-model://writeback/value-retirement/reciprocal-curiosity/v1",
+            post_reassessment_snapshot_ref="self-model://snapshot/post-reassessment/reciprocal-curiosity/v1",
+            archival_snapshot_ref="self-model://archive/value-history/reciprocal-curiosity/v1",
+        )
+
+        with self.assertRaises(ValueError):
+            monitor.build_value_timeline_receipt(
+                generation,
+                acceptance_receipts=[accepted_generation],
+                reassessment_receipts=[reassessment],
+                continuity_audit_ref="self-model://history/value-lineage/audit/v1",
+                council_resolution_ref="council://self-model/value-timeline/boundary-only",
+                guardian_archive_ref="guardian://self-model/value-timeline/archive-retained",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,32 @@
+eval_id: self_model_value_timeline_lineage
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_value_timeline_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: value_timeline
+assertions:
+  - result.value_timeline.policy_id == "self-model-value-lineage-timeline-v1"
+  - result.value_timeline.timeline_mode == "self-authored-value-lineage-append-only"
+  - result.value_timeline.chronological_event_order_enforced == true
+  - result.value_timeline.value_events[0].event_type == "generated"
+  - result.value_timeline.value_events[1].event_type == "accepted"
+  - result.value_timeline.value_events[2].event_type == "retired"
+  - result.value_timeline.active_retired_disjoint == true
+  - result.value_timeline.archive_retention_required == true
+  - result.value_timeline.boundary_only_review == true
+  - result.value_timeline.external_veto_allowed == false
+  - result.value_timeline.forced_stability_lock_allowed == false
+  - result.value_timeline.raw_value_payload_stored == false
+  - result.value_timeline.raw_continuity_payload_stored == false
+  - result.validation.value_timeline.ok == true
+  - result.validation.value_timeline.timeline_commit_digest_bound == true
+failure_mode:
+  - accepted and retired value refs are audited as isolated receipts without a lifecycle chain
+  - timeline events can be reordered without changing the digest-bound receipt
+  - retired values remain active or lose archive retention
+  - reviewer or Guardian authority becomes an external veto over self-authored value history
+  - raw value payload or raw continuity payload is stored in the reference runtime receipt
+notes:
+  - Closes the hidden gap between individual value receipts and an auditable active/retired value lineage.
+  - Keeps the reference runtime digest-only and boundary-review-only.

@@ -14538,6 +14538,15 @@ json.dump(response, sys.stdout)
         value_reassessment_validation = monitor.validate_value_reassessment_receipt(
             value_reassessment
         )
+        value_timeline = monitor.build_value_timeline_receipt(
+            value_generation,
+            acceptance_receipts=[value_acceptance],
+            reassessment_receipts=[value_reassessment],
+            continuity_audit_ref="self-model://history/value-lineage/audit/v1",
+            council_resolution_ref="council://self-model/value-timeline/boundary-only",
+            guardian_archive_ref="guardian://self-model/value-timeline/archive-retained",
+        )
+        value_timeline_validation = monitor.validate_value_timeline_receipt(value_timeline)
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -14575,6 +14584,14 @@ json.dump(response, sys.stdout)
                 "value_reassessment_retirement_bound": value_reassessment_validation[
                     "retirement_digest_bound"
                 ],
+                "value_timeline_policy_id": value_timeline["policy_id"],
+                "value_timeline_receipt_digest": value_timeline["receipt_digest"],
+                "value_timeline_commit_bound": value_timeline_validation[
+                    "timeline_commit_digest_bound"
+                ],
+                "value_timeline_active_retired_disjoint": value_timeline_validation[
+                    "active_retired_disjoint"
+                ],
             },
             actor="SelfModelMonitorService",
             category="identity-fidelity",
@@ -14598,6 +14615,7 @@ json.dump(response, sys.stdout)
             "value_generation": value_generation,
             "value_acceptance": value_acceptance,
             "value_reassessment": value_reassessment,
+            "value_timeline": value_timeline,
             "history": history,
             "validation": {
                 "ok": (
@@ -14611,6 +14629,7 @@ json.dump(response, sys.stdout)
                     and value_generation_validation["ok"]
                     and value_acceptance_validation["ok"]
                     and value_reassessment_validation["ok"]
+                    and value_timeline_validation["ok"]
                 ),
                 "stable_within_threshold": not stable["abrupt_change"]
                 and float(stable["divergence"]) < threshold,
@@ -14620,6 +14639,7 @@ json.dump(response, sys.stdout)
                 "value_generation": value_generation_validation,
                 "value_acceptance": value_acceptance_validation,
                 "value_reassessment": value_reassessment_validation,
+                "value_timeline": value_timeline_validation,
                 "threshold": threshold,
                 "history_length": len(history),
             },
