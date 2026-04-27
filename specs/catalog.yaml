@@ -2071,8 +2071,9 @@ entries:
       - specs/interfaces/mind.memory_replication.v0.idl
       - docs/03-protocols/memory-replication.md
       - docs/02-subsystems/mind-substrate/memory-model.md
+      - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, and council-escalated reconcile without mutating the source manifest.
+    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, council-escalated reconcile, and threshold key succession without mutating the source manifest or storing raw key material.
   - priority: P1
     kind: idl
     file: specs/interfaces/mind.memory_replication.v0.idl
@@ -2080,14 +2081,14 @@ entries:
       - docs/03-protocols/memory-replication.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 MemoryCrystal replication quorum and reconciliation contract machine-readable.
+    rationale: Required to make the L2 MemoryCrystal replication quorum, reconciliation, and key succession contract machine-readable.
   - priority: P1
     kind: eval
     file: evals/continuity/memory_replication_quorum.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects four-target placement, quorum-bound Merkle audit, and council-escalated reconciliation.
+    rationale: Protects four-target placement, quorum-bound Merkle audit, council-escalated reconciliation, and raw-key-redacted threshold key succession.
   - priority: P1
     kind: schema
     file: specs/schemas/semantic_memory_snapshot.schema

@@ -59,6 +59,11 @@ class MindSchemaContractTests(unittest.TestCase):
             "specs/schemas/memory_replication_session.schema",
             result["memory_replication"]["session"],
         )
+        self.assertFalse(
+            result["memory_replication"]["session"]["key_succession"][
+                "raw_key_material_stored"
+            ]
+        )
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()

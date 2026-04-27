@@ -50,6 +50,10 @@ reference runtime ではこの protocol を
 - random-block Merkle audit による全 target 比較
 - `trustee` mismatch を `primary` / `mirror` / `coldstore` の latest consensus digest に戻して
   `Guardian alert + Council escalation + resync_required=true` へ束縛する bounded reconcile
+- 本人が一時的に identity key を失った場合の `threshold-key-succession-guarded-recovery-v1`
+  receipt を同じ session に束縛し、3-of-5 Shamir share、2 Guardian attestation、
+  successor key digest、rotation ledger ref を保存する。ただし raw key / raw shard
+  material は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)
@@ -71,4 +75,4 @@ IDL:
 
 - 100-1000 年スケールの保管メディア → [docs/05-research-frontiers/long-term-storage.md](../05-research-frontiers/long-term-storage.md)
 - 量子情報の冗長保管（no-cloning に抵触）
-- 鍵管理の世代継承（本人が一時的に鍵を失った場合の復旧）
+- repo 外 key ceremony / HSM / trustee network への実接続

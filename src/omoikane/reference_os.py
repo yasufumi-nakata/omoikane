@@ -11722,6 +11722,13 @@ json.dump(response, sys.stdout)
                 "guardian_alert_ref": replication_session["verification_audit"]["guardian_alert_ref"],
                 "council_escalation_ref": replication_session["reconciliation"]["council_escalation_ref"],
                 "resync_required": replication_validation["resync_required"],
+                "key_succession_digest": replication_session["key_succession"]["digest"],
+                "key_succession_guardian_quorum_ok": replication_validation[
+                    "key_succession_guardian_quorum_ok"
+                ],
+                "key_succession_threshold_ok": replication_validation[
+                    "key_succession_threshold_ok"
+                ],
                 "session_digest": replication_session["digest"],
             },
             actor="MemoryReplicationService",
@@ -11747,6 +11754,13 @@ json.dump(response, sys.stdout)
                 "replication": replication_validation,
                 "consensus_quorum_ok": replication_validation["quorum_ok"],
                 "resync_required": replication_validation["resync_required"],
+                "key_succession_bound": replication_validation["key_succession_bound"],
+                "key_succession_guardian_quorum_ok": replication_validation[
+                    "key_succession_guardian_quorum_ok"
+                ],
+                "key_succession_threshold_ok": replication_validation[
+                    "key_succession_threshold_ok"
+                ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },
             "ledger_profile": self.ledger.profile(),

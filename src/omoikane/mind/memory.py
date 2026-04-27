@@ -52,10 +52,14 @@ MEMORY_REPLICATION_SCHEMA_VERSION = "1.0"
 MEMORY_REPLICATION_POLICY_ID = "quad-store-memory-replication-v1"
 MEMORY_REPLICATION_VERIFY_POLICY_ID = "merkle-random-block-audit-v1"
 MEMORY_REPLICATION_RECONCILE_POLICY_ID = "latest-consensus-point-rollback-v1"
+MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID = (
+    "threshold-key-succession-guarded-recovery-v1"
+)
 MEMORY_REPLICATION_REQUIRED_TARGETS = ("primary", "mirror", "coldstore", "trustee")
 MEMORY_REPLICATION_IMMEDIATE_TARGETS = ("primary", "mirror")
 MEMORY_REPLICATION_DELAYED_TARGETS = ("coldstore", "trustee")
 MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS = 3
+MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS = 2
 MEMORY_REPLICATION_ALLOWED_STATUS = {"clean", "degraded-but-recoverable"}
 MEMORY_REPLICATION_ALLOWED_SYNC_TIERS = {"immediate", "delayed"}
 MEMORY_REPLICATION_ALLOWED_SYNC_STATUS = {"current", "mismatch-detected"}
@@ -136,6 +140,12 @@ def _procedural_actuation_bridge_digest_payload(record: Dict[str, Any]) -> Dict[
 
 def _memory_replication_session_digest_payload(session: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in session.items() if key != "digest"}
+
+
+def _memory_replication_key_succession_digest_payload(
+    receipt: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
 
 
 def _slugify_text(value: str) -> str:
@@ -889,6 +899,10 @@ class MemoryReplicationService:
             "key_shard_catalog_ref": "shamir://memory-replication/reference-catalog-v1",
             "recovery_threshold": 3,
             "share_count": 5,
+            "key_succession_policy_id": MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID,
+            "key_succession_required_guardians": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS
+            ),
             "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
             "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
             "minimum_consensus_targets": MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS,
@@ -1010,6 +1024,11 @@ class MemoryReplicationService:
             "council_escalation_ref": "council://memory-replication/reconcile-001",
             "status": "council-escalated",
         }
+        key_succession = self._build_key_succession_receipt(
+            identity_id=identity_id,
+            source_manifest_ref=source_manifest_ref,
+            source_manifest_digest=source_manifest_digest,
+        )
         session = {
             "kind": "memory_replication_session",
             "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
@@ -1024,6 +1043,7 @@ class MemoryReplicationService:
             "replica_targets": replica_targets,
             "verification_audit": verification_audit,
             "reconciliation": reconciliation,
+            "key_succession": key_succession,
             "status": "degraded-but-recoverable",
         }
         session["digest"] = sha256_text(
@@ -1131,6 +1151,18 @@ class MemoryReplicationService:
                 errors.append("replication_policy.recovery_threshold must equal 3")
             if policy.get("share_count") != 5:
                 errors.append("replication_policy.share_count must equal 5")
+            if (
+                policy.get("key_succession_policy_id")
+                != MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID
+            ):
+                errors.append("replication_policy.key_succession_policy_id mismatch")
+            if (
+                policy.get("key_succession_required_guardians")
+                != MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS
+            ):
+                errors.append(
+                    "replication_policy.key_succession_required_guardians mismatch"
+                )
             if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
                 errors.append("replication_policy.verify_policy_id mismatch")
             if policy.get("reconcile_policy_id") != MEMORY_REPLICATION_RECONCILE_POLICY_ID:
@@ -1389,6 +1421,14 @@ class MemoryReplicationService:
                 and reconciliation.get("status") == "council-escalated"
             )
 
+        key_succession_validation = self._validate_key_succession(
+            session.get("key_succession"),
+            identity_id=session.get("identity_id"),
+            source_manifest_ref=session.get("source_manifest_ref"),
+            source_manifest_digest=source_manifest_digest,
+            errors=errors,
+        )
+
         quorum_ok = len(consensus_target_ids) >= minimum_consensus_targets
         if not quorum_ok:
             errors.append("verification_audit.consensus_target_ids must satisfy minimum_consensus_targets")
@@ -1418,7 +1458,336 @@ class MemoryReplicationService:
             "council_escalated": council_escalated,
             "resync_required": resync_required,
             "manifest_digest_bound": manifest_digest_bound,
+            "key_succession_bound": key_succession_validation["bound"],
+            "key_succession_guardian_quorum_ok": key_succession_validation[
+                "guardian_quorum_ok"
+            ],
+            "key_succession_threshold_ok": key_succession_validation["threshold_ok"],
+            "raw_key_material_stored": key_succession_validation[
+                "raw_key_material_stored"
+            ],
+            "raw_shard_material_stored": key_succession_validation[
+                "raw_shard_material_stored"
+            ],
             "errors": errors,
+        }
+
+    def _build_key_succession_receipt(
+        self,
+        *,
+        identity_id: str,
+        source_manifest_ref: str,
+        source_manifest_digest: str,
+    ) -> Dict[str, Any]:
+        holders = [
+            ("self-recovery-cache", "primary"),
+            ("guardian-alpha", "mirror"),
+            ("guardian-beta", "coldstore"),
+            ("coldstore-escrow", "coldstore"),
+            ("trustee-escrow", "trustee"),
+        ]
+        share_commitments = []
+        for holder_role, target_id in holders:
+            share_ref = (
+                f"shamir://memory-replication/{identity_id}/epoch-1/{holder_role}"
+            )
+            commitment_payload = {
+                "identity_id": identity_id,
+                "source_manifest_digest": source_manifest_digest,
+                "share_ref": share_ref,
+                "holder_role": holder_role,
+                "target_id": target_id,
+            }
+            share_commitments.append(
+                {
+                    "share_ref": share_ref,
+                    "holder_role": holder_role,
+                    "target_id": target_id,
+                    "commitment_digest": sha256_text(canonical_json(commitment_payload)),
+                    "raw_shard_material_stored": False,
+                }
+            )
+        accepted_share_refs = [
+            share["share_ref"]
+            for share in share_commitments
+            if share["holder_role"] in {"self-recovery-cache", "guardian-alpha", "guardian-beta"}
+        ]
+        guardian_attestations = []
+        for guardian_role in ("guardian-alpha", "guardian-beta"):
+            attestation_ref = (
+                f"guardian://memory-replication/key-succession/{guardian_role}"
+            )
+            attestation_payload = {
+                "attestation_ref": attestation_ref,
+                "guardian_role": guardian_role,
+                "identity_id": identity_id,
+                "source_manifest_digest": source_manifest_digest,
+                "successor_key_epoch": 2,
+            }
+            guardian_attestations.append(
+                {
+                    "guardian_ref": f"guardian://{guardian_role}",
+                    "attestation_ref": attestation_ref,
+                    "attestation_digest": sha256_text(
+                        canonical_json(attestation_payload)
+                    ),
+                }
+            )
+        successor_key_ref = f"key://identity/{identity_id}/memory-replication/epoch-2"
+        successor_key_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "source_manifest_digest": source_manifest_digest,
+                    "successor_key_ref": successor_key_ref,
+                    "successor_key_epoch": 2,
+                }
+            )
+        )
+        receipt = {
+            "kind": "memory_replication_key_succession",
+            "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
+            "policy_id": MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID,
+            "succession_case_id": new_id("memory-key-succession"),
+            "identity_id": identity_id,
+            "source_manifest_ref": source_manifest_ref,
+            "source_manifest_digest": source_manifest_digest,
+            "key_loss_signal_ref": "guardian://memory-replication/key-loss-signal-001",
+            "previous_key_epoch": 1,
+            "successor_key_epoch": 2,
+            "recovery_window_seconds": 86400,
+            "recovery_threshold": 3,
+            "share_count": 5,
+            "required_guardian_attestations": (
+                MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS
+            ),
+            "accepted_share_refs": accepted_share_refs,
+            "share_commitments": share_commitments,
+            "guardian_attestations": guardian_attestations,
+            "successor_key_ref": successor_key_ref,
+            "successor_key_digest": successor_key_digest,
+            "rotation_ledger_ref": "ledger://memory-replication/key-succession-001",
+            "raw_key_material_stored": False,
+            "raw_shard_material_stored": False,
+            "status": "successor-key-prepared",
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(_memory_replication_key_succession_digest_payload(receipt))
+        )
+        return receipt
+
+    def _validate_key_succession(
+        self,
+        receipt: Any,
+        *,
+        identity_id: Any,
+        source_manifest_ref: Any,
+        source_manifest_digest: Any,
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        local_errors: List[str] = []
+        raw_key_material_stored = False
+        raw_shard_material_stored = False
+        guardian_quorum_ok = False
+        threshold_ok = False
+        if not isinstance(receipt, dict):
+            errors.append("key_succession must be an object")
+            return {
+                "bound": False,
+                "guardian_quorum_ok": False,
+                "threshold_ok": False,
+                "raw_key_material_stored": False,
+                "raw_shard_material_stored": False,
+            }
+
+        if receipt.get("kind") != "memory_replication_key_succession":
+            local_errors.append(
+                "key_succession.kind must equal 'memory_replication_key_succession'"
+            )
+        if receipt.get("schema_version") != MEMORY_REPLICATION_SCHEMA_VERSION:
+            local_errors.append("key_succession.schema_version mismatch")
+        if receipt.get("policy_id") != MEMORY_REPLICATION_KEY_SUCCESSION_POLICY_ID:
+            local_errors.append("key_succession.policy_id mismatch")
+        self._require_non_empty_string(
+            receipt.get("succession_case_id"),
+            "key_succession.succession_case_id",
+            local_errors,
+        )
+        if receipt.get("identity_id") != identity_id:
+            local_errors.append("key_succession.identity_id must match session identity_id")
+        if receipt.get("source_manifest_ref") != source_manifest_ref:
+            local_errors.append(
+                "key_succession.source_manifest_ref must match source_manifest_ref"
+            )
+        if receipt.get("source_manifest_digest") != source_manifest_digest:
+            local_errors.append(
+                "key_succession.source_manifest_digest must match source_manifest_digest"
+            )
+        self._require_non_empty_string(
+            receipt.get("key_loss_signal_ref"),
+            "key_succession.key_loss_signal_ref",
+            local_errors,
+        )
+        previous_key_epoch = receipt.get("previous_key_epoch")
+        successor_key_epoch = receipt.get("successor_key_epoch")
+        if not isinstance(previous_key_epoch, int) or previous_key_epoch < 1:
+            local_errors.append("key_succession.previous_key_epoch must be >= 1")
+        if (
+            not isinstance(successor_key_epoch, int)
+            or not isinstance(previous_key_epoch, int)
+            or successor_key_epoch <= previous_key_epoch
+        ):
+            local_errors.append(
+                "key_succession.successor_key_epoch must be greater than previous_key_epoch"
+            )
+        if receipt.get("recovery_window_seconds") != 86400:
+            local_errors.append("key_succession.recovery_window_seconds must equal 86400")
+        if receipt.get("recovery_threshold") != 3:
+            local_errors.append("key_succession.recovery_threshold must equal 3")
+        if receipt.get("share_count") != 5:
+            local_errors.append("key_succession.share_count must equal 5")
+        if (
+            receipt.get("required_guardian_attestations")
+            != MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS
+        ):
+            local_errors.append(
+                "key_succession.required_guardian_attestations mismatch"
+            )
+
+        share_commitments = receipt.get("share_commitments")
+        share_refs: List[str] = []
+        if not isinstance(share_commitments, list) or len(share_commitments) != 5:
+            local_errors.append("key_succession.share_commitments must contain 5 shares")
+            share_commitments = []
+        for index, share in enumerate(share_commitments):
+            if not isinstance(share, dict):
+                local_errors.append(
+                    f"key_succession.share_commitments[{index}] must be an object"
+                )
+                continue
+            share_ref = share.get("share_ref")
+            self._require_non_empty_string(
+                share_ref,
+                f"key_succession.share_commitments[{index}].share_ref",
+                local_errors,
+            )
+            if isinstance(share_ref, str) and share_ref:
+                share_refs.append(share_ref)
+            self._require_non_empty_string(
+                share.get("holder_role"),
+                f"key_succession.share_commitments[{index}].holder_role",
+                local_errors,
+            )
+            target_id = share.get("target_id")
+            if target_id not in MEMORY_REPLICATION_REQUIRED_TARGETS:
+                local_errors.append(
+                    f"key_succession.share_commitments[{index}].target_id must be a replication target"
+                )
+            self._require_digest(
+                share.get("commitment_digest"),
+                f"key_succession.share_commitments[{index}].commitment_digest",
+                local_errors,
+            )
+            if share.get("raw_shard_material_stored") is not False:
+                raw_shard_material_stored = True
+                local_errors.append(
+                    f"key_succession.share_commitments[{index}].raw_shard_material_stored must be false"
+                )
+        if len(set(share_refs)) != len(share_refs):
+            local_errors.append("key_succession.share_commitments must not repeat shares")
+
+        accepted_share_refs = self._validate_string_list(
+            receipt.get("accepted_share_refs"),
+            "key_succession.accepted_share_refs",
+            local_errors,
+            minimum=3,
+        )
+        unknown_accepted_share_refs = set(accepted_share_refs) - set(share_refs)
+        if unknown_accepted_share_refs:
+            local_errors.append(
+                "key_succession.accepted_share_refs must be drawn from share_commitments"
+            )
+        threshold_ok = len(accepted_share_refs) >= 3 and not unknown_accepted_share_refs
+
+        guardian_attestations = receipt.get("guardian_attestations")
+        guardian_refs: List[str] = []
+        if not isinstance(guardian_attestations, list):
+            local_errors.append("key_succession.guardian_attestations must be a list")
+            guardian_attestations = []
+        for index, attestation in enumerate(guardian_attestations):
+            if not isinstance(attestation, dict):
+                local_errors.append(
+                    f"key_succession.guardian_attestations[{index}] must be an object"
+                )
+                continue
+            guardian_ref = attestation.get("guardian_ref")
+            self._require_non_empty_string(
+                guardian_ref,
+                f"key_succession.guardian_attestations[{index}].guardian_ref",
+                local_errors,
+            )
+            if isinstance(guardian_ref, str) and guardian_ref:
+                guardian_refs.append(guardian_ref)
+            self._require_non_empty_string(
+                attestation.get("attestation_ref"),
+                f"key_succession.guardian_attestations[{index}].attestation_ref",
+                local_errors,
+            )
+            self._require_digest(
+                attestation.get("attestation_digest"),
+                f"key_succession.guardian_attestations[{index}].attestation_digest",
+                local_errors,
+            )
+        guardian_quorum_ok = (
+            len(set(guardian_refs))
+            >= MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS
+        )
+        if not guardian_quorum_ok:
+            local_errors.append(
+                "key_succession.guardian_attestations must satisfy guardian quorum"
+            )
+
+        self._require_non_empty_string(
+            receipt.get("successor_key_ref"),
+            "key_succession.successor_key_ref",
+            local_errors,
+        )
+        self._require_digest(
+            receipt.get("successor_key_digest"),
+            "key_succession.successor_key_digest",
+            local_errors,
+        )
+        self._require_non_empty_string(
+            receipt.get("rotation_ledger_ref"),
+            "key_succession.rotation_ledger_ref",
+            local_errors,
+        )
+        if receipt.get("raw_key_material_stored") is not False:
+            raw_key_material_stored = True
+            local_errors.append("key_succession.raw_key_material_stored must be false")
+        if receipt.get("raw_shard_material_stored") is not False:
+            raw_shard_material_stored = True
+            local_errors.append("key_succession.raw_shard_material_stored must be false")
+        if receipt.get("status") != "successor-key-prepared":
+            local_errors.append(
+                "key_succession.status must equal 'successor-key-prepared'"
+            )
+        digest = receipt.get("digest")
+        self._require_digest(digest, "key_succession.digest", local_errors)
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(_memory_replication_key_succession_digest_payload(receipt))
+            )
+            if digest != expected_digest:
+                local_errors.append("key_succession.digest mismatch")
+
+        errors.extend(local_errors)
+        return {
+            "bound": not local_errors,
+            "guardian_quorum_ok": guardian_quorum_ok,
+            "threshold_ok": threshold_ok,
+            "raw_key_material_stored": raw_key_material_stored,
+            "raw_shard_material_stored": raw_shard_material_stored,
         }
 
     @staticmethod

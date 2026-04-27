@@ -722,6 +722,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["replication"]["ok"])
         self.assertTrue(result["validation"]["consensus_quorum_ok"])
         self.assertTrue(result["validation"]["resync_required"])
+        self.assertTrue(result["validation"]["key_succession_bound"])
+        self.assertTrue(result["validation"]["key_succession_guardian_quorum_ok"])
+        self.assertTrue(result["validation"]["key_succession_threshold_ok"])
+        self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
+        self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertEqual(
             ["primary", "mirror"],
             result["validation"]["replication"]["immediate_target_ids"],
@@ -737,6 +742,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "degraded-but-recoverable",
             result["memory_replication"]["session"]["status"],
+        )
+        self.assertEqual(
+            "threshold-key-succession-guarded-recovery-v1",
+            result["memory_replication"]["session"]["key_succession"]["policy_id"],
         )
         self.assertEqual(
             1,

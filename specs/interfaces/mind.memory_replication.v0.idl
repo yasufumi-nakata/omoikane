@@ -5,7 +5,7 @@ service: MemoryReplicationService
 summary: >
   Deterministic four-target MemoryCrystal replication contract with plaintext
   metadata plus encrypted payload transfer, random-block Merkle audit, and
-  council-escalated reconciliation.
+  council-escalated reconciliation plus threshold key succession recovery.
 imports:
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
   memory_replication_session: ../schemas/memory_replication_session.schema
@@ -33,6 +33,7 @@ operations:
       - immediate targets must be primary and mirror, while coldstore and trustee remain delayed targets
       - verification audit must compare all targets and bind one consensus Merkle root before reconcile
       - any mismatch must escalate to council with one bounded rollback point and resync requirement
+      - temporary identity-key loss must produce a guardian-quorum key_succession receipt without storing raw key or shard material
   validate_session:
     summary: Validate one replication session against the fixed quorum and reconciliation policy.
     input:
@@ -58,6 +59,11 @@ operations:
           - council_escalated
           - resync_required
           - manifest_digest_bound
+          - key_succession_bound
+          - key_succession_guardian_quorum_ok
+          - key_succession_threshold_ok
+          - raw_key_material_stored
+          - raw_shard_material_stored
           - errors
         properties:
           ok:
@@ -89,6 +95,16 @@ operations:
           resync_required:
             type: boolean
           manifest_digest_bound:
+            type: boolean
+          key_succession_bound:
+            type: boolean
+          key_succession_guardian_quorum_ok:
+            type: boolean
+          key_succession_threshold_ok:
+            type: boolean
+          raw_key_material_stored:
+            type: boolean
+          raw_shard_material_stored:
             type: boolean
           errors:
             type: array

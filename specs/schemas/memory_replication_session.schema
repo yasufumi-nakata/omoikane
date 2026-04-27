@@ -22,6 +22,7 @@ required:
   - replica_targets
   - verification_audit
   - reconciliation
+  - key_succession
   - status
   - digest
 properties:
@@ -55,6 +56,8 @@ properties:
       - key_shard_catalog_ref
       - recovery_threshold
       - share_count
+      - key_succession_policy_id
+      - key_succession_required_guardians
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -104,6 +107,12 @@ properties:
       share_count:
         type: integer
         const: 5
+      key_succession_policy_id:
+        type: string
+        const: threshold-key-succession-guarded-recovery-v1
+      key_succession_required_guardians:
+        type: integer
+        const: 2
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -173,6 +182,8 @@ properties:
     $ref: "#/$defs/verification_audit"
   reconciliation:
     $ref: "#/$defs/reconciliation"
+  key_succession:
+    $ref: "#/$defs/key_succession"
   status:
     type: string
     enum:
@@ -338,3 +349,154 @@ $defs:
       status:
         type: string
         const: council-escalated
+  key_succession:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - policy_id
+      - succession_case_id
+      - identity_id
+      - source_manifest_ref
+      - source_manifest_digest
+      - key_loss_signal_ref
+      - previous_key_epoch
+      - successor_key_epoch
+      - recovery_window_seconds
+      - recovery_threshold
+      - share_count
+      - required_guardian_attestations
+      - accepted_share_refs
+      - share_commitments
+      - guardian_attestations
+      - successor_key_ref
+      - successor_key_digest
+      - rotation_ledger_ref
+      - raw_key_material_stored
+      - raw_shard_material_stored
+      - status
+      - digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_key_succession
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: threshold-key-succession-guarded-recovery-v1
+      succession_case_id:
+        type: string
+        minLength: 1
+      identity_id:
+        type: string
+        minLength: 1
+      source_manifest_ref:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      key_loss_signal_ref:
+        type: string
+        minLength: 1
+      previous_key_epoch:
+        type: integer
+        minimum: 1
+      successor_key_epoch:
+        type: integer
+        minimum: 2
+      recovery_window_seconds:
+        type: integer
+        const: 86400
+      recovery_threshold:
+        type: integer
+        const: 3
+      share_count:
+        type: integer
+        const: 5
+      required_guardian_attestations:
+        type: integer
+        const: 2
+      accepted_share_refs:
+        type: array
+        minItems: 3
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      share_commitments:
+        type: array
+        minItems: 5
+        maxItems: 5
+        items:
+          $ref: "#/$defs/key_share_commitment"
+      guardian_attestations:
+        type: array
+        minItems: 2
+        items:
+          $ref: "#/$defs/key_succession_guardian_attestation"
+      successor_key_ref:
+        type: string
+        minLength: 1
+      successor_key_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      rotation_ledger_ref:
+        type: string
+        minLength: 1
+      raw_key_material_stored:
+        type: boolean
+        const: false
+      raw_shard_material_stored:
+        type: boolean
+        const: false
+      status:
+        type: string
+        const: successor-key-prepared
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  key_share_commitment:
+    type: object
+    additionalProperties: false
+    required:
+      - share_ref
+      - holder_role
+      - target_id
+      - commitment_digest
+      - raw_shard_material_stored
+    properties:
+      share_ref:
+        type: string
+        minLength: 1
+      holder_role:
+        type: string
+        minLength: 1
+      target_id:
+        $ref: "#/$defs/replica_target_id"
+      commitment_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      raw_shard_material_stored:
+        type: boolean
+        const: false
+  key_succession_guardian_attestation:
+    type: object
+    additionalProperties: false
+    required:
+      - guardian_ref
+      - attestation_ref
+      - attestation_digest
+    properties:
+      guardian_ref:
+        type: string
+        minLength: 1
+      attestation_ref:
+        type: string
+        minLength: 1
+      attestation_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"

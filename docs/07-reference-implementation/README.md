@@ -663,6 +663,9 @@ fixed four-target set へ束縛しつつ、
 random-block Merkle audit、
 `trustee` mismatch を latest consensus digest に戻して council escalation へ渡す
 bounded reconciliation、
+本人が一時的に key を失った場合の threshold key succession receipt
+(`3-of-5` share + `2` Guardian attestation + successor key digest / rotation ledger ref /
+raw key material redaction)、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

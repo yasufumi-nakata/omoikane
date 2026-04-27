@@ -60,6 +60,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
+  - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref に束縛され、raw key / raw shard material を保存していないことを検証する時
   - Collective dissolution receipt が全 member confirmation、schema version、IdentityConfirmation digest proof、digest-only audit ref に束縛されていることを検証する時
   - Collective dissolution 後の member recovery proof が remote reviewer verifier transport receipt と raw payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の recovery verifier transport receipt set が authenticated non-loopback authority-route trace と raw route payload 非保存に束縛されていることを検証する時

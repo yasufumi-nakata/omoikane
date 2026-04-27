@@ -16,6 +16,11 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["quorum_ok"])
         self.assertTrue(validation["council_escalated"])
         self.assertTrue(validation["resync_required"])
+        self.assertTrue(validation["key_succession_bound"])
+        self.assertTrue(validation["key_succession_guardian_quorum_ok"])
+        self.assertTrue(validation["key_succession_threshold_ok"])
+        self.assertFalse(validation["raw_key_material_stored"])
+        self.assertFalse(validation["raw_shard_material_stored"])
         self.assertEqual(["primary", "mirror"], validation["immediate_target_ids"])
         self.assertEqual(["coldstore", "trustee"], validation["delayed_target_ids"])
         self.assertEqual(["coldstore", "mirror", "primary"], validation["consensus_target_ids"])
@@ -41,6 +46,22 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertTrue(
             any("minimum_consensus_targets" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_raw_key_material_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["key_succession"]["raw_key_material_stored"] = True
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["key_succession_bound"])
+        self.assertTrue(validation["raw_key_material_stored"])
+        self.assertTrue(
+            any("raw_key_material_stored" in error for error in validation["errors"])
         )
 
 

@@ -126,6 +126,12 @@ and [specs/schemas/procedural_skill_execution.schema](../../../specs/schemas/pro
 and [specs/schemas/procedural_skill_enactment_session.schema](../../../specs/schemas/procedural_skill_enactment_session.schema)
 and [specs/schemas/procedural_actuation_bridge_session.schema](../../../specs/schemas/procedural_actuation_bridge_session.schema)
 
+MemoryCrystal replication は
+`threshold-key-succession-guarded-recovery-v1` を同じ
+`memory_replication_session` に含める。本人が一時的に identity key を失った場合も、
+3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref だけを
+保存し、raw key / raw shard material は保存しない。
+
 ## トラウマ記憶の扱い
 
 倫理的に最もデリケート。
